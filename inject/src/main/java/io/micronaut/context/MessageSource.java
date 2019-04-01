@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.util.ArgumentUtils;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.Collections;
 import java.util.Locale;
@@ -102,6 +103,11 @@ public interface MessageSource {
      */
     interface MessageContext {
         /**
+         * The default message context.
+         */
+        MessageContext DEFAULT = new MessageContext() { };
+
+        /**
          * The locale to use to resolve messages.
          * @return The locale
          */
@@ -114,6 +120,34 @@ public interface MessageSource {
          */
         @Nonnull default Map<String, Object> getVariables() {
             return Collections.emptyMap();
+        }
+
+        /**
+         * Obtain a message context for the given locale.
+         * @param locale The locale
+         * @return The message context
+         */
+        static @Nonnull MessageContext of(@Nullable Locale locale) {
+            return new DefaultMessageContext(locale, null);
+        }
+
+        /**
+         * Obtain a message context for the given variables.
+         * @param variables The variables.
+         * @return The message context
+         */
+        static @Nonnull MessageContext of(@Nullable Map<String, Object> variables) {
+            return new DefaultMessageContext(null, variables);
+        }
+
+        /**
+         * Obtain a message context for the given locale and variables.
+         * @param locale The locale
+         * @param variables The variables.
+         * @return The message context
+         */
+        static @Nonnull MessageContext of(@Nullable Locale locale, @Nullable Map<String, Object> variables) {
+            return new DefaultMessageContext(locale, variables);
         }
     }
 

@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
  * @since 1.2
  */
 @Primary
-final class CompositeMessageSource implements MessageSource {
+public final class CompositeMessageSource extends AbstractMessageSource {
 
     private final Collection<MessageSource> messageSources;
 
@@ -43,7 +43,7 @@ final class CompositeMessageSource implements MessageSource {
      *
      * @param messageSources The message sources.
      */
-    CompositeMessageSource(@Nullable Collection<MessageSource> messageSources) {
+    public CompositeMessageSource(@Nullable Collection<MessageSource> messageSources) {
         if (messageSources != null) {
             this.messageSources = OrderUtil.sort(messageSources.stream()).collect(Collectors.toList());
         } else {
@@ -63,11 +63,5 @@ final class CompositeMessageSource implements MessageSource {
             }
         }
         return Optional.empty();
-    }
-
-    @Nonnull
-    @Override
-    public String interpolate(@Nonnull String template, @Nonnull MessageContext context) {
-        return template; // TODO
     }
 }
