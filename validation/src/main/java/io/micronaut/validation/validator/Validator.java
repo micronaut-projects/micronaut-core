@@ -17,6 +17,7 @@
 package io.micronaut.validation.validator;
 
 import io.micronaut.core.annotation.AnnotatedElement;
+import io.micronaut.core.beans.BeanIntrospection;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -45,6 +46,19 @@ public interface Validator extends javax.validation.Validator {
             @Nonnull T object,
             Class<?>... groups
     );
+
+    /**
+     * Validate the given introspection and object.
+     * @param introspection The introspection
+     * @param object The object
+     * @param groups The groups
+     * @param <T> The object type
+     * @return The constraint violations
+     */
+    @Nonnull
+    <T> Set<ConstraintViolation<T>> validate(
+            @Nonnull BeanIntrospection<T> introspection,
+            @Nonnull T object, @Nullable Class<?>... groups);
 
     @Override
     @Nonnull <T> Set<ConstraintViolation<T>> validateProperty(
