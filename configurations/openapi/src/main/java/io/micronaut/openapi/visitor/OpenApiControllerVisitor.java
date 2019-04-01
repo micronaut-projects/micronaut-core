@@ -235,7 +235,9 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         newParameter.setExplode(exploded);
                     }
                 } else if (parameter.isAnnotationPresent(Header.class)) {
-                    String headerName = parameter.getValue(Header.class, "name", String.class).orElseGet(() -> NameUtils.hyphenate(parameterName));
+                    String headerName = parameter.getValue(Header.class, "name", String.class)
+                                                 .orElse(parameter.getValue(Header.class, String.class)
+                                                 .orElseGet(() -> NameUtils.hyphenate(parameterName)));
                     newParameter = new Parameter();
                     newParameter.setIn(ParameterIn.HEADER.toString());
                     newParameter.setName(headerName);

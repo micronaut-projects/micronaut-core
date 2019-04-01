@@ -505,12 +505,13 @@ import io.swagger.v3.oas.annotations.media.*;
 import io.swagger.v3.oas.annotations.enums.*;
 import io.micronaut.http.annotation.*;
 import java.util.List;
+import javax.annotation.Nullable;
 
 @Controller("/")
 class MyController {
 
     @Get("/subscription/{subscriptionId}")
-    public String getSubscription(@Parameter(description="foo") @CookieValue String subscriptionId, @QueryValue String q, @Header String contentType) { 
+    public String getSubscription(@Parameter(description="foo") @CookieValue String subscriptionId, @QueryValue String q, @Header String contentType, @Nullable @Header(name = "Bundle-ID") String bundleId, @Header("X-API-Version") String apiVersion) { 
         return null;                               
      }
 }
@@ -523,7 +524,7 @@ class MyBean {}
         expect:
         operation != null
         operation.operationId == 'getSubscription'
-        operation.parameters.size() == 3
+        operation.parameters.size() == 5
         operation.parameters[0].in == 'cookie'
         operation.parameters[0].name == 'subscriptionId'
         operation.parameters[0].required
@@ -534,6 +535,12 @@ class MyBean {}
         operation.parameters[2].in == 'header'
         operation.parameters[2].name == 'content-type'
         operation.parameters[2].required
+        operation.parameters[3].in == 'header'
+        operation.parameters[3].name == 'Bundle-ID'
+        !operation.parameters[3].required
+        operation.parameters[4].in == 'header'
+        operation.parameters[4].name == 'X-API-Version'
+        operation.parameters[4].required
 
 
     }
