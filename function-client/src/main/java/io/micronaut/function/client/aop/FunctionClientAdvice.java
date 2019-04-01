@@ -20,6 +20,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.function.client.FunctionDefinition;
@@ -69,19 +70,15 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
 
         Object body;
         if (len == 1) {
-            Optional<Argument> bodyArg = Arrays.stream(context.getArguments()).filter(arg -> arg.isAnnotationPresent(Body.class)).findFirst();
-            if (bodyArg.isPresent()) {
-                body = parameterValueMap.get(bodyArg.get().getName());
-            } else {
-                body = parameterValueMap;
-            }
+            body = parameterValueMap.values().iterator().next();
         } else if (len == 0) {
             body = null;
         } else {
             body = parameterValueMap;
         }
 
-        String functionName = context.getValue(Named.class, String.class).orElse(NameUtils.hyphenate(context.getMethodName(), true));
+        String functionName = context.getValue(Named.class, String.class)
+                .orElse(NameUtils.hyphenate(context.getMethodName(), true));
 
         Flowable<FunctionDefinition> functionDefinition = Flowable.fromPublisher(discoveryClient.getFunction(functionName));
         ReturnType<Object> returnType = context.getReturnType();
