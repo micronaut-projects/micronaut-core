@@ -131,6 +131,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
      * @param <T> The object type
      * @return The constraint violations
      */
+    @Override
     @SuppressWarnings("ConstantConditions")
     @Nonnull
     public <T> Set<ConstraintViolation<T>> validate(@Nonnull BeanIntrospection<T> introspection, @Nonnull T object, @Nullable Class<?>... groups) {
