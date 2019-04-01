@@ -28,7 +28,7 @@ import javax.validation.constraints.*;
  * @since 1.2
  */
 @Singleton
-public class DefaultMessages extends StaticMessageSource {
+public class DefaultValidationMessages extends StaticMessageSource {
 
     /**
      * The message suffix to use.
@@ -38,7 +38,7 @@ public class DefaultMessages extends StaticMessageSource {
     /**
      * Constructs the default error messages.
      */
-    public DefaultMessages() {
+    public DefaultValidationMessages() {
         addMessage(AssertTrue.class.getName() + MESSAGE_SUFFIX, "must be true");
         addMessage(AssertFalse.class.getName() + MESSAGE_SUFFIX, "must be false");
         addMessage(Digits.class.getName() + MESSAGE_SUFFIX, "numeric value out of bounds (<{integer} digits>.<{fraction} digits> expected)");
