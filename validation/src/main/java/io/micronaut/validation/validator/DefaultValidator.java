@@ -117,6 +117,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
     public <T> Set<ConstraintViolation<T>> validate(@Nonnull T object, @Nullable Class<?>... groups) {
         ArgumentUtils.requireNonNull("object", object);
         final BeanIntrospection<T> introspection = (BeanIntrospection<T>) getBeanIntrospection(object);
+        if (introspection == null) {
+            throw new ValidationException("Passed object [" + object + "] cannot be introspected. Please annotate with @Introspected");
+        }
         return validate(introspection, object, groups);
     }
 
@@ -134,8 +137,10 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         if (introspection == null) {
             throw new ValidationException("Passed object [" + object + "] cannot be introspected. Please annotate with @Introspected");
         }
+        @SuppressWarnings("unchecked")
         final Collection<? extends BeanProperty<Object, Object>> constrainedProperties =
                 ((BeanIntrospection<Object>) introspection).getIndexedProperties(Constraint.class);
+        @SuppressWarnings("unchecked")
         final Collection<BeanProperty<Object, Object>> cascadeProperties =
                 ((BeanIntrospection<Object>) introspection).getIndexedProperties(Valid.class);
 
@@ -175,7 +180,11 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             Set overallViolations = new HashSet<>(5);
             final Object propertyValue = constrainedProperty.get(object);
 
+            @SuppressWarnings("unchecked")
+            final Class<T> rootBeanClass = (Class<T>) object.getClass();
+            //noinspection unchecked
             validateConstrainedPropertyInternal(
+                    rootBeanClass,
                     object,
                     object,
                     constrainedProperty,
@@ -215,7 +224,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(groups);
         try {
             context.addPropertyNode(propertyName, null);
+            //noinspection unchecked
             validatePropertyInternal(
+                    beanType,
                     null,
                     null,
                     context,
@@ -227,19 +238,25 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             context.removeLast();
         }
 
+        //noinspection unchecked
         return Collections.unmodifiableSet(overallViolations);
     }
 
     @Nonnull
     @Override
-    public Set<ConstraintViolation<AnnotatedElement>> validateElement(@Nonnull AnnotatedElement element, @Nullable Object value, Class<?>... groups) {
+    public Set<ConstraintViolation<AnnotatedElement>> validateElement(
+            @Nonnull AnnotatedElement element,
+            @Nullable Object value,
+            Class<?>... groups) {
         ArgumentUtils.requireNonNull("element", element);
 
         final HashSet overallViolations = new HashSet<>(5);
         final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(groups);
         try {
             context.addPropertyNode(element.getName(), null);
+            //noinspection unchecked
             validatePropertyInternal(
+                    null,
                     element,
                     element,
                     context,
@@ -251,16 +268,20 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             context.removeLast();
         }
 
+        //noinspection unchecked
         return Collections.unmodifiableSet(overallViolations);
     }
 
     @Nonnull
     @Override
-    public <T> T createValid(@Nonnull Class<T> type, Object... arguments) throws ConstraintViolationException {
-        ArgumentUtils.requireNonNull("type", type);
+    public <T> T createValid(@Nonnull Class<T> beanType, Object... arguments) throws ConstraintViolationException {
+        ArgumentUtils.requireNonNull("type", beanType);
 
         @SuppressWarnings("unchecked")
-        final BeanIntrospection<T> introspection = (BeanIntrospection<T>) getBeanIntrospection(type);
+        final BeanIntrospection<T> introspection = (BeanIntrospection<T>) getBeanIntrospection(beanType);
+        if (introspection == null) {
+            throw new ValidationException("Passed bean type [" + beanType + "] cannot be introspected. Please annotate with @Introspected");
+        }
 
         final Set<ConstraintViolation<T>> constraintViolations = validateConstructorParameters(introspection, arguments);
 
@@ -314,9 +335,10 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
 
         final Path.Node node = context.addMethodNode(method.getMethodName(), method.getArgumentTypes());
         try {
-            final Class<T> aClass = (Class<T>) object.getClass();
+            @SuppressWarnings("unchecked")
+            final Class<T> rootClass = (Class<T>) object.getClass();
             validateParametersInternal(
-                    aClass,
+                    rootClass,
                     object,
                     parameterValues,
                     arguments,
@@ -328,6 +350,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         } finally {
             context.removeLast();
         }
+        //noinspection unchecked
         return Collections.unmodifiableSet(overallViolations);
     }
 
@@ -375,7 +398,11 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         final ReturnType<Object> returnType = executableMethod.getReturnType();
         final Argument<Object> returnTypeArgument = returnType.asArgument();
         final HashSet overallViolations = new HashSet(3);
+        @SuppressWarnings("unchecked")
+        final Class<T> rootBeanClass = (Class<T>) object.getClass();
+        //noinspection unchecked
         validateConstrainedPropertyInternal(
+                rootBeanClass,
                 object,
                 object,
                 returnTypeArgument,
@@ -385,6 +412,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                 overallViolations,
                 null
         );
+        //noinspection unchecked
         return (Set<ConstraintViolation<T>>) overallViolations;
     }
 
@@ -410,9 +438,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         //noinspection ConstantConditions
         parameterValues = parameterValues != null ? parameterValues : ArrayUtils.EMPTY_OBJECT_ARRAY;
         final Argument<?>[] constructorArguments = introspection.getConstructorArguments();
-        final int argLenth = constructorArguments.length;
-        if (parameterValues.length != argLenth) {
-            throw new IllegalArgumentException("Expected exactly [" + argLenth + "] constructor arguments");
+        final int argLength = constructorArguments.length;
+        if (parameterValues.length != argLength) {
+            throw new IllegalArgumentException("Expected exactly [" + argLength + "] constructor arguments");
         }
 
         DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(groups);
@@ -425,13 +453,14 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                     null,
                     parameterValues,
                     constructorArguments,
-                    argLenth,
+                    argLength,
                     context,
                     overallViolations,
                     node);
         } finally {
             context.removeLast();
         }
+        //noinspection unchecked
         return Collections.unmodifiableSet(overallViolations);
     }
 
@@ -448,8 +477,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
      * @param object The object, never null
      * @return The introspection or null
      */
-    protected @Nullable
-    BeanIntrospection<Object> getBeanIntrospection(@Nonnull Object object) {
+    @SuppressWarnings({"WeakerAccess", "unchecked"})
+    protected @Nullable BeanIntrospection<Object> getBeanIntrospection(@Nonnull Object object) {
         //noinspection ConstantConditions
         if (object == null) {
             return null;
@@ -586,7 +615,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                     final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
                     if (beanIntrospection != null) {
                         try {
-                            context.addParameterNode(argument.getName(), i, null);
+                            context.addParameterNode(argument.getName(), i);
                             cascadeToOneIntrospection(
                                     context,
                                     object,
@@ -616,7 +645,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             @Nonnull AnnotationMetadata annotationMetadata,
             @Nullable Object parameterValue) {
         try {
-            context.addParameterNode(parameterName, parameterIndex, null);
+            context.addParameterNode(parameterName, parameterIndex);
             final List<Class<? extends Annotation>> constraintTypes =
                     annotationMetadata.getAnnotationTypesByStereotype(Constraint.class);
             for (Class<? extends Annotation> constraintType : constraintTypes) {
@@ -651,10 +680,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             Collection<BeanProperty<Object, Object>> cascadeProperties,
             DefaultConstraintValidatorContext context,
             Set overallViolations) {
+        @SuppressWarnings("unchecked")
         final Class<T> rootBeanClass = (Class<T>) rootBean.getClass();
         for (BeanProperty<Object, Object> constrainedProperty : constrainedProperties) {
             final Object propertyValue = constrainedProperty.get(object);
+            //noinspection unchecked
             validateConstrainedPropertyInternal(
+                    rootBeanClass,
                     rootBean,
                     object,
                     constrainedProperty,
@@ -669,6 +701,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         for (BeanProperty<Object, Object> cascadeProperty : cascadeProperties) {
             final Object propertyValue = cascadeProperty.get(object);
             if (propertyValue != null) {
+                @SuppressWarnings("unchecked")
                 final Optional<? extends ValueExtractor<Object>> opt = valueExtractorRegistry
                         .findValueExtractor((Class<Object>) propertyValue.getClass());
 
@@ -739,11 +772,10 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                     final Path.Node node = context.addPropertyNode(cascadeProperty.getName(), null);
 
                     try {
-                        final boolean canCascade = canCascade(rootBean, context, propertyValue, node);
+                        final boolean canCascade = canCascade(rootBeanClass, context, propertyValue, node);
                         if (canCascade) {
-                            final Class<T> rootClass = (Class<T>) rootBeanClass;
                             cascadeToOne(
-                                    rootClass,
+                                    rootBeanClass,
                                     rootBean,
                                     object,
                                     context,
@@ -763,22 +795,26 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         return Collections.unmodifiableSet(overallViolations);
     }
 
-    private <T> boolean canCascade(@Nullable T rootBean, DefaultConstraintValidatorContext context, Object propertyValue, Path.Node node) {
-        final boolean isCascadable = traversableResolver.isCascadable(
+    private <T> boolean canCascade(
+            Class<T> rootBeanClass,
+            DefaultConstraintValidatorContext context,
+            Object propertyValue,
+            Path.Node node) {
+        final boolean canCascade = traversableResolver.isCascadable(
                 propertyValue,
                 node,
-                rootBean.getClass(),
+                rootBeanClass,
                 context.currentPath,
                 ElementType.FIELD
         );
         final boolean isReachable = traversableResolver.isReachable(
                 propertyValue,
                 node,
-                rootBean.getClass(),
+                rootBeanClass,
                 context.currentPath,
                 ElementType.FIELD
         );
-        return isCascadable && isReachable;
+        return canCascade && isReachable;
     }
 
     private <T> void cascadeToIterableValue(
@@ -825,7 +861,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             Integer index,
             Object key,
             boolean isIterable) {
-        if (canCascade(rootBean, context, iterableValue, node)) {
+        if (canCascade(rootClass, context, iterableValue, node)) {
             DefaultPropertyNode currentContainerNode = new DefaultPropertyNode(
                     methodArgument.getName(),
                     methodArgument.getClass(),
@@ -882,7 +918,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
 
         } else {
             // try apply cascade rules to actual property
+            //noinspection unchecked
             validateConstrainedPropertyInternal(
+                    rootClass,
                     rootBean,
                     object,
                     cascadeProperty,
@@ -915,6 +953,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
     }
 
     private <T> void validateConstrainedPropertyInternal(
+            @Nonnull Class<T> rootBeanClass,
             @Nullable T rootBean,
             @Nonnull Object object,
             @Nonnull AnnotatedElement constrainedProperty,
@@ -928,6 +967,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         );
 
         validatePropertyInternal(
+                rootBeanClass,
                 rootBean,
                 object,
                 context,
@@ -940,6 +980,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
     }
 
     private <T> void validatePropertyInternal(
+            @Nullable Class<T> rootBeanClass,
             @Nullable T rootBean,
             @Nullable Object object,
             @Nonnull DefaultConstraintValidatorContext context,
@@ -953,12 +994,14 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
 
             ValueExtractor<Object> valueExtractor = null;
             if (propertyValue != null && !annotationMetadata.hasAnnotation(Valid.class)) {
+                //noinspection unchecked
                 valueExtractor = valueExtractorRegistry.findUnwrapValueExtractor((Class<Object>) propertyValue.getClass())
                         .orElse(null);
             }
 
             if (valueExtractor != null) {
                 valueExtractor.extractValues(propertyValue, (SimpleValueReceiver) (nodeName, extractedValue) -> valueConstraintOnProperty(
+                        rootBeanClass,
                         rootBean,
                         object,
                         context,
@@ -970,6 +1013,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                 ));
             } else {
                 valueConstraintOnProperty(
+                        rootBeanClass,
                         rootBean,
                         object,
                         context,
@@ -984,6 +1028,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
     }
 
     private <T> void valueConstraintOnProperty(
+            @Nullable Class<T> rootBeanClass,
             @Nullable T rootBean,
             @Nullable Object object,
             DefaultConstraintValidatorContext context,
@@ -1010,7 +1055,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                     overallViolations.add(
                             new DefaultConstraintViolation(
                                     rootBean,
-                                    rootBean != null ? rootBean.getClass() : null,
+                                    rootBeanClass,
                                     object,
                                     propertyValue,
                                     messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
@@ -1034,8 +1079,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         return variables;
     }
 
-    private String buildMessageTemplate(AnnotationValue annotationValue) {
-        return (String) annotationValue.get("message", String.class)
+    private String buildMessageTemplate(AnnotationValue<?> annotationValue) {
+        return annotationValue.get("message", String.class)
                 .orElse("{" + annotationValue.getAnnotationName() + ".message}");
     }
 
@@ -1075,8 +1120,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             return node;
         }
 
-        Path.Node removeLast() {
-            return currentPath.nodes.removeLast();
+        void removeLast() {
+            currentPath.nodes.removeLast();
         }
 
         @SuppressWarnings("unchecked")
@@ -1086,19 +1131,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             return methodNode;
         }
 
-        Path.Node addParameterNode(String name, int index, @Nullable DefaultPropertyNode container) {
+        void addParameterNode(String name, int index) {
             final DefaultParameterNode node;
-            if (container != null) {
-                node = new DefaultParameterNode(
-                        name, container, index
-                );
-            } else {
-                node = new DefaultParameterNode(
-                        name, index
-                );
-            }
+            node = new DefaultParameterNode(
+                    name, index
+            );
             currentPath.nodes.add(node);
-            return node;
         }
 
         Path.Node addConstructorNode(String simpleName, Argument<?>... constructorArguments) {
@@ -1234,14 +1272,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
 
         private final int parameterIndex;
 
-        public DefaultParameterNode(@Nonnull String name, int parameterIndex) {
+        DefaultParameterNode(@Nonnull String name, int parameterIndex) {
             super(name, null, null, null, ElementKind.PARAMETER, false);
             this.parameterIndex = parameterIndex;
-        }
-
-        public DefaultParameterNode(@Nonnull String name, @Nonnull DefaultPropertyNode parent, int index) {
-            super(name, parent);
-            this.parameterIndex = index;
         }
 
         @Override
@@ -1291,23 +1324,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                 @Nonnull DefaultPropertyNode parent
         ) {
             this(name, parent.containerClass, parent.getIndex(), parent.getKey(), ElementKind.CONTAINER_ELEMENT, parent.isInIterable());
-        }
-
-        DefaultPropertyNode(
-                @Nonnull String name,
-                @Nullable Class<?> containerClass,
-                @Nullable Integer index,
-                @Nullable Object key,
-                @Nonnull ElementKind kind) {
-            this(name, containerClass, index, key, kind, index != null);
-        }
-
-        DefaultPropertyNode(
-                @Nonnull String name,
-                @Nullable Class<?> containerClass,
-                @Nullable Integer index,
-                @Nullable Object key) {
-            this(name, containerClass, index, key, ElementKind.PROPERTY);
         }
 
         @Override
