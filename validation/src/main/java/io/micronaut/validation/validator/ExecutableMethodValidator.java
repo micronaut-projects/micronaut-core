@@ -15,11 +15,13 @@
  */
 package io.micronaut.validation.validator;
 
+import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.inject.ExecutableMethod;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.validation.ConstraintViolation;
+import javax.validation.ConstraintViolationException;
 import javax.validation.executable.ExecutableValidator;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -32,6 +34,19 @@ import java.util.Set;
  * @since 1.2
  */
 public interface ExecutableMethodValidator extends ExecutableValidator  {
+
+
+    /**
+     * Create a new valid instance.
+     *
+     * @param type The type
+     * @param arguments The arguments
+     * @param <T> the generic type
+     * @return The instance
+     * @throws ConstraintViolationException If a valid instance couldn't be constructed
+     * @throws IllegalArgumentException If an argument is invalid
+     */
+    @Nonnull <T> T createValid(@Nonnull Class<T> type, Object... arguments) throws ConstraintViolationException;
 
     /**
      * Validate the parameter values of the given {@link ExecutableMethod}.
@@ -60,6 +75,20 @@ public interface ExecutableMethodValidator extends ExecutableValidator  {
             @Nonnull T object,
             @Nonnull ExecutableMethod<?, Object> executableMethod,
             @Nullable Object returnValue,
+            @Nullable Class<?>... groups);
+
+    /**
+     * Validates parameters for the given introspection and values.
+     * @param introspection The introspection
+     * @param parameterValues The parameter values
+     * @param groups The groups
+     * @param <T> The bean type.
+     * @return The constraint violations
+     */
+    @Nonnull
+    <T> Set<ConstraintViolation<T>> validateConstructorParameters(
+            @Nonnull BeanIntrospection<? extends T> introspection,
+            @Nonnull Object[] parameterValues,
             @Nullable Class<?>... groups);
 
     @Override
