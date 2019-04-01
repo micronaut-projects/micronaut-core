@@ -24,6 +24,7 @@ import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
@@ -188,6 +189,15 @@ class Test {
 
         ClassLoader classLoader = buildClassLoader(className, cls)
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
+        def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
     }
 
     protected BeanDefinitionReference buildBeanDefinitionReference(String className, String cls) {
