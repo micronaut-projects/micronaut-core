@@ -73,4 +73,22 @@ public interface Validator extends javax.validation.Validator {
             @Nullable Object value,
             Class<?>... groups
     );
+
+    /**
+     * Constructs a new default instance. Note that the returned instance will not contain
+     * managed {@link io.micronaut.validation.validator.constraints.ConstraintValidator} instances and using
+     * {@link javax.inject.Inject} should be preferred.
+     *
+     * @return The validator.
+     */
+    static @Nonnull Validator getInstance() {
+        return new DefaultValidator(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
 }
