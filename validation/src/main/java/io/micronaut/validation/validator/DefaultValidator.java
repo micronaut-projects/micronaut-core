@@ -36,7 +36,7 @@ import io.micronaut.validation.validator.constraints.DefaultConstraintValidators
 import io.micronaut.validation.validator.extractors.DefaultValueExtractors;
 import io.micronaut.validation.validator.extractors.SimpleValueReceiver;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
-import io.micronaut.validation.validator.messages.DefaultMessages;
+import io.micronaut.validation.validator.messages.DefaultValidationMessages;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -106,7 +106,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         };
         this.executionHandleLocator = executionHandleLocator != null ? executionHandleLocator : new ExecutionHandleLocator() {
         };
-        this.messageSource = messageSource != null ? messageSource : new DefaultMessages();
+        this.messageSource = messageSource != null ? messageSource : new DefaultValidationMessages();
     }
 
     @SuppressWarnings("unchecked")
