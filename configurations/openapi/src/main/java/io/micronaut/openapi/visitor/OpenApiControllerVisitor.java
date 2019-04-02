@@ -17,21 +17,37 @@ package io.micronaut.openapi.visitor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
+import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.CookieValue;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.HttpMethodMapping;
+import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatchVariable;
-import io.micronaut.inject.ast.*;
-import io.micronaut.inject.visitor.*;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.visitor.TypeElementVisitor;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.openapi.javadoc.JavadocDescription;
 import io.micronaut.openapi.javadoc.JavadocParser;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -52,11 +68,19 @@ import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.servers.Server;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.security.Principal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -67,6 +91,8 @@ import java.util.stream.Collectors;
  */
 @Experimental
 public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements TypeElementVisitor<Controller, HttpMethodMapping> {
+
+    private PropertyPlaceholderResolver propertyPlaceholderResolver;
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
@@ -92,8 +118,12 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 return;
             }
 
-            UriMatchTemplate matchTemplate = UriMatchTemplate.of(element.getValue(Controller.class, String.class).orElse("/"));
-            matchTemplate = matchTemplate.nest(element.getValue(HttpMethodMapping.class, String.class).orElse("/"));
+            String controllerValue = element.getValue(Controller.class, String.class).orElse("/");
+            controllerValue = getPropertyPlaceholderResolver().resolvePlaceholders(controllerValue).orElse(controllerValue);
+            UriMatchTemplate matchTemplate = UriMatchTemplate.of(controllerValue);
+            String methodValue = element.getValue(HttpMethodMapping.class, String.class).orElse("/");
+            methodValue = getPropertyPlaceholderResolver().resolvePlaceholders(methodValue).orElse(methodValue);
+            matchTemplate = matchTemplate.nest(methodValue);
 
             PathItem pathItem = resolvePathItem(context, matchTemplate);
             OpenAPI openAPI = resolveOpenAPI(context);
@@ -572,4 +602,30 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         return content;
     }
 
+    /**
+     *
+     * @return An Instance of {@link PropertyPlaceholderResolver} to resolve placeholders.
+     */
+    PropertyPlaceholderResolver getPropertyPlaceholderResolver() {
+        if (this.propertyPlaceholderResolver == null) {
+            this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(new PropertyResolver() {
+                @Override
+                public boolean containsProperty(@Nonnull String name) {
+                    return false;
+                }
+
+                @Override
+                public boolean containsProperties(@Nonnull String name) {
+                    return false;
+                }
+
+                @Nonnull
+                @Override
+                public <T> Optional<T> getProperty(@Nonnull String name, @Nonnull ArgumentConversionContext<T> conversionContext) {
+                    return Optional.empty();
+                }
+            }, new DefaultConversionService());
+        }
+        return this.propertyPlaceholderResolver;
+    }
 }
