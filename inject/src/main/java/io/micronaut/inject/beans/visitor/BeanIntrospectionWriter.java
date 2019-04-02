@@ -380,6 +380,10 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
         writeGetAnnotationMetadataMethod(classWriter);
 
+        for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
+            generatorAdapter.visitMaxs(3, 1);
+        }
+
         return classWriter;
     }
 
