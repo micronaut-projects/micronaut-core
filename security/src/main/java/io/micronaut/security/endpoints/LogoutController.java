@@ -86,7 +86,7 @@ public class LogoutController {
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
     @Post
-    public HttpResponse index(HttpRequest<?> request, Authentication authentication) {
+    public HttpResponse index(HttpRequest request, Authentication authentication) {
         return handleLogout(request, authentication);
     }
 
@@ -98,7 +98,7 @@ public class LogoutController {
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Get
-    public HttpResponse indexGet(HttpRequest<?> request, Authentication authentication) {
+    public HttpResponse indexGet(HttpRequest request, Authentication authentication) {
         if (!getAllowed) {
            return HttpResponse.status(HttpStatus.METHOD_NOT_ALLOWED);
         }
