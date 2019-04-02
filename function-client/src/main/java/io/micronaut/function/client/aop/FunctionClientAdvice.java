@@ -20,7 +20,6 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.function.client.FunctionDefinition;
@@ -29,15 +28,12 @@ import io.micronaut.function.client.FunctionInvoker;
 import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.function.client.exceptions.FunctionExecutionException;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
-import io.micronaut.http.annotation.Body;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.Arrays;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Implements advice for the {@link io.micronaut.function.client.FunctionClient} annotation.

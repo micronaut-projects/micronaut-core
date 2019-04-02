@@ -107,7 +107,7 @@ class MyBean {}
         operation
         operation.description.startsWith('subscribes')
         operation.parameters.size() == 2
-        operation.parameters[0].name == 'token'
+        operation.parameters[0].name == 'x-auth-token'
         operation.parameters[0].in == 'header'
         operation.parameters[0].required
         operation.parameters[1].name == 'url'
