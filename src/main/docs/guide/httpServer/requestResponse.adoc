@@ -40,3 +40,7 @@ include::{testsuite}/server/request/MessageController.java[tags=class, indent=0]
 <2> The method is mapped to the URI `/hello` and accepts a api:io.micronaut.http.HttpRequest[]
 <3> The api:http.HttpRequest[] is used to obtain the value of a query parameter called `name`.
 <4> The api:http.HttpResponse.ok(T)[] method is used to return a api:http.MutableHttpResponse[] with a text body. A header called `X-My-Header` is also added to the response object.
+
+api:io.micronaut.http.HttpRequest[] is also availble from static context via io.micronaut.http.context.ServerRequestContext[].
+
+IMPORTANT: Generally io.micronaut.http.context.ServerRequestContext[] is available within reactive flow, but recommended aproach is to propogate necessary state through lambdas.
