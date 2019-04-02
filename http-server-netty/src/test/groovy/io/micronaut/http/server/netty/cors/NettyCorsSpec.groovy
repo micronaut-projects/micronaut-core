@@ -19,9 +19,11 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Error
 
 import static io.micronaut.http.HttpHeaders.*
 
@@ -222,6 +224,34 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
     }
 
+    void "test control headers are applied to error response routes"() {
+        when:
+        rxClient.exchange(
+                HttpRequest.GET('/test/error')
+                        .header(ORIGIN, 'foo.com')
+        ).blockingFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.status == HttpStatus.BAD_REQUEST
+        ex.response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
+        ex.response.header(VARY) == ORIGIN
+    }
+
+    void "test control headers are applied to error responses with no handler"() {
+        when:
+        rxClient.exchange(
+                HttpRequest.GET('/test/error-checked')
+                        .header(ORIGIN, 'foo.com')
+        ).blockingFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.status == HttpStatus.INTERNAL_SERVER_ERROR
+        ex.response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
+        ex.response.header(VARY) == ORIGIN
+    }
+
     Map<String, Object> getConfiguration() {
         ['micronaut.server.cors.enabled': true,
         'micronaut.server.cors.configurations.foo.allowedOrigins': ['foo.com'],
@@ -247,6 +277,21 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         @Get('/arbitrary')
         Map arbitrary() {
             [some: 'data']
+        }
+
+        @Get("/error")
+        String error() {
+            throw new RuntimeException("error")
+        }
+
+        @Get("/error-checked")
+        String errorChecked() {
+            throw new IOException("error")
+        }
+
+        @Error(exception = RuntimeException)
+        HttpResponse onError() {
+            HttpResponse.badRequest()
         }
     }
 }
