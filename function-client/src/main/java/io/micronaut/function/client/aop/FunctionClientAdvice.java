@@ -28,15 +28,12 @@ import io.micronaut.function.client.FunctionInvoker;
 import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.function.client.exceptions.FunctionExecutionException;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
-import io.micronaut.http.annotation.Body;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.Arrays;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Implements advice for the {@link io.micronaut.function.client.FunctionClient} annotation.
@@ -69,19 +66,15 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
 
         Object body;
         if (len == 1) {
-            Optional<Argument> bodyArg = Arrays.stream(context.getArguments()).filter(arg -> arg.isAnnotationPresent(Body.class)).findFirst();
-            if (bodyArg.isPresent()) {
-                body = parameterValueMap.get(bodyArg.get().getName());
-            } else {
-                body = parameterValueMap;
-            }
+            body = parameterValueMap.values().iterator().next();
         } else if (len == 0) {
             body = null;
         } else {
             body = parameterValueMap;
         }
 
-        String functionName = context.getValue(Named.class, String.class).orElse(NameUtils.hyphenate(context.getMethodName(), true));
+        String functionName = context.getValue(Named.class, String.class)
+                .orElse(NameUtils.hyphenate(context.getMethodName(), true));
 
         Flowable<FunctionDefinition> functionDefinition = Flowable.fromPublisher(discoveryClient.getFunction(functionName));
         ReturnType<Object> returnType = context.getReturnType();
