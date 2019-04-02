@@ -18,9 +18,14 @@ package io.micronaut.validation;
 import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.validation.validator.ExecutableMethodValidator;
+import io.micronaut.validation.validator.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
@@ -46,22 +51,33 @@ public class ValidatingInterceptor implements MethodInterceptor {
 
     private static final Logger LOG = LoggerFactory.getLogger(ValidatingInterceptor.class);
 
-    private final ExecutableValidator executableValidator;
+    private final @Nullable ExecutableValidator executableValidator;
+    private final ExecutableMethodValidator micronautValidator;
 
     /**
      * Creates ValidatingInterceptor from the validatorFactory.
      *
      * @param validatorFactory Factory returning initialized {@code Validator} instances
+     * @deprecated Use {@link #ValidatingInterceptor(Validator, ValidatorFactory)} instead
      */
+    @Deprecated
     public ValidatingInterceptor(Optional<ValidatorFactory> validatorFactory) {
+        this(Validator.getInstance(), validatorFactory.orElse(null));
+    }
 
-        executableValidator = validatorFactory
-                .map(factory -> factory.getValidator().forExecutables())
-                .orElse(null);
+    /**
+     * Creates ValidatingInterceptor from the validatorFactory.
+     *
+     * @param micronautValidator The micronaut validator use if no factory is available
+     * @param validatorFactory Factory returning initialized {@code Validator} instances
+     */
+    @Inject
+    public ValidatingInterceptor(
+            Validator micronautValidator,
+            @Nullable ValidatorFactory validatorFactory) {
 
-        if (executableValidator == null && LOG.isWarnEnabled()) {
-            LOG.warn("Beans requiring validation present, but no implementation of javax.validation configuration. Add an implementation (such as hibernate-validator) to prevent this error.");
-        }
+        this.micronautValidator = micronautValidator.forExecutables();
+        this.executableValidator = validatorFactory != null ? validatorFactory.getValidator().forExecutables() : null;
     }
 
     @Override
@@ -71,8 +87,20 @@ public class ValidatingInterceptor implements MethodInterceptor {
 
     @Override
     public Object intercept(MethodInvocationContext context) {
+        final Object target = context.getTarget();
         if (executableValidator == null) {
-            return context.proceed();
+            final ExecutableMethod executableMethod = context.getExecutableMethod();
+            final Set<ConstraintViolation<Object>> constraintViolations = this.micronautValidator.validateParameters(
+                    target,
+                    executableMethod,
+                    context.getParameterValues());
+            if (constraintViolations.isEmpty()) {
+                final Object result = context.proceed();
+                this.micronautValidator.validateReturnValue(target, executableMethod, result);
+                return result;
+            } else {
+                throw new ConstraintViolationException(constraintViolations);
+            }
         } else {
             Method targetMethod = context.getTargetMethod();
             if (targetMethod.getParameterTypes().length == 0) {
@@ -80,7 +108,7 @@ public class ValidatingInterceptor implements MethodInterceptor {
             } else {
                 Set<ConstraintViolation<Object>> constraintViolations = executableValidator
                     .validateParameters(
-                        context.getTarget(),
+                            target,
                         targetMethod,
                         context.getParameterValues()
                     );
