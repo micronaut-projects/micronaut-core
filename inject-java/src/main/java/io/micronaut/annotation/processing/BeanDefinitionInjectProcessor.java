@@ -917,17 +917,25 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 visitAdaptedMethod(method, methodAnnotationMetadata);
             }
 
+            final boolean hasConstraints = params.getParameterMetadata().values().stream().anyMatch(am ->
+                    am.hasStereotype("javax.validation.Constraint") || am.hasStereotype("javax.validation.Valid")
+            );
+            if (hasConstraints && !methodAnnotationMetadata.hasStereotype("io.micronaut.validation.Validated")) {
+                methodAnnotationMetadata = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder().annotate(
+                        methodAnnotationMetadata,
+                        io.micronaut.core.annotation.AnnotationValue.builder("io.micronaut.validation.Validated").build()
+                );
+            }
             // shouldn't visit around advice on an introduction advice instance
             if (!(beanWriter instanceof AopProxyWriter)) {
-                boolean hasAround = methodAnnotationMetadata.hasStereotype(AROUND_TYPE);
+                boolean hasAround = hasConstraints || methodAnnotationMetadata.hasStereotype(AROUND_TYPE) ;
                 if (isAopProxyType || hasAround) {
                     if (isAopProxyType && !hasAround && !method.getModifiers().contains(Modifier.PUBLIC)) {
                         // ignore methods that are not public and have no explicit advise
                         return;
                     }
 
-                    Object[] interceptorTypes = methodAnnotationMetadata
-                            .getAnnotationNamesByStereotype(AROUND_TYPE)
+                    Object[] interceptorTypes = methodAnnotationMetadata.getAnnotationNamesByStereotype(AROUND_TYPE)
                             .toArray();
 
                     OptionalValues<Boolean> settings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean.class);

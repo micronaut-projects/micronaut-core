@@ -800,13 +800,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, GenericsUtils.createGenericsSpec(concreteClass))
 
                 Map<String, Object> paramsToType = [:]
-                Map<String, AnnotationMetadata> qualifierTypes = [:]
+                Map<String, AnnotationMetadata> argumentAnnotationMetadata = [:]
                 Map<String, Map<String, Object>> genericTypeMap = [:]
-                populateParameterData(methodNode, paramsToType, qualifierTypes, genericTypeMap)
+                populateParameterData(methodNode, paramsToType, argumentAnnotationMetadata, genericTypeMap)
 
                 boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "processOnStartup", Boolean.class).orElse(false)
                 if (preprocess) {
                     getBeanWriter().setRequiresMethodProcessing(true)
+                }
+                final boolean hasConstraints = argumentAnnotationMetadata.values().stream().anyMatch({ am ->
+                    am.hasStereotype("javax.validation.Constraint") || am.hasStereotype("javax.validation.Valid")
+                })
+
+                if (hasConstraints) {
+                    if (!methodAnnotationMetadata.hasStereotype("io.micronaut.validation.Validated")) {
+                        methodAnnotationMetadata = addValidated(methodAnnotationMetadata)
+                    }
                 }
                 ExecutableMethodWriter executableMethodWriter = getBeanWriter().visitExecutableMethod(
                         AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
@@ -815,14 +824,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         returnTypeGenerics,
                         methodName,
                         paramsToType,
-                        qualifierTypes,
+                        argumentAnnotationMetadata,
                         genericTypeMap, methodAnnotationMetadata)
 
                 if (methodAnnotationMetadata.hasStereotype(Adapter.class)) {
                     visitAdaptedMethod(methodNode, methodAnnotationMetadata)
                 }
 
-                if ((isAopProxyType && isPublic) || (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !concreteClass.isAbstract())) {
+                boolean hasAround = hasConstraints || methodAnnotationMetadata.hasStereotype(AROUND_TYPE)
+                if ((isAopProxyType && isPublic) || (hasAround && !concreteClass.isAbstract())) {
 
                     boolean hasExplicitAround = methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE)
 
@@ -834,6 +844,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                     } else {
                         Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
+                        if (hasConstraints) {
+                            interceptorTypeReferences = ArrayUtils.concat(interceptorTypeReferences, "io.micronaut.validation.Validated")
+                        }
                         OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
                         AopProxyWriter proxyWriter = resolveProxyWriter(
                                 aopSettings,
@@ -851,7 +864,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     returnTypeGenerics,
                                     methodName,
                                     paramsToType,
-                                    qualifierTypes,
+                                    argumentAnnotationMetadata,
                                     genericTypeMap,
                                     new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata)
                             )
@@ -859,6 +872,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 }
             }
+        }
+
+        @CompileDynamic
+        private AnnotationMetadata addValidated(AnnotationMetadata methodAnnotationMetadata) {
+            methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit).annotate(
+                    methodAnnotationMetadata,
+                    AnnotationValue.<Object> builder("io.micronaut.validation.Validated").build()
+            )
+            methodAnnotationMetadata
         }
 
         private AopProxyWriter resolveProxyWriter(

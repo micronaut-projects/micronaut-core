@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.
@@ -640,10 +641,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private void processAnnotationStereotype(A annotationMirror, DefaultAnnotationMetadata annotationMetadata, boolean isDeclared) {
-        String parentAnnotationName = getAnnotationTypeName(annotationMirror);
         T annotationType = getTypeForAnnotation(annotationMirror);
+        String parentAnnotationName = getAnnotationTypeName(annotationMirror);
+        processAnnotationStereotypes(annotationMetadata, isDeclared, annotationType, parentAnnotationName);
+    }
+
+    private void processAnnotationStereotypes(DefaultAnnotationMetadata annotationMetadata, boolean isDeclared, T annotationType, String annotationName) {
         List<String> parentAnnotations = new ArrayList<>();
-        parentAnnotations.add(parentAnnotationName);
+        parentAnnotations.add(annotationName);
         buildStereotypeHierarchy(
                 parentAnnotations,
                 annotationType,
@@ -693,5 +698,34 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Internal
     public static boolean isAnnotationMapped(@Nullable String annotationName) {
         return annotationName != null && ANNOTATION_MAPPERS.containsKey(annotationName);
+    }
+
+    /**
+     * Annotate an existing annotation metadata object.
+     * @param annotationMetadata The annotation metadata
+     * @param annotationValue The annotation value
+     * @param <A2> The annotation type
+     * @return The mutated metadata
+     */
+    public <A2 extends Annotation> AnnotationMetadata annotate(
+            AnnotationMetadata annotationMetadata,
+            AnnotationValue<A2> annotationValue) {
+        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+            final Optional<T> annotationMirror = getAnnotationMirror(annotationValue.getAnnotationName());
+            final DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
+            defaultMetadata.addDeclaredAnnotation(
+                    annotationValue.getAnnotationName(),
+                    annotationValue.getValues()
+            );
+            annotationMirror.ifPresent(annotationType ->
+                    processAnnotationStereotypes(
+                            defaultMetadata,
+                            true,
+                            annotationType,
+                            annotationValue.getAnnotationName()
+                    )
+            );
+        }
+        return annotationMetadata;
     }
 }

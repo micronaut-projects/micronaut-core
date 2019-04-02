@@ -612,7 +612,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                         }
                     });
                 } else {
-                    final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
+                    final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterType);
                     if (beanIntrospection != null) {
                         try {
                             context.addParameterNode(argument.getName(), i);
