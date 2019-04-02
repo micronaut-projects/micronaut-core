@@ -30,7 +30,6 @@ import javax.annotation.Nullable;
 import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 import java.util.*;
-import java.util.function.Consumer;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.
