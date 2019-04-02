@@ -18,6 +18,7 @@ package io.micronaut.health;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.discovery.CompositeDiscoveryClient;
 
@@ -27,6 +28,7 @@ import io.micronaut.discovery.CompositeDiscoveryClient;
  * @author graemerocher
  * @since 1.1
  */
+@Introspected
 public final class HeartbeatDiscoveryClientCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
