@@ -1683,7 +1683,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
     private <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody, boolean closeConnection) {
         HttpHeaders headers = nettyRequest.headers();
-        headers.set(HttpHeaderNames.HOST, getHostHeader(requestURI));
+
+        if (!headers.contains(HttpHeaderNames.HOST)) {
+            headers.set(HttpHeaderNames.HOST, getHostHeader(requestURI));
+        }
 
         if (closeConnection) {
             headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
