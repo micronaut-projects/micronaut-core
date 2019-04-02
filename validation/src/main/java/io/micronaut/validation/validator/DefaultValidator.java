@@ -44,6 +44,7 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.*;
+import javax.validation.groups.Default;
 import javax.validation.metadata.BeanDescriptor;
 import javax.validation.metadata.ConstraintDescriptor;
 import javax.validation.valueextraction.ValueExtractor;
@@ -64,6 +65,7 @@ import java.util.stream.Collectors;
 @Primary
 public class DefaultValidator implements Validator, ExecutableMethodValidator {
 
+    private static final List<Class> DEFAULT_GROUPS = Collections.singletonList(Default.class);
     private final ConstraintValidatorRegistry constraintValidatorRegistry;
     private final ClockProvider clockProvider;
     private final ValueExtractorRegistry valueExtractorRegistry;
@@ -1028,6 +1030,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private <T> void valueConstraintOnProperty(
             @Nullable Class<T> rootBeanClass,
             @Nullable T rootBean,
@@ -1038,32 +1041,58 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             Class propertyType,
             @Nullable Object propertyValue,
             Class<? extends Annotation> constraintType) {
+        Map<Class<?>, List<? extends AnnotationValue<? extends Annotation>>> constraintsByGroup;
         final List<? extends AnnotationValue<? extends Annotation>> annotationValues = constrainedProperty
                 .getAnnotationMetadata()
                 .getAnnotationValuesByType(constraintType);
+        if (context.groups == DEFAULT_GROUPS) {
+            constraintsByGroup = Collections.singletonMap(
+                    Default.class,
+                    annotationValues
+            );
+        } else {
+            constraintsByGroup = new LinkedHashMap<>(context.groups.size());
+            for (Class<?> group : context.groups) {
+                for (AnnotationValue<? extends Annotation> annotationValue : annotationValues) {
+                    final List<Class> constraintGroups = annotationValue.get("groups", Class[].class).map(Arrays::asList).orElse(DEFAULT_GROUPS);
+                    if (constraintGroups == DEFAULT_GROUPS) {
+                        final List<AnnotationValue<? extends Annotation>> values =
+                                (List<AnnotationValue<? extends Annotation>>) constraintsByGroup.computeIfAbsent(Default.class, (g -> new ArrayList<>(3)));
+                        values.add(annotationValue);
+                    } else if (constraintGroups.contains(group)) {
+                        final List<AnnotationValue<? extends Annotation>> values =
+                                (List<AnnotationValue<? extends Annotation>>) constraintsByGroup.computeIfAbsent(group, (g -> new ArrayList<>(3)));
+                        values.add(annotationValue);
+                    }
+                }
+            }
+        }
 
         @SuppressWarnings("unchecked") final Class<Object> targetType = propertyValue != null ? (Class<Object>) propertyValue.getClass() : propertyType;
         final ConstraintValidator<? extends Annotation, Object> validator = constraintValidatorRegistry
                 .findConstraintValidator(constraintType, targetType).orElse(null);
         if (validator != null) {
-            for (AnnotationValue annotationValue : annotationValues) {
-                //noinspection unchecked
-                if (!validator.isValid(propertyValue, annotationValue, context)) {
-
-                    final String messageTemplate = buildMessageTemplate(annotationValue);
-                    Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue);
+            for (Map.Entry<Class<?>, List<? extends AnnotationValue<? extends Annotation>>> entry : constraintsByGroup.entrySet()) {
+                final List<? extends AnnotationValue<? extends Annotation>> groupValues = entry.getValue();
+                for (AnnotationValue annotationValue : groupValues) {
                     //noinspection unchecked
-                    overallViolations.add(
-                            new DefaultConstraintViolation(
-                                    rootBean,
-                                    rootBeanClass,
-                                    object,
-                                    propertyValue,
-                                    messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
-                                    messageTemplate,
-                                    new PathImpl(context.currentPath)
-                            )
-                    );
+                    if (!validator.isValid(propertyValue, annotationValue, context)) {
+
+                        final String messageTemplate = buildMessageTemplate(annotationValue);
+                        Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue);
+                        //noinspection unchecked
+                        overallViolations.add(
+                                new DefaultConstraintViolation(
+                                        rootBean,
+                                        rootBeanClass,
+                                        object,
+                                        propertyValue,
+                                        messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
+                                        messageTemplate,
+                                        new PathImpl(context.currentPath)
+                                )
+                        );
+                    }
                 }
             }
         }
@@ -1091,15 +1120,21 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
     private final class DefaultConstraintValidatorContext implements ConstraintValidatorContext {
         final Set<Object> validatedObjects = new HashSet<>(20);
         final PathImpl currentPath = new PathImpl();
-        final Class<?>[] groups;
+        final List<Class> groups;
 
         private <T> DefaultConstraintValidatorContext(T object, Class<?>... groups) {
-            validatedObjects.add(object);
-            this.groups = groups;
+            if (object != null) {
+                validatedObjects.add(object);
+            }
+            if (ArrayUtils.isNotEmpty(groups)) {
+                this.groups = Arrays.asList(groups);
+            } else {
+                this.groups = DEFAULT_GROUPS;
+            }
         }
 
         private DefaultConstraintValidatorContext(Class<?>... groups) {
-            this.groups = groups;
+            this(null, groups);
         }
 
         @Nonnull
