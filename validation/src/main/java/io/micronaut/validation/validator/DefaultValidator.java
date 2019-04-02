@@ -91,9 +91,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             @Nullable TraversableResolver traversableResolver,
             @Nullable MessageSource messageSource,
             @Nullable ExecutionHandleLocator executionHandleLocator) {
-        ArgumentUtils.requireNonNull("constraintValidatorRegistry", constraintValidatorRegistry);
-        ArgumentUtils.requireNonNull("valueExtractorRegistry", valueExtractorRegistry);
-        ArgumentUtils.requireNonNull("clockProvider", clockProvider);
         this.constraintValidatorRegistry = constraintValidatorRegistry == null ? new DefaultConstraintValidators() : constraintValidatorRegistry;
         this.clockProvider = clockProvider == null ? new DefaultClockProvider() : clockProvider;
         this.valueExtractorRegistry = valueExtractorRegistry == null ? new DefaultValueExtractors() : valueExtractorRegistry;
