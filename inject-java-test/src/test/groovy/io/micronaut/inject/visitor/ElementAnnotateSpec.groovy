@@ -8,6 +8,8 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 
 import javax.annotation.processing.SupportedAnnotationTypes
+import java.lang.annotation.Retention
+import java.lang.annotation.RetentionPolicy
 
 class ElementAnnotateSpec extends AbstractTypeElementSpec {
 
@@ -39,9 +41,9 @@ class TestListener {
 ''')
 
         expect:
-        definition.hasAnnotation("foo.bar.Ann")
-        definition.getValue("foo.bar.Ann", "foo", String).get() == 'bar'
-        definition.findMethod("receive", String).get().hasAnnotation('foo.bar.Ann')
+        definition.hasAnnotation(Ann)
+        definition.getValue(Ann, "foo", String).get() == 'bar'
+        definition.findMethod("receive", String).get().hasAnnotation(Ann)
     }
 
     @Override
@@ -65,16 +67,21 @@ class TestListener {
     static class MyAnnotatingTypeElementVisitor implements TypeElementVisitor {
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
-            element.annotate("foo.bar.Ann") { AnnotationValueBuilder builder ->
+            element.annotate(Ann) { AnnotationValueBuilder builder ->
                 builder.member("foo", "bar")
             }
         }
 
         @Override
         void visitMethod(MethodElement element, VisitorContext context) {
-            element.annotate("foo.bar.Ann") { AnnotationValueBuilder builder ->
+            element.annotate(Ann) { AnnotationValueBuilder builder ->
                 builder.member("foo", "bar")
             }
         }
     }
+}
+
+@Retention(RetentionPolicy.SOURCE)
+@interface Ann {
+    String foo() default ""
 }
