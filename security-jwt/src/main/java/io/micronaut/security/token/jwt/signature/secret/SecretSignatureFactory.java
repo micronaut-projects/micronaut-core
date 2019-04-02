@@ -17,11 +17,9 @@ package io.micronaut.security.token.jwt.signature.secret;
 
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
-import io.micronaut.security.token.jwt.signature.SignatureGeneratorConfiguration;
 
 /**
- * Creates {@link SignatureConfiguration} and {@link SignatureGeneratorConfiguration} for each {@link SecretSignatureConfiguration} beans.
+ * Creates {@link SecretSignature} beans for each {@link SecretSignatureConfiguration} beans. Each {@link SecretSignature} is a bean of type {@link io.micronaut.security.token.jwt.signature.SignatureConfiguration} and {@link io.micronaut.security.token.jwt.signature.SignatureGeneratorConfiguration} as well.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -30,24 +28,13 @@ import io.micronaut.security.token.jwt.signature.SignatureGeneratorConfiguration
 public class SecretSignatureFactory {
 
     /**
-     * Creates {@link SignatureConfiguration} for each {@link SecretSignatureConfiguration} bean.
+     * Creates {@link SecretSignature} for each {@link SecretSignatureConfiguration} bean.
      *
      * @param configuration {@link SecretSignatureConfiguration} bean.
-     * @return The {@link SignatureConfiguration}
+     * @return The {@link SecretSignature}
      */
     @EachBean(SecretSignatureConfiguration.class)
-    public SignatureConfiguration signatureConfiguration(SecretSignatureConfiguration configuration) {
-        return new SecretSignature(configuration);
-    }
-
-    /**
-     * Creates {@link SignatureGeneratorConfiguration} for each {@link SecretSignatureConfiguration} bean.
-     *
-     * @param configuration {@link SecretSignatureConfiguration} bean.
-     * @return The {@link SignatureGeneratorConfiguration}
-     */
-    @EachBean(SecretSignatureConfiguration.class)
-    public SignatureGeneratorConfiguration signatureGeneratorConfiguration(SecretSignatureConfiguration configuration) {
+    public SecretSignature signatureConfiguration(SecretSignatureConfiguration configuration) {
         return new SecretSignature(configuration);
     }
 }
