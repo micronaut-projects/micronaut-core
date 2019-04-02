@@ -26,11 +26,7 @@ import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
 import io.netty.channel.*;
-import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpChunkedInput;
-import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
 import org.slf4j.Logger;
@@ -116,7 +112,10 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
      * @param response The response to modify
      */
     public void process(MutableHttpResponse response) {
-        response.header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(getLength()));
+        long length = getLength();
+        if (length > -1 && !response.getHeaders().contains(HttpHeaderNames.TRANSFER_ENCODING.toString())) {
+            response.header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(length));
+        }
         delegate.ifPresent((type) -> type.process(response));
     }
 
