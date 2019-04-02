@@ -541,10 +541,7 @@ class MyBean {}
         operation.parameters[4].in == 'header'
         operation.parameters[4].name == 'X-API-Version'
         operation.parameters[4].required
-
-
     }
-
 
     void "test URI template with query parameters is handled correctly"() {
         given:
@@ -559,10 +556,10 @@ import java.util.List;
 import javax.validation.constraints.*;
 import javax.annotation.*;
 
-@Controller("/")
+@Controller("${mycontroller.path:/}")
 class MyController {
 
-    @Get("/hello{?foo,bar}")
+    @Get("${mymethod.path:/hello}{?foo,bar}")
     public String query(@Nullable String foo, @Nullable String bar) { 
         return null;                               
      }
