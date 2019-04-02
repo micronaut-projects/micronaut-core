@@ -362,7 +362,32 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     writeDefaultErrorResponse(ctx, nettyHttpRequest, e);
                 }
             } else {
-                writeDefaultErrorResponse(ctx, nettyHttpRequest, cause);
+                logException(cause);
+
+                Flowable resultFlowable = Flowable.defer(() -> {
+                    return Flowable.just(HttpResponse.serverError()
+                            .body(new JsonError("Internal Server Error: " + cause.getMessage())));
+                });
+
+                AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
+                Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
+                        null,
+                        HttpResponse.class,
+                        AnnotationMetadata.EMPTY_METADATA,
+                        requestReference,
+                        resultFlowable);
+
+                Flowable<? extends MutableHttpResponse<?>> filteredPublisher = filterPublisher(
+                        requestReference,
+                        routePublisher,
+                        ctx.channel().eventLoop());
+
+                subscribeToResponsePublisher(
+                        ctx,
+                        MediaType.APPLICATION_JSON_TYPE,
+                        requestReference,
+                        filteredPublisher
+                );
             }
         }
     }
