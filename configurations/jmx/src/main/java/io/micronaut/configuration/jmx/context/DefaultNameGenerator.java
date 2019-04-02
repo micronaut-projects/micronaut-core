@@ -16,6 +16,7 @@
 package io.micronaut.configuration.jmx.context;
 
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ProxyBeanDefinition;
 
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
@@ -33,7 +34,13 @@ public class DefaultNameGenerator implements NameGenerator {
 
     @Override
     public ObjectName generate(BeanDefinition<?> beanDefinition) throws MalformedObjectNameException {
-        Class type = beanDefinition.getBeanType();
+        final Class type;
+        if (beanDefinition instanceof ProxyBeanDefinition) {
+            type = ((ProxyBeanDefinition<?>) beanDefinition).getTargetType();
+        } else {
+            type = beanDefinition.getBeanType();
+        }
+
         Hashtable<String, String> properties = new Hashtable<>(1);
         properties.put("type", type.getSimpleName());
 
