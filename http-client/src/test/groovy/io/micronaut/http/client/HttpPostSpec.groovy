@@ -330,6 +330,16 @@ class HttpPostSpec extends Specification {
         booleans[2] == false
     }
 
+    void "test request generic type no body"() {
+        when:
+        def response = HttpClient.create(embeddedServer.getURL()).toBlocking().exchange(
+                HttpRequest.POST('/post/requestObject', ''), String
+        )
+
+        then:
+        response.body() == "request-object"
+    }
+
     @Controller('/post')
     static class PostController {
 
@@ -413,6 +423,12 @@ class HttpPostSpec extends Specification {
         List<Boolean> booleans(@Body List<Boolean> booleans) {
             return booleans
         }
+
+        @Post("/requestObject")
+        String requestObject(HttpRequest<Object> request) {
+            "request-object"
+        }
+
     }
 
     @EqualsAndHashCode

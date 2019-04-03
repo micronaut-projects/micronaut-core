@@ -31,7 +31,7 @@ import static io.micronaut.http.HttpResponse.*; // <1>
 public class MessageController {
 
     @Get("/hello") // <2>
-    HttpResponse<String> hello(HttpRequest request) {
+    HttpResponse<String> hello(HttpRequest<?> request) {
         String name = request.getParameters()
                              .getFirst("name")
                              .orElse("Nobody"); // <3>
