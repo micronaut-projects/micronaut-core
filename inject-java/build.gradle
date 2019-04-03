@@ -1,8 +1,9 @@
 dependencies {
     compile project(":inject")
     compile project(":aop")
-
-    //compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    if (JavaVersion.current() == JavaVersion.VERSION_1_8) {
+        compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
     compileOnly dependencyVersion("validation")
 
     testCompile project(":aop")
@@ -16,7 +17,9 @@ dependencies {
     testCompile 'org.mongodb:mongo-java-driver:3.7.1'
     testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testCompile dependencyModuleVersion("groovy", "groovy-json")
-    //testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    if (JavaVersion.current() == JavaVersion.VERSION_1_8) {
+        testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
     testRuntime 'org.glassfish:javax.el:3.0.1-b08'
     testCompile dependencyVersion("micrometer")
 }
