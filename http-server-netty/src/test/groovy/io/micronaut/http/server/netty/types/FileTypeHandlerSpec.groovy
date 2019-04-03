@@ -16,11 +16,7 @@
 package io.micronaut.http.server.netty.types
 
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.MutableHttpRequest
+import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -135,6 +131,16 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
         response.body() == tempFileContents
+    }
+
+    void "test when stream a system file is returned transfer-encoding should be set"() {
+        when:
+        def response = rxClient.exchange('/test-system/download-stream', String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        !response.headers.contains(CONTENT_LENGTH)
+        response.headers.contains(TRANSFER_ENCODING)
     }
 
     void "test when an attached streamed file is returned"() {
@@ -297,6 +303,11 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         @Get('/download')
         SystemFile download() {
             new SystemFile(tempFile).attach()
+        }
+
+        @Get('/download-stream')
+        StreamedFile downloadStream() {
+            StreamedFile file = new StreamedFile(Files.newInputStream(tempFile.toPath()), "abc.html").attach("temp.html")
         }
 
         @Get('/different-name')
