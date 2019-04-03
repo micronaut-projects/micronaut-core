@@ -61,7 +61,7 @@ dependencies {
 
 shadowJar {
     dependencies {
-        for(dep in project.configurations.shadowCompile.dependencies + project.configurations.shadowRuntime.dependencies) {
+        for(dep in project.configurations.shadowCompile.dependencies) {
             if(dep instanceof ProjectDependency) {
                 exclude(project(":$dep.name"))
             }
