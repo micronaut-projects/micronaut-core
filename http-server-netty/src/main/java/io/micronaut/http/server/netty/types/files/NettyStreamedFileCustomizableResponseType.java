@@ -25,7 +25,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
-import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.stream.ChunkedStream;
 
 import java.io.InputStream;
@@ -79,7 +78,7 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
     @Override
     public void process(MutableHttpResponse response) {
         long length = getLength();
-        if (length > -1 && !response.getHeaders().contains(HttpHeaderNames.TRANSFER_ENCODING.toString())) {
+        if (length > -1) {
             response.header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(length));
         }
         delegate.ifPresent((type) -> type.process(response));
