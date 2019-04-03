@@ -1194,16 +1194,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
         }
 
-        // default to Transfer-Encoding: chunked if Content-Length not set or not already set
-        if (!nettyHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && !nettyHeaders.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
-            nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-        }
-
         final Object body = message.body();
         if (body instanceof NettyCustomizableResponseTypeHandlerInvoker) {
             NettyCustomizableResponseTypeHandlerInvoker handler = (NettyCustomizableResponseTypeHandlerInvoker) body;
             handler.invoke(httpRequest, nettyHttpResponse, context);
         } else {
+            // default to Transfer-Encoding: chunked if Content-Length not set or not already set
+            if (!nettyHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && !nettyHeaders.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
+                nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+            }
             // close handled by HttpServerKeepAliveHandler
             context.writeAndFlush(nettyResponse);
             context.read();

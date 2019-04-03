@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty.resources
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.exceptions.BeanInstantiationException
-import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
@@ -26,6 +25,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.resource.StaticResourceConfiguration
+import spock.lang.IgnoreIf
 
 import java.nio.file.Paths
 import java.time.Instant
@@ -51,6 +51,16 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
     void cleanupSpec() {
         tempFile.delete()
+    }
+
+    @IgnoreIf({ os.windows })
+    void "test transfer-encoding resources from the file system are returned"() {
+        when:
+        String curlCommand = "curl -I ${getServer().toString()}/${tempFile.getName()}"
+        Process process = ['bash', '-c', curlCommand].execute()
+
+        then:
+        !process.text.contains("transfer-encoding: chunked")
     }
 
     void "test resources from the file system are returned"() {
