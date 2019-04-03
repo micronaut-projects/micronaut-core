@@ -18,6 +18,7 @@ package io.micronaut.validation.validator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.MessageSource;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -29,15 +30,13 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
-import io.micronaut.validation.validator.constraints.DefaultConstraintValidators;
-import io.micronaut.validation.validator.extractors.DefaultValueExtractors;
 import io.micronaut.validation.validator.extractors.SimpleValueReceiver;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
-import io.micronaut.validation.validator.messages.DefaultValidationMessages;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -63,6 +62,7 @@ import java.util.stream.Collectors;
  */
 @Singleton
 @Primary
+@Requires(property = ValidatorConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 public class DefaultValidator implements Validator, ExecutableMethodValidator {
 
     private static final List<Class> DEFAULT_GROUPS = Collections.singletonList(Default.class);
@@ -76,38 +76,18 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
     /**
      * Default constructor.
      *
-     * @param constraintValidatorRegistry The validator registry.
-     * @param valueExtractorRegistry      The value extractor registry.
-     * @param clockProvider               The clock provider
-     * @param traversableResolver         The traversable resolver to use
-     * @param messageSource               The message source
-     * @param executionHandleLocator      The execution handle locator for located executable methods to validate
+     * @param configuration The validator configuration
      */
     @Inject
     protected DefaultValidator(
-            @Nullable ConstraintValidatorRegistry constraintValidatorRegistry,
-            @Nullable ValueExtractorRegistry valueExtractorRegistry,
-            @Nullable ClockProvider clockProvider,
-            @Nullable TraversableResolver traversableResolver,
-            @Nullable MessageSource messageSource,
-            @Nullable ExecutionHandleLocator executionHandleLocator) {
-        this.constraintValidatorRegistry = constraintValidatorRegistry == null ? new DefaultConstraintValidators() : constraintValidatorRegistry;
-        this.clockProvider = clockProvider == null ? new DefaultClockProvider() : clockProvider;
-        this.valueExtractorRegistry = valueExtractorRegistry == null ? new DefaultValueExtractors() : valueExtractorRegistry;
-        this.traversableResolver = traversableResolver != null ? traversableResolver : new TraversableResolver() {
-            @Override
-            public boolean isReachable(Object object, Path.Node node, Class<?> rootType, Path path, ElementType elementType) {
-                return true;
-            }
-
-            @Override
-            public boolean isCascadable(Object object, Path.Node node, Class<?> rootType, Path path, ElementType elementType) {
-                return true;
-            }
-        };
-        this.executionHandleLocator = executionHandleLocator != null ? executionHandleLocator : new ExecutionHandleLocator() {
-        };
-        this.messageSource = messageSource != null ? messageSource : new DefaultValidationMessages();
+            @Nonnull ValidatorConfiguration configuration) {
+        ArgumentUtils.requireNonNull("configuration", configuration);
+        this.constraintValidatorRegistry = configuration.getConstraintValidatorRegistry();
+        this.clockProvider = configuration.getClockProvider();
+        this.valueExtractorRegistry = configuration.getValueExtractorRegistry();
+        this.traversableResolver = configuration.getTraversableResolver();
+        this.executionHandleLocator = configuration.getExecutionHandleLocator();
+        this.messageSource = configuration.getMessageSource();
     }
 
     @SuppressWarnings("unchecked")

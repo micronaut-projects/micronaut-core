@@ -97,12 +97,7 @@ public interface Validator extends javax.validation.Validator {
      */
     static @Nonnull Validator getInstance() {
         return new DefaultValidator(
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
+                new DefaultValidatorConfiguration()
         );
     }
 }
