@@ -25,8 +25,6 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.resource.StaticResourceConfiguration
-import spock.lang.IgnoreIf
-
 import java.nio.file.Paths
 import java.time.Instant
 import java.time.ZoneId
