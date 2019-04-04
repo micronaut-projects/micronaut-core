@@ -22,9 +22,7 @@ import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpChunkedInput;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.stream.ChunkedStream;
 
 import java.io.InputStream;
@@ -79,7 +77,9 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
     public void process(MutableHttpResponse response) {
         long length = getLength();
         if (length > -1) {
-            response.header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(length));
+            response.header(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(length));
+        } else {
+            response.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         }
         delegate.ifPresent((type) -> type.process(response));
     }
