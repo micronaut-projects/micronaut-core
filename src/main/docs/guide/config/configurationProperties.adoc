@@ -186,6 +186,7 @@ snippet::io.micronaut.docs.config.builder.EngineConfig[tags="imports,class"]
 <1> The `@ConfigurationProperties` annotation takes the configuration prefix
 <2> The first builder can be configured with the class configuration prefix
 <3> The second builder can be configured with the class configuration prefix + the `configurationPrefix` value.
+<4> The third builder demonstrates that the annotation can be applied to a method as well as a property.
 
 NOTE: By default, only builder methods that take a single argument are supported. To support methods with no arguments, set the `allowZeroArgs` parameter of the annotation to true.
 
@@ -201,7 +202,7 @@ Configuration values can be supplied from one of the link:{api}/io/micronaut/con
 .Supply Configuration
 snippet::io.micronaut.docs.config.builder.VehicleSpec[tags="start"]
 
-The above example prints: `"Subaru Engine Starting V4 [rodLength=4.0]"`
+The above example prints: `"Subaru Engine Starting V4 [rodLength=4.0, sparkPlug=Iridium(NGK 6619 LFR6AIX)]"`
 
 == MapFormat
 

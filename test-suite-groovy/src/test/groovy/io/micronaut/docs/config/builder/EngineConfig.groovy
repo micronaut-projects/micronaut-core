@@ -36,7 +36,7 @@ class EngineConfig {
 
 	SparkPlug.Builder sparkPlug = SparkPlug.builder()
 
-	@ConfigurationBuilder(prefixes = "with", configurationPrefix = "spark-plug")
+	@ConfigurationBuilder(prefixes = "with", configurationPrefix = "spark-plug") // <4>
 	void setSparkPlug(SparkPlug.Builder sparkPlug) {
 		this.sparkPlug = sparkPlug
 	}
