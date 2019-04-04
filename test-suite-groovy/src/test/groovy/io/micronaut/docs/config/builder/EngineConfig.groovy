@@ -15,9 +15,6 @@
  */
 package io.micronaut.docs.config.builder
 
-import io.micronaut.context.annotation.ConfigurationBuilder
-import io.micronaut.context.annotation.ConfigurationProperties
-
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationBuilder
 import io.micronaut.context.annotation.ConfigurationProperties
@@ -31,17 +28,17 @@ import io.micronaut.context.annotation.ConfigurationProperties
 @ConfigurationProperties('my.engine') // <1>
 class EngineConfig {
 
-    @ConfigurationBuilder(prefixes = "with") // <2>
-    EngineImpl.Builder builder = EngineImpl.builder()
+	@ConfigurationBuilder(prefixes = "with") // <2>
+	EngineImpl.Builder builder = EngineImpl.builder()
 
-    @ConfigurationBuilder(prefixes = "with", configurationPrefix = "crank-shaft") // <3>
-    CrankShaft.Builder crankShaft = CrankShaft.builder()
+	@ConfigurationBuilder(prefixes = "with", configurationPrefix = "crank-shaft") // <3>
+	CrankShaft.Builder crankShaft = CrankShaft.builder()
 
-    SparkPlug.Builder sparkPlug = SparkPlug.builder()
+	SparkPlug.Builder sparkPlug = SparkPlug.builder()
 
-    @ConfigurationBuilder(prefixes = "with", configurationPrefix = "spark-plug")
-    void setSparkPlug(SparkPlug.Builder sparkPlug) {
-        this.sparkPlug = sparkPlug
-    }
+	@ConfigurationBuilder(prefixes = "with", configurationPrefix = "spark-plug")
+	void setSparkPlug(SparkPlug.Builder sparkPlug) {
+		this.sparkPlug = sparkPlug
+	}
 }
 // end::class[]
