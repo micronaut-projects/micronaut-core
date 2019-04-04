@@ -181,12 +181,7 @@ A configuration prefix can also be specified to tell Micronaut where to look for
 For example:
 
 .@ConfigurationBuilder Example
-[source,groovy]
-----
-include::{testsdir}/config/builder/EngineConfig.groovy[tags=imports, indent=0]
-
-include::{testsdir}/config/builder/EngineConfig.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.config.builder.EngineConfig[tags="imports,class"]
 
 <1> The `@ConfigurationProperties` annotation takes the configuration prefix
 <2> The first builder can be configured with the class configuration prefix
@@ -197,22 +192,14 @@ NOTE: By default, only builder methods that take a single argument are supported
 Just like in the previous example, we can construct an `EngineImpl`. Since we are using a builder, a factory class can be used to build the engine from the builder.
 
 .Factory Bean
-[source,groovy]
-----
-include::{testsdir}/config/builder/EngineFactory.groovy[tags=imports, indent=0]
-
-include::{testsdir}/config/builder/EngineFactory.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.config.builder.EngineFactory[tags="imports,class"]
 
 The engine that was returned can then be injected anywhere an engine is depended on.
 
 Configuration values can be supplied from one of the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] instances. For example:
 
 .Supply Configuration
-[source,groovy]
-----
-include::{testsdir}/config/builder/VehicleSpec.groovy[tags=start, indent=0]
-----
+snippet::io.micronaut.docs.config.builder.VehicleSpec[tags="start"]
 
 The above example prints: `"Subaru Engine Starting V4 [rodLength=4.0]"`
 
