@@ -29,6 +29,7 @@ import io.micronaut.http.server.types.files.AttachedFile
 import io.micronaut.http.server.types.files.StreamedFile
 import io.micronaut.http.server.types.files.SystemFile
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType
+import spock.lang.IgnoreIf
 
 import javax.inject.Inject
 import javax.inject.Named
@@ -133,14 +134,33 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.body() == tempFileContents
     }
 
-    void "test when stream a system file is returned transfer-encoding should be set"() {
+    //Using curl because the netty client reads the first chunk and alters the headers
+    @IgnoreIf({ os.windows })
+    void "test when a streamed file is returned transfer-encoding should be set"() {
         when:
-        def response = rxClient.exchange('/test-system/download-stream', String).blockingFirst()
+        String curlCommand = "curl -I -X GET ${getServer().toString()}/test-stream/download"
+        Process process = ['bash', '-c', curlCommand].execute()
+        String output = process.text.toLowerCase()
 
         then:
-        response.code() == HttpStatus.OK.code
-        !response.headers.contains(CONTENT_LENGTH)
-        response.headers.contains(TRANSFER_ENCODING)
+        output.contains("200 ok")
+        output.contains("transfer-encoding: chunked")
+        !output.contains("content-length:")
+    }
+
+    //Using curl because the netty client will remove one of transfer encoding or
+    // content type if both are set
+    @IgnoreIf({ os.windows })
+    void "est when a system file is returned content-length should be set"() {
+        when:
+        String curlCommand = "curl -I -X GET ${getServer().toString()}/test-system/download"
+        Process process = ['bash', '-c', curlCommand].execute()
+        String output = process.text.toLowerCase()
+
+        then:
+        output.contains("200 ok")
+        !output.contains("transfer-encoding: chunked")
+        output.contains("content-length:")
     }
 
     void "test when an attached streamed file is returned"() {
@@ -303,11 +323,6 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         @Get('/download')
         SystemFile download() {
             new SystemFile(tempFile).attach()
-        }
-
-        @Get('/download-stream')
-        StreamedFile downloadStream() {
-            StreamedFile file = new StreamedFile(Files.newInputStream(tempFile.toPath()), "abc.html").attach("temp.html")
         }
 
         @Get('/different-name')

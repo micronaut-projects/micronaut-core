@@ -53,16 +53,6 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         tempFile.delete()
     }
 
-    @IgnoreIf({ os.windows })
-    void "test transfer-encoding resources from the file system are returned"() {
-        when:
-        String curlCommand = "curl -I ${getServer().toString()}/${tempFile.getName()}"
-        Process process = ['bash', '-c', curlCommand].execute()
-
-        then:
-        !process.text.contains("transfer-encoding: chunked")
-    }
-
     void "test resources from the file system are returned"() {
         when:
         def response = rxClient.exchange(
