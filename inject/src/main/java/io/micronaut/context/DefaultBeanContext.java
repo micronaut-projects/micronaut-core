@@ -63,7 +63,6 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -1849,11 +1848,16 @@ public class DefaultBeanContext implements BeanContext {
         final boolean isProxy = definition.isProxy();
         final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
         if (qualifier != PROXY_TARGET_QUALIFIER && isProxy && isScopedProxyDefinition) {
-            BeanKey<T> key = new BeanKey<>(beanType, qualifier);
+            Class<?> proxiedType = resolveProxiedType(beanType, definition);
+            BeanKey key = new BeanKey(proxiedType, qualifier);
             BeanDefinition<T> finalDefinition = definition;
             BeanResolutionContext finalResolutionContext1 = resolutionContext;
             return (T) scopedProxies.computeIfAbsent(key, (Function<BeanKey, T>) beanKey -> {
-                BeanDefinition<T> proxyDefinition = findProxyBeanDefinition(beanType, qualifier).orElse(finalDefinition);
+                Qualifier<T> q = qualifier;
+                if (q == null) {
+                    q = resolveDeclaredQualifier(finalDefinition);
+                }
+                BeanDefinition<T> proxyDefinition = (BeanDefinition<T>) findProxyBeanDefinition((Class) proxiedType, q).orElse(finalDefinition);
 
                 BeanResolutionContext currentResolutionContext = finalResolutionContext1 != null ? finalResolutionContext1 : new DefaultBeanResolutionContext(
                         this,
@@ -1936,6 +1940,23 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
+    }
+
+    private <T> Class<?> resolveProxiedType(Class<T> beanType, BeanDefinition<T> definition) {
+        Class<?> proxiedType;
+        if (definition instanceof ProxyBeanDefinition) {
+            proxiedType = ((ProxyBeanDefinition<T>) definition).getTargetType();
+        } else if(definition instanceof BeanDefinitionDelegate) {
+            BeanDefinition<T> delegate = ((BeanDefinitionDelegate<T>) definition).getDelegate();
+            if (delegate instanceof ProxyBeanDefinition) {
+                proxiedType = ((ProxyBeanDefinition<T>) delegate).getTargetType();
+            } else {
+                proxiedType = beanType;
+            }
+        } else {
+            proxiedType = beanType;
+        }
+        return proxiedType;
     }
 
     private <T> T findExistingCompatibleSingleton(Class<T> beanType, Qualifier<T> qualifier, BeanDefinition<T> definition) {
