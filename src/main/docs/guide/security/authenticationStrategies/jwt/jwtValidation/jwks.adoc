@@ -1,0 +1,13 @@
+A https://tools.ietf.org/html/rfc7517[JSON Web Key (JWK)] is a JSON object that represents a cryptographic key. You can use a remote JWK Set, A JSON object that represents a set of JWKs, to validate JWT signatures.
+
+You can configure a remote JWKS as a signature validator:
+
+[source, groovy]
+----
+include::{testssecurityjwt}/jwks/JwksSpec.groovy[indent=0, tag=yamlconfig]
+----
+
+The previous snippet creates a link:{api}/io/micronaut/security/token/jwt/signature/jwks/JwksSignature.html[JwksSignature] bean with a `awscognito` name qualifier.
+
+If you want to expose your own JWK Set, read the <<keys, Keys Controller>> section.
+
