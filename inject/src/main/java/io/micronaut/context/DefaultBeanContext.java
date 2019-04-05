@@ -1940,7 +1940,7 @@ public class DefaultBeanContext implements BeanContext {
         Class<?> proxiedType;
         if (definition instanceof ProxyBeanDefinition) {
             proxiedType = ((ProxyBeanDefinition<T>) definition).getTargetType();
-        } else if(definition instanceof BeanDefinitionDelegate) {
+        } else if (definition instanceof BeanDefinitionDelegate) {
             BeanDefinition<T> delegate = ((BeanDefinitionDelegate<T>) definition).getDelegate();
             if (delegate instanceof ProxyBeanDefinition) {
                 proxiedType = ((ProxyBeanDefinition<T>) delegate).getTargetType();
@@ -2099,7 +2099,7 @@ public class DefaultBeanContext implements BeanContext {
                     if (!delegates.contains(delegate)) {
                         delegates.add(delegate);
                     }
-                } else if(filterProxied && delegate instanceof ProxyBeanDefinition) {
+                } else if (filterProxied && delegate instanceof ProxyBeanDefinition) {
                     proxiedTypes.add(((ProxyBeanDefinition) delegate).getTargetDefinitionType());
                 }
             }
