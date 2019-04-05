@@ -218,6 +218,13 @@ Environment detection can be disabled through a method on the application contex
 
 See the <<environments, Environment>> documentation for more information.
 
+=== JWK and JWK Set support
+
+You can expose an endpoint with a JWK Set thanks to the <<keys, Keys Controller>>.
+
+You can also make a remote JWKS participate in a JWT signature validation. Read the
+<<jwks, Validation with remote JWKS>> section to learn more.
+
 === Dependency Upgrades
 
 - Groovy `2.5.4` -> `2.5.6`

@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty.resources
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.exceptions.BeanInstantiationException
-import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
@@ -26,7 +25,6 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.resource.StaticResourceConfiguration
-
 import java.nio.file.Paths
 import java.time.Instant
 import java.time.ZoneId
