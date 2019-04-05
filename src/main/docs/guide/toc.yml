@@ -244,7 +244,9 @@ security:
         title: JWT Token Generation
         jwtGeneratorSignature: JWT Signature
         jwtGeneratorEncryption: Encrypted JWTs
-      jwtValidation: JWT Token Validation
+      jwtValidation:
+        title: JWT Token Validation
+        jwks: Validation with remote JWKS
       claimsGeneration: Claims Generation
       render:
         title: Token Render
@@ -259,6 +261,7 @@ security:
     login: Login Controller
     logout: Logout Controller
     refresh: Refresh Controller
+    keys: Keys Controller
   retrievingAuthenticatedUser:
     title: Retrieve the authenticated user
     securityService: User outside of a controller
