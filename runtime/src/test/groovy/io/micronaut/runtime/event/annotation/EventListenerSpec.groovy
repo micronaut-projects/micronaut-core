@@ -34,6 +34,7 @@ class EventListenerSpec extends Specification {
         then:
         !a.invoked
         t.invoked
+        t.invocationCount == 1
         g.invoked
 
         conditions.eventually {
