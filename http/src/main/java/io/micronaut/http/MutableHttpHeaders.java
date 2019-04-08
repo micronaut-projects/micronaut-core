@@ -68,7 +68,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      */
     default MutableHttpHeaders date(LocalDateTime date) {
         if (date != null) {
-            add(DATE, ZonedDateTime.of(date, ZoneId.of("GMT")).format(DateTimeFormatter.RFC_1123_DATE_TIME));
+            add(DATE, ZonedDateTime.of(date, ZoneId.systemDefault()));
         }
         return this;
     }
@@ -81,7 +81,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      */
     default MutableHttpHeaders expires(LocalDateTime date) {
         if (date != null) {
-            add(EXPIRES, ZonedDateTime.of(date, ZoneId.of("GMT")).format(DateTimeFormatter.RFC_1123_DATE_TIME));
+            add(EXPIRES, ZonedDateTime.of(date, ZoneId.systemDefault()));
         }
         return this;
     }
@@ -94,7 +94,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      */
     default MutableHttpHeaders lastModified(LocalDateTime date) {
         if (date != null) {
-            add(LAST_MODIFIED, ZonedDateTime.of(date, ZoneId.of("GMT")).format(DateTimeFormatter.RFC_1123_DATE_TIME));
+            add(LAST_MODIFIED, ZonedDateTime.of(date, ZoneId.systemDefault()));
         }
         return this;
     }
@@ -107,7 +107,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      */
     default MutableHttpHeaders ifModifiedSince(LocalDateTime date) {
         if (date != null) {
-            add(IF_MODIFIED_SINCE, ZonedDateTime.of(date, ZoneId.of("GMT")).format(DateTimeFormatter.RFC_1123_DATE_TIME));
+            add(IF_MODIFIED_SINCE, ZonedDateTime.of(date, ZoneId.systemDefault()));
         }
         return this;
     }
@@ -119,8 +119,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders date(long timeInMillis) {
-        ZonedDateTime date = ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.of("GMT"));
-        add(DATE, date.format(DateTimeFormatter.RFC_1123_DATE_TIME));
+        add(DATE, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
         return this;
     }
 
@@ -131,8 +130,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders expires(long timeInMillis) {
-        ZonedDateTime date = ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.of("GMT"));
-        add(EXPIRES, date.format(DateTimeFormatter.RFC_1123_DATE_TIME));
+        add(EXPIRES, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
         return this;
     }
 
@@ -143,8 +141,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders lastModified(long timeInMillis) {
-        ZonedDateTime date = ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.of("GMT"));
-        add(LAST_MODIFIED, date.format(DateTimeFormatter.RFC_1123_DATE_TIME));
+        add(LAST_MODIFIED, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
         return this;
     }
 
@@ -155,8 +152,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders ifModifiedSince(long timeInMillis) {
-        ZonedDateTime date = ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.of("GMT"));
-        add(IF_MODIFIED_SINCE, date.format(DateTimeFormatter.RFC_1123_DATE_TIME));
+        add(IF_MODIFIED_SINCE, ZonedDateTime.ofInstant(Instant.ofEpochMilli(timeInMillis), ZoneId.systemDefault()));
         return this;
     }
 
@@ -231,7 +227,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      */
     default MutableHttpHeaders add(CharSequence header, ZonedDateTime value) {
         if (header != null && value != null) {
-            add(header, value.format(DateTimeFormatter.RFC_1123_DATE_TIME));
+            add(header, value.withZoneSameInstant(ZoneId.of("GMT")).format(DateTimeFormatter.RFC_1123_DATE_TIME));
         }
         return this;
     }
