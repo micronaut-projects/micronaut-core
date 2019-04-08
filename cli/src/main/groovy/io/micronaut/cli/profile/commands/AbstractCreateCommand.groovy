@@ -606,6 +606,11 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         Integer javaVersion = VersionInfo.getJavaVersion()
         features = features.findAll { it.isSupported(javaVersion) }
 
+        def evicted = features.collect() { it.evictedFeatureNames }.flatten()
+        if (evicted) {
+            features.removeIf { evicted.contains(it.name) }
+        }
+
         List<String> oneOfFeatureNames = []
         profile.oneOfFeatures.each { g ->
             oneOfFeatureNames.addAll(g.oneOfFeatures*.feature*.name)
