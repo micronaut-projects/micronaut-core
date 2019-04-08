@@ -32,6 +32,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Function;
 
 /**
@@ -43,6 +44,7 @@ import java.util.function.Function;
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
 
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
+    private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
 
     private String[] args = new String[0];
     private Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
@@ -84,12 +86,14 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                     } else {
                         if (embeddedApplication instanceof EmbeddedServer) {
 
+                            final EmbeddedServer embeddedServer = (EmbeddedServer) embeddedApplication;
                             if (LOG.isInfoEnabled()) {
                                 long end = System.currentTimeMillis();
                                 long took = end - start;
-                                URL url = ((EmbeddedServer) embeddedApplication).getURL();
+                                URL url = embeddedServer.getURL();
                                 LOG.info("Startup completed in {}ms. Server Running: {}", took, url);
                             }
+                            keepAlive = embeddedServer.isKeepAlive();
                         } else {
                             if (LOG.isInfoEnabled()) {
                                 long end = System.currentTimeMillis();
@@ -102,30 +106,41 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
                     Thread mainThread = Thread.currentThread();
                     boolean finalKeepAlive = keepAlive;
+                    CountDownLatch countDownLatch = new CountDownLatch(1);
                     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                         if (LOG.isInfoEnabled()) {
                             LOG.info("Embedded Application shutting down");
                         }
-                        embeddedApplication.stop();
-                        if (finalKeepAlive) {
-                            mainThread.interrupt();
+                        if (embeddedApplication.isRunning()) {
+                            embeddedApplication.stop();
+                            countDownLatch.countDown();
+                            if (finalKeepAlive) {
+                                mainThread.interrupt();
+                            }
                         }
                     }));
 
                     if (keepAlive) {
-                        try {
-                            while (embeddedApplication.isRunning()) {
-                                Thread.sleep(1000);
+                        new Thread(() -> {
+                            try {
+                                if (!embeddedApplication.isRunning()) {
+                                    countDownLatch.countDown();
+                                    Thread.sleep(1000);
+                                }
+                            } catch (InterruptedException e) {
+                                // ignore
                             }
-                            if (LOG.isInfoEnabled()) {
-                                LOG.info("Embedded Application shutting down");
-                            }
-                            if (embeddedApplication.isForceExit()) {
-                                System.exit(0);
-                            }
-                        } catch (InterruptedException e) {
-                            // ignore
-                        }
+                        }, SHUTDOWN_MONITOR_THREAD).start();
+
+                        countDownLatch.await();
+                    }
+
+
+                    if (LOG.isInfoEnabled()) {
+                        LOG.info("Embedded Application shutting down");
+                    }
+                    if (embeddedApplication.isForceExit()) {
+                        System.exit(0);
                     }
 
                 } catch (Throwable e) {
