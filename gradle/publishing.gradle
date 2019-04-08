@@ -100,7 +100,8 @@ publishing {
                 pom.withXml { xml ->
                     def xmlNode = xml.asNode()
                     def dependenciesNode = xmlNode.appendNode('dependencies')
-
+                    Set<Dependency> visited = new HashSet<>()
+                    
                     project.configurations.compile.allDependencies.each {
                         if (! (it instanceof SelfResolvingDependency)) {
                             def dependencyNode = dependenciesNode.appendNode('dependency')
@@ -116,8 +117,12 @@ publishing {
                             dependencyNode.appendNode('version', project.version)
                             dependencyNode.appendNode('scope', 'compile')
                         }
+                        visited.add(it)
                     }
                     project.configurations.runtime.allDependencies.each {
+                        if (visited.contains(it)) {
+                            return
+                        }
                         if (! (it instanceof SelfResolvingDependency)) {
                             def dependencyNode = dependenciesNode.appendNode('dependency')
                             dependencyNode.appendNode('groupId', it.group)
@@ -133,6 +138,7 @@ publishing {
                             dependencyNode.appendNode('scope', 'runtime')
 
                         }
+                        visited.add(it)
                     }
                     xmlNode.children().last() + pomInfo
                 }
