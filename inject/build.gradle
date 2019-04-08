@@ -1,47 +1,16 @@
-apply plugin: 'com.github.johnrengelman.shadow'
-
-shadowJar {
-    mergeServiceFiles()
-    dependencies {
-        exclude(project(":core"))
-
-        exclude(dependency(dependencyVersion("slf4j")))
-        exclude(dependency(dependencyVersion("snakeyaml")))
-        exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
-        exclude(dependency('org.ow2.asm:.*:.*'))
-        exclude(dependency('javax.annotation:.*:.*'))
-        exclude(dependency('org.reactivestreams:.*:.*'))
-        exclude(dependency('com.google.code.findbugs:.*:.*'))
-        exclude(dependency('com.github.ben-manes.caffeine:.*:.*'))
-    }
-    relocate "org.objectweb.asm", "io.micronaut.asm"
-    relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
-}
-tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation) { t ->
-    t.enabled = false
-}
-
+shadowJar.enabled = true
 dependencies {
-    shadowCompile group: 'javax.inject', name: 'javax.inject', version: '1'
-    shadowCompile project(":core")
-    shadowCompile dependencyVersion("snakeyaml")
-    shadowCompile dependencyVersion("javax.annotation-api")
     compile dependencyVersion("javax.annotation-api")
     compile group: 'javax.inject', name: 'javax.inject', version: '1'
-    compile project(path: ':core')
+    compile project(':core')
     compile dependencyVersion("snakeyaml")
 
     compileOnly "javax.persistence:javax.persistence-api:2.2"
     compileOnly dependencyVersion("groovy")
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.3.20"
-    compile "org.ow2.asm:asm:$asmVersion"
-    compile "org.ow2.asm:asm-commons:$asmVersion"
-    compile "org.ow2.asm:asm-tree:$asmVersion"
-    compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
     compileOnly dependencyVersion("validation")
 
     testCompile dependencyVersion("validation")
     testCompile project(":inject-groovy")
     testCompile "com.github.stefanbirkner:system-rules:$systemRulesVersion"
-
 }
