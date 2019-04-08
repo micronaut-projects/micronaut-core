@@ -15,6 +15,7 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.order.Ordered;
 
 /**
@@ -36,6 +37,7 @@ import io.micronaut.core.order.Ordered;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Indexed(Interceptor.class)
 public interface Interceptor<T, R> extends Ordered {
 
     /**
