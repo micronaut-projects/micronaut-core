@@ -1,29 +1,4 @@
-apply plugin: 'com.github.johnrengelman.shadow'
-
 dependencies {
-    shadowCompile project(":inject")
     compile project(":inject")
 }
-
-shadowJar {
-    dependencies {
-        exclude(project(":inject"))
-        exclude(project(":core"))
-        exclude(dependency('javax.annotation:.*:.*'))
-        exclude(dependency(dependencyVersion("snakeyaml")))
-        exclude(dependency(dependencyVersion("slf4j")))
-        exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
-        exclude(dependency('org.ow2.asm:.*:.*'))
-        exclude(dependency('org.reactivestreams:.*:.*'))
-        exclude(dependency('com.google.code.findbugs:.*:.*'))
-        exclude(dependency('com.github.ben-manes.caffeine:.*:.*'))
-    }
-
-    relocate "org.objectweb.asm", "io.micronaut.asm"
-    relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
-
-}
-
-tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation) { t ->
-    t.enabled = false
-}
+shadowJar.enabled = true
