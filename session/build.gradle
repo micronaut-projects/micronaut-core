@@ -1,3 +1,4 @@
+shadowJar.enabled = true
 dependencies {
     compile project(":runtime")
     compile project(":http")

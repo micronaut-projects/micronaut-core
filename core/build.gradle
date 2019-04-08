@@ -1,3 +1,4 @@
+shadowJar.enabled = true
 shadowJar {
     exclude "module-info.class"
 }

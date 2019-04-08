@@ -93,7 +93,7 @@ publishing {
         maven(MavenPublication) { publication ->
             artifactId( "micronaut-" + project.name.substring(project.name.indexOf('/') + 1) )
             def shadowJar = tasks.findByName("shadowJar")
-            if(shadowJar) {
+            if(shadowJar && shadowJar.enabled) {
                 artifact(project.tasks.shadowJar) {
                     classifier = null
                 }
