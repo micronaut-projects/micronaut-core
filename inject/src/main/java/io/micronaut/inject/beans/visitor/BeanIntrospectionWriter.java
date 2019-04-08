@@ -330,7 +330,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, referenceName);
 
         try (OutputStream referenceStream = classWriterOutputVisitor.visitClass(referenceName)) {
-            startFinalClass(referenceWriter, targetClassType.getInternalName(), superType);
+            startPublicFinalClass(referenceWriter, targetClassType.getInternalName(), superType);
             final ClassWriter classWriter = generateClassBytes(referenceWriter);
             referenceStream.write(classWriter.toByteArray());
         }
