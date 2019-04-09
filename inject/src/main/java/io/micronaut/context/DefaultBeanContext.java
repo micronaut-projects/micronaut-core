@@ -2297,18 +2297,12 @@ public class DefaultBeanContext implements BeanContext {
         for (BeanDefinitionReference beanDefinitionReference: beanDefinitionsClasses) {
             if (beanDefinitionReference.isPresent()) {
                 final Class beanType = beanDefinitionReference.getBeanType();
-                if (indexedTypes.contains(beanType)) {
-                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(beanType);
+                indexedTypes.stream()
+                        .filter(t -> t == beanType || t.isAssignableFrom(beanType))
+                        .forEach(indexedType -> {
+                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType);
                     indexed.add(beanDefinitionReference);
-                } else {
-                    Optional<Class> indexedType = indexedTypes.stream().filter(t ->
-                            t == beanType || t.isAssignableFrom(beanType)
-                    ).findFirst();
-                    if (indexedType.isPresent()) {
-                        final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
-                        indexed.add(beanDefinitionReference);
-                    }
-                }
+                });
             }
         }
     }
