@@ -25,11 +25,14 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Get
+import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Inject
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ForkJoinPool
 
 /**
  * @author Graeme Rocher
@@ -58,6 +61,37 @@ class ReadTimeoutSpec extends Specification {
         then:
         def e = thrown(ReadTimeoutException)
         e.message == 'Read Timeout'
+    }
+
+    void "test connection pool with read timeout"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'10s',
+                'micronaut.http.client.pool.enabled':true,
+                'micronaut.http.client.pool.max-connections':10
+        )
+        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:"Another request is made"
+        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+
+        then:"Ensure the read timeout was reset in the connection in the pool"
+        result == result2
+
+        when:"issue a whole bunch of requests"
+        def results = Flowable.concat((1..500).collect() {
+            client.retrieve(HttpRequest.GET('/timeout/success'), String)
+        }).toList().blockingGet()
+
+        then:"Every result is correct"
+        results.size() == 500
+        results.every() { it == result }
+
+
+        cleanup:
+        client.close()
+        clientContext.close()
     }
 
     void "test read timeout setting with connection pool"() {
