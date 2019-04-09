@@ -1803,10 +1803,15 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             }
                         }
                     }
-                    if (channelPool != null) {
-                        Channel ch = channelHandlerContext.channel();
-                        channelPool.release(ch);
-                    }
+                    pipeline.remove(this);
+
+                }
+            }
+
+            @Override
+            public void handlerRemoved(ChannelHandlerContext ctx) {
+                if (channelPool != null) {
+                    channelPool.release(channel);
                 }
             }
 
@@ -2008,23 +2013,29 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         // in the connection pooled scenario
                     }
                 });
+                addReadTimeoutHandler(ch.pipeline());
             }
 
             @Override
             public void channelAcquired(Channel ch) {
                 final ChannelPipeline pipeline = ch.pipeline();
+                addReadTimeoutHandler(pipeline);
+            }
+
+            private void addReadTimeoutHandler(ChannelPipeline pipeline) {
                 if (readTimeoutMillis != null) {
                     // reset read timeout
-                    pipeline.replace(
-                            HANDLER_READ_TIMEOUT,
+                    pipeline.addBefore(
+                            HANDLER_HTTP_CLIENT_CODEC,
                             HANDLER_READ_TIMEOUT,
                             new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
                 }
+            }
 
-                final boolean hasResponseHandler = pipeline.get(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE) != null;
-                if (hasResponseHandler) {
-                    // will be re-added down the pipeline
-                    pipeline.remove(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE);
+            @Override
+            public void channelReleased(Channel ch) {
+                if (readTimeoutMillis != null) {
+                    ch.pipeline().remove(HANDLER_READ_TIMEOUT);
                 }
             }
         };
@@ -2090,16 +2101,19 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 p.addLast(HANDLER_SSL, sslHandler);
             }
 
-            // read timeout settings are not applied to streamed requests.
-            // instead idle timeout settings are applied.
-            if (!stream && readTimeoutMillis != null) {
-                p.addLast(HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
-            } else {
-                Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
-                if (readIdleTime.isPresent()) {
-                    Duration duration = readIdleTime.get();
-                    if (!duration.isNegative()) {
-                        p.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+            // Pool connections require alternative timeout handling
+            if (poolMap == null) {
+                // read timeout settings are not applied to streamed requests.
+                // instead idle timeout settings are applied.
+                if (!stream && readTimeoutMillis != null) {
+                    p.addLast(HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+                } else {
+                    Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
+                    if (readIdleTime.isPresent()) {
+                        Duration duration = readIdleTime.get();
+                        if (!duration.isNegative()) {
+                            p.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                        }
                     }
                 }
             }
@@ -2272,13 +2286,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
             if (channelPool == null) {
                 closeChannel(channel, emitter, channelFuture);
-            } else {
-                channelFuture.addListener(f -> {
-                    channelPool.release(channel);
-                    if (encoder != null) {
-                        encoder.cleanFiles();
-                    }
-                });
             }
         }
 
