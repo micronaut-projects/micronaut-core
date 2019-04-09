@@ -58,11 +58,11 @@ With this approach you need to have installed only Docker as it downloads the re
 
 To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using SDKman:
 
-.Installing GraalVM 1.0.0-rc14 with SDKman
+.Installing GraalVM 1.0.0-rc15 with SDKman
 [source,bash]
 ----
-$ sdk install java 1.0.0-rc-14-grl
-$ sdk use java 1.0.0-rc-14-grl
+$ sdk install java 1.0.0-rc-15-grl
+$ sdk use java 1.0.0-rc-15-grl
 ----
 
 .Creating native image with Gradle
