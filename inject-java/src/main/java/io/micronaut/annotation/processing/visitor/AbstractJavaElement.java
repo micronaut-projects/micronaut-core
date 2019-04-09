@@ -33,7 +33,6 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import java.lang.annotation.Annotation;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
