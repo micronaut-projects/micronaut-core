@@ -2267,6 +2267,15 @@ public class DefaultBeanContext implements BeanContext {
                     ClassLoadingReporter.reportMissing(beanDefinitionReference.getName());
                 }
             } else {
+                final List<AnnotationValue<Indexed>> indexes = beanDefinitionReference.getAnnotationMetadata().getAnnotationValuesByType(Indexed.class);
+                if (CollectionUtils.isNotEmpty(indexes)) {
+                    for (AnnotationValue<Indexed> index : indexes) {
+                        final Class indexedType = index.getValue(Class.class).orElse(null);
+                        if (indexedType != null) {
+                            resolveTypeIndex(indexedType);
+                        }
+                    }
+                }
                 if (beanDefinitionReference.isContextScope()) {
                     contextScopeBeans.add(beanDefinitionReference);
                 }
@@ -2277,35 +2286,28 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         beanDefinitionsClasses.removeAll(disabled);
-        beanDefinitionsClasses.forEach(this::indexBeanDefinitionIfNecessary);
+        indexBeanDefinitions();
         disabled.clear();
 
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans);
     }
 
-    private void indexBeanDefinitionIfNecessary(BeanDefinitionReference beanDefinitionReference) {
-        final List<AnnotationValue<Indexed>> indexes = beanDefinitionReference.getAnnotationMetadata().getAnnotationValuesByType(Indexed.class);
-        if (CollectionUtils.isNotEmpty(indexes)) {
-            for (AnnotationValue<Indexed> index : indexes) {
-                final Class indexedType = index.getValue(Class.class).orElse(null);
-                if (indexedType != null) {
-                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType);
+    private void indexBeanDefinitions() {
+        for (BeanDefinitionReference beanDefinitionReference: beanDefinitionsClasses) {
+            if (beanDefinitionReference.isPresent()) {
+                final Class beanType = beanDefinitionReference.getBeanType();
+                if (indexedTypes.contains(beanType)) {
+                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(beanType);
                     indexed.add(beanDefinitionReference);
-                }
-            }
-        } else if (beanDefinitionReference.isPresent()) {
-            final Class beanType = beanDefinitionReference.getBeanType();
-            if (indexedTypes.contains(beanType)) {
-                final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(beanType);
-                indexed.add(beanDefinitionReference);
-            } else {
-                Optional<Class> indexedType = indexedTypes.stream().filter(t ->
-                        t == beanType || t.isAssignableFrom(beanType)
-                ).findFirst();
-                if (indexedType.isPresent()) {
-                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
-                    indexed.add(beanDefinitionReference);
+                } else {
+                    Optional<Class> indexedType = indexedTypes.stream().filter(t ->
+                            t == beanType || t.isAssignableFrom(beanType)
+                    ).findFirst();
+                    if (indexedType.isPresent()) {
+                        final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
+                        indexed.add(beanDefinitionReference);
+                    }
                 }
             }
         }
