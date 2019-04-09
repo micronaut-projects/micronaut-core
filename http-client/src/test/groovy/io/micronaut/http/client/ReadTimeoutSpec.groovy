@@ -17,7 +17,10 @@ package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
+import io.micronaut.http.HttpHeaderValues
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.client.annotation.Client
@@ -63,7 +66,38 @@ class ReadTimeoutSpec extends Specification {
         e.message == 'Read Timeout'
     }
 
-    void "test connection pool with read timeout"() {
+    void "test connection pool under load - no keep alive"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'3s',
+                'micronaut.http.client.pool.enabled':true,
+                'micronaut.http.client.pool.max-connections':10
+        )
+        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:"Another request is made"
+        def result = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive'), String).blockingFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive'), String).blockingFirst()
+
+        then:"Ensure the read timeout was reset in the connection in the pool"
+        result == result2
+
+        when:"issue a whole bunch of requests"
+        def results = Flowable.concat((1..50).collect() {
+            client.retrieve(HttpRequest.GET('/timeout/no-keep-alive'), String)
+        }).toList().blockingGet()
+
+        then:"Every result is correct"
+        results.size() == 50
+        results.every() { it == result }
+
+
+        cleanup:
+        client.close()
+        clientContext.close()
+    }
+
+    void "test connection pool under load"() {
         given:
         ApplicationContext clientContext = ApplicationContext.run(
                 'micronaut.http.client.read-timeout':'10s',
@@ -93,6 +127,8 @@ class ReadTimeoutSpec extends Specification {
         client.close()
         clientContext.close()
     }
+
+
 
     void "test read timeout setting with connection pool"() {
         given:
@@ -159,6 +195,11 @@ class ReadTimeoutSpec extends Specification {
         @Get(value = "/success", produces = MediaType.TEXT_PLAIN)
         String success() {
             return "ok"
+        }
+
+        @Get(value = "/no-keep-alive", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> noKeepAlive() {
+            return HttpResponse.ok("ok").header(HttpHeaders.CONNECTION, "close")
         }
     }
 
