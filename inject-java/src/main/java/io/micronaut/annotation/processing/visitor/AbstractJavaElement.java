@@ -160,9 +160,6 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                     );
                 }
             }
-        } else if (returnType instanceof PrimitiveType) {
-            PrimitiveType pt = (PrimitiveType) returnType;
-            return JavaPrimitiveElement.valueOf(pt.toString().toUpperCase(Locale.ENGLISH));
         } else if (returnType instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) returnType;
             TypeMirror upperBound = tv.getUpperBound();
@@ -189,6 +186,9 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                     };
                 }
             }
+        } else if (returnType instanceof PrimitiveType) {
+            PrimitiveType pt = (PrimitiveType) returnType;
+            return JavaPrimitiveElement.valueOf(pt.getKind().name());
         }
         return null;
     }
