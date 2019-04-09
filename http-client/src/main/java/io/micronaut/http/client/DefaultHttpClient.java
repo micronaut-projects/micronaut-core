@@ -992,13 +992,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     channelFuture.addListener(future -> {
                         if (future.isSuccess()) {
                             Channel channel = (Channel) future.get();
-                            if (readTimeoutMillis != null) {
-                                // reset read timeout
-                                channel.pipeline().replace(
-                                        HANDLER_READ_TIMEOUT,
-                                        HANDLER_READ_TIMEOUT,
-                                        new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
-                            }
                             try {
                                 sendRequestThroughChannel(
                                         requestWrapper,
@@ -2013,6 +2006,17 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         false,
                         false
                 ));
+            }
+
+            @Override
+            public void channelAcquired(Channel ch) throws Exception {
+                if (readTimeoutMillis != null) {
+                    // reset read timeout
+                    ch.pipeline().replace(
+                            HANDLER_READ_TIMEOUT,
+                            HANDLER_READ_TIMEOUT,
+                            new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+                }
             }
         };
     }
