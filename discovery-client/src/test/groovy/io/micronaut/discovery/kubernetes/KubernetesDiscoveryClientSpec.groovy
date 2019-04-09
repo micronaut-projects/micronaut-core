@@ -15,6 +15,9 @@
  */
 package io.micronaut.discovery.kubernetes
 
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
+import io.micronaut.core.util.StringUtils
 import spock.lang.Specification
 
 /**
@@ -49,6 +52,30 @@ class KubernetesDiscoveryClientSpec extends Specification {
         client.getInstances('foo').blockingFirst()[0].getURI() == URI.create("https://foo:8443")
         client.getInstances('foo-baz').blockingFirst()[0].getURI() == URI.create("https://foobaz:8443")
         client.getInstances('bar').blockingFirst()[0].getURI() == URI.create("http://bar:8081")
+    }
 
+    void "KubernetesDiscoveryClient can be disabled"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run([
+                'k8s.discovery-client-env-vars.enabled': StringUtils.FALSE
+        ], Environment.KUBERNETES)
+
+        expect:
+        !applicationContext.containsBean(KubernetesDiscoveryClient)
+
+        cleanup:
+        applicationContext.close()
+    }
+
+
+    void "KubernetesDiscoveryClient is loaded by default in Kubernetes environment"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run([:], Environment.KUBERNETES)
+
+        expect:
+        applicationContext.containsBean(KubernetesDiscoveryClient)
+
+        cleanup:
+        applicationContext.close()
     }
 }

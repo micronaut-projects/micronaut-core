@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
  */
 @Singleton
 @Requires(env = Environment.KUBERNETES)
+@Requires(property = "k8s.discovery-client-env-vars.enabled", notEquals = StringUtils.FALSE)
 public class KubernetesDiscoveryClient implements DiscoveryClient {
     private static final Logger LOG = LoggerFactory.getLogger(KubernetesDiscoveryClient.class);
 
