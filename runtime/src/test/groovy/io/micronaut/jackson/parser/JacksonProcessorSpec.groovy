@@ -15,12 +15,14 @@
  */
 package io.micronaut.jackson.parser
 
-
+import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.core.io.JsonEOFException
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
+import com.fasterxml.jackson.databind.node.JsonNodeFactory
+import com.fasterxml.jackson.databind.node.LongNode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import org.reactivestreams.Subscriber
@@ -281,6 +283,63 @@ class JacksonProcessorSpec extends Specification {
         error != null
         error instanceof JsonParseException
 
+    }
+
+    void "test nested arrays"() {
+        given:
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+        JacksonProcessor processor = new JacksonProcessor(new JsonFactory(), true)
+
+        when:
+        byte[] bytes = '[1, 2, [3, 4, [5, 6], 7], [8, 9, 10], 11, 12]'.bytes
+        boolean complete = false
+        List<JsonNode> nodes = new ArrayList<>()
+        Throwable error = null
+        int nodeCount = 0
+        processor.subscribe(new Subscriber<JsonNode>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
+            }
+
+            @Override
+            void onNext(JsonNode jsonNode) {
+                nodeCount++
+                nodes.add(jsonNode)
+            }
+
+            @Override
+            void onError(Throwable t) {
+                error = t
+            }
+
+            @Override
+            void onComplete() {
+                complete = true
+            }
+        })
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {
+
+            }
+
+            @Override
+            void cancel() {
+
+            }
+        })
+        processor.onNext(bytes)
+        processor.onComplete()
+
+        then:
+        nodeCount == 6
+        nodes[0].equals(JsonNodeFactory.instance.numberNode(1L))
+        nodes[1].equals(JsonNodeFactory.instance.numberNode(2L))
+        ((ArrayNode) nodes[2]).size() == 4
+        ((ArrayNode) nodes[3]).size() == 3
+        nodes[4].equals(JsonNodeFactory.instance.numberNode(11L))
+        nodes[5].equals(JsonNodeFactory.instance.numberNode(12L))
     }
 
 }

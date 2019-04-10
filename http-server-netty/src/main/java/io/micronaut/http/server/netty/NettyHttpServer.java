@@ -212,6 +212,11 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.eventLoopGroupFactory = eventLoopGroupFactory;
     }
 
+    @Override
+    public boolean isKeepAlive() {
+        return false;
+    }
+
     /**
      * @return The configuration for the server
      */

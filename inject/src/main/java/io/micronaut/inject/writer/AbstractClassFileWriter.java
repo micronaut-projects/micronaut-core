@@ -879,7 +879,16 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @param superType   The super type
      */
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
-        classWriter.visit(V1_8, ACC_PUBLIC, className, null, superType.getInternalName(), null);
+        classWriter.visit(V1_8, ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+    }
+
+    /**
+     * @param classWriter The current class writer
+     * @param className   The class name
+     * @param superType   The super type
+     */
+    protected void startPublicClass(ClassVisitor classWriter, String className, Type superType) {
+        classWriter.visit(V1_8, ACC_PUBLIC | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
     }
 
     /**
@@ -888,6 +897,16 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @param superType   The super type
      */
     protected void startFinalClass(ClassVisitor classWriter, String className, Type superType) {
+        classWriter.visit(V1_8, ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+    }
+
+
+    /**
+     * @param classWriter The current class writer
+     * @param className   The class name
+     * @param superType   The super type
+     */
+    protected void startPublicFinalClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
     }
 
@@ -898,7 +917,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @param genericSignature The generic signature
      */
     protected void startClass(ClassWriter classWriter, String className, Type superType, String genericSignature) {
-        classWriter.visit(V1_8, ACC_PUBLIC, className, genericSignature, superType.getInternalName(), null);
+        classWriter.visit(V1_8, ACC_SYNTHETIC, className, genericSignature, superType.getInternalName(), null);
     }
 
     /**

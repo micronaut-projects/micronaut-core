@@ -137,7 +137,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         boolean hasArgs = !argumentTypes.isEmpty();
         Collection<Object> argumentTypeClasses = hasArgs ? argumentTypes.values() : Collections.emptyList();
 
-        int modifiers = isStatic ? ACC_PUBLIC | ACC_STATIC : ACC_PUBLIC;
+        int modifiers = isStatic ? ACC_SYNTHETIC | ACC_STATIC : ACC_SYNTHETIC;
         classWriter.visit(V1_8, modifiers,
             internalName,
             null,

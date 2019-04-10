@@ -18,6 +18,7 @@ package io.micronaut.security.filters;
 
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
@@ -50,6 +51,11 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
      * The attribute used to store the authentication object in the request.
      */
     public static final CharSequence AUTHENTICATION = HttpAttributes.PRINCIPAL;
+
+    /**
+     * The attribute used to store if the request was rejected and why.
+     */
+    public static final CharSequence REJECTION = "micronaut.security.REJECTION";
 
     /**
      * The attribute used to store a valid token in the request.
@@ -143,6 +149,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());
                 }
+                request.setAttribute(REJECTION, forbidden ? HttpStatus.FORBIDDEN : HttpStatus.UNAUTHORIZED);
                 return rejectionHandler.reject(request, forbidden);
             }
             if (result == SecurityRuleResult.ALLOWED) {
@@ -157,6 +164,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
             LOG.debug("Authorized request {} {}. No rule provider authorized or rejected the request.", method, path);
         }
         //no rule found for the given request, reject
+        request.setAttribute(REJECTION, forbidden ? HttpStatus.FORBIDDEN : HttpStatus.UNAUTHORIZED);
         return rejectionHandler.reject(request, forbidden);
     }
 }

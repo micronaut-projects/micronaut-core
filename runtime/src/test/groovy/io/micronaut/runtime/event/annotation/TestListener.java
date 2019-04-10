@@ -22,14 +22,14 @@ import javax.inject.Singleton;
 @Singleton
 public class TestListener {
 
-    boolean invoked = false;
+    int invocationCount = 0;
 
     @EventListener
     void onStartup(StartupEvent event) {
-        invoked = true;
+        invocationCount++;
     }
 
     public boolean isInvoked() {
-        return invoked;
+        return invocationCount > 0;
     }
 }

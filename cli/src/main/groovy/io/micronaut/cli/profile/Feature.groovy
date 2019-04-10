@@ -74,6 +74,11 @@ interface Feature {
     Iterable<Feature> getDependentFeatures(Profile profile)
 
     /**
+     * @return The features that are evicted by this feature
+     */
+    Iterable<String> getEvictedFeatureNames()
+
+    /**
      * @return The default feature names
      */
     Iterable<Feature> getDefaultFeatures(Profile profile)

@@ -362,7 +362,32 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     writeDefaultErrorResponse(ctx, nettyHttpRequest, e);
                 }
             } else {
-                writeDefaultErrorResponse(ctx, nettyHttpRequest, cause);
+                logException(cause);
+
+                Flowable resultFlowable = Flowable.defer(() -> {
+                    return Flowable.just(HttpResponse.serverError()
+                            .body(new JsonError("Internal Server Error: " + cause.getMessage())));
+                });
+
+                AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
+                Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
+                        null,
+                        HttpResponse.class,
+                        AnnotationMetadata.EMPTY_METADATA,
+                        requestReference,
+                        resultFlowable);
+
+                Flowable<? extends MutableHttpResponse<?>> filteredPublisher = filterPublisher(
+                        requestReference,
+                        routePublisher,
+                        ctx.channel().eventLoop());
+
+                subscribeToResponsePublisher(
+                        ctx,
+                        MediaType.APPLICATION_JSON_TYPE,
+                        requestReference,
+                        filteredPublisher
+                );
             }
         }
     }
@@ -1194,16 +1219,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
         }
 
-        // default to Transfer-Encoding: chunked if Content-Length not set or not already set
-        if (!nettyHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && !nettyHeaders.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
-            nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-        }
-
         final Object body = message.body();
         if (body instanceof NettyCustomizableResponseTypeHandlerInvoker) {
             NettyCustomizableResponseTypeHandlerInvoker handler = (NettyCustomizableResponseTypeHandlerInvoker) body;
             handler.invoke(httpRequest, nettyHttpResponse, context);
         } else {
+            // default to Transfer-Encoding: chunked if Content-Length not set or not already set
+            if (!nettyHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && !nettyHeaders.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
+                nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+            }
             // close handled by HttpServerKeepAliveHandler
             context.writeAndFlush(nettyResponse);
             context.read();

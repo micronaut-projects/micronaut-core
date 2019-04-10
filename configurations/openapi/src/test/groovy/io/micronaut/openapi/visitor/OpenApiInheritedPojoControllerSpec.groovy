@@ -17,6 +17,7 @@ package io.micronaut.openapi.visitor
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.swagger.v3.oas.models.OpenAPI
+import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.media.ComposedSchema
 import io.swagger.v3.oas.models.media.Schema
 
@@ -37,14 +38,12 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.validation.Validated;
 import io.reactivex.Single;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
-
 import java.util.HashMap;
 import java.util.Map;
-
-import io.swagger.v3.oas.annotations.media.Schema;
 
 @Validated
 interface PetOperations {
@@ -58,7 +57,7 @@ interface PetOperations {
     Single<Pet> save(@NotBlank String name, @Min(1L) int age);
 
     /**
-     * 
+     *
      * @param name The pet name
      * @return The Pet
      */
@@ -166,6 +165,15 @@ class CatController implements PetOperations {
         return Single.just(name)
                 .map( petName -> pets.get(petName));
     }
+
+    @Get("/claw/{size}")
+    public Single<Pet> findByClawSize(Integer size) {
+        return Single.just(pets.entrySet()
+                .stream()
+                .findFirst()
+                .map(Map.Entry::getValue)
+                .get());
+    }
 }
 
 @javax.inject.Singleton
@@ -197,6 +205,19 @@ class MyBean {}
         ((ComposedSchema)petSchema).oneOf.size() == 2
         ((ComposedSchema)petSchema).oneOf[0].$ref == '#/components/schemas/Dog'
         ((ComposedSchema)petSchema).oneOf[1].$ref == '#/components/schemas/Cat'
+
+        when:
+        Operation operation = openAPI.paths.get("/pet/cat/claw/{size}").get
+
+        then:
+        operation
+        operation.responses
+        operation.responses.size() == 1
+        operation.responses."default"
+        operation.responses."default".content
+        operation.responses."default".content."application/json"
+        operation.responses."default".content."application/json".schema
+        operation.responses."default".content."application/json".schema.$ref
     }
 
     void "test build OpenAPI doc for POJO with inheritance"() {

@@ -21,6 +21,39 @@ import javax.validation.constraints.Size
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test build introspection"() {
+        given:
+        def context = buildContext('test.Address', '''
+package test;
+
+import javax.validation.constraints.*;
+
+
+@io.micronaut.core.annotation.Introspected
+class Address {
+    @NotBlank(groups = GroupOne.class)
+    @NotBlank(groups = GroupThree.class, message = "different message")
+    @Size(min = 5, max = 20, groups = GroupTwo.class)
+    private String street;
+    
+    public String getStreet() {
+        return this.street;
+    }
+}
+
+interface GroupOne {}
+interface GroupTwo {}
+interface GroupThree {}
+''')
+        def clazz = context.classLoader.loadClass('test.$Address$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+
+        expect:
+        reference != null
+        reference.load()
+    }
+
     void "test multiple constructors with @JsonCreator"() {
         given:
         ApplicationContext context = buildContext('test.Test', '''

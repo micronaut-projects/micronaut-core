@@ -29,6 +29,7 @@ import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import spock.lang.Specification
 import zipkin2.Span
+import zipkin2.Span.Kind
 
 import javax.inject.Inject
 
@@ -101,12 +102,17 @@ class HttpTracingSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         def response = e.response
         response
-        reporter.spans.size() == 2
+        reporter.spans.size() == 3
         reporter.spans[0].tags().get('http.path') == '/traced/error/John'
         reporter.spans[0].tags().get('http.status_code') == '500'
         reporter.spans[0].tags().get('http.method') == 'GET'
         reporter.spans[0].tags().get('error') == 'bad'
         reporter.spans[0].name() == 'get /traced/error/{name}'
+        reporter.spans[1].tags().get('http.path') == '/traced/error/John'
+        reporter.spans[1].tags().get('http.status_code') == '500'
+        reporter.spans[1].tags().get('http.method') == 'GET'
+        reporter.spans[1].tags().get('error') == '500'
+        reporter.spans[1].name() == 'get /traced/error/{name}'
 
         cleanup:
         context.close()
@@ -155,17 +161,50 @@ class HttpTracingSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        reporter.spans.size() == 4
-        reporter.spans[0].tags().get('http.path') == '/traced/error/John'
-        reporter.spans[0].name() == 'get /traced/error/{name}'
-        reporter.spans[1].name() == 'get /traced/error/{name}'
-        reporter.spans[2].tags().get('http.path') == '/traced/nestedError/John'
-        reporter.spans[2].name() == 'get /traced/nestederror/{name}'
+        reporter.spans.size() == 6
+        assertSpan(reporter.spans[0],
+                "get /traced/error/{name}",
+                "bad",
+                "/traced/error/John",
+                Span.Kind.SERVER)
+        assertSpan(reporter.spans[1],
+                "get /traced/error/{name}",
+                "500",
+                "/traced/error/John",
+                Span.Kind.SERVER)
+        assertSpan(reporter.spans[2],
+                "get /traced/error/{name}",
+                "Internal Server Error: bad",
+                "/traced/error/John",
+                Span.Kind.CLIENT)
+
+        assertSpan(reporter.spans[3],
+                "get /traced/nestederror/{name}",
+                "Internal Server Error: bad",
+                "/traced/nestedError/John",
+                Span.Kind.SERVER)
+        assertSpan(reporter.spans[4],
+                "get /traced/nestederror/{name}",
+                "500",
+                "/traced/nestedError/John",
+                Span.Kind.SERVER)
+        assertSpan(reporter.spans[5],
+                "get",
+                "Internal Server Error: Internal Server Error: bad",
+                "/traced/nestedError/John",
+                Span.Kind.CLIENT)
+
 
         cleanup:
         context.close()
     }
 
+    private boolean assertSpan(Span span, String name, String error, String path, Kind kind) {
+        return span.tags().get('http.path') == path &&
+                span.tags().get('error') == error &&
+                span.name() == name &&
+                span.kind() == kind
+    }
 
     ApplicationContext buildContext() {
         def reporter = new TestReporter()

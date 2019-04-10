@@ -1,12 +1,6 @@
-apply plugin: 'com.github.johnrengelman.shadow'
-
-
 dependencies {
-    shadowCompile project(":inject")
     compile project(":inject")
-    shadowCompile project(":aop")
     compile project(":aop")
-    shadowCompile dependencyVersion("groovy")
     compile dependencyVersion("groovy")
 
     testCompile "junit:junit:4.7"
@@ -20,37 +14,6 @@ dependencies {
     testCompile project(":validation")
     testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testCompile dependencyModuleVersion("groovy", "groovy-json")
-}
-
-
-shadowJar {
-    dependencies {
-        for(dep in project.configurations.shadowCompile.dependencies) {
-            if(dep instanceof ProjectDependency) {
-                exclude(project(":$dep.name"))
-            }
-            else if(dep instanceof ExternalDependency) {
-                exclude(dependency("$dep.group:$dep.name:.*"))
-            }
-        }
-        exclude(project(":inject"))
-        exclude(project(":core"))
-        exclude(dependency('javax.annotation:.*:.*'))
-        exclude(dependency(dependencyVersion("slf4j")))
-        exclude(dependency(dependencyVersion("snakeyaml")))
-        exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
-        exclude(dependency('org.ow2.asm:.*:.*'))
-        exclude(dependency('org.reactivestreams:.*:.*'))
-        exclude(dependency('com.google.code.findbugs:.*:.*'))
-        exclude(dependency('com.github.ben-manes.caffeine:.*:.*'))
-    }
-
-    relocate "org.objectweb.asm", "io.micronaut.asm"
-    relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
-}
-
-tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation) { t ->
-    t.enabled = false
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

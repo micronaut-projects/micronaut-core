@@ -20,39 +20,35 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.security.config.InterceptUrlMapPattern
 import io.micronaut.security.token.config.TokenConfiguration
 import spock.lang.Specification
+import spock.lang.Unroll
 
 class InterceptUrlMapRuleSpec extends Specification {
 
+    @Unroll
     void "test query arguments are ignored by matching logic"() {
-        given:
-        def rule = new InterceptUrlMapRule(new TokenConfiguration() {
-            @Override
-            String getRolesName() {
-                "roles"
-            }
-        }) {
+
+        given: 'a token configuration'
+        TokenConfiguration configuration = Mock()
+
+        and: 'the expected mock behaviour'
+        (0..1) * configuration.rolesName >> "roles"
+        0 * _
+
+        and:
+        SecurityRule rule = new InterceptUrlMapRule(configuration) {
             @Override
             protected List<InterceptUrlMapPattern> getPatternList() {
                 [new InterceptUrlMapPattern("/foo", ["ROLE_ADMIN"], HttpMethod.GET)]
             }
         }
 
-        when:
-        SecurityRuleResult result = rule.check(HttpRequest.GET("/foo"), null, [roles: ["ROLE_ADMIN"]])
+        expect:
+        rule.check(HttpRequest.GET(uri), null, [roles: ["ROLE_ADMIN"]]) == expectedResult
 
-        then:
-        result == SecurityRuleResult.ALLOWED
-
-        when:
-        result = rule.check(HttpRequest.GET("/foo?bar=true"), null, [roles: ["ROLE_ADMIN"]])
-
-        then:
-        result == SecurityRuleResult.ALLOWED
-
-        when:
-        result = rule.check(HttpRequest.GET("/foo/bar"), null, [roles: ["ROLE_ADMIN"]])
-
-        then:
-        result == SecurityRuleResult.UNKNOWN
+        where:
+        uri             || expectedResult
+        '/foo'          || SecurityRuleResult.ALLOWED
+        '/foo?bar=true' || SecurityRuleResult.ALLOWED
+        '/foo/bar'      || SecurityRuleResult.UNKNOWN
     }
 }

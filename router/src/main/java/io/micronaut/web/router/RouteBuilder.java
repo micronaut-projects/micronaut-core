@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.MethodConvention;
 import io.micronaut.core.naming.conventions.PropertyConvention;
@@ -41,6 +42,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @SuppressWarnings("MethodName")
+@Indexed(RouteBuilder.class)
 public interface RouteBuilder {
 
     /**

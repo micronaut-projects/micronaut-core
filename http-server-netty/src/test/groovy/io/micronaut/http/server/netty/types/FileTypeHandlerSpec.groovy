@@ -16,11 +16,7 @@
 package io.micronaut.http.server.netty.types
 
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.MutableHttpRequest
+import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -33,6 +29,7 @@ import io.micronaut.http.server.types.files.AttachedFile
 import io.micronaut.http.server.types.files.StreamedFile
 import io.micronaut.http.server.types.files.SystemFile
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType
+import spock.lang.IgnoreIf
 
 import javax.inject.Inject
 import javax.inject.Named
@@ -135,6 +132,35 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
         response.body() == tempFileContents
+    }
+
+    //Using curl because the netty client reads the first chunk and alters the headers
+    @IgnoreIf({ os.windows })
+    void "test when a streamed file is returned transfer-encoding should be set"() {
+        when:
+        String curlCommand = "curl -I -X GET ${getServer().toString()}/test-stream/download"
+        Process process = ['bash', '-c', curlCommand].execute()
+        String output = process.text.toLowerCase()
+
+        then:
+        output.contains("200 ok")
+        output.contains("transfer-encoding: chunked")
+        !output.contains("content-length:")
+    }
+
+    //Using curl because the netty client will remove one of transfer encoding or
+    // content type if both are set
+    @IgnoreIf({ os.windows })
+    void "est when a system file is returned content-length should be set"() {
+        when:
+        String curlCommand = "curl -I -X GET ${getServer().toString()}/test-system/download"
+        Process process = ['bash', '-c', curlCommand].execute()
+        String output = process.text.toLowerCase()
+
+        then:
+        output.contains("200 ok")
+        !output.contains("transfer-encoding: chunked")
+        output.contains("content-length:")
     }
 
     void "test when an attached streamed file is returned"() {

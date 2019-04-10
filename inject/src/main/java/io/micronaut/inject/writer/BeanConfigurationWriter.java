@@ -77,7 +77,7 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
             Class<AbstractBeanConfiguration> superType = AbstractBeanConfiguration.class;
             Type beanConfigurationType = Type.getType(superType);
 
-            startClass(classWriter, configurationClassInternalName, beanConfigurationType);
+            startPublicClass(classWriter, configurationClassInternalName, beanConfigurationType);
             writeAnnotationMetadataStaticInitializer(classWriter);
 
             writeConstructor(classWriter);
