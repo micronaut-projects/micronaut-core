@@ -488,6 +488,7 @@ subprojects { Project subproject ->
         isGrailsPlugin = false
         isConfiguration = subproject.projectDir.parentFile.name == 'configurations'
         isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
+        isJava8 = JavaVersion.current() == JavaVersion.VERSION_1_8
     }
 
     if (subproject.name == "configurations") {
@@ -527,7 +528,11 @@ subprojects { Project subproject ->
 
             checkstyle {
                 toolVersion = 8.10
-                configFile = rootProject.file('config/checkstyle/checkstyle.xml')
+                if (isJava8) {
+                    configFile = rootProject.file('config/checkstyle/checkstyle.xml')
+                } else {
+                    configFile = file("${rootProject.projectDir}/config/checkstyle/checkstyle.xml")
+                }
 
                 // Per submodule
                 maxErrors = 0
