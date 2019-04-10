@@ -19,11 +19,13 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
+import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.http.HttpMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,7 +42,7 @@ public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrl
 
     private static final String PATTERN = "pattern";
     private static final String ACCESS = "access";
-    private static final String HTTP_METHOD = "httpMethod";
+    private static final String HTTP_METHOD = "http-method";
 
     private final ConversionService conversionService;
 
@@ -62,6 +64,7 @@ public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrl
         if (m == null) {
             return Optional.empty();
         }
+        m = transform(m);
         Optional<String> optionalPattern = conversionService.convert(m.get(PATTERN), String.class);
         if (optionalPattern.isPresent()) {
             Optional<List<String>> optionalAccessList = conversionService.convert(m.get(ACCESS), List.class);
@@ -91,5 +94,14 @@ public class InterceptUrlMapConverter implements TypeConverter<Map, InterceptUrl
         } else {
             throw new ConfigurationException(String.format("interceptUrlMap configuration record %s rejected due to missing %s key.", m.toString(), PATTERN));
         }
+    }
+
+    private Map transform(Map<String, Object> map) {
+        Map<String, Object> transformed = new HashMap<>();
+        StringConvention convention = StringConvention.HYPHENATED;
+        for (Map.Entry<String, Object> entry: map.entrySet()) {
+            transformed.put(convention.format(entry.getKey()), entry.getValue());
+        }
+        return transformed;
     }
 }
