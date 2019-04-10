@@ -1723,6 +1723,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandler<FullHttpResponse>(false) {
 
             AtomicBoolean complete = new AtomicBoolean(false);
+            boolean keepAlive = true;
 
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
@@ -1803,6 +1804,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             }
                         }
                     }
+                    if (!HttpUtil.isKeepAlive(fullResponse)) {
+                        keepAlive = false;
+                    }
                     pipeline.remove(this);
 
                 }
@@ -1811,7 +1815,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             @Override
             public void handlerRemoved(ChannelHandlerContext ctx) {
                 if (channelPool != null) {
-                    channelPool.release(channel);
+                    final Channel ch = ctx.channel();
+                    if (!keepAlive) {
+                        ch.closeFuture().addListener((future ->
+                                channelPool.release(ch)
+                        ));
+                    } else {
+                        channelPool.release(ch);
+                    }
                 }
             }
 
@@ -1837,6 +1848,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         }
                     }
                 } finally {
+                    keepAlive = false;
                     pipeline.remove(this);
                 }
             }
