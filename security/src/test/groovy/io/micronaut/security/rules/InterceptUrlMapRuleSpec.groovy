@@ -27,8 +27,12 @@ class InterceptUrlMapRuleSpec extends Specification {
     @Unroll
     void "test query arguments are ignored by matching logic"() {
 
-        given:
+        given: 'a token configuration'
         TokenConfiguration configuration = Mock()
+
+        and: 'the expected mock behaviour'
+        (0..1) * configuration.rolesName >> "roles"
+        0 * _
 
         and:
         SecurityRule rule = new InterceptUrlMapRule(configuration) {
@@ -38,15 +42,8 @@ class InterceptUrlMapRuleSpec extends Specification {
             }
         }
 
-        when:
-        SecurityRuleResult result = rule.check(HttpRequest.GET(uri), null, [roles: ["ROLE_ADMIN"]])
-
-        then:
-        result == expectedResult
-
-        and:
-        (0..1) * configuration.rolesName >> "roles"
-        0 * _
+        expect:
+        rule.check(HttpRequest.GET(uri), null, [roles: ["ROLE_ADMIN"]]) == expectedResult
 
         where:
         uri             || expectedResult
