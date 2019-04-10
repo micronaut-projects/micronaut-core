@@ -360,6 +360,17 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
         });
 
+        // String -> BigInteger
+        addConverter(CharSequence.class, BigInteger.class, (CharSequence object, Class<BigInteger> targetType, ConversionContext context) -> {
+            try {
+                BigInteger converted = new BigInteger(object.toString());
+                return Optional.of(converted);
+            } catch (NumberFormatException e) {
+                context.reject(object, e);
+                return Optional.empty();
+            }
+        });
+
         // String -> Float
         addConverter(CharSequence.class, Float.class, (CharSequence object, Class<Float> targetType, ConversionContext context) -> {
             try {
