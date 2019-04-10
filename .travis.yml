@@ -4,6 +4,7 @@ addons:
 language: java
 jdk:
 - oraclejdk8
+- openjdk11
 sudo: required
 services:
 - docker

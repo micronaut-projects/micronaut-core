@@ -21,6 +21,11 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
     fi
 fi
 
+# Only JDK8 execution will publish the release
+if [ "${TRAVIS_JDK_VERSION}" == "openjdk11" ] ; then
+  exit $EXIT_STATUS
+fi
+
 if [[ $EXIT_STATUS -eq 0 ]]; then
     echo "Publishing archives for branch $TRAVIS_BRANCH"
     if [[ -n $TRAVIS_TAG ]] || [[ $TRAVIS_BRANCH =~ ^1.1.x$ && $TRAVIS_PULL_REQUEST == 'false' ]]; then
