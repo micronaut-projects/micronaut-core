@@ -17,7 +17,7 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
 
         ./gradlew --stop
         killall -9 java
-        ./gradlew check --no-daemon -x licenseTest || EXIT_STATUS=$?
+        ./gradlew check --continue --no-daemon -x licenseTest || EXIT_STATUS=$?
     fi
 fi
 
