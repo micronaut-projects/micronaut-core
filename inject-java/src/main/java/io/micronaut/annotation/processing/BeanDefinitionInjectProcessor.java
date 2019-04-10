@@ -174,14 +174,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 beanDefinitionWriters.forEach((key, visitor) -> {
                     TypeElement classElement = visitor.getConcreteClass();
                     String className = classElement.getQualifiedName().toString();
-                    classElement.accept(visitor, className);
-                    visitor.getBeanDefinitionWriters().forEach((name, writer) -> {
-                        String beanDefinitionName = writer.getBeanDefinitionName();
-                        if (!processed.contains(beanDefinitionName)) {
-                            processed.add(beanDefinitionName);
-                            processBeanDefinitions(classElement, writer);
-                        }
-                    });
+                    if (!processed.contains(className)) {
+                        processed.add(className);
+                        classElement.accept(visitor, className);
+                        visitor.getBeanDefinitionWriters().forEach((name, writer) -> {
+                            String beanDefinitionName = writer.getBeanDefinitionName();
+                            if (!processed.contains(beanDefinitionName)) {
+                                processed.add(beanDefinitionName);
+                                processBeanDefinitions(classElement, writer);
+                            }
+                        });
+                    }
                 });
 
                 if (metadataBuilder.hasMetadata()) {
@@ -1134,7 +1137,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     );
 
                                     String qualifier = annotationUtils.getAnnotationMetadata(concreteClass)
-                                                                      .getValue(Named.class, String.class).orElse(null);
+                                            .getValue(Named.class, String.class).orElse(null);
 
                                     if (StringUtils.isNotEmpty(qualifier)) {
                                         members.put(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);

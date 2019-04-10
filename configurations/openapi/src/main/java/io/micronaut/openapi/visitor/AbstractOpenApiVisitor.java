@@ -587,9 +587,9 @@ abstract class AbstractOpenApiVisitor  {
         Map<String, Schema> schemas = resolveSchemas(openAPI);
         if (schemaValue != null) {
             String schemaName = schemaValue.get("name", String.class).orElse(computeDefaultSchemaName(definingElement, type));
-            inProgressSchemas.add(schemaName);
             schema = schemas.get(schemaName);
             if (schema == null) {
+                inProgressSchemas.add(schemaName);
                 JsonNode schemaJson = toJson(schemaValue.getValues(), context);
                 try {
                     schema = jsonMapper.treeToValue(schemaJson, Schema.class);

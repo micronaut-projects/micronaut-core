@@ -17,7 +17,10 @@ package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
+import io.micronaut.http.HttpHeaderValues
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.client.annotation.Client
@@ -25,11 +28,15 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Get
+import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Inject
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * @author Graeme Rocher
@@ -58,6 +65,172 @@ class ReadTimeoutSpec extends Specification {
         then:
         def e = thrown(ReadTimeoutException)
         e.message == 'Read Timeout'
+    }
+
+    void "test connection pool under load 2"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'10s',
+                'micronaut.http.client.pool.enabled':true,
+                'micronaut.http.client.pool.max-connections':10
+        )
+        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:"Another request is made"
+        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+
+        then:"Ensure the read timeout was reset in the connection in the pool"
+        result == result2
+
+        when:"issue a whole bunch of requests"
+        AtomicInteger integer = new AtomicInteger(0)
+        def results = (1..50).collect() { // larger than available connections
+            CompletableFuture.supplyAsync({->
+                client.retrieve(HttpRequest.GET('/timeout/success/' + integer.incrementAndGet()), String).blockingFirst()
+            })
+
+        }.collect({ it.get()})
+
+        then:"Every result is correct"
+        results.size() == 50
+        results.every() { it == result }
+
+
+        cleanup:
+        client.close()
+        clientContext.close()
+    }
+
+    void "test connection pool under load 3"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'10s',
+                'micronaut.http.client.pool.enabled':true,
+                'micronaut.http.client.pool.max-connections':10
+        )
+        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:"Another request is made"
+        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+
+        then:"Ensure the read timeout was reset in the connection in the pool"
+        result == result2
+
+        when:"issue a whole bunch of requests"
+        def integer = new AtomicInteger()
+        def results = Flowable.concat((1..500).collect() {
+
+            client.retrieve(HttpRequest.GET('/timeout/success/' + integer.incrementAndGet()), String)
+        }).toList().blockingGet()
+
+        then:"Every result is correct"
+        results.size() == 500
+        results.every() { it == result }
+
+
+        cleanup:
+        client.close()
+        clientContext.close()
+    }
+
+    void "test connection pool under load"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'10s',
+                'micronaut.http.client.pool.enabled':true,
+                'micronaut.http.client.pool.max-connections':10
+        )
+        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:"Another request is made"
+        def result = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/success'), String).blockingFirst()
+
+        then:"Ensure the read timeout was reset in the connection in the pool"
+        result == result2
+
+        when:"issue a whole bunch of requests"
+        def results = Flowable.concat((1..500).collect() {
+            client.retrieve(HttpRequest.GET('/timeout/success'), String)
+        }).toList().blockingGet()
+
+        then:"Every result is correct"
+        results.size() == 500
+        results.every() { it == result }
+
+
+        cleanup:
+        client.close()
+        clientContext.close()
+    }
+
+    void "test connection pool under load - no keep alive"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'3s',
+                'micronaut.http.client.pool.enabled':true,
+                'micronaut.http.client.pool.max-connections':10
+        )
+        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:"Another request is made"
+        def integer = new AtomicInteger()
+        def result = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+
+        then:"Ensure the read timeout was reset in the connection in the pool"
+        result == result2
+
+        when:"issue a whole bunch of requests"
+        def results = Flowable.concat((1..50).collect() {
+            client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)
+        }).toList().blockingGet()
+
+        then:"Every result is correct"
+        results.size() == 50
+        results.every() { it == result }
+
+
+        cleanup:
+        client.close()
+        clientContext.close()
+    }
+
+    void "test connection pool under load - no keep alive 2"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'3s',
+                'micronaut.http.client.pool.enabled':true,
+                'micronaut.http.client.pool.max-connections':10
+        )
+        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:"Another request is made"
+        def integer = new AtomicInteger()
+        def result = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+
+        then:"Ensure the read timeout was reset in the connection in the pool"
+        result == result2
+
+        when:"issue a whole bunch of requests"
+        def results = (1..25).collect() { // larger than available connections
+            CompletableFuture.supplyAsync({->
+                client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+            })
+
+        }.collect({ it.get()})
+
+        then:"Every result is correct"
+        results.size() == 25
+        results.every() { it == result }
+
+
+        cleanup:
+        client.close()
+        clientContext.close()
     }
 
     void "test read timeout setting with connection pool"() {
@@ -125,6 +298,16 @@ class ReadTimeoutSpec extends Specification {
         @Get(value = "/success", produces = MediaType.TEXT_PLAIN)
         String success() {
             return "ok"
+        }
+
+        @Get(value = "/success/{num}", produces = MediaType.TEXT_PLAIN)
+        String success(Integer num) {
+            return "ok"
+        }
+
+        @Get(value = "/no-keep-alive/{num}", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> noKeepAlive(Integer num) {
+            return HttpResponse.ok("ok").header(HttpHeaders.CONNECTION, "close")
         }
     }
 

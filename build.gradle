@@ -56,7 +56,20 @@ ext {
                     version: gormVersion,
                     group  : 'org.grails',
                     name   : 'grails-datastore-core',
-                    modules: ['grails-datastore-gorm', 'grails-datastore-gorm-hibernate5']
+                    modules: [
+                            'grails-datastore-gorm',
+                            'grails-datastore-async',
+                            'grails-datastore-gorm-async',
+                            'grails-datastore-gorm-support',
+                            'grails-datastore-gorm-test',
+                            'grails-datastore-gorm-validation',
+                            'grails-datastore-gorm-web'
+                    ]
+            ],
+            'gorm.hibernate'                       : [
+                    version: gormHibernateVersion,
+                    group  : 'org.grails',
+                    name   : 'grails-datastore-gorm-hibernate5'
             ],
             jackson                    : [
                     version: jacksonVersion,
@@ -512,7 +525,6 @@ subprojects { Project subproject ->
         apply plugin: "groovy"
         apply plugin: "java"
 
-
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
         compileJava.options.compilerArgs.add '-parameters'
@@ -575,7 +587,6 @@ subprojects { Project subproject ->
 
     configurations {
         shadowCompile
-        shadowRuntime
         documentation
         all {
             resolutionStrategy.eachDependency { DependencyResolveDetails details ->
@@ -589,6 +600,16 @@ subprojects { Project subproject ->
             }
         }
     }
+
+    apply plugin: 'com.github.johnrengelman.shadow'
+
+    shadowJar {
+        configurations = [project.configurations.shadowCompile]
+        relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
+        relocate "org.objectweb.asm", "io.micronaut.asm"
+    }
+    
+    shadowJar.enabled = false
 
     def isDocumented = subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')
 

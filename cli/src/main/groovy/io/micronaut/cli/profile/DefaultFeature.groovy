@@ -46,6 +46,7 @@ class DefaultFeature implements Feature {
     final List<String> jvmArgs
     final List<String> dependentFeatures = []
     final List<String> defaultFeatures = []
+    final List<String> evictedFeatures = []
     private Boolean requested = false
     final Integer minJava
     final Integer maxJava
@@ -61,6 +62,9 @@ class DefaultFeature implements Feature {
         Map featureMap = (Map) configuration.get("features", Collections.emptyMap())
         if (featureMap.containsKey("dependent")) {
             dependentFeatures.addAll((List) featureMap.get("dependent", Collections.emptyList()))
+        }
+        if (featureMap.containsKey("excludes")) {
+            evictedFeatures.addAll((List) featureMap.get("excludes", Collections.emptyList()))
         }
         if (featureMap.containsKey("default")) {
             defaultFeatures.addAll((List) featureMap.get("default", Collections.emptyList()))
@@ -111,6 +115,11 @@ class DefaultFeature implements Feature {
     @Override
     Iterable<Feature> getDependentFeatures(io.micronaut.cli.profile.Profile profile) {
         profile.getFeatures().findAll { Feature f -> dependentFeatures.contains(f.name) }
+    }
+
+    @Override
+    Iterable<String> getEvictedFeatureNames() {
+        return evictedFeatures
     }
 
     @Override

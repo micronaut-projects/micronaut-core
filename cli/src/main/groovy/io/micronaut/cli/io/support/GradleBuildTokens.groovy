@@ -20,7 +20,10 @@ import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.repository.MavenProfileRepository
 import io.micronaut.cli.util.VersionInfo
+import org.eclipse.aether.artifact.Artifact
 import org.eclipse.aether.graph.Dependency
+import org.eclipse.aether.graph.Exclusion
+import org.eclipse.aether.util.graph.selector.ExclusionDependencySelector
 
 /**
  * @author James Kleeh
@@ -51,18 +54,9 @@ class GradleBuildTokens extends BuildTokens {
 
         def repositories = (profile.repositories + defaultRepo).collect(repositoryUrl.curry(4)).unique().join(ln)
 
-        List<Dependency> profileDependencies = profile.dependencies
-        def dependencies = profileDependencies.findAll() { Dependency dep ->
-            dep.scope != 'build'
-        }
+        List<Dependency> dependencies = materializeDependencies(profile, features)
 
-        for (Feature f in features) {
-            dependencies.addAll f.dependencies.findAll() { Dependency dep -> dep.scope != 'build' }
-        }
-
-        dependencies = dependencies.unique()
-
-        dependencies = dependencies.sort({ Dependency dep -> dep.scope }).collect() { Dependency dep ->
+        String dependencyString = dependencies.sort({ Dependency dep -> dep.scope }).collect() { Dependency dep ->
             String scope = SCOPE_MAP.get(dep.scope)
             if (scope == null) scope = dep.scope
             String artifactStr = resolveArtifactString(dep, 4)
@@ -104,13 +98,14 @@ class GradleBuildTokens extends BuildTokens {
         tokens.put("jarPath", "build/libs/$appname-*.jar")
         tokens.put("jvmArgs", jvmArgs)
         tokens.put("buildPlugins", buildPlugins)
-        tokens.put("dependencies", dependencies)
+        tokens.put("dependencies", dependencyString)
         tokens.put("buildDependencies", buildDependencies)
         tokens.put("repositories", repositories)
         tokens.put("jdkversion", VersionInfo.getJdkVersion())
 
         tokens
     }
+
 
     Map getTokens(List<String> services) {
         final String serviceString = services.collect { String name ->

@@ -448,7 +448,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         for (int i = 0; i < interfaceInternalNames.length; i++) {
             interfaceInternalNames[i] = Type.getInternalName(j.next());
         }
-        classWriter.visit(V1_8, ACC_PUBLIC,
+        classWriter.visit(V1_8, ACC_SYNTHETIC,
                 beanDefinitionInternalName,
                 generateBeanDefSig(providedType.getInternalName()),
                 isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName(),

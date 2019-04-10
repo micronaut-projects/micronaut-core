@@ -218,24 +218,31 @@ Environment detection can be disabled through a method on the application contex
 
 See the <<environments, Environment>> documentation for more information.
 
+=== JWK and JWK Set support
+
+You can expose an endpoint with a JWK Set thanks to the <<keys, Keys Controller>>.
+
+You can also make a remote JWKS participate in a JWT signature validation. Read the
+<<jwks, Validation with remote JWKS>> section to learn more.
+
 === Dependency Upgrades
 
 - Groovy `2.5.4` -> `2.5.6`
 - Gradle `4.10.2` -> `5.1.1` (CLI Only)
 - Kafka `2.0.1` -> `2.1.1`
-- Micrometer `1.0.6` -> `1.1.2`
+- Micrometer `1.0.6` -> `1.1.4`
 - Reactive Streams `1.0.1` -> `1.0.2`
 - Jackson `2.9.7` -> `2.9.8`
 - Nimbus JOSE+JWT  `6.0.2` -> `6.8`
 - Spring `5.0.10.RELEASE` -> `5.1.4.RELEASE`
 - Reactor `3.2.0.RELEASE` -> `3.2.5.RELEASE`
 - RxJava 2 `2.2.2` -> `2.2.6`
-- Reactive Postgres `0.10.5` -> `0.11.2`
-- GORM `6.1.8.RELEASE` -> `7.0.0.RC1`
+- Reactive Postgres `0.10.5` -> `0.11.3`
+- GORM `6.1.8.RELEASE` -> `7.0.0.RELEASE`
 - Hibernate `5.3.7.Final` -> `5.4.0.Final`
-- Hikari `2.7.9` -> `3.3.0`
-- Commons DBCP 2 `2.1.1` -> `2.5.0`
-- Tomcat Pool `9.0.1` -> `9.0.14`
+- Hikari `2.7.9` -> `3.3.1`
+- Commons DBCP 2 `2.1.1` -> `2.6.0`
+- Tomcat Pool `9.0.1` -> `9.0.17`
 - Neo4j Java Driver `1.6.4` -> `1.7.2`
 - Mongo Java Driver `3.8.0` -> `3.10.0`
 - Mongo Reactive Driver `1.8.0` -> `1.10.0`

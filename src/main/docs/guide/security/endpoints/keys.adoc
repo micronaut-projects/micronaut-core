@@ -1,0 +1,11 @@
+NOTE: This controller can only be enabled if you are using JWT authentication.
+
+A https://tools.ietf.org/html/rfc7517[JSON Web Key (JWK)] is a JSON object that represents a cryptographic key. The members of the object represent properties of the key, including its value.
+
+Meanwhile, a JWK Set is a JSON object that represents a set of JWKs. The JSON object MUST have a "keys" member, which is an array of JWKs.
+
+You can enable the link:{api}/io/micronaut/security/token/jwt/endpoints/KeysController.html[KeysController] to expose an endpoint which returns a JWK Set. You can configure it with:
+
+include::{includedir}configurationProperties/io.micronaut.security.token.jwt.endpoints.KeysControllerConfigurationProperties.adoc[]
+
+Moreover, you will need to provide beans to type link:{api}/io/micronaut/security/token/jwt/endpoints/JwkProvider.html[JwkProvider].

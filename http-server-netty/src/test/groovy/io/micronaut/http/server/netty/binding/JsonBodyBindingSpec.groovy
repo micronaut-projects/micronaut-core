@@ -257,6 +257,41 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == "$json".toString()
     }
 
+    void "test request generic type binding"() {
+        when:
+        def json = '{"name":"Fred","age":10}'
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/request-generic', json), String
+        ).blockingFirst()
+
+        then:
+        response.body() == "Foo(Fred, 10)".toString()
+    }
+
+    void "test request generic type no body"() {
+        when:
+        def json = ''
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/request-generic', json), String
+        ).blockingFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.code() == HttpStatus.BAD_REQUEST.code
+        ex.message.contains("Required argument [HttpRequest request] not specified")
+    }
+
+    void "test request generic type conversion error"() {
+        when:
+        def json = '[1,2,3]'
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/request-generic', json), String
+        ).blockingFirst()
+
+        then:
+        response.body() == "not found"
+    }
+
     @Controller(value = "/json", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
     static class JsonController {
 
@@ -342,6 +377,11 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
                     .map({ Foo foo ->
                         foo.toString()
             })
+        }
+
+        @Post("/request-generic")
+        String requestGeneric(HttpRequest<Foo> request) {
+            return request.getBody().map({ foo -> foo.toString()}).orElse("not found")
         }
 
         @Error(JsonParseException)

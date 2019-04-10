@@ -24,10 +24,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpParameters;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.binders.*;
 import io.micronaut.http.cookie.Cookie;
@@ -99,7 +96,18 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         registerDefaultAnnotationBinders(byAnnotation);
 
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
-        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest>) (argument, source) -> () -> Optional.of(source));
+        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest>) (argument, source) -> {
+            Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable().filter(arg -> arg.getType() != Object.class);
+            if (typeVariable.isPresent() && HttpMethod.permitsRequestBody(source.getMethod())) {
+                if (source.getBody().isPresent()) {
+                    return () -> Optional.of(new FullHttpRequest(source, typeVariable.get()));
+                } else {
+                    return ArgumentBinder.BindingResult.UNSATISFIED;
+                }
+            } else {
+                return () -> Optional.of(source);
+            }
+        });
         byType.put(Argument.of(HttpParameters.class).typeHashCode(), (RequestArgumentBinder<HttpParameters>) (argument, source) -> () -> Optional.of(source.getParameters()));
         byType.put(Argument.of(Cookies.class).typeHashCode(), (RequestArgumentBinder<Cookies>) (argument, source) -> () -> Optional.of(source.getCookies()));
         byType.put(Argument.of(Cookie.class).typeHashCode(), (RequestArgumentBinder<Cookie>) (context, source) -> {

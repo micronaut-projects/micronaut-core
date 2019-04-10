@@ -24,6 +24,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -36,7 +37,6 @@ import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import java.time.LocalDate
-import java.time.LocalDateTime
 
 /**
  * @author Graeme Rocher
@@ -423,6 +423,24 @@ class HttpGetSpec extends Specification {
         client.retrieve("/slash/") == "slash"
     }
 
+    void "test a request with a custom host header"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        String body = client.toBlocking().retrieve(
+                HttpRequest.GET("/get/host").header("Host", "http://foo.com"), String
+        )
+
+
+        then:
+        body == "http://foo.com"
+
+        cleanup:
+        client.stop()
+        client.close()
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -489,6 +507,11 @@ class HttpGetSpec extends Specification {
         @Get("/dateTimeQuery")
         String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate) {
             return myDate.toString()
+        }
+
+        @Get("/host")
+        String hostHeader(@Header String host) {
+            return host
         }
     }
 

@@ -82,15 +82,7 @@ class MavenBuildTokens extends BuildTokens {
             }
         }
 
-        List<Dependency> profileDependencies = profile.dependencies
-        List<Dependency> dependencies = profileDependencies.findAll() { Dependency dep ->
-            dep.scope != 'build'
-        }
-
-        for (Feature f in features) {
-            dependencies.addAll f.dependencies.findAll() { Dependency dep -> dep.scope != 'build' }
-        }
-
+        List<Dependency> dependencies = materializeDependencies(profile, features)
         List<Dependency> annotationProcessors = dependencies
                 .unique()
                 .findAll( { it.scope == 'annotationProcessor' || it.scope == 'kapt' })

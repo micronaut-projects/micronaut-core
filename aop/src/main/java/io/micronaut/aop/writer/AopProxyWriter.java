@@ -275,7 +275,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
         String[] interfaces = getImplementedInterfaceInternalNames();
-        classWriter.visit(V1_8, ACC_PUBLIC, className, null, !isInterface ? superType.getInternalName() : null, interfaces);
+        classWriter.visit(V1_8, ACC_SYNTHETIC, className, null, !isInterface ? superType.getInternalName() : null, interfaces);
 
         classWriter.visitField(ACC_FINAL | ACC_PRIVATE, FIELD_INTERCEPTORS, FIELD_TYPE_INTERCEPTORS.getDescriptor(), null, null);
         classWriter.visitField(ACC_FINAL | ACC_PRIVATE, FIELD_PROXY_METHODS, FIELD_TYPE_PROXY_METHODS.getDescriptor(), null, null);
@@ -760,7 +760,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             String[] adviceInterfaces = {Type.getInternalName(interceptedInterface)};
             interfaces = ArrayUtils.concat(interfaces, adviceInterfaces);
         }
-        proxyClassWriter.visit(V1_8, ACC_PUBLIC,
+        proxyClassWriter.visit(V1_8, ACC_SYNTHETIC,
             proxyInternalName,
             null,
             isInterface ? TYPE_OBJECT.getInternalName() : getTypeReference(targetClassFullName).getInternalName(),

@@ -184,7 +184,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 if (nodeStack.isEmpty()) {
                     return current;
                 } else {
-                    if (streamArray && event == JsonToken.END_OBJECT && nodeStack.size() == 1) {
+                    if (streamArray && nodeStack.size() == 1) {
                         JsonNode jsonNode = nodeStack.peekFirst();
                         if (jsonNode instanceof ArrayNode) {
                             return current;
@@ -313,7 +313,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         }
 
         //its an array and the stack size is 1 which means the value is scalar
-        if (rootIsArray && nodeStack.size() == 1) {
+        if (rootIsArray && streamArray && nodeStack.size() == 1) {
             ArrayNode arrayNode = (ArrayNode) nodeStack.peekFirst();
             if (arrayNode.size() > 0) {
                 return arrayNode.get(arrayNode.size() - 1);

@@ -17,6 +17,9 @@ package io.micronaut.cli.io.support
 
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
+import org.eclipse.aether.graph.Dependency
+import org.eclipse.aether.graph.Exclusion
+import org.eclipse.aether.util.graph.selector.ExclusionDependencySelector
 
 abstract class BuildTokens {
     final String sourceLanguage, testFramework, appname
@@ -28,6 +31,35 @@ abstract class BuildTokens {
     }
 
     abstract Map getTokens(Profile profile, List<Feature> features)
+
+    protected List<Dependency> materializeDependencies(Profile profile, List<Feature> features) {
+        List<Dependency> profileDependencies = profile.dependencies
+        def dependencies = profileDependencies.findAll() { Dependency dep ->
+            dep.scope != 'build' && dep.scope != 'excludes'
+        }
+
+        for (Feature f in features) {
+            List<Dependency> excludes = f.dependencies.findAll() { Dependency dep -> dep.scope == 'excludes' }
+            if (excludes) {
+
+                ExclusionDependencySelector selector = new ExclusionDependencySelector(
+                        excludes.collect() { Dependency d ->
+                            def artifact = d.artifact
+                            new Exclusion(artifact.groupId, artifact.artifactId, null, null)
+                        }
+                )
+                dependencies.removeIf({ Dependency d ->
+                    !selector.selectDependency(d)
+                })
+            }
+            dependencies.addAll f.dependencies.findAll() { Dependency dep ->
+                dep.scope != 'build' && dep.scope != 'excludes'
+            }
+        }
+
+        dependencies = dependencies.unique()
+        dependencies
+    }
 
     abstract Map getTokens(List<String> services)
 }

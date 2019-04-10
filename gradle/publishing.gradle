@@ -93,28 +93,16 @@ publishing {
         maven(MavenPublication) { publication ->
             artifactId( "micronaut-" + project.name.substring(project.name.indexOf('/') + 1) )
             def shadowJar = tasks.findByName("shadowJar")
-            if(shadowJar) {
+            if(shadowJar && shadowJar.enabled) {
                 artifact(project.tasks.shadowJar) {
                     classifier = null
                 }
                 pom.withXml { xml ->
                     def xmlNode = xml.asNode()
                     def dependenciesNode = xmlNode.appendNode('dependencies')
-
-                    project.configurations.shadow.allDependencies.each {
-                        if (! (it instanceof SelfResolvingDependency)) {
-                            def dependencyNode = dependenciesNode.appendNode('dependency')
-                            dependencyNode.appendNode('groupId', it.group)
-                            if (it.group.startsWith('io.micronaut')) {
-                                dependencyNode.appendNode('artifactId', "micronaut-$it.name")
-                            } else {
-                                dependencyNode.appendNode('artifactId', it.name)
-                            }
-                            dependencyNode.appendNode('version', it.version)
-                            dependencyNode.appendNode('scope', 'runtime')
-                        }
-                    }
-                    project.configurations.shadowCompile.allDependencies.each {
+                    Set<Dependency> visited = new HashSet<>()
+                    
+                    project.configurations.compile.allDependencies.each {
                         if (! (it instanceof SelfResolvingDependency)) {
                             def dependencyNode = dependenciesNode.appendNode('dependency')
                             dependencyNode.appendNode('groupId', it.group)
@@ -128,10 +116,13 @@ publishing {
                             dependencyNode.appendNode('artifactId', "micronaut-$it.name")
                             dependencyNode.appendNode('version', project.version)
                             dependencyNode.appendNode('scope', 'compile')
-
                         }
+                        visited.add(it)
                     }
-                    project.configurations.shadowRuntime.allDependencies.each {
+                    project.configurations.runtime.allDependencies.each {
+                        if (visited.contains(it)) {
+                            return
+                        }
                         if (! (it instanceof SelfResolvingDependency)) {
                             def dependencyNode = dependenciesNode.appendNode('dependency')
                             dependencyNode.appendNode('groupId', it.group)
@@ -147,6 +138,7 @@ publishing {
                             dependencyNode.appendNode('scope', 'runtime')
 
                         }
+                        visited.add(it)
                     }
                     xmlNode.children().last() + pomInfo
                 }

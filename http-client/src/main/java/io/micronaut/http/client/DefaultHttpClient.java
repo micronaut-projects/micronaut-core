@@ -992,13 +992,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     channelFuture.addListener(future -> {
                         if (future.isSuccess()) {
                             Channel channel = (Channel) future.get();
-                            if (readTimeoutMillis != null) {
-                                // reset read timeout
-                                channel.pipeline().replace(
-                                        HANDLER_READ_TIMEOUT,
-                                        HANDLER_READ_TIMEOUT,
-                                        new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
-                            }
                             try {
                                 sendRequestThroughChannel(
                                         requestWrapper,
@@ -1047,7 +1040,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
             }, BackpressureStrategy.ERROR);
 
-            Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(parentRequest, request, requestURI, requestWrapper, responsePublisher);
+            Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(
+                    parentRequest,
+                    request,
+                    requestURI,
+                    requestWrapper,
+                    responsePublisher
+            );
             Flowable<io.micronaut.http.HttpResponse<O>> finalFlowable;
             if (finalPublisher instanceof Flowable) {
                 finalFlowable = (Flowable<io.micronaut.http.HttpResponse<O>>) finalPublisher;
@@ -1683,7 +1682,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
     private <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody, boolean closeConnection) {
         HttpHeaders headers = nettyRequest.headers();
-        headers.set(HttpHeaderNames.HOST, getHostHeader(requestURI));
+
+        if (!headers.contains(HttpHeaderNames.HOST)) {
+            headers.set(HttpHeaderNames.HOST, getHostHeader(requestURI));
+        }
 
         if (closeConnection) {
             headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
@@ -1718,10 +1720,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             Emitter<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
-        final boolean replace = pipeline.get(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE) != null;
         final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandler<FullHttpResponse>(false) {
 
             AtomicBoolean complete = new AtomicBoolean(false);
+            boolean keepAlive = true;
 
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
@@ -1802,14 +1804,24 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             }
                         }
                     }
-                    if (channelPool != null) {
-                        Channel ch = channelHandlerContext.channel();
-                        if (!HttpUtil.isKeepAlive(fullResponse)) {
-                            ch.closeFuture().addListener(future -> channelPool.release(ch));
-                        } else {
-                            channelPool.release(ch);
-                        }
+                    if (!HttpUtil.isKeepAlive(fullResponse)) {
+                        keepAlive = false;
+                    }
+                    pipeline.remove(this);
 
+                }
+            }
+
+            @Override
+            public void handlerRemoved(ChannelHandlerContext ctx) {
+                if (channelPool != null) {
+                    final Channel ch = ctx.channel();
+                    if (!keepAlive) {
+                        ch.closeFuture().addListener((future ->
+                                channelPool.release(ch)
+                        ));
+                    } else {
+                        channelPool.release(ch);
                     }
                 }
             }
@@ -1836,15 +1848,12 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         }
                     }
                 } finally {
+                    keepAlive = false;
                     pipeline.remove(this);
                 }
             }
         };
-        if (replace) {
-            pipeline.replace(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, newHandler);
-        } else {
-            pipeline.addLast(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, newHandler);
-        }
+        pipeline.addLast(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, newHandler);
     }
 
     private ClientFilterChain buildChain(AtomicReference<io.micronaut.http.HttpRequest> requestWrapper, List<HttpClientFilter> filters) {
@@ -2009,7 +2018,37 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         key.getPort(),
                         false,
                         false
-                ));
+                ) {
+                    @Override
+                    protected void addFinalHandler(ChannelPipeline pipeline) {
+                        // no-op, don't add the stream handler which is not supported
+                        // in the connection pooled scenario
+                    }
+                });
+                addReadTimeoutHandler(ch.pipeline());
+            }
+
+            @Override
+            public void channelAcquired(Channel ch) {
+                final ChannelPipeline pipeline = ch.pipeline();
+                addReadTimeoutHandler(pipeline);
+            }
+
+            private void addReadTimeoutHandler(ChannelPipeline pipeline) {
+                if (readTimeoutMillis != null) {
+                    // reset read timeout
+                    pipeline.addBefore(
+                            HANDLER_HTTP_CLIENT_CODEC,
+                            HANDLER_READ_TIMEOUT,
+                            new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+                }
+            }
+
+            @Override
+            public void channelReleased(Channel ch) {
+                if (readTimeoutMillis != null) {
+                    ch.pipeline().remove(HANDLER_READ_TIMEOUT);
+                }
             }
         };
     }
@@ -2074,16 +2113,19 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 p.addLast(HANDLER_SSL, sslHandler);
             }
 
-            // read timeout settings are not applied to streamed requests.
-            // instead idle timeout settings are applied.
-            if (!stream && readTimeoutMillis != null) {
-                p.addLast(HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
-            } else {
-                Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
-                if (readIdleTime.isPresent()) {
-                    Duration duration = readIdleTime.get();
-                    if (!duration.isNegative()) {
-                        p.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+            // Pool connections require alternative timeout handling
+            if (poolMap == null) {
+                // read timeout settings are not applied to streamed requests.
+                // instead idle timeout settings are applied.
+                if (!stream && readTimeoutMillis != null) {
+                    p.addLast(HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+                } else {
+                    Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
+                    if (readIdleTime.isPresent()) {
+                        Duration duration = readIdleTime.get();
+                        if (!duration.isNegative()) {
+                            p.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                        }
                     }
                 }
             }
@@ -2256,15 +2298,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
             if (channelPool == null) {
                 closeChannel(channel, emitter, channelFuture);
-            } else {
-                channelFuture.addListener(f -> {
-
-                    channelPool.release(channel);
-                    if (encoder != null) {
-                        encoder.cleanFiles();
-                    }
-
-                });
             }
         }
 
