@@ -24,6 +24,15 @@ In fact, there are several higher level interfaces that can be bound to method p
 |`String hello(Cookies cookies)`
 |===
 
+IMPORTANT: Note, that api:io.micronaut.http.HttpRequest[] should be declared parametrized with concrete genereic type if request body is needed, e.g. ```java
+ @Get("/hello")
+ public  get(HttpRequest<MyClass> request) {
+    request.getBody.map(this::process);
+  ...
+ }```
+ api:io.micronaut.http.HttpRequest.getBody()[] will be empty otherwise, event if request has a body.
+ 
+
 In addition, for full control over the emitted HTTP response you can use the static factory methods of the api:io.micronaut.http.HttpResponse[] class which return a api:io.micronaut.http.MutableHttpResponse[].
 
 The following example implements the previous `MessageController` example using the api:io.micronaut.http.HttpRequest[] and api:io.micronaut.http.HttpResponse[] objects:
