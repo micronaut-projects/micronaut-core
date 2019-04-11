@@ -23,9 +23,13 @@ import io.micronaut.security.config.InterceptUrlMapPattern;
 import io.micronaut.security.token.RolesFinder;
 import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.web.router.RouteMatch;
+
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * An abstract class with common functionality for Security Rule implementations which
@@ -83,11 +87,21 @@ abstract class InterceptUrlMapRule extends AbstractSecurityRule {
         final String path = request.getUri().getPath();
         final HttpMethod httpMethod = request.getMethod();
 
+        Predicate<InterceptUrlMapPattern> exactMatch = p -> pathMatcher.matches(p.getPattern(), path) && p.getHttpMethod().isPresent() && httpMethod.equals(p.getHttpMethod().get());
+        Predicate<InterceptUrlMapPattern> uriPatternMatch = p -> pathMatcher.matches(p.getPattern(), path) && p.getHttpMethod().map(method -> method.equals(httpMethod)).orElse(true);
+
         Optional<InterceptUrlMapPattern> matchedPattern = getPatternList()
                 .stream()
-                .filter(p -> p.getHttpMethod().map(method -> method.equals(httpMethod)).orElse(true))
-                .filter(p -> pathMatcher.matches(p.getPattern(), path))
+                .filter(exactMatch)
                 .findFirst();
+
+        // if we don't get an exact match try to find a match by the uri pattern
+        if (!matchedPattern.isPresent()) {
+            matchedPattern = getPatternList()
+                    .stream()
+                    .filter(uriPatternMatch)
+                    .findFirst();
+        }
 
         return matchedPattern
                 .map(pattern -> compareRoles(pattern.getAccess(), getRoles(claims)))
