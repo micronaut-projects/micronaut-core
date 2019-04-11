@@ -24,7 +24,7 @@ In fact, there are several higher level interfaces that can be bound to method p
 |`String hello(Cookies cookies)`
 |===
 
-IMPORTANT: Note, that api:io.micronaut.http.HttpRequest[] should be declared parametrized with concrete genereic type if request body is needed, e.g. ```java
+IMPORTANT: Note, that api:io.micronaut.http.HttpRequest[] should be declared parametrized with concrete generic type if request body is needed, e.g. ```java
  @Get("/hello")
  public  get(HttpRequest<MyClass> request) {
     request.getBody.map(this::process);
