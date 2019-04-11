@@ -175,19 +175,26 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
             }
             profiles.sort { it.module }
 
-            try {
-                for (Map profile in profiles) {
+            List<String> unresolved = []
+            for (Map profile in profiles) {
+                try {
                     grapeEngine.grab(profile)
+                } catch (ArtifactNotFoundException | DependencyResolutionFailedException e) {
+                    if (profile.module) {
+                        unresolved.add(profile.module.toString())
+                        if (Boolean.getBoolean("micronaut.verbose")) {
+                            MicronautConsole.instance.warn("Ignoring error: " + e)
+                        }
+                    }
                 }
-            } catch (ArtifactNotFoundException | DependencyResolutionFailedException e) {
-                if (Boolean.getBoolean("micronaut.verbose")) {
-                    MicronautConsole.instance.warn("Ignoring error: " + e)
-                }
-                MicronautConsole.instance.addStatus("No profiles could be resolved remotely. Searching Maven local...")
+            }
+
+            if (unresolved) {
+                MicronautConsole.instance.addStatus("Not all profiles could be resolved remotely. Searching Maven local...")
                 def localData = new File(mavenLocal, "/io/micronaut/profiles")
                 if (localData.exists()) {
                     localData.eachDir { File dir ->
-                        if (!dir.name.startsWith('.')) {
+                        if (unresolved.contains(dir.name)) {
                             def profileData = new File(dir, "/maven-metadata-local.xml")
                             if (profileData.exists()) {
                                 def currentVersion = parseCurrentVersion(profileData)
