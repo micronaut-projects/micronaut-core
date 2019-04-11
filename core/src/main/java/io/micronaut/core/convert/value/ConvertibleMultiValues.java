@@ -85,6 +85,17 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     }
 
     @Override
+    default void forEach(BiConsumer<String, List<V>> action) {
+        Objects.requireNonNull(action, "Consumer cannot be null");
+
+        Collection<String> names = names();
+        for (String headerName : names) {
+            List<V> values = getAll(headerName);
+            action.accept(headerName, values);
+        }
+    }
+
+    @Override
     default Iterator<Map.Entry<String, List<V>>> iterator() {
         Iterator<String> headerNames = names().iterator();
         return new Iterator<Map.Entry<String, List<V>>>() {
