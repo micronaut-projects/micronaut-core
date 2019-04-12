@@ -12,9 +12,9 @@ include::{testssecurity}/security/securityRule/intercepturlmap/InterceptUrlMapSp
 As you see in the previous code listing, any endpoint is identified by a combination of pattern
 and an optional HTTP method.
 
-Furthermore it is possible to declare multiple access rules for the an URI pattern. The example below defines that
-all HTTP requests to URIs matching the pattern `/v1/myResource/**` and using HTTP method `OPTIONS` will be accessible to everyone.
-Requests matching the same URI pattern but using a different HTTP method than `OPTIONS` require fully authenticated access.
+If a given request URI matches more than one intercept url map, the one that specifies an http method that matches the request method will be used. If there are multiple mappings that do not specify a method and match the request URI, then the first mapping will be used. For example:
+
+The example below defines that all HTTP requests to URIs matching the pattern `/v1/myResource/**` and using HTTP method `GET` will be accessible to everyone. Requests matching the same URI pattern but using a different HTTP method than `GET` require fully authenticated access.
 
 [source, yaml]
 ----
@@ -23,12 +23,12 @@ micronaut:
     enabled: true
     intercept-url-map:
       - pattern: /v1/myResource/**
-        httpMethod: OPTIONS // <1>
+        httpMethod: GET // <1>
         access:
           - isAnonymous()
       - pattern: /v1/myResource/**
         access:
           - isAuthenticated() // <2>
 ----
-<1> allow anonymous access to this path when accessing with HTTP method `OPTIONS`.
-<2> all other requests have to be fully authenticated for that path.
+<1> Accessing `/v1/myResource/**` with a GET request does not require authentication.
+<2> Accessing `/v1/myResource/**` with a request that isn't GET requires authentication.
