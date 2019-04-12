@@ -1,6 +1,6 @@
 package io.micronaut.docs.config.builder
 
-data class SparkPlug(
+internal data class SparkPlug(
         val name: String?,
         val type: String?,
         val companyName: String?

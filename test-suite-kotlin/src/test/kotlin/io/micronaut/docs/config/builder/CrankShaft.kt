@@ -15,7 +15,7 @@
 */
 package io.micronaut.docs.config.builder
 
-class CrankShaft(val rodLength: Double?) {
+internal class CrankShaft(val rodLength: Double?) {
 
     class Builder {
         private var rodLength: Double? = null

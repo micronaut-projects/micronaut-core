@@ -20,7 +20,7 @@ package io.micronaut.docs.config.builder
  * @since 1.1
  */
 // tag::class[]
-class EngineImpl(manufacturer: String, cylinders: Int, crankShaft: CrankShaft, sparkPlug: SparkPlug) : Engine {
+internal class EngineImpl(manufacturer: String, cylinders: Int, crankShaft: CrankShaft, sparkPlug: SparkPlug) : Engine {
     override var cylinders: Int = 0
     private val manufacturer: String
     private val crankShaft: CrankShaft

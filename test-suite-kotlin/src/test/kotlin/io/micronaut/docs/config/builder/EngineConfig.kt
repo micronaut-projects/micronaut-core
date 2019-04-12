@@ -23,11 +23,16 @@ import io.micronaut.context.annotation.ConfigurationProperties
  * @since 1.1
  */
 @ConfigurationProperties("my.engine") // <1>
-class EngineConfig {
+internal class EngineConfig {
     @ConfigurationBuilder(prefixes = ["with"])  // <2>
     val builder = EngineImpl.builder()
 
+    @ConfigurationBuilder(prefixes = ["with"], configurationPrefix = "crank-shaft") // <3>
     val crankShaft = CrankShaft.builder()
 
-    val sparkPlug = SparkPlug.builder()
+    var sparkPlug : SparkPlug.Builder = SparkPlug.builder()
+        @ConfigurationBuilder(prefixes = ["with"], configurationPrefix = "spark-plug") // <4>
+        set(value) {
+            field = value
+        }
 }
