@@ -19,7 +19,6 @@ import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.validation.validator.ExecutableMethodValidator;
 import io.micronaut.validation.validator.ReactiveValidator;
