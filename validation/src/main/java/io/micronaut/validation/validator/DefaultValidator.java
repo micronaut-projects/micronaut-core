@@ -36,6 +36,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
@@ -70,7 +71,7 @@ import java.util.stream.Collectors;
 @Singleton
 @Primary
 @Requires(property = ValidatorConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-public class DefaultValidator implements Validator, ExecutableMethodValidator, ReactiveValidator {
+public class DefaultValidator implements Validator, ExecutableMethodValidator, ReactiveValidator, AnnotatedElementValidator {
 
     private static final List<Class> DEFAULT_GROUPS = Collections.singletonList(Default.class);
     private final ConstraintValidatorRegistry constraintValidatorRegistry;
@@ -231,14 +232,14 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
     @Nonnull
     @Override
-    public Set<ConstraintViolation<AnnotatedElement>> validateElement(
-            @Nonnull AnnotatedElement element,
-            @Nullable Object value,
-            Class<?>... groups) {
+    public Set<String> validatedAnnotatedElement(@Nonnull AnnotatedElement element, @Nullable Object value) {
         ArgumentUtils.requireNonNull("element", element);
+        if (!element.getAnnotationMetadata().hasStereotype(Constraint.class)) {
+            return Collections.emptySet();
+        }
 
-        final HashSet overallViolations = new HashSet<>(5);
-        final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(groups);
+        final Set<ConstraintViolation<Object>> overallViolations = new HashSet<>(5);
+        final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext();
         try {
             context.addPropertyNode(element.getName(), null);
             //noinspection unchecked
@@ -256,7 +257,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         }
 
         //noinspection unchecked
-        return Collections.unmodifiableSet(overallViolations);
+        return Collections.unmodifiableSet(overallViolations.stream()
+                .map(ConstraintViolation::getMessage).collect(Collectors.toSet()));
     }
 
     @Nonnull

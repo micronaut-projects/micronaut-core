@@ -16,7 +16,6 @@
 
 package io.micronaut.validation.validator;
 
-import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.beans.BeanIntrospection;
 
 import javax.annotation.Nonnull;
@@ -71,19 +70,6 @@ public interface Validator extends javax.validation.Validator {
     @Nonnull <T> Set<ConstraintViolation<T>> validateValue(
             @Nonnull Class<T> beanType,
             @Nonnull String propertyName,
-            @Nullable Object value,
-            Class<?>... groups
-    );
-
-    /**
-     * Validates an annotated element for the given value.
-     * @param element The element
-     * @param value  The value
-     * @param groups The groups
-     * @return The constraint violations
-     */
-    @Nonnull Set<ConstraintViolation<AnnotatedElement>> validateElement(
-            @Nonnull AnnotatedElement element,
             @Nullable Object value,
             Class<?>... groups
     );

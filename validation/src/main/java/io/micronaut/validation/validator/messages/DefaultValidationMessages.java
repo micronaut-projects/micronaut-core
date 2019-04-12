@@ -33,7 +33,7 @@ public class DefaultValidationMessages extends StaticMessageSource {
     /**
      * The message suffix to use.
      */
-    protected static final String MESSAGE_SUFFIX = ".message";
+    private static final String MESSAGE_SUFFIX = ".message";
 
     /**
      * Constructs the default error messages.

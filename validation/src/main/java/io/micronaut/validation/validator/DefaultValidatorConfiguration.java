@@ -17,13 +17,13 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.MessageSource;
-import io.micronaut.context.StaticMessageSource;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.constraints.DefaultConstraintValidators;
 import io.micronaut.validation.validator.extractors.DefaultValueExtractors;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
+import io.micronaut.validation.validator.messages.DefaultValidationMessages;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -166,7 +166,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
         if (messageSource != null) {
             return messageSource;
         }
-        return new StaticMessageSource();
+        return new DefaultValidationMessages();
     }
 
     /**
