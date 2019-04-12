@@ -88,7 +88,7 @@ abstract class InterceptUrlMapRule extends AbstractSecurityRule {
         final HttpMethod httpMethod = request.getMethod();
 
         Predicate<InterceptUrlMapPattern> exactMatch = p -> pathMatcher.matches(p.getPattern(), path) && p.getHttpMethod().isPresent() && httpMethod.equals(p.getHttpMethod().get());
-        Predicate<InterceptUrlMapPattern> uriPatternMatch = p -> pathMatcher.matches(p.getPattern(), path) && p.getHttpMethod().map(method -> method.equals(httpMethod)).orElse(true);
+        Predicate<InterceptUrlMapPattern> uriPatternMatchOnly = p -> pathMatcher.matches(p.getPattern(), path) && !p.getHttpMethod().isPresent();
 
         Optional<InterceptUrlMapPattern> matchedPattern = getPatternList()
                 .stream()
@@ -99,7 +99,7 @@ abstract class InterceptUrlMapRule extends AbstractSecurityRule {
         if (!matchedPattern.isPresent()) {
             matchedPattern = getPatternList()
                     .stream()
-                    .filter(uriPatternMatch)
+                    .filter(uriPatternMatchOnly)
                     .findFirst();
         }
 
