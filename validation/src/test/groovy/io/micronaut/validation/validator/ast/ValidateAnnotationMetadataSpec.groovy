@@ -10,6 +10,25 @@ import javax.annotation.processing.SupportedAnnotationTypes
 
 class ValidateAnnotationMetadataSpec extends AbstractTypeElementSpec {
 
+    void "test validate annotation values on type with invalid constant"() {
+        when:
+        buildBeanIntrospection('test.Test', '''
+package test;
+@io.micronaut.validation.validator.ast.SomeAnn(Test.VAL) // blank not allowed
+@io.micronaut.core.annotation.Introspected
+class Test {
+    public static final String VAL = "";
+}
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message == '''test/Test.java:5: error: @SomeAnn.value: must not be blank
+class Test {
+^'''
+
+    }
+
     void "test validate annotation values on type"() {
         when:
         buildBeanIntrospection('test.Test', '''
