@@ -105,7 +105,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         ArgumentUtils.requireNonNull("object", object);
         final BeanIntrospection<T> introspection = (BeanIntrospection<T>) getBeanIntrospection(object);
         if (introspection == null) {
-            throw new ValidationException("Passed object [" + object + "] cannot be introspected. Please annotate with @Introspected");
+            return Collections.emptySet();
         }
         return validate(introspection, object, groups);
     }
