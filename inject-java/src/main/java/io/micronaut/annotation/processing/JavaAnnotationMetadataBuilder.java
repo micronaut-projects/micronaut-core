@@ -15,29 +15,24 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
-import javax.lang.model.element.AnnotationMirror;
-import javax.lang.model.element.AnnotationValue;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
-import javax.lang.model.util.Types;
+import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
@@ -57,9 +52,6 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     private final Elements elementUtils;
     private final Messager messager;
     private final AnnotationUtils annotationUtils;
-    private final Types types;
-    private final ModelUtils modelUtils;
-    private final Filer filer;
 
     /**
      * Default constructor.
@@ -67,23 +59,25 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * @param elements The elementUtils
      * @param messager The messager
      * @param annotationUtils The annotation utils
-     * @param types The types
-     * @param modelUtils The model utils
-     * @param filer The filer
      */
     public JavaAnnotationMetadataBuilder(
             Elements elements,
             Messager messager,
-            AnnotationUtils annotationUtils,
-            Types types,
-            ModelUtils modelUtils,
-            Filer filer) {
+            AnnotationUtils annotationUtils) {
         this.elementUtils = elements;
         this.messager = messager;
         this.annotationUtils = annotationUtils;
-        this.types = types;
-        this.modelUtils = modelUtils;
-        this.filer = filer;
+    }
+
+    @Nullable
+    @Override
+    protected AnnotatedElementValidator getElementValidator() {
+        return annotationUtils.getElementValidator();
+    }
+
+    @Override
+    protected void addError(@Nonnull Element originatingElement, @Nonnull String error) {
+        messager.printMessage(Diagnostic.Kind.ERROR, error, originatingElement);
     }
 
     @Override
@@ -144,7 +138,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected List<Element> buildHierarchy(Element element, boolean inheritTypeAnnotations) {
+    protected List<Element> buildHierarchy(Element element, boolean inheritTypeAnnotations, boolean declaredOnly) {
+        if (declaredOnly) {
+            return Collections.singletonList(element);
+        }
+
         if (element instanceof TypeElement) {
             List<Element> hierarchy = new ArrayList<>();
             hierarchy.add(element);
@@ -159,7 +157,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             // the starting hierarchy is the type and super types of this method
             List<Element> hierarchy;
             if (inheritTypeAnnotations) {
-                hierarchy = buildHierarchy(executableElement.getEnclosingElement(), false);
+                hierarchy = buildHierarchy(executableElement.getEnclosingElement(), false, declaredOnly);
             } else {
                 hierarchy = new ArrayList<>();
             }
@@ -196,7 +194,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected OptionalValues<?> getAnnotationValues(Element member, Class<?> annotationType) {
+    protected OptionalValues<?> getAnnotationValues(Element originatingElement, Element member, Class<?> annotationType) {
         List<? extends AnnotationMirror> annotationMirrors = member.getAnnotationMirrors();
         String annotationName = annotationType.getName();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
@@ -206,7 +204,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 for (Map.Entry<? extends Element, ?> entry : values.entrySet()) {
                     Element key = entry.getKey();
                     Object value = entry.getValue();
-                    readAnnotationRawValues(key.getSimpleName().toString(), value, converted);
+                    readAnnotationRawValues(originatingElement, annotationName, member, key.getSimpleName().toString(), value, converted);
                 }
                 return OptionalValues.of(Object.class, converted);
             }
@@ -215,21 +213,31 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected void readAnnotationRawValues(String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues) {
+    protected void readAnnotationRawValues(
+            Element originatingElement,
+            String annotationName, Element member,
+            String memberName,
+            Object annotationValue,
+            Map<CharSequence, Object> annotationValues) {
         if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue) {
             if (!annotationValues.containsKey(memberName)) {
-                ((javax.lang.model.element.AnnotationValue) annotationValue).accept(new MetadataAnnotationValueVisitor(annotationValues, memberName), this);
-
+                final MetadataAnnotationValueVisitor resolver = new MetadataAnnotationValueVisitor(originatingElement);
+                ((javax.lang.model.element.AnnotationValue) annotationValue).accept(resolver, this);
+                final Object resolvedValue = resolver.resolvedValue;
+                if (resolvedValue != null) {
+                    validateAnnotationValue(originatingElement, annotationName, member, memberName, resolvedValue);
+                    annotationValues.put(memberName, resolvedValue);
+                }
             }
         }
     }
 
     @Override
-    protected Object readAnnotationValue(String memberName, Object annotationValue) {
+    protected Object readAnnotationValue(Element originatingElement, String memberName, Object annotationValue) {
         if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue) {
-            HashMap<CharSequence, Object> result = new HashMap<>(1);
-            ((javax.lang.model.element.AnnotationValue) annotationValue).accept(new MetadataAnnotationValueVisitor(result, memberName), this);
-            return result.get(memberName);
+            final MetadataAnnotationValueVisitor visitor = new MetadataAnnotationValueVisitor(originatingElement);
+            ((javax.lang.model.element.AnnotationValue) annotationValue).accept(visitor, this);
+            return visitor.resolvedValue;
         }
         return null;
     }
@@ -425,69 +433,67 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * Meta annotation value visitor class.
      */
     private class MetadataAnnotationValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
-        private final Map<CharSequence, Object> annotationValues;
-        private final String memberName;
+        private final Element originatingElement;
+        private Object resolvedValue;
 
         /**
-         * @param annotationValues A map of annotation values
-         * @param member           A member
+         * @param originatingElement
          */
-        MetadataAnnotationValueVisitor(Map<CharSequence, Object> annotationValues, String member) {
-            this.annotationValues = annotationValues;
-            this.memberName = member;
+        MetadataAnnotationValueVisitor(Element originatingElement) {
+            this.originatingElement = originatingElement;
         }
 
         @Override
         public Object visitBoolean(boolean b, Object o) {
-            annotationValues.put(memberName, b);
+            resolvedValue = b;
             return null;
         }
 
         @Override
         public Object visitByte(byte b, Object o) {
-            annotationValues.put(memberName, b);
+            resolvedValue = b;
             return null;
         }
 
         @Override
         public Object visitChar(char c, Object o) {
-            annotationValues.put(memberName, c);
+            resolvedValue = c;
             return null;
         }
 
         @Override
         public Object visitDouble(double d, Object o) {
-            annotationValues.put(memberName, d);
+            resolvedValue = d;
             return null;
         }
 
         @Override
         public Object visitFloat(float f, Object o) {
-            annotationValues.put(memberName, f);
+            resolvedValue = f;
             return null;
         }
 
         @Override
         public Object visitInt(int i, Object o) {
-            annotationValues.put(memberName, i);
+            resolvedValue = i;
             return null;
         }
 
         @Override
         public Object visitLong(long i, Object o) {
-            annotationValues.put(memberName, i);
+            resolvedValue = i;
             return null;
         }
 
         @Override
         public Object visitShort(short s, Object o) {
-            annotationValues.put(memberName, s);
+            resolvedValue = s;
             return null;
         }
 
         @Override
         public Object visitString(String s, Object o) {
-            annotationValues.put(memberName, s);
+            resolvedValue = s;
             return null;
         }
 
@@ -497,7 +503,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 Element typeElement = ((DeclaredType) t).asElement();
                 if (typeElement instanceof TypeElement) {
                     String className = JavaModelUtils.getClassName((TypeElement) typeElement);
-                    annotationValues.put(memberName, new AnnotationClassValue<>(className));
+                    resolvedValue = new AnnotationClassValue<>(className);
                 }
             }
             return null;
@@ -505,15 +511,14 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitEnumConstant(VariableElement c, Object o) {
-            annotationValues.put(memberName, c.toString());
+            resolvedValue = c.toString();
             return null;
         }
 
         @Override
         public Object visitAnnotation(AnnotationMirror a, Object o) {
             if (a instanceof javax.lang.model.element.AnnotationValue) {
-                io.micronaut.core.annotation.AnnotationValue value = readNestedAnnotationValue(a);
-                annotationValues.put(memberName, value);
+                resolvedValue = readNestedAnnotationValue(originatingElement, a);
             }
             return null;
         }
@@ -524,7 +529,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             for (javax.lang.model.element.AnnotationValue val : vals) {
                 val.accept(arrayValueVisitor, o);
             }
-            annotationValues.put(memberName, arrayValueVisitor.getValues());
+            resolvedValue = arrayValueVisitor.getValues();
             return null;
         }
 
@@ -631,7 +636,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             @Override
             public Object visitAnnotation(AnnotationMirror a, Object o) {
                 arrayType = io.micronaut.core.annotation.AnnotationValue.class;
-                io.micronaut.core.annotation.AnnotationValue annotationValue = readNestedAnnotationValue(a);
+                io.micronaut.core.annotation.AnnotationValue annotationValue = readNestedAnnotationValue(originatingElement, a);
                 values.add(annotationValue);
                 return null;
             }

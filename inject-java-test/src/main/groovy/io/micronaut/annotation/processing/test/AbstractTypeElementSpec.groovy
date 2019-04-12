@@ -257,7 +257,7 @@ class Test {
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
         AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, env.filer) {
         }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, env.typeUtils, modelUtils, env.filer)
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils)
         return builder
     }
 }

@@ -16,7 +16,6 @@
 package io.micronaut.inject
 
 import com.sun.tools.javac.model.JavacElements
-import com.sun.tools.javac.processing.JavacMessager
 import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
 import groovy.transform.CompileStatic
@@ -176,7 +175,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
         AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, env.filer) {
         }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, env.typeUtils, modelUtils, env.filer)
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils)
         return builder
     }
 }
