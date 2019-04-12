@@ -15,8 +15,10 @@
 */
 package io.micronaut.docs.config.builder
 
+// tag::imports[]
 import io.micronaut.context.annotation.ConfigurationBuilder
 import io.micronaut.context.annotation.ConfigurationProperties
+// end::imports[]
 
 /**
  * @author Will Buck
@@ -30,9 +32,6 @@ internal class EngineConfig {
     @ConfigurationBuilder(prefixes = ["with"], configurationPrefix = "crank-shaft") // <3>
     val crankShaft = CrankShaft.builder()
 
-    var sparkPlug : SparkPlug.Builder = SparkPlug.builder()
-        @ConfigurationBuilder(prefixes = ["with"], configurationPrefix = "spark-plug") // <4>
-        set(value) {
-            field = value
-        }
+    @set:ConfigurationBuilder(prefixes = ["with"], configurationPrefix = "spark-plug") // <4>
+    var sparkPlug = SparkPlug.builder()
 }
