@@ -153,7 +153,9 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     @Override
     protected List<AnnotatedNode> buildHierarchy(AnnotatedNode element, boolean inheritTypeAnnotations, boolean declaredOnly) {
-        if (element instanceof ClassNode) {
+        if (declaredOnly) {
+            return Collections.singletonList(element)
+        } else if (element instanceof ClassNode) {
             List<AnnotatedNode> hierarchy = new ArrayList<>()
             ClassNode cn = (ClassNode) element
             hierarchy.add(cn)
@@ -194,7 +196,13 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
-    protected void readAnnotationRawValues(AnnotatedNode originatingElement, String annotationName, AnnotatedNode member, String memberName, Object annotationValue, Map<CharSequence, Object> annotationValues) {
+    protected void readAnnotationRawValues(
+            AnnotatedNode originatingElement,
+            String annotationName,
+            AnnotatedNode member,
+            String memberName,
+            Object annotationValue,
+            Map<CharSequence, Object> annotationValues) {
         if (!annotationValues.containsKey(memberName)) {
             def v = readAnnotationValue(originatingElement, memberName, annotationValue)
             if (v != null) {

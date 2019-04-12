@@ -266,7 +266,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected void validateAnnotationValue(T originatingElement, String annotationName, T member, String memberName, Object resolvedValue) {
         final AnnotatedElementValidator elementValidator = getElementValidator();
         if (elementValidator != null && !erroneousElements.contains(member)) {
-            final boolean shouldValidate = !(resolvedValue instanceof String) || !resolvedValue.toString().contains("${");
+            final boolean shouldValidate = !(annotationName.equals(AliasFor.class.getName())) &&
+                                           (!(resolvedValue instanceof String) || !resolvedValue.toString().contains("${"));
             if (shouldValidate) {
                 final Set<String> errors = elementValidator.validatedAnnotatedElement(new AnnotatedElement() {
 
@@ -488,8 +489,22 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         }
                         readAnnotationRawValues(originatingElement, annotationName, member, getAnnotationMemberName(member), annotationValue, annotationValues);
                     } else {
-                        OptionalValues<?> aliasForValues = getAnnotationValues(originatingElement, member, AliasFor.class);
-                        processAnnotationAlias(originatingElement, annotationName, member, metadata, isDeclared, parentAnnotations, annotationValues, annotationValue, aliasForValues);
+                        OptionalValues<?> aliasForValues = getAnnotationValues(
+                                originatingElement,
+                                member,
+                                AliasFor.class
+                        );
+                        processAnnotationAlias(
+                                originatingElement,
+                                annotationName,
+                                member,
+                                metadata,
+                                isDeclared,
+                                parentAnnotations,
+                                annotationValues,
+                                annotationValue,
+                                aliasForValues
+                        );
                         readAnnotationRawValues(originatingElement, annotationName, member, getAnnotationMemberName(member), annotationValue, annotationValues);
                     }
                 }
