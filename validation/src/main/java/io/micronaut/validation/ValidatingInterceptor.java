@@ -95,13 +95,13 @@ public class ValidatingInterceptor implements MethodInterceptor {
         final Object target = context.getTarget();
         if (executableValidator == null) {
             final ExecutableMethod executableMethod = context.getExecutableMethod();
-            final Set<ConstraintViolation<Object>> constraintViolations = this.micronautValidator.validateParameters(
+            Set<ConstraintViolation<Object>> constraintViolations = this.micronautValidator.validateParameters(
                     target,
                     executableMethod,
                     context.getParameters().values());
+            final boolean supportsReactive = micronautValidator instanceof ReactiveValidator;
             if (constraintViolations.isEmpty()) {
                 final Object result = context.proceed();
-                final boolean supportsReactive = micronautValidator instanceof ReactiveValidator;
                 final boolean hasResult = result != null;
                 if (supportsReactive & hasResult && Publishers.isConvertibleToPublisher(result)) {
                     ReactiveValidator reactiveValidator = (ReactiveValidator) micronautValidator;
@@ -112,7 +112,10 @@ public class ValidatingInterceptor implements MethodInterceptor {
                 } else if (supportsReactive & result instanceof CompletionStage) {
                     return ((ReactiveValidator) micronautValidator).validateCompletionStage(((CompletionStage) result));
                 } else {
-                    this.micronautValidator.validateReturnValue(target, executableMethod, result);
+                    constraintViolations = this.micronautValidator.validateReturnValue(target, executableMethod, result);
+                    if (!constraintViolations.isEmpty()) {
+                        throw new ConstraintViolationException(constraintViolations);
+                    }
                 }
                 return result;
             } else {
