@@ -10,4 +10,25 @@ include::{testssecurity}/security/securityRule/intercepturlmap/InterceptUrlMapSp
 <3> Enable access for users who are granted any of the specified roles.
 
 As you see in the previous code listing, any endpoint is identified by a combination of pattern
-and an optional HTTP Method
+and an optional HTTP method.
+
+If a given request URI matches more than one intercept url map, the one that specifies an http method that matches the request method will be used. If there are multiple mappings that do not specify a method and match the request URI, then the first mapping will be used. For example:
+
+The example below defines that all HTTP requests to URIs matching the pattern `/v1/myResource/**` and using HTTP method `GET` will be accessible to everyone. Requests matching the same URI pattern but using a different HTTP method than `GET` require fully authenticated access.
+
+[source, yaml]
+----
+micronaut:
+  security:
+    enabled: true
+    intercept-url-map:
+      - pattern: /v1/myResource/**
+        httpMethod: GET // <1>
+        access:
+          - isAnonymous()
+      - pattern: /v1/myResource/**
+        access:
+          - isAuthenticated() // <2>
+----
+<1> Accessing `/v1/myResource/**` with a GET request does not require authentication.
+<2> Accessing `/v1/myResource/**` with a request that isn't GET requires authentication.
