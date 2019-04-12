@@ -192,6 +192,14 @@ public interface AnnotationMetadata extends AnnotationSource {
         return false;
     }
 
+    /**
+     * Return the default values for the given annotation name.
+     * @param annotation The annotation name
+     * @return The default values
+     */
+    default @Nonnull Map<String, Object> getDefaultValues(@Nonnull String annotation) {
+        return Collections.emptyMap();
+    }
 
     /**
      * Return the default value for the given annotation member.

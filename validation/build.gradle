@@ -11,7 +11,6 @@ dependencies {
     testCompile project(":http-client")
     testCompile project(":inject-groovy")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
-    testRuntime project(":configurations:hibernate-validator")
     testCompile project(":inject-java-test")
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

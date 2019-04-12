@@ -16,6 +16,7 @@
 package io.micronaut.validation.validator;
 
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.inject.ExecutableMethod;
 
 import javax.annotation.Nonnull;
@@ -25,6 +26,7 @@ import javax.validation.ConstraintViolationException;
 import javax.validation.executable.ExecutableValidator;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.Set;
 
 /**
@@ -60,7 +62,23 @@ public interface ExecutableMethodValidator extends ExecutableValidator  {
     @Nonnull <T> Set<ConstraintViolation<T>> validateParameters(
             @Nonnull T object,
             @Nonnull ExecutableMethod method,
-            @Nullable Object[] parameterValues, @Nullable Class<?>... groups);
+            @Nonnull Object[] parameterValues,
+            @Nullable Class<?>... groups);
+
+    /**
+     * Validate the parameter values of the given {@link ExecutableMethod}.
+     * @param object The object
+     * @param method The method
+     * @param argumentValues The values
+     * @param groups The groups
+     * @param <T> The object type
+     * @return The constraint violations.
+     */
+    @Nonnull <T> Set<ConstraintViolation<T>> validateParameters(
+            @Nonnull T object,
+            @Nonnull ExecutableMethod method,
+            @Nonnull Collection<MutableArgumentValue<?>> argumentValues,
+            @Nullable Class<?>... groups);
 
     /**
      * Validates the return value of a {@link ExecutableMethod}.

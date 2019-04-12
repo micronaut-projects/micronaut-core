@@ -191,23 +191,6 @@ class ValidatedSpec extends Specification {
         server.close()
     }
 
-    void "test validated response manual rejection"() {
-        given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
-        TestClient client = server.applicationContext.getBean(TestClient)
-
-        when:
-        client.test2("x")
-
-        then:
-        def e = thrown(HttpClientResponseException)
-        e.message == 'thing: must not be null'
-
-
-        cleanup:
-        server.close()
-    }
-
     void "test validated response raw exception creation and null"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
@@ -261,29 +244,9 @@ class ValidatedSpec extends Specification {
     @Validated
     static class TestController {
 
-        private final ValidatorFactory validatorFactory
-
-        TestController(ValidatorFactory validatorFactory) {
-            this.validatorFactory = validatorFactory
-        }
-
         @Get(value = "/test1/{value}", produces = MediaType.TEXT_PLAIN)
         String test1(@Size(min = 2) String value) {
             return "got some " + value
-        }
-
-        @Get(value = "/test2/{value}", produces = MediaType.TEXT_PLAIN)
-        String test2(String value) {
-            // here we do validation manually (e.g. within a controller method like here
-            // or maybe in a custom TypeConverter etc.)
-            Some some = new Some()
-
-            // this produces constraint-validation because some.thing is null
-            Set<ConstraintViolation<Some>> violations = validatorFactory.getValidator().validate(some)
-            if (!violations.isEmpty()) {
-                throw new ConstraintViolationException(violations)
-            }
-            return "will never reach this statement"
         }
 
         @Get(value = "/test3", produces = MediaType.TEXT_PLAIN)

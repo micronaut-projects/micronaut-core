@@ -18,9 +18,12 @@ package io.micronaut.validation;
 import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.validation.validator.ExecutableMethodValidator;
+import io.micronaut.validation.validator.ReactiveValidator;
 import io.micronaut.validation.validator.Validator;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +37,7 @@ import javax.validation.executable.ExecutableValidator;
 import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletionStage;
 
 /**
  * A {@link MethodInterceptor} that validates method invocations.
@@ -51,7 +55,8 @@ public class ValidatingInterceptor implements MethodInterceptor {
 
     private static final Logger LOG = LoggerFactory.getLogger(ValidatingInterceptor.class);
 
-    private final @Nullable ExecutableValidator executableValidator;
+    private final @Nullable
+    ExecutableValidator executableValidator;
     private final ExecutableMethodValidator micronautValidator;
 
     /**
@@ -69,7 +74,7 @@ public class ValidatingInterceptor implements MethodInterceptor {
      * Creates ValidatingInterceptor from the validatorFactory.
      *
      * @param micronautValidator The micronaut validator use if no factory is available
-     * @param validatorFactory Factory returning initialized {@code Validator} instances
+     * @param validatorFactory   Factory returning initialized {@code Validator} instances
      */
     @Inject
     public ValidatingInterceptor(
@@ -93,10 +98,22 @@ public class ValidatingInterceptor implements MethodInterceptor {
             final Set<ConstraintViolation<Object>> constraintViolations = this.micronautValidator.validateParameters(
                     target,
                     executableMethod,
-                    context.getParameterValues());
+                    context.getParameters().values());
             if (constraintViolations.isEmpty()) {
                 final Object result = context.proceed();
-                this.micronautValidator.validateReturnValue(target, executableMethod, result);
+                final boolean supportsReactive = micronautValidator instanceof ReactiveValidator;
+                final boolean hasResult = result != null;
+                if (supportsReactive & hasResult && Publishers.isConvertibleToPublisher(result)) {
+                    ReactiveValidator reactiveValidator = (ReactiveValidator) micronautValidator;
+                    final Publisher newPublisher = reactiveValidator.validatePublisher(
+                            Publishers.convertPublisher(result, Publisher.class)
+                    );
+                    return Publishers.convertPublisher(newPublisher, executableMethod.getReturnType().getType());
+                } else if (supportsReactive & result instanceof CompletionStage) {
+                    return ((ReactiveValidator) micronautValidator).validateCompletionStage(((CompletionStage) result));
+                } else {
+                    this.micronautValidator.validateReturnValue(target, executableMethod, result);
+                }
                 return result;
             } else {
                 throw new ConstraintViolationException(constraintViolations);
@@ -107,11 +124,11 @@ public class ValidatingInterceptor implements MethodInterceptor {
                 return context.proceed();
             } else {
                 Set<ConstraintViolation<Object>> constraintViolations = executableValidator
-                    .validateParameters(
-                            target,
-                        targetMethod,
-                        context.getParameterValues()
-                    );
+                        .validateParameters(
+                                target,
+                                targetMethod,
+                                context.getParameterValues()
+                        );
                 if (constraintViolations.isEmpty()) {
                     return context.proceed();
                 } else {
