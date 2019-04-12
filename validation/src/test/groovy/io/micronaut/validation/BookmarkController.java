@@ -25,7 +25,6 @@ import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Positive;
 import javax.validation.constraints.PositiveOrZero;
 
-@Validated
 @Controller("/api")
 public class BookmarkController {
 
