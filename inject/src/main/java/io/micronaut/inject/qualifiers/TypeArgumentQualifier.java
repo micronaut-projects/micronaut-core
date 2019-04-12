@@ -17,7 +17,9 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -41,7 +43,7 @@ import java.util.stream.Stream;
 @Internal
 public class TypeArgumentQualifier<T> implements Qualifier<T> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TypeArgumentQualifier.class);
+    private static final Logger LOG = ClassUtils.getLogger(TypeArgumentQualifier.class);
     private final Class[] typeArguments;
 
     /**
