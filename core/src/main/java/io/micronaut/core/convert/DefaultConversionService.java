@@ -832,7 +832,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation);
                 typeConverter = typeConverters.get(pair);
                 if (typeConverter == null && hasFormatting) {
-                    ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType);
+                    pair = new ConvertiblePair(sourceSuperType, targetSuperType);
                     typeConverter = typeConverters.get(pair);
                 }
 
