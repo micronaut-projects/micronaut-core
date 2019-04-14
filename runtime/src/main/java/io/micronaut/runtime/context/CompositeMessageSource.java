@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.context;
+package io.micronaut.runtime.context;
 
+import io.micronaut.context.AbstractMessageSource;
+import io.micronaut.context.MessageSource;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArgumentUtils;
