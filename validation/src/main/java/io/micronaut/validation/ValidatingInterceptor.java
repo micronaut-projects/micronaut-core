@@ -24,8 +24,6 @@ import io.micronaut.validation.validator.ExecutableMethodValidator;
 import io.micronaut.validation.validator.ReactiveValidator;
 import io.micronaut.validation.validator.Validator;
 import org.reactivestreams.Publisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -55,8 +53,6 @@ public class ValidatingInterceptor implements MethodInterceptor {
      */
     public static final int POSITION = InterceptPhase.VALIDATE.getPosition();
 
-    private static final Logger LOG = LoggerFactory.getLogger(ValidatingInterceptor.class);
-
     private final @Nullable
     ExecutableValidator executableValidator;
     private final ExecutableMethodValidator micronautValidator;
@@ -80,10 +76,10 @@ public class ValidatingInterceptor implements MethodInterceptor {
      */
     @Inject
     public ValidatingInterceptor(
-            Validator micronautValidator,
+            @Nullable Validator micronautValidator,
             @Nullable ValidatorFactory validatorFactory) {
 
-        this.micronautValidator = micronautValidator.forExecutables();
+        this.micronautValidator = micronautValidator != null ? micronautValidator.forExecutables() : null;
         this.executableValidator = validatorFactory != null ? validatorFactory.getValidator().forExecutables() : null;
     }
 
@@ -94,9 +90,14 @@ public class ValidatingInterceptor implements MethodInterceptor {
 
     @Override
     public Object intercept(MethodInvocationContext context) {
+        final boolean isValidatorBeanNull = executableValidator == null;
+        if (isValidatorBeanNull && micronautValidator == null) {
+            return context.proceed();
+        }
         final Object target = context.getTarget();
-        if (executableValidator == null) {
+        if (isValidatorBeanNull) {
             final ExecutableMethod executableMethod = context.getExecutableMethod();
+            @SuppressWarnings("unchecked")
             Set<ConstraintViolation<Object>> constraintViolations = this.micronautValidator.validateParameters(
                     target,
                     executableMethod,
