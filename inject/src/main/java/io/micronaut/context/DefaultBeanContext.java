@@ -2214,18 +2214,6 @@ public class DefaultBeanContext implements BeanContext {
         disabled.clear();
 
         initializeEventListeners();
-        if (containsBean(MessageSource.class)) {
-            final Collection<MessageSource> messageSources = getBeansOfType(MessageSource.class);
-            registerSingleton(
-                    MessageSource.class,
-                    new CompositeMessageSource(messageSources)
-            );
-        } else {
-            registerSingleton(
-                    MessageSource.class,
-                    MessageSource.EMPTY
-            );
-        }
         initializeContext(contextScopeBeans, processedBeans);
     }
 
