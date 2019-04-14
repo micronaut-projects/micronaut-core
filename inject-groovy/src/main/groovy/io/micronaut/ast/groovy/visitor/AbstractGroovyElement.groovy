@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.visitor
 
 import groovy.transform.CompileStatic
+import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationMetadataDelegate
@@ -26,6 +27,7 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.ast.Element
 import org.codehaus.groovy.ast.AnnotatedNode
+import org.codehaus.groovy.control.SourceUnit
 
 import javax.annotation.Nonnull
 import java.lang.annotation.Annotation
@@ -39,11 +41,14 @@ import java.util.function.Consumer
  */
 abstract class AbstractGroovyElement implements AnnotationMetadataDelegate, Element {
 
-    final AnnotatedNode annotatedNode
+    protected final AnnotatedNode annotatedNode
+    protected SourceUnit sourceUnit
+
     AnnotationMetadata annotationMetadata
 
-    AbstractGroovyElement(AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
+    AbstractGroovyElement(SourceUnit sourceUnit, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
         this.annotatedNode = annotatedNode
+        this.sourceUnit = sourceUnit
         this.annotationMetadata = annotationMetadata
     }
 
@@ -54,11 +59,7 @@ abstract class AbstractGroovyElement implements AnnotationMetadataDelegate, Elem
         AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType)
         consumer?.accept(builder)
         def av = builder.build()
-        this.annotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                this.annotationMetadata,
-                av.annotationName,
-                av.values
-        )
+        annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit).annotate(annotationMetadata, av)
         AbstractAnnotationMetadataBuilder.addMutatedMetadata(
                 annotatedNode,
                 this.annotationMetadata

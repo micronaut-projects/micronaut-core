@@ -19,12 +19,15 @@ package io.micronaut.core.beans;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -39,7 +42,8 @@ import java.util.stream.Collectors;
  */
 class DefaultBeanIntrospector implements BeanIntrospector {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultBeanIntrospector.class);
+    // the reflection logger is used as this type may be used within the compiler
+    private static final Logger LOG = ClassUtils.REFLECTION_LOGGER;
 
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
 

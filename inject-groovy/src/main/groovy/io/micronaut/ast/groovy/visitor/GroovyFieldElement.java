@@ -46,7 +46,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     GroovyFieldElement(
             SourceUnit sourceUnit,
             Variable variable, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
-        super(annotatedNode, annotationMetadata);
+        super(sourceUnit, annotatedNode, annotationMetadata);
         this.variable = variable;
         this.sourceUnit = sourceUnit;
     }

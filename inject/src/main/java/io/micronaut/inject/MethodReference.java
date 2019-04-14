@@ -15,10 +15,12 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 
+import javax.annotation.Nonnull;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
@@ -30,7 +32,7 @@ import java.util.Arrays;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodReference<T, R> extends AnnotationMetadataDelegate {
+public interface MethodReference<T, R> extends AnnotationMetadataDelegate, AnnotatedElement {
 
     /**
      * @return The required argument types
@@ -75,5 +77,11 @@ public interface MethodReference<T, R> extends AnnotationMetadataDelegate {
             .stream(getArguments())
             .map(Argument::getName)
             .toArray(String[]::new);
+    }
+
+    @Nonnull
+    @Override
+    default String getName() {
+        return getMethodName();
     }
 }

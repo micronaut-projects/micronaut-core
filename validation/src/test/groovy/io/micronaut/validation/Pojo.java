@@ -15,9 +15,12 @@
  */
 package io.micronaut.validation;
 
+import io.micronaut.core.annotation.Introspected;
+
 import javax.validation.constraints.Email;
 import javax.validation.constraints.NotBlank;
 
+@Introspected
 public class Pojo {
 
     @Email(message = "Email should be valid")

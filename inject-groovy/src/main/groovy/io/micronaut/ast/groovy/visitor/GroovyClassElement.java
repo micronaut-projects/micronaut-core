@@ -46,7 +46,6 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached;
  */
 public class GroovyClassElement extends AbstractGroovyElement implements ClassElement {
 
-    private final SourceUnit sourceUnit;
     private final ClassNode classNode;
 
     /**
@@ -55,7 +54,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
      * @param annotationMetadata The annotation metadata
      */
     GroovyClassElement(SourceUnit sourceUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
-        super(classNode, annotationMetadata);
+        super(sourceUnit, classNode, annotationMetadata);
         this.classNode = classNode;
         this.sourceUnit = sourceUnit;
     }
@@ -118,6 +117,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
             if (propertyNode.isPublic() && !propertyNode.isStatic()) {
                 groovyProps.add(propertyNode.getName());
                 GroovyPropertyElement groovyPropertyElement = new GroovyPropertyElement(
+                        sourceUnit,
                         this,
                         propertyNode.getField(),
                         AstAnnotationUtils.getAnnotationMetadata(sourceUnit, propertyNode.getField()),
@@ -237,6 +237,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                         annotationMetadata = groovyAnnotationMetadataBuilder.buildForMethod(value.getter);
                     }
                     GroovyPropertyElement propertyElement = new GroovyPropertyElement(
+                            sourceUnit,
                             value.declaringType == null ? this : value.declaringType,
                             value.getter,
                             annotationMetadata,

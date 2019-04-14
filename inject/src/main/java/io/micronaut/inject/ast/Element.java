@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.util.ArgumentUtils;
@@ -30,12 +31,13 @@ import java.util.function.Consumer;
  * @author James Kleeh
  * @since 1.0
  */
-public interface Element extends AnnotationMetadataDelegate {
+public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
 
     /**
      * @return The name of the element.
      */
-    String getName();
+    @Override
+    @Nonnull String getName();
 
     /**
      * @return True if the element is protected.
@@ -53,7 +55,7 @@ public interface Element extends AnnotationMetadataDelegate {
      *
      * @return The native type
      */
-    Object getNativeType();
+    @Nonnull Object getNativeType();
 
     /**
      * Annotate this element with the given annotation type. If the annotation is already present then
@@ -117,7 +119,7 @@ public interface Element extends AnnotationMetadataDelegate {
      *
      * @return The simple name
      */
-    default String getSimpleName() {
+    default @Nonnull String getSimpleName() {
         return getName();
     }
 

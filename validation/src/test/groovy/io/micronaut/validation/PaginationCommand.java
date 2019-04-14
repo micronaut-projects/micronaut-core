@@ -15,12 +15,15 @@
  */
 package io.micronaut.validation;
 
+import io.micronaut.core.annotation.Introspected;
+
 import javax.annotation.Nullable;
 import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Positive;
 import javax.validation.constraints.PositiveOrZero;
 import java.util.List;
 
+@Introspected
 public class PaginationCommand {
 
     @PositiveOrZero

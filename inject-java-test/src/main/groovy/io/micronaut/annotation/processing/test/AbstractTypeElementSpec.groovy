@@ -24,6 +24,7 @@ import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
@@ -61,6 +62,28 @@ abstract class AbstractTypeElementSpec extends Specification {
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
         return metadata
+    }
+
+    /**
+     * @param annotationExpression the annotation expression
+     * @param packages the packages to import
+     * @return The metadata
+     */
+    @CompileStatic
+    AnnotationMetadata buildAnnotationMetadata(String annotationExpression, String... packages) {
+
+        List<String> packageList = ["io.micronaut.core.annotation",
+                                    "io.micronaut.inject.annotation"]
+        packageList.addAll(Arrays.asList(packages))
+        packageList = packageList.unique()
+        return buildTypeAnnotationMetadata("""
+${packageList.collect() { "import ${it}.*;" }.join(System.getProperty('line.separator'))}
+
+${annotationExpression}
+class Test {
+
+}
+""")
     }
 
     /**
@@ -168,6 +191,15 @@ abstract class AbstractTypeElementSpec extends Specification {
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
     }
 
+    protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
+        def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
+    }
+
     protected BeanDefinitionReference buildBeanDefinitionReference(String className, String cls) {
         def beanDefName= '$' + NameUtils.getSimpleName(className) + 'DefinitionClass'
         def packageName = NameUtils.getPackageName(className)
@@ -225,7 +257,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
         AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, env.filer) {
         }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, env.typeUtils, modelUtils, env.filer)
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils)
         return builder
     }
 }

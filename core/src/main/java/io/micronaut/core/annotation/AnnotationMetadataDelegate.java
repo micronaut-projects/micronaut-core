@@ -32,6 +32,12 @@ import java.util.*;
  */
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
 
+    @Nonnull
+    @Override
+    default Map<String, Object> getDefaultValues(@Nonnull String annotation) {
+        return getAnnotationMetadata().getDefaultValues(annotation);
+    }
+
     @Override
     default @Nonnull <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull Argument<T> requiredType) {
         return getAnnotationMetadata().getValue(annotation, requiredType);
