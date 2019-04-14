@@ -27,7 +27,6 @@ import javax.validation.constraints.Digits;
  * @since 1.0
  */
 @Controller("/validated")
-@Validated
 public class ValidatedController {
 
 

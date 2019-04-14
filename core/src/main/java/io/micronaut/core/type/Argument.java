@@ -15,11 +15,10 @@
  */
 package io.micronaut.core.type;
 
+import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 
@@ -37,7 +36,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMetadataProvider {
+public interface Argument<T> extends TypeVariableResolver, AnnotatedElement {
 
     /**
      * Constant for int argument. Used by generated code, do not remove.

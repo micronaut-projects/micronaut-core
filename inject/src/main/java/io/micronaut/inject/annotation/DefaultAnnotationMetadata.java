@@ -127,6 +127,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
     }
 
+    @Nonnull
+    @Override
+    public Map<String, Object> getDefaultValues(@Nonnull String annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return AnnotationMetadataSupport.getDefaultValues(annotation);
+    }
+
     @Override
     public @Nonnull <T> Optional<T> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);

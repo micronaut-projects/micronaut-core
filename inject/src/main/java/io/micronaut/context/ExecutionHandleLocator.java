@@ -42,7 +42,9 @@ public interface ExecutionHandleLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, String method, Class... arguments);
+    default <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, String method, Class... arguments) {
+        return Optional.empty();
+    }
 
     /**
      * Finds an optimized execution handle for invoking a bean method. The execution handle may or may not be
@@ -56,7 +58,9 @@ public interface ExecutionHandleLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> qualifier, String method, Class... arguments);
+    default <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> qualifier, String method, Class... arguments) {
+        return Optional.empty();
+    }
 
     /**
      * Finds an optimized execution handle for invoking a bean method. The execution handle may or may not be
@@ -69,7 +73,9 @@ public interface ExecutionHandleLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class... arguments);
+    default <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class... arguments) {
+        return Optional.empty();
+    }
 
     /**
      * Finds an optimized execution handle for invoking a bean method. The execution handle may or may not be
@@ -82,7 +88,9 @@ public interface ExecutionHandleLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class... arguments);
+    default <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class... arguments) {
+        return Optional.empty();
+    }
 
     /**
      * Finds the original unproxied method for a {@link io.micronaut.inject.ProxyBeanDefinition}.
@@ -94,7 +102,9 @@ public interface ExecutionHandleLocator {
      * @param arguments The arguments
      * @return The execution handle
      */
-    <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Class<T> beanType, String method, Class... arguments);
+    default <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Class<T> beanType, String method, Class... arguments) {
+        return Optional.empty();
+    }
 
     /**
      * Finds an optimized execution handle for invoking a bean method. The execution handle may or may not be

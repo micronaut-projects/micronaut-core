@@ -15,8 +15,11 @@
  */
 package io.micronaut.docs.datavalidation.pogo;
 
+import io.micronaut.core.annotation.Introspected;
+
 import javax.validation.constraints.NotBlank;
 
+@Introspected
 public class Email {
 
     @NotBlank // <1>

@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
@@ -67,11 +66,10 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         final AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
         consumer.accept(builder);
         final AnnotationValue<T> av = builder.build();
-        this.annotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                annotationMetadata,
-                annotationType,
-                av.getValues()
-        );
+        this.annotationMetadata = visitorContext
+                .getAnnotationUtils()
+                .newAnnotationBuilder()
+                .annotate(annotationMetadata, av);
         AbstractAnnotationMetadataBuilder.addMutatedMetadata(element, annotationMetadata);
         visitorContext.getAnnotationUtils().invalidateMetadata(element);
         return this;
