@@ -51,7 +51,8 @@ public class SessionForRequest {
 
     /**
      *
-     * @param request the Http Request
+     * @param request The Http Request
+     * @param sessionStore The session store to create the session if not found
      * @return A session if found in the request attributes.
      */
     public static Session findOrCreate(HttpRequest<?> request, SessionStore sessionStore) {
