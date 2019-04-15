@@ -122,6 +122,9 @@ import java.lang.reflect.Modifier
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
+    public static final String ANN_VALID = "javax.validation.Valid"
+    public static final String ANN_CONSTRAINT = "javax.validation.Constraint"
+
     CompilationUnit unit
     ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder
 
@@ -738,8 +741,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable)) && !hasInvalidModifiers
                 if (isExecutable) {
                     visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
-                }
-                if (isConfigurationProperties && isPublic && NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
+                } else if (isConfigurationProperties && isPublic && NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
                     String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
                     Parameter parameter = methodNode.parameters[0]
                     if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
@@ -789,6 +791,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 true
                         )
                     }
+                } else if (isPublic) {
+                    def sourceUnit = sourceUnit
+                    final boolean isConstrained =
+                            methodNode.getParameters()
+                                    .any { Parameter p ->
+                                AstAnnotationUtils.hasStereotype(sourceUnit, p, InjectTransform.ANN_CONSTRAINT) ||
+                                        AstAnnotationUtils.hasStereotype(sourceUnit, p, InjectTransform.ANN_VALID)
+                            }
+                    if (isConstrained) {
+                        visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
+                    }
                 }
             }
         }
@@ -809,7 +822,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     getBeanWriter().setRequiresMethodProcessing(true)
                 }
                 final boolean hasConstraints = argumentAnnotationMetadata.values().stream().anyMatch({ am ->
-                    am.hasStereotype("javax.validation.Constraint") || am.hasStereotype("javax.validation.Valid")
+                    am.hasStereotype(InjectTransform.ANN_CONSTRAINT) || am.hasStereotype(InjectTransform.ANN_VALID)
                 })
 
                 if (hasConstraints) {
@@ -973,7 +986,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     boolean isPrivate = Modifier.isPrivate(modifiers)
                     boolean requiresReflection = isPrivate || isInheritedAndNotPublic(fieldNode, fieldNode.declaringClass, modifiers)
                     if (!getBeanWriter().isValidated()) {
-                        if (fieldAnnotationMetadata.hasStereotype("javax.validation.Constraint")) {
+                        if (fieldAnnotationMetadata.hasStereotype(InjectTransform.ANN_CONSTRAINT)) {
                             getBeanWriter().setValidated(true)
                         }
                     }
@@ -1089,7 +1102,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 ClassNode declaringClass = fieldNode.declaringClass
                 if (!getBeanWriter().isValidated()) {
-                    if (fieldAnnotationMetadata.hasStereotype("javax.validation.Constraint")) {
+                    if (fieldAnnotationMetadata.hasStereotype(InjectTransform.ANN_CONSTRAINT)) {
                         getBeanWriter().setValidated(true)
                     }
                 }

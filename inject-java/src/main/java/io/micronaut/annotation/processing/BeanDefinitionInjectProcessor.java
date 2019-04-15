@@ -74,6 +74,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -104,6 +105,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     };
     private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
+    private static final String ANN_CONSTRAINT = "javax.validation.Constraint";
+    private static final String ANN_VALID = "javax.validation.Valid";
+    private static final Predicate<AnnotationMetadata> IS_CONSTRAINT = am ->
+            am.hasStereotype(ANN_CONSTRAINT) || am.hasStereotype(ANN_VALID);
 
     private JavaConfigurationMetadataBuilder metadataBuilder;
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
@@ -587,6 +592,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             } else if (isConfigurationPropertiesType && !modelUtils.isPrivate(method) && !modelUtils.isStatic(method) && NameUtils.isSetterName(method.getSimpleName().toString()) && method.getParameters().size() == 1) {
                 visitConfigurationPropertySetter(method);
+            } else if (isPublic) {
+                final boolean isConstrained =
+                        method.getParameters()
+                              .stream()
+                              .anyMatch((p) -> annotationUtils.hasStereotype(p, ANN_CONSTRAINT) || annotationUtils.hasStereotype(p, ANN_VALID));
+                if (isConstrained) {
+                    visitExecutableMethod(method, methodAnnotationMetadata);
+                }
             }
 
             return null;
@@ -594,7 +607,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private void visitConfigurationPropertySetter(ExecutableElement method) {
             BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
-            if (!writer.isValidated() && annotationUtils.hasStereotype(method, "javax.validation.Constraint")) {
+            if (!writer.isValidated() && annotationUtils.hasStereotype(method, ANN_CONSTRAINT)) {
                 writer.setValidated(true);
             }
             VariableElement parameter = method.getParameters().get(0);
@@ -920,9 +933,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 visitAdaptedMethod(method, methodAnnotationMetadata);
             }
 
-            final boolean hasConstraints = params.getParameterMetadata().values().stream().anyMatch(am ->
-                    am.hasStereotype("javax.validation.Constraint") || am.hasStereotype("javax.validation.Valid")
-            );
+            final boolean hasConstraints = params.getParameterMetadata().values().stream().anyMatch(IS_CONSTRAINT);
             if (hasConstraints && !methodAnnotationMetadata.hasStereotype("io.micronaut.validation.Validated")) {
                 methodAnnotationMetadata = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder().annotate(
                         methodAnnotationMetadata,
