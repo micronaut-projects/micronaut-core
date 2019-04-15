@@ -9,13 +9,13 @@ The following features are unsupported at this time:
 * Annotations on generic argument types since only the Java language supports this feature.
 * Any interaction with the https://beanvalidation.org/2.0/spec/#constraintmetadata[constraint metadata API], since Micronaut uses compilation time metadata.
 * XML-based configuration
-* Instead of you should use api:validation.validator.constraints.ConstraintValidator[] to define custom constraints, which supports validating annotations as compilation time.
+* Instead of you `javax.validation.ConstraintValidator` you should use api:validation.validator.constraints.ConstraintValidator[] to define custom constraints, which supports validating annotations as compilation time.
 
-However, Micronaut's implementation includes the following benefits:
+Micronaut's implementation includes the following benefits:
 
 * Reflection and Runtime Proxy free validation resulting in reduced memory consumption
 * Smaller JAR size since Hibernate Validator adds another 1.4MB
-* Faster startup since Hibernate Validator adds 200ms startup overhead
+* Faster startup since Hibernate Validator adds 200ms+ startup overhead
 * Configurability via Annotation Metadata
 * Support for Reactive Bean Validation
 * Support for validating the source AST at compilation time
@@ -123,10 +123,11 @@ You can use Micronaut's validator to validate annotation usages at compilation t
 
 dependency::micronaut-validation[scope="annotationProcessor"]
 
+Once this is done Micronaut will at compilation validate annotation values that are themselves annotated with `javax.validation`. For example consider the following annotation:
 
+.Annotation Validation
+snippet::io.micronaut.docs.ioc.validation.custom.TimeOff[tags="test", indent="0"]
 
+If your attempt to use `@TimeOff(duration="junk")` in your source Micronaut will fail compilation due to the value of `duration` violating the `DurationPattern` constraint.
 
-
-=== Validation Error Messages
-
-TODO
+NOTE: If `duration` is a property placeholder such as `@TimeOff(duration="${my.value}")` then validation handling will be deferred until runtime.
