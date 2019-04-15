@@ -47,7 +47,7 @@ class OracleCloudMetadataResolverSpec extends Specification {
         def configuration = new OracleCloudMetadataConfiguration()
         String currentPath = Paths.get("").toAbsolutePath().toString()
         configuration.url = "file:///${currentPath}/src/test/groovy/io/micronaut/discovery/cloud/oracleCloudInstanceMetadata.json"
-
+        configuration.vnicUrl = "file:///${currentPath}/src/test/groovy/io/micronaut/discovery/cloud/oracleCloudInstanceNetworkMetadata.json"
         return new OracleCloudMetadataResolver(new ObjectMapper(), configuration)
     }
 }
