@@ -110,7 +110,7 @@ public class DefaultBeanContext implements BeanContext {
     private final Map<BeanKey, Collection<Object>> initializedObjectsByType = new ConcurrentLinkedHashMap.Builder<BeanKey, Collection<Object>>().maximumWeightedCapacity(30).build();
     private final Map<BeanKey, Optional<BeanDefinition>> beanConcreteCandidateCache = new ConcurrentLinkedHashMap.Builder<BeanKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
     private final Map<Class, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Class, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
-    private final Map<Class, Collection<BeanDefinitionReference>> beanIndex = new ConcurrentLinkedHashMap.Builder<Class, Collection<BeanDefinitionReference>>().maximumWeightedCapacity(10).build();
+    private final Map<Class, Collection<BeanDefinitionReference>> beanIndex = new ConcurrentHashMap<>(12);
 
     private final ClassLoader classLoader;
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
@@ -1265,7 +1265,7 @@ public class DefaultBeanContext implements BeanContext {
      * @return The candidates
      */
     @SuppressWarnings("unchecked")
-    protected @Nonnull <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nonnull Class<T> beanType, @Nullable BeanDefinition<?> filter) {
+    protected @Nonnull <T> Collection<BeanDefinition<T>>  findBeanCandidates(@Nonnull Class<T> beanType, @Nullable BeanDefinition<?> filter) {
         ArgumentUtils.requireNonNull("beanType", beanType);
 
         if (LOG.isDebugEnabled()) {
