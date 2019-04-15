@@ -84,7 +84,7 @@ public abstract class AbstractMessageSource implements MessageSource {
          * @param locale The locale
          * @param code The code
          */
-        MessageKey(@Nonnull Locale locale, @Nonnull String code) {
+        public MessageKey(@Nonnull Locale locale, @Nonnull String code) {
             this.locale = locale;
             this.code = code;
         }

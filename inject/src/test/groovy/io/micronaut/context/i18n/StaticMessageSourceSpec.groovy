@@ -1,4 +1,4 @@
-package io.micronaut.context.env
+package io.micronaut.context.i18n
 
 import io.micronaut.context.MessageSource
 import io.micronaut.context.StaticMessageSource
