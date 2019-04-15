@@ -6,7 +6,7 @@ snippet::io.micronaut.docs.server.intro.Application[tags="imports,class",indent=
 To run the application from a unit test you can use the link:{api}/io/micronaut/runtime/server/EmbeddedServer.html[EmbeddedServer] interface:
 
 .Micronaut Test Case
-snippet::io.micronaut.docs.server.intro.HelloControllerSpec[tags="imports,class-init,embeddedServer,class", indent=0]
+snippet::io.micronaut.docs.server.intro.HelloControllerSpec[tags="imports,class", indent=0]
 
 <1> The `EmbeddedServer` is run and Spock's `@AutoCleanup` annotation ensures the server is stopped after the specification completes.
 <2> The `EmbeddedServer` interface provides the `URL` of the server under test which runs on a random port.

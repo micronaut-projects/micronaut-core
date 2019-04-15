@@ -2,9 +2,12 @@ package io.micronaut.inject.visitor.beans
 
 import io.micronaut.core.beans.BeanIntrospector
 import junit.framework.TestCase
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
 
-class BeanIntrospectorSpec : TestCase() {
+class BeanIntrospectorSpec {
 
+    @Test
     fun testGetIntrospection() {
         val introspection = BeanIntrospector.SHARED.getIntrospection(TestBean::class.java)
 
@@ -19,7 +22,7 @@ class BeanIntrospectorSpec : TestCase() {
 
         try {
             introspection.getProperty("name").get().set(testBean, "bob")
-            fail("Should have failed with unsupported operation, readonly")
+            fail<Any>("Should have failed with unsupported operation, readonly")
         } catch (e: UnsupportedOperationException) {
         }
 

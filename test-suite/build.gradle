@@ -25,7 +25,7 @@ dependencies {
     testCompile project(":runtime")
     testCompile project(":inject")
     testCompile dependencyVersion("jcache")
-
+    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-junit5")
     testCompile dependencyVersion("jaeger")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     // tag::testcontainers-dependencies[]
@@ -39,7 +39,6 @@ dependencies {
 
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
 apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
-
 tasks.withType(Test) {
     jvmArgs('-Dio.netty.leakDetection.level=paranoid')
 /*    testLogging {

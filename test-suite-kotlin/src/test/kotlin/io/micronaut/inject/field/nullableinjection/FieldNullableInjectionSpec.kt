@@ -16,14 +16,16 @@
 package io.micronaut.inject.field.nullableinjection
 
 import io.micronaut.context.BeanContext
-import junit.framework.TestCase
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Test
 
-class FieldNullableInjectionSpec : TestCase() {
+class FieldNullableInjectionSpec {
 
+    @Test
     fun testNullableFieldInjection() {
         val context = BeanContext.run()
         val b = context.getBean(B::class.java)
-        TestCase.assertNull(b.a)
+        assertNull(b.a)
     }
 
 }

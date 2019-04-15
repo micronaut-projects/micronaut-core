@@ -3,9 +3,12 @@ package io.micronaut.docs.ioc.beans
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.beans.BeanWrapper
-import junit.framework.TestCase
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
 
-class IntrospectionSpec : TestCase() {
+class IntrospectionSpec {
+
+    @Test
     fun testRetrieveInspection() {
 
         // tag::usage[]
@@ -22,6 +25,7 @@ class IntrospectionSpec : TestCase() {
         assertEquals("Fred", name)
     }
 
+    @Test
     fun testBeanWrapper() {
         // tag::wrapper[]
         val wrapper = BeanWrapper.getWrapper(Person("Fred")) // <1>
@@ -31,6 +35,6 @@ class IntrospectionSpec : TestCase() {
 
         println("Person's age now $newAge")
         // end::wrapper[]
-        TestCase.assertEquals(20, newAge)
+        assertEquals(20, newAge)
     }
 }

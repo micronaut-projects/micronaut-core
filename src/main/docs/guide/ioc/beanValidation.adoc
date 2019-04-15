@@ -1,0 +1,83 @@
+Since Micronaut 1.2, Micronaut has built-in support for validating beans that are annotated with `javax.validation` annotations.
+
+Note that Micronaut's implementation is not currently fully compliant with the Bean Validator specification as the specification heavily relies on reflection-based APIs, however Micronaut's implementation includes the following benefits:
+
+* Reflection and Runtime Proxy free validation resulting in reduced memory consumption
+* Smaller JAR size since Hibernate Validator adds another 1.4MB
+* Faster startup since Hibernate Validator adds 200ms startup overhead
+* Configurability via Annotation Metadata
+* Support for Reactive Bean Validation
+* Support for validating the source AST at compilation time
+
+TIP: If you require full Bean Validator 2.0 compliance you can add the `micronaut-hibernate-validator` module to your classpath, which will replace Micronaut's implementation.
+
+
+=== Validating Bean Methods
+
+You can validate methods of any class declared as a Micronaut bean simply by using the `javax.validation` annotation as arguments:
+
+.Validating Methods
+snippet::io.micronaut.docs.ioc.validation.PersonService[tags="imports,class",indent=0]
+
+The above example declares that the `@NotBlank` annotation should be validated when executing the `sayHello` method.
+
+WARNING: If you are using Kotlin the class and method must be declared open so that Micronaut can create a compilation time subclass.
+
+If a validation error occurs a `javax.validation.ConstraintViolationException` will be thrown. For example:
+
+.ConstraintViolationException Example
+snippet::io.micronaut.docs.ioc.validation.PersonServiceSpec[tags="imports,test",indent=0]
+
+<1> The method is called with a blank string
+<2> An exception occurs
+
+=== Validating Data Classes
+
+If you wish to validation data classes, such as POJOs and so on, typically used in JSON interchange, the class must be annotated with ann:core.annotation.Introspected[] (see the previous section on <<introspection, Bean Introspection>>) or if the class is external be imported by the `@Introspected` annotation.
+
+.POJO Validation Example
+snippet::io.micronaut.docs.ioc.validation.Person[tags="class"]
+
+TIP: The ann:core.annotation.Introspected[] annotation can be used as a meta-annotation and common annotations like `@javax.persistence.Entity` are treated as `@Introspected`
+
+The above example defines a class called `Person` that has 2 properties (`name` and `age`) that have constraints applied to them. Note that in Java the annotations can be on the field or the getter and with Kotlin data classes the annotation should target the field.
+
+If you wish to validate the class manually then you can inject an instance of api:validation.validator.Validator[]:
+
+.Manual Validation Example
+snippet::io.micronaut.docs.ioc.validation.pojo.PersonServiceSpec[tags="validator", indent="0"]
+
+<1> The validator is used to validate the person
+<2> The constraint violations are verified
+
+Alternatively on Bean methods you can use `javax.validation.Valid` to trigger cascading validation:
+
+.ConstraintViolationException Example
+snippet::io.micronaut.docs.ioc.validation.pojo.PersonService[tags="class",indent="0"]
+
+The `PersonService` will now validate the `Person` class when invoked:
+
+.Manual Validation Example
+snippet::io.micronaut.docs.ioc.validation.pojo.PersonServiceSpec[tags="validate-service",indent="0"]
+
+<1> A validated method is invoked
+<2> The constraint violations are verified
+
+
+
+=== Validating Configuration Properties
+
+You can also validate the properties of classes that are annotated with ann:context.annotation.ConfigurationProperties[] to ensure configuration is correct.
+
+NOTE: It is recommended that you annotate ann:context.annotation.ConfigurationProperties[] that features validation with ann:context.annotation.Context[] to ensure that the validation occurs at startup time.
+
+=== Validating Annotations at Compilation Time
+
+
+=== Defining Additional Constraints
+
+TODO
+
+=== Validation Error Messages
+
+TODO

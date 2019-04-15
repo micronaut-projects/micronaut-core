@@ -1,8 +1,8 @@
 package io.micronaut.docs.inject.intro
 
 import io.micronaut.context.BeanContext
-import kotlin.test.Test
-import kotlin.test.assertEquals
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
 
 class VehicleSpec {
     @Test

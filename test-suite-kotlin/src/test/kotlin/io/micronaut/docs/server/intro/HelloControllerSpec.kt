@@ -16,43 +16,25 @@
 package io.micronaut.docs.server.intro
 
 // tag::imports[]
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.Environment
+import io.micronaut.context.annotation.Property
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-
+import io.micronaut.test.annotation.MicronautTest
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import javax.inject.Inject
 // end::imports[]
+@Property(name = "spec.name", value = "HelloControllerSpec")
+// tag::class[]
+@MicronautTest
+class HelloControllerSpec {
+    @Inject
+    lateinit var server: EmbeddedServer // <1>
 
-// tag::class-init[]
-class HelloControllerSpec() {
-    lateinit var server: EmbeddedServer
-    lateinit var client: HttpClient
-
-    @BeforeTest
-    fun setup() {
-        // end::class-init[]
-        server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName), Environment.TEST)
-
-        /*
-// tag::embeddedServer[]
-        server = ApplicationContext.run(EmbeddedServer::class.java) // <1>
-// end::embeddedServer[]
-        */
-        //tag::class[]
-        client = server
-                .getApplicationContext()
-                .createBean(HttpClient::class.java, server.getURL())// <2>
-    }
-
-    @AfterTest
-    fun teardown() {
-        client?.close()
-        server?.close()
-    }
+    @Inject
+    @field:Client("/")
+    lateinit var client: HttpClient // <2>
 
     @Test
     fun testHelloWorldResponse() {

@@ -15,47 +15,32 @@
  */
 package io.micronaut.docs.server.intro
 
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.Environment
+import io.micronaut.context.annotation.Property
+
 
 // tag::imports[]
-
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.AutoCleanup
-import spock.lang.Shared
+import io.micronaut.test.annotation.MicronautTest
 import spock.lang.Specification
-
+import javax.inject.Inject
 // end::imports[]
-
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-// tag::class-init[]
+@Property(name = "spec.name", value = "HelloControllerSpec")
+// tag::class[]
+@MicronautTest
 class HelloControllerSpec extends Specification {
-    // end::class-init[]
-    @Shared
-    @AutoCleanup
-    EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer.class,
-                    [
-                        "spec.name": HelloControllerSpec.simpleName
-                    ]
-                    , Environment.TEST)
+    @Inject
+    EmbeddedServer embeddedServer // <1>
 
-    /*
-// tag::embeddedServer[]
-    @Shared
-    @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer) // <1>
-// end::embeddedServer[]
-    */
-    // tag::class[]
-    @Shared
-    @AutoCleanup
-    HttpClient client = HttpClient.create(embeddedServer.URL) // <2>
+    @Inject
+    @Client("/")
+    HttpClient client // <2>
 
     void "test hello world response"() {
         expect:

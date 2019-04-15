@@ -16,59 +16,29 @@
 package io.micronaut.docs.server.intro;
 
 // tag::imports[]
-
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.env.Environment;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import io.micronaut.test.annotation.MicronautTest;
+import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
+import javax.inject.Inject;
 
-import static org.junit.Assert.assertEquals;
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
 // end::imports[]
+// tag::class[]
+@MicronautTest
+class HelloControllerSpec {
+    @Inject
+    EmbeddedServer server; // <1>
 
-// tag::class-init[]
-public class HelloControllerSpec {
-    private static EmbeddedServer server;
-    private static HttpClient client;
-
-    @BeforeClass
-    public static void setupServer() {
-        // end::class-init[]
-        server = ApplicationContext.run(EmbeddedServer.class,
-                new HashMap<String, Object>() {{
-                    put("spec.name", HelloControllerSpec.class.getSimpleName());
-                    put("spec.lang", "java");
-                }}
-                , Environment.TEST);
-        /*
-// tag::embeddedServer[]
-        server = ApplicationContext.run(EmbeddedServer.class) // <1>
-// end::embeddedServer[]
-        */
-        // tag::class[]
-        client = server
-                .getApplicationContext()
-                .createBean(HttpClient.class, server.getURL());// <2>
-    }
-
-    @AfterClass
-    public static void stopServer() {
-        if (client != null) {
-            client.stop();
-        }
-        if (server != null) {
-            server.stop();
-        }
-    }
+    @Inject
+    @Client("/")
+    HttpClient client; // <2>
 
     @Test
-    public void testHelloWorldResponse() {
+    void testHelloWorldResponse() {
         String response = client.toBlocking() // <3>
                 .retrieve(HttpRequest.GET("/hello"));
         assertEquals("Hello World", response); //) <4>

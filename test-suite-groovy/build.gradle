@@ -3,6 +3,8 @@ dependencies {
     testCompile project(":inject-groovy")
     testCompile project(":http-server-netty")
     testCompile project(":runtime")
+    testCompile project(":validation")
     testCompile project(":inject")
     testCompile dependencyVersion("jcache")
+    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-spock")
 }

@@ -1,11 +1,12 @@
 package io.micronaut.validation.validator
 
 import io.micronaut.context.ApplicationContext
-import junit.framework.TestCase
 import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.fail
 import javax.validation.ConstraintViolationException
 
-class ValidatorSpec : TestCase() {
+class ValidatorSpec {
 
 
     @Test
@@ -26,7 +27,7 @@ class ValidatorSpec : TestCase() {
 
         try {
             val person = validator.createValid(Person::class.java, "", 10)
-            fail("should have failed with validation errors")
+            fail<Any>("should have failed with validation errors")
         } catch (e: ConstraintViolationException) {
             assertEquals(2, e.constraintViolations.size)
         }
