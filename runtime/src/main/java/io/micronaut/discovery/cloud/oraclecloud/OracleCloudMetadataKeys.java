@@ -36,6 +36,9 @@ public enum OracleCloudMetadataKeys {
     AGENT_CONFIG("agentConfig"),
     MONITORING_DISABLED("monitoringDisabled"),
     USER_METADATA("metadata"),
+    MAC("macAddr"),
+    VNIC_ID("vnicId"),
+    PRIVATE_IP("privateIp"),
     TIME_CREATED("timeCreated");
 
     private final String name;

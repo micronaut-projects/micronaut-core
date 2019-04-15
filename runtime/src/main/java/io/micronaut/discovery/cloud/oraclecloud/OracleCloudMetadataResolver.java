@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
+import io.micronaut.discovery.cloud.NetworkInterface;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,9 +113,30 @@ public class OracleCloudMetadataResolver implements ComputeInstanceMetadataResol
 
                 populateMetadata(instanceMetadata, metadata);
                 cachedMetadata = instanceMetadata;
-
-                return Optional.of(instanceMetadata);
             }
+
+            String vnicUrl = configuration.getVnicUrl();
+            JsonNode vnicJson = readMetadataUrl(
+                    new URL(vnicUrl),
+                    CONNECTION_TIMEOUT_IN_MILLS,
+                    READ_TIMEOUT_IN_MILLS,
+                    objectMapper,
+                    new HashMap<>());
+
+            if(vnicJson != null) {
+                List<NetworkInterface> networkInterfaces = new ArrayList<>();
+                vnicJson.elements().forEachRemaining( vnicNode -> {
+                    OracleCloudNetworkInterface networkInterface = new OracleCloudNetworkInterface();
+                    networkInterface.setId(textValue(vnicJson, VNIC_ID));
+                    networkInterface.setIpv4(textValue(vnicJson, PRIVATE_IP));
+                    networkInterface.setMac(textValue(vnicJson, MAC));
+                    networkInterfaces.add(networkInterface);
+                });
+                instanceMetadata.setInterfaces(networkInterfaces);
+            }
+
+            return Optional.of(instanceMetadata);
+
         } catch (MalformedURLException mue) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Oracle Cloud metadataUrl value is invalid!: " + configuration.getUrl(), mue);

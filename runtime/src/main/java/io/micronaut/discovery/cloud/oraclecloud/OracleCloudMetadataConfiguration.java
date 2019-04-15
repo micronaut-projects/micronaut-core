@@ -47,10 +47,12 @@ public class OracleCloudMetadataConfiguration implements Toggleable {
      */
     @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_URL = "http://169.254.169.254/opc/v1/instance/";
+    public static final String DEFAULT_VNIC_URL = "http://169.254.169.254/opc/v1/vnics/";
 
     private String url = DEFAULT_URL;
     private String metadataUrl;
     private String instanceDocumentUrl;
+    private String vnicUrl = DEFAULT_VNIC_URL;
     private boolean enabled = DEFAULT_ENABLED;
 
     /**
@@ -110,5 +112,23 @@ public class OracleCloudMetadataConfiguration implements Toggleable {
      */
     public void setInstanceDocumentUrl(String instanceDocumentUrl) {
         this.instanceDocumentUrl = instanceDocumentUrl;
+    }
+
+    /**
+     * * Default value ({@value #DEFAULT_VNIC_URL}).
+     * @return The VNIC Url
+     */
+    public String getVnicUrl() {
+        if (vnicUrl == null) {
+            return DEFAULT_VNIC_URL;
+        }
+        return vnicUrl;
+    }
+
+    /**
+     * @param vnicUrl The instance document Url
+     */
+    public void setVnicUrl(String vnicUrl) {
+        this.vnicUrl = vnicUrl;
     }
 }
