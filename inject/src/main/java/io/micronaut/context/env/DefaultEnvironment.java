@@ -74,6 +74,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final int DEFAULT_READ_TIMEOUT = 500;
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
     private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
+    private static final String ORACLE_CLOUD_METADATA = "http://169.254.169.254/opc/v1/instance/";
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
 
@@ -698,6 +699,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                                 environments.add(AMAZON_EC2);
                                 environments.add(Environment.CLOUD);
                                 break;
+                            case ORACLE_CLOUD:
+                                environments.add(ORACLE_CLOUD);
+                                environments.add(Environment.CLOUD);
+                                break;
                             case AZURE:
                                 // not yet implemented
                                 environments.add(AZURE);
@@ -807,6 +812,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             return ComputePlatform.GOOGLE_COMPUTE;
         }
 
+        if (isOracleCloud()) {
+            return ComputePlatform.ORACLE_CLOUD;
+        }
+
         if (isDigitalOcean()) {
             return ComputePlatform.DIGITAL_OCEAN;
         }
@@ -841,6 +850,21 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         } catch (IOException e) {
             // well not google then
+        }
+        return false;
+    }
+
+    @SuppressWarnings("MagicNumber")
+    private static boolean isOracleCloud() {
+        try {
+            final HttpURLConnection con = createConnection(ORACLE_CLOUD_METADATA);
+            con.setRequestMethod("GET");
+            con.setDoOutput(true);
+            int responseCode = con.getResponseCode();
+            return responseCode == 200;
+
+        } catch (IOException e) {
+            // well not oracle then
         }
         return false;
     }
