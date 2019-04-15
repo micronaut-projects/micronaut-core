@@ -112,7 +112,6 @@ public class OracleCloudMetadataResolver implements ComputeInstanceMetadataResol
                 metadata.put("zone", textValue(metadataJson, AVAILABILITY_DOMAIN));
 
                 populateMetadata(instanceMetadata, metadata);
-                cachedMetadata = instanceMetadata;
             }
 
             String vnicUrl = configuration.getVnicUrl();
@@ -134,7 +133,7 @@ public class OracleCloudMetadataResolver implements ComputeInstanceMetadataResol
                 });
                 instanceMetadata.setInterfaces(networkInterfaces);
             }
-
+            cachedMetadata = instanceMetadata;
             return Optional.of(instanceMetadata);
 
         } catch (MalformedURLException mue) {
