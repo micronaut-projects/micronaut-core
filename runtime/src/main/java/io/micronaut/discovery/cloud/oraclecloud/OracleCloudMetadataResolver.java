@@ -133,6 +133,7 @@ public class OracleCloudMetadataResolver implements ComputeInstanceMetadataResol
                 });
                 instanceMetadata.setInterfaces(networkInterfaces);
             }
+
             cachedMetadata = instanceMetadata;
             return Optional.of(instanceMetadata);
 
