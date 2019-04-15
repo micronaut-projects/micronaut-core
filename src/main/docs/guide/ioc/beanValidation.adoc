@@ -126,7 +126,7 @@ dependency::micronaut-validation[scope="annotationProcessor"]
 Once this is done Micronaut will at compilation validate annotation values that are themselves annotated with `javax.validation`. For example consider the following annotation:
 
 .Annotation Validation
-snippet::io.micronaut.docs.ioc.validation.custom.TimeOff[tags="test", indent="0"]
+snippet::io.micronaut.docs.ioc.validation.custom.TimeOff[tags="imports,class", indent="0"]
 
 If your attempt to use `@TimeOff(duration="junk")` in your source Micronaut will fail compilation due to the value of `duration` violating the `DurationPattern` constraint.
 
