@@ -37,7 +37,7 @@ import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.
 import static io.micronaut.discovery.cloud.oraclecloud.OracleCloudMetadataKeys.*;
 
 /**
- * Resolves {@link ComputeInstanceMetadata} for Oracle Cloud.
+ * Resolves {@link ComputeInstanceMetadata} for Oracle Cloud Infrastructure.
  *
  * @author Todd Sharp
  * @since 1.2.0
