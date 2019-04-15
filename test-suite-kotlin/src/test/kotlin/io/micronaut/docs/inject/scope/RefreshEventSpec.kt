@@ -14,26 +14,26 @@ import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
 import org.junit.Assert.*
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.annotation.PostConstruct
 import javax.inject.Inject
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
-import kotlin.test.Test
 
 class RefreshEventSpec {
 
     lateinit var embeddedServer: EmbeddedServer
     lateinit var client: HttpClient
 
-    @BeforeTest
+    @BeforeEach
     fun setup() {
         embeddedServer = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to RefreshEventSpec::class.simpleName), Environment.TEST)
         client = HttpClient.create(embeddedServer.url)
     }
 
-    @AfterTest
+    @AfterEach
     fun teardown() {
         client.close()
         embeddedServer.close()

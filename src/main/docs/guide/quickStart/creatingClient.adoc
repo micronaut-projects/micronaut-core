@@ -28,11 +28,11 @@ To test the `HelloClient` simply retrieve it from the api:context.ApplicationCon
 
 .Testing HelloClient
 
-snippet::io.micronaut.docs.server.intro.HelloClientSpec[tags="class-init,embeddedServer,class-end",indent=0]
+snippet::io.micronaut.docs.server.intro.HelloClientSpec[tags="imports,class",indent=0]
 
 
-<1> The api:runtime.server.EmbeddedServer[] is run
-<2> The `HelloClient` is retrieved from the api:context.ApplicationContext[]
+<1> The `@MicronautTest` annotation is used to define the test
+<2> The `HelloClient` is injected from the api:context.ApplicationContext[]
 <3> The client is invoked using RxJava's `blockingGet` method
 
 The api:http.client.annotation.Client[] annotation produces an implementation automatically for you at compile time without the need to use proxies or runtime reflection.
