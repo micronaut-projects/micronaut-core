@@ -122,9 +122,9 @@ public class OracleCloudMetadataResolver implements ComputeInstanceMetadataResol
                     objectMapper,
                     new HashMap<>());
 
-            if(vnicJson != null) {
+            if (vnicJson != null) {
                 List<NetworkInterface> networkInterfaces = new ArrayList<>();
-                vnicJson.elements().forEachRemaining( vnicNode -> {
+                vnicJson.elements().forEachRemaining(vnicNode -> {
                     OracleCloudNetworkInterface networkInterface = new OracleCloudNetworkInterface();
                     networkInterface.setId(textValue(vnicJson, VNIC_ID));
                     networkInterface.setIpv4(textValue(vnicJson, PRIVATE_IP));
