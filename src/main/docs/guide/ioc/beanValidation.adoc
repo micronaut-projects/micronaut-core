@@ -1,6 +1,17 @@
-Since Micronaut 1.2, Micronaut has built-in support for validating beans that are annotated with `javax.validation` annotations.
+Since Micronaut 1.2, Micronaut has built-in support for validating beans that are annotated with `javax.validation` annotations. As a minimum you should include the `micronaut-validation` module as a compile dependency:
 
-Note that Micronaut's implementation is not currently fully compliant with the Bean Validator specification as the specification heavily relies on reflection-based APIs, however Micronaut's implementation includes the following benefits:
+dependency::micronaut-validation[]
+
+Note that Micronaut's implementation is not currently fully compliant with the https://beanvalidation.org/2.0/spec/[Bean Validator specification] as the specification heavily relies on reflection-based APIs.
+
+The following features are unsupported at this time:
+
+* Annotations on generic argument types since only the Java language supports this feature.
+* Any interaction with the https://beanvalidation.org/2.0/spec/#constraintmetadata[constraint metadata API], since Micronaut uses compilation time metadata.
+* XML-based configuration
+* Instead of you should use api:validation.validator.constraints.ConstraintValidator[] to define custom constraints, which supports validating annotations as compilation time.
+
+However, Micronaut's implementation includes the following benefits:
 
 * Reflection and Runtime Proxy free validation resulting in reduced memory consumption
 * Smaller JAR size since Hibernate Validator adds another 1.4MB
@@ -64,19 +75,57 @@ snippet::io.micronaut.docs.ioc.validation.pojo.PersonServiceSpec[tags="validate-
 <2> The constraint violations are verified
 
 
-
 === Validating Configuration Properties
 
 You can also validate the properties of classes that are annotated with ann:context.annotation.ConfigurationProperties[] to ensure configuration is correct.
 
 NOTE: It is recommended that you annotate ann:context.annotation.ConfigurationProperties[] that features validation with ann:context.annotation.Context[] to ensure that the validation occurs at startup time.
 
-=== Validating Annotations at Compilation Time
-
-
 === Defining Additional Constraints
 
-TODO
+To define additional constraints you can define a new annotation, for example:
+
+.Example Constraint Annotation
+snippet::io.micronaut.docs.ioc.validation.custom.DurationPattern[tags="imports,class", indent="0"]
+
+<1> The annotation should be annotated with `javax.validation.Constraint`
+<2> A `message` template can be provided in a hard coded manner as above. If none is specified Micronaut will try to find a message using `ClassName.message` using the api:context.MessageSource[] interface. (optional)
+<3> To support repeated annotations you can define a inner annotation (optional).
+
+TIP: You can add messages and message bundles using the api:context.MessageSource[] and api:context.i18n.ResourceBundleMessageSource[] classes.
+
+Once you have defined the annotation you need to implement a api:validation.validator.constraints.ConstraintValidator[] that validates the annotation. You can either implement a bean that implements the interace directly or define a factory that returns one or more validators.
+
+The latter approach is recommended if you plant to define multiple validators:
+
+.Example Constraint Validator
+snippet::io.micronaut.docs.ioc.validation.custom.MyValidatorFactory[tags="imports,class", indent="0"]
+
+The above example implements a validator that validates any field, parameter etc. that is annotated with `DurationPattern`, ensuring that the string can be parsed with `java.time.Duration.parse`.
+
+NOTE: Generally `null` is regarded as valid and `@NotNull` used to constrain a value as not being `null`. The example above returns regards `null` as a valid value.
+
+For example:
+
+.Example Custom Constraint Usage
+snippet::io.micronaut.docs.ioc.validation.custom.HolidayService[tags="class", indent="0"]
+
+To verify the above examples validates the `duration` parameter you can define a test:
+
+
+.Testing Example Custom Constraint Usage
+snippet::io.micronaut.docs.ioc.validation.custom.DurationPatternValidatorSpec[tags="test", indent="0"]
+
+
+=== Validating Annotations at Compilation Time
+
+You can use Micronaut's validator to validate annotation usages at compilation time. To do so you should include `micronaut-validation` in the annotation processor classpath:
+
+dependency::micronaut-validation[scope="annotationProcessor"]
+
+
+
+
 
 === Validation Error Messages
 
