@@ -20,8 +20,9 @@ Micronaut's implementation includes the following benefits:
 * Support for Reactive Bean Validation
 * Support for validating the source AST at compilation time
 
-TIP: If you require full Bean Validator 2.0 compliance you can add the `micronaut-hibernate-validator` module to your classpath, which will replace Micronaut's implementation.
+If you require full Bean Validator 2.0 compliance you can add the `micronaut-hibernate-validator` module to your classpath, which will replace Micronaut's implementation.
 
+dependency::micronaut-hibernate-validator[]
 
 === Validating Bean Methods
 
