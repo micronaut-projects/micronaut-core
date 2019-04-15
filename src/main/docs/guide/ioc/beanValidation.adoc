@@ -45,7 +45,7 @@ snippet::io.micronaut.docs.ioc.validation.PersonServiceSpec[tags="imports,test",
 
 === Validating Data Classes
 
-If you wish to validation data classes, such as POJOs and so on, typically used in JSON interchange, the class must be annotated with ann:core.annotation.Introspected[] (see the previous section on <<introspection, Bean Introspection>>) or if the class is external be imported by the `@Introspected` annotation.
+If you wish to validate data classes, such as POJOs and so on, typically used in JSON interchange, the class must be annotated with ann:core.annotation.Introspected[] (see the previous section on <<introspection, Bean Introspection>>) or if the class is external be imported by the `@Introspected` annotation.
 
 .POJO Validation Example
 snippet::io.micronaut.docs.ioc.validation.Person[tags="class"]
