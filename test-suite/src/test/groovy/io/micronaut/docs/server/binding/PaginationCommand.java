@@ -16,6 +16,8 @@
 package io.micronaut.docs.server.binding;
 
 // tag::imports[]
+import io.micronaut.core.annotation.Introspected;
+
 import javax.annotation.Nullable;
 import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Positive;
@@ -27,6 +29,7 @@ import javax.validation.constraints.PositiveOrZero;
  * @since 1.0
  */
 // tag::class[]
+@Introspected
 public class PaginationCommand {
 // end::class[]
 

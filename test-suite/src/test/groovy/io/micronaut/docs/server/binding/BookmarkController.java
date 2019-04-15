@@ -31,7 +31,6 @@ import javax.validation.Valid;
  */
 // tag::class[]
 @Controller("/api")
-@Validated
 public class BookmarkController {
 // end::class[]
 

@@ -16,6 +16,7 @@
 package io.micronaut.docs.server.intro;
 
 // tag::imports[]
+import io.micronaut.context.annotation.Property;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
@@ -27,6 +28,7 @@ import javax.inject.Inject;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 // end::imports[]
+@Property(name = "spec.name", value = "HelloControllerSpec")
 // tag::class[]
 @MicronautTest
 class HelloControllerSpec {
