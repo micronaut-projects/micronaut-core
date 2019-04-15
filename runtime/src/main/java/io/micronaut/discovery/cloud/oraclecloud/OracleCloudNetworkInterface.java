@@ -22,7 +22,7 @@ import io.micronaut.discovery.cloud.NetworkInterface;
  * A {@link NetworkInterface} implementation for Google.
  *
  * @author Todd Sharp
- * @since 1.2
+ * @since 1.2.0
  */
 @Internal
 class OracleCloudNetworkInterface extends NetworkInterface {

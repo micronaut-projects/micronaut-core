@@ -17,7 +17,7 @@
  * Oracle cloud configuration.
  *
  * @author Todd Sharp
- * @since 1.2
+ * @since 1.2.0
  */
 package io.micronaut.discovery.cloud.oraclecloud;
 

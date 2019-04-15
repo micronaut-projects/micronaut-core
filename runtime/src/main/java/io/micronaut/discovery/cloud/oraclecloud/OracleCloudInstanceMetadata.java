@@ -23,7 +23,7 @@ import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
  * Represents {@link io.micronaut.discovery.cloud.ComputeInstanceMetadata} for Oracle Cloud.
  *
  * @author Todd Sharp
- * @since 1.2
+ * @since 1.2.0
  */
 public class OracleCloudInstanceMetadata extends AbstractComputeInstanceMetadata {
 

@@ -25,7 +25,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
  * Default configuration for retrieving Oracle Cloud metadata for {@link io.micronaut.context.env.ComputePlatform#ORACLE_CLOUD}.
  *
  * @author Todd Sharp
- * @since 1.2
+ * @since 1.2.0
  */
 @ConfigurationProperties(OracleCloudMetadataConfiguration.PREFIX)
 @Requires(env = Environment.ORACLE_CLOUD)

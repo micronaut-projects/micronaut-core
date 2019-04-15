@@ -19,7 +19,7 @@ package io.micronaut.discovery.cloud.oraclecloud;
  * Models common Oracle Cloud compute instance metadata keys.
  *
  * @author Todd Sharp
- * @since 1.2
+ * @since 1.2.0
  */
 public enum OracleCloudMetadataKeys {
 

@@ -40,7 +40,7 @@ import static io.micronaut.discovery.cloud.oraclecloud.OracleCloudMetadataKeys.*
  * Resolves {@link ComputeInstanceMetadata} for Oracle Cloud.
  *
  * @author Todd Sharp
- * @since 1.2
+ * @since 1.2.0
  */
 @Singleton
 @Requires(env = Environment.ORACLE_CLOUD)
