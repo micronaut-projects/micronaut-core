@@ -9,7 +9,7 @@ The following features are unsupported at this time:
 * Annotations on generic argument types since only the Java language supports this feature.
 * Any interaction with the https://beanvalidation.org/2.0/spec/#constraintmetadata[constraint metadata API], since Micronaut uses compilation time metadata.
 * XML-based configuration
-* Instead of you `javax.validation.ConstraintValidator` you should use api:validation.validator.constraints.ConstraintValidator[] to define custom constraints, which supports validating annotations as compilation time.
+* Instead of using `javax.validation.ConstraintValidator` you should use api:validation.validator.constraints.ConstraintValidator[] to define custom constraints, which supports validating annotations as compilation time.
 
 Micronaut's implementation includes the following benefits:
 
@@ -33,7 +33,7 @@ snippet::io.micronaut.docs.ioc.validation.PersonService[tags="imports,class",ind
 
 The above example declares that the `@NotBlank` annotation should be validated when executing the `sayHello` method.
 
-WARNING: If you are using Kotlin the class and method must be declared open so that Micronaut can create a compilation time subclass.
+WARNING: If you are using Kotlin the class and method must be declared open so that Micronaut can create a compilation time subclass, alternatively you can annotate the class with ann:validation.Validated[] and configure the Kotlin `all-open` plugin to open classes annotated with this type. See the https://kotlinlang.org/docs/reference/compiler-plugins.html[Compiler plugins] section.
 
 If a validation error occurs a `javax.validation.ConstraintViolationException` will be thrown. For example:
 
