@@ -48,4 +48,13 @@ public class SessionForRequest {
     public static Optional<Session> find(HttpRequest<?> request) {
         return request.getAttributes().get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
     }
+
+    /**
+     *
+     * @param request the Http Request
+     * @return A session if found in the request attributes.
+     */
+    public static Session findOrCreate(HttpRequest<?> request, SessionStore sessionStore) {
+        return find(request).orElseGet(() -> create(sessionStore, request));
+    }
 }
