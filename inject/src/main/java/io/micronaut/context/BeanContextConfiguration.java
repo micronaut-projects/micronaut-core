@@ -30,8 +30,7 @@ public interface BeanContextConfiguration {
      * The class loader to use.
      * @return The class loader.
      */
-    default @Nonnull
-    ClassLoader getClassLoader() {
+    default @Nonnull ClassLoader getClassLoader() {
         return ApplicationContextConfiguration.class.getClassLoader();
     }
 }
