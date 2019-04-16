@@ -7,7 +7,7 @@ Note that Micronaut's implementation is not currently fully compliant with the h
 The following features are unsupported at this time:
 
 * Annotations on generic argument types since only the Java language supports this feature.
-* Any interaction with the https://beanvalidation.org/2.0/spec/#constraintmetadata[constraint metadata API], since Micronaut uses compilation time metadata.
+* Any interaction with the https://beanvalidation.org/2.0/spec/#constraintmetadata[constraint metadata API], since Micronaut uses already computed compilation time metadata.
 * XML-based configuration
 * Instead of using `javax.validation.ConstraintValidator` you should use api:validation.validator.constraints.ConstraintValidator[] to define custom constraints, which supports validating annotations as compilation time.
 
@@ -19,6 +19,7 @@ Micronaut's implementation includes the following benefits:
 * Configurability via Annotation Metadata
 * Support for Reactive Bean Validation
 * Support for validating the source AST at compilation time
+* Automatic compatibility with GraalVM native without additional configuration
 
 If you require full Bean Validator 2.0 compliance you can add the `micronaut-hibernate-validator` module to your classpath, which will replace Micronaut's implementation.
 
@@ -104,7 +105,7 @@ snippet::io.micronaut.docs.ioc.validation.custom.MyValidatorFactory[tags="import
 
 The above example implements a validator that validates any field, parameter etc. that is annotated with `DurationPattern`, ensuring that the string can be parsed with `java.time.Duration.parse`.
 
-NOTE: Generally `null` is regarded as valid and `@NotNull` used to constrain a value as not being `null`. The example above returns regards `null` as a valid value.
+NOTE: Generally `null` is regarded as valid and `@NotNull` used to constrain a value as not being `null`. The example above regards `null` as a valid value.
 
 For example:
 
@@ -116,7 +117,6 @@ To verify the above examples validates the `duration` parameter you can define a
 
 .Testing Example Custom Constraint Usage
 snippet::io.micronaut.docs.ioc.validation.custom.DurationPatternValidatorSpec[tags="test", indent="0"]
-
 
 === Validating Annotations at Compilation Time
 
@@ -132,3 +132,14 @@ snippet::io.micronaut.docs.ioc.validation.custom.TimeOff[tags="imports,class", i
 If your attempt to use `@TimeOff(duration="junk")` in your source Micronaut will fail compilation due to the value of `duration` violating the `DurationPattern` constraint.
 
 NOTE: If `duration` is a property placeholder such as `@TimeOff(duration="${my.value}")` then validation handling will be deferred until runtime.
+
+Note that if you wish to allow use of a custom `ConstraintValidator` at compilation time you should instead define the validator as a class:
+
+.Example Constraint Validator
+snippet::io.micronaut.docs.ioc.validation.custom.DurationPatternValidator[tags="imports,class", indent="0"]
+
+In addition to the following requirements:
+
+* Define a `META-INF/services/io.micronaut.validation.validator.constraints.ConstraintValidator` file that references the class.
+* The class should be public and feature a zero argument public constructor
+* The class should be placed on the annotation processor classpath of the project that is to be validated.

@@ -80,18 +80,22 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
      * Sets whether Micronaut's validator is enabled.
      *
      * @param enabled True if it is
+     * @return this configuration
      */
-    public void setEnabled(boolean enabled) {
+    public DefaultValidatorConfiguration setEnabled(boolean enabled) {
         this.enabled = enabled;
+        return this;
     }
 
     /**
      * Sets the constraint validator registry to use.
      * @param constraintValidatorRegistry The registry to use
+     * @return this configuration
      */
     @Inject
-    public void setConstraintValidatorRegistry(@Nullable ConstraintValidatorRegistry constraintValidatorRegistry) {
+    public DefaultValidatorConfiguration setConstraintValidatorRegistry(@Nullable ConstraintValidatorRegistry constraintValidatorRegistry) {
         this.constraintValidatorRegistry = constraintValidatorRegistry;
+        return this;
     }
 
     @Override
@@ -106,10 +110,12 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     /**
      * Sets the value extractor registry use.
      * @param valueExtractorRegistry The registry
+     * @return this configuration
      */
     @Inject
-    public void setValueExtractorRegistry(@Nullable ValueExtractorRegistry valueExtractorRegistry) {
+    public DefaultValidatorConfiguration setValueExtractorRegistry(@Nullable ValueExtractorRegistry valueExtractorRegistry) {
         this.valueExtractorRegistry = valueExtractorRegistry;
+        return this;
     }
 
     @Override
@@ -125,10 +131,12 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     /**
      * Sets the clock provider to use.
      * @param clockProvider The clock provider
+     * @return this configuration
      */
     @Inject
-    public void setClockProvider(@Nullable ClockProvider clockProvider) {
+    public DefaultValidatorConfiguration setClockProvider(@Nullable ClockProvider clockProvider) {
         this.clockProvider = clockProvider;
+        return this;
     }
 
     @Override
@@ -154,10 +162,12 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     /**
      * Sets the traversable resolver to use.
      * @param traversableResolver The resolver
+     * @return This configuration
      */
     @Inject
-    public void setTraversableResolver(@Nullable TraversableResolver traversableResolver) {
+    public DefaultValidatorConfiguration setTraversableResolver(@Nullable TraversableResolver traversableResolver) {
         this.traversableResolver = traversableResolver;
+        return this;
     }
 
     @Override
@@ -173,10 +183,12 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
      * Sets the message source to use.
      *
      * @param messageSource The message source
+     * @return this configuration
      */
     @Inject
-    public void setMessageSource(@Nullable MessageSource messageSource) {
+    public DefaultValidatorConfiguration setMessageSource(@Nullable MessageSource messageSource) {
         this.messageSource = messageSource;
+        return this;
     }
 
     @Override
@@ -194,9 +206,11 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
      * Sets the execution handler locator to use.
      *
      * @param executionHandleLocator The locator
+     * @return this configuration
      */
     @Inject
-    public void setExecutionHandleLocator(@Nullable ExecutionHandleLocator executionHandleLocator) {
+    public DefaultValidatorConfiguration setExecutionHandleLocator(@Nullable ExecutionHandleLocator executionHandleLocator) {
         this.executionHandleLocator = executionHandleLocator;
+        return this;
     }
 }

@@ -848,7 +848,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     final AnnotationValue<? extends Annotation> annotationValue =
                             annotationMetadata.getAnnotation(constraintType);
                     if (annotationValue != null && !constraintValidator.isValid(parameterValue, annotationValue, context)) {
-                        final String messageTemplate = buildMessageTemplate(annotationValue);
+                        final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
                         final Map<String, Object> variables = newConstraintVariables(annotationValue, parameterValue, annotationMetadata);
                         overallViolations.add(new DefaultConstraintViolation(
                                 object,
@@ -1270,7 +1270,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     //noinspection unchecked
                     if (!validator.isValid(propertyValue, annotationValue, context)) {
 
-                        final String messageTemplate = buildMessageTemplate(annotationValue);
+                        final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
                         Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, annotationMetadata);
                         //noinspection unchecked
                         overallViolations.add(
@@ -1312,9 +1312,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         return variables;
     }
 
-    private String buildMessageTemplate(AnnotationValue<?> annotationValue) {
+    private String buildMessageTemplate(AnnotationValue<?> annotationValue, AnnotationMetadata annotationMetadata) {
         return annotationValue.get("message", String.class)
-                .orElse("{" + annotationValue.getAnnotationName() + ".message}");
+                .orElseGet(() ->
+                        annotationMetadata.getDefaultValue(annotationValue.getAnnotationName(), "message", String.class)
+                            .orElse("{" + annotationValue.getAnnotationName() + ".message}")
+                        );
     }
 
     @Nonnull
