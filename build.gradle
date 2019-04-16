@@ -24,6 +24,7 @@ buildscript {
 
 plugins {
     id 'com.github.hierynomus.license' version '0.15.0' apply false
+    id 'com.github.ben-manes.versions' version '0.21.0'
 }
 
 apply plugin: "io.sdkman.vendors"
@@ -767,3 +768,16 @@ htmlSanityCheck {
 
 }
 docs.finalizedBy(htmlSanityCheck)
+
+dependencyUpdates.resolutionStrategy {
+    componentSelection { rules ->
+        rules.all { ComponentSelection selection ->
+            boolean rejected = ['alpha', 'beta', 'rc', 'cr', 'm', 'preview', 'b', 'ea'].any { qualifier ->
+                selection.candidate.version ==~ /(?i).*[.-]$qualifier[.\d-+]*/
+            }
+            if (rejected) {
+                selection.reject('Release candidate')
+            }
+        }
+    }
+}
