@@ -59,7 +59,7 @@ import java.util.*;
 @Introspected
 public class DefaultConstraintValidators implements ConstraintValidatorRegistry {
 
-    private final Map<DefaultConstraintValidators.Key, ConstraintValidator> validatorCache = new ConcurrentLinkedHashMap.Builder<DefaultConstraintValidators.Key, ConstraintValidator>().initialCapacity(10).maximumWeightedCapacity(40).build();
+    private final Map<ValidatorKey, ConstraintValidator> validatorCache = new ConcurrentLinkedHashMap.Builder<ValidatorKey, ConstraintValidator>().initialCapacity(10).maximumWeightedCapacity(40).build();
 
     private final ConstraintValidator<AssertFalse, Boolean> assertFalseValidator =
             (value, annotationMetadata, context) -> value == null || !value;
@@ -251,7 +251,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
         };
 
     private final @Nullable BeanContext beanContext;
-    private final Map<Key, ConstraintValidator> localValidators;
+    private final Map<ValidatorKey, ConstraintValidator> localValidators;
 
     /**
      * Default constructor.
@@ -268,9 +268,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     @Inject
     protected DefaultConstraintValidators(@Nullable BeanContext beanContext) {
         this.beanContext = beanContext;
-        final BeanWrapper<DefaultConstraintValidators> wrapper = BeanWrapper.getWrapper(this);
+        final BeanWrapper<DefaultConstraintValidators> wrapper = getBeanWrapper();
         final Collection<BeanProperty<DefaultConstraintValidators, Object>> beanProperties = wrapper.getBeanProperties();
-        Map<Key, ConstraintValidator> validatorMap = new HashMap<>(beanProperties.size());
+        Map<ValidatorKey, ConstraintValidator> validatorMap = new HashMap<>(beanProperties.size());
         for (BeanProperty<DefaultConstraintValidators, Object> property : beanProperties) {
             if (ConstraintValidator.class.isAssignableFrom(property.getType())) {
                 final Argument[] typeParameters = property.asArgument().getTypeParameters();
@@ -280,20 +280,20 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
                     wrapper.getProperty(property.getName(), ConstraintValidator.class).ifPresent(constraintValidator -> {
                         if (len == 2) {
                             final Class targetType = ReflectionUtils.getWrapperType(typeParameters[1].getType());
-                            final Key key = new Key(typeParameters[0].getType(), targetType);
+                            final ValidatorKey key = new ValidatorKey(typeParameters[0].getType(), targetType);
                             validatorMap.put(key, constraintValidator);
                         } else if (len == 1) {
                             if (constraintValidator instanceof SizeValidator) {
-                                final Key key = new Key(Size.class, typeParameters[0].getType());
+                                final ValidatorKey key = new ValidatorKey(Size.class, typeParameters[0].getType());
                                 validatorMap.put(key, constraintValidator);
                             } else if (constraintValidator instanceof DigitsValidator) {
-                                final Key key = new Key(Digits.class, typeParameters[0].getType());
+                                final ValidatorKey key = new ValidatorKey(Digits.class, typeParameters[0].getType());
                                 validatorMap.put(key, constraintValidator);
                             } else if (constraintValidator instanceof DecimalMaxValidator) {
-                                final Key key = new Key(DecimalMax.class, typeParameters[0].getType());
+                                final ValidatorKey key = new ValidatorKey(DecimalMax.class, typeParameters[0].getType());
                                 validatorMap.put(key, constraintValidator);
                             } else if (constraintValidator instanceof DecimalMinValidator) {
-                                final Key key = new Key(DecimalMin.class, typeParameters[0].getType());
+                                final ValidatorKey key = new ValidatorKey(DecimalMin.class, typeParameters[0].getType());
                                 validatorMap.put(key, constraintValidator);
                             }
                         }
@@ -302,14 +302,18 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             }
         }
         validatorMap.put(
-                new Key(Pattern.class, CharSequence.class),
+                new ValidatorKey(Pattern.class, CharSequence.class),
                 new PatternValidator()
         );
         validatorMap.put(
-                new Key(Email.class, CharSequence.class),
+                new ValidatorKey(Email.class, CharSequence.class),
                 new EmailValidator()
         );
         this.localValidators = validatorMap;
+    }
+
+    private BeanWrapper<DefaultConstraintValidators> getBeanWrapper() {
+        return BeanWrapper.getWrapper(DefaultConstraintValidators.class, this);
     }
 
     @SuppressWarnings("unchecked")
@@ -318,7 +322,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     public <A extends Annotation, T> Optional<ConstraintValidator<A, T>> findConstraintValidator(@Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
         ArgumentUtils.requireNonNull("constraintType", constraintType);
         ArgumentUtils.requireNonNull("targetType", targetType);
-        final Key key = new Key(constraintType, targetType);
+        final ValidatorKey key = new ValidatorKey(constraintType, targetType);
         targetType = ReflectionUtils.getWrapperType(targetType);
         ConstraintValidator constraintValidator = localValidators.get(key);
         if (constraintValidator != null) {
@@ -334,7 +338,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
                 );
                 Class<T> finalTargetType = targetType;
                 final Optional<ConstraintValidator> local = localValidators.entrySet().stream().filter(entry -> {
-                            final Key k = entry.getKey();
+                            final ValidatorKey k = entry.getKey();
                             return TypeArgumentQualifier.areTypesCompatible(
                                     new Class[]{constraintType, finalTargetType},
                                     Arrays.asList(k.constraintType, k.targetType)
@@ -348,6 +352,14 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
                 } else if (beanContext != null) {
                     final ConstraintValidator cv = beanContext
                             .findBean(ConstraintValidator.class, qualifier).orElse(ConstraintValidator.VALID);
+                    validatorCache.put(key, cv);
+                    if (cv != ConstraintValidator.VALID) {
+                        return Optional.of(cv);
+                    }
+                } else {
+                    // last chance lookup
+                    final ConstraintValidator cv = findLocalConstraintValidator(constraintType, targetType)
+                                                        .orElse(ConstraintValidator.VALID);
                     validatorCache.put(key, cv);
                     if (cv != ConstraintValidator.VALID) {
                         return Optional.of(cv);
@@ -754,6 +766,19 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
         return futureOrPresentTemporalAccessorConstraintValidator;
     }
 
+    /**
+     * Last chance resolve for constraint validator.
+     * @param constraintType The constraint type
+     * @param targetType The target type
+     * @param <A> The annotation type
+     * @param <T> The target type
+     * @return The validator if present
+     */
+    protected <A extends Annotation, T> Optional<ConstraintValidator> findLocalConstraintValidator(
+            @Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
+        return Optional.empty();
+    }
+
     private Comparable<? extends TemporalAccessor> getNow(TemporalAccessor value, Clock clock) {
         if (!(value instanceof Comparable)) {
             throw new IllegalArgumentException("TemporalAccessor value must be comparable");
@@ -814,13 +839,32 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
      * @param <A> The annotation type
      * @param <T> The target type.
      */
-    private final class Key<A extends Annotation, T> {
-        final Class<A> constraintType;
-        final Class<T> targetType;
+    protected final class ValidatorKey<A extends Annotation, T> {
+        private final Class<A> constraintType;
+        private final Class<T> targetType;
 
-        Key(@Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
+        /**
+         * The key to lookup the validator.
+         * @param constraintType THe constraint type
+         * @param targetType The target type
+         */
+        public ValidatorKey(@Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
             this.constraintType = constraintType;
             this.targetType = targetType;
+        }
+
+        /**
+         * @return The constraint type
+         */
+        public Class<A> getConstraintType() {
+            return constraintType;
+        }
+
+        /**
+         * @return The target type
+         */
+        public Class<T> getTargetType() {
+            return targetType;
         }
 
         @Override
@@ -831,7 +875,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-            Key<?, ?> key = (Key<?, ?>) o;
+            ValidatorKey<?, ?> key = (ValidatorKey<?, ?>) o;
             return constraintType.equals(key.constraintType) &&
                     targetType.equals(key.targetType);
         }

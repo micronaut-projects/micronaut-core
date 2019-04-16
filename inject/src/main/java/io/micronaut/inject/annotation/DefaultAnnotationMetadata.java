@@ -209,8 +209,16 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
                 if (results != null) {
                     return results;
+                } else if (allAnnotations != null) {
+                    final Map<CharSequence, Object> values = allAnnotations.get(annotationType.getName());
+                    if (values != null) {
+                        results = Collections.singletonList(new AnnotationValue<T>(annotationType.getName(), values));
+                    }
                 }
-                results = Collections.emptyList();
+
+                if (results == null) {
+                    results = Collections.emptyList();
+                }
                 annotationValuesByType.put(annotationType, results);
             }
             return results;
