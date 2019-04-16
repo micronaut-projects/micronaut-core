@@ -21,7 +21,7 @@ import io.micronaut.session.SessionStore;
 import java.util.Optional;
 
 /**
- * Utility class with methods to create or retrieve a Session associated to a Request.
+ * Utility class with methods to create or retrieve a session associated to a request.
  *
  * @author Sergio del Amo
  * @since 1.1.0
@@ -29,6 +29,7 @@ import java.util.Optional;
 public class SessionForRequest {
 
     /**
+     * Creates a session and stores it in the request attributes.
      *
      * @param sessionStore the session store
      * @param request the Http Request
@@ -41,6 +42,7 @@ public class SessionForRequest {
     }
 
     /**
+     * Finds a session.
      *
      * @param request the Http Request
      * @return A session if found in the request attributes.
@@ -50,10 +52,12 @@ public class SessionForRequest {
     }
 
     /**
+     * Finds a session or creates a new one and stores it in the request attributes.
      *
      * @param request The Http Request
      * @param sessionStore The session store to create the session if not found
-     * @return A session if found in the request attributes.
+     * @return A session if found in the request attributes or a new session
+     * stored in the request attributes.
      */
     public static Session findOrCreate(HttpRequest<?> request, SessionStore sessionStore) {
         return find(request).orElseGet(() -> create(sessionStore, request));
