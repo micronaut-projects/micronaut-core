@@ -217,4 +217,25 @@ class CachesEndpointSpec extends Specification {
         rxClient.close()
         embeddedServer?.close()
     }
+
+    void "test endpoint with a cache without an eviction policy"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
+                [
+                        "endpoints.caches.enabled": true,
+                        "endpoints.caches.sensitive": false,
+                        "micronaut.caches.foo-cache.initialCapacity": 100,
+                ],Environment.TEST)
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        def response = rxClient.exchange("/caches", Map).blockingFirst()
+        Map result = response.body()
+        Map<String, Map<String, Object>> caches = result.caches
+
+        then:
+        noExceptionThrown()
+        caches.containsKey("foo-cache")
+    }
+
 }
