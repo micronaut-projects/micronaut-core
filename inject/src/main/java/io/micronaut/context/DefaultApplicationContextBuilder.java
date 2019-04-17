@@ -40,7 +40,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
     private Boolean deduceEnvironments = null;
-    private ClassLoader classLoader;
+    private ClassLoader classLoader = getClass().getClassLoader();
 
     /**
      * Default constructor.
