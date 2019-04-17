@@ -141,10 +141,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param conversionService  The conversion service
      * @param deduceEnvironments Option to deduce environments
      * @param names              The names
+     * @deprecated  Use {@link #DefaultEnvironment(ApplicationContextConfiguration)} instead.
      */
     @SuppressWarnings("MagicNumber")
+    @Deprecated
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, @Nullable Boolean deduceEnvironments, String... names) {
         this(new ApplicationContextConfiguration() {
+            @Nonnull
+            @Override
+            public ClassLoader getClassLoader() {
+                return resourceLoader.getClassLoader();
+            }
+
             @Nonnull
             @Override
             public List<String> getEnvironments() {

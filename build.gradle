@@ -191,6 +191,11 @@ ext {
                     name:'micronaut-netflix-archaius',
                     modules:['micronaut-netflix-hystrix', 'micronaut-netflix-ribbon']
             ],
+            'micronaut.openapi': [
+                    version:micronautOpenApi,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-openapi'
+            ],
             kafka                      : [
                     version: kafkaVersion,
                     group  : 'org.apache.kafka',
