@@ -1,9 +1,0 @@
-Micronaut supports authentication with LDAP out of the box. To get started, add the `security-ldap` dependency to your application.
-
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut.configuration:micronaut-security-ldap"
-----
-
-TIP: Read the http://guides.micronaut.io/micronaut-database-authentication-provider-groovy/guide/index.html#securityLdap[LDAP and Database authentication providers] to see an example.
