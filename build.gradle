@@ -428,6 +428,16 @@ ext {
                     version: methvinDirectoryWatcherVersion,
                     group  : 'io.methvin',
                     name   : 'directory-watcher'
+            ],
+            security                   : [
+                    version : securityVersion,
+                    group   : 'io.micronaut',
+                    modules : ['micronaut-security', 'micronaut-security-jwt', 'micronaut-security-session']
+            ],
+            'security-configurations'  : [
+                    version : securityVersion,
+                    group   : 'io.micronaut.configuration',
+                    modules : ['micronaut-security-ldap']
             ]
     ]
 
