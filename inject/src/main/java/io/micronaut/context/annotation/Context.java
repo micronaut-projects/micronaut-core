@@ -26,8 +26,8 @@ import java.lang.annotation.Retention;
  * {@link io.micronaut.context.BeanContext} and it should be initialized and shutdown during startup and shutdown of
  * the underlying {@link io.micronaut.context.BeanContext}.</p>
  * <p>
- * <p>Micronaut by default treats all {@link Singleton} bean definitions as lazy and will only load them on demand by
- * annotating a bean with @Context you can ensure that the bean is loaded at the same time as the context</p>
+ * <p>Micronaut by default treats all {@link Singleton} bean definitions as lazy and will only load them on demand.  By
+ * annotating a bean with @Context you can ensure that the bean is loaded at the same time as the context.</p>
  * <p>
  * <p>WARNING: This annotation should be used sparingly as Micronaut is designed in such a way as to encourage minimal
  * bean creation during startup.</p>
