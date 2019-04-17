@@ -74,7 +74,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final int DEFAULT_READ_TIMEOUT = 500;
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
     private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
-    private static final String ORACLE_CLOUD_METADATA = "http://169.254.169.254/opc/v1/instance/";
+    private static final String ORACLE_CLOUD_INSTANCE_ID_FILE = "/run/cloud-init/.instance-id";
+    private static final String ORACLE_CLOUD_WINDOWS_ASSET_TAG_CMD = "wmic systemenclosure get smbiosassettag";
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
 
@@ -812,7 +813,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             return ComputePlatform.GOOGLE_COMPUTE;
         }
 
-        if (isOracleCloud()) {
+        if (isWindows ? isOracleCloudWindows() : isOracleCloudLinux()) {
             return ComputePlatform.ORACLE_CLOUD;
         }
 
@@ -855,16 +856,62 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @SuppressWarnings("MagicNumber")
-    private static boolean isOracleCloud() {
-        try {
-            final HttpURLConnection con = createConnection(ORACLE_CLOUD_METADATA);
-            con.setRequestMethod("GET");
-            con.setDoOutput(true);
-            int responseCode = con.getResponseCode();
-            return responseCode == 200;
+    private static boolean isOracleCloudLinux() {
+        if (readFile(ORACLE_CLOUD_INSTANCE_ID_FILE).contains("ocid")) {
+            return true;
+        }
+        return false;
+    }
 
+    private static Optional<Process> runWindowsCmd(String cmd) {
+        try {
+            ProcessBuilder builder = new ProcessBuilder();
+            builder.command("cmd.exe", "/c", cmd);
+            builder.redirectErrorStream(true);
+            builder.directory(new File(System.getProperty("user.home")));
+            Process process = builder.start();
+            return Optional.of(process);
         } catch (IOException e) {
-            // well not oracle then
+
+        }
+        return Optional.empty();
+    }
+
+    private static StringBuilder readProcessStream(Process process) {
+        StringBuilder stdout = new StringBuilder();
+
+        try {
+            //Read out dir output
+            InputStream is = process.getInputStream();
+            InputStreamReader isr = new InputStreamReader(is);
+            BufferedReader br = new BufferedReader(isr);
+            String line;
+            while ((line = br.readLine()) != null) {
+                stdout.append(line);
+            }
+        } catch (IOException e) {
+
+        }
+
+        return stdout;
+    }
+
+    private static boolean isOracleCloudWindows() {
+        Optional<Process> optionalProcess = runWindowsCmd(ORACLE_CLOUD_WINDOWS_ASSET_TAG_CMD);
+        if (!optionalProcess.isPresent()) {
+            return false;
+        }
+        Process process = optionalProcess.get();
+        StringBuilder stdout = readProcessStream(process);
+
+        //Wait to get exit value
+        try {
+            int exitValue = process.waitFor();
+            if (exitValue == 0 && stdout.toString().toLowerCase().contains("oraclecloud")) {
+                return true;
+            }
+        } catch (InterruptedException e) {
+            // test negative
         }
         return false;
     }
@@ -888,35 +935,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static boolean isEC2Windows() {
+        Optional<Process> optionalProcess = runWindowsCmd(EC2_WINDOWS_HYPERVISOR_CMD);
+        if (!optionalProcess.isPresent()) {
+            return false;
+        }
+        Process process = optionalProcess.get();
+        StringBuilder stdout = readProcessStream(process);
+        //Wait to get exit value
         try {
-            ProcessBuilder builder = new ProcessBuilder();
-            builder.command("cmd.exe", "/c", EC2_WINDOWS_HYPERVISOR_CMD);
-            builder.redirectErrorStream(true);
-            builder.directory(new File(System.getProperty("user.home")));
-            Process process = builder.start();
-
-            //Read out dir output
-            InputStream is = process.getInputStream();
-            InputStreamReader isr = new InputStreamReader(is);
-            BufferedReader br = new BufferedReader(isr);
-            String line;
-            StringBuilder stdout = new StringBuilder();
-            while ((line = br.readLine()) != null) {
-                stdout.append(line);
+            int exitValue = process.waitFor();
+            if (exitValue == 0 && stdout.toString().startsWith("EC2")) {
+                return true;
             }
-
-            //Wait to get exit value
-            try {
-                int exitValue = process.waitFor();
-                if (exitValue == 0 && stdout.toString().startsWith("EC2")) {
-                    return true;
-                }
-            } catch (InterruptedException e) {
-                // test negative
-            }
-
-        } catch (IOException e) {
-
+        } catch (InterruptedException e) {
+            // test negative
         }
         return false;
     }
