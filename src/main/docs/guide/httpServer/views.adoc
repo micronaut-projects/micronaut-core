@@ -17,9 +17,9 @@ The following is an example of a controller which renders a template by passing 
 [source,java]
 .src/main/java/myapp/ViewsController.java
 ----
-include::{testsviews}/ViewsController.groovy[tags=clazz]
+include::{testsviews}/groovy/io/micronaut/docs/ViewsController.groovy[tags=clazz]
 
-include::{testsviews}/ViewsController.groovy[tags=map]
+include::{testsviews}/groovy/io/micronaut/docs/ViewsController.groovy[tags=map]
 
 }
 ----
@@ -31,9 +31,9 @@ In addition, you can return any POJO object and the properties of the POJO will 
 [source,java]
 .src/main/java/myapp/ViewsController.java
 ----
-include::{testsviews}/ViewsController.groovy[tags=clazz]
+include::{testsviews}/groovy/io/micronaut/docs/ViewsController.groovy[tags=clazz]
 
-include::{testsviews}/ViewsController.groovy[tags=pogo]
+include::{testsviews}/groovy/io/micronaut/docs/ViewsController.groovy[tags=pogo]
 
 }
 ----
@@ -45,9 +45,9 @@ You can also return a api:views.ModelAndView[] and skip specifying the api:views
 [source,java]
 .src/main/java/myapp/ViewsController.java
 ----
-include::{testsviews}/ViewsController.groovy[tags=clazz]
+include::{testsviews}/groovy/io/micronaut/docs/ViewsController.groovy[tags=clazz]
 
-include::{testsviews}/ViewsController.groovy[tags=modelAndView]
+include::{testsviews}/groovy/io/micronaut/docs/ViewsController.groovy[tags=modelAndView]
 ----
 
 You can also provide implementations of api:views.model.ViewsModelDecorator[] to decorate the model with

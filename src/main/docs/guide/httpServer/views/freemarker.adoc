@@ -10,7 +10,7 @@ The example shown in the <<views, Views>> section, could be rendered with the fo
 [source,html]
 .src/main/resources/views/home.ftl
 ----
-include::{testsviews}/../../../../resources/views/home.ftl[]
+include::{testsviews}/resources/views/home.ftl[]
 ----
 
 Freemarker integration instantiates a freemarker https://freemarker.apache.org/docs/api/freemarker/template/Configuration.html[`Configuration`].
