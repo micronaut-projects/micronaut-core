@@ -106,7 +106,7 @@ httpServer:
     velocity: Apache Velocity
     freemarker: Apache Freemarker
     csp: CSP Header Support
-    security: Security Integration
+    views-security: Security Integration
   openapi: OpenAPI / Swagger Support
   graphql: GraphQL Support
 httpClient:
