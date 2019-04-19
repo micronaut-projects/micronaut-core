@@ -68,6 +68,9 @@ public class FileTypeHandlerConfiguration {
         this.cacheControl = cacheControl;
     }
 
+    /**
+     * Configuration for the Cache-Control header.
+     */
     @ConfigurationProperties("cache-control")
     public static class CacheControlConfiguration {
 
@@ -84,6 +87,9 @@ public class FileTypeHandlerConfiguration {
             this.publicCache = publicCache;
         }
 
+        /**
+         * @return True if the cache control should be public
+         */
         @Nonnull
         public boolean getPublic() {
             return publicCache;
