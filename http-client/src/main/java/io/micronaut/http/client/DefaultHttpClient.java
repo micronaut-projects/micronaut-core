@@ -1465,7 +1465,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             throw new CodecException("Cannot encode value [" + o + "]. No possible encoders found");
                         });
 
-                        if (!isSingle && requestContentType == MediaType.APPLICATION_JSON_TYPE) {
+                        if (!isSingle && MediaType.APPLICATION_JSON_TYPE.equals(requestContentType)) {
                             requestBodyPublisher = requestBodyPublisher.map(new Function<HttpContent, HttpContent>() {
                                 boolean first = true;
 
