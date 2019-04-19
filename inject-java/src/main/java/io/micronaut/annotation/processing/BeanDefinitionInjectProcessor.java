@@ -614,7 +614,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                     writer.visitConfigBuilderMethod(
                             fieldType,
-                            NameUtils.getterNameFor(parameter.getSimpleName().toString()),
+                            NameUtils.getterNameFor(NameUtils.getPropertyNameForSetter(method.getSimpleName().toString())),
                             methodAnnotationMetadata,
                             metadataBuilder);
                     try {
