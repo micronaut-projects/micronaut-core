@@ -962,10 +962,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                             if(isPrivate) {
                                 // Using the field would throw a IllegalAccessError, use the method instead
-                                String fieldGetterName = NameUtils.getterNameFor(fieldNode.name, fieldType == Boolean)
-                                Optional<MethodNode> getterMethod = Optional.ofNullable(declaringClass.methods?.find { it.name == fieldGetterName})
-                                if(getterMethod.isPresent()) {
-                                    getBeanWriter().visitConfigBuilderMethod(fieldType, getterMethod.get().name, fieldAnnotationMetadata, configurationMetadataBuilder)
+                                String fieldGetterName = NameUtils.getterNameFor(fieldNode.name)
+                                MethodNode getterMethod = declaringClass.methods?.find { it.name == fieldGetterName}
+                                if(getterMethod != null) {
+                                    getBeanWriter().visitConfigBuilderMethod(fieldType, getterMethod.name, fieldAnnotationMetadata, configurationMetadataBuilder)
                                 } else {
                                     addError("ConfigurationBuilder applied to a private field must have a corresponding non-private getter method.", fieldNode)
                                 }
