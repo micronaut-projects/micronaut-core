@@ -15,8 +15,8 @@
  */
 package io.micronaut.docs.server.intro
 
-// tag::imports[]
 import io.micronaut.context.annotation.Requires
+// tag::imports[]
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
