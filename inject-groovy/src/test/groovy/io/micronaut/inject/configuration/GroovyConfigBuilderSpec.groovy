@@ -14,6 +14,7 @@ class GroovyConfigBuilderSpec extends AbstractBeanDefinitionSpec {
 package test;
 
 import io.micronaut.context.annotation.*;
+import io.micronaut.inject.configuration.Engine;
 
 @ConfigurationProperties("test.props")    
 final class TestProps {
@@ -22,35 +23,6 @@ final class TestProps {
 
     public final Engine.Builder getBuilder() {
         return builder;
-    }
-}
-
-class Engine {
-    private final String manufacturer; 
-
-    public Engine(String manufacturer) {
-        this.manufacturer = manufacturer;
-    }
-    
-    public String getManufacturer() {
-        return manufacturer;    
-    }
-    
-    static Builder builder() {
-        return new Builder();
-    }
-
-    static final class Builder {
-        private String manufacturer = "Ford";
-
-        public Builder withManufacturer(String manufacturer) {
-            this.manufacturer = manufacturer;
-            return this;
-        }
-
-        Engine build() {
-            return new Engine(manufacturer);
-        }
     }
 }
 ''')
@@ -72,40 +44,12 @@ class Engine {
 package test;
 
 import io.micronaut.context.annotation.*;
+import io.micronaut.inject.configuration.Engine;
 
 @ConfigurationProperties("test.props")    
 final class TestProps {
     @ConfigurationBuilder(prefixes = "with") 
     private Engine.Builder builder = Engine.builder();
-}
-
-class Engine {
-    private final String manufacturer; 
-
-    public Engine(String manufacturer) {
-        this.manufacturer = manufacturer;
-    }
-    
-    public String getManufacturer() {
-        return manufacturer;    
-    }
-    
-    static Builder builder() {
-        return new Builder();
-    }
-
-    static final class Builder {
-        private String manufacturer = "Ford";
-
-        public Builder withManufacturer(String manufacturer) {
-            this.manufacturer = manufacturer;
-            return this;
-        }
-
-        Engine build() {
-            return new Engine(manufacturer);
-        }
-    }
 }
 ''')
 
@@ -113,6 +57,40 @@ class Engine {
         MultipleCompilationErrorsException ex = thrown()
         ex.message.contains("ConfigurationBuilder applied to a private field must have a corresponding non-private getter method.")
         ex.message.contains("@ConfigurationBuilder(prefixes = \"with\")")
+    }
+
+    void "test config field with setter abnormal paramater name"() {
+        given:
+        ApplicationContext ctx = buildContext("test.TestProps", '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.configuration.Engine;
+
+@ConfigurationProperties("test.props")    
+final class TestProps {     
+    Engine.Builder builder = Engine.builder();
+    
+    Engine.Builder getBuilder() {
+        return this.builder;
+    }
+    
+    @ConfigurationBuilder(prefixes = "with")
+    void setBuilder(Engine.Builder p0) {
+        this.builder = p0;
+    }
+}
+''')
+        ctx.getEnvironment().addPropertySource(PropertySource.of(["test.props.manufacturer": "Toyota"]))
+
+        when:
+        Class testProps = ctx.classLoader.loadClass("test.TestProps")
+        def testPropBean = ctx.getBean(testProps)
+
+        then:
+        noExceptionThrown()
+        ctx.getProperty("test.props.manufacturer", String).get() == "Toyota"
+        testPropBean.getBuilder().build().getManufacturer() == "Toyota"
 
     }
 }
