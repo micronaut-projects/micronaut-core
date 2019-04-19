@@ -60,7 +60,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     private static final int DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS = 20;
 
     private final ApplicationEventPublisher eventPublisher;
-    private final ExecutorService executorService;
+    private final ScheduledExecutorService executorService;
     private final Map<ExecutableMethod, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
 
     /**
@@ -83,7 +83,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      * @param executorService The executor service to use for completable futures
      */
     @Inject
-    public DefaultRetryInterceptor(ApplicationEventPublisher eventPublisher, @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
+    public DefaultRetryInterceptor(ApplicationEventPublisher eventPublisher, @Named(TaskExecutors.SCHEDULED) ScheduledExecutorService executorService) {
         this.eventPublisher = eventPublisher;
         this.executorService = executorService;
     }
@@ -238,22 +238,17 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                         LOG.error("Error occurred publishing RetryEvent: " + e.getMessage(), e);
                     }
                 }
-                executorService.submit(() -> {
-                    try {
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("Retrying execution for method [{}] after delay of {}ms for exception: {}",
-                                    context,
-                                    delay,
-                                    (exception).getMessage());
-                        }
-                        Thread.sleep(delay);
-                        Object retryResult = context.proceed(this);
-                        ((CompletableFuture<?>) retryResult).whenComplete(retryCompletable(newFuture, context, retryState));
-                    } catch (InterruptedException e) {
-                        retryState.close(e);
-                        newFuture.completeExceptionally(e);
+                executorService.schedule(() -> {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Retrying execution for method [{}] after delay of {}ms for exception: {}",
+                                context,
+                                delay,
+                                (exception).getMessage());
                     }
-                });
+                    Object retryResult = context.proceed(this);
+                    ((CompletableFuture<?>) retryResult).whenComplete(retryCompletable(newFuture, context, retryState));
+
+                }, delay, TimeUnit.MILLISECONDS);
             } else {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Cannot retry anymore. Rethrowing original exception for method: {}", context);
