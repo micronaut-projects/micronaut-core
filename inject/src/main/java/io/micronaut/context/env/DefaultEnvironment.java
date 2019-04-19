@@ -74,7 +74,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final int DEFAULT_READ_TIMEOUT = 500;
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
     private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
-    private static final String ORACLE_CLOUD_INSTANCE_ID_FILE = "/run/cloud-init/.instance-id";
+    private static final String ORACLE_CLOUD_ASSET_TAG_FILE = "/sys/devices/virtual/dmi/id/chassis_asset_tag";
     private static final String ORACLE_CLOUD_WINDOWS_ASSET_TAG_CMD = "wmic systemenclosure get smbiosassettag";
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
@@ -857,7 +857,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @SuppressWarnings("MagicNumber")
     private static boolean isOracleCloudLinux() {
-        if (readFile(ORACLE_CLOUD_INSTANCE_ID_FILE).contains("ocid")) {
+        if (readFile(ORACLE_CLOUD_ASSET_TAG_FILE).toLowerCase().contains("oraclecloud")) {
             return true;
         }
         return false;
