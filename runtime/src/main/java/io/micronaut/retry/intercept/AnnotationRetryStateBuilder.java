@@ -80,7 +80,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
         if (value.isPresent()) {
             for (AnnotationClassValue classValue: value.get()) {
                 classValue.getType().ifPresent(clazz -> {
-                    classes.add((Class)clazz);
+                    classes.add((Class) clazz);
                 });
             }
         }
