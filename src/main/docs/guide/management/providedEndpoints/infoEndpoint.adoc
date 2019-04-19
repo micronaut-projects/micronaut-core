@@ -59,14 +59,8 @@ The configuration info source can be disabled using the `endpoints.info.config.e
 
 === Git Info Source
 
-If a `git.properties` file is available on the classpath, the link:{api}/io/micronaut/management/endpoint/info/source/GitInfoSource.html[GitInfoSource] will expose the values in that file under the `git` key. Generating of a `git.properties` file will need to be configured as part of your build; for example, you may choose to use the Gradle Git Properties plugin.
+If a `git.properties` file is available on the classpath, the link:{api}/io/micronaut/management/endpoint/info/source/GitInfoSource.html[GitInfoSource] will expose the values in that file under the `git` key. Generating of a `git.properties` file will need to be configured as part of your build. One easy option for Gradle users is the https://plugins.gradle.org/plugin/com.gorylenko.gradle-git-properties[Gradle Git Properties Plugin]. Maven users can look at the https://github.com/git-commit-id/maven-git-commit-id-plugin[Maven Git Commit Id Plugin].
 
-[source,groovy]
-----
-plugins {
-    id "com.gorylenko.gradle-git-properties" version "1.4.21"
-}
-----
 
 ==== Configuration
 
@@ -76,7 +70,7 @@ The git info source can be disabled using the `endpoints.info.git.enabled` prope
 
 === Build Info Source
 
-If a `META-INF/build-info.properties` file is available on the classpath, the link:{api}/io/micronaut/management/endpoint/info/source/BuildInfoSource.html[BuildInfoSource] will expose the values in that file under the `build` key. Generating of a `build-info.properties` file will need to be configured as part of your build.
+If a `META-INF/build-info.properties` file is available on the classpath, the link:{api}/io/micronaut/management/endpoint/info/source/BuildInfoSource.html[BuildInfoSource] will expose the values in that file under the `build` key. Generating of a `build-info.properties` file will need to be configured as part of your build. One easy option for Gradle users is the https://plugins.gradle.org/plugin/com.pasam.gradle.buildinfo[Gradle Build Info Plugin]. Another option for Maven users is the https://docs.spring.io/spring-boot/docs/current/maven-plugin/examples/build-info.html[Spring Boot Maven Plugin]
 
 ==== Configuration
 
