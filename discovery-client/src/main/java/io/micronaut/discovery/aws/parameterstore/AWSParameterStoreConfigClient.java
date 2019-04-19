@@ -77,6 +77,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      * @param awsParameterStoreConfiguration      configuration for the parameter store
      * @param applicationConfiguration            the application configuration
      * @param route53ClientDiscoveryConfiguration configuration for route53 service discovery, if you are using this (not required)
+     * @throws SdkClientException If the aws sdk client could not be created
      */
     AWSParameterStoreConfigClient(
             AWSClientConfiguration awsConfiguration,
