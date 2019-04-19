@@ -33,6 +33,7 @@ import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 import io.micronaut.inject.writer.GeneratedFile
 
 import javax.inject.Named
+import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.VariableElement
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -958,9 +959,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     String fieldName = fieldNode.name
                     Object fieldType = AstGenericUtils.resolveTypeReference(fieldNode.type)
                     if (isValue) {
-
                         if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
-                            getBeanWriter().visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, configurationMetadataBuilder)
+                            if(isPrivate) {
+                                // Using the field would throw a IllegalAccessError, use the method instead
+                                String fieldGetterName = NameUtils.getterNameFor(fieldNode.name, fieldType == Boolean)
+                                Optional<MethodNode> getterMethod = Optional.ofNullable(declaringClass.methods?.find { it.name == fieldGetterName})
+                                if(getterMethod.isPresent()) {
+                                    getBeanWriter().visitConfigBuilderMethod(fieldType, getterMethod.get().name, fieldAnnotationMetadata, configurationMetadataBuilder)
+                                } else {
+                                    addError("ConfigurationBuilder applied to a private field must have a corresponding non-private getter method.", fieldNode)
+                                }
+                            } else {
+                                getBeanWriter().visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, configurationMetadataBuilder)
+                            }
                             try {
                                 visitConfigurationBuilder(fieldAnnotationMetadata, fieldNode.type, getBeanWriter())
                             } finally {
