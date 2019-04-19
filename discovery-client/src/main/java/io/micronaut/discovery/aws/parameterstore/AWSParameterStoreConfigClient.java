@@ -82,16 +82,10 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
             AWSClientConfiguration awsConfiguration,
             AWSParameterStoreConfiguration awsParameterStoreConfiguration,
             ApplicationConfiguration applicationConfiguration,
-            @Nullable Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) {
+            @Nullable Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) throws SdkClientException {
         this.awsConfiguration = awsConfiguration;
         this.awsParameterStoreConfiguration = awsParameterStoreConfiguration;
-
-        try {
-            this.client = AWSSimpleSystemsManagementAsyncClient.asyncBuilder().withClientConfiguration(awsConfiguration.getClientConfiguration()).build();
-        } catch (SdkClientException sce) {
-            LOG.warn("Error creating Simple Systems Management client - check your credentials: " + sce.getMessage(), sce);
-        }
-
+        this.client = AWSSimpleSystemsManagementAsyncClient.asyncBuilder().withClientConfiguration(awsConfiguration.getClientConfiguration()).build();
         this.serviceId = (route53ClientDiscoveryConfiguration != null ? route53ClientDiscoveryConfiguration.getServiceId() : applicationConfiguration.getName()).orElse(null);
     }
 
@@ -140,6 +134,13 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                 configurationValues = Flowable.concat(
                         configurationValues,
                         Flowable.fromPublisher(getParametersRecursive(environmentSpecificPath)));
+
+                if (applicationSpecificPath != null) {
+                    String appEnvironmentSpecificPath = applicationSpecificPath + "_" + activeName;
+                    configurationValues = Flowable.concat(
+                            configurationValues,
+                            Flowable.fromPublisher(getParametersRecursive(appEnvironmentSpecificPath)));
+                }
             }
 
         }
