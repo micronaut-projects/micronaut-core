@@ -83,9 +83,9 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      * @param executorService The executor service to use for completable futures
      */
     @Inject
-    public DefaultRetryInterceptor(ApplicationEventPublisher eventPublisher, @Named(TaskExecutors.SCHEDULED) ScheduledExecutorService executorService) {
+    public DefaultRetryInterceptor(ApplicationEventPublisher eventPublisher, @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
         this.eventPublisher = eventPublisher;
-        this.executorService = executorService;
+        this.executorService = (ScheduledExecutorService) executorService;
     }
 
     @Override
