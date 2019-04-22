@@ -1,0 +1,21 @@
+The views project has integration with the Micronaut security project. api:views.model.security.SecurityViewModelProcessor[] is enabled by default and injects the current username in the view. The following properties allow you to customize the injection:
+
+include::{includedir}configurationProperties/io.micronaut.views.model.security.SecurityViewModelProcessorConfigurationProperties.adoc[]
+
+In a controller, you can return a model without specifying in the model the authenticated user:
+
+[source,java]
+.src/main/java/myapp/BooksController.java
+----
+include::{testsviews}/groovy/io/micronaut/views/model/security/BooksController.java[tags=class]
+----
+
+and still access the authenticated user in the view (for example a velocity template):
+
+[source,html]
+.src/main/resources/views/books.vm
+----
+include::{testsviews}/resources/views/securitydecorator.vm[tag=html]
+----
+
+You can access information about the current user with the `security` map.
