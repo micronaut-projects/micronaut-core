@@ -193,6 +193,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private int optionalInstanceIndex;
     private boolean preprocessMethods = false;
     private Map<String, Map<String, Object>> typeArguments;
+    private List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
+    private List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
 
     /**
      * Creates a bean definition writer.
@@ -271,6 +273,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.interfaceTypes = new HashSet<>();
         this.interfaceTypes.add(BeanFactory.class);
         this.isConfigurationProperties = annotationMetadata.hasDeclaredStereotype(ConfigurationProperties.class);
+    }
+
+    /**
+     * @return The data for any post construct methods that were visited
+     */
+    public final List<MethodVisitData> getPostConstructMethodVisits() {
+        return Collections.unmodifiableList(postConstructMethodVisits);
+    }
+
+    /**
+     * @return The data for any pre destroy methods that were visited
+     */
+    public List<MethodVisitData> getPreDestroyMethodVisits() {
+        return Collections.unmodifiableList(preDestroyMethodVisits);
     }
 
     /**
@@ -658,7 +674,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         visitPostConstructMethodDefinition();
 
-        visitMethodInjectionPointInternal(
+        final MethodVisitData methodVisitData = new MethodVisitData(
                 declaringType,
                 requiresReflection,
                 returnType,
@@ -666,7 +682,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 argumentTypes,
                 argumentAnnotationMetadata,
                 genericTypes,
-                this.annotationMetadata,
+                annotationMetadata
+        );
+        postConstructMethodVisits.add(methodVisitData);
+        visitMethodInjectionPointInternal(methodVisitData,
                 constructorVisitor,
                 postConstructMethodVisitor,
                 postConstructInstanceIndex,
@@ -689,14 +708,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * Visits a pre-destroy method injection point.
      *
      * @param declaringType The declaring type of the method. Either a Class or a string representing the name of the type
-     * @param returnType The return type of the method
+     * @param returnType    The return type of the method
      * @param methodName    The method name
      */
     public void visitPreDestroyMethod(Object declaringType,
                                       Object returnType,
                                       String methodName) {
         visitPreDestroyMethodDefinition();
-        visitMethodInjectionPointInternal(
+        final MethodVisitData methodVisitData = new MethodVisitData(
                 declaringType,
                 false,
                 returnType,
@@ -704,7 +723,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 Collections.emptyMap(),
                 Collections.emptyMap(),
                 Collections.emptyMap(),
-                AnnotationMetadata.EMPTY_METADATA,
+                AnnotationMetadata.EMPTY_METADATA);
+        preDestroyMethodVisits.add(methodVisitData);
+        visitMethodInjectionPointInternal(methodVisitData,
                 constructorVisitor,
                 preDestroyMethodVisitor,
                 preDestroyInstanceIndex,
@@ -722,14 +743,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                       AnnotationMetadata annotationMetadata) {
 
         visitPreDestroyMethodDefinition();
-        visitMethodInjectionPointInternal(
-                declaringType,
+        final MethodVisitData methodVisitData = new MethodVisitData(declaringType,
                 requiresReflection,
-                returnType, methodName,
+                returnType,
+                methodName,
                 argumentTypes,
                 argumentAnnotationMetadata,
                 genericTypes,
-                annotationMetadata,
+                annotationMetadata);
+        preDestroyMethodVisits.add(methodVisitData);
+        visitMethodInjectionPointInternal(
+                methodVisitData,
                 constructorVisitor,
                 preDestroyMethodVisitor,
                 preDestroyInstanceIndex,
@@ -751,14 +775,15 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         int injectInstanceIndex = this.injectInstanceIndex;
 
         visitMethodInjectionPointInternal(
-                declaringType,
-                requiresReflection,
-                returnType,
-                methodName,
-                argumentTypes,
-                argumentAnnotationMetadata,
-                genericTypes,
-                annotationMetadata,
+                new MethodVisitData(
+                        declaringType,
+                        requiresReflection,
+                        returnType,
+                        methodName,
+                        argumentTypes,
+                        argumentAnnotationMetadata,
+                        genericTypes,
+                        annotationMetadata),
                 constructorVisitor,
                 injectMethodVisitor,
                 injectInstanceIndex,
@@ -1396,32 +1421,27 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     /**
-     * @param declaringType                 The declaring type
-     * @param requiresReflection            Whether invoking the constructor requires reflection
-     * @param returnType                    The return type
-     * @param methodName                    The method name
-     * @param argumentTypes                 The argument type nams for each parameter
-     * @param argumentMetadata              The argument annotation metadata
-     * @param genericTypes                  The generic types for each parameter
-     * @param annotationMetadata            The annotation metadata
+     * @param methodVisitData               The data for the method
      * @param constructorVisitor            The constructor visitor
      * @param injectMethodVisitor           The inject method visitor
      * @param injectInstanceIndex           The inject instance index
      * @param addMethodInjectionPointMethod The add method inject point method
      */
-    private void visitMethodInjectionPointInternal(Object declaringType,
-                                                   boolean requiresReflection,
-                                                   Object returnType,
-                                                   String methodName,
-                                                   Map<String, Object> argumentTypes,
-                                                   Map<String, AnnotationMetadata> argumentMetadata,
-                                                   Map<String, Map<String, Object>> genericTypes,
-                                                   AnnotationMetadata annotationMetadata,
+    private void visitMethodInjectionPointInternal(MethodVisitData methodVisitData,
                                                    GeneratorAdapter constructorVisitor,
                                                    GeneratorAdapter injectMethodVisitor,
                                                    int injectInstanceIndex,
                                                    Method addMethodInjectionPointMethod) {
 
+
+        final AnnotationMetadata annotationMetadata = methodVisitData.annotationMetadata;
+        final Map<String, Object> argumentTypes = methodVisitData.argumentTypes;
+        final Object declaringType = methodVisitData.declaringType;
+        final String methodName = methodVisitData.methodName;
+        final Map<String, AnnotationMetadata> argumentMetadata = methodVisitData.argumentAnnotationMetadata;
+        final Map<String, Map<String, Object>> genericTypes = methodVisitData.genericTypes;
+        final boolean requiresReflection = methodVisitData.requiresReflection;
+        final Object returnType = methodVisitData.returnType;
         DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
         boolean hasArguments = argumentTypes != null && !argumentTypes.isEmpty();
         int argCount = hasArguments ? argumentTypes.size() : 0;
@@ -1452,7 +1472,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         // 4th argument: the annotation metadata
-        pushAnnotationMetadata(annotationMetadata, constructorVisitor);
+        pushAnnotationMetadata(this.annotationMetadata, constructorVisitor);
 
         // 5th  argument to addInjectionPoint: do we need reflection?
         constructorVisitor.visitInsn(requiresReflection ? ICONST_1 : ICONST_0);
@@ -2067,5 +2087,106 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         psv.visitEnd();
+    }
+
+    /**
+     * Data used when visiting method.
+     */
+    @Internal
+    public static final class MethodVisitData {
+        private Object declaringType;
+        private boolean requiresReflection;
+        private Object returnType;
+        private String methodName;
+        private Map<String, Object> argumentTypes;
+        private Map<String, AnnotationMetadata> argumentAnnotationMetadata;
+        private Map<String, Map<String, Object>> genericTypes;
+        private AnnotationMetadata annotationMetadata;
+
+        /**
+         * Default constructor.
+         * @param declaringType The declaring type
+         * @param requiresReflection Whether reflection is required
+         * @param returnType The return type
+         * @param methodName The method name
+         * @param argumentTypes The argument types
+         * @param argumentAnnotationMetadata The argument metadata
+         * @param genericTypes The generic type metadata
+         * @param annotationMetadata The method annotation metadata
+         */
+        MethodVisitData(
+                Object declaringType,
+                boolean requiresReflection,
+                Object returnType,
+                String methodName,
+                Map<String, Object> argumentTypes,
+                Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+                Map<String, Map<String, Object>> genericTypes,
+                AnnotationMetadata annotationMetadata) {
+            this.declaringType = declaringType;
+            this.requiresReflection = requiresReflection;
+            this.returnType = returnType;
+            this.methodName = methodName;
+            this.argumentTypes = argumentTypes;
+            this.argumentAnnotationMetadata = argumentAnnotationMetadata;
+            this.genericTypes = genericTypes;
+            this.annotationMetadata = annotationMetadata;
+        }
+
+        /**
+         * @return The declaring type object.
+         */
+        public Object getDeclaringType() {
+            return declaringType;
+        }
+
+        /**
+         * @return is reflection required
+         */
+        public boolean isRequiresReflection() {
+            return requiresReflection;
+        }
+
+        /**
+         * @return The return type object
+         */
+        public Object getReturnType() {
+            return returnType;
+        }
+
+        /**
+         * @return The method name
+         */
+        public String getMethodName() {
+            return methodName;
+        }
+
+        /**
+         * @return The argument types
+         */
+        public Map<String, Object> getArgumentTypes() {
+            return argumentTypes;
+        }
+
+        /**
+         * @return The argument metadata
+         */
+        public Map<String, AnnotationMetadata> getArgumentAnnotationMetadata() {
+            return argumentAnnotationMetadata;
+        }
+
+        /**
+         * @return The generic types
+         */
+        public Map<String, Map<String, Object>> getGenericTypes() {
+            return genericTypes;
+        }
+
+        /**
+         * @return The annotation metadata
+         */
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
     }
 }

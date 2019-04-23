@@ -36,6 +36,7 @@ class SimpleClassMethodLevelAopSpec extends Specification {
 
         expect:
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+        foo.postConstructInvoked
 
         where:
         method                        | args                   | result

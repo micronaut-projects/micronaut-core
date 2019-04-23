@@ -45,6 +45,7 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.inject.writer.ExecutableMethodWriter;
 
+import javax.annotation.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
@@ -472,7 +473,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         /**
          * Gets or creates a bean definition writer.
-         * @param classElement The class element
+         *
+         * @param classElement  The class element
          * @param qualifiedName The name
          * @return The writer
          */
@@ -481,10 +483,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (beanDefinitionWriter == null) {
 
                 beanDefinitionWriter = createBeanDefinitionWriterFor(classElement);
+                Name proxyKey = createProxyKey(beanDefinitionWriter.getBeanDefinitionName());
                 beanDefinitionWriters.put(qualifiedName, beanDefinitionWriter);
 
 
-                Name proxyKey = createProxyKey(beanDefinitionWriter.getBeanDefinitionName());
                 BeanDefinitionVisitor proxyWriter = beanDefinitionWriters.get(proxyKey);
                 if (proxyWriter != null) {
                     proxyWriter.visitBeanDefinitionConstructor(
@@ -1072,7 +1074,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                             String variableName = tv.toString();
 
 
-
                                             if (typeVariables.containsKey(variableName)) {
                                                 TypeMirror variableMirror = typeVariables.get(variableName);
                                                 if (variableMirror.getKind() == TypeKind.TYPEVAR) {
@@ -1297,6 +1298,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             if (annotationMetadata.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
+                final AopProxyWriter aopWriter = resolveAopWriter(writer);
+                if (aopWriter != null && !aopWriter.isProxyTarget()) {
+                    writer = aopWriter;
+                }
                 writer.visitPostConstructMethod(
                         modelUtils.resolveTypeReference(declaringClass),
                         requiresReflection,
@@ -1309,6 +1314,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 );
             } else if (annotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
+                final AopProxyWriter aopWriter = resolveAopWriter(writer);
+                if (aopWriter != null && !aopWriter.isProxyTarget()) {
+                    writer = aopWriter;
+                }
                 writer.visitPreDestroyMethod(
                         modelUtils.resolveTypeReference(declaringClass),
                         requiresReflection,
@@ -1334,6 +1343,26 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             } else {
                 error("Unexpected call to visitAnnotatedMethod(%s)", method);
             }
+        }
+
+        private @Nullable AopProxyWriter resolveAopWriter(BeanDefinitionVisitor writer) {
+            Name proxyKey = createProxyKey(writer.getBeanDefinitionName());
+            final BeanDefinitionVisitor aopWriter = beanDefinitionWriters.get(proxyKey);
+            if (aopWriter instanceof AopProxyWriter) {
+                return (AopProxyWriter) aopWriter;
+            } else if (isAopProxyType) {
+                Object[] interceptorTypes = annotationUtils.getAnnotationMetadata(concreteClass)
+                        .getAnnotationNamesByStereotype(AROUND_TYPE)
+                        .toArray();
+                return resolveAopProxyWriter(
+                        writer,
+                        aopSettings,
+                        isFactoryType,
+                        constructorParameterInfo,
+                        interceptorTypes
+                );
+            }
+            return null;
         }
 
         @Override
@@ -1403,7 +1432,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         /**
-         * @param field The {@link VariableElement}
+         * @param field                   The {@link VariableElement}
          * @param fieldAnnotationMetadata The annotation metadata for the field
          * @return Returns null after visiting the configuration properties
          */

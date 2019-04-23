@@ -90,6 +90,12 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
     }
 
     @Override
+    public String toString() {
+        String text = Argument.toString(getArguments());
+        return declaringType.getSimpleName() + "." + methodName + "(" + text + ")";
+    }
+
+    @Override
     public void configure(Environment environment) {
         this.environment = environment;
     }

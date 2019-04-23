@@ -452,39 +452,49 @@ public class DefaultBeanContext implements BeanContext {
         synchronized (singletonObjects) {
 
             initializedObjectsByType.clear();
-
-            BeanDefinition<T> beanDefinition = inject ? findBeanCandidatesForInstance(singleton).stream().findFirst().orElse(null) : null;
+            beanCandidateCache.remove(type);
+            BeanDefinition<T> beanDefinition = inject ? findConcreteCandidate(type, qualifier, false, false).orElse(null) : null;
             if (beanDefinition != null && beanDefinition.getBeanType().isInstance(singleton)) {
                 doInject(new DefaultBeanResolutionContext(this, beanDefinition), singleton, beanDefinition);
                 singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, beanDefinition, singleton));
+                BeanKey concreteKey = new BeanKey(singleton.getClass(), qualifier);
+                singletonObjects.put(concreteKey, new BeanRegistration<>(concreteKey, beanDefinition, singleton));
             } else {
-                NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(type);
-                beanDefinition = dynamicRegistration;
+                NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(singleton.getClass());
+                if (qualifier instanceof Named) {
+                    final BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(dynamicRegistration);
+                    delegate.put(Named.class.getName(), ((Named) qualifier).getName());
+                    beanDefinition = delegate;
+                } else {
+                    beanDefinition = dynamicRegistration;
+                }
                 beanDefinitionsClasses.add(dynamicRegistration);
                 singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, dynamicRegistration, singleton));
+                BeanKey concreteKey = new BeanKey(singleton.getClass(), qualifier);
+                singletonObjects.put(concreteKey, new BeanRegistration<>(concreteKey, dynamicRegistration, singleton));
+                final Optional<Class> indexedType = indexedTypes.stream().filter(t -> t.isAssignableFrom(type) || t == type).findFirst();
+                if (indexedType.isPresent()) {
+                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
+                    BeanDefinition<T> finalBeanDefinition = beanDefinition;
+                    indexed.add(new AbstractBeanDefinitionReference(type.getName(), type.getName()) {
+                        @Override
+                        protected Class<? extends BeanDefinition<?>> getBeanDefinitionType() {
+                            return (Class<? extends BeanDefinition<?>>) finalBeanDefinition.getClass();
+                        }
+
+                        @Override
+                        public BeanDefinition load() {
+                            return finalBeanDefinition;
+                        }
+
+                        @Override
+                        public Class getBeanType() {
+                            return type;
+                        }
+                    });
+                }
             }
 
-            final Optional<Class> indexedType = indexedTypes.stream().filter(t -> t.isAssignableFrom(type) || t == type).findFirst();
-            if (indexedType.isPresent()) {
-                final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
-                BeanDefinition<T> finalBeanDefinition = beanDefinition;
-                indexed.add(new AbstractBeanDefinitionReference(type.getName(), type.getName()) {
-                    @Override
-                    protected Class<? extends BeanDefinition<?>> getBeanDefinitionType() {
-                        return (Class<? extends BeanDefinition<?>>) finalBeanDefinition.getClass();
-                    }
-
-                    @Override
-                    public BeanDefinition load() {
-                        return finalBeanDefinition;
-                    }
-
-                    @Override
-                    public Class getBeanType() {
-                        return type;
-                    }
-                });
-            }
         }
         return this;
     }

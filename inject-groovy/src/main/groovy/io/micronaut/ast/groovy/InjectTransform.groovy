@@ -703,7 +703,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         populateParameterData(methodNode, paramsToType, argumentAnnotationMetadata, genericTypeMap)
 
                         if (methodAnnotationMetadata.hasStereotype(ProcessedTypes.POST_CONSTRUCT)) {
-                            getBeanWriter().visitPostConstructMethod(
+                            def beanWriter = getBeanWriter()
+                            if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
+                                beanWriter = aopProxyWriter
+                            }
+                            beanWriter.visitPostConstructMethod(
                                     AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
@@ -713,7 +717,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     genericTypeMap,
                                     methodAnnotationMetadata)
                         } else if (methodAnnotationMetadata.hasStereotype(ProcessedTypes.PRE_DESTROY)) {
-                            getBeanWriter().visitPreDestroyMethod(
+                            def beanWriter = getBeanWriter()
+                            if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
+                                beanWriter = aopProxyWriter
+                            }
+                            beanWriter.visitPreDestroyMethod(
                                     AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
