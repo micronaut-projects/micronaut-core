@@ -1,34 +1,16 @@
 Validation advice is one of the most common advice types you are likely to want to incorporate into your application.
 
-Validation advice is built on https://jcp.org/en/jsr/detail?id=380[JSR 380], also known as Bean Validation 2.0.
+Validation advice is built on https://beanvalidation.org/2.0/spec/[Bean Validation JSR 380].
 
 JSR 380 is a specification of the Java API for bean validation which ensures that the
 properties of a bean meet specific criteria, using `javax.validation` annotations such as `@NotNull`, `@Min`, and `@Max`.
 
-http://hibernate.org/validator[Hibernate Validator] project is a reference implementation for JSR 380. Micronaut ships
-with a built-in configuration to use Hibernate Validator.
+Micronaut provides native support for the `javax.validation` annotations with the `micronaut-validation` dependency:
 
-To get started, first add the Hibernate Validator configuration to your application:
+dependency::micronaut-validation[]
 
-dependency:micronaut-hibernate-validator[groupId="io.micronaut.configuration"]
+Or full JSR 380 compliance with the `micronaut-hibernate-validator` dependency:
 
-Then simply add the api:validation.Validated[] annotation to any class that requires validation. For example, consider this trivial service that retrieves books by title:
+dependency::micronaut-hibernate-validator[]
 
-.BookService.java
-[source,java]
-----
-include::{testsuite}/aop/validation/BookService.java[tags=imports, indent=0]
-
-include::{testsuite}/aop/validation/BookService.java[tags=class, indent=0]
-----
-
-<1> The api:validation.Validated[] annotation is defined at the class level
-<2> The `javax.validation.NotBlank` constraint is used to ensure parameters passed cannot be blank
-
-You can verify the behaviour of the class by writing a test. The following test is written in Groovy and Spock:
-
-.Testing Validation
-[source,groovy]
-----
-include::{testsuite}/aop/validation/BookServiceSpec.groovy[tags=test, indent=0]
-----
+See the section on <<beanValidation, Bean Validation>> for more informatino on how to apply validation rules to your bean classes.

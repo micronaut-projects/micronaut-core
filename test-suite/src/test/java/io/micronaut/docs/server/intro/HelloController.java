@@ -22,8 +22,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 // end::imports[]
-
-@Requires(property = "spec.lang", value = "java")
 @Requires(property = "spec.name", value = "HelloControllerSpec")
 // tag::class[]
 @Controller("/hello") // <1>

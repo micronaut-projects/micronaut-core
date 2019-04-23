@@ -67,6 +67,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
     private static final String FILE_SEPARATOR = ",";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
+    private static final String AWS_LAMBDA_FUNCTION_NAME_ENV = "AWS_LAMBDA_FUNCTION_NAME";
     private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
     private static final String PCF_ENV = "VCAP_SERVICES";
     private static final String HEROKU_DYNO = "DYNO";
@@ -143,10 +144,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param conversionService  The conversion service
      * @param deduceEnvironments Option to deduce environments
      * @param names              The names
+     * @deprecated  Use {@link #DefaultEnvironment(ApplicationContextConfiguration)} instead.
      */
     @SuppressWarnings("MagicNumber")
+    @Deprecated
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, @Nullable Boolean deduceEnvironments, String... names) {
         this(new ApplicationContextConfiguration() {
+            @Nonnull
+            @Override
+            public ClassLoader getClassLoader() {
+                return resourceLoader.getClassLoader();
+            }
+
             @Nonnull
             @Override
             public List<String> getEnvironments() {
@@ -609,7 +618,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             synchronized (EnvironmentsAndPackage.class) { // double check
                 environmentsAndPackage = this.environmentsAndPackage;
                 if (environmentsAndPackage == null) {
-                    environmentsAndPackage = deduceEnvironmentsAndPackage(shouldDeduceEnvironments(), extendedDeduction, extendedDeduction);
+                    environmentsAndPackage = deduceEnvironmentsAndPackage(
+                            shouldDeduceEnvironments(),
+                            extendedDeduction,
+                            extendedDeduction,
+                            !extendedDeduction
+                    );
                     this.environmentsAndPackage = environmentsAndPackage;
                 }
             }
@@ -620,7 +634,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static EnvironmentsAndPackage deduceEnvironmentsAndPackage(
             boolean deduceEnvironments,
             boolean deduceComputePlatform,
-            boolean inspectTrace) {
+            boolean inspectTrace,
+            boolean deduceFunctionPlatform
+        ) {
 
 
         EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
@@ -726,6 +742,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                         }
                     }
                 }
+            }
+        }
+
+        if (deduceFunctionPlatform) {
+            // deduce AWS Lambda
+            if (StringUtils.isNotEmpty(System.getenv(AWS_LAMBDA_FUNCTION_NAME_ENV))) {
+                environments.add(Environment.AMAZON_EC2);
+                environments.add(Environment.CLOUD);
             }
         }
 

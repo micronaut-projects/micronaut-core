@@ -107,6 +107,7 @@ httpServer:
     velocity: Apache Velocity
     freemarker: Apache Freemarker
     csp: CSP Header Support
+    views-security: Security Integration
   openapi: OpenAPI / Swagger Support
   graphql: GraphQL Support
 httpClient:
@@ -224,51 +225,6 @@ management:
     stopEndpoint: The Server Stop Endpoint
 security:
   title: Security
-  authenticationProviders: Authentication Providers
-  securityRule:
-      title: Security Rules
-      ipPattern: IP Pattern Rule
-      secured: Secured Annotation
-      interceptUrlMap: Intercept URL Map
-      builtInEndpointsAccess: Built-In Endpoints Security
-  authenticationStrategies:
-    title: Authentication Strategies
-    basicAuth: Basic Auth
-    session: Session Authentication
-    jwt:
-      title: JSON Web Token
-      reader:
-        title: Reading JWT Token
-        bearerToken: Bearer Token Reader
-        cookieToken: Cookie Token Reader
-      jwtGenerator:
-        title: JWT Token Generation
-        jwtGeneratorSignature: JWT Signature
-        jwtGeneratorEncryption: Encrypted JWTs
-      jwtValidation:
-        title: JWT Token Validation
-        jwks: Validation with remote JWKS
-      claimsGeneration: Claims Generation
-      render:
-        title: Token Render
-    ldap:
-      title: LDAP Authentication
-      configuration: Configuration
-      extending: Extending Default Behavior
-  rejection: Rejection Handling
-  tokenPropagation: Token Propagation
-  endpoints:
-    title: Built-In Security Controllers
-    login: Login Controller
-    logout: Logout Controller
-    refresh: Refresh Controller
-    keys: Keys Controller
-  retrievingAuthenticatedUser:
-    title: Retrieve the authenticated user
-    securityService: User outside of a controller
-    accessSecurityInViews: User in a view
-  securityEvents: Security Events
-
 multitenancy:
   title: Multi-Tenancy
   multitenancyGorm: Multi-Tenancy GORM

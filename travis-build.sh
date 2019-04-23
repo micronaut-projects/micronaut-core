@@ -23,7 +23,7 @@ fi
 
 if [[ $EXIT_STATUS -eq 0 ]]; then
     echo "Publishing archives for branch $TRAVIS_BRANCH"
-    if [[ -n $TRAVIS_TAG ]] || [[ $TRAVIS_BRANCH =~ ^1.1.x$ && $TRAVIS_PULL_REQUEST == 'false' ]]; then
+    if [[ -n $TRAVIS_TAG ]] || [[ $TRAVIS_BRANCH =~ ^master$ && $TRAVIS_PULL_REQUEST == 'false' ]]; then
 
       echo "Publishing archives"
       ./gradlew --stop

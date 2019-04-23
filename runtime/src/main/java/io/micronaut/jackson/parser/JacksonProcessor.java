@@ -316,7 +316,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         if (rootIsArray && streamArray && nodeStack.size() == 1) {
             ArrayNode arrayNode = (ArrayNode) nodeStack.peekFirst();
             if (arrayNode.size() > 0) {
-                return arrayNode.get(arrayNode.size() - 1);
+                return arrayNode.remove(arrayNode.size() - 1);
             }
         }
 

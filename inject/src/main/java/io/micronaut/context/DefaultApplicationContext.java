@@ -441,6 +441,17 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     private static class BootstrapEnvironment extends DefaultEnvironment {
         BootstrapEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... activeEnvironments) {
             super(new ApplicationContextConfiguration() {
+                @Override
+                public Optional<Boolean> getDeduceEnvironments() {
+                    return Optional.of(false);
+                }
+
+                @Nonnull
+                @Override
+                public ClassLoader getClassLoader() {
+                    return resourceLoader.getClassLoader();
+                }
+
                 @Nonnull
                 @Override
                 public List<String> getEnvironments() {

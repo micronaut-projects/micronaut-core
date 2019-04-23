@@ -1,16 +1,29 @@
-Since Micronaut 1.2, Micronaut has built-in support for validating beans that are annotated with `javax.validation` annotations.
+Since Micronaut 1.2, Micronaut has built-in support for validating beans that are annotated with `javax.validation` annotations. As a minimum you should include the `micronaut-validation` module as a compile dependency:
 
-Note that Micronaut's implementation is not currently fully compliant with the Bean Validator specification as the specification heavily relies on reflection-based APIs, however Micronaut's implementation includes the following benefits:
+dependency::micronaut-validation[]
+
+Note that Micronaut's implementation is not currently fully compliant with the https://beanvalidation.org/2.0/spec/[Bean Validator specification] as the specification heavily relies on reflection-based APIs.
+
+The following features are unsupported at this time:
+
+* Annotations on generic argument types since only the Java language supports this feature.
+* Any interaction with the https://beanvalidation.org/2.0/spec/#constraintmetadata[constraint metadata API], since Micronaut uses already computed compilation time metadata.
+* XML-based configuration
+* Instead of using `javax.validation.ConstraintValidator` you should use api:validation.validator.constraints.ConstraintValidator[] to define custom constraints, which supports validating annotations as compilation time.
+
+Micronaut's implementation includes the following benefits:
 
 * Reflection and Runtime Proxy free validation resulting in reduced memory consumption
 * Smaller JAR size since Hibernate Validator adds another 1.4MB
-* Faster startup since Hibernate Validator adds 200ms startup overhead
+* Faster startup since Hibernate Validator adds 200ms+ startup overhead
 * Configurability via Annotation Metadata
 * Support for Reactive Bean Validation
 * Support for validating the source AST at compilation time
+* Automatic compatibility with GraalVM native without additional configuration
 
-TIP: If you require full Bean Validator 2.0 compliance you can add the `micronaut-hibernate-validator` module to your classpath, which will replace Micronaut's implementation.
+If you require full Bean Validator 2.0 compliance you can add the `micronaut-hibernate-validator` module to your classpath, which will replace Micronaut's implementation.
 
+dependency::micronaut-hibernate-validator[]
 
 === Validating Bean Methods
 
@@ -21,7 +34,7 @@ snippet::io.micronaut.docs.ioc.validation.PersonService[tags="imports,class",ind
 
 The above example declares that the `@NotBlank` annotation should be validated when executing the `sayHello` method.
 
-WARNING: If you are using Kotlin the class and method must be declared open so that Micronaut can create a compilation time subclass.
+WARNING: If you are using Kotlin the class and method must be declared open so that Micronaut can create a compilation time subclass, alternatively you can annotate the class with ann:validation.Validated[] and configure the Kotlin `all-open` plugin to open classes annotated with this type. See the https://kotlinlang.org/docs/reference/compiler-plugins.html[Compiler plugins] section.
 
 If a validation error occurs a `javax.validation.ConstraintViolationException` will be thrown. For example:
 
@@ -33,7 +46,7 @@ snippet::io.micronaut.docs.ioc.validation.PersonServiceSpec[tags="imports,test",
 
 === Validating Data Classes
 
-If you wish to validation data classes, such as POJOs and so on, typically used in JSON interchange, the class must be annotated with ann:core.annotation.Introspected[] (see the previous section on <<introspection, Bean Introspection>>) or if the class is external be imported by the `@Introspected` annotation.
+If you wish to validate data classes, such as POJOs and so on, typically used in JSON interchange, the class must be annotated with ann:core.annotation.Introspected[] (see the previous section on <<introspection, Bean Introspection>>) or if the class is external be imported by the `@Introspected` annotation.
 
 .POJO Validation Example
 snippet::io.micronaut.docs.ioc.validation.Person[tags="class"]
@@ -64,20 +77,69 @@ snippet::io.micronaut.docs.ioc.validation.pojo.PersonServiceSpec[tags="validate-
 <2> The constraint violations are verified
 
 
-
 === Validating Configuration Properties
 
 You can also validate the properties of classes that are annotated with ann:context.annotation.ConfigurationProperties[] to ensure configuration is correct.
 
 NOTE: It is recommended that you annotate ann:context.annotation.ConfigurationProperties[] that features validation with ann:context.annotation.Context[] to ensure that the validation occurs at startup time.
 
-=== Validating Annotations at Compilation Time
-
-
 === Defining Additional Constraints
 
-TODO
+To define additional constraints you can define a new annotation, for example:
 
-=== Validation Error Messages
+.Example Constraint Annotation
+snippet::io.micronaut.docs.ioc.validation.custom.DurationPattern[tags="imports,class", indent="0"]
 
-TODO
+<1> The annotation should be annotated with `javax.validation.Constraint`
+<2> A `message` template can be provided in a hard coded manner as above. If none is specified Micronaut will try to find a message using `ClassName.message` using the api:context.MessageSource[] interface. (optional)
+<3> To support repeated annotations you can define a inner annotation (optional).
+
+TIP: You can add messages and message bundles using the api:context.MessageSource[] and api:context.i18n.ResourceBundleMessageSource[] classes.
+
+Once you have defined the annotation you need to implement a api:validation.validator.constraints.ConstraintValidator[] that validates the annotation. You can either implement a bean that implements the interace directly or define a factory that returns one or more validators.
+
+The latter approach is recommended if you plan to define multiple validators:
+
+.Example Constraint Validator
+snippet::io.micronaut.docs.ioc.validation.custom.MyValidatorFactory[tags="imports,class", indent="0"]
+
+The above example implements a validator that validates any field, parameter etc. that is annotated with `DurationPattern`, ensuring that the string can be parsed with `java.time.Duration.parse`.
+
+NOTE: Generally `null` is regarded as valid and `@NotNull` used to constrain a value as not being `null`. The example above regards `null` as a valid value.
+
+For example:
+
+.Example Custom Constraint Usage
+snippet::io.micronaut.docs.ioc.validation.custom.HolidayService[tags="class", indent="0"]
+
+To verify the above examples validates the `duration` parameter you can define a test:
+
+
+.Testing Example Custom Constraint Usage
+snippet::io.micronaut.docs.ioc.validation.custom.DurationPatternValidatorSpec[tags="test", indent="0"]
+
+=== Validating Annotations at Compilation Time
+
+You can use Micronaut's validator to validate annotation usages at compilation time. To do so you should include `micronaut-validation` in the annotation processor classpath:
+
+dependency::micronaut-validation[scope="annotationProcessor"]
+
+Once this is done Micronaut will at compilation validate annotation values that are themselves annotated with `javax.validation`. For example consider the following annotation:
+
+.Annotation Validation
+snippet::io.micronaut.docs.ioc.validation.custom.TimeOff[tags="imports,class", indent="0"]
+
+If your attempt to use `@TimeOff(duration="junk")` in your source Micronaut will fail compilation due to the value of `duration` violating the `DurationPattern` constraint.
+
+NOTE: If `duration` is a property placeholder such as `@TimeOff(duration="${my.value}")` then validation handling will be deferred until runtime.
+
+Note that if you wish to allow use of a custom `ConstraintValidator` at compilation time you should instead define the validator as a class:
+
+.Example Constraint Validator
+snippet::io.micronaut.docs.ioc.validation.custom.DurationPatternValidator[tags="imports,class", indent="0"]
+
+In addition to the following requirements:
+
+* Define a `META-INF/services/io.micronaut.validation.validator.constraints.ConstraintValidator` file that references the class.
+* The class should be public and feature a zero argument public constructor
+* The class should be placed on the annotation processor classpath of the project that is to be validated.

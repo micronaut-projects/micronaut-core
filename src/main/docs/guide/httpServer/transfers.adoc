@@ -38,3 +38,12 @@ public StreamedFile download() {
 The server supports returning `304` (Not Modified) responses if the files being transferred have not changed and the request contains the appropriate header. In addition, if the client accepts encoded responses, Micronaut will encode the file if it is deemed appropriate. Encoding will happen if the file is text based and greater than 1KB by default. The threshold at which data will be encoded is configurable. See the server configuration reference for details.
 
 TIP: To use a custom data source to send data through an input stream, construct a link:{javase}java/io/PipedInputStream.html[PipedInputStream] and link:{javase}java/io/PipedOutputStream.html[PipedOutputStream] to allow writing data from the output stream to the input. Make sure to do the work on a separate thread so the file can be returned immediately.
+
+== Cache Configuration
+
+By default file responses will include caching headers. The following options determine how the `Cache-Control` header is built.
+
+include::{includedir}configurationProperties/io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration.adoc[]
+
+include::{includedir}configurationProperties/io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration$CacheControlConfiguration.adoc[]
+

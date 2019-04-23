@@ -62,10 +62,10 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     @Option(names = ['-i', '--inplace'], description = 'Create a service using the current directory')
     boolean inplace
 
-    @Option(names = ['-p', '--profile'], paramLabel = 'PROFILE', description = 'The profile to use', completionCandidates = ProfileCompletionCandidates)
+    @Option(names = ['-p', '--profile'], paramLabel = 'PROFILE', description = 'The profile to use. Possible values: ${COMPLETION-CANDIDATES}.', completionCandidates = ProfileCompletionCandidates)
     String profile
 
-    @Option(names = ['-f', '--features'], paramLabel = 'FEATURE', split = ",", description = 'The features to use', completionCandidates = FeatureCompletionCandidates)
+    @Option(names = ['-f', '--features'], paramLabel = 'FEATURE', split = ",", description = 'The features to use. Possible values: ${COMPLETION-CANDIDATES}', completionCandidates = FeatureCompletionCandidates)
     List<String> features = []
 
     @Mixin
@@ -728,6 +728,11 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         variables['version'] = micronautVersion
         variables['app.name'] = appname
         variables['app.group'] = groupname
+        variables['jansi'] = isWindows() ? "false" : "true"
+    }
+
+    private boolean isWindows() {
+        System.getProperty("os.name")?.toLowerCase(Locale.ENGLISH)?.contains("windows")
     }
 
     private String establishGroupAndAppName(String groupAndAppName) {

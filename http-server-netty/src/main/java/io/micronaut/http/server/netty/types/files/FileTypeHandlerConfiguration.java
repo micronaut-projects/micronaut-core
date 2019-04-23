@@ -17,6 +17,8 @@ package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
+import javax.annotation.Nonnull;
+
 /**
  * Allows configuration of properties for the {@link FileTypeHandler}.
  *
@@ -33,6 +35,7 @@ public class FileTypeHandlerConfiguration {
     public static final int DEFAULT_CACHESECONDS = 60;
 
     private int cacheSeconds = DEFAULT_CACHESECONDS;
+    private CacheControlConfiguration cacheControl = new CacheControlConfiguration();
 
     /**
      * @return the cache seconds
@@ -47,5 +50,49 @@ public class FileTypeHandlerConfiguration {
      */
     public void setCacheSeconds(int cacheSeconds) {
         this.cacheSeconds = cacheSeconds;
+    }
+
+    /**
+     * @return The cache control configuration
+     */
+    public CacheControlConfiguration getCacheControl() {
+        return cacheControl;
+    }
+
+    /**
+     * Sets the cache control configuration.
+     *
+     * @param cacheControl The cache control configuration
+     */
+    public void setCacheControl(CacheControlConfiguration cacheControl) {
+        this.cacheControl = cacheControl;
+    }
+
+    /**
+     * Configuration for the Cache-Control header.
+     */
+    @ConfigurationProperties("cache-control")
+    public static class CacheControlConfiguration {
+
+        private static final boolean DEFAULT_PUBLIC_CACHE = false;
+
+        private boolean publicCache = DEFAULT_PUBLIC_CACHE;
+
+        /**
+         * Sets whether the cache control is public. Default value ({@value #DEFAULT_PUBLIC_CACHE})
+         *
+         * @param publicCache Public cache value
+         */
+        public void setPublic(boolean publicCache) {
+            this.publicCache = publicCache;
+        }
+
+        /**
+         * @return True if the cache control should be public
+         */
+        @Nonnull
+        public boolean getPublic() {
+            return publicCache;
+        }
     }
 }

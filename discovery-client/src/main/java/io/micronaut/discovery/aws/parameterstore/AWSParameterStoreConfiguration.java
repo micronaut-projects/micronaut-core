@@ -23,6 +23,8 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 
+import javax.annotation.Nonnull;
+
 /**
  * This is the configuration class for the AWSParameterStoreConfigClient for AWS Parameter Store based configuration.
  */
@@ -45,10 +47,12 @@ public class AWSParameterStoreConfiguration extends AWSClientConfiguration imple
 
     private static final String PREFIX = "config";
     private static final String DEFAULT_PATH = "/" + PREFIX + "/";
+    private static final boolean DEFAULT_SECURE = false;
+    private static final boolean DEFAULT_ENABLED = false;
 
-    private boolean useSecureParameters = false;
-    private String rootHierarchyPath;
-    private Boolean enabled;
+    private boolean useSecureParameters = DEFAULT_SECURE;
+    private String rootHierarchyPath = DEFAULT_PATH;
+    private boolean enabled = DEFAULT_ENABLED;
 
     /**
      * Enable or disable this feature.
@@ -60,7 +64,8 @@ public class AWSParameterStoreConfiguration extends AWSClientConfiguration imple
     }
 
     /**
-     * Enable or disable this feature.
+     * Enable or disable distributed configuration with AWS Parameter Store. Default value ({@value #DEFAULT_ENABLED}).
+     *
      * @param enabled enable this feature
      */
     public void setEnabled(boolean enabled) {
@@ -68,40 +73,38 @@ public class AWSParameterStoreConfiguration extends AWSClientConfiguration imple
     }
 
     /**
-     * This is the default for the root hierarchy on the parameter store. If empty will default to '/config/application'.
+     * This is the default for the root hierarchy on the parameter store.
+     *
      * @return root level of parameter hierarchy
      */
+    @Nonnull
     public String getRootHierarchyPath() {
-        if (this.rootHierarchyPath == null) {
-            return DEFAULT_PATH;
-        }
         return rootHierarchyPath;
     }
 
     /**
-     * This is the default for the root hierarchy on the parameter store. If empty will default to '/config/application'.
+     * The the root hierarchy on the parameter store. Default value ({@value #DEFAULT_PATH}).
+     *
      * @param rootHierarchyPath root prefix used for all calls to get Parameter store values
      */
-    public void setRootHierarchyPath(String rootHierarchyPath) {
+    public void setRootHierarchyPath(@Nonnull String rootHierarchyPath) {
         this.rootHierarchyPath = rootHierarchyPath;
     }
 
     /**
-     * This will turn on or off auto-decryption via MKS for SecureString parameters.
-     * If you set this to off you will not get unencrypted values.
-     * @return use auto encryption on SecureString types
+     * @return Use auto encryption on SecureString types
      */
-    public boolean  getUseSecureParameters() {
+    public boolean getUseSecureParameters() {
         return useSecureParameters;
     }
 
     /**
-     * This will turn on or off auto-decryption via MKS for SecureString parameters.
-     * If you set this to off you will not get unencrypted values.
+     * Use auto-decryption via MKS for SecureString parameters. Default value ({@value DEFAULT_SECURE}).
+     * If set to false, you will not get unencrypted values.
      *
      * @param useSecureParameters True if secure parameters should be used
      */
-    public void setUseSecureParameters(boolean  useSecureParameters) {
+    public void setUseSecureParameters(boolean useSecureParameters) {
         this.useSecureParameters = useSecureParameters;
     }
 }

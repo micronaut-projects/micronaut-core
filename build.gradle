@@ -24,6 +24,7 @@ buildscript {
 
 plugins {
     id 'com.github.hierynomus.license' version '0.15.0' apply false
+    id 'com.github.ben-manes.versions' version '0.21.0'
 }
 
 apply plugin: "io.sdkman.vendors"
@@ -189,6 +190,11 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-netflix-archaius',
                     modules:['micronaut-netflix-hystrix', 'micronaut-netflix-ribbon']
+            ],
+            'micronaut.openapi': [
+                    version:micronautOpenApi,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-openapi'
             ],
             kafka                      : [
                     version: kafkaVersion,
@@ -422,6 +428,16 @@ ext {
                     version: methvinDirectoryWatcherVersion,
                     group  : 'io.methvin',
                     name   : 'directory-watcher'
+            ],
+            security                   : [
+                    version : securityVersion,
+                    group   : 'io.micronaut',
+                    modules : ['micronaut-security', 'micronaut-security-jwt', 'micronaut-security-session']
+            ],
+            'security-configurations'  : [
+                    version : securityVersion,
+                    group   : 'io.micronaut.configuration',
+                    modules : ['micronaut-security-ldap']
             ]
     ]
 
@@ -767,3 +783,16 @@ htmlSanityCheck {
 
 }
 docs.finalizedBy(htmlSanityCheck)
+
+dependencyUpdates.resolutionStrategy {
+    componentSelection { rules ->
+        rules.all { ComponentSelection selection ->
+            boolean rejected = ['alpha', 'beta', 'rc', 'cr', 'm', 'preview', 'b', 'ea'].any { qualifier ->
+                selection.candidate.version ==~ /(?i).*[.-]$qualifier[.\d-+]*/
+            }
+            if (rejected) {
+                selection.reject('Release candidate')
+            }
+        }
+    }
+}
