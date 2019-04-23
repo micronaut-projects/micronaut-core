@@ -65,12 +65,6 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
         this(declaringBean, declaringType, methodName, arguments, AnnotationMetadata.EMPTY_METADATA);
     }
 
-    @Override
-    public String toString() {
-        String text = Argument.toString(getArguments());
-        return declaringType.getSimpleName() + "." + methodName + "(" + text + ")";
-    }
-
     /**
      * Constructs a new {@link DefaultMethodInjectionPoint}.
      *
@@ -93,6 +87,12 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
         this.argTypes = Argument.toClassArray(arguments);
         this.declaringBean = declaringBean;
         this.annotationMetadata = initAnnotationMetadata(annotationMetadata);
+    }
+
+    @Override
+    public String toString() {
+        String text = Argument.toString(getArguments());
+        return declaringType.getSimpleName() + "." + methodName + "(" + text + ")";
     }
 
     @Override
