@@ -1411,13 +1411,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 String fieldName = field.getSimpleName().toString();
                 if (fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
-                    if(modelUtils.isPrivate(field)) {
+                    if (modelUtils.isPrivate(field)) {
                         // Using the field would throw a IllegalAccessError, use the method instead
                         Optional<ExecutableElement> getterMethod = modelUtils.findGetterMethodFor(field);
-                        if(getterMethod.isPresent()) {
+                        if (getterMethod.isPresent()) {
                             writer.visitConfigBuilderMethod(fieldType, getterMethod.get().getSimpleName().toString(), fieldAnnotationMetadata, metadataBuilder);
                         } else {
-                            error(field,"ConfigurationBuilder applied to a private field must have a corresponding non-private getter method.");
+                            error(field, "ConfigurationBuilder applied to a private field must have a corresponding non-private getter method.");
                         }
                     } else {
                         writer.visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, metadataBuilder);
