@@ -29,17 +29,22 @@ import io.micronaut.retry.RetryState;
 import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.Retryable;
 import io.micronaut.retry.event.RetryEvent;
+import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.scheduling.executor.ExecutorType;
+import io.micronaut.scheduling.executor.UserExecutorConfiguration;
 import io.reactivex.Flowable;
 import io.reactivex.functions.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.function.BiConsumer;
 
 /**
  * A {@link MethodInterceptor} that retries an operation according to the specified
@@ -55,15 +60,32 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     private static final int DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS = 20;
 
     private final ApplicationEventPublisher eventPublisher;
+    private final ScheduledExecutorService executorService;
     private final Map<ExecutableMethod, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
 
     /**
      * Construct a default retry method interceptor with the event publisher.
      *
      * @param eventPublisher The event publisher to publish retry events
+     * @deprecated Use {@link #DefaultRetryInterceptor(ApplicationEventPublisher, ExecutorService)} instead
      */
+    @Deprecated
     public DefaultRetryInterceptor(ApplicationEventPublisher eventPublisher) {
         this.eventPublisher = eventPublisher;
+        UserExecutorConfiguration configuration = UserExecutorConfiguration.of(ExecutorType.SCHEDULED);
+        this.executorService = Executors.newScheduledThreadPool(configuration.getCorePoolSize());
+    }
+
+    /**
+     * Construct a default retry method interceptor with the event publisher.
+     *
+     * @param eventPublisher The event publisher to publish retry events
+     * @param executorService The executor service to use for completable futures
+     */
+    @Inject
+    public DefaultRetryInterceptor(ApplicationEventPublisher eventPublisher, @Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
+        this.eventPublisher = eventPublisher;
+        this.executorService = (ScheduledExecutorService) executorService;
     }
 
     @Override
@@ -104,7 +126,16 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
 
         ReturnType<Object> returnType = context.getReturnType();
         Class<Object> javaReturnType = returnType.getType();
-        if (Publishers.isConvertibleToPublisher(javaReturnType)) {
+        if (CompletableFuture.class.isAssignableFrom(javaReturnType)) {
+            Object result = context.proceed();
+            if (result == null) {
+                return result;
+            } else {
+                CompletableFuture newFuture = new CompletableFuture();
+                ((CompletableFuture<?>) result).whenComplete(retryCompletable(newFuture, context, retryState));
+                return newFuture;
+            }
+        } else if (Publishers.isConvertibleToPublisher(javaReturnType)) {
             ConversionService<?> conversionService = ConversionService.SHARED;
             Object result = context.proceed();
             if (result == null) {
@@ -189,5 +220,43 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 return Flowable.error(exception);
             }
         };
+    }
+
+    private  BiConsumer<Object, ? super Throwable> retryCompletable(CompletableFuture<Object> newFuture, MethodInvocationContext<Object, Object> context, MutableRetryState retryState) {
+        return (Object value, Throwable exception) -> {
+            if (exception == null) {
+                retryState.close(null);
+                newFuture.complete(value);
+                return;
+            }
+            if (retryState.canRetry(exception)) {
+                long delay = retryState.nextDelay();
+                if (eventPublisher != null) {
+                    try {
+                        eventPublisher.publishEvent(new RetryEvent(context, retryState, exception));
+                    } catch (Exception e) {
+                        LOG.error("Error occurred publishing RetryEvent: " + e.getMessage(), e);
+                    }
+                }
+                executorService.schedule(() -> {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Retrying execution for method [{}] after delay of {}ms for exception: {}",
+                                context,
+                                delay,
+                                (exception).getMessage());
+                    }
+                    Object retryResult = context.proceed(this);
+                    ((CompletableFuture<?>) retryResult).whenComplete(retryCompletable(newFuture, context, retryState));
+
+                }, delay, TimeUnit.MILLISECONDS);
+            } else {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Cannot retry anymore. Rethrowing original exception for method: {}", context);
+                }
+                retryState.close(exception);
+                newFuture.completeExceptionally(exception);
+            }
+        };
+
     }
 }

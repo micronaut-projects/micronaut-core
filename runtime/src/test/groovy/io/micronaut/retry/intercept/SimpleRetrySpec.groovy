@@ -24,6 +24,8 @@ import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import javax.inject.Singleton
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 
 /**
  * @author graemerocher
@@ -81,6 +83,35 @@ class SimpleRetrySpec extends Specification {
         then:"The original exception is thrown"
         def e = thrown(IllegalStateException)
         e.message == "Bad count"
+
+        cleanup:
+        context.stop()
+    }
+
+    void "test simply retry with completablefuture"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+        MyRetryListener listener = context.getBean(MyRetryListener)
+
+        when:"A method is annotated retry"
+        int result = counterService.getCountCompletable().get()
+
+
+        then:"It executes until successful"
+        listener.events.size() == 2
+        result == 3
+
+        when:"The threshold can never be met"
+        listener.reset()
+        counterService.countThreshold = 10
+        counterService.count = 0
+        def single = counterService.getCountCompletable()
+        single.get()
+
+        then:"The original exception is thrown"
+        def e = thrown(ExecutionException)
+        e.cause.message == "Bad count"
 
         cleanup:
         context.stop()
@@ -180,6 +211,7 @@ class SimpleRetrySpec extends Specification {
         int countReact = 0
         int countIncludes = 0
         int countExcludes = 0
+        int countCompletion = 0
         int countThreshold = 3
 
         @Retryable(attempts = '5', delay = '5ms')
@@ -237,6 +269,17 @@ class SimpleRetrySpec extends Specification {
                 }
             }
             return countExcludes
+        }
+
+        @Retryable(attempts = '5', delay = '5ms')
+        CompletableFuture<Integer> getCountCompletable() {
+            CompletableFuture.supplyAsync({ ->
+                countCompletion++
+                if(countCompletion < countThreshold) {
+                    throw new IllegalStateException("Bad count")
+                }
+                return countCompletion
+            })
         }
     }
 }

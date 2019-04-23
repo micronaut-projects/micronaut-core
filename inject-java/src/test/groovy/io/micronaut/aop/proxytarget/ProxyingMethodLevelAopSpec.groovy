@@ -36,6 +36,7 @@ class ProxyingMethodLevelAopSpec extends Specification {
 
         expect:
         args.isEmpty() ? foo."$method"() : foo."$method"(*args) == result
+        foo.lifeCycleCount == 1
 
         where:
         method                        | args                   | result
