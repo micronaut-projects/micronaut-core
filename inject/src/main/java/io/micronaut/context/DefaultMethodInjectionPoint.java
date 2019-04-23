@@ -65,6 +65,12 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
         this(declaringBean, declaringType, methodName, arguments, AnnotationMetadata.EMPTY_METADATA);
     }
 
+    @Override
+    public String toString() {
+        String text = Argument.toString(getArguments());
+        return declaringType.getSimpleName() + "." + methodName + "(" + text + ")";
+    }
+
     /**
      * Constructs a new {@link DefaultMethodInjectionPoint}.
      *
