@@ -103,5 +103,13 @@ interface Feature {
      */
     Integer getMaxJavaVersion()
 
+    /**
+     * @return Whether the feature is supported for a specific java version
+     */
     boolean isSupported(Integer javaVersion)
+
+    /**
+     * @return List of files to delete that may exists from applying previous features and are not needed
+     */
+    List<String> getFilesToDelete()
 }

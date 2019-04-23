@@ -345,6 +345,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                     ant.chmod(dir: targetDirectory, includes: profileInstance.executablePatterns.join(' '), perm: 'u+x')
                 }
 
+                deleteFilesFromTarget(ant, targetDirectory, f.filesToDelete)
                 deleteDirectory(tmpDir)
                 deleteDirectory(skeletonDir)
             }
@@ -847,6 +848,17 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                     variables.each { k, v ->
                         replacestring(from: "@${k}@".toString(), to: v)
                     }
+                }
+            }
+        }
+    }
+
+    @CompileDynamic
+    private void deleteFilesFromTarget(ConsoleAntBuilder ant, File targetDirectory, List<String> filesToDelete) {
+        if (filesToDelete) {
+            ant.delete {
+                filesToDelete.each { fileToDelete ->
+                    fileset(dir: targetDirectory, includes: fileToDelete)
                 }
             }
         }

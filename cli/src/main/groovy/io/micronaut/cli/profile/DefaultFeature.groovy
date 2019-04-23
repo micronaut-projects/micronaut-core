@@ -47,6 +47,7 @@ class DefaultFeature implements Feature {
     final List<String> dependentFeatures = []
     final List<String> defaultFeatures = []
     final List<String> evictedFeatures = []
+    final List<String> filesToDelete = []
     private Boolean requested = false
     final Integer minJava
     final Integer maxJava
@@ -102,6 +103,7 @@ class DefaultFeature implements Feature {
         }
         this.buildPlugins = (List<String>) configuration.get("build.plugins", [])
         this.jvmArgs = (List<String>) configuration.get("jvmArgs", [])
+        this.filesToDelete = (List<String>) configuration.get("filesToDelete", [])
 
         this.minJava = (Integer) configuration.get("java.min") ?: null
         this.maxJava = (Integer) configuration.get("java.max") ?: null
