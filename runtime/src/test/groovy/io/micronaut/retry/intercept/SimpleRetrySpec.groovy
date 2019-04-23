@@ -24,6 +24,8 @@ import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import javax.inject.Singleton
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 
 /**
  * @author graemerocher
@@ -86,6 +88,35 @@ class SimpleRetrySpec extends Specification {
         context.stop()
     }
 
+    void "test simply retry with completablefuture"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+        MyRetryListener listener = context.getBean(MyRetryListener)
+
+        when:"A method is annotated retry"
+        int result = counterService.getCountCompletable().get()
+
+
+        then:"It executes until successful"
+        listener.events.size() == 2
+        result == 3
+
+        when:"The threshold can never be met"
+        listener.reset()
+        counterService.countThreshold = 10
+        counterService.count = 0
+        def single = counterService.getCountCompletable()
+        single.get()
+
+        then:"The original exception is thrown"
+        def e = thrown(ExecutionException)
+        e.cause.message == "Bad count"
+
+        cleanup:
+        context.stop()
+    }
+
     void "test simply retry with reactor"() {
         given:
         ApplicationContext context = ApplicationContext.run()
@@ -114,6 +145,52 @@ class SimpleRetrySpec extends Specification {
         context.stop()
     }
 
+    void "test retry with includes"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountIncludes(true)
+
+        then: "retry didn't kick in because the exception thrown doesn't match includes"
+        thrown(IllegalStateException)
+        counterService.countIncludes == 1
+
+        when:
+        counterService.getCountIncludes(false)
+
+        then: "retry kicks in because the exception thrown matches includes"
+        noExceptionThrown()
+        counterService.countIncludes == counterService.countThreshold
+
+        cleanup:
+        context.stop()
+    }
+
+    void "test retry with excludes"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountExcludes(false)
+
+        then: "retry didn't kick in because the exception thrown matches excludes"
+        thrown(MyCustomException)
+        counterService.countExcludes == 1
+
+        when:
+        counterService.getCountExcludes(true)
+
+        then: "retry kicks in because the exception thrown doesn't match excludes"
+        noExceptionThrown()
+        counterService.countExcludes == counterService.countThreshold
+
+        cleanup:
+        context.stop()
+    }
+
     @Singleton
     static class MyRetryListener implements RetryEventListener {
 
@@ -132,6 +209,9 @@ class SimpleRetrySpec extends Specification {
         int count = 0
         int countRx = 0
         int countReact = 0
+        int countIncludes = 0
+        int countExcludes = 0
+        int countCompletion = 0
         int countThreshold = 3
 
         @Retryable(attempts = '5', delay = '5ms')
@@ -162,6 +242,43 @@ class SimpleRetrySpec extends Specification {
                     throw new IllegalStateException("Bad count")
                 }
                 return countReact
+            })
+        }
+
+        @Retryable(attempts = '5', delay = '5ms', includes = MyCustomException.class)
+        Integer getCountIncludes(boolean illegalState) {
+            countIncludes++
+            if(countIncludes < countThreshold) {
+                if (illegalState) {
+                    throw new IllegalStateException("Bad count")
+                } else {
+                    throw new MyCustomException()
+                }
+            }
+            return countIncludes
+        }
+
+        @Retryable(attempts = '5', delay = '5ms', excludes = MyCustomException.class)
+        Integer getCountExcludes(boolean illegalState) {
+            countExcludes++
+            if(countExcludes < countThreshold) {
+                if (illegalState) {
+                    throw new IllegalStateException("Bad count")
+                } else {
+                    throw new MyCustomException()
+                }
+            }
+            return countExcludes
+        }
+
+        @Retryable(attempts = '5', delay = '5ms')
+        CompletableFuture<Integer> getCountCompletable() {
+            CompletableFuture.supplyAsync({ ->
+                countCompletion++
+                if(countCompletion < countThreshold) {
+                    throw new IllegalStateException("Bad count")
+                }
+                return countCompletion
             })
         }
     }

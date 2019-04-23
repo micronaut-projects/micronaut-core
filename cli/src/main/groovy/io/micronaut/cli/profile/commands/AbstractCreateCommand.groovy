@@ -728,6 +728,11 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         variables['version'] = micronautVersion
         variables['app.name'] = appname
         variables['app.group'] = groupname
+        variables['jansi'] = isWindows() ? "false" : "true"
+    }
+
+    private boolean isWindows() {
+        System.getProperty("os.name")?.toLowerCase(Locale.ENGLISH)?.contains("windows")
     }
 
     private String establishGroupAndAppName(String groupAndAppName) {
