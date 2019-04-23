@@ -39,6 +39,11 @@ import java.util.concurrent.FutureTask
  * @author RVanderwerf
  */
 class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
+
+    static {
+        System.setProperty("aws.region", "us-west-1")
+    }
+
     @Shared
     int serverPort = SocketUtils.findAvailableTcpPort()
 

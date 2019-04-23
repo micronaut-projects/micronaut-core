@@ -10,5 +10,5 @@ The example shown in the <<views, Views>> section, could be rendered with the fo
 [source,html]
 .src/main/resources/views/home.hbs
 ----
-include::{testsviews}/../../../../resources/views/home.hbs[]
+include::{testsviews}/resources/views/home.hbs[]
 ----

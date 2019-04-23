@@ -77,21 +77,16 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      * @param awsParameterStoreConfiguration      configuration for the parameter store
      * @param applicationConfiguration            the application configuration
      * @param route53ClientDiscoveryConfiguration configuration for route53 service discovery, if you are using this (not required)
+     * @throws SdkClientException If the aws sdk client could not be created
      */
     AWSParameterStoreConfigClient(
             AWSClientConfiguration awsConfiguration,
             AWSParameterStoreConfiguration awsParameterStoreConfiguration,
             ApplicationConfiguration applicationConfiguration,
-            @Nullable Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) {
+            @Nullable Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) throws SdkClientException {
         this.awsConfiguration = awsConfiguration;
         this.awsParameterStoreConfiguration = awsParameterStoreConfiguration;
-
-        try {
-            this.client = AWSSimpleSystemsManagementAsyncClient.asyncBuilder().withClientConfiguration(awsConfiguration.getClientConfiguration()).build();
-        } catch (SdkClientException sce) {
-            LOG.warn("Error creating Simple Systems Management client - check your credentials: " + sce.getMessage(), sce);
-        }
-
+        this.client = AWSSimpleSystemsManagementAsyncClient.asyncBuilder().withClientConfiguration(awsConfiguration.getClientConfiguration()).build();
         this.serviceId = (route53ClientDiscoveryConfiguration != null ? route53ClientDiscoveryConfiguration.getServiceId() : applicationConfiguration.getName()).orElse(null);
     }
 
@@ -140,6 +135,13 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                 configurationValues = Flowable.concat(
                         configurationValues,
                         Flowable.fromPublisher(getParametersRecursive(environmentSpecificPath)));
+
+                if (applicationSpecificPath != null) {
+                    String appEnvironmentSpecificPath = applicationSpecificPath + "_" + activeName;
+                    configurationValues = Flowable.concat(
+                            configurationValues,
+                            Flowable.fromPublisher(getParametersRecursive(appEnvironmentSpecificPath)));
+                }
             }
 
         }
