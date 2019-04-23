@@ -239,7 +239,8 @@ public interface BeanDefinitionVisitor {
                                String methodName,
                                Map<String, Object> argumentTypes,
                                Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                               Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata);
+                               Map<String, Map<String, Object>> genericTypes,
+                               AnnotationMetadata annotationMetadata);
 
     /**
      * Visits a method injection point.

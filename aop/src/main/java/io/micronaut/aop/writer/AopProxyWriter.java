@@ -204,6 +204,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             isInterface,
             parent.getAnnotationMetadata());
         startClass(classWriter, getInternalName(proxyFullName), getTypeReference(targetClassFullName));
+        processAlreadyVisitedMethods(parent);
     }
 
     /**
@@ -270,6 +271,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 isInterface,
                 annotationMetadata);
         startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
+    }
+
+    /**
+     * Is the target bean being proxied.
+     * @return True if the target bean is being proxied
+     */
+    public boolean isProxyTarget() {
+        return isProxyTarget;
     }
 
     @Override
@@ -1336,6 +1345,35 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             proxyConstructorGenerator.invokeStatic(TYPE_INTERCEPTOR_CHAIN, Method.getMethod(RESOLVE_AROUND_INTERCEPTORS_METHOD));
         }
         proxyConstructorGenerator.visitInsn(AASTORE);
+    }
+
+    private void processAlreadyVisitedMethods(BeanDefinitionWriter parent) {
+        final List<BeanDefinitionWriter.MethodVisitData> postConstructMethodVisits = parent.getPostConstructMethodVisits();
+        for (BeanDefinitionWriter.MethodVisitData methodVisit : postConstructMethodVisits) {
+            visitPostConstructMethod(
+                    methodVisit.getDeclaringType(),
+                    methodVisit.isRequiresReflection(),
+                    methodVisit.getReturnType(),
+                    methodVisit.getMethodName(),
+                    methodVisit.getArgumentTypes(),
+                    methodVisit.getArgumentAnnotationMetadata(),
+                    methodVisit.getGenericTypes(),
+                    methodVisit.getAnnotationMetadata()
+            );
+        }
+        final List<BeanDefinitionWriter.MethodVisitData> preDestroyMethodVisits = parent.getPreDestroyMethodVisits();
+        for (BeanDefinitionWriter.MethodVisitData methodVisit : preDestroyMethodVisits) {
+            visitPreDestroyMethod(
+                    methodVisit.getDeclaringType(),
+                    methodVisit.isRequiresReflection(),
+                    methodVisit.getReturnType(),
+                    methodVisit.getMethodName(),
+                    methodVisit.getArgumentTypes(),
+                    methodVisit.getArgumentAnnotationMetadata(),
+                    methodVisit.getGenericTypes(),
+                    methodVisit.getAnnotationMetadata()
+            );
+        }
     }
 
     /**
