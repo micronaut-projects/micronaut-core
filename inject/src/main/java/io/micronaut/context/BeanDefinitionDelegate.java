@@ -17,7 +17,6 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
