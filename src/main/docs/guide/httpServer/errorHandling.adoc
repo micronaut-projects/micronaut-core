@@ -1,4 +1,4 @@
-Sometimes with distributing applications, bad things happen. Thus having a good way to handle errors is important.
+Sometimes with distributed applications, bad things happen. Having a good way to handle errors is important.
 
 == Status Handlers
 
