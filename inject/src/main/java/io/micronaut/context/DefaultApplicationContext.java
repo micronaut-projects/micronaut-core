@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
@@ -313,7 +314,43 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         }
                     }
                 } else {
-                    transformedCandidates.add(candidate);
+                    if (candidate.hasStereotype(ConfigurationReader.class)) {
+
+                        candidate.getValue(ConfigurationReader.class, "prefix", String.class)
+                                .ifPresent(prefix -> {
+                                    int starIndex = prefix.indexOf("*");
+                                    if (starIndex > -1) {
+                                        String eachProperty = prefix.substring(0, starIndex);
+                                        if (eachProperty.endsWith(".")) {
+                                            eachProperty = eachProperty.substring(0, eachProperty.length() - 1);
+                                        }
+
+                                        if (StringUtils.isNotEmpty(eachProperty)) {
+                                            Map entries = getProperty(eachProperty, Map.class, Collections.emptyMap());
+                                            if (!entries.isEmpty()) {
+                                                for (Object key : entries.keySet()) {
+
+                                                    BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                                    delegate.put(EachProperty.class.getName(), delegate.getBeanType());
+                                                    delegate.put(Named.class.getName(), key.toString());
+
+                                                    if (delegate.isEnabled(this) &&
+                                                            containsProperties(prefix.replace("*", key.toString()))) {
+                                                        transformedCandidates.add(delegate);
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
+                                        }
+
+                                    } else {
+                                        transformedCandidates.add(candidate);
+                                    }
+                                });
+                    } else {
+                        transformedCandidates.add(candidate);
+                    }
                 }
             }
             if (LOG.isDebugEnabled()) {
