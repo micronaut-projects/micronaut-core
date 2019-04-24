@@ -50,7 +50,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
                 'micronaut.http.services.bar.health-check':true,
                 'micronaut.http.services.bar.health-check-interval':'100ms',
                 'micronaut.http.services.bar.read-timeout':'10s',
-                'micronaut.http.services.bar.pool.enabled':false
+                'micronaut.http.services.bar.pool.enabled':true
         )
         TestClientFoo tcFoo = clientApp.getBean(TestClientFoo)
         TestClientBar tcBar = clientApp.getBean(TestClientBar)
@@ -76,7 +76,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
         then:
         config.readTimeout.get() == Duration.ofSeconds(10)
-        !config.getConnectionPoolConfiguration().isEnabled()
+        config.getConnectionPoolConfiguration().isEnabled()
 
         when:
         client = clientApp.getBean(RxHttpClient, Qualifiers.byName("bar"))

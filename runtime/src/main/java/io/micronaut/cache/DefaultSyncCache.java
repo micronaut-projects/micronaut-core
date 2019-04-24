@@ -46,7 +46,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachBean(DefaultCacheConfiguration.class)
+@EachBean(CacheConfiguration.class)
 public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.cache.Cache> {
 
     private final CacheConfiguration cacheConfiguration;
@@ -61,7 +61,7 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
      * @param applicationContext The application context
      * @param conversionService To convert the value from the cache into given required type
      */
-    @Inject public DefaultSyncCache(
+    public DefaultSyncCache(
             DefaultCacheConfiguration cacheConfiguration,
             ApplicationContext applicationContext,
             ConversionService<?> conversionService) {
@@ -75,6 +75,7 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
      * @param applicationContext The application context
      * @param conversionService To convert the value from the cache into given required type
      */
+    @Inject
     public DefaultSyncCache(
             CacheConfiguration cacheConfiguration,
             ApplicationContext applicationContext,
