@@ -62,6 +62,21 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
      * @param conversionService To convert the value from the cache into given required type
      */
     public DefaultSyncCache(
+            DefaultCacheConfiguration cacheConfiguration,
+            ApplicationContext applicationContext,
+            ConversionService<?> conversionService) {
+        this((CacheConfiguration) cacheConfiguration, applicationContext, conversionService);
+    }
+
+    /**
+     * Construct a sync cache implementation with given configurations.
+     *
+     * @param cacheConfiguration The cache configurations
+     * @param applicationContext The application context
+     * @param conversionService To convert the value from the cache into given required type
+     */
+    @Inject
+    public DefaultSyncCache(
             CacheConfiguration cacheConfiguration,
             ApplicationContext applicationContext,
             ConversionService<?> conversionService) {
