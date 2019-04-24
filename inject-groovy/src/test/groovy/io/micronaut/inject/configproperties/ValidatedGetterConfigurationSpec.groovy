@@ -17,13 +17,19 @@ package io.micronaut.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
 import javax.validation.Validation
+import javax.validation.constraints.NotBlank
+import javax.validation.constraints.NotNull
 
-class ValidatedConfigurationSpec extends Specification {
+/**
+ * Created by graemerocher on 15/06/2017.
+ */
+class ValidatedGetterConfigurationSpec extends Specification {
 
     void "test validated config with invalid config"() {
         given:
@@ -34,7 +40,7 @@ class ValidatedConfigurationSpec extends Specification {
         applicationContext.start()
 
         when:
-        ValidatedConfig config = applicationContext.getBean(ValidatedConfig)
+        ValidatedGetterConfig config = applicationContext.getBean(ValidatedGetterConfig)
 
         then:
         def e = thrown(BeanInstantiationException)
@@ -49,8 +55,9 @@ class ValidatedConfigurationSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(PropertySource.of(
-                'foo.bar.url':'http://localhost',
-                'foo.bar.name':'test'
+                'test',
+                ['foo.bar.url':'http://localhost',
+                'foo.bar.name':'test']
         ))
 
         applicationContext.registerSingleton(
@@ -60,7 +67,7 @@ class ValidatedConfigurationSpec extends Specification {
         applicationContext.start()
 
         when:
-        ValidatedConfig config = applicationContext.getBean(ValidatedConfig)
+        ValidatedGetterConfig config = applicationContext.getBean(ValidatedGetterConfig)
 
         then:
         config != null
@@ -69,5 +76,30 @@ class ValidatedConfigurationSpec extends Specification {
 
         cleanup:
         applicationContext.close()
+    }
+
+    @ConfigurationProperties('foo.bar')
+    static class ValidatedGetterConfig {
+
+        private URL url
+        private String name
+
+        @NotNull
+        URL getUrl() {
+            return url
+        }
+
+        void setUrl(URL url) {
+            this.url = url
+        }
+
+        @NotBlank
+        String getName() {
+            return name
+        }
+
+        void setName(String name) {
+            this.name = name
+        }
     }
 }

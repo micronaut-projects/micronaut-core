@@ -23,7 +23,7 @@ import spock.lang.Specification
 
 import javax.validation.Validation
 
-class ValidatedConfigurationSpec extends Specification {
+class ValidatedGetterConfigurationSpec extends Specification {
 
     void "test validated config with invalid config"() {
         given:
@@ -34,7 +34,7 @@ class ValidatedConfigurationSpec extends Specification {
         applicationContext.start()
 
         when:
-        ValidatedConfig config = applicationContext.getBean(ValidatedConfig)
+        ValidatedGetterConfig config = applicationContext.getBean(ValidatedGetterConfig)
 
         then:
         def e = thrown(BeanInstantiationException)
@@ -60,7 +60,7 @@ class ValidatedConfigurationSpec extends Specification {
         applicationContext.start()
 
         when:
-        ValidatedConfig config = applicationContext.getBean(ValidatedConfig)
+        ValidatedGetterConfig config = applicationContext.getBean(ValidatedGetterConfig)
 
         then:
         config != null
