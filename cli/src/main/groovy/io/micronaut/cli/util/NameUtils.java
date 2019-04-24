@@ -15,9 +15,7 @@
  */
 package io.micronaut.cli.util;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -421,14 +419,16 @@ public final class NameUtils {
     public static String getNaturalName(String name) {
         name = getShortName(name);
 
-        if(isBlank(name))
+        if(isBlank(name)) {
             return name;
+        }
 
-        if(name.length() == 1)
+        if(name.length() == 1) {
             return name.toUpperCase();
-        else {
+        } else {
             StringBuilder sb = new StringBuilder();
-            sb.append(name.charAt(name.length() - 1));//Traversing the string in reverse order
+            sb.append(name.charAt(name.length() - 1));
+            //Traversing the string in reverse order
             for(int i = name.length() - 2; i > 0; i--) {
                 char currChar = name.charAt(i);
                 char prevChar = name.charAt(i - 1);
@@ -438,15 +438,16 @@ public final class NameUtils {
                 boolean isPrevCharLowerCase = Character.isLowerCase(prevChar);
                 boolean isNextCharLowerCase = Character.isLowerCase(nextChar);
 
-                if(isCurrentCharLowerCase != isPrevCharLowerCase && !isCurrentCharLowerCase) {
+                if (isCurrentCharLowerCase != isPrevCharLowerCase && !isCurrentCharLowerCase) {
                     sb.append(currChar + " ");
-                } else if(isCurrentCharLowerCase == isPrevCharLowerCase && !isCurrentCharLowerCase && isNextCharLowerCase) {
+                } else if (isCurrentCharLowerCase == isPrevCharLowerCase && !isCurrentCharLowerCase && isNextCharLowerCase) {
                     sb.append(currChar + " ");
                 } else {
                     sb.append(currChar);
                 }
             }
-            sb.append(Character.toUpperCase(name.charAt(0)));//The first character of the string is always in Upper case
+            //The first character of the string is always in Upper case
+            sb.append(Character.toUpperCase(name.charAt(0)));
             return sb.reverse().toString();
         }
     }
