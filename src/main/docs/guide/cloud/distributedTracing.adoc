@@ -34,7 +34,7 @@ class HelloService {
 
     @ContinueSpan // <3>
     public String greet(@SpanTag("hello.greeting") String greet) {
-        return greeting;
+        return greet;
     }
 }
 ----
