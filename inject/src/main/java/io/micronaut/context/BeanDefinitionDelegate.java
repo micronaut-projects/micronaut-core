@@ -165,7 +165,14 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
-        resolutionContext.putAll(attributes);
+        LinkedHashMap<String, Object> oldAttributes = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry: attributes.entrySet()) {
+            String key = entry.getKey();
+            if (resolutionContext.containsKey(key)) {
+                oldAttributes.put(key, resolutionContext.get(key));
+            }
+            resolutionContext.put(key, entry.getValue());
+        }
         try {
             if (this.definition instanceof ParametrizedBeanFactory) {
                 ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
@@ -199,6 +206,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
             for (String key : attributes.keySet()) {
                 resolutionContext.remove(key);
             }
+            resolutionContext.putAll(oldAttributes);
         }
     }
 
