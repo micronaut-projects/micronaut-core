@@ -101,6 +101,7 @@ public class ServiceHttpClientFactory {
             httpClient = beanContext.createBean(DefaultHttpClient.class, loadBalancer, configuration);
         }
 
+        httpClient.setClientIdentifiers(configuration.getServiceId());
 
         if (isHealthCheck) {
             taskScheduler.scheduleWithFixedDelay(configuration.getHealthCheckInterval(), configuration.getHealthCheckInterval(), () -> Flowable.fromIterable(originalURLs).flatMap(originalURI -> {
