@@ -71,6 +71,8 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     @Mixin
     private CommonOptionsMixin autoHelp // adds help, and version options to the command
 
+    private Map<URL, File> unzippedDirectories = new LinkedHashMap<URL, File>()
+
     String appname
     String groupname
     String defaultpackagename
@@ -356,9 +358,11 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                 cmd.console.addStatus(profileInstance.instructions)
             }
             MicronautCli.tiggerAppLoad()
+            cleanupState()
             return true
         } else {
             MicronautConsole.getInstance().error "Cannot find profile $profileName"
+            cleanupState()
             return false
         }
     }
@@ -386,8 +390,6 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         }
         return true
     }
-
-    private Map<URL, File> unzippedDirectories = new LinkedHashMap<URL, File>()
 
     @CompileDynamic
     protected File unzipProfile(AntBuilder ant, Resource location) {
@@ -858,6 +860,18 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         } catch (Throwable t) {
             // Ignore error deleting temporal directory
         }
+    }
+
+    private void cleanupState() {
+        variables = [:]
+        inplace = false
+        profile = null
+        features = []
+        appname = null
+        groupname = null
+        defaultpackagename = null
+        targetDirectory = null
+        unzippedDirectories.clear()
     }
 
     static class CreateServiceCommandObject {
