@@ -46,27 +46,13 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachBean(DefaultCacheConfiguration.class)
+@EachBean(CacheConfiguration.class)
 public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.cache.Cache> {
 
     private final CacheConfiguration cacheConfiguration;
     private final com.github.benmanes.caffeine.cache.Cache cache;
     private final ApplicationContext applicationContext;
     private final ConversionService<?> conversionService;
-
-    /**
-     * Construct a sync cache implementation with given configurations.
-     *
-     * @param cacheConfiguration The cache configurations
-     * @param applicationContext The application context
-     * @param conversionService To convert the value from the cache into given required type
-     */
-    @Inject public DefaultSyncCache(
-            DefaultCacheConfiguration cacheConfiguration,
-            ApplicationContext applicationContext,
-            ConversionService<?> conversionService) {
-        this((CacheConfiguration) cacheConfiguration, applicationContext, conversionService);
-    }
 
     /**
      * Construct a sync cache implementation with given configurations.
