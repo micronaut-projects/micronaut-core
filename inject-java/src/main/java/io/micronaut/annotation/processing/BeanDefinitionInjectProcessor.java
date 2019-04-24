@@ -79,7 +79,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
- * <p>The core annotation processed used to generate bean definitions and power AOP for Micronaut.</p>
+ * <p>The core annotation processor used to generate bean definitions and power AOP for Micronaut.</p>
  *
  * <p>Each dependency injection candidate is visited and {@link BeanDefinitionWriter} is used to produce byte code via ASM.
  * Each bean results in a instanceof {@link io.micronaut.inject.BeanDefinition}</p>
@@ -629,7 +629,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                     writer.visitConfigBuilderMethod(
                             fieldType,
-                            NameUtils.getterNameFor(parameter.getSimpleName().toString()),
+                            NameUtils.getterNameFor(NameUtils.getPropertyNameForSetter(method.getSimpleName().toString())),
                             methodAnnotationMetadata,
                             metadataBuilder);
                     try {
@@ -1459,7 +1459,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 String fieldName = field.getSimpleName().toString();
                 if (fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
-                    writer.visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, metadataBuilder);
+                    if (modelUtils.isPrivate(field)) {
+                        // Using the field would throw a IllegalAccessError, use the method instead
+                        Optional<ExecutableElement> getterMethod = modelUtils.findGetterMethodFor(field);
+                        if (getterMethod.isPresent()) {
+                            writer.visitConfigBuilderMethod(fieldType, getterMethod.get().getSimpleName().toString(), fieldAnnotationMetadata, metadataBuilder);
+                        } else {
+                            error(field, "ConfigurationBuilder applied to a private field must have a corresponding non-private getter method.");
+                        }
+                    } else {
+                        writer.visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, metadataBuilder);
+                    }
                     try {
                         visitConfigurationBuilder(field, fieldTypeMirror, writer);
                     } finally {
