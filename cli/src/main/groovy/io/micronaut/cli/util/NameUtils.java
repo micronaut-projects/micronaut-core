@@ -419,17 +419,17 @@ public final class NameUtils {
     public static String getNaturalName(String name) {
         name = getShortName(name);
 
-        if(isBlank(name)) {
+        if (isBlank(name)) {
             return name;
         }
 
-        if(name.length() == 1) {
+        if (name.length() == 1) {
             return name.toUpperCase();
         } else {
             StringBuilder sb = new StringBuilder();
             sb.append(name.charAt(name.length() - 1));
             //Traversing the string in reverse order
-            for(int i = name.length() - 2; i > 0; i--) {
+            for (int i = name.length() - 2; i > 0; i--) {
                 char currChar = name.charAt(i);
                 char prevChar = name.charAt(i - 1);
                 char nextChar = name.charAt(i + 1);
