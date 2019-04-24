@@ -18,7 +18,6 @@ package io.micronaut.discovery.client;
 import static io.micronaut.discovery.client.DiscoveryClientCacheConfiguration.CACHE_NAME;
 
 import io.micronaut.cache.CacheConfiguration;
-import io.micronaut.cache.DefaultCacheConfiguration;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
