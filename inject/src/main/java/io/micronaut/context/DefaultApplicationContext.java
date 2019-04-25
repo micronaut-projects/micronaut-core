@@ -293,24 +293,27 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                             }
 
                             optional.ifPresent(qualifier -> {
-                                    String qualifierKey = javax.inject.Qualifier.class.getName();
-                                    Argument<?>[] arguments = candidate.getConstructor().getArguments();
-                                    for (Argument<?> argument : arguments) {
-                                        if (argument.getType().equals(dependentType)) {
-                                            Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
-                                            delegate.put(qualifierKey, qualifedArg);
-                                            break;
-                                        }
-                                    }
-
-                                    if (qualifier instanceof Named) {
-                                        delegate.put(Named.class.getName(), ((Named) qualifier).getName());
-                                    }
-                                    if (delegate.isEnabled(this)) {
-                                        transformedCandidates.add((BeanDefinition<T>) delegate);
+                                BeanRegistration beanRegistration = getActiveBeanRegistration(dependentCandidate, qualifier);
+                                if (beanRegistration != null && beanRegistration.bean == null) {
+                                    return;
+                                }
+                                String qualifierKey = javax.inject.Qualifier.class.getName();
+                                Argument<?>[] arguments = candidate.getConstructor().getArguments();
+                                for (Argument<?> argument : arguments) {
+                                    if (argument.getType().equals(dependentType)) {
+                                        Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
+                                        delegate.put(qualifierKey, qualifedArg);
+                                        break;
                                     }
                                 }
-                            );
+
+                                if (qualifier instanceof Named) {
+                                    delegate.put(Named.class.getName(), ((Named) qualifier).getName());
+                                }
+                                if (delegate.isEnabled(this)) {
+                                    transformedCandidates.add((BeanDefinition<T>) delegate);
+                                }
+                            });
                         }
                     }
                 } else {
