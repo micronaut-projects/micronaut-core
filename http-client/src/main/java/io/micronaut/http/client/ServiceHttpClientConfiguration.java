@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.runtime.ApplicationConfiguration;
 
+import javax.annotation.Nullable;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Collections;
@@ -78,11 +79,15 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
      */
     public ServiceHttpClientConfiguration(
             @Parameter String serviceId,
-            ServiceConnectionPoolConfiguration connectionPoolConfiguration,
+            @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
             ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.serviceId = serviceId;
-        this.connectionPoolConfiguration = connectionPoolConfiguration;
+        if (connectionPoolConfiguration != null) {
+            this.connectionPoolConfiguration = connectionPoolConfiguration;
+        } else {
+            this.connectionPoolConfiguration = new ServiceConnectionPoolConfiguration();
+        }
     }
 
     /**

@@ -79,7 +79,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
- * <p>The core annotation processed used to generate bean definitions and power AOP for Micronaut.</p>
+ * <p>The core annotation processor used to generate bean definitions and power AOP for Micronaut.</p>
  *
  * <p>Each dependency injection candidate is visited and {@link BeanDefinitionWriter} is used to produce byte code via ASM.
  * Each bean results in a instanceof {@link io.micronaut.inject.BeanDefinition}</p>
@@ -447,13 +447,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         ElementFilter.methodsIn(members).forEach(method -> {
                             boolean isCandidateMethod = !modelUtils.isStatic(method) &&
                                     !modelUtils.isPrivate(method) &&
-                                    !modelUtils.isAbstract(method) &&
-                                    method.getParameters().size() == 1 &&
-                                    NameUtils.isSetterName(method.getSimpleName().toString());
+                                    !modelUtils.isAbstract(method);
                             if (isCandidateMethod) {
                                 Element e = method.getEnclosingElement();
                                 if (e instanceof TypeElement && !e.equals(classElement)) {
-                                    visitConfigurationPropertySetter(method);
+                                    String methodName = method.getSimpleName().toString();
+                                    if (method.getParameters().size() == 1 &&
+                                            NameUtils.isSetterName(methodName)) {
+                                        visitConfigurationPropertySetter(method);
+                                    } else if (NameUtils.isGetterName(methodName)) {
+                                        BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
+                                        if (!writer.isValidated() && annotationUtils.hasStereotype(method, "javax.validation.Constraint")) {
+                                            writer.setValidated(true);
+                                        }
+                                    }
                                 }
                             }
                         });
@@ -592,8 +599,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (isExecutable) {
                 visitExecutableMethod(method, methodAnnotationMetadata);
                 return null;
-            } else if (isConfigurationPropertiesType && !modelUtils.isPrivate(method) && !modelUtils.isStatic(method) && NameUtils.isSetterName(method.getSimpleName().toString()) && method.getParameters().size() == 1) {
-                visitConfigurationPropertySetter(method);
+            } else if (isConfigurationPropertiesType && !modelUtils.isPrivate(method) && !modelUtils.isStatic(method)) {
+                String methodName = method.getSimpleName().toString();
+                if (NameUtils.isSetterName(methodName) && method.getParameters().size() == 1) {
+                    visitConfigurationPropertySetter(method);
+                } else if (NameUtils.isGetterName(methodName)) {
+                    BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
+                    if (!writer.isValidated() && annotationUtils.hasStereotype(method, ANN_CONSTRAINT)) {
+                        writer.setValidated(true);
+                    }
+                }
             } else if (isPublic) {
                 final boolean isConstrained =
                         method.getParameters()
@@ -609,9 +624,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private void visitConfigurationPropertySetter(ExecutableElement method) {
             BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
-            if (!writer.isValidated() && annotationUtils.hasStereotype(method, ANN_CONSTRAINT)) {
-                writer.setValidated(true);
-            }
             VariableElement parameter = method.getParameters().get(0);
             TypeMirror valueType = parameter.asType();
             Object fieldType = modelUtils.resolveTypeReference(valueType);
@@ -629,7 +641,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                     writer.visitConfigBuilderMethod(
                             fieldType,
-                            NameUtils.getterNameFor(parameter.getSimpleName().toString()),
+                            NameUtils.getterNameFor(NameUtils.getPropertyNameForSetter(method.getSimpleName().toString())),
                             methodAnnotationMetadata,
                             metadataBuilder);
                     try {
@@ -1459,7 +1471,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 String fieldName = field.getSimpleName().toString();
                 if (fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
-                    writer.visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, metadataBuilder);
+                    if (modelUtils.isPrivate(field)) {
+                        // Using the field would throw a IllegalAccessError, use the method instead
+                        Optional<ExecutableElement> getterMethod = modelUtils.findGetterMethodFor(field);
+                        if (getterMethod.isPresent()) {
+                            writer.visitConfigBuilderMethod(fieldType, getterMethod.get().getSimpleName().toString(), fieldAnnotationMetadata, metadataBuilder);
+                        } else {
+                            error(field, "ConfigurationBuilder applied to a private field must have a corresponding non-private getter method.");
+                        }
+                    } else {
+                        writer.visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, metadataBuilder);
+                    }
                     try {
                         visitConfigurationBuilder(field, fieldTypeMirror, writer);
                     } finally {
