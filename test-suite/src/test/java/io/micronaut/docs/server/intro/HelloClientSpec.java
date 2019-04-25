@@ -17,6 +17,7 @@ public class HelloClientSpec  {
     @Inject
     HelloClient client; // <2>
 
+    @Test
     public void testHelloWorldResponse(){
         assertEquals("Hello World", client.hello().blockingGet());// <3>
     }
