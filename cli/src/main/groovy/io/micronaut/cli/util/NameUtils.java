@@ -15,9 +15,7 @@
  */
 package io.micronaut.cli.util;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -420,46 +418,38 @@ public final class NameUtils {
      */
     public static String getNaturalName(String name) {
         name = getShortName(name);
-        List<String> words = new ArrayList<String>();
-        int i = 0;
-        char[] chars = name.toCharArray();
-        for (int j = 0; j < chars.length; j++) {
-            char c = chars[j];
-            String w;
-            if (i >= words.size()) {
-                w = "";
-                words.add(i, w);
-            } else {
-                w = words.get(i);
-            }
 
-            if (Character.isLowerCase(c) || Character.isDigit(c)) {
-                if (Character.isLowerCase(c) && w.length() == 0) {
-                    c = Character.toUpperCase(c);
-                } else if (w.length() > 1 && Character.isUpperCase(w.charAt(w.length() - 1))) {
-                    w = "";
-                    words.add(++i, w);
-                }
+        if (isBlank(name)) {
+            return name;
+        }
 
-                words.set(i, w + c);
-            } else if (Character.isUpperCase(c)) {
-                if ((i == 0 && w.length() == 0) || (Character.isUpperCase(w.charAt(w.length() - 1)) && Character.isUpperCase(chars[j - 1]))) {
-                    words.set(i, w + c);
+        if (name.length() == 1) {
+            return name.toUpperCase();
+        } else {
+            StringBuilder sb = new StringBuilder();
+            sb.append(name.charAt(name.length() - 1));
+            //Traversing the string in reverse order
+            for (int i = name.length() - 2; i > 0; i--) {
+                char currChar = name.charAt(i);
+                char prevChar = name.charAt(i - 1);
+                char nextChar = name.charAt(i + 1);
+
+                boolean isCurrentCharLowerCase = Character.isLowerCase(currChar);
+                boolean isPrevCharLowerCase = Character.isLowerCase(prevChar);
+                boolean isNextCharLowerCase = Character.isLowerCase(nextChar);
+
+                if (isCurrentCharLowerCase != isPrevCharLowerCase && !isCurrentCharLowerCase) {
+                    sb.append(currChar + " ");
+                } else if (isCurrentCharLowerCase == isPrevCharLowerCase && !isCurrentCharLowerCase && isNextCharLowerCase) {
+                    sb.append(currChar + " ");
                 } else {
-                    words.add(++i, String.valueOf(c));
+                    sb.append(currChar);
                 }
             }
+            //The first character of the string is always in Upper case
+            sb.append(Character.toUpperCase(name.charAt(0)));
+            return sb.reverse().toString();
         }
-
-        StringBuilder buf = new StringBuilder();
-        for (Iterator<String> j = words.iterator(); j.hasNext(); ) {
-            String word = j.next();
-            buf.append(word);
-            if (j.hasNext()) {
-                buf.append(' ');
-            }
-        }
-        return buf.toString();
     }
 
     /**
