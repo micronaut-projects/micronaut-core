@@ -347,7 +347,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                     ant.chmod(dir: targetDirectory, includes: profileInstance.executablePatterns.join(' '), perm: 'u+x')
                 }
 
-                deleteExcludedFilesFromTarget(ant, targetDirectory, f.excludedFiles)
+                deleteExcludedFilesFromTarget(ant, targetDirectory, f.profile.skeletonExcludes)
                 deleteDirectory(tmpDir)
                 deleteDirectory(skeletonDir)
             }

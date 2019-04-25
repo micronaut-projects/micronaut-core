@@ -107,9 +107,4 @@ interface Feature {
      * @return Whether the feature is supported for a specific java version
      */
     boolean isSupported(Integer javaVersion)
-
-    /**
-     * @return List of files excluded from the feature that will be deleted. These files can be from other features applied before
-     */
-    List<String> getExcludedFiles()
 }
