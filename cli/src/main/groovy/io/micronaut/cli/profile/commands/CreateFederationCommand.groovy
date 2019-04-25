@@ -55,6 +55,7 @@ class CreateFederationCommand extends AbstractCreateAppCommand {
         final String micronautVersion = VersionInfo.getVersion(MicronautCli)
         final File serviceDir = inplace ? new File('.').canonicalFile : new File(executionContext.baseDir, federationName)
         final String profileName = evaluateProfileName()
+        final List<String> featuresCopy = this.features
 
         final CreateServiceCommandObject parent = new CreateServiceCommandObject(
                 appName: federationName,
@@ -73,7 +74,7 @@ class CreateFederationCommand extends AbstractCreateAppCommand {
                         baseDir: serviceDir,
                         profileName: profileName,
                         micronautVersion: micronautVersion,
-                        features: new HashSet<>(this.features),
+                        features: new HashSet<>(featuresCopy),
                         inplace: false,
                         build: this.build.toString(),
                         console: executionContext.console,
