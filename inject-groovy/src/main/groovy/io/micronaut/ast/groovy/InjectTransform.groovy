@@ -33,6 +33,7 @@ import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 import io.micronaut.inject.writer.GeneratedFile
 
 import javax.inject.Named
+import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.VariableElement
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -749,55 +750,64 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable)) && !hasInvalidModifiers
                 if (isExecutable) {
                     visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
-                } else if (isConfigurationProperties && isPublic && NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
-                    String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
-                    Parameter parameter = methodNode.parameters[0]
-                    if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
-                        getBeanWriter().visitConfigBuilderMethod(
-                                parameter.type.name,
-                                NameUtils.getterNameFor(propertyName),
-                                methodAnnotationMetadata,
-                                configurationMetadataBuilder)
-                        try {
-                            visitConfigurationBuilder(methodAnnotationMetadata, parameter.type, getBeanWriter())
-                        } finally {
-                            getBeanWriter().visitConfigBuilderEnd()
+                } else if (isConfigurationProperties && isPublic) {
+                    if (NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
+                        String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
+                        Parameter parameter = methodNode.parameters[0]
+
+                        if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
+                            getBeanWriter().visitConfigBuilderMethod(
+                                    parameter.type.name,
+                                    NameUtils.getterNameFor(propertyName),
+                                    methodAnnotationMetadata,
+                                    configurationMetadataBuilder)
+                            try {
+                                visitConfigurationBuilder(methodAnnotationMetadata, parameter.type, getBeanWriter())
+                            } finally {
+                                getBeanWriter().visitConfigBuilderEnd()
+                            }
+                        } else if (declaringClass.getField(propertyName) == null) {
+                            PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
+                                    concreteClass,
+                                    declaringClass,
+                                    parameter.type.name,
+                                    propertyName,
+                                    null,
+                                    null
+                            )
+
+                            methodAnnotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                                    methodAnnotationMetadata,
+                                    PropertySource.class.getName(),
+                                    AnnotationMetadata.VALUE_MEMBER,
+                                    Collections.singletonList(
+                                            new AnnotationValue(
+                                                    Property.class.getName(),
+                                                    Collections.singletonMap(
+                                                            (CharSequence) "name",
+                                                            (Object) propertyMetadata.getPath()
+                                                    )
+                                            )
+                                    )
+                            )
+
+                            getBeanWriter().visitSetterValue(
+                                    AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                    methodAnnotationMetadata,
+                                    false,
+                                    resolveParameterType(parameter),
+                                    methodNode.name,
+                                    resolveGenericTypes(parameter),
+                                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, parameter),
+                                    true
+                            )
                         }
-                    } else if (declaringClass.getField(propertyName) == null) {
-                        PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
-                                concreteClass,
-                                declaringClass,
-                                parameter.type.name,
-                                propertyName,
-                                null,
-                                null
-                        )
-
-                        methodAnnotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                                methodAnnotationMetadata,
-                                PropertySource.class.getName(),
-                                AnnotationMetadata.VALUE_MEMBER,
-                                Collections.singletonList(
-                                        new AnnotationValue(
-                                                Property.class.getName(),
-                                                Collections.singletonMap(
-                                                        (CharSequence) "name",
-                                                        (Object) propertyMetadata.getPath()
-                                                )
-                                        )
-                                )
-                        )
-
-                        getBeanWriter().visitSetterValue(
-                                AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                                methodAnnotationMetadata,
-                                false,
-                                resolveParameterType(parameter),
-                                methodNode.name,
-                                resolveGenericTypes(parameter),
-                                AstAnnotationUtils.getAnnotationMetadata(sourceUnit, parameter),
-                                true
-                        )
+                    } else if (NameUtils.isGetterName(methodNode.name)) {
+                        if (!getBeanWriter().isValidated()) {
+                            if (methodAnnotationMetadata.hasStereotype("javax.validation.Constraint")) {
+                                getBeanWriter().setValidated(true)
+                            }
+                        }
                     }
                 } else if (isPublic) {
                     def sourceUnit = sourceUnit
@@ -1001,9 +1011,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     String fieldName = fieldNode.name
                     Object fieldType = AstGenericUtils.resolveTypeReference(fieldNode.type)
                     if (isValue) {
-
                         if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
-                            getBeanWriter().visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, configurationMetadataBuilder)
+                            if(isPrivate) {
+                                // Using the field would throw a IllegalAccessError, use the method instead
+                                String fieldGetterName = NameUtils.getterNameFor(fieldNode.name)
+                                MethodNode getterMethod = declaringClass.methods?.find { it.name == fieldGetterName}
+                                if(getterMethod != null) {
+                                    getBeanWriter().visitConfigBuilderMethod(fieldType, getterMethod.name, fieldAnnotationMetadata, configurationMetadataBuilder)
+                                } else {
+                                    addError("ConfigurationBuilder applied to a private field must have a corresponding non-private getter method.", fieldNode)
+                                }
+                            } else {
+                                getBeanWriter().visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, configurationMetadataBuilder)
+                            }
                             try {
                                 visitConfigurationBuilder(fieldAnnotationMetadata, fieldNode.type, getBeanWriter())
                             } finally {
