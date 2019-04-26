@@ -55,8 +55,5 @@ class SparkPlug {
         SparkPlug build() {
             new SparkPlug(name, type, companyName)
         }
-
     }
-
-
 }

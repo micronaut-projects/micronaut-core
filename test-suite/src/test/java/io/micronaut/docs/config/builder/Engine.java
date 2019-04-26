@@ -1,4 +1,4 @@
-package io.micronaut.docs.inject.intro;
+package io.micronaut.docs.config.builder;
 
 // tag::class[]
 public interface Engine { // <1>
