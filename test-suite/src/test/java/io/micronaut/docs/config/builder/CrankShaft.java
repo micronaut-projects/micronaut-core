@@ -18,7 +18,7 @@ public class CrankShaft {
     static final class Builder {
         private Optional<Double> rodLength = Optional.empty();
 
-        Builder withRodLength(Double rodLength) {
+        public Builder withRodLength(Double rodLength) {
             this.rodLength = Optional.ofNullable(rodLength);
             return this;
         }

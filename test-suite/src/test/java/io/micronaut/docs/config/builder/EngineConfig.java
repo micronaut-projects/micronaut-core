@@ -17,18 +17,10 @@ class EngineConfig {
     @ConfigurationBuilder(prefixes = "with") // <2>
     EngineImpl.Builder builder = EngineImpl.builder();
 
-    public EngineImpl.Builder getBuilder() { return builder; }
-
-    public void setBuilder(EngineImpl.Builder builder) { this.builder = builder; }
-
     @ConfigurationBuilder(prefixes = "with", configurationPrefix = "crank-shaft") // <3>
     CrankShaft.Builder crankShaft = CrankShaft.builder();
 
-    public CrankShaft.Builder getCrankShaft() { return crankShaft; }
-
-    public void setCrankShaft(CrankShaft.Builder crankShaft) { this.crankShaft = crankShaft; }
-
-    SparkPlug.Builder sparkPlug = SparkPlug.builder();
+    private SparkPlug.Builder sparkPlug = SparkPlug.builder();
 
     SparkPlug.Builder getSparkPlug() { return this.sparkPlug; }
 
