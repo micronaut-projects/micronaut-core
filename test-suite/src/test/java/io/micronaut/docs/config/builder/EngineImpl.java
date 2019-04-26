@@ -47,12 +47,12 @@ public class EngineImpl implements Engine {
         private String manufacturer = "Ford";
         private int cylinders;
 
-        Builder withManufacturer(String manufacturer) {
+        public Builder withManufacturer(String manufacturer) {
             this.manufacturer = manufacturer;
             return this;
         }
 
-        Builder withCylinders(int cylinders) {
+        public Builder withCylinders(int cylinders) {
             this.cylinders = cylinders;
             return this;
         }
