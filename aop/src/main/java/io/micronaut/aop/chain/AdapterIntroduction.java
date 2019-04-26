@@ -55,7 +55,7 @@ final class AdapterIntroduction implements MethodInterceptor<Object, Object> {
         }
 
         if (StringUtils.isEmpty(beanMethod)) {
-            throw new IllegalStateException("No bean bean method to adapt found in Adapter configuration for method: " + method);
+            throw new IllegalStateException("No bean method to adapt found in Adapter configuration for method: " + method);
         }
 
         if (StringUtils.isNotEmpty(beanQualifier)) {
