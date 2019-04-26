@@ -19,7 +19,6 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
@@ -82,6 +81,12 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
         return areTypesCompatible(typeArguments, classes);
     }
 
+    /**
+     * @param beanType   The bean type
+     * @param candidate  The candidate
+     * @param <BT>       The bean type subclass
+     * @return The list of type arguments
+     */
     protected <BT extends BeanType<T>> List<Class> getTypeArguments(Class<T> beanType, BT candidate) {
         if (candidate instanceof BeanDefinition) {
             BeanDefinition<BT> definition = (BeanDefinition<BT>) candidate;
