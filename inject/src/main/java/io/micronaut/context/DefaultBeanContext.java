@@ -780,7 +780,8 @@ public class DefaultBeanContext implements BeanContext {
      * Find an active {@link javax.inject.Singleton} bean for the given definition and qualifier.
      *
      * @param beanDefinition The bean definition
-     * @param qualifier The qualifier
+     * @param qualifier      The qualifier
+     * @param <T>            The bean generic type
      * @return The bean registration
      */
     @Nullable
