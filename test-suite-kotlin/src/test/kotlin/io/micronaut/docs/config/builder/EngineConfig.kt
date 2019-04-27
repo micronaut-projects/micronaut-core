@@ -24,6 +24,7 @@ import io.micronaut.context.annotation.ConfigurationProperties
  * @author Will Buck
  * @since 1.1
  */
+// tag::class[]
 @ConfigurationProperties("my.engine") // <1>
 internal class EngineConfig {
     @ConfigurationBuilder(prefixes = ["with"])  // <2>
@@ -35,3 +36,4 @@ internal class EngineConfig {
     @set:ConfigurationBuilder(prefixes = ["with"], configurationPrefix = "spark-plug") // <4>
     var sparkPlug = SparkPlug.builder()
 }
+// end::class[]
