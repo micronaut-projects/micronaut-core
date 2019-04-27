@@ -184,7 +184,7 @@ For example:
 snippet::io.micronaut.docs.config.builder.EngineConfig[tags="imports,class"]
 
 <1> The `@ConfigurationProperties` annotation takes the configuration prefix
-<2> The first builder can be configured with the class configuration prefix
+<2> The first builder can be configured without the class configuration prefix; it will inherit from the above.
 <3> The second builder can be configured with the class configuration prefix + the `configurationPrefix` value.
 <4> The third builder demonstrates that the annotation can be applied to a method as well as a property.
 

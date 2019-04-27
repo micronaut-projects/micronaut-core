@@ -126,13 +126,8 @@ function postProcessCodeBlocks() {
                             if (isLang(optionId)) {
                                 window.localStorage.setItem(LOCALSTORAGE_KEY_LANG, optionId);
                             }
-                            // Record how far down the page the clicked element is before switching all samples
-                            var beforeOffset = evt.target.offsetTop;
 
                             switchSampleLanguage(isLang(optionId) ? optionId : initPreferredLanguage(), isBuild(optionId) ? optionId : initPreferredBuild());
-
-                            // Scroll the window to account for content height differences between different sample languages
-                            window.scrollBy(0, evt.target.offsetTop - beforeOffset);
                         });
                         multiLanguageSelectorElement.appendChild(optionEl);
                     });
