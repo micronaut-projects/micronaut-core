@@ -5,6 +5,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 
+import javax.annotation.Nullable;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
@@ -46,8 +47,11 @@ public class NullableFactory {
     }
 
     @EachBean(B.class)
-    C getC(B b) {
+    C getC(@Nullable B b) {
         cCalls++;
+        if (b == null) {
+            return null;
+        }
         if (b.name.equals("three")) {
             return new C(b.name);
         } else {
@@ -56,8 +60,11 @@ public class NullableFactory {
     }
 
     @EachBean(C.class)
-    D getD(C c) {
+    D getD(@Nullable C c) {
         dCalls++;
+        if (c == null) {
+            return null;
+        }
         return new D();
     }
 

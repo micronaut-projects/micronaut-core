@@ -40,14 +40,14 @@ class NullReturnFactorySpec extends Specification {
         then:
         cs.size() == 1
         cs[0].name == "three"
-        factory.cCalls == 2
+        factory.cCalls == 3
         factory.bCalls == 3
 
         expect:
         beanContext.getBeansOfType(D).size() == 1
         factory.bCalls == 3
-        factory.cCalls == 2
-        factory.dCalls == 1
+        factory.cCalls == 3
+        factory.dCalls == 3
 
         when:
         beanContext.getBean(E)
@@ -66,6 +66,23 @@ class NullReturnFactorySpec extends Specification {
 
         then:
         thrown(BeanContextException)
+
+        cleanup:
+        beanContext.close()
+    }
+
+    void "test it works as expected nested resolution"() {
+        given:
+        BeanContext beanContext = ApplicationContext.run()
+        NullableFactory factory = beanContext.getBean(NullableFactory)
+
+        expect:
+        beanContext.getBeansOfType(D).size() == 1
+        beanContext.getBeansOfType(C).size() == 1
+        beanContext.getBeansOfType(B).size() == 2
+        factory.bCalls == 3
+        factory.cCalls == 3
+        factory.dCalls == 3
 
         cleanup:
         beanContext.close()
