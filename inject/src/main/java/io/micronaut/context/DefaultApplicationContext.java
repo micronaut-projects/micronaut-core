@@ -293,6 +293,10 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                             }
 
                             optional.ifPresent(qualifier -> {
+                                    BeanRegistration beanRegistration = getActiveBeanRegistration(dependentCandidate, qualifier);
+                                    if (beanRegistration != null && beanRegistration.bean == null) {
+                                        return;
+                                    }
                                     String qualifierKey = javax.inject.Qualifier.class.getName();
                                     Argument<?>[] arguments = candidate.getConstructor().getArguments();
                                     for (Argument<?> argument : arguments) {
