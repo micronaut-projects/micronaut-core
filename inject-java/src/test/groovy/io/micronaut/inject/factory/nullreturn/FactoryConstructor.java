@@ -5,5 +5,5 @@ import io.micronaut.context.annotation.Factory;
 @Factory
 public class FactoryConstructor {
 
-    FactoryConstructor(E e) {}
+    FactoryConstructor(F f) {}
 }

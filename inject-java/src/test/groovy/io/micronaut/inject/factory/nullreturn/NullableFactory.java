@@ -15,21 +15,19 @@ public class NullableFactory {
     public int bCalls = 0;
     public int cCalls = 0;
     public int dCalls = 0;
+    public int d2Calls = 0;
+    public int d3Calls = 0;
 
     @Prototype
     A getA(@Parameter String name) {
-        if (name.equals("null")) {
-            return null;
-        } else {
-            return new A();
-        }
+        return null;
     }
 
     @Singleton
     @Named("one")
     B getBOne() {
         bCalls++;
-        return null;
+        return new B("one");
     }
 
     @Singleton
@@ -46,37 +44,66 @@ public class NullableFactory {
         return new B("three");
     }
 
+    @Singleton
+    @Named("four")
+    B getBFour() {
+        bCalls++;
+        return null;
+    }
+
     @EachBean(B.class)
-    C getC(@Nullable B b) {
+    C getC(B b) {
         cCalls++;
-        if (b == null) {
-            return null;
-        }
         if (b.name.equals("three")) {
-            return new C(b.name);
-        } else {
             return null;
+        } else {
+            return new C(b.name);
         }
     }
 
     @EachBean(C.class)
-    D getD(@Nullable C c) {
+    D getD(C c) {
         dCalls++;
+        if (c.name.equals("two")) {
+            return null;
+        } else {
+            return new D();
+        }
+    }
+
+    @EachBean(C.class)
+    D2 getD2(@Nullable C c) {
+        d2Calls++;
         if (c == null) {
             return null;
         }
-        return new D();
+        if (c.name.equals("two")) {
+            return null;
+        } else {
+            return new D2();
+        }
+    }
+
+    @EachBean(C.class)
+    D3 getD3(@Parameter C c) {
+        d3Calls++;
+        if (c.name.equals("two")) {
+            return null;
+        } else {
+            return new D3();
+        }
+    }
+
+    @EachBean(D.class)
+    E getE(D d, F f) {
+        return new E();
     }
 
     @Singleton
-    E getE() {
+    F getF() {
         return null;
     }
 
-    @Singleton
-    F getF(E e) {
-        return new F();
-    }
 
 }
 
@@ -96,5 +123,7 @@ class C {
     }
 }
 class D {}
+class D2 {}
+class D3 {}
 class E {}
 class F {}
