@@ -1501,7 +1501,7 @@ public class DefaultBeanContext implements BeanContext {
                     bean = beanFactory.build(resolutionContext, this, beanDefinition);
 
                     if (bean == null) {
-                        if (!beanDefinition.getAnnotationMetadata().hasAnnotation(Factory.class)) {
+                        if (!(beanDefinition.isIterable() || beanDefinition.getAnnotationMetadata().hasAnnotation(Factory.class))) {
                             throw new BeanInstantiationException(resolutionContext, "Bean Factory [" + beanFactory + "] returned null");
                         }
                     } else {
