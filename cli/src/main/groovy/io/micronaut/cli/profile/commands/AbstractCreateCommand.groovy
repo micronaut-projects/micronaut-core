@@ -341,13 +341,15 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
                 appendFeatureFiles(skeletonDir, cmd.build)
 
+                List<String> featureExcludes = ['**/' + APPLICATION_YML]
+                featureExcludes.addAll(profileInstance.skeletonExcludes)
+
                 if (skeletonDir.exists()) {
-                    copySrcToTarget(ant, skeletonDir, ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
-                    copySrcToTarget(ant, new File(skeletonDir, cmd.build + "-build"), ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
+                    copySrcToTarget(ant, skeletonDir, featureExcludes, profileInstance.binaryExtensions)
+                    copySrcToTarget(ant, new File(skeletonDir, cmd.build + "-build"), featureExcludes, profileInstance.binaryExtensions)
                     ant.chmod(dir: targetDirectory, includes: profileInstance.executablePatterns.join(' '), perm: 'u+x')
                 }
 
-                deleteExcludedFilesFromTarget(ant, targetDirectory, f.excludedFiles)
                 deleteDirectory(tmpDir)
                 deleteDirectory(skeletonDir)
             }
@@ -850,17 +852,6 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                     variables.each { k, v ->
                         replacestring(from: "@${k}@".toString(), to: v)
                     }
-                }
-            }
-        }
-    }
-
-    @CompileDynamic
-    private void deleteExcludedFilesFromTarget(ConsoleAntBuilder ant, File targetDirectory, List<String> excludedFiles) {
-        if (excludedFiles) {
-            ant.delete {
-                excludedFiles.each { fileToDelete ->
-                    fileset(dir: targetDirectory, includes: fileToDelete)
                 }
             }
         }
