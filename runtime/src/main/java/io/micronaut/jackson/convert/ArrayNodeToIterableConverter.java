@@ -23,7 +23,6 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.type.Argument;
 
 import javax.inject.Inject;
-import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
