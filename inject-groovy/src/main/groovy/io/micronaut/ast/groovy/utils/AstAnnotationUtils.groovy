@@ -144,7 +144,7 @@ class AstAnnotationUtils {
      * @return True if it is
      */
     static boolean isAnnotated(AnnotatedNode annotatedNode) {
-        if (AbstractAnnotationMetadataBuilder.isMetadataMutadated(annotatedNode)) {
+        if (AbstractAnnotationMetadataBuilder.isMetadataMutated(annotatedNode)) {
             return true
         }
         for (ann in annotatedNode.annotations) {

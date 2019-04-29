@@ -185,7 +185,7 @@ public class AnnotationUtils {
      * @return True if it is annotated with non internal annotations
      */
     public boolean isAnnotated(ExecutableElement method) {
-        if (AbstractAnnotationMetadataBuilder.isMetadataMutadated(method)) {
+        if (AbstractAnnotationMetadataBuilder.isMetadataMutated(method)) {
             return true;
         }
         List<? extends AnnotationMirror> annotationMirrors = method.getAnnotationMirrors();
