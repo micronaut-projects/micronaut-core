@@ -18,6 +18,8 @@ package io.micronaut.visitors
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.ast.EnumElement
 
+import java.util.function.Supplier
+
 class ClassElementSpec extends AbstractTypeElementSpec {
 
     void "test visit methods that take and return arrays"() {
@@ -127,6 +129,31 @@ class Foo {}
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'test.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'test.Foo'
+    }
+
+    void "test resolve generic type using getTypeArguments"() {
+        buildBeanDefinition('test.TestController', '''
+package test;
+
+import io.micronaut.http.annotation.*;
+import javax.inject.Inject;
+
+@Controller("/test")
+public class TestController implements java.util.function.Supplier<String> {
+    
+    @Get("/getMethod")
+    public String get() {
+        return null;
+    }
+    
+
+}
+
+''')
+        expect:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].getTypeArguments(Supplier).get("T").name == String.name
     }
 
     void "test array generic types at type level"() {

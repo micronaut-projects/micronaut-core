@@ -536,7 +536,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
 
                     typeArguments.put(AstGenericUtils.resolveTypeReference(returnType).toString(), boundTypes)
-                    populateTypeArguments(returnType, typeArguments)
+                    AstGenericUtils.populateTypeArguments(returnType, typeArguments)
                     beanMethodWriter.visitTypeArguments(typeArguments)
                 }
 
@@ -1515,78 +1515,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private void visitTypeArguments(ClassNode typeElement, BeanDefinitionWriter beanDefinitionWriter) {
-            Map<String, Map<String, Object>> typeArguments = new HashMap<>()
-
-            populateTypeArguments(typeElement, typeArguments)
-
+            Map<String, Map<String, Object>> typeArguments = AstGenericUtils.buildAllGenericTypeInfo(typeElement)
             beanDefinitionWriter.visitTypeArguments(
                     typeArguments
             )
-        }
-
-        private void populateTypeArguments(ClassNode typeElement, Map<String, Map<String, Object>> typeArguments) {
-            ClassNode current = typeElement
-            ClassNode last = null
-            while (current != null) {
-
-                if (current != ClassHelper.OBJECT_TYPE) {
-                    GenericsType[] superArguments = current.redirect().getGenericsTypes()
-                    if (ArrayUtils.isNotEmpty(superArguments)) {
-                        Map<String, ClassNode> genericSpec = AstGenericUtils.createGenericsSpec(current)
-                        Map<String, Object> arguments = new LinkedHashMap<>()
-                        if (genericSpec) {
-                            for (gt in superArguments) {
-                                ClassNode cn = genericSpec.get(gt.name)
-                                if (cn != null) {
-                                    arguments.put(gt.name, AstGenericUtils.resolveTypeReference(cn, genericSpec))
-                                }
-                            }
-                        }
-                        if (last != null) {
-                            carryForwardTypeArguments(last, typeArguments, arguments)
-                        }
-                        typeArguments.put(current.name, arguments)
-                    }
-                }
-
-                populateTypeArgumentsForInterfaces(typeArguments, current)
-
-                last = current
-                current = current.getUnresolvedSuperClass()
-            }
-        }
-
-        private void populateTypeArgumentsForInterfaces(Map<String, Map<String, Object>> typeArguments, ClassNode current) {
-            for (ClassNode anInterface : current.getInterfaces()) {
-                String name = anInterface.name
-                if (!typeArguments.containsKey(name)) {
-
-                    Map<String, ClassNode> genericSpec = AstGenericUtils.createGenericsSpec(anInterface)
-
-                    if (genericSpec) {
-                        Map<String, Object> types = [:]
-                        for (entry in genericSpec) {
-                            types[entry.key] = AstGenericUtils.resolveTypeReference(entry.value, genericSpec)
-                        }
-                        carryForwardTypeArguments(current, typeArguments, types)
-                        typeArguments.put(name, types)
-                    }
-
-                    populateTypeArgumentsForInterfaces(typeArguments, anInterface)
-                }
-
-            }
-        }
-
-        private void carryForwardTypeArguments(ClassNode child, Map<String, Map<String, Object>> typeArguments, Map<String, Object> types) {
-            String childName = child.name
-            if (typeArguments.containsKey(childName)) {
-                typeArguments.get(childName).forEach({ arg, type ->
-                    if (types.containsKey(arg)) {
-                        types.put(arg, type)
-                    }
-                })
-            }
         }
 
         private ConstructorNode findConcreteConstructor(List<ConstructorNode> constructors) {

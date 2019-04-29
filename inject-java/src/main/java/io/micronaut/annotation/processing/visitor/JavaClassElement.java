@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.processing.JavaModelUtils;
 
@@ -74,6 +75,16 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         this.typeArguments = typeArguments;
+    }
+
+    @Nonnull
+    @Override
+    public Map<String, ClassElement> getTypeArguments(@Nonnull String type) {
+        if (StringUtils.isNotEmpty(type)) {
+            Map<String, Map<String, Object>> data = visitorContext.getGenericUtils().buildTypeArgumentInfo(classElement);
+            Map<String, Object> forType = data.get(type);
+        }
+        return Collections.emptyMap();
     }
 
     @Override

@@ -89,6 +89,41 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         });
     }
 
+    @Nonnull
+    @Override
+    public Map<String, ClassElement> getTypeArguments(@Nonnull String type) {
+        if (type != null) {
+            Map<String, Map<String, Object>> allData = AstGenericUtils.buildAllGenericTypeInfo(classNode);
+
+            Map<String, Object> forType = allData.get(type);
+            if (forType != null) {
+                GroovyVisitorContext context = new GroovyVisitorContext(sourceUnit);
+                Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
+                for (Map.Entry<String, Object> entry : forType.entrySet()) {
+                    Object v = entry.getValue();
+                    ClassElement ce;
+                    if (v instanceof Class) {
+                        ClassNode cn = makeCached(((Class) v));
+                        ce = new GroovyClassElement(sourceUnit, cn, AstAnnotationUtils.getAnnotationMetadata(
+                                sourceUnit,
+                                cn
+                        ));
+                    } else {
+                        ce = v != null ? context.getClassElement(v.toString()).orElse(null) : null;
+                    }
+                    if (ce == null) {
+                        return Collections.emptyMap();
+                    } else {
+                        typeArgs.put(entry.getKey(), ce);
+                    }
+                }
+                return Collections.unmodifiableMap(typeArgs);
+            }
+
+        }
+        return Collections.emptyMap();
+    }
+
     @Override
     public @Nonnull Map<String, ClassElement> getTypeArguments() {
         Map<String, ClassNode> spec = AstGenericUtils.createGenericsSpec(classNode);

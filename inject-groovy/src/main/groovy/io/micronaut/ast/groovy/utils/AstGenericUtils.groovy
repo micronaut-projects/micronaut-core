@@ -210,6 +210,84 @@ class AstGenericUtils {
         return resolvedGenericTypes
     }
 
+    /**
+     * Builds all the generic information for the given type
+     * @param classNode
+     * @return
+     */
+    static Map<String, Map<String, Object>> buildAllGenericTypeInfo(ClassNode classNode) {
+        Map<String, Map<String, Object>> typeArguments = new HashMap<>()
+
+        populateTypeArguments(classNode, typeArguments)
+
+        return typeArguments
+    }
+
+    static void populateTypeArguments(ClassNode typeElement, Map<String, Map<String, Object>> typeArguments) {
+        ClassNode current = typeElement
+        ClassNode last = null
+        while (current != null) {
+
+            if (current != ClassHelper.OBJECT_TYPE) {
+                GenericsType[] superArguments = current.redirect().getGenericsTypes()
+                if (ArrayUtils.isNotEmpty(superArguments)) {
+                    Map<String, ClassNode> genericSpec = createGenericsSpec(current)
+                    Map<String, Object> arguments = new LinkedHashMap<>()
+                    if (genericSpec) {
+                        for (gt in superArguments) {
+                            ClassNode cn = genericSpec.get(gt.name)
+                            if (cn != null) {
+                                arguments.put(gt.name, resolveTypeReference(cn, genericSpec))
+                            }
+                        }
+                    }
+                    if (last != null) {
+                        carryForwardTypeArguments(last, typeArguments, arguments)
+                    }
+                    typeArguments.put(current.name, arguments)
+                }
+            }
+
+            populateTypeArgumentsForInterfaces(typeArguments, current)
+
+            last = current
+            current = current.getUnresolvedSuperClass()
+        }
+    }
+
+    private static void populateTypeArgumentsForInterfaces(Map<String, Map<String, Object>> typeArguments, ClassNode current) {
+        for (ClassNode anInterface : current.getInterfaces()) {
+            String name = anInterface.name
+            if (!typeArguments.containsKey(name)) {
+
+                Map<String, ClassNode> genericSpec = createGenericsSpec(anInterface)
+
+                if (genericSpec) {
+                    Map<String, Object> types = [:]
+                    for (entry in genericSpec) {
+                        types[entry.key] = resolveTypeReference(entry.value, genericSpec)
+                    }
+                    carryForwardTypeArguments(current, typeArguments, types)
+                    typeArguments.put(name, types)
+                }
+
+                populateTypeArgumentsForInterfaces(typeArguments, anInterface)
+            }
+        }
+    }
+
+    private static void carryForwardTypeArguments(ClassNode child, Map<String, Map<String, Object>> typeArguments, Map<String, Object> types) {
+        String childName = child.name
+        if (typeArguments.containsKey(childName)) {
+            typeArguments.get(childName).forEach({ arg, type ->
+                if (types.containsKey(arg)) {
+                    types.put(arg, type)
+                }
+            })
+        }
+    }
+
+
 
     static Map<String, Object> extractPlaceholders(ClassNode cn) {
         Map<String, Object> ret = new HashMap<String, Object>()

@@ -58,6 +58,7 @@ public class AnnotationUtils {
     private final Filer filer;
     private final MutableConvertibleValues<Object> visitorAttributes;
     private final ProcessingEnvironment processingEnv;
+    private final GenericUtils genericUtils;
 
     /**
      * Default constructor.
@@ -67,6 +68,7 @@ public class AnnotationUtils {
      * @param messager          The messager
      * @param types             The types
      * @param modelUtils        The model utils
+     * @param genericUtils      The generic utils
      * @param filer             The filer
      * @param visitorAttributes The visitor attributes
      */
@@ -76,12 +78,14 @@ public class AnnotationUtils {
             Messager messager,
             Types types,
             ModelUtils modelUtils,
+            GenericUtils genericUtils,
             Filer filer,
             MutableConvertibleValues<Object> visitorAttributes) {
         this.elementUtils = elementUtils;
         this.messager = messager;
         this.types = types;
         this.modelUtils = modelUtils;
+        this.genericUtils = genericUtils;
         this.filer = filer;
         this.visitorAttributes = visitorAttributes;
         this.processingEnv = processingEnv;
@@ -95,6 +99,7 @@ public class AnnotationUtils {
      * @param messager          The messager
      * @param types             The types
      * @param modelUtils        The model utils
+     * @param genericUtils      The generic utils
      * @param filer             The filer
      */
     protected AnnotationUtils(
@@ -103,8 +108,9 @@ public class AnnotationUtils {
             Messager messager,
             Types types,
             ModelUtils modelUtils,
+            GenericUtils genericUtils,
             Filer filer) {
-        this(processingEnv, elementUtils, messager, types, modelUtils, filer, new MutableConvertibleValuesMap<>());
+        this(processingEnv, elementUtils, messager, types, modelUtils, genericUtils, filer, new MutableConvertibleValuesMap<>());
     }
 
     /**
@@ -227,6 +233,7 @@ public class AnnotationUtils {
                 this,
                 types,
                 modelUtils,
+                genericUtils,
                 filer,
                 visitorAttributes
         );
