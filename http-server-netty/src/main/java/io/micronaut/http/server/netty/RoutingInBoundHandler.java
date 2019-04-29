@@ -320,7 +320,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
 
             Optional<ExceptionHandler> exceptionHandler = beanLocator
-                    .findBean(ExceptionHandler.class, Qualifiers.byTypeArguments(cause.getClass(), Object.class));
+                    .findBean(ExceptionHandler.class, Qualifiers.byTypeArgumentsClosest(cause.getClass(), Object.class));
 
             if (exceptionHandler.isPresent()) {
                 ExceptionHandler handler = exceptionHandler.get();

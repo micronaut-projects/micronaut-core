@@ -147,6 +147,18 @@ public class Qualifiers {
     }
 
     /**
+     * Build a qualifier for the given generic type arguments. Only the closest
+     * matches will be returned.
+     *
+     * @param typeArguments The generic type arguments
+     * @param <T>           The component type
+     * @return The qualifier
+     */
+    public static <T> Qualifier<T> byTypeArgumentsClosest(Class... typeArguments) {
+        return new ClosestTypeArgumentQualifier<>(typeArguments);
+    }
+
+    /**
      * Build a qualifier for the given generic type arguments.
      *
      * @param typeArguments The generic type arguments
