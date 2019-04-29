@@ -22,6 +22,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.Parameterizable;
 import javax.lang.model.element.TypeElement;
@@ -35,12 +37,7 @@ import javax.lang.model.type.WildcardType;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.lang.reflect.Array;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Utility methods for dealing with generic type signatures.
@@ -59,10 +56,61 @@ public class GenericUtils {
      * @param typeUtils    The {@link Types}
      * @param modelUtils   The {@link ModelUtils}
      */
-    GenericUtils(Elements elementUtils, Types typeUtils, ModelUtils modelUtils) {
+    protected GenericUtils(Elements elementUtils, Types typeUtils, ModelUtils modelUtils) {
         this.elementUtils = elementUtils;
         this.typeUtils = typeUtils;
         this.modelUtils = modelUtils;
+    }
+
+    /**
+     * Builds type argument information for the given type.
+     *
+     * @param dt The declared type
+     * @return The type argument information
+     */
+    Map<String, Map<String, Object>> buildTypeArgumentInfo(DeclaredType dt) {
+        Element element = dt.asElement();
+        return buildTypeArgumentInfo(element, dt);
+    }
+
+    /**
+     * Builds type argument information for the given type.
+     *
+     * @param element The element
+     * @return The type argument information
+     */
+    public Map<String, Map<String, Object>> buildTypeArgumentInfo(@Nonnull Element element) {
+        return buildTypeArgumentInfo(element, null);
+    }
+
+    /**
+     * Builds type argument information for the given type.
+     *
+     * @param element The element
+     * @param dt The declared type
+     * @return The type argument information
+     */
+    private Map<String, Map<String, Object>> buildTypeArgumentInfo(@Nonnull Element element, @Nullable DeclaredType dt) {
+
+        Map<String, Map<String, Object>> beanTypeArguments = new HashMap<>();
+        if (dt != null) {
+
+            List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
+            if (CollectionUtils.isNotEmpty(typeArguments)) {
+                TypeElement typeElement = (TypeElement) element;
+
+                Map<String, Object> directTypeArguments = resolveBoundTypes(dt);
+                if (CollectionUtils.isNotEmpty(directTypeArguments)) {
+                    beanTypeArguments.put(typeElement.getQualifiedName().toString(), directTypeArguments);
+                }
+            }
+        }
+
+        if (element instanceof TypeElement) {
+            TypeElement typeElement = (TypeElement) element;
+            populateTypeArguments(typeElement, beanTypeArguments);
+        }
+        return beanTypeArguments;
     }
 
     /**
@@ -378,6 +426,68 @@ public class GenericUtils {
                         upperBound,
                         boundTypes
                 );
+            }
+        }
+    }
+
+    private void populateTypeArguments(TypeElement typeElement, Map<String, Map<String, Object>> typeArguments) {
+        TypeElement current = typeElement;
+        while (current != null) {
+
+            populateTypeArgumentsForInterfaces(typeArguments, current);
+            TypeMirror superclass = current.getSuperclass();
+
+            if (superclass.getKind() == TypeKind.NONE) {
+                current = null;
+            } else {
+                if (superclass instanceof DeclaredType) {
+                    DeclaredType dt = (DeclaredType) superclass;
+                    List<? extends TypeMirror> superArguments = dt.getTypeArguments();
+
+
+                    Element te = dt.asElement();
+                    if (te instanceof TypeElement) {
+                        TypeElement child = current;
+                        current = (TypeElement) te;
+                        if (CollectionUtils.isNotEmpty(superArguments)) {
+                            Map<String, Object> boundTypes = typeArguments.get(child.getQualifiedName().toString());
+                            if (boundTypes == null) {
+                                boundTypes = Collections.emptyMap();
+                            }
+                            Map<String, Object> types = resolveGenericTypes(dt, current, boundTypes);
+
+                            String name = current.getQualifiedName().toString();
+                            typeArguments.put(name, types);
+                        }
+
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    private void populateTypeArgumentsForInterfaces(Map<String, Map<String, Object>> typeArguments, TypeElement child) {
+        for (TypeMirror anInterface : child.getInterfaces()) {
+            if (anInterface instanceof DeclaredType) {
+                DeclaredType declaredType = (DeclaredType) anInterface;
+                Element element = declaredType.asElement();
+                if (element instanceof TypeElement) {
+                    TypeElement te = (TypeElement) element;
+                    String name = te.getQualifiedName().toString();
+                    if (!typeArguments.containsKey(name)) {
+                        Map<String, Object> boundTypes = typeArguments.get(child.getQualifiedName().toString());
+                        if (boundTypes == null) {
+                            boundTypes = Collections.emptyMap();
+                        }
+                        Map<String, Object> types = resolveGenericTypes(declaredType, te, boundTypes);
+                        typeArguments.put(name, types);
+                    }
+                    populateTypeArgumentsForInterfaces(typeArguments, te);
+                }
             }
         }
     }

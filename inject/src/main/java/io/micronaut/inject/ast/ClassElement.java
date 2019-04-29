@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.ArgumentUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -148,6 +149,28 @@ public interface ClassElement extends TypedElement {
      */
     default boolean isIterable() {
         return isArray() || isAssignable(Iterable.class);
+    }
+
+    /**
+     * Get the type arguments for the given type name.
+     *
+     * @param type The type to retrieve type arguments for
+     * @return The type arguments for this class element
+     * @since 1.1.1
+     */
+    default @Nonnull Map<String, ClassElement> getTypeArguments(@Nonnull String type) {
+        return Collections.emptyMap();
+    }
+
+    /**
+     * Get the type arguments for the given type name.
+     *
+     * @param type The type to retrieve type arguments for
+     * @return The type arguments for this class element
+     */
+    default @Nonnull Map<String, ClassElement> getTypeArguments(@Nonnull Class<?> type) {
+        ArgumentUtils.requireNonNull("type", type);
+        return getTypeArguments(type.getName());
     }
 
     /**

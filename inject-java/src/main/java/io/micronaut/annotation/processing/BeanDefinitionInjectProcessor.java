@@ -706,22 +706,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             if (returnType instanceof DeclaredType) {
                 DeclaredType dt = (DeclaredType) returnType;
-                Element element = dt.asElement();
-
-                List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
-                Map<String, Map<String, Object>> beanTypeArguments = new HashMap<>();
-                if (CollectionUtils.isNotEmpty(typeArguments)) {
-                    TypeElement typeElement = (TypeElement) element;
-
-                    Map<String, Object> directTypeArguments = genericUtils.resolveBoundTypes(dt);
-                    if (CollectionUtils.isNotEmpty(directTypeArguments)) {
-                        beanTypeArguments.put(typeElement.getQualifiedName().toString(), directTypeArguments);
-                    }
-                }
-
-                if (element instanceof TypeElement) {
-                    populateTypeArguments((TypeElement) element, beanTypeArguments);
-                }
+                Map<String, Map<String, Object>> beanTypeArguments = genericUtils.buildTypeArgumentInfo(dt);
                 beanMethodWriter.visitTypeArguments(beanTypeArguments);
             }
 
@@ -1688,80 +1673,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private void visitTypeArguments(TypeElement typeElement, BeanDefinitionWriter beanDefinitionWriter) {
-            Map<String, Map<String, Object>> typeArguments = new HashMap<>();
-
-            populateTypeArguments(typeElement, typeArguments);
-
+            Map<String, Map<String, Object>> typeArguments = genericUtils.buildTypeArgumentInfo(typeElement);
             beanDefinitionWriter.visitTypeArguments(
                     typeArguments
             );
-        }
-
-        private void populateTypeArguments(TypeElement typeElement, Map<String, Map<String, Object>> typeArguments) {
-            TypeElement current = typeElement;
-            while (current != null) {
-
-                populateTypeArgumentsForInterfaces(typeArguments, current);
-                TypeMirror superclass = current.getSuperclass();
-
-                if (superclass.getKind() == TypeKind.NONE) {
-                    current = null;
-                } else {
-                    if (superclass instanceof DeclaredType) {
-                        DeclaredType dt = (DeclaredType) superclass;
-                        List<? extends TypeMirror> superArguments = dt.getTypeArguments();
-
-
-                        Element te = dt.asElement();
-                        if (te instanceof TypeElement) {
-                            TypeElement child = current;
-                            current = (TypeElement) te;
-                            if (CollectionUtils.isNotEmpty(superArguments)) {
-                                Map<String, Object> types = genericUtils.resolveBoundTypes(dt);
-                                String name = current.getQualifiedName().toString();
-                                carryForwardArguments(child, typeArguments, types);
-                                typeArguments.put(name, types);
-                            }
-
-                        } else {
-                            break;
-                        }
-                    } else {
-                        break;
-                    }
-                }
-            }
-        }
-
-        private void populateTypeArgumentsForInterfaces(Map<String, Map<String, Object>> typeArguments, TypeElement child) {
-            for (TypeMirror anInterface : child.getInterfaces()) {
-                if (anInterface instanceof DeclaredType) {
-                    DeclaredType declaredType = (DeclaredType) anInterface;
-                    Element element = declaredType.asElement();
-                    if (element instanceof TypeElement) {
-                        TypeElement te = (TypeElement) element;
-                        String name = te.getQualifiedName().toString();
-                        if (!typeArguments.containsKey(name)) {
-                            Map<String, Object> types = genericUtils.resolveBoundTypes(declaredType);
-                            carryForwardArguments(child, typeArguments, types);
-                            typeArguments.put(name, types);
-                        }
-                        populateTypeArgumentsForInterfaces(typeArguments, te);
-                    }
-                }
-            }
-        }
-
-        private void carryForwardArguments(TypeElement child, Map<String, Map<String, Object>> typeArguments, Map<String, Object> types) {
-            String childName = child.getQualifiedName().toString();
-            //carry forward type arguments from the child
-            if (typeArguments.containsKey(childName)) {
-                typeArguments.get(childName).forEach((arg, type) -> {
-                    if (types.containsKey(arg)) {
-                        types.put(arg, type);
-                    }
-                });
-            }
         }
 
         private boolean isConfigurationProperties(TypeElement concreteClass) {
