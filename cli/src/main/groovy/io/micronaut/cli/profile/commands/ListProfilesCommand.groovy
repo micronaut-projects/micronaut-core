@@ -61,4 +61,9 @@ class ListProfilesCommand implements Command, ProfileRepositoryAware {
         }
         return true
     }
+
+    @Override
+    void reset() {
+
+    }
 }
