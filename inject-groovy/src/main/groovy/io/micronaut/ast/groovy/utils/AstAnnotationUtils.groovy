@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Internal
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassNode
@@ -143,6 +144,9 @@ class AstAnnotationUtils {
      * @return True if it is
      */
     static boolean isAnnotated(AnnotatedNode annotatedNode) {
+        if (AbstractAnnotationMetadataBuilder.isMetadataMutadated(annotatedNode)) {
+            return true
+        }
         for (ann in annotatedNode.annotations) {
             if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(ann.classNode.name)) {
                 return true

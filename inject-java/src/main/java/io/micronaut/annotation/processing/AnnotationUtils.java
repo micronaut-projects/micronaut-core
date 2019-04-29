@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -184,6 +185,9 @@ public class AnnotationUtils {
      * @return True if it is annotated with non internal annotations
      */
     public boolean isAnnotated(ExecutableElement method) {
+        if (AbstractAnnotationMetadataBuilder.isMetadataMutadated(method)) {
+            return true;
+        }
         List<? extends AnnotationMirror> annotationMirrors = method.getAnnotationMirrors();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             String typeName = annotationMirror.getAnnotationType().toString();
