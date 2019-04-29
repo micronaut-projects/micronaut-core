@@ -83,6 +83,19 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         if (StringUtils.isNotEmpty(type)) {
             Map<String, Map<String, Object>> data = visitorContext.getGenericUtils().buildTypeArgumentInfo(classElement);
             Map<String, Object> forType = data.get(type);
+            if (forType != null) {
+                Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
+                for (Map.Entry<String, Object> entry : forType.entrySet()) {
+                    Object v = entry.getValue();
+                    ClassElement ce = v != null ? visitorContext.getClassElement(v.toString()).orElse(null) : null;
+                    if (ce == null) {
+                        return Collections.emptyMap();
+                    } else {
+                        typeArgs.put(entry.getKey(), ce);
+                    }
+                }
+                return Collections.unmodifiableMap(typeArgs);
+            }
         }
         return Collections.emptyMap();
     }
