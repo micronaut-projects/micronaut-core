@@ -22,6 +22,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 
+import javax.inject.Inject;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.Optional;
 
@@ -34,12 +36,22 @@ import java.util.Optional;
  */
 @Singleton
 public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object> {
-    private final ObjectMapper objectMapper;
+    private final Provider<ObjectMapper> objectMapper;
+
+    /**
+     * @param objectMapper To read/write JSON
+     * @deprecated Use {@link #JsonNodeToObjectConverter(Provider)} instead
+     */
+    @Deprecated
+    public JsonNodeToObjectConverter(ObjectMapper objectMapper) {
+        this(() -> objectMapper);
+    }
 
     /**
      * @param objectMapper To read/write JSON
      */
-    public JsonNodeToObjectConverter(ObjectMapper objectMapper) {
+    @Inject
+    public JsonNodeToObjectConverter(Provider<ObjectMapper> objectMapper) {
         this.objectMapper = objectMapper;
     }
 
@@ -49,7 +61,7 @@ public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object
             if (CharSequence.class.isAssignableFrom(targetType) && node instanceof ObjectNode) {
                 return Optional.of(node.toString());
             } else {
-                Object result = objectMapper.treeToValue(node, targetType);
+                Object result = objectMapper.get().treeToValue(node, targetType);
                 return Optional.ofNullable(result);
             }
         } catch (JsonProcessingException e) {

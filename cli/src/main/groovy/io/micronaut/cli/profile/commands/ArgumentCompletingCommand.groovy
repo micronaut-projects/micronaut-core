@@ -51,4 +51,9 @@ abstract class ArgumentCompletingCommand implements Command, Completer {
     int complete(String buffer, int cursor, List<CharSequence> candidates) {
         return new PicocliCompleter(commandSpec).complete(buffer, cursor, candidates)
     }
+
+    @Override
+    void reset() {
+
+    }
 }
