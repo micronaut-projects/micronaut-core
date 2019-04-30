@@ -16,7 +16,6 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
-import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.io.service.ServiceDefinition;
@@ -24,16 +23,16 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.Nonnull;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.lang.model.element.*;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.ExecutableType;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementScanner8;
 import java.util.*;
@@ -193,21 +192,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     superClass.accept(this, o);
                 }
 
-                if (classElement.getKind() == ElementKind.INTERFACE && typeAnnotationMetadata.hasStereotype(Introduction.class)) {
-                    PublicAbstractMethodVisitor<Object, Object> visitor = new PublicAbstractMethodVisitor<Object, Object>(classElement, modelUtils, elementUtils) {
-                        @Override
-                        protected void accept(DeclaredType type, Element element, Object o) {
-                            if (element instanceof ExecutableElement) {
-                                ElementVisitor.this.visitExecutable((ExecutableElement) element, o);
-                            }
-                        }
-                    };
-                    classElement.asType().accept(visitor, null);
-                    return null;
-                } else {
-                    return scan(classElement.getEnclosedElements(), o);
-                }
-
+                return scan(classElement.getEnclosedElements(), o);
             } else {
                 return null;
             }
