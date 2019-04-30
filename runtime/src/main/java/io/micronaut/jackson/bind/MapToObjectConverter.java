@@ -21,6 +21,8 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 
+import javax.inject.Inject;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -35,12 +37,22 @@ import java.util.Optional;
 @Singleton
 public class MapToObjectConverter implements TypeConverter<Map, Object> {
 
-    private final BeanPropertyBinder beanPropertyBinder;
+    private final Provider<BeanPropertyBinder> beanPropertyBinder;
+
+    /**
+     * @param beanPropertyBinder To bind map and Java bean properties
+     * @deprecated Use {@link #MapToObjectConverter(Provider)} instead
+     */
+    @Deprecated
+    public MapToObjectConverter(BeanPropertyBinder beanPropertyBinder) {
+        this(() -> beanPropertyBinder);
+    }
 
     /**
      * @param beanPropertyBinder To bind map and Java bean properties
      */
-    public MapToObjectConverter(BeanPropertyBinder beanPropertyBinder) {
+    @Inject
+    public MapToObjectConverter(Provider<BeanPropertyBinder> beanPropertyBinder) {
         this.beanPropertyBinder = beanPropertyBinder;
     }
 
@@ -59,7 +71,7 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
                                     Object key = entry.getKey();
                                     bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
                                 }
-                                return beanPropertyBinder.bind(object, bindMap);
+                                return beanPropertyBinder.get().bind(object, bindMap);
                             }
                     );
         }

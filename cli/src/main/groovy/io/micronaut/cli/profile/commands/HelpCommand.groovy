@@ -110,4 +110,9 @@ class HelpCommand implements ProfileCommand, ProjectContextAware, ProfileReposit
     boolean handle(ExecutionContext executionContext) {
         run()
     }
+
+    @Override
+    void reset() {
+
+    }
 }

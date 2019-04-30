@@ -341,15 +341,14 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
                 appendFeatureFiles(skeletonDir, cmd.build)
 
+                List<String> featureExcludes = ['**/' + APPLICATION_YML]
+                featureExcludes.addAll(profileInstance.skeletonExcludes)
+
                 if (skeletonDir.exists()) {
-                    copySrcToTarget(ant, skeletonDir, ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
-                    copySrcToTarget(ant, new File(skeletonDir, cmd.build + "-build"), ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
+                    copySrcToTarget(ant, skeletonDir, featureExcludes, profileInstance.binaryExtensions)
+                    copySrcToTarget(ant, new File(skeletonDir, cmd.build + "-build"), featureExcludes, profileInstance.binaryExtensions)
                     ant.chmod(dir: targetDirectory, includes: profileInstance.executablePatterns.join(' '), perm: 'u+x')
                 }
-
-                deleteExcludedFilesFromTarget(ant, targetDirectory, f.excludedFiles)
-                deleteDirectory(tmpDir)
-                deleteDirectory(skeletonDir)
             }
             replaceBuildTokens(cmd.build, profileInstance, features, projectTargetDirectory)
 
@@ -359,13 +358,23 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                 cmd.console.addStatus(profileInstance.instructions)
             }
             MicronautCli.tiggerAppLoad()
-            cleanupState()
             return true
         } else {
             MicronautConsole.getInstance().error "Cannot find profile $profileName"
-            cleanupState()
             return false
         }
+    }
+
+    @Override
+    void reset() {
+        variables = [:]
+        inplace = false
+        profile = null
+        features = []
+        appname = null
+        groupname = null
+        defaultpackagename = null
+        targetDirectory = null
     }
 
     protected void messageOnComplete(MicronautConsole console, CreateServiceCommandObject command, File targetDir) {
@@ -541,8 +550,9 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
             requestedFeatures.removeAll(allFeatureNames)
             requestedFeatures.each { String invalidFeature ->
+                int idx = Math.min(invalidFeature.size(), 2)
                 List possibleSolutions = allFeatureNames.findAll {
-                    it.substring(0, 2) == invalidFeature.substring(0, 2)
+                    it.substring(0, idx) == invalidFeature.substring(0, idx)
                 }
                 StringBuilder warning = new StringBuilder("Feature ${invalidFeature} does not exist in the profile ${profile.name}!")
                 if (possibleSolutions) {
@@ -853,37 +863,6 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                 }
             }
         }
-    }
-
-    @CompileDynamic
-    private void deleteExcludedFilesFromTarget(ConsoleAntBuilder ant, File targetDirectory, List<String> excludedFiles) {
-        if (excludedFiles) {
-            ant.delete {
-                excludedFiles.each { fileToDelete ->
-                    fileset(dir: targetDirectory, includes: fileToDelete)
-                }
-            }
-        }
-    }
-
-    private void deleteDirectory(File directory) {
-        try {
-            directory?.deleteDir()
-        } catch (Throwable t) {
-            // Ignore error deleting temporal directory
-        }
-    }
-
-    private void cleanupState() {
-        variables = [:]
-        inplace = false
-        profile = null
-        features = []
-        appname = null
-        groupname = null
-        defaultpackagename = null
-        targetDirectory = null
-        unzippedDirectories.clear()
     }
 
     static class CreateServiceCommandObject {
