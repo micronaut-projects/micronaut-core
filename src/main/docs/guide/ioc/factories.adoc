@@ -1,4 +1,4 @@
-In many cases, you may want to make available as a bean a class that is not part of your codebase such as those provided by third-party libraries. In this case, you cannot annotate the already compiled class. Instead, you should implement a link:{api}/io/micronaut/context/annotation/Factory.html[Factory].
+In many cases, you may want to make available as a bean a class that is not part of your codebase such as those provided by third-party libraries. In this case, you cannot annotate the already compiled class. Instead, you should implement a ann:context.annotation.Factory[].
 
 A factory is a class annotated with the link:{api}/io/micronaut/context/annotation/Factory.html[Factory] annotation that provides 1 or more methods annotated with a bean scope annotation. Which annotation you use depends on what scope you want the bean to be in. See the section on <<scopes, bean scopes>> for more information.
 
@@ -13,5 +13,15 @@ A factory can have multiple methods annotated with bean scope annotations, each 
 NOTE: If you take this approach, then you should not invoke other bean methods internally within the class. Instead, inject the types via parameters.
 
 TIP: To allow the resulting bean to participate in the application context shutdown process, annotate the method with link:{api}/io/micronaut/context/annotation/Bean.html[@Bean] and set the `preDestroy` argument to the name of the method that should be called to close the bean.
+
+=== Nullability
+
+Factory methods can return null to allow for beans to be created conditionally. The use of ann:context.annotation.Requires[] should always be the preferred method to conditionally create beans and returning null from a factory method should only be done if using ann:context.annotation.Requires[] is not possible.
+
+For example:
+
+snippet::io.micronaut.docs.factories.nullable.Engine,io.micronaut.docs.factories.nullable.EngineConfiguration,io.micronaut.docs.factories.nullable.EngineFactory[tags="class",indent=0]
+
+
 
 

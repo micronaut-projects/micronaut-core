@@ -13,23 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.factories;
+package io.micronaut.docs.factories.nullable;
 
-import io.micronaut.context.annotation.Factory;
-
-import javax.inject.Singleton;
-
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 // tag::class[]
-@Factory
-class EngineFactory {
-
-    @Singleton
-    Engine v8Engine(CrankShaft crankShaft) {
-        return new V8Engine(crankShaft);
-    }
+interface Engine {
+    Integer getCylinders()
 }
-// tag::class[]
+// end::class[]
