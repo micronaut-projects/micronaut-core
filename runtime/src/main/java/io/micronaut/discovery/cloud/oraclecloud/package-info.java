@@ -13,51 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.env;
-
 /**
- * @author Ryan Vanderwerf
- * @since 1.0
+ * Oracle cloud configuration.
+ *
+ * @author Todd Sharp
+ * @since 1.2.0
  */
-public enum ComputePlatform {
+package io.micronaut.discovery.cloud.oraclecloud;
 
-    /**
-     * Google Compute Platform.
-     */
-    GOOGLE_COMPUTE,
-
-    /**
-     * Amazon EC2.
-     */
-    AMAZON_EC2,
-
-    /**
-     * Microsoft Azure.
-     */
-    AZURE,
-
-    /**
-     * Oracle Cloud.
-     */
-    ORACLE_CLOUD,
-
-    /**
-     * Digital Ocean.
-     */
-    DIGITAL_OCEAN,
-
-    /**
-     * Cloud or non cloud provider on bare metal (unknown).
-     */
-    BARE_METAL,
-
-    /**
-     * IBM Cloud.
-     */
-    IBM,
-
-    /**
-     * Other.
-     */
-    OTHER
-}
