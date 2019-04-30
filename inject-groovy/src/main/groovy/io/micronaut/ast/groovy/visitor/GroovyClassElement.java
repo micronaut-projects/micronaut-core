@@ -359,7 +359,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     @Override
     public boolean isAssignable(String type) {
-        return AstClassUtils.isSubclassOf(classNode, type);
+        return AstClassUtils.isSubclassOfOrImplementsInterface(classNode, type);
     }
 
     private ConstructorNode findConcreteConstructor(List<ConstructorNode> constructors) {
