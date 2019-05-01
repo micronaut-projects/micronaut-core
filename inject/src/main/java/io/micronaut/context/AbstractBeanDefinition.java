@@ -751,7 +751,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 Class argumentType = argument.getType();
 
                 if (isInnerConfiguration(argumentType)) {
-                    return ((DefaultBeanContext) context).createBean(resolutionContext, argumentType, null);
+                    Qualifier qualifier = resolveQualifier(resolutionContext, argument, true);
+                    return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                 } else {
                     String argumentName = argument.getName();
                     String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);
@@ -976,7 +977,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pushConstructorResolve(this, argument);
                 try {
                     Object bean;
-                    Qualifier qualifier = resolveQualifier(resolutionContext, argument);
+                    Qualifier qualifier = resolveQualifier(resolutionContext, argument, isInnerConfiguration(argumentType));
                     //noinspection unchecked
                     bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                     path.pop();
@@ -1170,7 +1171,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 String valueAnnVal = annotationMetadata.getValue(Value.class, String.class).orElse(null);
                 Class<?> fieldType = injectionPoint.getType();
                 if (isInnerConfiguration(fieldType)) {
-                    return context.createBean(fieldType);
+                    Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint.asArgument(), true);
+                    return ((DefaultBeanContext) context).getBean(resolutionContext, fieldType, qualifier);
                 } else {
                     String valString = resolvePropertyValueName(resolutionContext, injectionPoint, valueAnnVal, annotationMetadata);
                     Argument fieldArgument = injectionPoint.asArgument();
@@ -1340,7 +1342,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             path.pushFieldResolve(this, injectionPoint);
 
             try {
-                Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint);
+                Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint.asArgument());
                 @SuppressWarnings("unchecked") Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, beanType, qualifier);
                 path.pop();
                 return bean;
@@ -1706,7 +1708,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
         try {
             Optional<Class> genericType = injectionPoint.getType().isArray() ? Optional.of(injectionPoint.getType().getComponentType()) : injectionPoint.asArgument().getFirstTypeVariable().map(Argument::getType);
-            Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint);
+            Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint.asArgument());
             @SuppressWarnings("unchecked") B bean = (B) beanResolver.resolveBean(genericType.orElse(injectionPoint.getType()), qualifier);
             path.pop();
             return bean;
@@ -1719,11 +1721,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         return isConfigurationProperties;
     }
 
-    private Qualifier resolveQualifier(BeanResolutionContext resolutionContext, FieldInjectionPoint injectionPoint) {
-        return resolveQualifier(resolutionContext, injectionPoint.asArgument());
+    private Qualifier resolveQualifier(BeanResolutionContext resolutionContext, Argument argument) {
+        return resolveQualifier(resolutionContext, argument, false);
     }
 
-    private Qualifier resolveQualifier(BeanResolutionContext resolutionContext, Argument argument) {
+    private Qualifier resolveQualifier(BeanResolutionContext resolutionContext, Argument argument, boolean innerConfiguration) {
         Qualifier qualifier = null;
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         Optional<Class<? extends Annotation>> qualifierType = annotationMetadata.getAnnotationTypeByStereotype(javax.inject.Qualifier.class);
@@ -1742,12 +1744,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
                         .map(map -> (Qualifier) map.get(argument));
                 qualifier = optional.orElse(null);
-                if (qualifier == null && isIterable() && argument.isAnnotationPresent(Parameter.class)) {
-
-                    qualifier = optional.orElseGet(() -> {
-                        final Optional<String> n = resolutionContext.get(Named.class.getName(), String.class);
-                        return n.map(Qualifiers::byName).orElse(null);
-                    });
+                if (qualifier == null && isIterable()) {
+                    if (argument.isAnnotationPresent(Parameter.class) || innerConfiguration) {
+                        qualifier = optional.orElseGet(() -> {
+                            final Optional<String> n = resolutionContext.get(Named.class.getName(), String.class);
+                            return n.map(Qualifiers::byName).orElse(null);
+                        });
+                    }
                 }
             }
         }

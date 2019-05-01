@@ -15,6 +15,7 @@
  */
 package io.micronaut.docs.factories;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.DefaultBeanContext;
 import org.junit.Test;
 
@@ -24,13 +25,12 @@ public class VehicleSpec {
 
     @Test
     public void testStartVehicle() {
-        // tag::start[]
-        Vehicle vehicle = new DefaultBeanContext()
-                .start()
-                .getBean(Vehicle.class);
+        BeanContext beanContext = new DefaultBeanContext().start();
+        Vehicle vehicle = beanContext.getBean(Vehicle.class);
         System.out.println( vehicle.start() );
-        // end::start[]
 
         assertEquals("Starting V8", vehicle.start());
+
+        beanContext.close();
     }
 }

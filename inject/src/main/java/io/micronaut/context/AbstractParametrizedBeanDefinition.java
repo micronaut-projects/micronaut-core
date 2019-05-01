@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -86,6 +87,7 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
 
         requiredArgumentValues = requiredArgumentValues != null ? new LinkedHashMap<>(requiredArgumentValues) : Collections.emptyMap();
         Argument<?>[] requiredArguments = getRequiredArguments();
+        Optional<Class> eachBeanType = definition.getValue(EachBean.class, Class.class);
         for (Argument<?> requiredArgument : requiredArguments) {
             if (requiredArgument.getType() == BeanResolutionContext.class) {
                 requiredArgumentValues.put(requiredArgument.getName(), resolutionContext);
@@ -96,6 +98,9 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
                 path.pushConstructorResolve(this, requiredArgument);
                 String argumentName = requiredArgument.getName();
                 if (!requiredArgumentValues.containsKey(argumentName) && !requiredArgument.isAnnotationPresent(Nullable.class)) {
+                    if (eachBeanType.filter(type -> type == requiredArgument.getType()).isPresent()) {
+                        return null;
+                    }
                     throw new BeanInstantiationException(resolutionContext, "Missing bean argument value: " + argumentName);
                 }
                 Object value = requiredArgumentValues.get(argumentName);

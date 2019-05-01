@@ -447,13 +447,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         ElementFilter.methodsIn(members).forEach(method -> {
                             boolean isCandidateMethod = !modelUtils.isStatic(method) &&
                                     !modelUtils.isPrivate(method) &&
-                                    !modelUtils.isAbstract(method) &&
-                                    method.getParameters().size() == 1 &&
-                                    NameUtils.isSetterName(method.getSimpleName().toString());
+                                    !modelUtils.isAbstract(method);
                             if (isCandidateMethod) {
                                 Element e = method.getEnclosingElement();
                                 if (e instanceof TypeElement && !e.equals(classElement)) {
-                                    visitConfigurationPropertySetter(method);
+                                    String methodName = method.getSimpleName().toString();
+                                    if (method.getParameters().size() == 1 &&
+                                            NameUtils.isSetterName(methodName)) {
+                                        visitConfigurationPropertySetter(method);
+                                    } else if (NameUtils.isGetterName(methodName)) {
+                                        BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
+                                        if (!writer.isValidated() && annotationUtils.hasStereotype(method, "javax.validation.Constraint")) {
+                                            writer.setValidated(true);
+                                        }
+                                    }
                                 }
                             }
                         });
@@ -592,8 +599,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (isExecutable) {
                 visitExecutableMethod(method, methodAnnotationMetadata);
                 return null;
-            } else if (isConfigurationPropertiesType && !modelUtils.isPrivate(method) && !modelUtils.isStatic(method) && NameUtils.isSetterName(method.getSimpleName().toString()) && method.getParameters().size() == 1) {
-                visitConfigurationPropertySetter(method);
+            } else if (isConfigurationPropertiesType && !modelUtils.isPrivate(method) && !modelUtils.isStatic(method)) {
+                String methodName = method.getSimpleName().toString();
+                if (NameUtils.isSetterName(methodName) && method.getParameters().size() == 1) {
+                    visitConfigurationPropertySetter(method);
+                } else if (NameUtils.isGetterName(methodName)) {
+                    BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
+                    if (!writer.isValidated() && annotationUtils.hasStereotype(method, ANN_CONSTRAINT)) {
+                        writer.setValidated(true);
+                    }
+                }
             } else if (isPublic) {
                 final boolean isConstrained =
                         method.getParameters()
@@ -609,9 +624,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private void visitConfigurationPropertySetter(ExecutableElement method) {
             BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
-            if (!writer.isValidated() && annotationUtils.hasStereotype(method, ANN_CONSTRAINT)) {
-                writer.setValidated(true);
-            }
             VariableElement parameter = method.getParameters().get(0);
             TypeMirror valueType = parameter.asType();
             Object fieldType = modelUtils.resolveTypeReference(valueType);

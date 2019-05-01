@@ -114,4 +114,11 @@ class JacksonSetupSpec extends Specification {
         'LOWER_CASE'                           | PropertyNamingStrategy.LOWER_CASE
         'KEBAB_CASE'                           | PropertyNamingStrategy.KEBAB_CASE
     }
+
+    void "test property naming strategy from yml"() {
+        ApplicationContext applicationContext = ApplicationContext.run("jackson")
+
+        expect:
+        applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy == PropertyNamingStrategy.SNAKE_CASE
+    }
 }
