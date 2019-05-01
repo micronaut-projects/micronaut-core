@@ -144,8 +144,14 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String AZURE = "azure";
 
     /**
+     * Cloud provider Oracle Cloud.
+     */
+    String ORACLE_CLOUD = "oraclecloud";
+
+    /**
      * Cloud provider Digital Ocean.
      */
+
     String DIGITAL_OCEAN = "digitalocean";
     /**
      * Cloud or non cloud provider on bare metal (unknown).

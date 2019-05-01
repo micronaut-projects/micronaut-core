@@ -37,6 +37,11 @@ public enum ComputePlatform {
     AZURE,
 
     /**
+     * Oracle Cloud.
+     */
+    ORACLE_CLOUD,
+
+    /**
      * Digital Ocean.
      */
     DIGITAL_OCEAN,

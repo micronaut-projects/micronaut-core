@@ -26,7 +26,6 @@ import javax.validation.Validation
 class ValidatedConfigurationSpec extends Specification {
 
     void "test validated config with invalid config"() {
-
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.registerSingleton(
@@ -41,10 +40,12 @@ class ValidatedConfigurationSpec extends Specification {
         def e = thrown(BeanInstantiationException)
         e.message.contains('url - must not be null')
         e.message.contains('name - must not be blank')
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test validated config with valid config"() {
-
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(PropertySource.of(
@@ -66,5 +67,7 @@ class ValidatedConfigurationSpec extends Specification {
         config.url == new URL("http://localhost")
         config.name == 'test'
 
+        cleanup:
+        applicationContext.close()
     }
 }
