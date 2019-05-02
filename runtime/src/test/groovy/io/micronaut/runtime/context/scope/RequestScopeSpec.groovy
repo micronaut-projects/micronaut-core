@@ -17,17 +17,10 @@ package io.micronaut.runtime.context.scope
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.RxHttpClient
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.support.AbstractBeanDefinitionSpec
 
-import javax.inject.Inject
 import javax.inject.Scope
-import javax.inject.Singleton
 
 /**
  * @author Marcel Overdijk
@@ -62,34 +55,6 @@ class RequestBean {
         aDefinition.getAnnotationNameByStereotype(Scope).get() == Request.name
     }
 
-    void "test bean created per request"() {
-        given:
-        ApplicationContext applicationContext = ApplicationContext.run(Environment.TEST)
-        EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer).start()
-        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
-
-        when:
-        def result = client.retrieve(HttpRequest.GET("/test"), String).blockingFirst()
-
-        then:
-        result == "message count 1, count within request 1"
-
-        when:
-        result = client.retrieve(HttpRequest.GET("/test"), String).blockingFirst()
-
-        then:
-        result == "message count 2, count within request 1"
-
-        when:
-        result = client.retrieve(HttpRequest.GET("/test"), String).blockingFirst()
-
-        then:
-        result == "message count 3, count within request 1"
-
-        cleanup:
-        embeddedServer.stop()
-    }
-
     @Request
     static class RequestBean {
 
@@ -98,36 +63,6 @@ class RequestBean {
         int count() {
             num++
             return num
-        }
-    }
-
-    @Singleton
-    static class MessageService {
-
-        @Inject
-        RequestBean requestBean
-
-        int num = 0
-
-        int count() {
-            num++
-            return num
-        }
-
-        String getMessage() {
-            return "message count ${count()}, count within request ${requestBean.count()}"
-        }
-    }
-
-    @Controller
-    static class TestController {
-
-        @Inject
-        MessageService messageService
-
-        @Get("/test")
-        String test() {
-            return messageService.message
         }
     }
 }

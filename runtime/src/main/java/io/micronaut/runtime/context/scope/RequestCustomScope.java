@@ -42,7 +42,7 @@ import java.util.WeakHashMap;
 @Singleton
 class RequestCustomScope implements CustomScope<Request>, LifeCycle<RequestCustomScope> {
 
-    private WeakHashMap<HttpRequest, Map<String, Object>> requestScope = new WeakHashMap<>();
+    private final Map<HttpRequest, Map<String, Object>> requestScope = new WeakHashMap<>();
 
     @Override
     public Class<Request> annotationType() {
