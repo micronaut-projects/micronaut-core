@@ -16,12 +16,18 @@
 package io.micronaut.ast.groovy.utils
 
 import groovy.transform.CompileStatic
+import io.micronaut.ast.groovy.visitor.GroovyClassElement
 import io.micronaut.core.util.ArrayUtils
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.visitor.VisitorContext
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.tools.GenericsUtils
+
+import javax.lang.model.element.Element
+import javax.lang.model.element.TypeElement
 
 /**
  * @author Graeme Rocher
@@ -159,7 +165,12 @@ class AstGenericUtils {
 
                     String typeVar = classNode.genericsTypes[0].name
                     if (boundTypes.containsKey(typeVar)) {
-                        return boundTypes.get(typeVar).name
+                        def resolved = boundTypes.get(typeVar)
+                        if (resolved.isGenericsPlaceHolder()) {
+                            return resolveTypeReference(resolved, boundTypes)
+                        } else {
+                            return resolved.name
+                        }
                     }
                 } else {
                     if (classNode.isResolved() || ClassHelper.isPrimitiveType(classNode)) {
@@ -209,6 +220,119 @@ class AstGenericUtils {
         extractPlaceholders(classNode, resolvedGenericTypes, boundTypes)
         return resolvedGenericTypes
     }
+
+    /**
+     * Builds all the generic information for the given type
+     * @param classNode
+     * @return
+     */
+    static Map<String, Map<String, Object>> buildAllGenericTypeInfo(ClassNode classNode) {
+        Map<String, Map<String, Object>> typeArguments = new HashMap<>()
+
+        populateTypeArguments(classNode, typeArguments)
+
+        return typeArguments
+    }
+
+    /**
+     * Builds all the generic information for the given type
+     * @param classNode
+     * @return
+     */
+    static Map<String, Map<String, ClassNode>> buildAllGenericElementInfo(ClassNode classNode, VisitorContext visitorContext) {
+        Map<String, Map<String, Object>> typeArguments = new HashMap<>()
+
+        populateTypeArguments(classNode, typeArguments)
+
+        Map<String, Map<String, ClassNode>> elements = new HashMap<>(typeArguments.size())
+        for (Map.Entry<String, Map<String, Object>> entry : typeArguments.entrySet()) {
+            Map<String, Object> value = entry.getValue()
+            HashMap<String, ClassNode> submap = new HashMap<>(value.size())
+            for (Map.Entry<String, Object> genericEntry : value.entrySet()) {
+                def v = genericEntry.getValue()
+                ClassNode te = null
+                if (v instanceof Class) {
+                    te = ClassHelper.makeCached( (Class)v )
+                } else if(v instanceof String) {
+                    def ce = visitorContext.getClassElement(v).orElse(null)
+                    def nativeType = ce?.nativeType
+                    if (nativeType instanceof ClassNode) {
+                        te = (ClassNode) nativeType
+                    }
+                }
+                if (te != null) {
+                    submap.put(genericEntry.getKey(), te)
+                }
+            }
+            elements.put(entry.getKey(), submap)
+        }
+        return elements
+    }
+
+    static void populateTypeArguments(ClassNode typeElement, Map<String, Map<String, Object>> typeArguments) {
+        ClassNode current = typeElement
+        ClassNode last = null
+        while (current != null) {
+
+            if (current != ClassHelper.OBJECT_TYPE) {
+                GenericsType[] superArguments = current.redirect().getGenericsTypes()
+                if (ArrayUtils.isNotEmpty(superArguments)) {
+                    Map<String, ClassNode> genericSpec = createGenericsSpec(current)
+                    Map<String, Object> arguments = new LinkedHashMap<>(3)
+                    if (genericSpec) {
+                        for (gt in superArguments) {
+                            ClassNode cn = genericSpec.get(gt.name)
+                            if (cn != null) {
+                                arguments.put(gt.name, resolveTypeReference(cn, genericSpec))
+                            }
+                        }
+                    }
+                    if (last != null) {
+                        carryForwardTypeArguments(last, typeArguments, arguments)
+                    }
+                    typeArguments.put(current.name, arguments)
+                }
+            }
+
+            populateTypeArgumentsForInterfaces(typeArguments, current)
+
+            last = current
+            current = current.getUnresolvedSuperClass()
+        }
+    }
+
+    private static void populateTypeArgumentsForInterfaces(Map<String, Map<String, Object>> typeArguments, ClassNode current) {
+        for (ClassNode anInterface : current.getInterfaces()) {
+            String name = anInterface.name
+            if (!typeArguments.containsKey(name)) {
+
+                Map<String, ClassNode> genericSpec = createGenericsSpec(anInterface)
+
+                if (genericSpec) {
+                    Map<String, Object> types = [:]
+                    for (entry in genericSpec) {
+                        types[entry.key] = resolveTypeReference(entry.value, genericSpec)
+                    }
+                    carryForwardTypeArguments(current, typeArguments, types)
+                    typeArguments.put(name, types)
+                }
+
+                populateTypeArgumentsForInterfaces(typeArguments, anInterface)
+            }
+        }
+    }
+
+    private static void carryForwardTypeArguments(ClassNode child, Map<String, Map<String, Object>> typeArguments, Map<String, Object> types) {
+        String childName = child.name
+        if (typeArguments.containsKey(childName)) {
+            typeArguments.get(childName).forEach({ arg, type ->
+                if (types.containsKey(arg)) {
+                    types.put(arg, type)
+                }
+            })
+        }
+    }
+
 
 
     static Map<String, Object> extractPlaceholders(ClassNode cn) {

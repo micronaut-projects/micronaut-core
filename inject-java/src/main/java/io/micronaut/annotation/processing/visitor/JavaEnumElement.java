@@ -41,7 +41,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
      * @param typeArguments The type arguments
      */
     JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, List<? extends TypeMirror> typeArguments) {
-        super(classElement, annotationMetadata, visitorContext, typeArguments);
+        super(classElement, annotationMetadata, visitorContext, typeArguments, Collections.emptyMap());
     }
 
     @Override

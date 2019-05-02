@@ -50,6 +50,7 @@ class LoadedVisitor {
     private final TypeElementVisitor visitor
     private final String classAnnotation
     private final String elementAnnotation
+    private GroovyClassElement currentClassElement
 
     LoadedVisitor( SourceUnit source, TypeElementVisitor visitor) {
         this.sourceUnit = source
@@ -130,23 +131,25 @@ class LoadedVisitor {
                 visitor.visitField(e, visitorContext)
                 return e
             case ConstructorNode:
-                def e = new GroovyConstructorElement(sourceUnit, (ConstructorNode) annotatedNode, annotationMetadata)
+                def e = new GroovyConstructorElement(currentClassElement, sourceUnit, (ConstructorNode) annotatedNode, annotationMetadata)
                 visitor.visitConstructor(e, visitorContext)
                 return e
             case MethodNode:
-                def e = new GroovyMethodElement(sourceUnit, (MethodNode) annotatedNode, annotationMetadata)
-                visitor.visitMethod(e, visitorContext)
-                return e
+                if (currentClassElement != null) {
+                    def e = new GroovyMethodElement(currentClassElement, sourceUnit, (MethodNode) annotatedNode, annotationMetadata)
+                    visitor.visitMethod(e, visitorContext)
+                    return e
+                }
             case ClassNode:
                 ClassNode cn = (ClassNode) annotatedNode
                 if (cn.isEnum()) {
-                    def e = new GroovyEnumElement(sourceUnit, cn, annotationMetadata)
-                    visitor.visitClass(e, visitorContext)
-                    return e
+                    currentClassElement = new GroovyEnumElement(sourceUnit, cn, annotationMetadata)
+                    visitor.visitClass(currentClassElement, visitorContext)
+                    return currentClassElement
                 } else {
-                    def e = new GroovyClassElement(sourceUnit, cn, annotationMetadata)
-                    visitor.visitClass(e, visitorContext)
-                    return e
+                    currentClassElement = new GroovyClassElement(sourceUnit, cn, annotationMetadata)
+                    visitor.visitClass(currentClassElement, visitorContext)
+                    return currentClassElement
                 }
         }
 

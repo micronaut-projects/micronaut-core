@@ -31,7 +31,9 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import java.lang.annotation.Annotation;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -125,6 +127,25 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         return element.toString();
     }
 
+
+    /**
+     * Returns a class element with aligned generic information.
+     * @param typeMirror The type mirror
+     * @param visitorContext The visitor context
+     * @param declaredGenericInfo The declared generic info
+     * @return The class element
+     */
+    protected @Nonnull ClassElement parameterizedClassElement(
+            TypeMirror typeMirror,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, Element>> declaredGenericInfo) {
+        return mirrorToClassElement(
+                typeMirror,
+                visitorContext,
+                declaredGenericInfo
+        );
+    }
+
     /**
      * Obtain the ClassElement for the given mirror.
      *
@@ -133,6 +154,21 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @return The class element
      */
     protected ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext) {
+        return mirrorToClassElement(returnType, visitorContext, Collections.emptyMap());
+    }
+
+    /**
+     * Obtain the ClassElement for the given mirror.
+     *
+     * @param returnType The return type
+     * @param visitorContext The visitor context
+     * @param genericsInfo The generic informatino
+     * @return The class element
+     */
+    protected ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, Element>> genericsInfo) {
+        if (genericsInfo == null) {
+            genericsInfo = Collections.emptyMap();
+        }
         if (returnType instanceof NoType) {
             return new JavaVoidElement();
         } else if (returnType instanceof DeclaredType) {
@@ -141,6 +177,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
             if (e instanceof TypeElement) {
                 TypeElement typeElement = (TypeElement) e;
+                Map<String, Element> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
                 if (JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
                     return new JavaEnumElement(
                             typeElement,
@@ -149,27 +186,45 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                             typeArguments
                     );
                 } else {
+                    genericsInfo = visitorContext.getGenericUtils().alignNewGenericsInfo(
+                        typeElement,
+                        boundGenerics
+                    );
                     return new JavaClassElement(
                             typeElement,
                             visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
                             visitorContext,
-                            typeArguments
+                            typeArguments,
+                            genericsInfo
                     );
                 }
             }
         } else if (returnType instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) returnType;
             TypeMirror upperBound = tv.getUpperBound();
-            ClassElement classElement = mirrorToClassElement(upperBound, visitorContext);
-            if (classElement != null) {
-                return classElement;
+            Map<String, Element> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
+
+            Element bound = boundGenerics.get(tv.toString());
+            if (bound instanceof TypeElement) {
+                return new JavaClassElement(
+                        (TypeElement) bound,
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(bound),
+                        visitorContext
+                );
             } else {
-                return mirrorToClassElement(tv.getLowerBound(), visitorContext);
+
+                ClassElement classElement = mirrorToClassElement(upperBound, visitorContext, genericsInfo);
+                if (classElement != null) {
+                    return classElement;
+                } else {
+                    return mirrorToClassElement(tv.getLowerBound(), visitorContext, genericsInfo);
+                }
             }
+
         } else if (returnType instanceof ArrayType) {
             ArrayType at = (ArrayType) returnType;
             TypeMirror componentType = at.getComponentType();
-            ClassElement arrayType = mirrorToClassElement(componentType, visitorContext);
+            ClassElement arrayType = mirrorToClassElement(componentType, visitorContext, genericsInfo);
             if (arrayType != null) {
                 if (arrayType instanceof JavaPrimitiveElement) {
                     JavaPrimitiveElement jpe = (JavaPrimitiveElement) arrayType;
@@ -188,6 +243,19 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             return JavaPrimitiveElement.valueOf(pt.getKind().name());
         }
         return null;
+    }
+
+    private Map<String, Element> resolveBoundGenerics(JavaVisitorContext visitorContext, Map<String, Map<String, Element>> genericsInfo) {
+        String declaringTypeName = null;
+        TypeElement typeElement = visitorContext.getModelUtils().classElementFor(element);
+        if (typeElement != null) {
+            declaringTypeName = typeElement.getQualifiedName().toString();
+        }
+        Map<String, Element> boundGenerics = genericsInfo.get(declaringTypeName);
+        if (boundGenerics == null) {
+            boundGenerics = Collections.emptyMap();
+        }
+        return boundGenerics;
     }
 
     private boolean hasModifier(Modifier modifier) {
