@@ -325,7 +325,7 @@ public class GenericUtils {
                 if (boundTypes.containsKey(name)) {
                     return boundTypes.get(name);
                 } else {
-                    return modelUtils.resolveTypeReference(mirror);
+                    return resolveTypeReference(tv.getUpperBound(), boundTypes);
                 }
             case WILDCARD:
                 WildcardType wcType = (WildcardType) mirror;

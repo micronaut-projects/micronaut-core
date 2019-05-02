@@ -797,6 +797,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                                         Map<String, Object> returnTypeGenericTypes,
                                                         String methodName,
                                                         Map<String, Object> argumentTypes,
+                                                        Map<String, Object> genericArgumentTypes,
                                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                                         Map<String, Map<String, Object>> genericTypes,
                                                         AnnotationMetadata annotationMetadata) {
@@ -817,6 +818,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 returnTypeGenericTypes,
                 methodName,
                 argumentTypes,
+                genericArgumentTypes,
                 argumentAnnotationMetadata,
                 genericTypes
         );
