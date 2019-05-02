@@ -427,6 +427,29 @@ public class GenericUtils {
         return boundTypes;
     }
 
+    /**
+     * Takes a type element and the bound generic information and re-aligns for the new type.
+     * @param typeElement The type element
+     * @param genericsInfo The generic info
+     * @return The aligned generics
+     */
+    public Map<String, Map<String, Element>> alignNewGenericsInfo(TypeElement typeElement, Map<String, Element> genericsInfo) {
+        String typeName = typeElement.getQualifiedName().toString();
+        List<? extends TypeParameterElement> typeParameters = typeElement.getTypeParameters();
+        Map<String, Element> resolved = new HashMap<>(genericsInfo.size());
+        for (TypeParameterElement typeParameter : typeParameters) {
+            String name = typeParameter.getSimpleName().toString();
+            Element element = genericsInfo.get(name);
+            if (element != null) {
+                resolved.put(name, element);
+            }
+        }
+        return Collections.singletonMap(
+                typeName,
+                resolved
+        );
+    }
+
     private void resolveGenericTypeParameter(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror, Map<String, Object> boundTypes) {
         if (mirror instanceof DeclaredType) {
             DeclaredType declaredType = (DeclaredType) mirror;

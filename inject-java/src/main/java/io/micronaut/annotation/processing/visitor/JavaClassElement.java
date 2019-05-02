@@ -70,12 +70,19 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      * @param typeArguments      The type arguments
+     * @param genericsInfo       The generic type info
      */
-    JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, List<? extends TypeMirror> typeArguments) {
+    JavaClassElement(
+            TypeElement classElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext,
+            List<? extends TypeMirror> typeArguments,
+            Map<String, Map<String, Element>> genericsInfo) {
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         this.typeArguments = typeArguments;
+        this.genericTypeInfo = genericsInfo;
     }
 
     @Nonnull
@@ -193,10 +200,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                         if (classElement != null) {
                             getterReturnType = classElement;
                         } else {
-                            getterReturnType = mirrorToClassElement(returnType, visitorContext);
+                            getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo);
                         }
                     } else {
-                        getterReturnType = mirrorToClassElement(returnType, visitorContext);
+                        getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo);
                     }
 
                     if (getterReturnType != null) {
@@ -207,7 +214,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                         beanPropertyData.getter = executableElement;
                         if (beanPropertyData.setter != null) {
                             TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();
-                            ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext);
+                            ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
                             if (setterParameterType == null || !setterParameterType.getName().equals(getterReturnType.getName())) {
                                 beanPropertyData.setter = null; // not a compatible setter
                             }
@@ -216,7 +223,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                 } else if (NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1) {
                     String propertyName = NameUtils.getPropertyNameForSetter(methodName);
                     TypeMirror typeMirror = executableElement.getParameters().get(0).asType();
-                    ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext);
+                    ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
 
                     if (setterParameterType != null) {
 
@@ -379,7 +386,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                 TypeParameterElement tpe = tpi.next();
                 TypeMirror typeMirror = tai.next();
 
-                ClassElement classElement = mirrorToClassElement(typeMirror, visitorContext);
+                ClassElement classElement = mirrorToClassElement(typeMirror, visitorContext, this.genericTypeInfo);
                 if (classElement != null) {
                     map.put(tpe.toString(), classElement);
                 }

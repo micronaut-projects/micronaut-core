@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.control.SourceUnit;
@@ -124,9 +125,18 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         Map<String, ClassNode> genericsSpec = getGenericsSpec();
 
         if (CollectionUtils.isNotEmpty(genericsSpec)) {
-            ClassElement classNode = resolveGenericType(genericsSpec, type);
+            ClassElement classNode = resolveGenericType(genericsSpec, type, rawElement);
             if (classNode != null) {
                 return classNode;
+            } else {
+                GenericsType[] genericsTypes = type.getGenericsTypes();
+                if (genericsTypes != null) {
+                    genericsSpec = alignNewGenericsInfo(genericsTypes, genericsSpec);
+                    return new GroovyClassElement(sourceUnit, type, rawElement.getAnnotationMetadata(), Collections.singletonMap(
+                            type.getName(),
+                            genericsSpec
+                    ));
+                }
             }
         }
         return rawElement;
@@ -154,18 +164,15 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         return genericsSpec;
     }
 
-    private ClassElement resolveGenericType(Map<String, ClassNode> typeGenericInfo, ClassNode returnType) {
+    private ClassElement resolveGenericType(Map<String, ClassNode> typeGenericInfo, ClassNode returnType, ClassElement rawElement) {
         if (returnType.isGenericsPlaceHolder()) {
             String unresolvedName = returnType.getUnresolvedName();
             ClassNode classNode = typeGenericInfo.get(unresolvedName);
             if (classNode != null) {
                 if (classNode.isGenericsPlaceHolder()) {
-                    return resolveGenericType(typeGenericInfo, classNode);
+                    return resolveGenericType(typeGenericInfo, classNode, rawElement);
                 } else {
-                    return new GroovyClassElement(sourceUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
-                            sourceUnit,
-                            classNode
-                    ));
+                    return new GroovyClassElement(sourceUnit, classNode, rawElement.getAnnotationMetadata());
                 }
             }
         }

@@ -29,9 +29,13 @@ class Foo {}
 ''')
         expect:
         IntroductionVisitor.VISITED_CLASS_ELEMENTS.size() == 1
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS.size() == 2
+        IntroductionVisitor.VISITED_METHOD_ELEMENTS.size() == 3
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].name == 'save'
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].genericReturnType.name == 'test.Foo'
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].parameters[0].genericType.name == 'test.Foo'
+        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.name == Iterable.name
+        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().isPresent()
+        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().get().name == 'test.Foo'
+        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].genericReturnType.getFirstTypeArgument().get().name == 'test.Foo'
     }
 }
