@@ -31,11 +31,12 @@ import javax.lang.model.element.ExecutableElement;
 class JavaConstructorElement extends JavaMethodElement implements ConstructorElement {
 
     /**
+     * @param declaringClass     The declaring class
      * @param executableElement  The {@link ExecutableElement}
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      */
-    JavaConstructorElement(ExecutableElement executableElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(executableElement, annotationMetadata, visitorContext);
+    JavaConstructorElement(JavaClassElement declaringClass, ExecutableElement executableElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
+        super(declaringClass, executableElement, annotationMetadata, visitorContext);
     }
 }

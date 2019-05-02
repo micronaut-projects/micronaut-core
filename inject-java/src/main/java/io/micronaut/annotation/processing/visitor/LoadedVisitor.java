@@ -45,6 +45,7 @@ public class LoadedVisitor implements Ordered {
     private final String classAnnotation;
     private final String elementAnnotation;
     private final JavaVisitorContext visitorContext;
+    private JavaClassElement currentClassElement;
 
     /**
      * @param visitor               The {@link TypeElementVisitor}
@@ -134,49 +135,55 @@ public class LoadedVisitor implements Ordered {
             return e;
         } else if (element instanceof ExecutableElement) {
             ExecutableElement executableElement = (ExecutableElement) element;
-            if (executableElement.getSimpleName().toString().equals("<init>")) {
-                final JavaConstructorElement e = new JavaConstructorElement(
-                        executableElement,
-                        annotationMetadata, visitorContext);
-                visitor.visitConstructor(
-                        e,
-                        visitorContext
-                );
-                return e;
-            } else {
-                final JavaMethodElement e = new JavaMethodElement(
-                        executableElement,
-                        annotationMetadata, visitorContext);
-                visitor.visitMethod(
-                        e,
-                        visitorContext
-                );
-                return e;
+            if (currentClassElement != null) {
+
+                if (executableElement.getSimpleName().toString().equals("<init>")) {
+                    final JavaConstructorElement e = new JavaConstructorElement(
+                            currentClassElement,
+                            executableElement,
+                            annotationMetadata,
+                            visitorContext);
+                    visitor.visitConstructor(
+                            e,
+                            visitorContext
+                    );
+                    return e;
+                } else {
+                    final JavaMethodElement e = new JavaMethodElement(
+                            currentClassElement,
+                            executableElement,
+                            annotationMetadata, visitorContext);
+                    visitor.visitMethod(
+                            e,
+                            visitorContext
+                    );
+                    return e;
+                }
             }
         } else if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
             boolean isEnum = JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent();
             if (isEnum) {
-                final JavaEnumElement e = new JavaEnumElement(
+                this.currentClassElement = new JavaEnumElement(
                         typeElement,
                         annotationMetadata,
                         visitorContext,
                         Collections.emptyList());
                 visitor.visitClass(
-                        e,
+                        currentClassElement,
                         visitorContext
                 );
-                return e;
+                return currentClassElement;
             } else {
-                final JavaClassElement e = new JavaClassElement(
+                this.currentClassElement =  new JavaClassElement(
                         typeElement,
                         annotationMetadata,
                         visitorContext);
                 visitor.visitClass(
-                        e,
+                        currentClassElement,
                         visitorContext
                 );
-                return e;
+                return currentClassElement;
             }
         }
         return null;

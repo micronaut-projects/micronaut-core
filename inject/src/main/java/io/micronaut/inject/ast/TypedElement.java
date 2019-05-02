@@ -34,6 +34,20 @@ public interface TypedElement extends Element {
     ClassElement getType();
 
     /**
+     * Returns the generic type of the element. This differs from {@link #getType()} as it returns
+     * the actual type without erasure. Whilst {@link #getType()} is often needed to produce the correct byte code when
+     * generating code via ASM, the {@code getGenericType()} method is more useful for documentation and other types of code
+     * generation.
+     *
+     * @return The generic type
+     * @since 1.1.1
+     */
+    @Nullable
+    default ClassElement getGenericType() {
+        return getType();
+    }
+
+    /**
      * Whether the type is primitive.
      * @return True if it is
      */
