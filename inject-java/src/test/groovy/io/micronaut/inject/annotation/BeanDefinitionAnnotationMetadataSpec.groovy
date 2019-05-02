@@ -25,6 +25,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
+import spock.lang.Issue
 
 import javax.inject.Scope
 import javax.inject.Singleton
@@ -34,6 +35,25 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class BeanDefinitionAnnotationMetadataSpec extends AbstractTypeElementSpec {
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1607')
+    void "test recursive generics"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.RecursiveGenerics;
+
+@javax.inject.Singleton
+class Test extends RecursiveGenerics<Test> {
+
+}
+''')
+        expect:
+        definition != null
+        definition.getTypeArguments(RecursiveGenerics).size() == 1
+        definition.getTypeArguments(RecursiveGenerics).get(0).type.name == 'test.Test'
+    }
 
     void "test alias for existing member values within annotation values"() {
         given:

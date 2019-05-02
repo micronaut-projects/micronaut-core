@@ -42,7 +42,7 @@ class Test {
 ''')
         expect:
         definition != null
-        definition.findMethod("apply", Object.class).isPresent()
+        definition.findMethod("apply", String.class).isPresent()
         definition.getTypeArguments(Function).size() == 2
         definition.getTypeArguments(Function)[0].name == 'T'
         definition.getTypeArguments(Function)[1].name == 'R'

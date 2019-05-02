@@ -19,6 +19,8 @@ import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.inject.ast.EnumElement
 
+import java.util.function.Supplier
+
 class ClassElementSpec extends AbstractBeanDefinitionSpec {
 
     def setup() {
@@ -27,6 +29,31 @@ class ClassElementSpec extends AbstractBeanDefinitionSpec {
 
     def cleanup() {
         AllElementsVisitor.clearVisited()
+    }
+
+    void "test resolve generic type using getTypeArguments"() {
+        buildBeanDefinition('test.TestController', '''
+package test;
+
+import io.micronaut.http.annotation.*;
+import javax.inject.Inject;
+
+@Controller("/test")
+public class TestController implements java.util.function.Supplier<String> {
+    
+    @Get("/getMethod")
+    public String get() {
+        return null;
+    }
+    
+
+}
+
+''')
+        expect:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].getTypeArguments(Supplier).get("T").name == String.name
     }
 
     void "test class is visited by custom visitor"() {

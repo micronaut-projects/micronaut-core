@@ -37,18 +37,31 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
 
     private final SourceUnit sourceUnit;
     private final Parameter parameter;
+    private final GroovyMethodElement methodElement;
 
     /**
      * Default constructor.
      *
+     * @param methodElement the parent method element
      * @param sourceUnit The source unit
      * @param parameter The parameter
      * @param annotationMetadata The annotation metadata
      */
-    GroovyParameterElement(SourceUnit sourceUnit, Parameter parameter, AnnotationMetadata annotationMetadata) {
+    GroovyParameterElement(GroovyMethodElement methodElement, SourceUnit sourceUnit, Parameter parameter, AnnotationMetadata annotationMetadata) {
         super(sourceUnit, parameter, annotationMetadata);
         this.parameter = parameter;
         this.sourceUnit = sourceUnit;
+        this.methodElement = methodElement;
+    }
+
+    @Nullable
+    @Override
+    public ClassElement getGenericType() {
+        ClassElement type = getType();
+        if (type != null) {
+            return methodElement.getGenericElement(parameter.getType(), type);
+        }
+        return type;
     }
 
     @Override
