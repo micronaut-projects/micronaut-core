@@ -115,13 +115,13 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
     /**
      * Write the method.
-     *
-     * @param declaringType              The declaring type
+     *  @param declaringType              The declaring type
      * @param returnType                 The return type
      * @param genericReturnType          The generic return type
      * @param returnTypeGenericTypes     The return type generics
      * @param methodName                 The method name
      * @param argumentTypes              The argument types
+     * @param genericArgumentTypes       The generic argument types
      * @param argumentAnnotationMetadata The argument annotation metadata
      * @param genericTypes               The generic types
      */
@@ -131,6 +131,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                             Map<String, Object> returnTypeGenericTypes,
                             String methodName,
                             Map<String, Object> argumentTypes,
+                            Map<String, Object> genericArgumentTypes,
                             Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                             Map<String, Map<String, Object>> genericTypes) {
         Type declaringTypeObject = getTypeReference(declaringType);
@@ -209,7 +210,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                 getTypeReferenceForName(getClassName()),
                 classWriter,
                 constructorWriter,
-                argumentTypes,
+                genericArgumentTypes,
                 argumentAnnotationMetadata,
                 genericTypes,
                 loadTypeMethods);

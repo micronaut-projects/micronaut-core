@@ -2,6 +2,7 @@ package io.micronaut.inject.visitor
 
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 class IntroductionVisitorSpec extends AbstractBeanDefinitionSpec {
@@ -14,7 +15,7 @@ class IntroductionVisitorSpec extends AbstractBeanDefinitionSpec {
     }
 
     void "test that it is possible to visit introduction advice that extend from existing interfaces"() {
-        buildBeanDefinition('test.MyInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+        def definition = buildBeanDefinition('test.MyInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.introduction.Stub;
@@ -37,5 +38,8 @@ class Foo {}
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().isPresent()
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().get().name == 'test.Foo'
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].genericReturnType.getFirstTypeArgument().get().name == 'test.Foo'
+        definition.findPossibleMethods("save").findFirst().get().getReturnType().type.name == 'test.Foo'
+        definition.findPossibleMethods("save").findFirst().get().getArguments()[0].type.name == 'test.Foo'
+
     }
 }

@@ -165,7 +165,12 @@ class AstGenericUtils {
 
                     String typeVar = classNode.genericsTypes[0].name
                     if (boundTypes.containsKey(typeVar)) {
-                        return boundTypes.get(typeVar).name
+                        def resolved = boundTypes.get(typeVar)
+                        if (resolved.isGenericsPlaceHolder()) {
+                            return resolveTypeReference(resolved, boundTypes)
+                        } else {
+                            return resolved.name
+                        }
                     }
                 } else {
                     if (classNode.isResolved() || ClassHelper.isPrimitiveType(classNode)) {
