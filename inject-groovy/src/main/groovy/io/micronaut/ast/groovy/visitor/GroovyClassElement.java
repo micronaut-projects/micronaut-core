@@ -48,6 +48,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     private final SourceUnit sourceUnit;
     private final ClassNode classNode;
+    private Map<String, Map<String, ClassNode>> genericInfo;
 
     /**
      * @param sourceUnit         The source unit
@@ -85,8 +86,19 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     public Optional<ConstructorElement> getPrimaryConstructor() {
         return Optional.ofNullable(findConcreteConstructor(classNode.getDeclaredConstructors())).map(constructorNode -> {
             final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, constructorNode);
-            return new GroovyConstructorElement(sourceUnit, constructorNode, annotationMetadata);
+            return new GroovyConstructorElement(this, sourceUnit, constructorNode, annotationMetadata);
         });
+    }
+
+    /**
+     * Builds and returns the generic type information.
+     * @return The generic type info
+     */
+    public Map<String, Map<String, ClassNode>> getGenericTypeInfo() {
+        if (genericInfo == null) {
+            genericInfo = AstGenericUtils.buildAllGenericElementInfo(classNode, new GroovyVisitorContext(sourceUnit));
+        }
+        return genericInfo;
     }
 
     @Nonnull
@@ -258,6 +270,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
             classNode = classNode.getSuperClass();
         }
         if (!props.isEmpty()) {
+            GroovyClassElement thisElement = this;
             for (Map.Entry<String, GetterAndSetter> entry : props.entrySet()) {
                 String propertyName = entry.getKey();
                 GetterAndSetter value = entry.getValue();
@@ -283,6 +296,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                         public Optional<MethodElement> getWriteMethod() {
                             if (value.setter != null) {
                                 return Optional.of(new GroovyMethodElement(
+                                        thisElement,
                                         sourceUnit,
                                         value.setter,
                                         groovyAnnotationMetadataBuilder.buildForMethod(value.setter)
@@ -293,7 +307,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
                         @Override
                         public Optional<MethodElement> getReadMethod() {
-                            return Optional.of(new GroovyMethodElement(sourceUnit, value.getter, annotationMetadata));
+                            return Optional.of(new GroovyMethodElement(thisElement, sourceUnit, value.getter, annotationMetadata));
                         }
                     };
                     propertyElements.add(propertyElement);

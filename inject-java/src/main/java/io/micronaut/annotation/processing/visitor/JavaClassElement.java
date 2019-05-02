@@ -51,6 +51,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     private final TypeElement classElement;
     private final JavaVisitorContext visitorContext;
     private final List<? extends TypeMirror> typeArguments;
+    private Map<String, Map<String, Element>> genericTypeInfo;
 
     /**
      * @param classElement       The {@link TypeElement}
@@ -279,6 +280,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                         public Optional<MethodElement> getWriteMethod() {
                             if (value.setter != null) {
                                 return Optional.of(new JavaMethodElement(
+                                        JavaClassElement.this,
                                         value.setter,
                                         visitorContext.getAnnotationUtils().newAnnotationBuilder().buildForMethod(value.setter),
                                         visitorContext
@@ -290,6 +292,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                         @Override
                         public Optional<MethodElement> getReadMethod() {
                             return Optional.of(new JavaMethodElement(
+                                    JavaClassElement.this,
                                     value.getter,
                                     annotationMetadata,
                                     visitorContext
@@ -349,13 +352,18 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         return false;
     }
 
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return super.getAnnotationMetadata();
+    }
+
     @Nonnull
     @Override
     public Optional<ConstructorElement> getPrimaryConstructor() {
         final AnnotationUtils annotationUtils = visitorContext.getAnnotationUtils();
         return Optional.ofNullable(visitorContext.getModelUtils().concreteConstructorFor(classElement, annotationUtils)).map(executableElement -> {
             final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(executableElement);
-            return new JavaConstructorElement(executableElement, annotationMetadata, visitorContext);
+            return new JavaConstructorElement(this, executableElement, annotationMetadata, visitorContext);
         });
     }
 
@@ -380,6 +388,16 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             return Collections.unmodifiableMap(map);
         }
         return Collections.emptyMap();
+    }
+
+    /**
+     * @return The generic type info for this class.
+     */
+    Map<String, Map<String, Element>> getGenericTypeInfo() {
+        if (genericTypeInfo == null) {
+            genericTypeInfo = visitorContext.getGenericUtils().buildTypeArgumentElementInfo(classElement);
+        }
+        return genericTypeInfo;
     }
 
     /**

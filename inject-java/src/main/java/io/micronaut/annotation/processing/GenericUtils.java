@@ -87,6 +87,29 @@ public class GenericUtils {
      * Builds type argument information for the given type.
      *
      * @param element The element
+     * @return The type argument information
+     */
+    public Map<String, Map<String, Element>> buildTypeArgumentElementInfo(@Nonnull Element element) {
+        Map<String, Map<String, Object>> data = buildTypeArgumentInfo(element, null);
+        Map<String, Map<String, Element>> elements = new HashMap<>(data.size());
+        for (Map.Entry<String, Map<String, Object>> entry : data.entrySet()) {
+            Map<String, Object> value = entry.getValue();
+            HashMap<String, Element> submap = new HashMap<>(value.size());
+            for (Map.Entry<String, Object> genericEntry : value.entrySet()) {
+                TypeElement te = elementUtils.getTypeElement(genericEntry.getValue().toString());
+                if (te != null) {
+                    submap.put(genericEntry.getKey(), te);
+                }
+            }
+            elements.put(entry.getKey(), submap);
+        }
+        return elements;
+    }
+
+    /**
+     * Builds type argument information for the given type.
+     *
+     * @param element The element
      * @param dt The declared type
      * @return The type argument information
      */
@@ -365,8 +388,14 @@ public class GenericUtils {
                     List<? extends TypeMirror> bounds = typeParameter.getBounds();
                     if (bounds.size() == 1) {
                         TypeMirror typeMirror = bounds.get(0);
-                        if (typeMirror.getKind() == TypeKind.DECLARED) {
-                            return (DeclaredType) typeMirror;
+                        TypeKind kind = typeMirror.getKind();
+                        switch (kind) {
+                            case DECLARED:
+                                return (DeclaredType) typeMirror;
+                            case TYPEVAR:
+                                return resolveTypeVariable(element, (TypeVariable) typeMirror);
+                           default:
+                               return null;
                         }
                     }
                 }

@@ -16,12 +16,18 @@
 package io.micronaut.ast.groovy.utils
 
 import groovy.transform.CompileStatic
+import io.micronaut.ast.groovy.visitor.GroovyClassElement
 import io.micronaut.core.util.ArrayUtils
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.visitor.VisitorContext
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.tools.GenericsUtils
+
+import javax.lang.model.element.Element
+import javax.lang.model.element.TypeElement
 
 /**
  * @author Graeme Rocher
@@ -223,6 +229,41 @@ class AstGenericUtils {
         return typeArguments
     }
 
+    /**
+     * Builds all the generic information for the given type
+     * @param classNode
+     * @return
+     */
+    static Map<String, Map<String, ClassNode>> buildAllGenericElementInfo(ClassNode classNode, VisitorContext visitorContext) {
+        Map<String, Map<String, Object>> typeArguments = new HashMap<>()
+
+        populateTypeArguments(classNode, typeArguments)
+
+        Map<String, Map<String, ClassNode>> elements = new HashMap<>(typeArguments.size())
+        for (Map.Entry<String, Map<String, Object>> entry : typeArguments.entrySet()) {
+            Map<String, Object> value = entry.getValue()
+            HashMap<String, ClassNode> submap = new HashMap<>(value.size())
+            for (Map.Entry<String, Object> genericEntry : value.entrySet()) {
+                def v = genericEntry.getValue()
+                ClassNode te = null
+                if (v instanceof Class) {
+                    te = ClassHelper.makeCached( (Class)v )
+                } else if(v instanceof String) {
+                    def ce = visitorContext.getClassElement(v).orElse(null)
+                    def nativeType = ce?.nativeType
+                    if (nativeType instanceof ClassNode) {
+                        te = (ClassNode) nativeType
+                    }
+                }
+                if (te != null) {
+                    submap.put(genericEntry.getKey(), te)
+                }
+            }
+            elements.put(entry.getKey(), submap)
+        }
+        return elements
+    }
+
     static void populateTypeArguments(ClassNode typeElement, Map<String, Map<String, Object>> typeArguments) {
         ClassNode current = typeElement
         ClassNode last = null
@@ -232,7 +273,7 @@ class AstGenericUtils {
                 GenericsType[] superArguments = current.redirect().getGenericsTypes()
                 if (ArrayUtils.isNotEmpty(superArguments)) {
                     Map<String, ClassNode> genericSpec = createGenericsSpec(current)
-                    Map<String, Object> arguments = new LinkedHashMap<>()
+                    Map<String, Object> arguments = new LinkedHashMap<>(3)
                     if (genericSpec) {
                         for (gt in superArguments) {
                             ClassNode cn = genericSpec.get(gt.name)
