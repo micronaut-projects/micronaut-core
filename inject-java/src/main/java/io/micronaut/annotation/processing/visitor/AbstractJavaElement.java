@@ -32,7 +32,9 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import java.lang.annotation.Annotation;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -135,6 +137,18 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @return The class element
      */
     protected ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext) {
+        return mirrorToClassElement(returnType, visitorContext, Collections.emptyMap());
+    }
+
+    /**
+     * Obtain the ClassElement for the given mirror.
+     *
+     * @param returnType The return type
+     * @param visitorContext The visitor context
+     * @param genericsInfo The generic informatino
+     * @return The class element
+     */
+    protected ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, Element>> genericsInfo) {
         if (returnType instanceof NoType) {
             return new JavaVoidElement();
         } else if (returnType instanceof DeclaredType) {
@@ -162,16 +176,37 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         } else if (returnType instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) returnType;
             TypeMirror upperBound = tv.getUpperBound();
-            ClassElement classElement = mirrorToClassElement(upperBound, visitorContext);
-            if (classElement != null) {
-                return classElement;
-            } else {
-                return mirrorToClassElement(tv.getLowerBound(), visitorContext);
+            String declaringTypeName = null;
+            TypeElement typeElement = visitorContext.getModelUtils().classElementFor(element);
+            if (typeElement != null) {
+                declaringTypeName = typeElement.getQualifiedName().toString();
             }
+            Map<String, Element> boundGenerics = genericsInfo.get(declaringTypeName);
+            if (boundGenerics == null) {
+                boundGenerics = Collections.emptyMap();
+            }
+
+            Element bound = boundGenerics.get(tv.toString());
+            if (bound instanceof TypeElement) {
+                return new JavaClassElement(
+                        (TypeElement) bound,
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(bound),
+                        visitorContext
+                );
+            } else {
+
+                ClassElement classElement = mirrorToClassElement(upperBound, visitorContext, genericsInfo);
+                if (classElement != null) {
+                    return classElement;
+                } else {
+                    return mirrorToClassElement(tv.getLowerBound(), visitorContext, genericsInfo);
+                }
+            }
+
         } else if (returnType instanceof ArrayType) {
             ArrayType at = (ArrayType) returnType;
             TypeMirror componentType = at.getComponentType();
-            ClassElement arrayType = mirrorToClassElement(componentType, visitorContext);
+            ClassElement arrayType = mirrorToClassElement(componentType, visitorContext, genericsInfo);
             if (arrayType != null) {
                 if (arrayType instanceof JavaPrimitiveElement) {
                     JavaPrimitiveElement jpe = (JavaPrimitiveElement) arrayType;

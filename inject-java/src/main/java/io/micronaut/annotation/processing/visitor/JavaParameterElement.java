@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 
+import javax.annotation.Nullable;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 
@@ -33,16 +34,19 @@ import javax.lang.model.type.TypeMirror;
 class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
 
     private final JavaVisitorContext visitorContext;
+    private final JavaClassElement declaringClass;
 
     /**
      * Default constructor.
      *
-     * @param element The variable element
+     * @param declaringClass     The declaring class
+     * @param element            The variable element
      * @param annotationMetadata The annotation metadata
-     * @param visitorContext The visitor context
+     * @param visitorContext     The visitor context
      */
-    JavaParameterElement(VariableElement element, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
+    JavaParameterElement(JavaClassElement declaringClass, VariableElement element, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
         super(element, annotationMetadata, visitorContext);
+        this.declaringClass = declaringClass;
         this.visitorContext = visitorContext;
     }
 
@@ -50,6 +54,13 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     public ClassElement getType() {
         TypeMirror returnType = getNativeType().asType();
         return mirrorToClassElement(returnType, visitorContext);
+    }
+
+    @Nullable
+    @Override
+    public ClassElement getGenericType() {
+        TypeMirror returnType = getNativeType().asType();
+        return mirrorToClassElement(returnType, visitorContext, declaringClass.getGenericTypeInfo());
     }
 
     @Override

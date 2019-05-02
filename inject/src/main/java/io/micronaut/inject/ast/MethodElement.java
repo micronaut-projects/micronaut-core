@@ -34,4 +34,14 @@ public interface MethodElement extends MemberElement {
      * @return The method parameters
      */
     ParameterElement[] getParameters();
+
+    /**
+     * The generic return type of the method.
+     *
+     * @return The return type of the method
+     * @since 1.1.1
+     */
+    default @Nullable ClassElement getGenericReturnType() {
+        return getReturnType();
+    }
 }

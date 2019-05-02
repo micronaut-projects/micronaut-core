@@ -16,8 +16,10 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
+import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.ExtendedParameter;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -26,7 +28,12 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.control.SourceUnit;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -39,16 +46,24 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     private final SourceUnit sourceUnit;
     private final MethodNode methodNode;
+    private final GroovyClassElement declaringClass;
+    private Map<String, ClassNode> genericsSpec = null;
 
     /**
+     * @param declaringClass The declaring class
      * @param sourceUnit The source unit
      * @param methodNode         The {@link MethodNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyMethodElement(SourceUnit sourceUnit, MethodNode methodNode, AnnotationMetadata annotationMetadata) {
+    GroovyMethodElement(
+            GroovyClassElement declaringClass,
+            SourceUnit sourceUnit,
+            MethodNode methodNode,
+            AnnotationMetadata annotationMetadata) {
         super(methodNode, annotationMetadata);
         this.methodNode = methodNode;
         this.sourceUnit = sourceUnit;
+        this.declaringClass = declaringClass;
     }
 
     @Override
@@ -91,6 +106,72 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         return methodNode;
     }
 
+    @Nullable
+    @Override
+    public ClassElement getGenericReturnType() {
+        ClassNode returnType = methodNode.getReturnType();
+        ClassElement rawElement = getReturnType();
+        return getGenericElement(returnType, rawElement);
+    }
+
+    /**
+     * Obtains the generic element if present otherwise returns the raw element.
+     * @param type The type
+     * @param rawElement The raw element
+     * @return The class element
+     */
+    @Nonnull ClassElement getGenericElement(@Nonnull ClassNode type, @Nonnull ClassElement rawElement) {
+        Map<String, ClassNode> genericsSpec = getGenericsSpec();
+
+        if (CollectionUtils.isNotEmpty(genericsSpec)) {
+            ClassElement classNode = resolveGenericType(genericsSpec, type);
+            if (classNode != null) {
+                return classNode;
+            }
+        }
+        return rawElement;
+    }
+
+    /**
+     * Resolves the generics spec for this method.
+     * @return The generic spec
+     */
+    @Nonnull Map<String, ClassNode> getGenericsSpec() {
+        if (genericsSpec == null) {
+            Map<String, Map<String, ClassNode>> info = declaringClass.getGenericTypeInfo();
+            if (CollectionUtils.isNotEmpty(info)) {
+                Map<String, ClassNode> typeGenericInfo = info.get(methodNode.getDeclaringClass().getName());
+                if (CollectionUtils.isNotEmpty(typeGenericInfo)) {
+
+                    genericsSpec = AstGenericUtils.createGenericsSpec(methodNode, new HashMap<>(typeGenericInfo));
+                }
+            }
+
+            if (genericsSpec == null) {
+                genericsSpec = Collections.emptyMap();
+            }
+        }
+        return genericsSpec;
+    }
+
+    private ClassElement resolveGenericType(Map<String, ClassNode> typeGenericInfo, ClassNode returnType) {
+        if (returnType.isGenericsPlaceHolder()) {
+            String unresolvedName = returnType.getUnresolvedName();
+            ClassNode classNode = typeGenericInfo.get(unresolvedName);
+            if (classNode != null) {
+                if (classNode.isGenericsPlaceHolder()) {
+                    return resolveGenericType(typeGenericInfo, classNode);
+                } else {
+                    return new GroovyClassElement(sourceUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
+                            sourceUnit,
+                            classNode
+                    ));
+                }
+            }
+        }
+        return null;
+    }
+
     @Override
     public ClassElement getReturnType() {
         ClassNode returnType = methodNode.getReturnType();
@@ -105,7 +186,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     public ParameterElement[] getParameters() {
         Parameter[] parameters = methodNode.getParameters();
         return Arrays.stream(parameters).map((Function<Parameter, ParameterElement>) parameter ->
-                new GroovyParameterElement(sourceUnit, parameter, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, new ExtendedParameter(methodNode, parameter)))
+                new GroovyParameterElement(this, sourceUnit, parameter, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, new ExtendedParameter(methodNode, parameter)))
         ).toArray(ParameterElement[]::new);
     }
 
