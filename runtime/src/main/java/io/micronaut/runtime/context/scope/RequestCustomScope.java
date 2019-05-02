@@ -50,8 +50,8 @@ class RequestCustomScope implements CustomScope<Request>, LifeCycle<RequestCusto
     }
 
     @Override
-    public <T> T get(
-            BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, BeanIdentifier identifier, Provider<T> provider) {
+    public <T> T get(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition,
+                     BeanIdentifier identifier, Provider<T> provider) {
         Optional<HttpRequest<T>> currentRequest = ServerRequestContext.currentRequest();
         if (!currentRequest.isPresent()) {
             throw new NoSuchBeanException(beanDefinition.getBeanType(), Qualifiers.byStereotype(Request.class));

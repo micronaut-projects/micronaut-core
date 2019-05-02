@@ -41,6 +41,8 @@ dependencies {
     testCompile dependencyVersion("jcache")
     testCompile dependencyVersion("rxjava1.interop")
     testCompile dependencyVersion("reactor")
+    testCompile project(":http-client")
+    testCompile project(":http-server-netty")
     testCompile project(":inject-java")
     testCompile project(":inject-java-test")
     testCompile project(":inject-groovy")
