@@ -429,12 +429,12 @@ ext {
                     name   : 'directory-watcher'
             ],
             security                   : [
-                    version : securityVersion,
+                    version : micronautSecurityVersion,
                     group   : 'io.micronaut',
                     modules : ['micronaut-security', 'micronaut-security-jwt', 'micronaut-security-session']
             ],
             'security-configurations'  : [
-                    version : securityVersion,
+                    version : micronautSecurityVersion,
                     group   : 'io.micronaut.configuration',
                     modules : ['micronaut-security-ldap']
             ]
