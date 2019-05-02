@@ -42,8 +42,7 @@ import java.util.stream.Collectors;
  */
 class DefaultBeanIntrospector implements BeanIntrospector {
 
-    // the reflection logger is used as this type may be used within the compiler
-    private static final Logger LOG = ClassUtils.REFLECTION_LOGGER;
+    private static final Logger LOG = ClassUtils.getLogger(DefaultBeanIntrospector.class);
 
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
 

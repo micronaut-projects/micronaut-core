@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
+import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -65,6 +66,7 @@ public class JavaVisitorContext implements VisitorContext {
     private final ModelUtils modelUtils;
     private final AnnotationProcessingOutputVisitor outputVisitor;
     private final MutableConvertibleValues<Object> visitorAttributes;
+    private final GenericUtils genericUtils;
     private @Nullable JavaFileManager standardFileManager;
 
     /**
@@ -75,6 +77,7 @@ public class JavaVisitorContext implements VisitorContext {
      * @param annotationUtils The annotation utils
      * @param types Type types
      * @param modelUtils The model utils
+     * @param genericUtils The generic type utils
      * @param filer The filer
      * @param visitorAttributes The attributes
      */
@@ -85,6 +88,7 @@ public class JavaVisitorContext implements VisitorContext {
             AnnotationUtils annotationUtils,
             Types types,
             ModelUtils modelUtils,
+            GenericUtils genericUtils,
             Filer filer,
             MutableConvertibleValues<Object> visitorAttributes) {
         this.messager = messager;
@@ -92,6 +96,7 @@ public class JavaVisitorContext implements VisitorContext {
         this.annotationUtils = annotationUtils;
         this.types = types;
         this.modelUtils = modelUtils;
+        this.genericUtils = genericUtils;
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.visitorAttributes = visitorAttributes;
 
@@ -131,7 +136,7 @@ public class JavaVisitorContext implements VisitorContext {
     public Optional<ClassElement> getClassElement(String name) {
         TypeElement typeElement = elements.getTypeElement(name);
         return Optional.ofNullable(typeElement).map(typeElement1 ->
-                new JavaClassElement(typeElement1, annotationUtils.getAnnotationMetadata(typeElement1), this, Collections.emptyList())
+                new JavaClassElement(typeElement1, annotationUtils.getAnnotationMetadata(typeElement1), this, Collections.emptyList(), Collections.emptyMap())
         );
     }
 
@@ -250,6 +255,14 @@ public class JavaVisitorContext implements VisitorContext {
      */
     public Types getTypes() {
         return types;
+    }
+
+    /**
+     * The generic utils object.
+     * @return The generic utils
+     */
+    public GenericUtils getGenericUtils() {
+        return genericUtils;
     }
 
     @Override

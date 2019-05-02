@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
+import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.io.service.ServiceDefinition;
@@ -33,6 +34,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementScanner8;
 import java.util.*;
@@ -187,12 +189,27 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     concreteClass.getQualifiedName().equals(classElement.getQualifiedName());
 
             if (shouldVisit) {
-                TypeElement superClass = modelUtils.superClassFor(classElement);
-                if (superClass != null && !modelUtils.isObjectClass(superClass)) {
-                    superClass.accept(this, o);
-                }
+                if (typeAnnotationMetadata.hasStereotype(Introduction.class)) {
+                    classElement.asType().accept(new PublicAbstractMethodVisitor<Object, Object>(classElement, modelUtils, elementUtils) {
+                        @Override
+                        protected void accept(DeclaredType type, Element element, Object o) {
+                            if (element instanceof ExecutableElement) {
+                                ElementVisitor.this.visitExecutable(
+                                        (ExecutableElement) element,
+                                        o
+                                );
+                            }
+                        }
+                    }, null);
+                    return null;
+                } else {
+                    TypeElement superClass = modelUtils.superClassFor(classElement);
+                    if (superClass != null && !modelUtils.isObjectClass(superClass)) {
+                        superClass.accept(this, o);
+                    }
 
-                return scan(classElement.getEnclosedElements(), o);
+                    return scan(classElement.getEnclosedElements(), o);
+                }
             } else {
                 return null;
             }

@@ -77,6 +77,61 @@ interface Foo extends java.util.function.Function<String, Integer> {}
         definition.getTypeArguments(Function)[1].type == Integer
     }
 
+    void "test type arguments for inherited interface 2"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@javax.inject.Singleton
+class Test implements Bar {
+
+    public Integer apply(String str) {
+        return 10;
+    }
+}
+
+interface Bar extends Foo<Integer> {}
+interface Foo<A> extends java.util.function.Function<String, A> {}
+''')
+        expect:
+        definition != null
+        definition.getTypeArguments(Function).size() == 2
+        definition.getTypeArguments(Function)[0].name == 'T'
+        definition.getTypeArguments(Function)[1].name == 'R'
+        definition.getTypeArguments(Function)[0].type == String
+        definition.getTypeArguments(Function)[1].type == Integer
+    }
+
+    void "test type arguments for inherited interface - using same name as another type parameter"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@javax.inject.Singleton
+class Test implements Bar {
+
+    public Integer apply(String str) {
+        return 10;
+    }
+}
+
+interface Bar extends Foo<Integer> {}
+interface Foo<T> extends java.util.function.Function<String, T> {}
+''')
+        expect:
+        definition != null
+        definition.getTypeArguments(Function).size() == 2
+        definition.getTypeArguments(Function)[0].name == 'T'
+        definition.getTypeArguments(Function)[1].name == 'R'
+        definition.getTypeArguments(Function)[0].type == String
+        definition.getTypeArguments(Function)[1].type == Integer
+    }
 
 
     void "test type arguments for superclass that implements interface"() {

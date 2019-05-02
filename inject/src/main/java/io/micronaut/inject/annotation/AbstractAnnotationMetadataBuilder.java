@@ -809,6 +809,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * Used to store metadata mutations at compilation time. Not for public consumption.
+     *
+     * @param element The element
+     * @return True if the annotation metadata was mutated
+     */
+    @Internal
+    public static boolean isMetadataMutated(Object element) {
+        if (element != null) {
+            return MUTATED_ANNOTATION_METADATA.containsKey(element);
+        }
+        return false;
+    }
+
+    /**
      * Used to clear mutated metadata at the end of a compilation cycle.
      */
     @Internal
