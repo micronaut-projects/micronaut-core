@@ -56,9 +56,20 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
      * @param annotationMetadata The annotation metadata
      */
     GroovyClassElement(SourceUnit sourceUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
+        this(sourceUnit, classNode, annotationMetadata, null);
+    }
+
+    /**
+     * @param sourceUnit         The source unit
+     * @param classNode          The {@link ClassNode}
+     * @param annotationMetadata The annotation metadata
+     * @param genericInfo        The generic info
+     */
+    GroovyClassElement(SourceUnit sourceUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, Map<String, Map<String, ClassNode>> genericInfo) {
         super(classNode, annotationMetadata);
         this.classNode = classNode;
         this.sourceUnit = sourceUnit;
+        this.genericInfo = genericInfo;
     }
 
     @Override
@@ -92,6 +103,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     /**
      * Builds and returns the generic type information.
+     *
      * @return The generic type info
      */
     public Map<String, Map<String, ClassNode>> getGenericTypeInfo() {
@@ -137,7 +149,35 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     }
 
     @Override
-    public @Nonnull Map<String, ClassElement> getTypeArguments() {
+    public @Nonnull
+    Map<String, ClassElement> getTypeArguments() {
+        Map<String, Map<String, ClassNode>> genericInfo = getGenericTypeInfo();
+        Map<String, ClassNode> info = genericInfo.get(classNode.getName());
+        if (info != null) {
+            GenericsType[] genericsTypes = classNode.getGenericsTypes();
+            if (genericsTypes != null) {
+                Map<String, ClassElement> typeArgumentMap = new HashMap<>(genericsTypes.length);
+                for (GenericsType gt : genericsTypes) {
+                    String name = gt.getName();
+                    ClassNode cn = info.get(name);
+                    while (cn != null && cn.isGenericsPlaceHolder()) {
+                        name = cn.getUnresolvedName();
+                        cn = info.get(name);
+                    }
+
+                    if (cn != null) {
+                        typeArgumentMap.put(name, new GroovyClassElement(
+                                sourceUnit,
+                                cn,
+                                AstAnnotationUtils.getAnnotationMetadata(sourceUnit, cn)
+                        ));
+                    }
+                }
+                if (CollectionUtils.isNotEmpty(typeArgumentMap)) {
+                    return typeArgumentMap;
+                }
+            }
+        }
         Map<String, ClassNode> spec = AstGenericUtils.createGenericsSpec(classNode);
         if (!spec.isEmpty()) {
             Map<String, ClassElement> map = new LinkedHashMap<>(spec.size());

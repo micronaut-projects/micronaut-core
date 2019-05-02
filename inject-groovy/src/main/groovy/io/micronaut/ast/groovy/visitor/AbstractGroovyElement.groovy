@@ -26,6 +26,8 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.ast.Element
 import org.codehaus.groovy.ast.AnnotatedNode
+import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.GenericsType
 
 import javax.annotation.Nonnull
 import java.lang.annotation.Annotation
@@ -49,7 +51,7 @@ abstract class AbstractGroovyElement implements AnnotationMetadataDelegate, Elem
 
     @CompileStatic
     @Override
-    def <T extends Annotation> Element annotate(@Nonnull String annotationType, @Nonnull Consumer<AnnotationValueBuilder<T>> consumer) {
+    <T extends Annotation> Element annotate(@Nonnull String annotationType, @Nonnull Consumer<AnnotationValueBuilder<T>> consumer) {
         ArgumentUtils.requireNonNull("annotationType", annotationType)
         AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType)
         consumer?.accept(builder)
@@ -65,5 +67,30 @@ abstract class AbstractGroovyElement implements AnnotationMetadataDelegate, Elem
         )
         AstAnnotationUtils.invalidateCache(annotatedNode)
         return this
+    }
+
+    @CompileStatic
+    protected Map<String, ClassNode> alignNewGenericsInfo(
+            @Nonnull GenericsType[] genericsTypes,
+            Map<String, ClassNode> genericsSpec) {
+        Map<String, ClassNode> newSpec = new HashMap<>(genericsSpec.size())
+        for (GenericsType genericsType : genericsTypes) {
+            String name = genericsType.getName()
+            ClassNode cn = genericsSpec.get(name)
+            toNewGenericSpec(genericsSpec, newSpec, name, cn)
+        }
+        return newSpec
+    }
+
+    @CompileStatic
+    private void toNewGenericSpec(Map<String, ClassNode> genericsSpec, Map<String, ClassNode> newSpec, String name, ClassNode cn) {
+        if (cn != null) {
+            newSpec.put(name, cn)
+            if (cn.isGenericsPlaceHolder()) {
+                String n = cn.getUnresolvedName()
+                ClassNode resolved = genericsSpec.get(n)
+                toNewGenericSpec(genericsSpec, newSpec, n, resolved)
+            }
+        }
     }
 }
