@@ -4,10 +4,6 @@ import io.kotlintest.shouldBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 
-/**
- * @author Will Buck
- * @since 1.1
- */
 internal class VehicleSpec : StringSpec({
 
     "test start vehicle".config(enabled = false) {

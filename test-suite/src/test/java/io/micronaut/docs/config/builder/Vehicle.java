@@ -3,10 +3,6 @@ package io.micronaut.docs.config.builder;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
-/**
- * @author Will Buck
- * @since 1.1
- */
 // tag::class[]
 @Singleton
 class Vehicle {

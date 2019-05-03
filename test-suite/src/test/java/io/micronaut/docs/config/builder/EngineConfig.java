@@ -3,13 +3,8 @@ package io.micronaut.docs.config.builder;
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
-
 // end::imports[]
 
-/**
- * @author Will Buck
- * @since 1.1
- */
 // tag::class[]
 @ConfigurationProperties("my.engine") // <1>
 class EngineConfig {
