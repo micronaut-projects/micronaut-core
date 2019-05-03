@@ -6,10 +6,6 @@ import io.micronaut.context.annotation.Factory;
 import javax.inject.Singleton;
 // end::imports[]
 
-/**
- * @author Will Buck
- * @since 1.1
- */
 // tag::class[]
 @Factory
 class EngineFactory {

@@ -2,10 +2,6 @@ package io.micronaut.docs.config.builder;
 
 import javax.annotation.concurrent.Immutable;
 
-/**
- * @author Will Buck
- * @since 1.1
- */
 // tag::class[]
 @Immutable
 public class EngineImpl implements Engine {
