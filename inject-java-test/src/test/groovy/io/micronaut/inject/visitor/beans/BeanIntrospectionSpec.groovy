@@ -517,9 +517,14 @@ class Test extends ParentBean {
     private int[] primitiveArray;
     private boolean flag;
     private TypeConverter<String, Collection> genericsTest;
+    private TypeConverter<String, Object[]> genericsArrayTest;
     
     public TypeConverter<String, Collection> getGenericsTest() {
         return genericsTest;
+    }
+    
+    public TypeConverter<String, Object[]> getGenericsArrayTest() {
+        return genericsArrayTest;
     }
     
     public String getReadOnly() {
@@ -601,7 +606,7 @@ class ParentBean {
         introspection != null
         introspection.hasAnnotation(Introspected)
         introspection.instantiate().getClass().name == 'test.Test'
-        introspection.getBeanProperties().size() == 9
+        introspection.getBeanProperties().size() == 10
         introspection.getProperty("name").isPresent()
         introspection.getProperty("name", String).isPresent()
         !introspection.getProperty("name", Integer).isPresent()
@@ -615,6 +620,7 @@ class ParentBean {
         BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
         BeanProperty listOfBytes = introspection.getProperty("listOfBytes").get()
         BeanProperty genericsTest = introspection.getProperty("genericsTest").get()
+        BeanProperty genericsArrayTest = introspection.getProperty("genericsArrayTest").get()
         def readOnlyProp = introspection.getProperty("readOnly", String).get()
         def instance = introspection.instantiate()
 
@@ -633,6 +639,10 @@ class ParentBean {
         genericsTest.asArgument().typeParameters[0].type == String
         genericsTest.asArgument().typeParameters[1].type == Collection
         genericsTest.asArgument().typeParameters[1].typeParameters.length == 1
+        genericsArrayTest.type == TypeConverter
+        genericsArrayTest.asArgument().typeParameters.size() == 2
+        genericsArrayTest.asArgument().typeParameters[0].type == String
+        genericsArrayTest.asArgument().typeParameters[1].type == Object[].class
         stringArrayProp.get(instance) == null
         stringArrayProp.type == String[]
         primitiveArrayProp.get(instance) == null
