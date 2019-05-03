@@ -22,7 +22,7 @@ In addition to being able to inject beans Micronaut natively supports injecting 
 |`Engine[]`
 
 |link:{jeeapi}/javax/inject/Provider.html[Provider]
-|A `javax.inject.Provider` if a circular dependency requires it
+|A `javax.inject.Provider` if a circular dependency requires it or to inject a prototype bean into a singleton instance
 |`Provider<Engine>`
 
 |===
