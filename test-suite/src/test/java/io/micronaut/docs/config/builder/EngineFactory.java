@@ -16,7 +16,7 @@ class EngineFactory {
 
     @Singleton
     EngineImpl buildEngine(EngineConfig engineConfig) {
-        return engineConfig.builder.build(engineConfig.crankShaft, engineConfig.sparkPlug);
+        return engineConfig.builder.build(engineConfig.crankShaft, engineConfig.getSparkPlug());
     }
 }
 // end::class[]
