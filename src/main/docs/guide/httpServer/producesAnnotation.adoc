@@ -1,4 +1,4 @@
-A Micronaut's controller action produces `application-json` by default.
+A Micronaut's controller action produces `application/json` by default.
 Nonetheless you can change the `Content-Type` of the response with the `@Produces` annotation.
 [source,java]
 ----
