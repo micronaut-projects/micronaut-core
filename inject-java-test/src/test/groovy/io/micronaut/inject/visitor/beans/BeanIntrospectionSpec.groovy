@@ -8,7 +8,9 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.reflect.exception.InstantiationException
+import io.micronaut.core.type.Argument
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 
@@ -501,6 +503,7 @@ package test;
 import io.micronaut.core.annotation.*;
 import javax.validation.constraints.*;
 import java.util.*;
+import io.micronaut.core.convert.TypeConverter;
 
 @Introspected
 class Test extends ParentBean {
@@ -513,6 +516,11 @@ class Test extends ParentBean {
     private String[] stringArray;
     private int[] primitiveArray;
     private boolean flag;
+    private TypeConverter<String, Collection> genericsTest;
+    
+    public TypeConverter<String, Collection> getGenericsTest() {
+        return genericsTest;
+    }
     
     public String getReadOnly() {
         return readOnly;
@@ -593,7 +601,7 @@ class ParentBean {
         introspection != null
         introspection.hasAnnotation(Introspected)
         introspection.instantiate().getClass().name == 'test.Test'
-        introspection.getBeanProperties().size() == 8
+        introspection.getBeanProperties().size() == 9
         introspection.getProperty("name").isPresent()
         introspection.getProperty("name", String).isPresent()
         !introspection.getProperty("name", Integer).isPresent()
@@ -606,6 +614,7 @@ class ParentBean {
         BeanProperty primitiveArrayProp = introspection.getProperty("primitiveArray").get()
         BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
         BeanProperty listOfBytes = introspection.getProperty("listOfBytes").get()
+        BeanProperty genericsTest = introspection.getProperty("genericsTest").get()
         def readOnlyProp = introspection.getProperty("readOnly", String).get()
         def instance = introspection.instantiate()
 
@@ -618,7 +627,14 @@ class ParentBean {
         boolProp.get(instance) == false
         nameProp.get(instance) == null
         ageProp.get(instance) == 0
+        genericsTest != null
+        genericsTest.type == TypeConverter
+        genericsTest.asArgument().typeParameters.size() == 2
+        genericsTest.asArgument().typeParameters[0].type == String
+        genericsTest.asArgument().typeParameters[1].type == Collection
+        genericsTest.asArgument().typeParameters[1].typeParameters.length == 1
         stringArrayProp.get(instance) == null
+        stringArrayProp.type == String[]
         primitiveArrayProp.get(instance) == null
         ageProp.hasAnnotation(Size)
         listOfBytes.asArgument().getFirstTypeVariable().get().type == byte[].class
