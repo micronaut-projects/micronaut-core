@@ -25,8 +25,16 @@ dependencies {
     kaptTest project(':inject-java')
     kaptTest project(':validation')
     testCompile project(":http-client")
+    testCompile 'io.kotlintest:kotlintest-runner-junit5:3.3.0'
 }
 
 compileTestKotlin {
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions {
+        jvmTarget = '1.8'
+        javaParameters = true
+    }
+}
+
+test {
+    useJUnitPlatform()
 }
