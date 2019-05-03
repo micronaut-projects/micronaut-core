@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * A method element returning data from a {@link ExecutableElement}.
@@ -64,7 +63,7 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
     @Nullable
     @Override
     public ClassElement getGenericReturnType() {
-        Map<String, Map<String, Element>> info = declaringClass.getGenericTypeInfo();
+        Map<String, Map<String, TypeMirror>> info = declaringClass.getGenericTypeInfo();
         return mirrorToClassElement(executableElement.getReturnType(), visitorContext, info);
     }
 
@@ -95,12 +94,10 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
             if (declaringClass.getName().equals(te.getQualifiedName().toString())) {
                 return declaringClass;
             } else {
-                List<TypeMirror> typeArguments = te.getTypeParameters().stream().map(Element::asType).collect(Collectors.toList());
                 return new JavaClassElement(
                         te,
                         visitorContext.getAnnotationUtils().getAnnotationMetadata(te),
                         visitorContext,
-                        typeArguments,
                         declaringClass.getGenericTypeInfo()
                 );
             }
