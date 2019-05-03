@@ -25,6 +25,7 @@ import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
@@ -62,6 +63,20 @@ abstract class AbstractTypeElementSpec extends Specification {
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
         return metadata
+    }
+
+    /**
+     * Build and return a {@link BeanIntrospection} for the given class name and class data.
+     *
+     * @return the introspection if it is correct
+     **/
+    protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
+        def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
     }
 
     /**

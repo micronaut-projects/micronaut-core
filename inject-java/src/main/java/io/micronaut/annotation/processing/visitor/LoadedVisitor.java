@@ -45,7 +45,7 @@ public class LoadedVisitor implements Ordered {
     private final String classAnnotation;
     private final String elementAnnotation;
     private final JavaVisitorContext visitorContext;
-    private JavaClassElement currentClassElement;
+    private JavaClassElement rootClassElement;
 
     /**
      * @param visitor               The {@link TypeElementVisitor}
@@ -135,11 +135,11 @@ public class LoadedVisitor implements Ordered {
             return e;
         } else if (element instanceof ExecutableElement) {
             ExecutableElement executableElement = (ExecutableElement) element;
-            if (currentClassElement != null) {
+            if (rootClassElement != null) {
 
                 if (executableElement.getSimpleName().toString().equals("<init>")) {
                     final JavaConstructorElement e = new JavaConstructorElement(
-                            currentClassElement,
+                            rootClassElement,
                             executableElement,
                             annotationMetadata,
                             visitorContext);
@@ -150,7 +150,7 @@ public class LoadedVisitor implements Ordered {
                     return e;
                 } else {
                     final JavaMethodElement e = new JavaMethodElement(
-                            currentClassElement,
+                            rootClassElement,
                             executableElement,
                             annotationMetadata, visitorContext);
                     visitor.visitMethod(
@@ -164,26 +164,26 @@ public class LoadedVisitor implements Ordered {
             TypeElement typeElement = (TypeElement) element;
             boolean isEnum = JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent();
             if (isEnum) {
-                this.currentClassElement = new JavaEnumElement(
+                this.rootClassElement = new JavaEnumElement(
                         typeElement,
                         annotationMetadata,
                         visitorContext,
                         Collections.emptyList());
                 visitor.visitClass(
-                        currentClassElement,
+                        rootClassElement,
                         visitorContext
                 );
-                return currentClassElement;
+                return rootClassElement;
             } else {
-                this.currentClassElement =  new JavaClassElement(
+                this.rootClassElement =  new JavaClassElement(
                         typeElement,
                         annotationMetadata,
                         visitorContext);
                 visitor.visitClass(
-                        currentClassElement,
+                        rootClassElement,
                         visitorContext
                 );
-                return currentClassElement;
+                return rootClassElement;
             }
         }
         return null;
