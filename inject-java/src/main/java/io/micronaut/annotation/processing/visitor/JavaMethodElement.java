@@ -22,15 +22,14 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
 import javax.annotation.Nullable;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * A method element returning data from a {@link ExecutableElement}.
@@ -90,6 +89,23 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
     @Override
     public ClassElement getDeclaringType() {
-        return declaringClass;
+        Element enclosingElement = executableElement.getEnclosingElement();
+        if (enclosingElement instanceof TypeElement) {
+            TypeElement te = (TypeElement) enclosingElement;
+            if (declaringClass.getName().equals(te.getQualifiedName().toString())) {
+                return declaringClass;
+            } else {
+                List<TypeMirror> typeArguments = te.getTypeParameters().stream().map(Element::asType).collect(Collectors.toList());
+                return new JavaClassElement(
+                        te,
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(te),
+                        visitorContext,
+                        typeArguments,
+                        declaringClass.getGenericTypeInfo()
+                );
+            }
+        } else {
+            return declaringClass;
+        }
     }
 }

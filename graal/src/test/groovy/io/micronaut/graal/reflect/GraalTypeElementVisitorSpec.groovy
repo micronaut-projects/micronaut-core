@@ -199,4 +199,49 @@ class Test {
         reader.close()
     }
 
+    void "test write reflect.json for @ReflectiveAccess with inheritance"() {
+
+        given:
+        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.HTTPCheck', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class HTTPCheck extends NewCheck {
+
+    private String interval;
+
+    @ReflectiveAccess
+    protected void setInterval(String interval) {
+        this.interval = interval;
+    }
+}
+abstract class NewCheck {
+    
+    private String status;
+     
+    @ReflectiveAccess
+    protected void setStatus(String status) {
+        this.status = status;
+    }
+}
+
+
+''')
+
+        when:
+        def json = new JsonSlurper().parse(reader)
+        json = json.sort { it.name }
+        def entry = json?.find { it.name == 'test.HTTPCheck'}
+        then:
+        entry
+        entry.name == 'test.HTTPCheck'
+        entry.methods.size() == 1
+        entry.methods[0].name == 'setInterval'
+
+        cleanup:
+        reader.close()
+    }
+
 }
