@@ -24,7 +24,7 @@ class VehicleSpec extends Specification {
         when:
         // tag::start[]
         ApplicationContext applicationContext = ApplicationContext.run(
-                ['my.engine.cylinders':'4',
+                ['my.engine.cylinders'             : '4',
                  'my.engine.manufacturer'          : 'Subaru',
                  'my.engine.crank-shaft.rod-length': 4,
                  'my.engine.spark-plug.name'       : '6619 LFR6AIX',
