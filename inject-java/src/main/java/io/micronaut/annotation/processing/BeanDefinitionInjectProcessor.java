@@ -1863,7 +1863,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 type
                         );
 
-                        Map<String, Object> resolvedParameters = genericUtils.resolveGenericTypes(declaredType, typeElement, Collections.emptyMap());
+                        Map<String, Object> resolvedParameters = genericUtils.resolveGenericTypes(declaredType, typeElement, boundTypes);
                         if (!resolvedParameters.isEmpty()) {
                             params.addGenericTypes(argName, resolvedParameters);
                         }

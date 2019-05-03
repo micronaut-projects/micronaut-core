@@ -262,9 +262,9 @@ public class GenericUtils {
                             TypeMirror upperBound = tv.getUpperBound();
                             TypeMirror lowerBound = tv.getLowerBound();
                             if (upperBound.getKind() != TypeKind.NULL) {
-                                resolvedParameters.put(parameterName, resolveTypeReference(upperBound, Collections.emptyMap()));
+                                resolvedParameters.put(parameterName, resolveTypeReference(upperBound, boundTypes));
                             } else if (lowerBound.getKind() != TypeKind.NULL) {
-                                resolvedParameters.put(parameterName, resolveTypeReference(lowerBound, Collections.emptyMap()));
+                                resolvedParameters.put(parameterName, resolveTypeReference(lowerBound, boundTypes));
                             }
                         }
                         continue;

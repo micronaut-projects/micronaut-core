@@ -38,8 +38,12 @@ class Foo {}
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().isPresent()
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().get().name == 'test.Foo'
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].genericReturnType.getFirstTypeArgument().get().name == 'test.Foo'
-        definition.findPossibleMethods("save").findFirst().get().getReturnType().type.name == 'test.Foo'
-        definition.findPossibleMethods("save").findFirst().get().getArguments()[0].type.name == 'test.Foo'
+        def saveMethod = definition.findPossibleMethods("save").findFirst().get()
+        saveMethod.getReturnType().type.name == 'test.Foo'
+        saveMethod.getArguments()[0].type.name == 'test.Foo'
+        def saveAllMethod = definition.findPossibleMethods("saveAll").findFirst().get()
+        saveAllMethod.getArguments()[0].getFirstTypeVariable().get().type.name == 'test.Foo'
+        saveAllMethod.getReturnType().getFirstTypeVariable().get().type.name == 'test.Foo'
 
     }
 }

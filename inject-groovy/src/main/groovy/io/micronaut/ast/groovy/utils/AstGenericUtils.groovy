@@ -395,9 +395,9 @@ class AstGenericUtils {
                         }
                     } else {
                         if (boundTypes.containsKey(value.name)) {
-                            map.put(name, resolveTypeReference(boundTypes.get(value.name)))
+                            map.put(name, resolveTypeReference(boundTypes.get(value.name), boundTypes))
                         } else {
-                            map.put(name, resolveTypeReference(value.type))
+                            map.put(name, resolveTypeReference(value.type, boundTypes))
                         }
                     }
                 }
