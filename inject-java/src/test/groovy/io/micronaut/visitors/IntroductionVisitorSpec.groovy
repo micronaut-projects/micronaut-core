@@ -23,7 +23,7 @@ class Foo {}
 ''')
         expect:
         IntroductionVisitor.VISITED_CLASS_ELEMENTS.size() == 1
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS.size() == 3
+        IntroductionVisitor.VISITED_METHOD_ELEMENTS.size() == 4
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].name == 'save'
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].genericReturnType.name == 'test.Foo'
         IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].parameters[0].genericType.name == 'test.Foo'
@@ -37,6 +37,9 @@ class Foo {}
         def saveAllMethod = definition.findPossibleMethods("saveAll").findFirst().get()
         saveAllMethod.getReturnType().getFirstTypeVariable().get().type.name == 'test.Foo'
         saveAllMethod.getArguments()[0].getFirstTypeVariable().get().type.name == 'test.Foo'
+        def findMethod = definition.findPossibleMethods("find").findFirst().get()
+        findMethod.getReturnType().getFirstTypeVariable().get().type.name == 'test.Foo'
+        findMethod.getArguments()[0].type == Long
     }
 
 }
