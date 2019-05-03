@@ -146,7 +146,11 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 classReference = ClassUtils.getPrimitiveType(n).map(t -> (Object) t).orElse(n);
             }
         } else {
-            classReference = n;
+            if (classElement.isArray()) {
+                classReference = n + "[]";
+            } else {
+                classReference = n;
+            }
         }
         return classReference;
     }
