@@ -20,6 +20,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import spock.util.concurrent.PollingConditions
 
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,7 +33,9 @@ class RequestScopeSpec extends AbstractMicronautSpec {
 
     void "test @Request bean created per request"() {
 
+        given:
         def requestCustomScope = applicationContext.getBean(RequestCustomScope)
+        def conditions = new PollingConditions(timeout: 10)
 
         when:
         def result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
@@ -51,6 +54,14 @@ class RequestScopeSpec extends AbstractMicronautSpec {
 
         then:
         result == "message count 3, count within request 1"
+
+        when:
+        System.gc()
+
+        then:
+        conditions.eventually {
+            requestCustomScope.@requestScope.size() == 0
+        }
 
         cleanup:
         embeddedServer.stop()
