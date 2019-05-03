@@ -107,9 +107,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                             message = ((ByteBufHolder) message).content();
                         }
                         Optional<?> converted = conversionService.convert(message, conversionContext);
-                        if (message instanceof ReferenceCounted) {
-                            ((ReferenceCounted) message).release();
-                        }
+
                         if (converted.isPresent()) {
                             subscriber.onNext(converted.get());
                         } else {
@@ -130,6 +128,10 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                             } finally {
                                 s.cancel();
                             }
+                        }
+
+                        if (message instanceof ReferenceCounted) {
+                            ((ReferenceCounted) message).release();
                         }
                     }
 

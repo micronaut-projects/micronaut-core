@@ -104,6 +104,59 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @param generatorAdapter The generator adapter
      * @param types The type references
      */
+    protected static void pushTypeArgumentElements(GeneratorAdapter generatorAdapter, Map<String, ClassElement> types) {
+        if (types == null || types.isEmpty()) {
+            generatorAdapter.visitInsn(ACONST_NULL);
+            return;
+        }
+        int len = types.size();
+        // Build calls to Argument.create(...)
+        pushNewArray(generatorAdapter, Argument.class, len);
+        int i = 0;
+        for (Map.Entry<String, ClassElement> entry : types.entrySet()) {
+            // the array index
+            generatorAdapter.push(i);
+            String argumentName = entry.getKey();
+            ClassElement classElement = entry.getValue();
+            Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
+            Object classReference = toClassReference(classElement);
+            if (CollectionUtils.isNotEmpty(typeArguments)) {
+                buildArgumentWithGenerics(generatorAdapter, argumentName, classReference, typeArguments);
+            } else {
+                buildArgument(generatorAdapter, argumentName, classReference);
+            }
+
+            // store the type reference
+            generatorAdapter.visitInsn(AASTORE);
+            // if we are not at the end of the array duplicate array onto the stack
+            if (i != (len - 1)) {
+                generatorAdapter.visitInsn(DUP);
+            }
+            i++;
+        }
+    }
+
+    private static Object toClassReference(ClassElement classElement) {
+        String n = classElement.getName();
+        Object classReference;
+        if (classElement.isPrimitive()) {
+            if (classElement.isArray()) {
+                classReference = ClassUtils.arrayTypeForPrimitive(n).map(t -> (Object) t).orElse(n);
+            } else {
+                classReference = ClassUtils.getPrimitiveType(n).map(t -> (Object) t).orElse(n);
+            }
+        } else {
+            classReference = n;
+        }
+        return classReference;
+    }
+
+
+    /**
+     * Pushes type arguments onto the stack.
+     * @param generatorAdapter The generator adapter
+     * @param types The type references
+     */
     protected static void pushTypeArguments(GeneratorAdapter generatorAdapter, Map<String, Object> types) {
         if (types == null || types.isEmpty()) {
             generatorAdapter.visitInsn(ACONST_NULL);
@@ -154,7 +207,34 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         );
     }
 
+
     /**
+     * Builds generic type arguments recursively.
+     *
+     * @param generatorAdapter The generator adapter to use
+     * @param argumentName The argument name
+     * @param typeReference The type name
+     * @param typeArguments The nested type arguments
+     */
+    static void buildArgumentWithGenerics(GeneratorAdapter generatorAdapter, String argumentName, Object typeReference, Map<String, ClassElement> typeArguments) {
+        // 1st argument: the type
+        generatorAdapter.push(getTypeReference(typeReference));
+        // 2nd argument: the name
+        generatorAdapter.push(argumentName);
+        // 3rd argument, more generics
+        pushTypeArgumentElements(generatorAdapter, typeArguments);
+
+        // Argument.create( .. )
+        invokeInterfaceStaticMethod(
+                generatorAdapter,
+                Argument.class,
+                METHOD_CREATE_ARGUMENT_WITH_GENERICS
+        );
+    }
+
+    /**
+     * This method should be replaced by the above method.
+     *
      * @param generatorAdapter The {@link GeneratorAdapter}
      * @param argumentName     The argument name
      * @param nestedTypeObject The nested type object
