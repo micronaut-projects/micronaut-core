@@ -222,10 +222,10 @@ import io.micronaut.http.annotation.*;
 import javax.inject.Inject;
 
 @Controller("/test")
-public class TestController<T extends Foo> {
+public class TestController<MT extends Foo> {
     
     @Get("/getMethod")
-    public java.util.List<T> getMethod(java.util.Set<T> argument) {
+    public java.util.List<MT> getMethod(java.util.Set<MT> argument) {
         return null;
     }
     

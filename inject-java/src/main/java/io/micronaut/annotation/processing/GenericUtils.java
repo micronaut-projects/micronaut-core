@@ -89,16 +89,16 @@ public class GenericUtils {
      * @param element The element
      * @return The type argument information
      */
-    public Map<String, Map<String, Element>> buildTypeArgumentElementInfo(@Nonnull Element element) {
+    public Map<String, Map<String, TypeMirror>> buildTypeArgumentElementInfo(@Nonnull Element element) {
         Map<String, Map<String, Object>> data = buildTypeArgumentInfo(element, null);
-        Map<String, Map<String, Element>> elements = new HashMap<>(data.size());
+        Map<String, Map<String, TypeMirror>> elements = new HashMap<>(data.size());
         for (Map.Entry<String, Map<String, Object>> entry : data.entrySet()) {
             Map<String, Object> value = entry.getValue();
-            HashMap<String, Element> submap = new HashMap<>(value.size());
+            HashMap<String, TypeMirror> submap = new HashMap<>(value.size());
             for (Map.Entry<String, Object> genericEntry : value.entrySet()) {
                 TypeElement te = elementUtils.getTypeElement(genericEntry.getValue().toString());
                 if (te != null) {
-                    submap.put(genericEntry.getKey(), te);
+                    submap.put(genericEntry.getKey(), te.asType());
                 }
             }
             elements.put(entry.getKey(), submap);
@@ -262,9 +262,9 @@ public class GenericUtils {
                             TypeMirror upperBound = tv.getUpperBound();
                             TypeMirror lowerBound = tv.getLowerBound();
                             if (upperBound.getKind() != TypeKind.NULL) {
-                                resolvedParameters.put(parameterName, resolveTypeReference(upperBound, Collections.emptyMap()));
+                                resolvedParameters.put(parameterName, resolveTypeReference(upperBound, boundTypes));
                             } else if (lowerBound.getKind() != TypeKind.NULL) {
-                                resolvedParameters.put(parameterName, resolveTypeReference(lowerBound, Collections.emptyMap()));
+                                resolvedParameters.put(parameterName, resolveTypeReference(lowerBound, boundTypes));
                             }
                         }
                         continue;
@@ -430,24 +430,69 @@ public class GenericUtils {
     /**
      * Takes a type element and the bound generic information and re-aligns for the new type.
      * @param typeElement The type element
+     * @param typeArguments The type arguments
      * @param genericsInfo The generic info
      * @return The aligned generics
      */
-    public Map<String, Map<String, Element>> alignNewGenericsInfo(TypeElement typeElement, Map<String, Element> genericsInfo) {
+    public Map<String, Map<String, TypeMirror>> alignNewGenericsInfo(
+            TypeElement typeElement,
+            List<? extends TypeMirror> typeArguments,
+            Map<String, TypeMirror> genericsInfo) {
         String typeName = typeElement.getQualifiedName().toString();
         List<? extends TypeParameterElement> typeParameters = typeElement.getTypeParameters();
-        Map<String, Element> resolved = new HashMap<>(genericsInfo.size());
-        for (TypeParameterElement typeParameter : typeParameters) {
-            String name = typeParameter.getSimpleName().toString();
-            Element element = genericsInfo.get(name);
-            if (element != null) {
-                resolved.put(name, element);
+        if (typeArguments.size() == typeParameters.size()) {
+
+            Map<String, TypeMirror> resolved = new HashMap<>(typeArguments.size());
+            Iterator<? extends TypeMirror> i = typeArguments.iterator();
+            for (TypeParameterElement typeParameter : typeParameters) {
+                TypeMirror typeParameterMirror = i.next();
+                if (typeParameterMirror instanceof TypeVariable) {
+                    TypeVariable tv = (TypeVariable) typeParameterMirror;
+                    resolveTypeVariable(genericsInfo, resolved, typeParameter, tv);
+                } else if (typeParameterMirror instanceof DeclaredType) {
+                    resolved.put(typeParameter.getSimpleName().toString(), typeParameterMirror);
+                } else if (typeParameterMirror instanceof ArrayType) {
+                    resolved.put(typeParameter.getSimpleName().toString(), typeParameterMirror);
+                }
+            }
+            return Collections.singletonMap(
+                    typeName,
+                    resolved
+            );
+        }
+        return Collections.emptyMap();
+    }
+
+    private void resolveTypeVariable(
+            Map<String, TypeMirror> genericsInfo,
+            Map<String, TypeMirror> resolved,
+            TypeParameterElement typeParameter,
+            TypeVariable variable) {
+        String name = variable.toString();
+        TypeMirror element = genericsInfo.get(name);
+        if (element != null) {
+            resolved.put(typeParameter.getSimpleName().toString(), element);
+        } else {
+            TypeMirror upperBound = variable.getUpperBound();
+            if (upperBound instanceof TypeVariable) {
+                resolveTypeVariable(genericsInfo, resolved, typeParameter, (TypeVariable) upperBound);
+            } else if (upperBound instanceof DeclaredType) {
+                resolved.put(
+                        typeParameter.getSimpleName().toString(),
+                        upperBound
+                );
+            } else {
+                TypeMirror lowerBound = variable.getLowerBound();
+                if (lowerBound instanceof TypeVariable) {
+                    resolveTypeVariable(genericsInfo, resolved, typeParameter, (TypeVariable) lowerBound);
+                } else if (lowerBound instanceof DeclaredType) {
+                    resolved.put(
+                            typeParameter.getSimpleName().toString(),
+                            lowerBound
+                    );
+                }
             }
         }
-        return Collections.singletonMap(
-                typeName,
-                resolved
-        );
     }
 
     private void resolveGenericTypeParameter(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror, Map<String, Object> boundTypes) {

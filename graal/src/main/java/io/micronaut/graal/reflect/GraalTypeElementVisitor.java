@@ -180,10 +180,13 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 .map(ParameterElement::getType)
                 .filter(Objects::nonNull)
                 .map(this::resolveName).collect(Collectors.toList());
-        methods.add(CollectionUtils.mapOf(
+        Map newMap = CollectionUtils.mapOf(
                 "name", methodName,
                 "parameterTypes", params
-        ));
+        );
+        if (!methods.contains(newMap)) {
+            methods.add(newMap);
+        }
     }
 
     private void processClasses(TypeHint.AccessType[] accessType, String... introspectedClasses) {

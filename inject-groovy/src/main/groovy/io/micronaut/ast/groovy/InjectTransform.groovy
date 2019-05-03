@@ -1130,15 +1130,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        Map<String, Object> resolveGenericTypes(Parameter parameter) {
+        Map<String, Object> resolveGenericTypes(Parameter parameter, Map<String, ClassNode> boundTypes = Collections.emptyMap()) {
             ClassNode parameterType = parameter.type
             GenericsType[] genericsTypes = parameterType.genericsTypes
             if (genericsTypes != null && genericsTypes.length > 0) {
-                AstGenericUtils.extractPlaceholders(parameterType)
+                return AstGenericUtils.buildGenericTypeInfo(parameterType, boundTypes)
             } else if (parameterType.isArray()) {
                 Map<String, Object> genericTypeList = [:]
-                genericTypeList.put('E', AstGenericUtils.resolveTypeReference(parameterType.componentType))
-                genericTypeList
+                genericTypeList.put('E', AstGenericUtils.resolveTypeReference(parameterType.componentType, boundTypes))
+                return genericTypeList
             }
         }
 
@@ -1643,7 +1643,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 anntationMetadata.put(parameterName, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, new ExtendedParameter(methodNode, param)))
 
-                genericTypeMap.put(parameterName, resolveGenericTypes(param))
+                genericTypeMap.put(parameterName, resolveGenericTypes(param, boundTypes))
             }
         }
 
