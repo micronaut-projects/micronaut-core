@@ -140,7 +140,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     protected @Nonnull ClassElement parameterizedClassElement(
             TypeMirror typeMirror,
             JavaVisitorContext visitorContext,
-            Map<String, Map<String, Element>> declaredGenericInfo) {
+            Map<String, Map<String, TypeMirror>> declaredGenericInfo) {
         return mirrorToClassElement(
                 typeMirror,
                 visitorContext,
@@ -167,7 +167,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @param genericsInfo The generic informatino
      * @return The class element
      */
-    protected ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, Element>> genericsInfo) {
+    protected ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {
         if (genericsInfo == null) {
             genericsInfo = Collections.emptyMap();
         }
@@ -179,24 +179,23 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
             if (e instanceof TypeElement) {
                 TypeElement typeElement = (TypeElement) e;
-                Map<String, Element> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
+                Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
                 if (JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
                     return new JavaEnumElement(
                             typeElement,
                             visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
-                            visitorContext,
-                            typeArguments
+                            visitorContext
                     );
                 } else {
                     genericsInfo = visitorContext.getGenericUtils().alignNewGenericsInfo(
                         typeElement,
+                        typeArguments,
                         boundGenerics
                     );
                     return new JavaClassElement(
                             typeElement,
                             visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
                             visitorContext,
-                            typeArguments,
                             genericsInfo
                     );
                 }
@@ -204,15 +203,11 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         } else if (returnType instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) returnType;
             TypeMirror upperBound = tv.getUpperBound();
-            Map<String, Element> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
+            Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
 
-            Element bound = boundGenerics.get(tv.toString());
-            if (bound instanceof TypeElement) {
-                return new JavaClassElement(
-                        (TypeElement) bound,
-                        visitorContext.getAnnotationUtils().getAnnotationMetadata(bound),
-                        visitorContext
-                );
+            TypeMirror bound = boundGenerics.get(tv.toString());
+            if (bound != null) {
+                return mirrorToClassElement(bound, visitorContext, genericsInfo);
             } else {
 
                 ClassElement classElement = mirrorToClassElement(upperBound, visitorContext, genericsInfo);
@@ -247,13 +242,13 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         return null;
     }
 
-    private Map<String, Element> resolveBoundGenerics(JavaVisitorContext visitorContext, Map<String, Map<String, Element>> genericsInfo) {
+    private Map<String, TypeMirror> resolveBoundGenerics(JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {
         String declaringTypeName = null;
         TypeElement typeElement = visitorContext.getModelUtils().classElementFor(element);
         if (typeElement != null) {
             declaringTypeName = typeElement.getQualifiedName().toString();
         }
-        Map<String, Element> boundGenerics = genericsInfo.get(declaringTypeName);
+        Map<String, TypeMirror> boundGenerics = genericsInfo.get(declaringTypeName);
         if (boundGenerics == null) {
             boundGenerics = Collections.emptyMap();
         }

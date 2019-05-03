@@ -27,7 +27,6 @@ import javax.annotation.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -167,8 +166,7 @@ public class LoadedVisitor implements Ordered {
                 this.rootClassElement = new JavaEnumElement(
                         typeElement,
                         annotationMetadata,
-                        visitorContext,
-                        Collections.emptyList());
+                        visitorContext);
                 visitor.visitClass(
                         rootClassElement,
                         visitorContext

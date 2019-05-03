@@ -50,8 +50,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
     private final TypeElement classElement;
     private final JavaVisitorContext visitorContext;
-    private final List<? extends TypeMirror> typeArguments;
-    private Map<String, Map<String, Element>> genericTypeInfo;
+    private Map<String, Map<String, TypeMirror>> genericTypeInfo;
 
     /**
      * @param classElement       The {@link TypeElement}
@@ -62,26 +61,22 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
-        this.typeArguments = Collections.emptyList();
     }
 
     /**
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
-     * @param typeArguments      The type arguments
      * @param genericsInfo       The generic type info
      */
     JavaClassElement(
             TypeElement classElement,
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext,
-            List<? extends TypeMirror> typeArguments,
-            Map<String, Map<String, Element>> genericsInfo) {
+            Map<String, Map<String, TypeMirror>> genericsInfo) {
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
-        this.typeArguments = typeArguments;
         this.genericTypeInfo = genericsInfo;
     }
 
@@ -243,10 +238,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
             private void configureDeclaringType(TypeElement declaringTypeElement, BeanPropertyData beanPropertyData) {
                 if (beanPropertyData.declaringType == null && !classElement.equals(declaringTypeElement)) {
-                    beanPropertyData.declaringType = new JavaClassElement(
-                            declaringTypeElement,
-                            visitorContext.getAnnotationUtils().getAnnotationMetadata(declaringTypeElement),
-                            visitorContext
+                    beanPropertyData.declaringType = mirrorToClassElement(
+                            declaringTypeElement.asType(),
+                            visitorContext,
+                            genericTypeInfo
                     );
                 }
             }
@@ -268,6 +263,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                                 .getAnnotationUtils()
                                 .newAnnotationBuilder().buildForMethod(value.getter);
                     }
+
                     JavaPropertyElement propertyElement = new JavaPropertyElement(
                             value.declaringType == null ? this : value.declaringType,
                             value.getter,
@@ -375,32 +371,27 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
-    public @Nonnull Map<String, ClassElement> getTypeArguments() {
+    public @Nonnull
+    Map<String, ClassElement> getTypeArguments() {
         List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
-        if (typeParameters.size() == typeArguments.size()) {
-            Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
-            Iterator<? extends TypeMirror> tai = typeArguments.iterator();
+        Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
 
-            Map<String, ClassElement> map = new LinkedHashMap<>();
-            while (tpi.hasNext()) {
-                TypeParameterElement tpe = tpi.next();
-                TypeMirror typeMirror = tai.next();
-
-                ClassElement classElement = mirrorToClassElement(typeMirror, visitorContext, this.genericTypeInfo);
-                if (classElement != null) {
-                    map.put(tpe.toString(), classElement);
-                }
+        Map<String, ClassElement> map = new LinkedHashMap<>();
+        while (tpi.hasNext()) {
+            TypeParameterElement tpe = tpi.next();
+            ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo);
+            if (classElement != null) {
+                map.put(tpe.toString(), classElement);
             }
-
-            return Collections.unmodifiableMap(map);
         }
-        return Collections.emptyMap();
+
+        return Collections.unmodifiableMap(map);
     }
 
     /**
      * @return The generic type info for this class.
      */
-    Map<String, Map<String, Element>> getGenericTypeInfo() {
+    Map<String, Map<String, TypeMirror>> getGenericTypeInfo() {
         if (genericTypeInfo == null) {
             genericTypeInfo = visitorContext.getGenericUtils().buildTypeArgumentElementInfo(classElement);
         }
