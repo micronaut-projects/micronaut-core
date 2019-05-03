@@ -384,7 +384,16 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return buildRoute(httpMethod, uri, executableHandle);
     }
 
-    private UriRoute buildRoute(HttpMethod httpMethod, String uri, MethodExecutionHandle<?, Object> executableHandle) {
+    /**
+     * Build a route.
+     *
+     * @param httpMethod The HTTP method
+     * @param uri The URI
+     * @param executableHandle The executable handle
+     *
+     * @return an {@link UriRoute}
+     */
+    protected UriRoute buildRoute(HttpMethod httpMethod, String uri, MethodExecutionHandle<?, Object> executableHandle) {
         DefaultUriRoute route;
         if (currentParentRoute != null) {
             route = new DefaultUriRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri), executableHandle);
