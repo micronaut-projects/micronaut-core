@@ -66,6 +66,20 @@ abstract class AbstractTypeElementSpec extends Specification {
     }
 
     /**
+    * Build and return a {@link BeanIntrospection} for the given class name and class data.
+    *
+    * @return the introspection if it is correct
+    **/
+    protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
+        def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
      * @param annotationExpression the annotation expression
      * @param packages the packages to import
      * @return The metadata
@@ -190,15 +204,6 @@ class Test {
 
         ClassLoader classLoader = buildClassLoader(className, cls)
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
-    }
-
-    protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
-        def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
-        def packageName = NameUtils.getPackageName(className)
-        String beanFullName = "${packageName}.${beanDefName}"
-
-        ClassLoader classLoader = buildClassLoader(className, cls)
-        return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
     }
 
     protected BeanDefinitionReference buildBeanDefinitionReference(String className, String cls) {

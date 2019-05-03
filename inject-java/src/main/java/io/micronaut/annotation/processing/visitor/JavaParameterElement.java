@@ -21,7 +21,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 
 import javax.annotation.Nullable;
-import javax.lang.model.element.Element;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import java.util.Map;
@@ -62,7 +61,7 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     @Override
     public ClassElement getGenericType() {
         TypeMirror returnType = getNativeType().asType();
-        Map<String, Map<String, Element>> declaredGenericInfo = declaringClass.getGenericTypeInfo();
+        Map<String, Map<String, TypeMirror>> declaredGenericInfo = declaringClass.getGenericTypeInfo();
         return parameterizedClassElement(returnType, visitorContext, declaredGenericInfo);
     }
 
