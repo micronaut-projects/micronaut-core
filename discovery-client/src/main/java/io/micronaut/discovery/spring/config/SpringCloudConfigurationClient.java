@@ -115,6 +115,12 @@ public class SpringCloudConfigurationClient implements ConfigurationClient {
                 if (throwable instanceof HttpClientResponseException) {
                     HttpClientResponseException httpClientResponseException = (HttpClientResponseException) throwable;
                     if (httpClientResponseException.getStatus() == HttpStatus.NOT_FOUND) {
+                        if (springCloudConfiguration.isFailFast()) {
+                            return Flowable.error(new IllegalStateException(
+                                    "Could not locate PropertySource and the fail fast property is set",
+                                    throwable));
+                        }
+                        LOG.warn("Could not locate PropertySource: ", throwable);
                         return Flowable.empty();
                     }
                 }
@@ -123,6 +129,8 @@ public class SpringCloudConfigurationClient implements ConfigurationClient {
 
             Flowable<ConfigServerResponse> configurationValues =
                     Flowable.fromPublisher(
+                            springCloudConfiguration.getLabel() == null ?
+                            springCloudConfigClient.readValues(applicationName, profiles) :
                             springCloudConfigClient.readValues(
                                     applicationName, profiles, springCloudConfiguration.getLabel()))
                             .onErrorResumeNext(errorHandler);
