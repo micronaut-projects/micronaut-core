@@ -42,6 +42,7 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
     public static final String SPRING_CLOUD_CONFIG_ENDPOINT = "${" + SpringCloudConfigConfiguration.PREFIX + ".uri}";
 
     private String uri = "http://locahost:8888";
+    private String label;
 
     private final SpringCloudConnectionPoolConfiguration springCloudConnectionPoolConfiguration;
     private final SpringConfigDiscoveryConfiguration springConfigDiscoveryConfiguration = new SpringConfigDiscoveryConfiguration();
@@ -89,6 +90,22 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
      */
     public void setUri(String uri) {
         this.uri = uri;
+    }
+
+    /**
+     * @return The spring cloud config server label
+     */
+    public String getLabel() {
+        return label;
+    }
+
+    /**
+     * Set the Spring Cloud config server label.
+     *
+     * @param label Spring Cloud config server label
+     */
+    public void setLabel(String label) {
+        this.label = label;
     }
 
     /**

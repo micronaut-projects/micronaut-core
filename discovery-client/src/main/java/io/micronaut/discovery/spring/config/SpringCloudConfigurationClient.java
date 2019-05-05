@@ -107,7 +107,8 @@ public class SpringCloudConfigurationClient implements ConfigurationClient {
 
             if (LOG.isInfoEnabled()) {
                 LOG.info("Spring Cloud Config Active: {}", uri);
-                LOG.info("Application Name: {}, Application Profiles: {}", applicationName, profiles);
+                LOG.info("Application Name: {}, Application Profiles: {}, label: {}", applicationName, profiles,
+                         springCloudConfiguration.getLabel());
             }
 
             Function<Throwable, Publisher<? extends ConfigServerResponse>> errorHandler = throwable -> {
@@ -121,7 +122,9 @@ public class SpringCloudConfigurationClient implements ConfigurationClient {
             };
 
             Flowable<ConfigServerResponse> configurationValues =
-                    Flowable.fromPublisher(springCloudConfigClient.readValues(applicationName, profiles))
+                    Flowable.fromPublisher(
+                            springCloudConfigClient.readValues(
+                                    applicationName, profiles, springCloudConfiguration.getLabel()))
                             .onErrorResumeNext(errorHandler);
 
             Flowable<PropertySource> propertySourceFlowable = configurationValues.flatMap(configServerResponse -> Flowable.create(emitter -> {

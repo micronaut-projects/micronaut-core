@@ -40,12 +40,14 @@ public class MockSpringCloudConfigServer implements SpringCloudConfigOperations 
 
     final static Logger LOGGER = LoggerFactory.getLogger(MockSpringCloudConfigServer.class);
     @Override
-    public @Nonnull Publisher<ConfigServerResponse> readValues(@Nonnull String applicationName, @Nullable String profiles) {
+    public @Nonnull Publisher<ConfigServerResponse> readValues(@Nonnull String applicationName,
+                                                               @Nullable String profiles,
+                                                               @Nullable String label) {
         String[] profilesArray = profiles != null ? profiles.split(",") : new String[0];
         ConfigServerResponse configServerResponse = new ConfigServerResponse();
         configServerResponse.setName(applicationName);
         configServerResponse.setProfiles(profilesArray);
-        configServerResponse.setLabel(null);
+        configServerResponse.setLabel(label);
         configServerResponse.setState(null);
         configServerResponse.setVersion(null);
         List<String> list = Arrays.asList(profilesArray);
