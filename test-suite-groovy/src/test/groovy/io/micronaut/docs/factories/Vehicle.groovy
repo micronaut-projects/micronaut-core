@@ -15,7 +15,6 @@
  */
 package io.micronaut.docs.factories
 
-import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
