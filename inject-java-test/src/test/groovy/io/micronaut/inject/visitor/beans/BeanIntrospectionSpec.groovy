@@ -11,8 +11,10 @@ import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
+import spock.lang.Issue
 
 import javax.annotation.processing.SupportedAnnotationTypes
 import javax.persistence.Column
@@ -22,6 +24,22 @@ import javax.persistence.Version
 import javax.validation.constraints.Size
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1607')
+    void "test recursive generics"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+import io.micronaut.inject.visitor.beans.RecursiveGenerics;
+
+@io.micronaut.core.annotation.Introspected
+class Test extends RecursiveGenerics<Test> {
+
+}
+''')
+        expect:
+        introspection != null
+    }
 
     void "test build introspection"() {
         given:
