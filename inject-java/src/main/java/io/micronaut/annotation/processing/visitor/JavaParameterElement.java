@@ -53,8 +53,8 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
 
     @Override
     public ClassElement getType() {
-        TypeMirror returnType = getNativeType().asType();
-        return mirrorToClassElement(returnType, visitorContext);
+        TypeMirror parameterType = getNativeType().asType();
+        return mirrorToClassElement(parameterType, visitorContext);
     }
 
     @Nullable
