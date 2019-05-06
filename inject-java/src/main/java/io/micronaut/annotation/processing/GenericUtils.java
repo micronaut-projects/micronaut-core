@@ -446,14 +446,8 @@ public class GenericUtils {
             Iterator<? extends TypeMirror> i = typeArguments.iterator();
             for (TypeParameterElement typeParameter : typeParameters) {
                 TypeMirror typeParameterMirror = i.next();
-                if (typeParameterMirror instanceof TypeVariable) {
-                    TypeVariable tv = (TypeVariable) typeParameterMirror;
-                    resolveTypeVariable(genericsInfo, resolved, typeParameter, tv);
-                } else if (typeParameterMirror instanceof DeclaredType) {
-                    resolved.put(typeParameter.getSimpleName().toString(), typeParameterMirror);
-                } else if (typeParameterMirror instanceof ArrayType) {
-                    resolved.put(typeParameter.getSimpleName().toString(), typeParameterMirror);
-                }
+                String variableName = typeParameter.getSimpleName().toString();
+                resolveVariableForMirror(genericsInfo, resolved, variableName, typeParameterMirror);
             }
             return Collections.singletonMap(
                     typeName,
@@ -463,31 +457,52 @@ public class GenericUtils {
         return Collections.emptyMap();
     }
 
+    private void resolveVariableForMirror(
+            Map<String, TypeMirror> genericsInfo,
+            Map<String, TypeMirror> resolved,
+            String variableName,
+            TypeMirror mirror) {
+        if (mirror instanceof TypeVariable) {
+            TypeVariable tv = (TypeVariable) mirror;
+            resolveTypeVariable(genericsInfo, resolved, variableName, tv);
+        } else {
+            if (mirror instanceof WildcardType) {
+                WildcardType wt = (WildcardType) mirror;
+                TypeMirror extendsBound = wt.getExtendsBound();
+                resolveVariableForMirror(genericsInfo, resolved, variableName, extendsBound);
+            } else if (mirror instanceof DeclaredType) {
+                resolved.put(variableName, mirror);
+            } else if (mirror instanceof ArrayType) {
+                resolved.put(variableName, mirror);
+            }
+        }
+    }
+
     private void resolveTypeVariable(
             Map<String, TypeMirror> genericsInfo,
             Map<String, TypeMirror> resolved,
-            TypeParameterElement typeParameter,
+            String variableName,
             TypeVariable variable) {
         String name = variable.toString();
         TypeMirror element = genericsInfo.get(name);
         if (element != null) {
-            resolved.put(typeParameter.getSimpleName().toString(), element);
+            resolved.put(variableName, element);
         } else {
             TypeMirror upperBound = variable.getUpperBound();
             if (upperBound instanceof TypeVariable) {
-                resolveTypeVariable(genericsInfo, resolved, typeParameter, (TypeVariable) upperBound);
+                resolveTypeVariable(genericsInfo, resolved, variableName, (TypeVariable) upperBound);
             } else if (upperBound instanceof DeclaredType) {
                 resolved.put(
-                        typeParameter.getSimpleName().toString(),
+                        variableName,
                         upperBound
                 );
             } else {
                 TypeMirror lowerBound = variable.getLowerBound();
                 if (lowerBound instanceof TypeVariable) {
-                    resolveTypeVariable(genericsInfo, resolved, typeParameter, (TypeVariable) lowerBound);
+                    resolveTypeVariable(genericsInfo, resolved, variableName, (TypeVariable) lowerBound);
                 } else if (lowerBound instanceof DeclaredType) {
                     resolved.put(
-                            typeParameter.getSimpleName().toString(),
+                            variableName,
                             lowerBound
                     );
                 }
@@ -515,14 +530,22 @@ public class GenericUtils {
             }
         } else if (mirror instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) mirror;
-            TypeMirror upperBound = tv.getUpperBound();
-            if (upperBound instanceof DeclaredType) {
-                resolveGenericTypeParameter(
-                        resolvedParameters,
+            String variableName = tv.toString();
+            if (boundTypes.containsKey(variableName)) {
+                resolvedParameters.put(
                         parameterName,
-                        upperBound,
-                        boundTypes
+                        boundTypes.get(variableName)
                 );
+            } else {
+                TypeMirror upperBound = tv.getUpperBound();
+                if (upperBound instanceof DeclaredType) {
+                    resolveGenericTypeParameter(
+                            resolvedParameters,
+                            parameterName,
+                            upperBound,
+                            boundTypes
+                    );
+                }
             }
         }
     }

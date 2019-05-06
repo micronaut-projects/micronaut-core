@@ -143,6 +143,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         propertyDefinitions.add(
                 new BeanPropertyWriter(
                         this,
+                        type,
                         propertyType,
                         name,
                         readMethod,

@@ -11,4 +11,6 @@ public interface InterfaceWithGenerics<ET, ID>  {
     <S extends ET> Iterable<S> saveAll(@Valid @NotNull @Nonnull Iterable<S> entities);
 
     Optional<ET> find(ID id);
+
+    void deleteAll(Iterable<? extends ET> iterable);
 }
