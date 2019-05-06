@@ -16,11 +16,11 @@
 
 package io.micronaut.views.thymeleaf;
 
-import io.micronaut.http.HttpRequest;
 import org.thymeleaf.context.IExpressionContext;
 import org.thymeleaf.exceptions.TemplateProcessingException;
 import org.thymeleaf.linkbuilder.StandardLinkBuilder;
 
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.Map;
 
@@ -34,7 +34,11 @@ import java.util.Map;
 @Singleton
 public class LinkBuilder extends StandardLinkBuilder {
 
+    /**
+     * @return {@code null}.
+     */
     @Override
+    @Nullable
     protected String computeContextPath(
             IExpressionContext context, String base, Map<String, Object> parameters) {
         if (!(context instanceof WebEngineContext)) {
@@ -44,13 +48,7 @@ public class LinkBuilder extends StandardLinkBuilder {
                             "used for executing the engine implements the " + WebEngineContext.class
                             .getName() + " interface");
         }
-        HttpRequest<?> request = ((WebEngineContext) context).getRequest();
-        String path = request.getPath();
-        int len = path.length();
-        if (len > 1 && path.charAt(len - 1) == '/') {
-            return path.substring(0, len - 1);
-        }
-        return path;
+        return null;
     }
 
     @Override
