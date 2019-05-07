@@ -107,13 +107,20 @@ public class SpringCloudConfigurationClient implements ConfigurationClient {
 
             if (LOG.isInfoEnabled()) {
                 LOG.info("Spring Cloud Config Active: {}", uri);
-                LOG.info("Application Name: {}, Application Profiles: {}", applicationName, profiles);
+                LOG.info("Application Name: {}, Application Profiles: {}, label: {}", applicationName, profiles,
+                         springCloudConfiguration.getLabel());
             }
 
             Function<Throwable, Publisher<? extends ConfigServerResponse>> errorHandler = throwable -> {
                 if (throwable instanceof HttpClientResponseException) {
                     HttpClientResponseException httpClientResponseException = (HttpClientResponseException) throwable;
                     if (httpClientResponseException.getStatus() == HttpStatus.NOT_FOUND) {
+                        if (springCloudConfiguration.isFailFast()) {
+                            return Flowable.error(new IllegalStateException(
+                                    "Could not locate PropertySource and the fail fast property is set",
+                                    throwable));
+                        }
+                        LOG.warn("Could not locate PropertySource: ", throwable);
                         return Flowable.empty();
                     }
                 }
@@ -121,7 +128,11 @@ public class SpringCloudConfigurationClient implements ConfigurationClient {
             };
 
             Flowable<ConfigServerResponse> configurationValues =
-                    Flowable.fromPublisher(springCloudConfigClient.readValues(applicationName, profiles))
+                    Flowable.fromPublisher(
+                            springCloudConfiguration.getLabel() == null ?
+                            springCloudConfigClient.readValues(applicationName, profiles) :
+                            springCloudConfigClient.readValues(
+                                    applicationName, profiles, springCloudConfiguration.getLabel()))
                             .onErrorResumeNext(errorHandler);
 
             Flowable<PropertySource> propertySourceFlowable = configurationValues.flatMap(configServerResponse -> Flowable.create(emitter -> {

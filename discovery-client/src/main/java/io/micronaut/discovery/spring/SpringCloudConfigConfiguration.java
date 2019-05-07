@@ -42,6 +42,8 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
     public static final String SPRING_CLOUD_CONFIG_ENDPOINT = "${" + SpringCloudConfigConfiguration.PREFIX + ".uri}";
 
     private String uri = "http://locahost:8888";
+    private String label;
+    private boolean failFast;
 
     private final SpringCloudConnectionPoolConfiguration springCloudConnectionPoolConfiguration;
     private final SpringConfigDiscoveryConfiguration springConfigDiscoveryConfiguration = new SpringConfigDiscoveryConfiguration();
@@ -89,6 +91,39 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
      */
     public void setUri(String uri) {
         this.uri = uri;
+    }
+
+    /**
+     * @return The spring cloud config server label
+     */
+    public String getLabel() {
+        return label;
+    }
+
+    /**
+     *
+     * @return Flag to indicate that failure to connect to Spring Cloud Config is fatal (default false).
+     */
+    public boolean isFailFast() {
+        return failFast;
+    }
+
+    /**
+     * Set flag to indicate that failure to connect to Spring Cloud config is fatal.
+     *
+     * @param failFast  flag to fail fast
+     */
+    public void setFailFast(boolean failFast) {
+        this.failFast = failFast;
+    }
+
+    /**
+     * Set the Spring Cloud config server label.
+     *
+     * @param label Spring Cloud config server label
+     */
+    public void setLabel(String label) {
+        this.label = label;
     }
 
     /**
