@@ -35,10 +35,10 @@ import javax.annotation.Nullable;
 public interface SpringCloudConfigOperations {
 
     /**
-     * Reads a Key from Consul. See https://www.consul.io/api/kv.html.
+     * Reads an application configuration from Spring Config Server.
      *
-     * @param applicationName   The key
-     * @param profiles          The data center
+     * @param applicationName   The application name
+     * @param profiles          The active profiles
      * @return A {@link Publisher} that emits a list of {@link ConfigServerResponse}
      */
     @Get("/{applicationName}/{profiles}")
@@ -50,5 +50,24 @@ public interface SpringCloudConfigOperations {
     @Nonnull Publisher<ConfigServerResponse> readValues(
             @Nonnull String applicationName,
             @Nullable String profiles);
+
+    /**
+     * Reads a versioned (#label) application configuration from Spring Config Server.
+     *
+     * @param applicationName   The application name
+     * @param profiles          The active profiles
+     * @param label             The label
+     * @return A {@link Publisher} that emits a list of {@link ConfigServerResponse}
+     */
+    @Get("/{applicationName}/{profiles}/{label}")
+    @Produces(single = true)
+    @Retryable(
+            attempts = "${" + SpringCloudConfigConfiguration.SpringConfigDiscoveryConfiguration.PREFIX + ".retry-count:3}",
+            delay = "${" + SpringCloudConfigConfiguration.SpringConfigDiscoveryConfiguration.PREFIX + ".retry-delay:1s}"
+    )
+    @Nonnull Publisher<ConfigServerResponse> readValues(
+            @Nonnull String applicationName,
+            @Nullable String profiles,
+            @Nullable String label);
 
 }

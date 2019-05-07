@@ -15,22 +15,30 @@
  */
 package io.micronaut.discovery.spring;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.spring.config.client.SpringCloudConfigOperations;
 import io.micronaut.discovery.spring.config.client.response.ConfigServerPropertySource;
 import io.micronaut.discovery.spring.config.client.response.ConfigServerResponse;
 import io.micronaut.http.annotation.Controller;
-import org.reactivestreams.Publisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
 @Controller("/")
 @Requires(property = MockSpringCloudConfigServer.ENABLED)
@@ -39,13 +47,28 @@ public class MockSpringCloudConfigServer implements SpringCloudConfigOperations 
     public static final String ENABLED = "enable.mock.spring-cloud-config";
 
     final static Logger LOGGER = LoggerFactory.getLogger(MockSpringCloudConfigServer.class);
+
     @Override
-    public @Nonnull Publisher<ConfigServerResponse> readValues(@Nonnull String applicationName, @Nullable String profiles) {
+    public @Nonnull Publisher<ConfigServerResponse> readValues(@Nonnull String applicationName,
+                                                               @Nullable String profiles) {
+        return getConfigServerResponse(applicationName, profiles, null);
+    }
+
+    @Override
+    public @Nonnull Publisher<ConfigServerResponse> readValues(@Nonnull String applicationName,
+                                                               @Nullable String profiles,
+                                                               @Nullable String label) {
+        return getConfigServerResponse(applicationName, profiles, label);
+    }
+
+    private Publisher<ConfigServerResponse> getConfigServerResponse(
+            String applicationName, String profiles, String label)
+    {
         String[] profilesArray = profiles != null ? profiles.split(",") : new String[0];
         ConfigServerResponse configServerResponse = new ConfigServerResponse();
         configServerResponse.setName(applicationName);
         configServerResponse.setProfiles(profilesArray);
-        configServerResponse.setLabel(null);
+        configServerResponse.setLabel(label);
         configServerResponse.setState(null);
         configServerResponse.setVersion(null);
         List<String> list = Arrays.asList(profilesArray);
