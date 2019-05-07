@@ -37,7 +37,7 @@ import java.util.WeakHashMap;
  *
  * @author James Kleeh
  * @author Marcel Overdijk
- * @since 1.2
+ * @since 1.2.0
  */
 @Singleton
 class RequestCustomScope implements CustomScope<Request>, LifeCycle<RequestCustomScope> {

@@ -26,7 +26,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * A {@link io.micronaut.context.scope.CustomScope} that creates a new bean for every HTTP request.
  *
  * @author James Kleeh
- * @since 1.2
+ * @since 1.2.0
  */
 @ScopedProxy
 @Documented

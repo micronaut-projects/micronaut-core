@@ -27,7 +27,7 @@ import javax.inject.Singleton
 
 /**
  * @author Marcel Overdijk
- * @since 1.2
+ * @since 1.2.0
  */
 class RequestScopeSpec extends AbstractMicronautSpec {
 
