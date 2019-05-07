@@ -14,8 +14,8 @@
 |`@ThreadLocal` scope is a custom scope that associates a bean per thread via a ThreadLocal
 |link:{api}/io/micronaut/runtime/context/scope/Refreshable.html[@Refreshable]
 |`@Refreshable` scope is a custom scope that allows a bean's state to be refreshed via the `/refresh` endpoint.
-|link:{api}/io/micronaut/runtime/context/scope/Request.html[@Request]
-|`@Request` scope is a custom scope that indicates a new instance of the bean is created for each HTTP request
+|link:{api}/io/micronaut/runtime/context/scope/RequestScope.html[@RequestScope]
+|`@RequestScope` scope is a custom scope that indicates a new instance of the bean is created for each HTTP request
 |===
 
 NOTE: The link:{api}/io/micronaut/context/annotation/Prototype.html[@Prototype] annotation is a synonym for link:{api}/io/micronaut/context/annotation/Bean.html[@Bean] because the default scope is prototype.
