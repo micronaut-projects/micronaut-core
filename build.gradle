@@ -437,7 +437,7 @@ ext {
             'security-configurations'  : [
                     version : micronautSecurityVersion,
                     group   : 'io.micronaut.configuration',
-                    modules : ['micronaut-security-ldap']
+                    modules : ['micronaut-security-ldap', 'micronaut-security-oauth2']
             ]
     ]
 
