@@ -67,7 +67,7 @@ public class JdbcDatabaseManager {
     public static Optional<JdbcDatabase> findDatabase(String jdbcUrl) {
         if (StringUtils.isNotEmpty(jdbcUrl)) {
             if (!jdbcUrl.startsWith("jdbc")) {
-                throw new IllegalArgumentException("JDBC URLs must start with 'jdbc'");
+                throw new IllegalArgumentException("Invalid JDBC URL [" + jdbcUrl + "]. JDBC URLs must start with 'jdbc'.");
             }
             String partialUrl = jdbcUrl.substring(5);
             String prefix = partialUrl.substring(0, partialUrl.indexOf(':')).toLowerCase();
