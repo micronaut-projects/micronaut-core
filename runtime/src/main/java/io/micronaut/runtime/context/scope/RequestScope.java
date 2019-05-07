@@ -32,5 +32,5 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
-public @interface Request {
+public @interface RequestScope {
 }

@@ -35,14 +35,14 @@ package test;
 
 import io.micronaut.runtime.context.scope.*;
 
-@Request
+@RequestScope
 class RequestBean {
 
 }
 """)
 
         then:
-        beanDefinition.getAnnotationNameByStereotype(Scope).get() == Request.name
+        beanDefinition.getAnnotationNameByStereotype(Scope).get() == RequestScope.name
     }
 
     void "test bean definition data"() {
@@ -52,10 +52,10 @@ class RequestBean {
 
         expect:
         aDefinition.getAnnotationNameByStereotype(Scope).isPresent()
-        aDefinition.getAnnotationNameByStereotype(Scope).get() == Request.name
+        aDefinition.getAnnotationNameByStereotype(Scope).get() == RequestScope.name
     }
 
-    @Request
+    @RequestScope
     static class RequestBean {
 
         int num = 0

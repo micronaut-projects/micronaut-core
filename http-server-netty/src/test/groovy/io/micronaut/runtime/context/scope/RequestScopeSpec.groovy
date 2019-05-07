@@ -67,7 +67,7 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         embeddedServer.stop()
     }
 
-    @Request
+    @RequestScope
     static class RequestBean {
 
         int num = 0

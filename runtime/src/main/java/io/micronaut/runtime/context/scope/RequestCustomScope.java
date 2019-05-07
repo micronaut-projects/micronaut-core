@@ -40,13 +40,13 @@ import java.util.WeakHashMap;
  * @since 1.2.0
  */
 @Singleton
-class RequestCustomScope implements CustomScope<Request>, LifeCycle<RequestCustomScope> {
+class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<RequestCustomScope> {
 
     private final Map<HttpRequest, Map<String, Object>> requestScope = new WeakHashMap<>();
 
     @Override
-    public Class<Request> annotationType() {
-        return Request.class;
+    public Class<RequestScope> annotationType() {
+        return RequestScope.class;
     }
 
     @Override
@@ -54,7 +54,7 @@ class RequestCustomScope implements CustomScope<Request>, LifeCycle<RequestCusto
                      BeanIdentifier identifier, Provider<T> provider) {
         Optional<HttpRequest<T>> currentRequest = ServerRequestContext.currentRequest();
         if (!currentRequest.isPresent()) {
-            throw new NoSuchBeanException(beanDefinition.getBeanType(), Qualifiers.byStereotype(Request.class));
+            throw new NoSuchBeanException(beanDefinition.getBeanType(), Qualifiers.byStereotype(RequestScope.class));
         }
         Map<String, Object> values = requestScope.get(currentRequest.get());
         if (values == null) {
