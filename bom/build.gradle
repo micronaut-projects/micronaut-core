@@ -7,6 +7,8 @@ publishing {
                 def profiles = new Properties()
                 profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
 
+                boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
+                
                 xml.children().last() + {
                     def mkp = delegate
 
@@ -14,7 +16,7 @@ publishing {
                     mkp.properties {
                         for(dep in dependencyVersions) {
                             def v = dep.value.version
-                            if(!v.toString().endsWith("-SNAPSHOT")) {
+                            if(!v.toString().endsWith("-SNAPSHOT") || micronautSnapshot) {
                                 mkp."${dep.key}.version"(v)
                             }
                         }
@@ -50,7 +52,7 @@ publishing {
                             for (dep in dependencyVersions) {
                                 def info = dep.value
                                 // don't include snapshots
-                                if(info.version.toString().endsWith("-SNAPSHOT")) {
+                                if(info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
                                     continue
                                 }
 
