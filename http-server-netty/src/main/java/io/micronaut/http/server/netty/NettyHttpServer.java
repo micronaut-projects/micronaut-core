@@ -56,6 +56,7 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
+import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
@@ -101,6 +102,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     public static final String HTTP_CODEC = "http-codec";
     @SuppressWarnings("WeakerAccess")
     public static final String HTTP_COMPRESSOR = "http-compressor";
+    @SuppressWarnings("WeakerAccess")
+    public static final String HTTP_DECOMPRESSOR = "http-decompressor";
     @SuppressWarnings("WeakerAccess")
     public static final String HTTP_KEEP_ALIVE_HANDLER = "http-keep-alive-handler";
     @SuppressWarnings("WeakerAccess")
@@ -274,6 +277,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         pipeline.addLast(new FlowControlHandler());
                         pipeline.addLast(HTTP_KEEP_ALIVE_HANDLER, new HttpServerKeepAliveHandler());
                         pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor(serverConfiguration.getCompressionThreshold()));
+                        pipeline.addLast(HTTP_DECOMPRESSOR, new HttpContentDecompressor());
                         pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                         pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
                         pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(
