@@ -708,7 +708,7 @@ public class DefaultBeanContext implements BeanContext {
                                     new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
                             ));
                         } else {
-                            if (!requiredArgument.getAnnotationMetadata().hasDeclaredAnnotation(Nullable.class)) {
+                            if (!requiredArgument.isDeclaredNullable()) {
                                 throw new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. Argument cannot be null");
                             }
                         }
@@ -718,7 +718,7 @@ public class DefaultBeanContext implements BeanContext {
                         if (existingBean.isPresent()) {
                             argumentValues.put(requiredArgument.getName(), existingBean.get());
                         } else {
-                            if (!requiredArgument.getAnnotationMetadata().hasDeclaredAnnotation(Nullable.class)) {
+                            if (!requiredArgument.isDeclaredNullable()) {
                                 throw new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. No bean found for type: " + requiredArgument.getType());
                             }
                         }
@@ -1478,7 +1478,7 @@ public class DefaultBeanContext implements BeanContext {
                     Map<String, Object> convertedValues = new LinkedHashMap<>(argumentValues);
                     for (Argument<?> requiredArgument : requiredArguments) {
                         Object val = argumentValues.get(requiredArgument.getName());
-                        if (val == null && !requiredArgument.getAnnotationMetadata().hasDeclaredAnnotation(Nullable.class)) {
+                        if (val == null && !requiredArgument.isDeclaredNullable()) {
                             throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "].");
                         }
                         BeanResolutionContext finalResolutionContext = resolutionContext;

@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
 import java.lang.reflect.Field;
@@ -26,7 +27,7 @@ import java.lang.reflect.Field;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotationMetadataProvider {
+public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotationMetadataProvider, AnnotatedElement {
 
     /**
      * @return The name of the field

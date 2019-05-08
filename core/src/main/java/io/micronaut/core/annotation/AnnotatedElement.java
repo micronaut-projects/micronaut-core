@@ -26,4 +26,17 @@ import io.micronaut.core.naming.Named;
  * @since 1.2
  */
 public interface AnnotatedElement extends AnnotationMetadataProvider, Named {
+    /**
+     * @return Whether the element is nullable.
+     */
+    default boolean isDeclaredNullable() {
+        return getAnnotationMetadata().hasSimpleDeclaredAnnotation(AnnotationUtil.NULLABLE);
+    }
+
+    /**
+     * @return Whether the element is nullable.
+     */
+    default boolean isNullable() {
+        return getAnnotationMetadata().hasSimpleAnnotation(AnnotationUtil.NULLABLE);
+    }
 }

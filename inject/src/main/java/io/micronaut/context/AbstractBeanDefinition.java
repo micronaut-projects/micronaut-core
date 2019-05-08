@@ -767,7 +767,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         if (value.isPresent()) {
                             return value.get();
                         } else {
-                            if (argument.isDeclaredAnnotationPresent(Nullable.class)) {
+                            if (argument.isDeclaredNullable()) {
                                 return null;
                             }
                             throw new DependencyInjectionException(resolutionContext, injectionPoint, conversionContext, valString);
@@ -970,7 +970,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         } else {
             BeanResolutionContext.Path path = resolutionContext.getPath();
             BeanResolutionContext.Segment current = path.peek();
-            boolean isNullable = argument.isDeclaredAnnotationPresent(Nullable.class);
+            boolean isNullable = argument.isDeclaredNullable();
             if (isNullable && current != null && current.getArgument().equals(argument)) {
                 return null;
             } else {
@@ -1030,7 +1030,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     if (value.isPresent()) {
                         result = value.get();
                     } else {
-                        if (argMetadata.hasDeclaredAnnotation(Nullable.class)) {
+                        if (argument.isDeclaredNullable()) {
                             result = null;
                         } else {
                             throw new DependencyInjectionException(resolutionContext, conversionContext, prop);
@@ -1184,7 +1184,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         if (value.isPresent()) {
                             return value.get();
                         } else {
-                            if (fieldArgument.isDeclaredAnnotationPresent(Nullable.class)) {
+                            if (fieldArgument.isDeclaredNullable()) {
                                 return null;
                             }
                             throw new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist or cannot be converted");
@@ -1347,7 +1347,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pop();
                 return bean;
             } catch (NoSuchBeanException e) {
-                if (injectionPoint.isDeclaredAnnotationPresent(Nullable.class)) {
+                if (injectionPoint.isDeclaredNullable()) {
                     path.pop();
                     return null;
                 }
@@ -1524,7 +1524,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pop();
                 return bean;
             } catch (NoSuchBeanException e) {
-                if (argument.isDeclaredAnnotationPresent(Nullable.class)) {
+                if (argument.isDeclaredNullable()) {
                     path.pop();
                     return null;
                 }

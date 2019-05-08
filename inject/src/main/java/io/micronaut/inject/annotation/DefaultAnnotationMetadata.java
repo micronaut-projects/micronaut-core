@@ -325,16 +325,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public boolean hasSimpleAnnotation(@Nullable String annotation) {
-        if (allStereotypes != null) {
-            return allStereotypes.keySet().stream().anyMatch(a ->
-                    NameUtils.getSimpleName(a).equalsIgnoreCase(annotation)
-            );
-        }
-        return false;
-    }
-
-    @Override
     public @Nonnull Set<String> getDeclaredAnnotationNames() {
         if (declaredAnnotations != null) {
             return declaredAnnotations.keySet();

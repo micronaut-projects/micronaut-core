@@ -17,6 +17,7 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.*;
 import java.lang.reflect.AnnotatedElement;
 import java.util.*;
@@ -51,6 +52,14 @@ public class AnnotationUtil {
     );
 
     /**
+     * Packages excludes from stereotype processing.
+     */
+    public static final List<String> STEREOTYPE_EXCLUDES = Arrays.asList(
+            "javax.annotation",
+            "edu.umd.cs.findbugs.annotations"
+    );
+
+    /**
      * Constant indicating an zero annotation.
      */
     public static final Annotation[] ZERO_ANNOTATIONS = new Annotation[0];
@@ -79,6 +88,11 @@ public class AnnotationUtil {
             return ZERO_ANNOTATIONS;
         }
     };
+
+    /**
+     * Simple Annotation name used for nullable.
+     */
+    public static final String NULLABLE = "Nullable";
 
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();

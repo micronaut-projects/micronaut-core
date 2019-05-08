@@ -93,7 +93,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
             Argument<?> constructorArgument = constructorArguments[i];
             final Object specified = arguments[i];
             if (specified == null) {
-                if (constructorArgument.isAnnotationPresent(Nullable.class)) {
+                if (constructorArgument.isDeclaredNullable()) {
                     continue;
                 } else {
                     throw new InstantiationException("Null argument specified for [" + constructorArgument.getName() + "]. If this argument is allowed to be null annotate it with @Nullable");

@@ -29,7 +29,6 @@ import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
 
-import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Collections;
@@ -136,7 +135,7 @@ public class RequestArgumentSatisfier {
                     }
                 } else if (bindingResult.isPresentAndSatisfied()) {
                     value = bindingResult.get();
-                } else if (HttpMethod.requiresRequestBody(request.getMethod()) || argument.isAnnotationPresent(Nullable.class)) {
+                } else if (HttpMethod.requiresRequestBody(request.getMethod()) || argument.isDeclaredNullable()) {
                     value = (UnresolvedArgument) () -> {
                         ArgumentBinder.BindingResult result = argumentBinder.bind(conversionContext, request);
                         Optional<ConversionError> lastError = conversionContext.getLastError();

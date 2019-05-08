@@ -23,6 +23,7 @@ import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -1868,7 +1869,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         buildMethodVisitor.visitJumpInsn(GOTO, catchEnd);
 
                         buildMethodVisitor.visitLabel(catchStart);
-                        if (!argMetadata.isAnnotationPresent(Nullable.class)) {
+                        if (!argMetadata.hasSimpleDeclaredAnnotation(AnnotationUtil.NULLABLE)) {
                             buildMethodVisitor.visitInsn(ACONST_NULL);
                             buildMethodVisitor.visitInsn(ARETURN);
                         } else {

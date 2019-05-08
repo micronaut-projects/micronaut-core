@@ -28,7 +28,6 @@ import io.micronaut.session.Session;
 import io.micronaut.session.SessionStore;
 import io.micronaut.session.http.HttpSessionFilter;
 
-import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.Optional;
 
@@ -73,7 +72,7 @@ public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session
             return () -> existing;
         } else {
             // create a new session store it in the attribute
-            if (!context.isAnnotationPresent(Nullable.class)) {
+            if (!context.getArgument().isDeclaredNullable()) {
                 Session newSession = sessionStore.newSession();
                 attrs.put(HttpSessionFilter.SESSION_ATTRIBUTE, newSession);
                 return () -> Optional.of(newSession);
