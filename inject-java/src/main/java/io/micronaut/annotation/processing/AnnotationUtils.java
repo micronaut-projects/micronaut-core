@@ -248,7 +248,8 @@ public class AnnotationUtils {
         return new JavaAnnotationMetadataBuilder(
                 elementUtils,
                 messager,
-                this
+                this,
+                modelUtils
         );
     }
 
