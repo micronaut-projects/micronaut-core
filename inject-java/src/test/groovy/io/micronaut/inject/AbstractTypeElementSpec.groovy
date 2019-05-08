@@ -177,7 +177,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
         AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {
         }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils)
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, modelUtils)
         return builder
     }
 }

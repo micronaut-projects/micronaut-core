@@ -52,6 +52,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     private final Elements elementUtils;
     private final Messager messager;
     private final AnnotationUtils annotationUtils;
+    private final ModelUtils modelUtils;
 
     /**
      * Default constructor.
@@ -59,14 +60,17 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * @param elements The elementUtils
      * @param messager The messager
      * @param annotationUtils The annotation utils
+     * @param modelUtils The model utils
      */
     public JavaAnnotationMetadataBuilder(
             Elements elements,
             Messager messager,
-            AnnotationUtils annotationUtils) {
+            AnnotationUtils annotationUtils,
+            ModelUtils modelUtils) {
         this.elementUtils = elements;
         this.messager = messager;
         this.annotationUtils = annotationUtils;
+        this.modelUtils = modelUtils;
     }
 
     @Nullable

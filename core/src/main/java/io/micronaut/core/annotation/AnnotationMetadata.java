@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -166,6 +167,36 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean hasAnnotation(@Nullable String annotation) {
         return false;
+    }
+
+    /**
+     * Checks whether the given annotation simple name (name without the package) is present in the annotations.
+     *
+     * @param annotation The annotation
+     * @return True if the annotation is present
+     */
+    default boolean hasSimpleAnnotation(@Nullable String annotation) {
+        if (annotation == null) {
+            return false;
+        }
+        return getAnnotationNames().stream().anyMatch(a ->
+                NameUtils.getSimpleName(a).equalsIgnoreCase(annotation)
+        );
+    }
+
+    /**
+     * Checks whether the given annotation simple name (name without the package) is present in the declared annotations.
+     *
+     * @param annotation The annotation
+     * @return True if the annotation is present
+     */
+    default boolean hasSimpleDeclaredAnnotation(@Nullable String annotation) {
+        if (annotation == null) {
+            return false;
+        }
+        return getDeclaredAnnotationNames().stream().anyMatch(a ->
+                NameUtils.getSimpleName(a).equalsIgnoreCase(annotation)
+        );
     }
 
     /**
