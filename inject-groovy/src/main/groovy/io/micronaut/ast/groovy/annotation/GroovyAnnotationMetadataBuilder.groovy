@@ -104,6 +104,19 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
+    protected boolean isMethodOrClassElement(AnnotatedNode element) {
+        return element instanceof ClassNode || element instanceof MethodNode
+    }
+
+    @Override
+    protected String getDeclaringType(@Nonnull AnnotatedNode element) {
+        if (element instanceof ClassNode) {
+            return element.name
+        }
+        return element.declaringClass?.name
+    }
+
+    @Override
     protected boolean hasAnnotation(AnnotatedNode element, Class<? extends Annotation> annotation) {
         return !element.getAnnotations(ClassHelper.makeCached(annotation)).isEmpty()
     }

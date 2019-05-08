@@ -44,7 +44,7 @@ import java.util.*;
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private static final Map<String, List<AnnotationMapper>> ANNOTATION_MAPPERS = new HashMap<>();
-    private static final Map<Object, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>();
+    private static final Map<MetadataKey, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>();
 
     static {
         SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
@@ -115,7 +115,19 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata build(T element) {
-        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(element);
+        String declaringType = getDeclaringType(element);
+        return build(declaringType, element);
+    }
+
+    /**
+     * Build the meta data for the given element. If the element is a method the class metadata will be included.
+     *
+     * @param declaringType The declaring type
+     * @param element The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata build(String declaringType, T element) {
+        final AnnotationMetadata existing = lookupExisting(declaringType, element);
         if (existing != null) {
             return existing;
         } else {
@@ -140,13 +152,28 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * Whether the element is a field, method, class or constructor.
+     * @param element The element
+     * @return True if it is
+     */
+    protected abstract boolean isMethodOrClassElement(T element);
+
+    /**
+     * Obtains the declaring type for an element.
+     * @param element The element
+     * @return The declaring type
+     */
+    protected abstract @Nonnull String getDeclaringType(@Nonnull T element);
+
+    /**
      * Build the meta data for the given method element excluding any class metadata.
      *
      * @param element The element
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildForMethod(T element) {
-        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(element);
+        String declaringType = getDeclaringType(element);
+        final AnnotationMetadata existing = lookupExisting(declaringType, element);
         if (existing != null) {
             return existing;
         } else {
@@ -163,7 +190,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildForParent(T parent, T element) {
-        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(element);
+        String declaringType = getDeclaringType(element);
+        return buildForParent(declaringType, parent, element);
+    }
+
+    /**
+     * Build the meta data for the given parent and method element excluding any class metadata.
+     *
+     * @param declaringType The declaring type
+     * @param parent  The parent element
+     * @param element The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata buildForParent(String declaringType, T parent, T element) {
+        final AnnotationMetadata existing = lookupExisting(declaringType, element);
         DefaultAnnotationMetadata annotationMetadata;
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
@@ -183,7 +223,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildForParent(T parent, T element, boolean inheritTypeAnnotations) {
-        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(element);
+        String declaringType = getDeclaringType(element);
+        final AnnotationMetadata existing = lookupExisting(declaringType, element);
         DefaultAnnotationMetadata annotationMetadata;
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
@@ -371,8 +412,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param annotationMirror The annotation mirror
      * @return Return the name or null
      */
-    protected abstract @Nullable
-    String getRepeatableName(A annotationMirror);
+    protected abstract @Nullable String getRepeatableName(A annotationMirror);
 
     /**
      * Obtain the name of the repeatable annotation if the annotation is is one.
@@ -380,8 +420,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param annotationType The annotation mirror
      * @return Return the name or null
      */
-    protected abstract @Nullable
-    String getRepeatableNameForType(T annotationType);
+    protected abstract @Nullable String getRepeatableNameForType(T annotationType);
 
     /**
      * @param originatingElement The originating element
@@ -605,6 +644,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
+    private AnnotationMetadata lookupExisting(String declaringType, T element) {
+        return isMethodOrClassElement(element) ? MUTATED_ANNOTATION_METADATA.get(new MetadataKey(declaringType, element)) : null;
+    }
+
     private void processAnnotationAlias(
             T originatingElement, String annotationName,
             T member,
@@ -798,26 +841,28 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     /**
      * Used to store metadata mutations at compilation time. Not for public consumption.
      *
-     * @param element  The element
+     * @param declaringType The declaring type
+     * @param element The element
      * @param metadata The metadata
      */
     @Internal
-    public static void addMutatedMetadata(Object element, AnnotationMetadata metadata) {
+    public static void addMutatedMetadata(String declaringType, Object element, AnnotationMetadata metadata) {
         if (element != null && metadata != null) {
-            MUTATED_ANNOTATION_METADATA.put(element, metadata);
+            MUTATED_ANNOTATION_METADATA.put(new MetadataKey(declaringType, element), metadata);
         }
     }
 
     /**
      * Used to store metadata mutations at compilation time. Not for public consumption.
      *
+     * @param declaringType The declaring type
      * @param element The element
      * @return True if the annotation metadata was mutated
      */
     @Internal
-    public static boolean isMetadataMutated(Object element) {
+    public static boolean isMetadataMutated(String declaringType, Object element) {
         if (element != null) {
-            return MUTATED_ANNOTATION_METADATA.containsKey(element);
+            return MUTATED_ANNOTATION_METADATA.containsKey(new MetadataKey(declaringType, element));
         }
         return false;
     }
@@ -869,5 +914,38 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             );
         }
         return annotationMetadata;
+    }
+
+    /**
+     * Key used to reference mutated metadata.
+     *
+     * @param <T> the element type
+     */
+    private static class MetadataKey<T> {
+        final String declaringName;
+        final T element;
+
+        MetadataKey(String declaringName, T element) {
+            this.declaringName = declaringName;
+            this.element = element;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            MetadataKey that = (MetadataKey) o;
+            return declaringName.equals(that.declaringName) &&
+                    element.equals(that.element);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(declaringName, element);
+        }
     }
 }
