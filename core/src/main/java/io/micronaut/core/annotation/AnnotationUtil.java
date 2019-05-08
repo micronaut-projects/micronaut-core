@@ -17,7 +17,6 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.util.StringUtils;
 
-import javax.annotation.Nullable;
 import java.lang.annotation.*;
 import java.lang.reflect.AnnotatedElement;
 import java.util.*;
