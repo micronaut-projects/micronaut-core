@@ -23,6 +23,7 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -129,6 +130,21 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected VisitorContext createVisitorContext() {
         return annotationUtils.newVisitorContext();
+    }
+
+    @Override
+    protected boolean isMethodOrClassElement(Element element) {
+        return element instanceof TypeElement || element instanceof ExecutableElement;
+    }
+
+    @Nonnull
+    @Override
+    protected String getDeclaringType(@Nonnull Element element) {
+        TypeElement typeElement = modelUtils.classElementFor(element);
+        if (typeElement != null) {
+            return typeElement.getQualifiedName().toString();
+        }
+        return element.getSimpleName().toString();
     }
 
     @Override

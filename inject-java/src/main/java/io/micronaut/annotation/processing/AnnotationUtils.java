@@ -187,11 +187,12 @@ public class AnnotationUtils {
     /**
      * Check whether the method is annotated.
      *
+     * @param declaringType The declaring type
      * @param method The method
      * @return True if it is annotated with non internal annotations
      */
-    public boolean isAnnotated(ExecutableElement method) {
-        if (AbstractAnnotationMetadataBuilder.isMetadataMutated(method)) {
+    public boolean isAnnotated(String declaringType, ExecutableElement method) {
+        if (AbstractAnnotationMetadataBuilder.isMetadataMutated(declaringType, method)) {
             return true;
         }
         List<? extends AnnotationMirror> annotationMirrors = method.getAnnotationMirrors();

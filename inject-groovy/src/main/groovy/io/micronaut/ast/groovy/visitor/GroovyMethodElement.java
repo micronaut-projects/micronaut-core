@@ -208,4 +208,9 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
                 )
         );
     }
+
+    @Override
+    public ClassElement getOwningType() {
+        return declaringClass;
+    }
 }

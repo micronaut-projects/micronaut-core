@@ -456,8 +456,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                     AnnotationMetadata annotationMetadata
-                    if (AstAnnotationUtils.isAnnotated(methodNode) || AstAnnotationUtils.hasAnnotation(methodNode, Override)) {
-                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, node, methodNode)
+                    if (AstAnnotationUtils.isAnnotated(node.name, methodNode) || AstAnnotationUtils.hasAnnotation(methodNode, Override)) {
+                        annotationMetadata = AstAnnotationUtils.newBuilder(source).buildForParent(node.name, node, methodNode)
                     } else {
                         annotationMetadata = new AnnotationMetadataReference(
                                 aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
@@ -620,8 +620,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 targetMethodGenericTypeMap,
                                 boundTypes)
                             AnnotationMetadata annotationMetadata
-                            if (AstAnnotationUtils.isAnnotated(methodNode)) {
-                                annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, methodNode, targetBeanMethodNode)
+                            if (AstAnnotationUtils.isAnnotated(producedType.name, methodNode)) {
+                                annotationMetadata = AstAnnotationUtils.newBuilder(source)
+                                        .buildForParent(
+                                        producedType.name, methodNode, targetBeanMethodNode)
                             } else {
                                 annotationMetadata = new AnnotationMetadataReference(
                                         beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,

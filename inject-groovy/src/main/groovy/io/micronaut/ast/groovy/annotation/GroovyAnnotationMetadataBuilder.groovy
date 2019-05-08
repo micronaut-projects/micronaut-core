@@ -41,6 +41,7 @@ import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.SourceUnit
 
+import javax.annotation.Nonnull
 import java.lang.annotation.Annotation
 import java.lang.annotation.Repeatable
 import java.lang.reflect.Array
@@ -60,6 +61,19 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit
+    }
+
+    @Override
+    protected boolean isMethodOrClassElement(AnnotatedNode element) {
+        return element instanceof ClassNode || element instanceof MethodNode
+    }
+
+    @Override
+    protected String getDeclaringType(@Nonnull AnnotatedNode element) {
+        if (element instanceof ClassNode) {
+            return element.name
+        }
+        return element.declaringClass?.name
     }
 
     @Override
