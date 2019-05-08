@@ -43,6 +43,5 @@ include "test-utils"
 include "configurations:cassandra"
 include "configurations:hibernate-validator"
 include "configurations:jmx"
-include "configurations:openapi"
 include "configurations:picocli"
 
