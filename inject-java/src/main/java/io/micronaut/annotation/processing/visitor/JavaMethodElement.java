@@ -105,4 +105,9 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
             return declaringClass;
         }
     }
+
+    @Override
+    public ClassElement getOwningType() {
+        return declaringClass;
+    }
 }

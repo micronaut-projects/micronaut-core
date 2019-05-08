@@ -28,4 +28,15 @@ public interface MemberElement extends Element {
      * @return The declaring type of the element.
      */
     ClassElement getDeclaringType();
+
+    /**
+     * The owing type is the type that owns this element. This can differ from {@link #getDeclaringType()}
+     * in the case of inheritance since this method will return the subclass that owners the inherited member,
+     * whilst {@link #getDeclaringType()} will return the super class that declares the type.
+     *
+     * @return The owning type.
+     */
+    default ClassElement getOwningType() {
+        return getDeclaringType();
+    }
 }

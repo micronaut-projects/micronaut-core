@@ -76,7 +76,16 @@ class AstAnnotationUtils {
      * @return The metadata
      */
     static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, AnnotatedNode parent, AnnotatedNode annotatedNode, boolean inheritTypeAnnotations) {
-        new GroovyAnnotationMetadataBuilder(sourceUnit).buildForParent(parent, annotatedNode, inheritTypeAnnotations)
+        newBuilder(sourceUnit).buildForParent(parent, annotatedNode, inheritTypeAnnotations)
+    }
+
+    /**
+     * Creates a new annotation builder for the given source unit
+     * @param sourceUnit The unit
+     * @return the builder
+     */
+    static GroovyAnnotationMetadataBuilder newBuilder(SourceUnit sourceUnit) {
+        new GroovyAnnotationMetadataBuilder(sourceUnit)
     }
 
     /**
@@ -140,11 +149,12 @@ class AstAnnotationUtils {
     /**
      * Whether the node is annotated with any non internal annotations
      *
+     * @param declaringType The declaring type
      * @param annotatedNode The annotated node
      * @return True if it is
      */
-    static boolean isAnnotated(AnnotatedNode annotatedNode) {
-        if (AbstractAnnotationMetadataBuilder.isMetadataMutated(annotatedNode)) {
+    static boolean isAnnotated(String declaringType, AnnotatedNode annotatedNode) {
+        if (AbstractAnnotationMetadataBuilder.isMetadataMutated(declaringType, annotatedNode)) {
             return true
         }
         for (ann in annotatedNode.annotations) {

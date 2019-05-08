@@ -23,6 +23,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.annotation.Nonnull;
@@ -66,6 +67,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     public <T extends Annotation> io.micronaut.inject.ast.Element annotate(@Nonnull String annotationType, @Nonnull Consumer<AnnotationValueBuilder<T>> consumer) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         ArgumentUtils.requireNonNull("consumer", consumer);
+
         final AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
         consumer.accept(builder);
         final AnnotationValue<T> av = builder.build();
@@ -74,7 +76,9 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 annotationType,
                 av.getValues()
         );
-        AbstractAnnotationMetadataBuilder.addMutatedMetadata(element, annotationMetadata);
+
+        String declaringTypeName = this instanceof MemberElement ? ((MemberElement) this).getOwningType().getName() : getName();
+        AbstractAnnotationMetadataBuilder.addMutatedMetadata(declaringTypeName, element, annotationMetadata);
         visitorContext.getAnnotationUtils().invalidateMetadata(element);
         return this;
     }

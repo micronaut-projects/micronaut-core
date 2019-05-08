@@ -25,6 +25,7 @@ import io.micronaut.core.util.ArgumentUtils
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.ast.Element
+import io.micronaut.inject.ast.MemberElement
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.GenericsType
@@ -61,7 +62,9 @@ abstract class AbstractGroovyElement implements AnnotationMetadataDelegate, Elem
                 av.annotationName,
                 av.values
         )
+        String declaringTypeName = this instanceof MemberElement ? ((MemberElement) this).getOwningType().getName() : getName()
         AbstractAnnotationMetadataBuilder.addMutatedMetadata(
+                declaringTypeName,
                 annotatedNode,
                 this.annotationMetadata
         )
