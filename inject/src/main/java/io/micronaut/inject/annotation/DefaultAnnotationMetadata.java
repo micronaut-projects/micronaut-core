@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.*;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
