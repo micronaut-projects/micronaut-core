@@ -229,7 +229,7 @@ interface A {
         !metadata.hasDeclaredAnnotation(Scope)
         metadata.hasDeclaredAnnotation(Singleton)
         metadata.hasSimpleDeclaredAnnotation("Singleton")
-        metadata.hasSimpleAnnotation("Scope")
+        metadata.hasSimpleAnnotation("Singleton")
         metadata.hasStereotype(Singleton)
         metadata.hasStereotype(Scope)
         metadata.getAnnotationNameByStereotype(Singleton).get() == 'javax.inject.Singleton'

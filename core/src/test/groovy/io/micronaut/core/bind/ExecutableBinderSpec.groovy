@@ -16,6 +16,7 @@
 package io.micronaut.core.bind
 
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.Executable
@@ -62,7 +63,7 @@ class ExecutableBinderSpec extends Specification {
         given:
 
         AnnotationMetadata annotationMetadata = Mock(AnnotationMetadata)
-        annotationMetadata.hasAnnotation(Nullable) >> true
+        annotationMetadata.hasSimpleDeclaredAnnotation(AnnotationUtil.NULLABLE) >> true
         annotationMetadata.getAnnotationTypeByStereotype(_) >> Optional.empty()
 
         Executable executable = new Executable() {

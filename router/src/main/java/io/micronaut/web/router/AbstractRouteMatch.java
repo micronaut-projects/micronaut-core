@@ -35,7 +35,6 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -265,7 +264,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                             argumentList.add(resolveValueOrError(argument, conversionContext, result));
                         }
                     } else {
-                        if (argument.isAnnotationPresent(Nullable.class)) {
+                        if (argument.isNullable()) {
                             argumentList.add(null);
                             continue;
                         } else {
@@ -347,7 +346,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     protected Object resolveValueOrError(Argument argument, ConversionContext conversionContext, Optional<?> result) {
         if (!result.isPresent()) {
             Optional<ConversionError> lastError = conversionContext.getLastError();
-            if (!lastError.isPresent() && argument.isAnnotationPresent(Nullable.class)) {
+            if (!lastError.isPresent() && argument.isDeclaredNullable()) {
                 return null;
             }
             throw lastError.map(conversionError ->

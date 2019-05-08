@@ -755,7 +755,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
             for (A annotationMirror : annotationHierarchy) {
-                processAnnotationStereotype(annotationMirror, annotationMetadata, isDeclared);
+                String annotationTypeName = getAnnotationTypeName(annotationMirror);
+                String packageName = NameUtils.getPackageName(annotationTypeName);
+                if (!AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName)) {
+                    processAnnotationStereotype(annotationMirror, annotationMetadata, isDeclared);
+                }
             }
 
         }

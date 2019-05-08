@@ -68,7 +68,6 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -255,9 +254,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     definedValue = argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", String.class).orElse(null);
                 }
 
-                if (definedValue == null && !argument.isAnnotationPresent(Nullable.class)) {
+                if (definedValue == null && !argument.isNullable()) {
                     throw new IllegalArgumentException(
-                            String.format("Null values are not allowed to be passed to client methods (%s). Add @javax.validation.Nullable if that is the desired behavior", context.getExecutableMethod().toString())
+                            String.format("Argument [%s] is null. Null values are not allowed to be passed to client methods (%s). Add a supported Nullable annotation type if that is the desired behavior", argument.getName(), context.getExecutableMethod().toString())
                     );
                 }
 
