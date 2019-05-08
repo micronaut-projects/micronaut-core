@@ -212,22 +212,6 @@ class ThymeleafViewRendererSpec extends Specification {
 
         then:
             body
-            rsp.body().contains("<a href=\"/views/relative-link/to-resolve\">Relative Link</a>")
-    }
-
-    def "invoking /views/relative-link/ renders thymeleaf template with relative link"() {
-        when:
-            HttpResponse<String> rsp = client.toBlocking().exchange('/views/relative-link/', String)
-
-        then:
-            noExceptionThrown()
-            rsp.status() == HttpStatus.OK
-
-        when:
-            String body = rsp.body()
-
-        then:
-            body
-            rsp.body().contains("<a href=\"/views/relative-link/to-resolve\">Relative Link</a>")
+            rsp.body().contains("<a href=\"/to-resolve\">Relative Link</a>")
     }
 }
