@@ -9,7 +9,7 @@ import io.micronaut.http.annotation.Get
 @Controller("/test")
 class TestController {
 
-    protected final ColorPicker colorPicker;
+    protected final ColorPicker colorPicker
 
     TestController(ColorPicker colorPicker) { // <1>
         this.colorPicker = colorPicker
