@@ -11,11 +11,11 @@ import javax.inject.Singleton
 @Requires(property = 'spec.name', value = 'primaryspec')
 //tag::clazz[]
 @Singleton
-public class Blue implements ColorPicker {
+class Blue implements ColorPicker {
 
     @Override
-    public String color() {
-        return "blue";
+    String color() {
+        return "blue"
     }
 }
 //end::clazz[]

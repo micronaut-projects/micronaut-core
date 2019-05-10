@@ -7,17 +7,17 @@ import io.micronaut.http.annotation.Get
 @Requires(property = 'spec.name', value = 'primaryspec')
 //tag::clazz[]
 @Controller("/test")
-public class TestController {
+class TestController {
 
     protected final ColorPicker colorPicker;
 
-    public TestController(ColorPicker colorPicker) { // <1>
-        this.colorPicker = colorPicker;
+    TestController(ColorPicker colorPicker) { // <1>
+        this.colorPicker = colorPicker
     }
 
     @Get
-    public String index() {
-        return colorPicker.color();
+    String index() {
+        colorPicker.color()
     }
 }
 //end::clazz[]
