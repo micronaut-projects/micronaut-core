@@ -1314,32 +1314,31 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     /**
      * Configures the HTTP proxy for the pipeline.
      *
-     * @param pipeline     The pipeline
-     * @param proxyType    The proxy type
-     * @param proxyAddress The proxy address
+     * @param pipeline The pipeline
+     * @param proxy    The proxy
      */
-    protected void configureProxy(ChannelPipeline pipeline, Type proxyType, SocketAddress proxyAddress) {
+    protected void configureProxy(ChannelPipeline pipeline, Proxy proxy) {
         String username = configuration.getProxyUsername().orElse(null);
         String password = configuration.getProxyPassword().orElse(null);
 
         if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
-            switch (proxyType) {
+            switch (proxy.type()) {
                 case HTTP:
-                    pipeline.addLast(HANDLER_HTTP_PROXY, new HttpProxyHandler(proxyAddress, username, password));
+                    pipeline.addLast(HANDLER_HTTP_PROXY, new HttpProxyHandler(proxy.address(), username, password));
                     break;
                 case SOCKS:
-                    pipeline.addLast(HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxyAddress, username, password));
+                    pipeline.addLast(HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxy.address(), username, password));
                     break;
                 default:
                     // no-op
             }
         } else {
-            switch (proxyType) {
+            switch (proxy.type()) {
                 case HTTP:
-                    pipeline.addLast(HANDLER_HTTP_PROXY, new HttpProxyHandler(proxyAddress));
+                    pipeline.addLast(HANDLER_HTTP_PROXY, new HttpProxyHandler(proxy.address()));
                     break;
                 case SOCKS:
-                    pipeline.addLast(HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxyAddress));
+                    pipeline.addLast(HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxy.address()));
                     break;
                 default:
                     // no-op
@@ -2097,11 +2096,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 ch.config().setAutoRead(false);
             }
 
-            Optional<SocketAddress> proxy = configuration.getProxyAddress();
-            if (proxy.isPresent()) {
-                Type proxyType = configuration.getProxyType();
-                SocketAddress proxyAddress = proxy.get();
-                configureProxy(p, proxyType, proxyAddress);
+            Proxy proxy = configuration.resolveProxy(sslContext != null, host, port);
+
+            if (!Proxy.NO_PROXY.equals(proxy)) {
+                configureProxy(p, proxy);
             }
 
             if (sslContext != null) {

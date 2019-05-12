@@ -23,8 +23,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
 
 import javax.annotation.Nullable;
-import java.net.Proxy;
-import java.net.SocketAddress;
+import java.net.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -99,6 +98,8 @@ public abstract class HttpClientConfiguration {
     private String proxyUsername;
 
     private String proxyPassword;
+
+    private ProxySelector proxySelector;
 
     private Charset defaultCharset = StandardCharsets.UTF_8;
 
@@ -399,6 +400,42 @@ public abstract class HttpClientConfiguration {
      */
     public void setProxyPassword(String proxyPassword) {
         this.proxyPassword = proxyPassword;
+    }
+
+    /**
+     * Sets the proxy selector.
+     * ProxySelector decides what proxy to use and take precedence over proxy configuration.
+     *
+     * @param proxySelector The proxy selector to use
+     */
+    public void setProxySelector(ProxySelector proxySelector) {
+        this.proxySelector = proxySelector;
+    }
+
+    /**
+     * @return The proxy selector being used
+     */
+    public Optional<ProxySelector> getProxySelector() {
+        return Optional.ofNullable(proxySelector);
+    }
+
+    public Proxy resolveProxy(URI target) {
+        return getProxySelector()
+            .flatMap(selector -> selector.select(target).stream().findFirst())
+            .orElse(
+                getProxyAddress()
+                    .map(address -> new Proxy(getProxyType(), address))
+                    .orElse(Proxy.NO_PROXY)
+            );
+    }
+
+    public Proxy resolveProxy(boolean isSsl, String host, int port) {
+        try {
+            URI uri = new URI(isSsl ? "https" : "http", null, host, port, null, null, null);
+            return resolveProxy(uri);
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
