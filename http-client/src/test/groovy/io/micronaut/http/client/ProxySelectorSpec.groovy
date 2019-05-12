@@ -57,7 +57,7 @@ class ProxySelectorSpec extends Specification {
         def config = new DefaultHttpClientConfiguration()
         def client = new DefaultHttpClient(new URL(server.httpUrl), config)
 
-        when: "proxy selector returns selects a proxy"
+        when: "proxy selector is set to return a proxy"
         config.setProxySelector(new ProxySelector() {
             @Override
             List<Proxy> select(URI uri) {
@@ -70,7 +70,7 @@ class ProxySelectorSpec extends Specification {
             }
         })
 
-        then: "the selected proxy is being used"
+        then: "the proxy is being used"
         def response = client.exchange(HttpRequest.GET("/ping"), String).blockingFirst()
         response.body() == "pong!"
         proxyCalled
@@ -120,7 +120,7 @@ class ProxySelectorSpec extends Specification {
         def config = new DefaultHttpClientConfiguration()
         def client = new DefaultHttpClient(new URL(server.httpsUrl), config)
 
-        when: "proxy selector selects a proxy"
+        when: "proxy selector is set to return a proxy"
         config.setProxySelector(new ProxySelector() {
             @Override
             List<Proxy> select(URI uri) {
@@ -133,7 +133,7 @@ class ProxySelectorSpec extends Specification {
             }
         })
 
-        then: "selected proxy is being used"
+        then: "the proxy is being used"
         def response = client.exchange(HttpRequest.GET("/ping"), String).blockingFirst()
         response.header("proxied") == "true"
         response.body() == "pong!"
