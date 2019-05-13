@@ -19,8 +19,10 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.reactivex.Flowable;
 import io.reactivex.Maybe;
+import io.reactivex.Single;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -66,8 +68,9 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
             return Flowable.just(Collections.emptyList());
         }
         String finalServiceId = serviceId;
-        Stream<Flowable<List<ServiceInstance>>> flowableStream = Arrays.stream(discoveryClients).map(client -> Flowable.fromPublisher(client.getInstances(finalServiceId)));
-        Maybe<List<ServiceInstance>> reduced = Flowable.merge(flowableStream.collect(Collectors.toList())).reduce((instances, otherInstances) -> {
+        Single<List<ServiceInstance>> reduced = Flowable.fromArray(discoveryClients)
+                .flatMap(client -> client.getInstances(finalServiceId))
+                .reduce(new ArrayList<>(), (instances, otherInstances) -> {
             instances.addAll(otherInstances);
             return instances;
         });
