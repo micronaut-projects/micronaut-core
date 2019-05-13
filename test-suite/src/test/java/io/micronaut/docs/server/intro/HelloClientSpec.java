@@ -1,5 +1,6 @@
 package io.micronaut.docs.server.intro;
 
+import io.micronaut.context.annotation.Property;
 // tag::imports[]
 import io.micronaut.test.annotation.MicronautTest;
 import javax.inject.Inject;
