@@ -72,7 +72,7 @@ public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session
             return () -> existing;
         } else {
             // create a new session store it in the attribute
-            if (!context.getArgument().isDeclaredNullable()) {
+            if (!context.getArgument().isNullable()) {
                 Session newSession = sessionStore.newSession();
                 attrs.put(HttpSessionFilter.SESSION_ATTRIBUTE, newSession);
                 return () -> Optional.of(newSession);
