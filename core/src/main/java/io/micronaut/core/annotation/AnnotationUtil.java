@@ -91,7 +91,12 @@ public class AnnotationUtil {
     /**
      * Simple Annotation name used for nullable.
      */
-    public static final String NULLABLE = "Nullable";
+    public static final String NULLABLE = "javax.annotation.Nullable";
+
+    /**
+     * Simple Annotation name used for non-null.
+     */
+    public static final String NON_NULL = "javax.annotation.Nonnull";
 
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();
