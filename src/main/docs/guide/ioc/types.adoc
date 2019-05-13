@@ -22,7 +22,9 @@ In addition to being able to inject beans Micronaut natively supports injecting 
 |`Engine[]`
 
 |link:{jeeapi}/javax/inject/Provider.html[Provider]
-|A `javax.inject.Provider` if a circular dependency requires it
+|A `javax.inject.Provider` if a circular dependency requires it or to instantiate a prototype for each `get` call.
 |`Provider<Engine>`
 
 |===
+
+TIP: A prototype bean will have one instance created per place the bean is injected. When a prototype bean is injected as a `Provider`, each call to `get()` will create a new instance.
