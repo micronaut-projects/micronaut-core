@@ -19,6 +19,8 @@ import io.micronaut.http.*;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 
+import java.util.Optional;
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -87,5 +89,14 @@ public class ResponseController {
     @Get("/custom-headers")
     public HttpResponse customHeaders() {
        return HttpResponse.ok("abc").contentType("text/plain").contentLength(7);
+    }
+
+    @Get("/optional-response/{empty}")
+    public Optional<HttpResponse> optionalResponse(Boolean empty) {
+        if (empty) {
+            return Optional.empty();
+        } else {
+            return Optional.of(HttpResponse.ok());
+        }
     }
 }
