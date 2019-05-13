@@ -7,10 +7,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 // end::imports[]
 
-/**
- * @author graemerocher
- * @since 1.0
- */
+@Property(name = "spec.name", value = "HelloControllerSpec")
 // tag::class[]
 @MicronautTest // <1>
 public class HelloClientSpec  {
