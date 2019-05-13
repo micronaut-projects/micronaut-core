@@ -78,7 +78,7 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
                     );
 
                     if (!bindingResult.isPresentAndSatisfied()) {
-                        if (argument.isDeclaredNullable()) {
+                        if (argument.isNullable()) {
                             boundArguments[i] = null;
                         } else {
                             final Optional<ConversionError> lastError = conversionContext.getLastError();
@@ -143,7 +143,7 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
                     );
 
                     if (!bindingResult.isPresentAndSatisfied()) {
-                        if (argument.isDeclaredNullable()) {
+                        if (argument.isNullable()) {
                             boundArguments[i] = null;
                         } else {
                             boundArguments[i] = null;
