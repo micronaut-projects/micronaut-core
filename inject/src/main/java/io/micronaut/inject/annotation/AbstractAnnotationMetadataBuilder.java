@@ -44,6 +44,7 @@ import java.util.*;
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private static final Map<String, List<AnnotationMapper>> ANNOTATION_MAPPERS = new HashMap<>();
+    private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>();
     private static final Map<MetadataKey, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>();
 
     static {
@@ -59,7 +60,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         name = ((NamedAnnotationMapper) mapper).getName();
                     }
                     if (StringUtils.isNotEmpty(name)) {
-                        ANNOTATION_MAPPERS.computeIfAbsent(name, s -> new ArrayList<>()).add(mapper);
+                        ANNOTATION_MAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
+                    }
+                } catch (Throwable e) {
+                    // mapper, missing dependencies, continue
+                }
+            }
+        }
+        SoftServiceLoader<AnnotationRemapper> remapperLoader = SoftServiceLoader.load(AnnotationRemapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
+        for (ServiceDefinition<AnnotationRemapper> definition : remapperLoader) {
+            if (definition.isPresent()) {
+                AnnotationRemapper mapper = definition.load();
+                try {
+                    String name = mapper.getPackageName();
+                    if (StringUtils.isNotEmpty(name)) {
+                        ANNOTATION_REMAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
                     }
                 } catch (Throwable e) {
                     // mapper, missing dependencies, continue
@@ -738,19 +753,60 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 Map<CharSequence, Object> annotationValues = populateAnnotationData(currentElement, annotationMirror, annotationMetadata, isDeclared);
 
                 String repeatableName = getRepeatableName(annotationMirror);
+                String packageName = NameUtils.getPackageName(annotationName);
+                List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
+                boolean notRemapped = CollectionUtils.isEmpty(annotationRemappers);
 
                 if (repeatableName != null) {
-                    io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, annotationValues);
-                    if (isDeclared) {
-                        annotationMetadata.addDeclaredRepeatable(repeatableName, av);
+                    if (notRemapped) {
+                        io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, annotationValues);
+                        if (isDeclared) {
+                            annotationMetadata.addDeclaredRepeatable(repeatableName, av);
+                        } else {
+                            annotationMetadata.addRepeatable(repeatableName, av);
+                        }
                     } else {
-                        annotationMetadata.addRepeatable(repeatableName, av);
+                        AnnotationValue repeatableAnn = new AnnotationValue(repeatableName);
+                        VisitorContext visitorContext = createVisitorContext();
+                        io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, annotationValues);
+                        for (AnnotationRemapper annotationRemapper : annotationRemappers) {
+                            List<AnnotationValue<?>> remappedRepeatable = annotationRemapper.remap(repeatableAnn, visitorContext);
+                            List<AnnotationValue<?>> remappedValue = annotationRemapper.remap(av, visitorContext);
+                            if (CollectionUtils.isNotEmpty(remappedRepeatable) && CollectionUtils.isNotEmpty(remappedRepeatable)) {
+                                for (AnnotationValue<?> repeatable : remappedRepeatable) {
+                                    for (AnnotationValue<?> rmv : remappedValue) {
+                                        if (isDeclared) {
+                                            annotationMetadata.addDeclaredRepeatable(repeatable.getAnnotationName(), rmv);
+                                        } else {
+                                            annotationMetadata.addRepeatable(repeatable.getAnnotationName(), rmv);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 } else {
-                    if (isDeclared) {
-                        annotationMetadata.addDeclaredAnnotation(annotationName, annotationValues);
+                    if (notRemapped) {
+                        if (isDeclared) {
+                            annotationMetadata.addDeclaredAnnotation(annotationName, annotationValues);
+                        } else {
+                            annotationMetadata.addAnnotation(annotationName, annotationValues);
+                        }
                     } else {
-                        annotationMetadata.addAnnotation(annotationName, annotationValues);
+                        io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, annotationValues);
+                        VisitorContext visitorContext = createVisitorContext();
+                        for (AnnotationRemapper annotationRemapper : annotationRemappers) {
+                            List<AnnotationValue<?>> remapped = annotationRemapper.remap(av, visitorContext);
+                            if (CollectionUtils.isNotEmpty(remapped)) {
+                                for (AnnotationValue<?> annotationValue : remapped) {
+                                    if (isDeclared) {
+                                        annotationMetadata.addDeclaredAnnotation(annotationValue.getAnnotationName(), annotationValue.getValues());
+                                    } else {
+                                        annotationMetadata.addAnnotation(annotationValue.getAnnotationName(), annotationValue.getValues());
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
