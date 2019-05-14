@@ -153,6 +153,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param serverSslBuilder                        The Netty Server SSL builder
      * @param outboundHandlers                        The outbound handlers
      * @param eventLoopGroupFactory                   The EventLoopGroupFactory
+     * @param httpCompressionLogic                    The compression logic
      */
     @SuppressWarnings("ParameterNumber")
     @Inject
