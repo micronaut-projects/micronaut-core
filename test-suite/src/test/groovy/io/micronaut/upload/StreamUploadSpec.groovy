@@ -107,7 +107,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
     void "test non-blocking upload with publisher receiving bytes"() {
         given:
-        def data = 'some data ' * 5000
+        def data = 'some data ' * 500
         MultipartBody requestBody = MultipartBody.builder()
                 .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
                 .addPart("title", "bar")
