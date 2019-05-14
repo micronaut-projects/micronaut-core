@@ -113,6 +113,15 @@ public class UploadController {
         );
     }
 
+    @Post(value = "/receive-flow-parts", consumes = MediaType.MULTIPART_FORM_DATA)
+    public Single<HttpResponse> receiveFlowParts(Flowable<PartData> data) {
+        return data.toList().doOnSuccess(parts -> {
+            for (PartData part : parts) {
+                part.getBytes(); //intentionally releasing the parts after all data has been received
+            }
+        }).map(parts -> HttpResponse.ok());
+    }
+
     @Post(value = "/receive-flow-data", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Publisher<HttpResponse> receiveFlowData(Data data) {
         return Flowable.just(HttpResponse.ok(data.toString()));
