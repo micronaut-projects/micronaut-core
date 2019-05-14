@@ -56,24 +56,20 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         file.length() == data.size()
     }
 
-    void "test streaming upload when accessing bytebuffer of PartData"() {
+    void "test releasing part datas late"() {
         given:
-        boolean noExceptionThrown = true
-        def val = 'Big ' + 'xxxx' * 200
-        def data = '{"title":'+val+'}'
         MultipartBody requestBody = MultipartBody.builder()
-                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .addPart("data", "data.pdf", new MediaType("application/pdf"), new byte[3000])
                 .build()
 
         when:
         HttpResponse response = client.toBlocking().exchange(
-                HttpRequest.POST("/upload/stream-file-upload", requestBody)
+                HttpRequest.POST("/upload/receive-flow-parts", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE), Boolean)
 
         then:
         response.code() == HttpStatus.OK.code
-        response.getBody().get() == noExceptionThrown
     }
 
     void "test upload big FileUpload object via transferTo"() {
@@ -111,7 +107,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
     void "test non-blocking upload with publisher receiving bytes"() {
         given:
-        def data = 'some data ' * 500
+        def data = 'some data ' * 5000
         MultipartBody requestBody = MultipartBody.builder()
                 .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
                 .addPart("title", "bar")
