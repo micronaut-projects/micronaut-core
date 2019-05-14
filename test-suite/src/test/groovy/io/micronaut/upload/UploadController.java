@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
@@ -72,6 +73,15 @@ public class UploadController {
     public Publisher<HttpResponse> receiveFileUpload(StreamingFileUpload data, String title) {
         return Flowable.fromPublisher(data.transferTo(title + ".json"))
                        .map(success -> success ? HttpResponse.ok( "Uploaded " + data.getSize()  ) : HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"));
+    }
+
+    @Post(value = "/stream-file-upload", consumes = MediaType.MULTIPART_FORM_DATA)
+    public HttpResponse<Boolean> streamFileUpload(StreamingFileUpload data) {
+        AtomicBoolean noExceptionThrown = new AtomicBoolean(true);
+        Flowable.fromPublisher(data)
+                .map(PartData::getByteBuffer)
+                .blockingSubscribe(byteBuffer -> {}, throwable -> noExceptionThrown.set(false));
+        return HttpResponse.ok(noExceptionThrown.get());
     }
 
     @Post(value = "/receive-completed-file-upload", consumes = MediaType.MULTIPART_FORM_DATA)

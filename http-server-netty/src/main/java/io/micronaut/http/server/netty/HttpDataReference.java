@@ -212,8 +212,8 @@ public class HttpDataReference {
                 int index = components.indexOf(this);
                 if (byteBuf instanceof CompositeByteBuf) {
                     CompositeByteBuf compositeByteBuf = (CompositeByteBuf) byteBuf;
-                    return createDelegate(compositeByteBuf.component(index), (buf, count) -> {
-                        ((CompositeByteBuf) buf).removeComponent(index);
+                    return createDelegate(compositeByteBuf.component(index), (buf, count) -> { // what happens when it get released
+                        compositeByteBuf.removeComponent(index);
                         removeComponent(index);
                         return true;
                     });
