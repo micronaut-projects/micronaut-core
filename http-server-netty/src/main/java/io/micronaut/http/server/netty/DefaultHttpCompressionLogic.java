@@ -27,6 +27,8 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 /**
+ * Default implementation of {@link HttpCompressionLogic}.
+ *
  * @author James Kleeh
  * @since 1.2.0
  */
@@ -44,6 +46,9 @@ class DefaultHttpCompressionLogic implements HttpCompressionLogic {
         this.compressionThreshold = serverConfiguration.getCompressionThreshold();
     }
 
+    /**
+     * @param compressionThreshold The compression threshold
+     */
     DefaultHttpCompressionLogic(int compressionThreshold) {
         this.compressionThreshold = compressionThreshold;
     }
