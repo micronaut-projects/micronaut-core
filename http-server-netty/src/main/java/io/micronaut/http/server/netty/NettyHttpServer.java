@@ -128,6 +128,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final ThreadFactory threadFactory;
     private final WebSocketBeanRegistry webSocketBeanRegistry;
     private final int specifiedPort;
+    private final HttpCompressionLogic httpCompressionLogic;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final SslContext sslContext;
@@ -168,8 +169,10 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         ExecutorSelector executorSelector,
         Optional<ServerSslBuilder> serverSslBuilder,
         List<ChannelOutboundHandler> outboundHandlers,
-        EventLoopGroupFactory eventLoopGroupFactory
+        EventLoopGroupFactory eventLoopGroupFactory,
+        HttpCompressionLogic httpCompressionLogic
     ) {
+        this.httpCompressionLogic = httpCompressionLogic;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());
         this.applicationContext = applicationContext;
@@ -276,7 +279,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
                         pipeline.addLast(new FlowControlHandler());
                         pipeline.addLast(HTTP_KEEP_ALIVE_HANDLER, new HttpServerKeepAliveHandler());
-                        pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor(serverConfiguration.getCompressionThreshold()));
+                        pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor(httpCompressionLogic));
                         pipeline.addLast(HTTP_DECOMPRESSOR, new HttpContentDecompressor());
                         pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                         pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
