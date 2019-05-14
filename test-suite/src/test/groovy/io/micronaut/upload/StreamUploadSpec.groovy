@@ -15,6 +15,7 @@
  */
 package io.micronaut.upload
 
+
 import io.micronaut.AbstractMicronautSpec
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -53,6 +54,26 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         result == "Uploaded ${data.size()}"
         file.exists()
         file.length() == data.size()
+    }
+
+    void "test streaming upload when accessing bytebuffer of PartData"() {
+        given:
+        boolean noExceptionThrown = true
+        def val = 'Big ' + 'xxxx' * 200
+        def data = '{"title":'+val+'}'
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .build()
+
+        when:
+        HttpResponse response = client.toBlocking().exchange(
+                HttpRequest.POST("/upload/stream-file-upload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE), Boolean)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.getBody().get() == noExceptionThrown
     }
 
     void "test upload big FileUpload object via transferTo"() {
