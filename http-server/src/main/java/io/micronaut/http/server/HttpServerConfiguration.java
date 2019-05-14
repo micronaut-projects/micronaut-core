@@ -493,8 +493,10 @@ public class HttpServerConfiguration {
     public static class CorsConfiguration implements Toggleable {
 
         public static final boolean DEFAULT_ENABLED = false;
+        public static final boolean DEFAULT_SINGLE_HEADER = false;
 
         private boolean enabled = DEFAULT_ENABLED;
+        private boolean singleHeader = DEFAULT_SINGLE_HEADER;
 
         private Map<String, CorsOriginConfiguration> configurations = Collections.emptyMap();
 
@@ -522,6 +524,13 @@ public class HttpServerConfiguration {
         }
 
         /**
+         * @return Whether headers should be combined into a single header
+         */
+        public boolean isSingleHeader() {
+            return singleHeader;
+        }
+
+        /**
          * Sets whether CORS is enabled. Default value ({@value #DEFAULT_ENABLED})
          * @param enabled True if CORS is enabled
          */
@@ -535,6 +544,15 @@ public class HttpServerConfiguration {
          */
         public void setConfigurations(Map<String, CorsOriginConfiguration> configurations) {
             this.configurations = configurations;
+        }
+
+        /**
+         * Sets whether CORS header values should be joined into a single header. Default value ({@value #DEFAULT_SINGLE_HEADER}).
+         *
+         * @param singleHeader The single header flag
+         */
+        public void setSingleHeader(boolean singleHeader) {
+            this.singleHeader = singleHeader;
         }
     }
 }
