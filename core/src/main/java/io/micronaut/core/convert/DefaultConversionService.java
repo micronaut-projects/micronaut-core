@@ -588,6 +588,12 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                     Enum val = Enum.valueOf(targetType, NameUtils.environmentName(stringValue));
                     return Optional.of(val);
                 } catch (Exception e1) {
+                    Optional<Enum> valOpt = Arrays.stream(targetType.getEnumConstants())
+                            .filter(val -> val.toString().equals(stringValue))
+                            .findFirst();
+                    if (valOpt.isPresent()) {
+                        return valOpt;
+                    }
                     context.reject(object, e);
                     return Optional.empty();
                 }
