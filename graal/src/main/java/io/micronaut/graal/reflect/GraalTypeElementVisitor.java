@@ -75,6 +75,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private static final String ALL_PUBLIC_FIELDS = "allPublicFields";
 
+    private static final String ALL_DECLARED_FIELDS = "allDeclaredFields";
+
     private static final String NAME = "name";
 
     private static final String ALL_DECLARED_CONSTRUCTORS = "allDeclaredConstructors";
@@ -121,7 +123,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         resolveClassData(beanName).putAll(CollectionUtils.mapOf(
                 ALL_PUBLIC_METHODS, true,
                 ALL_DECLARED_CONSTRUCTORS, true,
-                ALL_PUBLIC_FIELDS, true
+                ALL_DECLARED_FIELDS, true
         ));
     }
 
