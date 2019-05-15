@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
@@ -101,6 +102,15 @@ public class UploadController {
                     return res;
                 }
         );
+    }
+
+    @Post(value = "/receive-flow-parts", consumes = MediaType.MULTIPART_FORM_DATA)
+    public Single<HttpResponse> receiveFlowParts(Flowable<PartData> data) {
+        return data.toList().doOnSuccess(parts -> {
+            for (PartData part : parts) {
+                part.getBytes(); //intentionally releasing the parts after all data has been received
+            }
+        }).map(parts -> HttpResponse.ok());
     }
 
     @Post(value = "/receive-flow-data", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
