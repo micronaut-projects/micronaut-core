@@ -111,7 +111,11 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     @Override
     protected Optional<AnnotatedNode> getAnnotationMirror(String annotationName) {
         ClassNode cn = ClassUtils.forName(annotationName, GroovyAnnotationMetadataBuilder.classLoader).map({ Class cls -> ClassHelper.make(cls)}).orElseGet({->ClassHelper.make(annotationName)})
-        return Optional.of((AnnotatedNode)cn)
+        if (cn.name != ClassHelper.OBJECT) {
+            return Optional.of((AnnotatedNode)cn)
+        } else {
+            return Optional.empty()
+        }
     }
 
     @Override
@@ -191,19 +195,24 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                 if (classNode.isResolved()) {
                     Class resolved = classNode.getTypeClass()
                     for (MethodNode method: methods) {
-                        def defaultValue = resolved.getDeclaredMethod(method.getName()).defaultValue
-                        if (defaultValue != null) {
-                            if (defaultValue instanceof Class) {
-                                defaultValues.put(method, new ClassExpression(ClassHelper.makeCached((Class)defaultValue)))
-                            } else {
-                                if (defaultValue instanceof String) {
-                                    if (StringUtils.isNotEmpty((String)defaultValue)) {
+                        try {
+                            def defaultValue = resolved.getDeclaredMethod(method.getName()).defaultValue
+                            if (defaultValue != null) {
+                                if (defaultValue instanceof Class) {
+                                    defaultValues.put(method, new ClassExpression(ClassHelper.makeCached((Class)defaultValue)))
+                                } else {
+                                    if (defaultValue instanceof String) {
+                                        if (StringUtils.isNotEmpty((String)defaultValue)) {
+                                            defaultValues.put(method, new ConstantExpression(defaultValue))
+                                        }
+                                    } else {
                                         defaultValues.put(method, new ConstantExpression(defaultValue))
                                     }
-                                } else {
-                                    defaultValues.put(method, new ConstantExpression(defaultValue))
                                 }
                             }
+                        } catch (NoSuchMethodError e) {
+                            // method no longer exists alias annotation
+                            // ignore and continue
                         }
                     }
                 } else {
