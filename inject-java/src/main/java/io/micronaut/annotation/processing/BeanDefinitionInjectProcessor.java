@@ -1857,7 +1857,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if (kind == TypeKind.ERROR) {
                     TypeElement refreshedElement = processingEnv.getElementUtils().getTypeElement(typeMirror.toString());
                     if (refreshedElement == null) {
-                        // if the unresolvable type is in the enclosing type as the bean, the enclosing type is ommitted from the
+                        // if the unresolvable type is in the same enclosing type as the bean, the enclosing type is omitted from the
                         // type mirror in error, so attempt again, prepending the enclosing type
                         // constructor <enclosed by> class <enclosed by> enclosing type (package / outer class)
                         refreshedElement = processingEnv.getElementUtils().getTypeElement(element.getEnclosingElement().getEnclosingElement().toString() + "." + typeMirror.toString());
