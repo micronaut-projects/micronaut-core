@@ -79,6 +79,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Introduction advice that implements the {@link Client} annotation.
@@ -524,32 +525,44 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
 
                 if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
-                    return blockingHttpClient.exchange(
-                        request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), errorType
-                    );
+                    return handleBlockingCall(javaReturnType, () ->
+                            blockingHttpClient.exchange(request,
+                                    returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT),
+                                    errorType
+                    ));
                 } else if (void.class == javaReturnType) {
-                    blockingHttpClient.exchange(request, null, errorType);
-                    return null;
+                    return handleBlockingCall(javaReturnType, () ->
+                            blockingHttpClient.exchange(request, null, errorType));
                 } else {
-                    try {
-                        return blockingHttpClient.retrieve(
-                                request, returnType.asArgument(), errorType
-                        );
-                    } catch (RuntimeException t) {
-                        if (t instanceof HttpClientResponseException && ((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
-                            if (javaReturnType == Optional.class) {
-                                return Optional.empty();
-                            }
-                            return null;
-                        } else {
-                            throw t;
-                        }
-                    }
+                    return handleBlockingCall(javaReturnType, () ->
+                            blockingHttpClient.retrieve(request, returnType.asArgument(), errorType));
                 }
             }
         }
         // try other introduction advice
         return context.proceed();
+    }
+
+    private Object handleBlockingCall(Class returnType, Supplier<Object> supplier) {
+        try {
+            if (void.class == returnType) {
+                supplier.get();
+                return null;
+            } else {
+                return supplier.get();
+            }
+        } catch (RuntimeException t) {
+            if (t instanceof HttpClientResponseException && ((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
+                if (returnType == Optional.class) {
+                    return Optional.empty();
+                } else if (HttpResponse.class.isAssignableFrom(returnType)) {
+                    return ((HttpClientResponseException) t).getResponse();
+                }
+                return null;
+            } else {
+                throw t;
+            }
+        }
     }
 
     private ClientVersioningConfiguration getVersioningConfiguration(AnnotationValue<Client> clientAnnotation) {
