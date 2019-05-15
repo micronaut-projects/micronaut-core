@@ -33,16 +33,16 @@ import java.util.List;
 @Internal
 public class SmartHttpContentCompressor extends HttpContentCompressor {
 
-    private final HttpCompressionStrategy httpCompressionLogic;
+    private final HttpCompressionStrategy httpCompressionStrategy;
     private boolean skipEncoding = false;
 
     /**
      * Creates a SmartHttpContentCompressor with the given compression logic.
      *
-     * @param httpCompressionLogic The compression logic
+     * @param httpCompressionStrategy The compression strategy
      */
-    SmartHttpContentCompressor(HttpCompressionStrategy httpCompressionLogic) {
-        this.httpCompressionLogic = httpCompressionLogic;
+    SmartHttpContentCompressor(HttpCompressionStrategy httpCompressionStrategy) {
+        this.httpCompressionStrategy = httpCompressionStrategy;
     }
 
     /**
@@ -52,7 +52,7 @@ public class SmartHttpContentCompressor extends HttpContentCompressor {
      * @return True if the content should not be compressed
      */
     public boolean shouldSkip(HttpResponse response) {
-        return !httpCompressionLogic.shouldCompress(response);
+        return !httpCompressionStrategy.shouldCompress(response);
     }
 
     @Override
