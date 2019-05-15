@@ -1740,6 +1740,15 @@ public class DefaultBeanContext implements BeanContext {
             Class<? super T> superclass = bt.getSuperclass();
             return (clazz) -> clazz == superclass || clazz == bt;
         }
+        if (annotationMetadata.hasAnnotation(DefaultImplementation.class)) {
+            Optional<Class> defaultImpl = annotationMetadata.getValue(DefaultImplementation.class, Class.class);
+            if (!defaultImpl.isPresent()) {
+                defaultImpl = annotationMetadata.getValue(DefaultImplementation.class, "name", Class.class);
+            }
+            if (defaultImpl.filter(impl -> impl == bt).isPresent()) {
+                return (clazz) -> clazz.isAssignableFrom(bt);
+            }
+        }
 
         return (clazz) -> clazz == bt;
     }
