@@ -128,7 +128,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final ThreadFactory threadFactory;
     private final WebSocketBeanRegistry webSocketBeanRegistry;
     private final int specifiedPort;
-    private final HttpCompressionLogic httpCompressionLogic;
+    private final HttpCompressionStrategy httpCompressionLogic;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final SslContext sslContext;
@@ -170,7 +170,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         Optional<ServerSslBuilder> serverSslBuilder,
         List<ChannelOutboundHandler> outboundHandlers,
         EventLoopGroupFactory eventLoopGroupFactory,
-        HttpCompressionLogic httpCompressionLogic
+        HttpCompressionStrategy httpCompressionLogic
     ) {
         this.httpCompressionLogic = httpCompressionLogic;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
