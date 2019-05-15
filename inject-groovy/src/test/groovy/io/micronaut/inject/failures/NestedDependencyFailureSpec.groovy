@@ -40,9 +40,9 @@ class NestedDependencyFailureSpec extends Specification {
         def e = thrown(DependencyInjectionException)
 
         e.message.normalize().contains( '''\
-Failed to inject value for parameter [d] of class: io.micronaut.inject.failures.nesteddependency.C
+Failed to inject value for parameter [d] of class: io.micronaut.inject.failures.NestedDependencyFailureSpec$C
 
-Message: No bean of type [io.micronaut.inject.failures.nesteddependency.D] exists.''')
+Message: No bean of type [io.micronaut.inject.failures.NestedDependencyFailureSpec$D] exists.''')
         e.message.normalize().contains('Path Taken: B.a --> new A([C c]) --> new C([D d])')
     }
 
