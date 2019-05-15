@@ -39,9 +39,9 @@ class ConstructorDependencyFailureSpec extends Specification {
         then:"The correct error is thrown"
         def e = thrown(DependencyInjectionException)
         e.message.normalize().contains('''\
-Failed to inject value for parameter [a] of class: io.micronaut.inject.failures.ctordependencyfailure.B
+Failed to inject value for parameter [a] of class: io.micronaut.inject.failures.ConstructorDependencyFailureSpec$B
 
-Message: No bean of type [io.micronaut.inject.failures.ctordependencyfailure.A] exists.''')
+Message: No bean of type [io.micronaut.inject.failures.ConstructorDependencyFailureSpec$A] exists.''')
 
         e.message.normalize().contains('Path Taken: new B([A a])')
     }
