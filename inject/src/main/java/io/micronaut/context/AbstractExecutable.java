@@ -102,9 +102,7 @@ abstract class AbstractExecutable implements Executable {
         Method method = initialize();
         if (method == null) {
             if (LOG.isWarnEnabled()) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Type [{}] previously declared a method [{}] which has been removed or changed. It is recommended you re-compile the class or library against the latest version to remove this warning.", declaringType, methodName);
-                }
+                LOG.warn("Type [{}] previously declared a method [{}] which has been removed or changed. It is recommended you re-compile the class or library against the latest version to remove this warning.", declaringType, methodName);
             }
             throw ReflectionUtils.newNoSuchMethodError(declaringType, methodName, argTypes);
         }
