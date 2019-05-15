@@ -27,12 +27,14 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 /**
+ * Default implementation of {@link HttpCompressionStrategy}.
+ *
  * @author James Kleeh
  * @since 1.2.0
  */
 @Internal
 @Singleton
-class DefaultHttpCompressionLogic implements HttpCompressionLogic {
+class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
 
     private final int compressionThreshold;
 
@@ -40,11 +42,14 @@ class DefaultHttpCompressionLogic implements HttpCompressionLogic {
      * @param serverConfiguration The netty server configuration
      */
     @Inject
-    DefaultHttpCompressionLogic(NettyHttpServerConfiguration serverConfiguration) {
+    DefaultHttpCompressionStrategy(NettyHttpServerConfiguration serverConfiguration) {
         this.compressionThreshold = serverConfiguration.getCompressionThreshold();
     }
 
-    DefaultHttpCompressionLogic(int compressionThreshold) {
+    /**
+     * @param compressionThreshold The compression threshold
+     */
+    DefaultHttpCompressionStrategy(int compressionThreshold) {
         this.compressionThreshold = compressionThreshold;
     }
 
