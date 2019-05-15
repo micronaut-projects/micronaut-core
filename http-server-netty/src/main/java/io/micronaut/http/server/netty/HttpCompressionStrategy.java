@@ -25,7 +25,7 @@ import io.netty.handler.codec.http.HttpResponse;
  * @author James Kleeh
  * @since 1.2.0
  */
-public interface HttpCompressionLogic {
+public interface HttpCompressionStrategy {
 
     /**
      * @param response The HTTP response
