@@ -1,0 +1,47 @@
+Since 1.1, Micronaut features a native https://www.vaultproject.io/[HashiCorp Vault] for those who have not switched to a dedicated more complete solution like Consul.
+
+To enable support for Vault Configuration simply add the following configuration to your `bootstrap.yml` file:
+
+.Integrating with HashiCorp Vault
+[source,yaml]
+----
+micronaut:
+    application:
+        name: hello-world
+    config-client:
+        enabled: true
+
+vault:
+    client:
+        config:
+            enabled: true
+        uri: http://localhost:8200
+        token: ${VAULT_TOKEN}
+        kv-version: V1
+        secret-engine-name: backendv1
+        fail-fast: false
+----
+
+include::{includedir}configurationProperties/io.micronaut.discovery.vault.VaultClientConfiguration.adoc[]
+
+Micronaut will use the configured `micronaut.application.name` to lookup property sources for the application from Vault configured via `vault.client.uri`.
+
+.Configuration Resolution Precedence
+|===
+|Folder|Description
+
+|`/application`
+|Configuration shared by all applications
+
+|`/[APPLICATION_NAME]`
+|Application specific configuration
+
+|`/application/prod`
+|Configuration shared by all applications for the `prod` api:context.env.Environment[]
+
+|`/[APPLICATION_NAME]/prod`
+|Application specific configuration for an active api:context.env.Environment[]
+
+|===
+
+See the https://www.vaultproject.io/api/secret/kv/index.html[Documentation for HashiCorp Vault] for more information on how to setup the server.
