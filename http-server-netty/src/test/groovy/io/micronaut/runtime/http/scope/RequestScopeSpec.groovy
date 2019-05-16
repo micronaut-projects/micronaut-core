@@ -13,15 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.runtime.context.scope
+package io.micronaut.runtime.http.scope
 
 
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.runtime.http.scope.RequestCustomScope
+import io.micronaut.runtime.http.scope.RequestScope
 import spock.util.concurrent.PollingConditions
 
+import javax.annotation.PreDestroy
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,35 +36,31 @@ class RequestScopeSpec extends AbstractMicronautSpec {
 
     void "test @Request bean created per request"() {
 
-        given:
-        def requestCustomScope = applicationContext.getBean(RequestCustomScope)
-        def conditions = new PollingConditions(timeout: 10)
-
         when:
         def result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
 
         then:
         result == "message count 1, count within request 1"
+        RequestBean.BEANS_CREATED.size() == 1
+        RequestBean.BEANS_CREATED.first().dead
 
         when:
+        RequestBean.BEANS_CREATED.clear()
         result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
 
         then:
         result == "message count 2, count within request 1"
+        RequestBean.BEANS_CREATED.size() == 1
+        RequestBean.BEANS_CREATED.first().dead
 
         when:
+        RequestBean.BEANS_CREATED.clear()
         result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
 
         then:
         result == "message count 3, count within request 1"
-
-        when:
-        System.gc()
-
-        then:
-        conditions.eventually {
-            requestCustomScope.@requestScope.size() == 0
-        }
+        RequestBean.BEANS_CREATED.size() == 1
+        RequestBean.BEANS_CREATED.first().dead
 
         cleanup:
         embeddedServer.stop()
@@ -70,11 +69,25 @@ class RequestScopeSpec extends AbstractMicronautSpec {
     @RequestScope
     static class RequestBean {
 
-        int num = 0
+        static final Set<RequestBean> BEANS_CREATED = new HashSet<>()
 
+        RequestBean() {
+            // don't add the proxy
+            if (getClass() == RequestBean) {
+                BEANS_CREATED.add(this)
+            }
+        }
+
+        int num = 0
+        boolean dead = false
         int count() {
             num++
             return num
+        }
+
+        @PreDestroy
+        void killMe() {
+            this.dead = true
         }
     }
 

@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.runtime.context.scope;
+package io.micronaut.runtime.http.scope;
+
+import io.micronaut.runtime.context.scope.ScopedProxy;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

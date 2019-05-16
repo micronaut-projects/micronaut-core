@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.runtime.context.scope
+package io.micronaut.runtime.http.scope
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.runtime.http.scope.RequestScope
 import io.micronaut.support.AbstractBeanDefinitionSpec
 
 import javax.inject.Scope

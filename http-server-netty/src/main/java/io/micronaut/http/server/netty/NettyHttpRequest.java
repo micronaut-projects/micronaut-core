@@ -366,6 +366,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     static NettyHttpRequest remove(ChannelHandlerContext ctx) {
         Channel channel = ctx.channel();
+
         io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
         return attr.getAndSet(null);
     }
