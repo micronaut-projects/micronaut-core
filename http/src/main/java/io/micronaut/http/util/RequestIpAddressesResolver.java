@@ -13,9 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.http.util;
+
+import io.micronaut.http.HttpRequest;
+
+import javax.annotation.Nonnull;
+import java.util.List;
+
 /**
- * This package contains classes related to the resolution of originating IP addresses.
+ * Resolves the orginating IP Addresses for a given Request.
  * @author Sergio del Amo
  * @since 1.2.0
  */
-package io.micronaut.http.originatingips;
+public interface RequestIpAddressesResolver {
+    String PREFIX = "micronaut.http.originating-ips";
+
+    /**
+     *
+     * @param request The Http Request
+     * @return List of IP Addresses
+     */
+    @Nonnull
+    List<String> requestIpAddresses(@Nonnull HttpRequest<?> request);
+}

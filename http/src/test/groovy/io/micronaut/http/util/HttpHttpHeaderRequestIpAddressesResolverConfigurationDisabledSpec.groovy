@@ -1,4 +1,4 @@
-package io.micronaut.http.originatingips
+package io.micronaut.http.util
 
 import io.micronaut.context.ApplicationContext
 import spock.lang.AutoCleanup

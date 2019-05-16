@@ -1,6 +1,7 @@
-package io.micronaut.http.originatingips
+package io.micronaut.http.util
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.util.RemoteAddressRequestIpAddressesResolver
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification

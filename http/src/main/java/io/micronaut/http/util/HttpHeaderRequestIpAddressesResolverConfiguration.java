@@ -13,26 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.originatingips;
+package io.micronaut.http.util;
 
-import io.micronaut.http.HttpRequest;
+import io.micronaut.core.util.Toggleable;
 
 import javax.annotation.Nonnull;
-import java.util.List;
 
 /**
- * Resolves the orginating IP Addresses for a given Request.
+ * {@link RequestIpAddressesResolver} implementation which resolves IP Address from an HTTP Header.
  * @author Sergio del Amo
  * @since 1.2.0
  */
-public interface RequestIpAddressesResolver {
-    String PREFIX = "micronaut.http.originating-ips";
+public interface HttpHeaderRequestIpAddressesResolverConfiguration extends Toggleable {
 
     /**
      *
-     * @param request The Http Request
-     * @return List of IP Addresses
+     * @return HTTP Header name.
      */
     @Nonnull
-    List<String> requestIpAddresses(@Nonnull HttpRequest<?> request);
+    String getHeaderName();
+
+    /**
+     *
+     * @return The delimiter used eg. {@value ,} to separate IPs in the Http Header value.
+     */
+    @Nonnull
+    String getDelimiter();
 }
