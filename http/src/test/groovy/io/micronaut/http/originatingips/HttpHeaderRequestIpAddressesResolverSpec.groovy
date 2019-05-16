@@ -7,7 +7,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class HeaderIpAddressesResolverSpec extends Specification {
+class HttpHeaderRequestIpAddressesResolverSpec extends Specification {
 
     @Shared
     @AutoCleanup
@@ -15,12 +15,12 @@ class HeaderIpAddressesResolverSpec extends Specification {
 
     void "Bean HeaderIpAddressesResolver exists"() {
         expect:
-        applicationContext.containsBean(HeaderIpAddressesResolver)
+        applicationContext.containsBean(HttpHeaderRequestIpAddressesResolver)
     }
 
     void "can resolve a list of IPS from X-Forwarded-For header value"() {
         when:
-        HeaderIpAddressesResolver resolver = applicationContext.getBean(HeaderIpAddressesResolver)
+        HttpHeaderRequestIpAddressesResolver resolver = applicationContext.getBean(HttpHeaderRequestIpAddressesResolver)
 
         then:
         noExceptionThrown()
@@ -32,7 +32,7 @@ class HeaderIpAddressesResolverSpec extends Specification {
         def request = Stub(HttpRequest) {
             getHeaders() >> headers
         }
-        List<String> result = resolver.originatingIpAddres(request)
+        List<String> result = resolver.requestIpAddresses(request)
 
         then:
         result == ['34.202.241.227', '10.32.108.32']

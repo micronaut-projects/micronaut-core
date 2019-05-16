@@ -5,7 +5,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class HeaderIpAddressesResolverConfigurationDisabledSpec extends Specification {
+class HttpHttpHeaderRequestIpAddressesResolverConfigurationDisabledSpec extends Specification {
     @Shared
     @AutoCleanup
     ApplicationContext applicationContext = ApplicationContext.run([
@@ -14,6 +14,6 @@ class HeaderIpAddressesResolverConfigurationDisabledSpec extends Specification {
 
     void "Bean HeaderIpAddressesResolverConfiguration can be disabled"() {
         expect:
-        !applicationContext.containsBean(HeaderIpAddressesResolverConfiguration)
+        !applicationContext.containsBean(HttpHeaderRequestIpAddressesResolverConfiguration)
     }
 }

@@ -5,7 +5,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class RemoteAddressIpAddressesResolverDisabledSpec extends Specification {
+class RemoteAddressRequestIpAddressesResolverDisabledSpec extends Specification {
     @Shared
     @AutoCleanup
     ApplicationContext applicationContext = ApplicationContext.run([
@@ -14,6 +14,6 @@ class RemoteAddressIpAddressesResolverDisabledSpec extends Specification {
 
     void "Bean RemoteAddressIpAddressesResolver can be disabled"() {
         expect:
-        !applicationContext.containsBean(RemoteAddressIpAddressesResolver)
+        !applicationContext.containsBean(RemoteAddressRequestIpAddressesResolver)
     }
 }

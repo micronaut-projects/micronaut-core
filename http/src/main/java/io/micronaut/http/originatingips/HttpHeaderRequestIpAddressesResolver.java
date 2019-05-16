@@ -31,21 +31,21 @@ import java.util.stream.Stream;
  * @since 1.2.0
  */
 @Singleton
-public class HeaderIpAddressesResolver implements IpAddressesResolver {
+public class HttpHeaderRequestIpAddressesResolver implements RequestIpAddressesResolver {
 
-    private final HeaderIpAddressesResolverConfiguration configuration;
+    private final HttpHeaderRequestIpAddressesResolverConfiguration configuration;
 
     /**
      *
      * @param configuration Configuration
      */
-    public HeaderIpAddressesResolver(HeaderIpAddressesResolverConfiguration configuration) {
+    public HttpHeaderRequestIpAddressesResolver(HttpHeaderRequestIpAddressesResolverConfiguration configuration) {
         this.configuration = configuration;
     }
 
     @Override
     @Nonnull
-    public List<String> originatingIpAddres(HttpRequest<?> request) {
+    public List<String> requestIpAddresses(HttpRequest<?> request) {
         String value = request.getHeaders().get(configuration.getHeaderName());
         if (value == null) {
             return new ArrayList<>();

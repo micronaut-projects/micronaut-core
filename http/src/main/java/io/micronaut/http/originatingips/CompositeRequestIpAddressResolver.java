@@ -15,30 +15,33 @@
  */
 package io.micronaut.http.originatingips;
 
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.HttpRequest;
 
+import javax.annotation.Nonnull;
 import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Aggregator of beans of type {@link IpAddressesResolver}.
+ * A composite implementation combining all registered {@link RequestIpAddressesResolver} instances.
  *
  * @author Sergio del Amo
  * @since 1.2.0
  */
+@Primary
 @Singleton
-public class IpAddressesResolverAggregator {
+public class CompositeRequestIpAddressResolver implements RequestIpAddressesResolver {
 
-    private Collection<IpAddressesResolver> ipAddressesResolvers;
+    private Collection<RequestIpAddressesResolver> requestIpAddressesResolvers;
 
     /**
      *
-     * @param ipAddressesResolvers Beans of type {@link IpAddressesResolver} in the context.
+     * @param requestIpAddressesResolvers Beans of type {@link RequestIpAddressesResolver} in the context.
      */
-    public IpAddressesResolverAggregator(Collection<IpAddressesResolver> ipAddressesResolvers) {
-        this.ipAddressesResolvers = ipAddressesResolvers;
+    public CompositeRequestIpAddressResolver(Collection<RequestIpAddressesResolver> requestIpAddressesResolvers) {
+        this.requestIpAddressesResolvers = requestIpAddressesResolvers;
     }
 
     /**
@@ -46,9 +49,11 @@ public class IpAddressesResolverAggregator {
      * @param request Http Request
      * @return List of originating IP Addresses
      */
-    public List<String> originatingIpAddresses(HttpRequest<?> request) {
-        return ipAddressesResolvers.stream()
-                .map(resolver -> resolver.originatingIpAddres(request))
+    @Nonnull
+    @Override
+    public List<String> requestIpAddresses(@Nonnull HttpRequest<?> request) {
+        return requestIpAddressesResolvers.stream()
+                .map(resolver -> resolver.requestIpAddresses(request))
                 .collect(Collectors.toList())
                 .stream()
                 .flatMap(List::stream)

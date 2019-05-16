@@ -5,7 +5,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class IpAddressesResolverSpec extends Specification {
+class RequestIpAddressesResolverSpec extends Specification {
 
     @Shared
     @AutoCleanup
@@ -13,10 +13,17 @@ class IpAddressesResolverSpec extends Specification {
 
     void "Bean IpAddressesResolver exists"() {
         expect:
-        applicationContext.containsBean(IpAddressesResolver)
+        applicationContext.containsBean(RequestIpAddressesResolver)
+
+        when:
+        RequestIpAddressesResolver resolver = applicationContext.getBean(RequestIpAddressesResolver)
+
+        then:
+        resolver instanceof CompositeRequestIpAddressResolver
+
     }
 
     void "2 IpAddressesResolver : HeaderIpAddressesResolver and RemoteAddressIpAddressesResolver"() {
-        applicationContext.getBeansOfType(IpAddressesResolver).size() == 2
+        applicationContext.getBeansOfType(RequestIpAddressesResolver).size() == 2
     }
 }

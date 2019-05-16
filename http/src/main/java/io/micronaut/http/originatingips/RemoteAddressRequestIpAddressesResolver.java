@@ -26,14 +26,14 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * {@link IpAddressesResolver} implementation based on {@link HttpRequest#getRemoteAddress} method.
+ * {@link RequestIpAddressesResolver} implementation based on {@link HttpRequest#getRemoteAddress} method.
  * @author Sergio del Amo
  * @since 1.2.0
  */
-@Requires(property = RemoteAddressIpAddressesResolver.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
+@Requires(property = RemoteAddressRequestIpAddressesResolver.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Singleton
-public class RemoteAddressIpAddressesResolver implements IpAddressesResolver {
-    public static final String PREFIX = IpAddressesResolver.PREFIX + ".remote-address";
+public class RemoteAddressRequestIpAddressesResolver implements RequestIpAddressesResolver {
+    public static final String PREFIX = RequestIpAddressesResolver.PREFIX + ".remote-address";
 
     /**
      *
@@ -42,7 +42,7 @@ public class RemoteAddressIpAddressesResolver implements IpAddressesResolver {
      */
     @Nonnull
     @Override
-    public List<String> originatingIpAddres(HttpRequest<?> request) {
+    public List<String> requestIpAddresses(HttpRequest<?> request) {
         return Optional.ofNullable(request.getRemoteAddress().getAddress())
                 .map(inetAddress -> Collections.singletonList(inetAddress.getHostAddress()))
                 .orElseGet(Collections::emptyList);

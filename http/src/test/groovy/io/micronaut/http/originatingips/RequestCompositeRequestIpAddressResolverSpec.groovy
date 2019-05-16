@@ -7,7 +7,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class IpAddressesResolverAggregatorSpec extends Specification {
+class RequestCompositeRequestIpAddressResolverSpec extends Specification {
 
     @Shared
     @AutoCleanup
@@ -15,7 +15,7 @@ class IpAddressesResolverAggregatorSpec extends Specification {
 
     void "IpAddressesResolverAggregator aggregates every IpAddressesResolver and returns a list of ips"() {
         given:
-        IpAddressesResolverAggregator aggregator = applicationContext.getBean(IpAddressesResolverAggregator)
+        CompositeRequestIpAddressResolver resolver = applicationContext.getBean(CompositeRequestIpAddressResolver)
         def headers = Stub(HttpHeaders) {
             get(_) >> '34.202.241.227, 10.32.108.32'
         }
@@ -25,7 +25,7 @@ class IpAddressesResolverAggregatorSpec extends Specification {
         }
 
         when:
-        List<String> result = aggregator.originatingIpAddresses(request)
+        List<String> result = resolver.requestIpAddresses(request)
 
         then:
         result.sort() == ['34.202.241.227', '10.32.108.32', '0.0.0.0'].sort()

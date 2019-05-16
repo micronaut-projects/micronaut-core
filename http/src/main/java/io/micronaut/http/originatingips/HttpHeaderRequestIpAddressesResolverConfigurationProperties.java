@@ -22,16 +22,16 @@ import io.micronaut.core.util.StringUtils;
 import javax.annotation.Nonnull;
 
 /**
- * {@link ConfigurationProperties} implementation of {@link HeaderIpAddressesResolverConfiguration}.
+ * {@link ConfigurationProperties} implementation of {@link HttpHeaderRequestIpAddressesResolverConfiguration}.
  *
  * @see <a href="https://en.wikipedia.org/wiki/X-Forwarded-For">X-Forwarded-For</a>
  * @author Sergio del Amo
  * @since 1.2.0
  */
-@Requires(property = HeaderIpAddressesResolverConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
-@ConfigurationProperties(HeaderIpAddressesResolverConfigurationProperties.PREFIX)
-public class HeaderIpAddressesResolverConfigurationProperties implements HeaderIpAddressesResolverConfiguration {
-    public static final String PREFIX = IpAddressesResolver.PREFIX + ".header";
+@Requires(property = HttpHeaderRequestIpAddressesResolverConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
+@ConfigurationProperties(HttpHeaderRequestIpAddressesResolverConfigurationProperties.PREFIX)
+public class HttpHeaderRequestIpAddressesResolverConfigurationProperties implements HttpHeaderRequestIpAddressesResolverConfiguration {
+    public static final String PREFIX = RequestIpAddressesResolver.PREFIX + ".header";
     public static final String DEFAULT_HEADER_NAME = "X-Forwarded-For";
     public static final String DEFAULT_DELIMITER = ",";
 

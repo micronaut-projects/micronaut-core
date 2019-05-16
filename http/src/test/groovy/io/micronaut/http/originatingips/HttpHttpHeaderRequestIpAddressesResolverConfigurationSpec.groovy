@@ -5,7 +5,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class HeaderIpAddressesResolverConfigurationSpec extends Specification {
+class HttpHttpHeaderRequestIpAddressesResolverConfigurationSpec extends Specification {
 
     @Shared
     @AutoCleanup
@@ -13,16 +13,16 @@ class HeaderIpAddressesResolverConfigurationSpec extends Specification {
 
     void "Bean HeaderIpAddressesResolverConfiguration exists"() {
         expect:
-        applicationContext.containsBean(HeaderIpAddressesResolverConfiguration)
+        applicationContext.containsBean(HttpHeaderRequestIpAddressesResolverConfiguration)
     }
 
     void "default HTTP Header name for HeaderIpAddressesResolverConfiguration is X-Forwarded-For"() {
         expect:
-        applicationContext.getBean(HeaderIpAddressesResolverConfiguration).getHeaderName() == 'X-Forwarded-For'
+        applicationContext.getBean(HttpHeaderRequestIpAddressesResolverConfiguration).getHeaderName() == 'X-Forwarded-For'
     }
 
     void "default delimiter for IP Address within the HTTP Header value for HeaderIpAddressesResolverConfiguration is ,"() {
         expect:
-        applicationContext.getBean(HeaderIpAddressesResolverConfiguration).getDelimiter() == ','
+        applicationContext.getBean(HttpHeaderRequestIpAddressesResolverConfiguration).getDelimiter() == ','
     }
 }
