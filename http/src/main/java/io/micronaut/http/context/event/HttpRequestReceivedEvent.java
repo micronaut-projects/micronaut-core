@@ -27,7 +27,7 @@ import javax.annotation.Nonnull;
  * trace the URI, headers and so on but should not perform I/O.
  *
  * @author graemerocher
- * @since 1.0
+ * @since 1.2.0
  */
 public class HttpRequestReceivedEvent extends ApplicationEvent {
 

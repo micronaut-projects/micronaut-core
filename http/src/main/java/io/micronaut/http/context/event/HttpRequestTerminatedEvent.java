@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
  * consumers of the event should generally not perform I/O, instead this designed for tracing of headers, URI etc.
  *
  * @author graemerocher
- * @since 1.0
+ * @since 1.2.0
  */
 public class HttpRequestTerminatedEvent extends ApplicationEvent {
 

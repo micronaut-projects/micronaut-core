@@ -142,20 +142,6 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
         destroyBeans(event.getSource());
     }
 
-    private <T> Map getRequestScopedBeans(HttpRequest<T> httpRequest) {
-        MutableConvertibleValues<Object> attrs = httpRequest.getAttributes();
-        return attrs.get(SCOPED_BEANS_ATTRIBUTE, Object.class).flatMap(o -> {
-            if (o instanceof Map) {
-                return Optional.of((Map) o);
-            }
-            return Optional.empty();
-        }).orElseGet(() -> {
-            Map scopedBeans = new ConcurrentHashMap(5);
-            attrs.put(SCOPED_BEANS_ATTRIBUTE, scopedBeans);
-            return scopedBeans;
-        });
-    }
-
     /**
      * Destroys the request scoped beans for the given request.
      * @param request The request
@@ -170,5 +156,19 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
                 }
             });
         }
+    }
+
+    private synchronized <T> Map getRequestScopedBeans(HttpRequest<T> httpRequest) {
+        MutableConvertibleValues<Object> attrs = httpRequest.getAttributes();
+        return attrs.get(SCOPED_BEANS_ATTRIBUTE, Object.class).flatMap(o -> {
+            if (o instanceof Map) {
+                return Optional.of((Map) o);
+            }
+            return Optional.empty();
+        }).orElseGet(() -> {
+            Map scopedBeans = new ConcurrentHashMap(5);
+            attrs.put(SCOPED_BEANS_ATTRIBUTE, scopedBeans);
+            return scopedBeans;
+        });
     }
 }
