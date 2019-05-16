@@ -4,7 +4,7 @@ Any Micronaut application can be run using the GraalVM JVM, however special supp
 
 === Experimental Status
 
-WARNING: GraalVM support (like GraalVM itself) is still in the incubating phase. Third-party library support is hit and miss and the Micronaut team are still ironing out all of the potential issues. Don't hesitate to https://github.com/micronaut-projects/micronaut-core/issues[report issues] however and gradually over time the support will become more stable.
+WARNING: Although GraalVM `19.0.0` is the first Production ready release the support for creating native-images is still considered experimental. Third-party library support is hit and miss and the Micronaut team are still ironing out all of the potential issues. Don't hesitate to https://github.com/micronaut-projects/micronaut-core/issues[report issues] however and gradually over time the support will become more stable.
 
 
 So far Micronaut's HTTP server, HTTP client, function support and service discovery module have been verified as working on GraalVM 1.0 RC6 or above. Support for other modules is still evolving and will improve over time.
@@ -14,7 +14,3 @@ So far Micronaut's HTTP server, HTTP client, function support and service discov
 NOTE: Use of GraalVM's `native-image` tool is only supported in Java or Kotlin projects. Groovy relies heavily on reflection which is only partially supported by GraalVM.
 
 To start using GraalVM you should first install the GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started].
-
-
-WARNING: As of this writing, GraalVM is currently only available for Linux and Mac OS X systems.
-
