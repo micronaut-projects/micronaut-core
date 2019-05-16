@@ -1,0 +1,6 @@
+You may need to resolve the host name of the current server. Micronaut ships with the bean link:{api}/io/micronaut/http/server/hostresolver/HttpHeaderHostResolver.html[HttpHeaderHostResolver] of type
+	The link:{api}/io/micronaut/http/server/hostresolver/HostResolver.html[HostResolver].
+
+The properties used by link:{api}/io/micronaut/http/server/hostresolver/HttpHeaderHostResolver.html[HttpHeaderHostResolver] can be customized by overriding the values of:
+
+include::{includedir}configurationProperties/io.micronaut.http.server.hostresolver.HttpHeaderHostResolverConfigurationProperties.adoc[]
