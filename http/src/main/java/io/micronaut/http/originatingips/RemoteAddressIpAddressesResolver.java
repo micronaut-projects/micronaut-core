@@ -27,6 +27,8 @@ import java.util.Optional;
 
 /**
  * {@link IpAddressesResolver} implementation based on {@link HttpRequest#getRemoteAddress} method.
+ * @author Sergio del Amo
+ * @since 1.2.0
  */
 @Requires(property = RemoteAddressIpAddressesResolver.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Singleton

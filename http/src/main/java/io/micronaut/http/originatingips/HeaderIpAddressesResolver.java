@@ -28,7 +28,7 @@ import java.util.stream.Stream;
  * Resolves the originating IP Addresses using the value of an HTTP Header.
  * @see <a href="https://en.wikipedia.org/wiki/X-Forwarded-For">X-Forwarded-For</a>
  * @author Sergio del Amo
- * @since 1.0.0
+ * @since 1.2.0
  */
 @Singleton
 public class HeaderIpAddressesResolver implements IpAddressesResolver {

@@ -26,7 +26,7 @@ import javax.annotation.Nonnull;
  *
  * @see <a href="https://en.wikipedia.org/wiki/X-Forwarded-For">X-Forwarded-For</a>
  * @author Sergio del Amo
- * @since 1.0.0
+ * @since 1.2.0
  */
 @Requires(property = HeaderIpAddressesResolverConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @ConfigurationProperties(HeaderIpAddressesResolverConfigurationProperties.PREFIX)
