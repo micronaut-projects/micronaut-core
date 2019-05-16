@@ -18,7 +18,6 @@ package io.micronaut.runtime.http.scope
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.runtime.http.scope.RequestScope
 import io.micronaut.support.AbstractBeanDefinitionSpec
 
 import javax.inject.Scope
@@ -34,7 +33,7 @@ class RequestScopeSpec extends AbstractBeanDefinitionSpec {
         BeanDefinition beanDefinition = buildBeanDefinition("test.RequestBean", """
 package test;
 
-import io.micronaut.runtime.context.scope.*;
+import io.micronaut.runtime.http.scope.RequestScope;
 
 @RequestScope
 class RequestBean {
