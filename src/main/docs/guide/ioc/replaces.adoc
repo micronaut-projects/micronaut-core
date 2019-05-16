@@ -30,6 +30,8 @@ include::{testsjava}/replaces/MockBookService.java[tags=class, indent=0]
 
 <1> The `MockBookService` declares that it replaces `JdbcBookService`
 
+=== Factory Replacement
+
 The `@Replaces` annotation also supports a `factory` argument. That argument allows the replacement of factory beans in their entirety or specific types created by the factory.
 
 For example, it may be desired to replace all or part of the given factory class:
@@ -60,3 +62,22 @@ include::{testsjava}/replaces/TextBookFactory.java[tags=class, indent=0]
 
 The `BookFactory#novel()` method will not be replaced because the TextBook class is defined in the annotation.
 
+=== Default Implementation
+
+When exposing an API, it may be desirable for the default implementation of an interface to not be exposed as part of the public API. Doing so would prevent users from being able to replace the implementation because they would not be able to reference the class. The solution is to annotate the interface with api:context.annotation.DefaultImplementation[] to indicate which implementation should be replaced if a user creates a bean that `@Replaces(YourInterface.class)`.
+
+For example consider:
+
+A public API contract
+
+snippet::io.micronaut.docs.qualifiers.replaces.defaultimpl.ResponseStrategy[tags="clazz"]
+
+The default implementation
+
+snippet::io.micronaut.docs.qualifiers.replaces.defaultimpl.DefaultResponseStrategy[tags="clazz"]
+
+The custom implementation
+
+snippet::io.micronaut.docs.qualifiers.replaces.defaultimpl.CustomResponseStrategy[tags="clazz"]
+
+In the above example, the `CustomResponseStrategy` will replace the `DefaultResponseStrategy` because the api:context.annotation.DefaultImplementation[] annotation points to the `DefaultResponseStrategy`.
