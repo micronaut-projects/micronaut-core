@@ -40,6 +40,18 @@ include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=cron, indent=0]
 
 The above example will run the task every Monday morning at 10:15AM.
 
+=== Scheduling with only an Initial Delay
+
+To schedule a task so that is runs a single time after the server starts, use the `initialDelay` member:
+
+.Initial Delay Example
+[source,java]
+----
+include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=initialDelay, indent=0]
+----
+
+The above example will only run a single time 1 minute after the server starts.
+
 == Programmatically Scheduling Tasks
 
 If you wish to programmatically schedule tasks, then you can use the api:scheduling.TaskScheduler[] bean which can be injected as follows:
