@@ -67,7 +67,7 @@ public class HeaderIpAddressesResolverConfigurationProperties implements HeaderI
 
     /**
      *
-     * @param delimiter The delimiter used eg. {@value ,} to separate IPs in the Http Header value.
+     * @param delimiter The delimiter used eg. {@value #DEFAULT_DELIMITER} to separate IPs in the Http Header value.
      */
     public void setDelimiter(String delimiter) {
         this.delimiter = delimiter;
