@@ -56,18 +56,27 @@ The provided `Dockerfile` is a multi-stage dockerfile which builds the project i
 
 To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using SDKman:
 
-.Installing GraalVM 1.0.0-rc16 with SDKman
+.Installing GraalVM 19.0.0 with SDKman
 [source,bash]
 ----
-$ sdk install java 1.0.0-rc-16-grl
-$ sdk use java 1.0.0-rc-16-grl
+$ sdk install java 19.0.0-grl
+$ sdk use java 19.0.0-grl
 ----
+
+The `native-image` tool was extracted from the base GraalVM distribution. Currently it is available as an early adopter plugin. To install it, run:
+
+.Installing `native-image` tool
+[source,bash]
+----
+$ gu install native-image
+----
+
 
 .Creating native image with Gradle
 [source,bash]
 ----
 $ ./gradlew assemble
-$ native-image --no-server -cp build/libs/hello-world-0.1-all.jar
+$ native-image --no-server -cp build/libs/hello-world-0.1.jar
 ----
 
 .Creating native image with Maven
