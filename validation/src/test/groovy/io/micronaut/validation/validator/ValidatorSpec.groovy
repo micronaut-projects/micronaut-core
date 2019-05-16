@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.validation.validator.resolver.CompositeTraversableResolver
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -13,6 +14,7 @@ import javax.inject.Singleton
 import javax.validation.ConstraintViolation
 import javax.validation.ElementKind
 import javax.validation.Valid
+import javax.validation.ValidatorFactory
 import javax.validation.constraints.Max
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
@@ -26,6 +28,16 @@ class ValidatorSpec extends Specification {
     ApplicationContext applicationContext = ApplicationContext.run()
     @Shared
     Validator validator = applicationContext.getBean(Validator)
+
+    void "test validator config"() {
+        given:
+        ValidatorConfiguration config = applicationContext.getBean(ValidatorConfiguration)
+        ValidatorFactory factory = applicationContext.getBean(ValidatorFactory)
+
+        expect:
+        config.traversableResolver instanceof CompositeTraversableResolver
+        factory instanceof DefaultValidatorFactory
+    }
 
     void "test simple bean validation"() {
         given:
