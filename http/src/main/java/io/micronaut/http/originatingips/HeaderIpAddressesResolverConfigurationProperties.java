@@ -52,7 +52,7 @@ public class HeaderIpAddressesResolverConfigurationProperties implements HeaderI
     }
 
     /**
-     *
+     * The HTTP Header name. Default value ({@value #DEFAULT_HEADER_NAME}).
      * @param headerName HTTP Header name.
      */
     public void setHeaderName(String headerName) {
@@ -66,8 +66,8 @@ public class HeaderIpAddressesResolverConfigurationProperties implements HeaderI
     }
 
     /**
-     *
-     * @param delimiter The delimiter used eg. {@value #DEFAULT_DELIMITER} to separate IPs in the Http Header value.
+     * The delimiter used to separate IPs in the Http Header value. Default value ({@value #DEFAULT_DELIMITER})
+     * @param delimiter The delimiter used to separate IPs in the Http Header value.
      */
     public void setDelimiter(String delimiter) {
         this.delimiter = delimiter;
@@ -82,7 +82,7 @@ public class HeaderIpAddressesResolverConfigurationProperties implements HeaderI
     }
 
     /**
-     * Default value ({@value #DEFAULT_ENABLED}).
+     *  Whether the HTTP Header IpAddresses Resolver is enabled. Default value ({@value #DEFAULT_ENABLED}).
      * @param enabled Whether the HTTP Header IpAddresses Resolver is enabled
      */
     public void setEnabled(boolean enabled) {
