@@ -35,14 +35,17 @@ import javax.inject.Singleton
 class RequestScopeSpec extends AbstractMicronautSpec {
 
     void "test @Request bean created per request"() {
-
+        given:
+        PollingConditions conditions = new PollingConditions(delay: 0.5, timeout: 3)
         when:
         def result = rxClient.retrieve(HttpRequest.GET("/test-request-scope"), String).blockingFirst()
 
         then:
         result == "message count 1, count within request 1"
         RequestBean.BEANS_CREATED.size() == 1
-        RequestBean.BEANS_CREATED.first().dead
+        conditions.eventually {
+            RequestBean.BEANS_CREATED.first().dead
+        }
 
         when:
         RequestBean.BEANS_CREATED.clear()
@@ -51,7 +54,9 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         then:
         result == "message count 2, count within request 1"
         RequestBean.BEANS_CREATED.size() == 1
-        RequestBean.BEANS_CREATED.first().dead
+        conditions.eventually {
+            RequestBean.BEANS_CREATED.first().dead
+        }
 
         when:
         RequestBean.BEANS_CREATED.clear()
@@ -60,7 +65,9 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         then:
         result == "message count 3, count within request 1"
         RequestBean.BEANS_CREATED.size() == 1
-        RequestBean.BEANS_CREATED.first().dead
+        conditions.eventually {
+            RequestBean.BEANS_CREATED.first().dead
+        }
 
         cleanup:
         embeddedServer.stop()
