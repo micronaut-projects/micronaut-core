@@ -48,6 +48,13 @@ public class ScheduledExample {
     }
     // end::cron[]
 
+    // tag::initialDelay[]
+    @Scheduled(initialDelay = "1m" )
+    void onceOneMinuteAfterStartup() {
+        System.out.println("Executing onceOneMinuteAfterStartup()");
+    }
+    // end::initialDelay[]
+
     // tag::configured[]
     @Scheduled( fixedRate = "${my.task.rate:5m}",
                 initialDelay = "${my.task.delay:1m}" )
