@@ -118,7 +118,6 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import java.io.Closeable;
 import java.net.*;
-import java.net.Proxy.Type;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

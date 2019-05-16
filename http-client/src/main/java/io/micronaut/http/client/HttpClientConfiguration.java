@@ -413,26 +413,38 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * @return The proxy selector being used
+     * @return The proxy selector provided
      */
     public Optional<ProxySelector> getProxySelector() {
         return Optional.ofNullable(proxySelector);
     }
 
-    public Proxy resolveProxy(URI target) {
-        return getProxySelector()
-            .flatMap(selector -> selector.select(target).stream().findFirst())
-            .orElse(
-                getProxyAddress()
-                    .map(address -> new Proxy(getProxyType(), address))
-                    .orElse(Proxy.NO_PROXY)
-            );
-    }
 
+    /**
+     * Resolves a proxy to use for connection.
+     *
+     * If ProxySelector is set by {@link #setProxySelector(ProxySelector)} then it constructs URI and pass it to {@link ProxySelector#select(URI)}.
+     * First proxy returned by proxy selector will be used. If no proxy is returned by select, then {@link Proxy#NO_PROXY} will be used.
+     *
+     * If ProxySelector is not set then parameters are ignored and a proxy as defined by {@link #setProxyAddress(SocketAddress)} and {@link #setProxyType(Proxy.Type)} will be returned.
+     * If no proxy is defined then parameters are ignored and {@link Proxy#NO_PROXY} is used.
+     *
+     * @param isSsl is it http or https connection
+     * @param host connection host
+     *  @param port connection port
+     * @return A non null proxy instance
+     */
     public Proxy resolveProxy(boolean isSsl, String host, int port) {
         try {
-            URI uri = new URI(isSsl ? "https" : "http", null, host, port, null, null, null);
-            return resolveProxy(uri);
+            if (proxySelector != null) {
+                final URI uri = new URI(isSsl ? "https" : "http", null, host, port, null, null, null);
+                return getProxySelector()
+                    .flatMap(selector -> selector.select(uri).stream().findFirst())
+                    .orElse(Proxy.NO_PROXY);
+            } else if (proxyAddress != null) {
+                return new Proxy(getProxyType(), proxyAddress);
+            }
+            return  Proxy.NO_PROXY;
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }

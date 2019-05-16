@@ -87,15 +87,13 @@ class DefaultHttpClientConfigurationSpec extends Specification {
 
     void "test setting a proxy selector" () {
         given: "a http client config and two addresses"
-        URI addressOne = new URI("http://a")
-        URI addressTwo = new URI("http://b")
         def config = new DefaultHttpClientConfiguration()
 
         when: "I register proxy selector that use proxy for addressOne but not for addressTwo"
         config.setProxySelector(new ProxySelector() {
             @Override
             List<Proxy> select(URI uri) {
-                if (uri == addressOne) {
+                if (uri.host == "a") {
                     return [ new Proxy(Proxy.Type.HTTP, new InetSocketAddress(8080)) ]
                 } else {
                     return [ Proxy.NO_PROXY ]
@@ -109,7 +107,10 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         })
 
         then: "proxy is used for first address but not for the second"
-        config.resolveProxy(addressOne).type() == Proxy.Type.HTTP
-        config.resolveProxy(addressTwo) == Proxy.NO_PROXY
+        def proxyOne = config.resolveProxy(false, "a", 80)
+        proxyOne.type() == Proxy.Type.HTTP
+        proxyOne.address().port == 8080
+
+        config.resolveProxy(false, "b", 80) == Proxy.NO_PROXY
     }
 }
