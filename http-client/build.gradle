@@ -14,9 +14,6 @@ dependencies {
     testCompile dependencyVersion("rxjava2")
     testCompile dependencyVersion("reactor")
     testCompile project(":http-server-netty")
-    testCompile 'org.hamcrest:hamcrest-library:1.3'
-    testCompile 'com.stehno.ersatz:ersatz:1.9.0:safe@jar'
-    testCompile 'org.littleshoot:littleproxy:1.1.2:littleproxy-shade@jar'
     testRuntime project(":configurations:hibernate-validator")
 }
 
