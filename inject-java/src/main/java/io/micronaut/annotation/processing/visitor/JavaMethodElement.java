@@ -22,7 +22,6 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
 import java.util.Collections;
