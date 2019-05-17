@@ -24,6 +24,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
 import io.micronaut.scheduling.TaskExceptionHandler;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.TaskScheduler;
@@ -41,6 +42,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 
 /**
@@ -92,9 +95,16 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             }
 
             String scheduler = scheduledAnnotation.get(MEMBER_SCHEDULER, String.class).orElse(TaskExecutors.SCHEDULED);
-            TaskScheduler taskScheduler = beanContext
-                .findBean(TaskScheduler.class, Qualifiers.byName(scheduler))
-                .orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
+            Optional<TaskScheduler> optionalTaskScheduler = beanContext
+                    .findBean(TaskScheduler.class, Qualifiers.byName(scheduler));
+
+            if (!optionalTaskScheduler.isPresent()) {
+                optionalTaskScheduler = beanContext.findBean(ExecutorService.class, Qualifiers.byName(scheduler))
+                        .filter(ScheduledExecutorService.class::isInstance)
+                        .map(ScheduledExecutorTaskScheduler::new);
+            }
+
+            TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
 
             Runnable task = () -> {
                 io.micronaut.context.Qualifier<Object> qualifer = beanDefinition
