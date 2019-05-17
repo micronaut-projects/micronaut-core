@@ -1,9 +1,0 @@
-You may need to resolve the originating IP address of an HTTP Request. Micronaut ships with several beans (link:{api}/io/micronaut/http/util/HttpHeaderRequestIpAddressesResolver.html[HttpHeaderRequestIpAddressesResolver], link:{api}/io/micronaut/http/util/RemoteAddressRequestIpAddressesResolver.html[RemoteAddressRequestIpAddressesResolver]) of type link:{api}/io/micronaut/http/util/RequestIpAddressesResolver.html[RequestIpAddressesResolver] and a composite implementation link:{api}/io/micronaut/http/util/CompositeRequestIpAddressResolver.html[CompositeRequestIpAddressResolver] which combines all registered link:{api}/io/micronaut/http/util/RequestIpAddressesResolver.html[RequestIpAddressesResolver] and it is annotated with
-api:context.annotation.Primary[].
-
-The properties used by link:{api}/io/micronaut/http/util/HeaderIpAddressesResolver.html[HeaderIpAddressesResolver] can be customized by overriding the values of:
-
-include::{includedir}configurationProperties/io.micronaut.http.util.HttpHeaderRequestIpAddressesResolverConfigurationProperties.adoc[]
-
-You can disable link:{api}/io/micronaut/http/util/RemoteAddressIpAddressesResolver.html[RemoteAddressIpAddressesResolver] by setting `micronaut.http.originating-ips.remote-address.enabled` to `false`.
-

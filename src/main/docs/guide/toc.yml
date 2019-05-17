@@ -71,7 +71,7 @@ httpServer:
   routing: HTTP Routing
   binding: Simple Request Binding
   hostResolution: Host Resolution
-  originatingIpAddresses: Originating IP Addresses
+  clientIpAddress: Client IP Address
   requestResponse: The HttpRequest and HttpResponse
   statusAnnotation: Response Status
   producesAnnotation: Response Content-Type
