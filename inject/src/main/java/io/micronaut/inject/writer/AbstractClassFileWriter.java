@@ -52,6 +52,9 @@ import java.util.*;
 @Internal
 public abstract class AbstractClassFileWriter implements Opcodes {
 
+    protected static final Type TYPE_ARGUMENT = Type.getType(Argument.class);
+    protected static final Type TYPE_ARGUMENT_ARRAY = Type.getType(Argument[].class);
+    protected static final String ZERO_ARGUMENTS_CONSTANT = "ZERO_ARGUMENTS";
     protected static final String CONSTRUCTOR_NAME = "<init>";
     protected static final String DESCRIPTOR_DEFAULT_CONSTRUCTOR = "()V";
     protected static final Method METHOD_DEFAULT_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
@@ -106,40 +109,63 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @param declaringElement     The declaring class element of the generics
      * @param types            The type references
      */
-    protected static void pushTypeArgumentElements(GeneratorAdapter generatorAdapter, TypedElement declaringElement, Map<String, ClassElement> types) {
+    protected static void pushTypeArgumentElements(
+            GeneratorAdapter generatorAdapter,
+            TypedElement declaringElement,
+            Map<String, ClassElement> types) {
         if (types == null || types.isEmpty()) {
             generatorAdapter.visitInsn(ACONST_NULL);
             return;
         }
-        int len = types.size();
-        // Build calls to Argument.create(...)
-        pushNewArray(generatorAdapter, Argument.class, len);
-        int i = 0;
-        for (Map.Entry<String, ClassElement> entry : types.entrySet()) {
-            // the array index
-            generatorAdapter.push(i);
-            String argumentName = entry.getKey();
-            ClassElement classElement = entry.getValue();
-            Object classReference = toClassReference(classElement);
-            Map<String, ClassElement> typeArguments = null;
+        Set<String> visitedTypes = new HashSet<>(5);
+        pushTypeArgumentElements(generatorAdapter, declaringElement, types, visitedTypes);
+    }
 
-            if (!classElement.getName().equals(declaringElement.getName())) {
-                typeArguments = classElement.getTypeArguments();
-            }
-            if (CollectionUtils.isNotEmpty(typeArguments)) {
-                buildArgumentWithGenerics(generatorAdapter, argumentName, classReference, classElement, typeArguments);
-            } else {
-                buildArgument(generatorAdapter, argumentName, classReference);
-            }
+    private static void pushTypeArgumentElements(
+            GeneratorAdapter generatorAdapter,
+            TypedElement declaringElement,
+            Map<String, ClassElement> types,
+            Set<String> visitedTypes) {
+        if (visitedTypes.contains(declaringElement.getName())) {
+            generatorAdapter.getStatic(
+                    TYPE_ARGUMENT,
+                    ZERO_ARGUMENTS_CONSTANT,
+                    TYPE_ARGUMENT_ARRAY
+            );
+        } else {
+            visitedTypes.add(declaringElement.getName());
 
-            // store the type reference
-            generatorAdapter.visitInsn(AASTORE);
-            // if we are not at the end of the array duplicate array onto the stack
-            if (i != (len - 1)) {
-                generatorAdapter.visitInsn(DUP);
+            int len = types.size();
+            // Build calls to Argument.create(...)
+            pushNewArray(generatorAdapter, Argument.class, len);
+            int i = 0;
+            for (Map.Entry<String, ClassElement> entry : types.entrySet()) {
+                // the array index
+                generatorAdapter.push(i);
+                String argumentName = entry.getKey();
+                ClassElement classElement = entry.getValue();
+                Object classReference = toClassReference(classElement);
+                Map<String, ClassElement> typeArguments = null;
+
+                if (!classElement.getName().equals(declaringElement.getName())) {
+                    typeArguments = classElement.getTypeArguments();
+                }
+                if (CollectionUtils.isNotEmpty(typeArguments)) {
+                    buildArgumentWithGenerics(generatorAdapter, argumentName, classReference, classElement, typeArguments, visitedTypes);
+                } else {
+                    buildArgument(generatorAdapter, argumentName, classReference);
+                }
+
+                // store the type reference
+                generatorAdapter.visitInsn(AASTORE);
+                // if we are not at the end of the array duplicate array onto the stack
+                if (i != (len - 1)) {
+                    generatorAdapter.visitInsn(DUP);
+                }
+                i++;
             }
-            i++;
         }
+
     }
 
     private static Object toClassReference(ClassElement classElement) {
@@ -222,24 +248,24 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     /**
      * Builds generic type arguments recursively.
-     *
-     * @param generatorAdapter The generator adapter to use
+     *  @param generatorAdapter The generator adapter to use
      * @param argumentName     The argument name
      * @param typeReference    The type name
      * @param classElement     The class element that declares the generics
      * @param typeArguments    The nested type arguments
+     * @param visitedTypes
      */
-    static void buildArgumentWithGenerics(
+    private static void buildArgumentWithGenerics(
             GeneratorAdapter generatorAdapter, String argumentName,
             Object typeReference,
             ClassElement classElement,
-            Map<String, ClassElement> typeArguments) {
+            Map<String, ClassElement> typeArguments, Set<String> visitedTypes) {
         // 1st argument: the type
         generatorAdapter.push(getTypeReference(typeReference));
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
         // 3rd argument, more generics
-        pushTypeArgumentElements(generatorAdapter, classElement, typeArguments);
+        pushTypeArgumentElements(generatorAdapter, classElement, typeArguments, visitedTypes);
 
         // Argument.create( .. )
         invokeInterfaceStaticMethod(
