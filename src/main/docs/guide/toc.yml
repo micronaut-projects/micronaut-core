@@ -70,7 +70,8 @@ httpServer:
   runningSpecificPort: Running Server on a Specific Port
   routing: HTTP Routing
   binding: Simple Request Binding
-  originatingIpAddresses: Originating IP Addresses
+  hostResolution: Host Resolution
+  clientIpAddress: Client IP Address
   requestResponse: The HttpRequest and HttpResponse
   statusAnnotation: Response Status
   producesAnnotation: Response Content-Type
