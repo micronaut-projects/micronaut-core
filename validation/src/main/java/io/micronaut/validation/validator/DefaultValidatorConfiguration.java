@@ -28,9 +28,9 @@ import io.micronaut.validation.validator.messages.DefaultValidationMessages;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.validation.ClockProvider;
-import javax.validation.Path;
-import javax.validation.TraversableResolver;
+import javax.validation.*;
+import javax.validation.Validator;
+import javax.validation.valueextraction.ValueExtractor;
 import java.lang.annotation.ElementType;
 
 /**
@@ -40,7 +40,7 @@ import java.lang.annotation.ElementType;
  * @since 1.2
  */
 @ConfigurationProperties(ValidatorConfiguration.PREFIX)
-public class DefaultValidatorConfiguration implements ValidatorConfiguration, Toggleable {
+public class DefaultValidatorConfiguration implements ValidatorConfiguration, Toggleable, ValidatorContext {
 
     @Nullable
     private ConstraintValidatorRegistry constraintValidatorRegistry;
@@ -212,5 +212,42 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     public DefaultValidatorConfiguration setExecutionHandleLocator(@Nullable ExecutionHandleLocator executionHandleLocator) {
         this.executionHandleLocator = executionHandleLocator;
         return this;
+    }
+
+    @Override
+    public ValidatorContext messageInterpolator(MessageInterpolator messageInterpolator) {
+        throw new UnsupportedOperationException("Method messageInterpolator(..) not supported");
+    }
+
+    @Override
+    public ValidatorContext traversableResolver(TraversableResolver traversableResolver) {
+        this.traversableResolver = traversableResolver;
+        return this;
+    }
+
+    @Override
+    public ValidatorContext constraintValidatorFactory(ConstraintValidatorFactory factory) {
+        throw new UnsupportedOperationException("Method constraintValidatorFactory(..) not supported");
+    }
+
+    @Override
+    public ValidatorContext parameterNameProvider(ParameterNameProvider parameterNameProvider) {
+        throw new UnsupportedOperationException("Method parameterNameProvider(..) not supported");
+    }
+
+    @Override
+    public ValidatorContext clockProvider(ClockProvider clockProvider) {
+        this.clockProvider = clockProvider;
+        return this;
+    }
+
+    @Override
+    public ValidatorContext addValueExtractor(ValueExtractor<?> extractor) {
+        throw new UnsupportedOperationException("Method addValueExtractor(..) not supported");
+    }
+
+    @Override
+    public Validator getValidator() {
+        return new DefaultValidator(this);
     }
 }

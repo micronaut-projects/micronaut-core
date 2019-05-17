@@ -24,4 +24,6 @@ public @interface Nested {
     int num() default 10;
 
     String value() default "";
+
+    boolean bool() default false;
 }

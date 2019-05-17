@@ -1220,13 +1220,23 @@ public class DefaultBeanContext implements BeanContext {
 
             // group the method references by annotation type such that we have a map of Annotation -> MethodReference
             // ie. Class<Scheduled> -> @Scheduled void someAnnotation()
-            Map<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> byAnnotation = methodStream
-                    .collect(
-                            Collectors.groupingBy((Function<ExecutableMethod<?, ?>, Class<? extends Annotation>>) executableMethod ->
-                                    executableMethod.getAnnotationTypeByStereotype(Executable.class)
-                                            .orElseThrow(() ->
-                                                    new IllegalStateException("BeanDefinition.requiresMethodProcessing() returned true but method has no @Executable definition. This should never happen. Please report an issue.")
-                                            )));
+            Map<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> byAnnotation = new HashMap<>();
+            methodStream.collect(Collectors.toList()).forEach(reference -> {
+                List<Class<? extends Annotation>> annotations = reference.getAnnotationTypesByStereotype(Executable.class);
+                if (annotations.isEmpty()) {
+                    throw new IllegalStateException("BeanDefinition.requiresMethodProcessing() returned true but method has no @Executable definition. This should never happen. Please report an issue.");
+                } else {
+                    annotations.forEach(annotation -> {
+                        byAnnotation.compute(annotation, (ann, list) -> {
+                            if (list == null) {
+                                list = new ArrayList<>();
+                            }
+                            list.add(reference);
+                            return list;
+                        });
+                    });
+                }
+            });
 
             // Find ExecutableMethodProcessor for each annotation and process the BeanDefinitionMethodReference
             for (Map.Entry<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> entry : byAnnotation.entrySet()) {
@@ -1739,6 +1749,15 @@ public class DefaultBeanContext implements BeanContext {
         if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
             Class<? super T> superclass = bt.getSuperclass();
             return (clazz) -> clazz == superclass || clazz == bt;
+        }
+        if (annotationMetadata.hasAnnotation(DefaultImplementation.class)) {
+            Optional<Class> defaultImpl = annotationMetadata.getValue(DefaultImplementation.class, Class.class);
+            if (!defaultImpl.isPresent()) {
+                defaultImpl = annotationMetadata.getValue(DefaultImplementation.class, "name", Class.class);
+            }
+            if (defaultImpl.filter(impl -> impl == bt).isPresent()) {
+                return (clazz) -> clazz.isAssignableFrom(bt);
+            }
         }
 
         return (clazz) -> clazz == bt;

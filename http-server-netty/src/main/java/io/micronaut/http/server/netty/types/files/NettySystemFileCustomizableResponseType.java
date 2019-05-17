@@ -133,7 +133,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
 
             ChannelFuture sendFileFuture;
             // Write the content.
-            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(headers)) {
+            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(nettyResponse)) {
                 // SSL not enabled - can use zero-copy file transfer.
                 sendFileFuture = context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
                 context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);

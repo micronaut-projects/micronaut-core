@@ -67,6 +67,7 @@ public class JavaVisitorContext implements VisitorContext {
     private final AnnotationProcessingOutputVisitor outputVisitor;
     private final MutableConvertibleValues<Object> visitorAttributes;
     private final GenericUtils genericUtils;
+    private final ProcessingEnvironment proccessingEnv;
     private @Nullable JavaFileManager standardFileManager;
 
     /**
@@ -99,16 +100,7 @@ public class JavaVisitorContext implements VisitorContext {
         this.genericUtils = genericUtils;
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.visitorAttributes = visitorAttributes;
-
-        final Optional<Method> contextMethod = ReflectionUtils.getMethod(processingEnv.getClass(), "getContext");
-        if (contextMethod.isPresent()) {
-            final Object context = ReflectionUtils.invokeMethod(processingEnv, contextMethod.get());
-            if (context != null) {
-
-                final Optional<Method> getMethod = ReflectionUtils.getMethod(context.getClass(), "get", Class.class);
-                getMethod.ifPresent(method -> this.standardFileManager = ReflectionUtils.invokeMethod(context, method, JavaFileManager.class));
-            }
-        }
+        this.proccessingEnv = processingEnv;
     }
 
     @Nonnull
@@ -116,6 +108,8 @@ public class JavaVisitorContext implements VisitorContext {
     public Iterable<URL> getClasspathResources(@Nonnull String path) {
         // reflective hack required because no way to get the JavaFileManager
         // from public processor API
+        info("EXPERIMENTAL: Compile time resource scanning is experimental", null);
+        JavaFileManager standardFileManager = getStandardFileManager(proccessingEnv).orElse(null);
         if (standardFileManager != null) {
             try {
                 final ClassLoader classLoader = standardFileManager
@@ -319,5 +313,26 @@ public class JavaVisitorContext implements VisitorContext {
                 populateClassElements(stereotypes, (PackageElement) enclosedElement, classElements);
             }
         }
+    }
+
+    private Optional<JavaFileManager> getStandardFileManager(ProcessingEnvironment processingEnv) {
+        if (this.standardFileManager == null) {
+
+            final Optional<Method> contextMethod = ReflectionUtils.getMethod(processingEnv.getClass(), "getContext");
+            if (contextMethod.isPresent()) {
+                final Object context = ReflectionUtils.invokeMethod(processingEnv, contextMethod.get());
+                try {
+                    if (context != null) {
+
+                        final Optional<Method> getMethod = ReflectionUtils.getMethod(context.getClass(), "get", Class.class);
+                        this.standardFileManager = (JavaFileManager)
+                                getMethod.map(method -> ReflectionUtils.invokeMethod(context, method, JavaFileManager.class)).orElse(null);
+                    }
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+        }
+        return Optional.ofNullable(this.standardFileManager);
     }
 }

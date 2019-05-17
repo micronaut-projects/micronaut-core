@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -41,6 +42,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpServerFilter;
@@ -188,7 +190,25 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
         NettyHttpRequest request = NettyHttpRequest.remove(ctx);
         if (request != null) {
-            request.release();
+            try {
+                request.release();
+            } finally {
+                if (beanLocator instanceof ApplicationEventPublisher) {
+                    ctx.executor().execute(() -> {
+                        try {
+                            ((ApplicationEventPublisher) beanLocator).publishEvent(
+                                    new HttpRequestTerminatedEvent(
+                                            request
+                                    )
+                            );
+                        } catch (Exception e) {
+                            if (LOG.isErrorEnabled()) {
+                                LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
+                            }
+                        }
+                    });
+                }
+            }
         }
     }
 
