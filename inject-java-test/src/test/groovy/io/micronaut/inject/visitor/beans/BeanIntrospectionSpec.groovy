@@ -24,6 +24,27 @@ import javax.persistence.Version
 import javax.validation.constraints.Size
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1645")
+    void "test recusive generics 2"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Test<T extends B> {
+    private T child;
+    public T getChild() {
+        return child;
+    } 
+}
+class B<T extends Test> {}
+
+''')
+        expect:
+        introspection != null
+    }
+
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1607')
     void "test recursive generics"() {
         given:
