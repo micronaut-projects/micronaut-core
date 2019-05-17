@@ -15,9 +15,6 @@
  */
 package io.micronaut.discovery.vault;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.vault.config.v2.VaultResponseData;
 import io.micronaut.discovery.vault.config.v2.VaultResponseV2;
@@ -25,8 +22,6 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.util.Collections;
@@ -43,21 +38,27 @@ import java.util.Map;
 public class MockingVaultServerV2Controller {
 
     public static final String ENABLED = "enable.mock.vault-config-v2";
-    public final static Logger LOGGER = LoggerFactory.getLogger(MockingVaultServerV2Controller.class);
 
     @Get("/v2/{backend}/data/{vaultKey:.*}")
     public Publisher<VaultResponseV2> readConfigurationValuesV2(@Nonnull String backend,
-                                                              @Nonnull String vaultKey) {
-        return getVaultResponseV2(backend, vaultKey);
-    }
-
-    private Publisher<VaultResponseV2> getVaultResponseV2(@Nonnull String backend,
-                                                        @Nonnull String vaultKey) {
-
+                                                                @Nonnull String vaultKey) {
         Map<String, Object> properties = new HashMap<>();
-        properties.put("vault-backend-key-one", vaultKey);
-        properties.put("vault-backend-name", backend + "-" + vaultKey);
-        properties.put("vault-backend-kv-version", "v2" + "-" +vaultKey);
+
+        if (vaultKey.equals("myapp/test")) {
+            properties.put("v2-secret-1", 1);
+        } else if (vaultKey.equals("application/test")) {
+            properties.put("v2-secret-1", 2);
+            properties.put("v2-secret-2", 1);
+        } else if (vaultKey.equals("myapp")) {
+            properties.put("v2-secret-1", 3);
+            properties.put("v2-secret-2", 2);
+            properties.put("v2-secret-3", 1);
+        } else if (vaultKey.equals("application")) {
+            properties.put("v2-secret-1", 4);
+            properties.put("v2-secret-2", 3);
+            properties.put("v2-secret-3", 2);
+            properties.put("v2-secret-4", 1);
+        }
 
         VaultResponseData vaultResponseData = new VaultResponseData(properties, Collections.emptyMap());
 
@@ -69,15 +70,8 @@ public class MockingVaultServerV2Controller {
                 false,
                 Collections.emptyList());
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-        try {
-            LOGGER.info(objectMapper.writeValueAsString(response));
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
-
         return Flowable.just(response);
     }
+
 
 }
