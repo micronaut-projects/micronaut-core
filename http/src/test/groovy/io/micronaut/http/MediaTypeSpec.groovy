@@ -48,6 +48,24 @@ class MediaTypeSpec extends Specification {
         "text/html;charset=utf-8"   | null  | null       | "text/html"            | 'html'      | [charset: "utf-8"] | 1.0     | 'html'     | "text"
     }
 
+    void "test equals case insensitive"() {
+        given:
+        MediaType mediaType1 = new MediaType("application/json")
+        MediaType mediaType2 = new MediaType("application/JSON")
+
+        expect:
+        mediaType1 == mediaType2
+    }
+
+    void "test equals ignores params"() {
+        given:
+        MediaType mediaType1 = new MediaType("application/json")
+        MediaType mediaType2 = new MediaType("application/json;charset=utf-8")
+
+        expect:
+        mediaType1 == mediaType2
+    }
+
     @Unroll
     void "test #contentType is compressible = #expected"() {
         expect:

@@ -246,10 +246,12 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
             processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
             processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
-
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
                 .channel(eventLoopGroupFactory.serverSocketChannelClass())
                 .childHandler(new ChannelInitializer() {
+                    final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
+                    final LoggingHandler loggingHandler = serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(serverConfiguration.getLogLevel().get()) : null;
+
                     @Override
                     protected void initChannel(Channel ch) {
                         ChannelPipeline pipeline = ch.pipeline();
@@ -258,9 +260,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                             pipeline.addLast(sslContext.newHandler(ch.alloc()));
                         }
 
-                        serverConfiguration.getLogLevel().ifPresent(logLevel ->
-                                pipeline.addLast(new LoggingHandler(logLevel))
-                        );
+                        if (loggingHandler != null) {
+                            pipeline.addLast(loggingHandler);
+                        }
 
                         final Duration idleTime = serverConfiguration.getIdleTimeout();
                         if (!idleTime.isNegative()) {
@@ -284,11 +286,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         pipeline.addLast(HTTP_DECOMPRESSOR, new HttpContentDecompressor());
                         pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                         pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
-                        pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(
-                                NettyHttpServer.this,
-                                environment,
-                                serverConfiguration
-                        ));
+                        pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
                         pipeline.addLast(HttpResponseEncoder.ID, new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration));
                         pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
                                 getWebSocketSessionRepository(),
