@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.hostresolver;
+package io.micronaut.http.server.util;
 
 import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.http.HttpRequest;
@@ -27,16 +27,16 @@ import javax.annotation.Nullable;
  * @author Sergio del Amo
  * @since 1.2.0
  */
-@DefaultImplementation(HttpHeaderHostResolver.class)
-public interface HostResolver {
+@DefaultImplementation(DefaultHttpHostResolver.class)
+public interface HttpHostResolver {
 
     /**
-     * Returns the host name of the current server with the
-     * scheme. Example http://my-url.com.
+     * Returns the host of the current server with
+     * protocol, host name, and an optional port.
      *
-     * @param current The current request
-     * @return The host name of the current server
+     * @param request The current request
+     * @return The host information
      */
     @Nonnull
-    String resolve(@Nullable HttpRequest current);
+    String resolve(@Nullable HttpRequest request);
 }
