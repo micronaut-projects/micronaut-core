@@ -52,15 +52,17 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
 
     private final AnnotatedNode annotatedNode;
     private AnnotationMetadata annotationMetadata;
+    protected final SourceUnit sourceUnit;
 
     /**
      * Default constructor.
      * @param annotatedNode The annotated node
      * @param annotationMetadata The annotation metadata
      */
-    public AbstractGroovyElement(AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
+    public AbstractGroovyElement(SourceUnit sourceUnit, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
         this.annotatedNode = annotatedNode;
         this.annotationMetadata = annotationMetadata;
+        this.sourceUnit = sourceUnit;
     }
 
     @Override
