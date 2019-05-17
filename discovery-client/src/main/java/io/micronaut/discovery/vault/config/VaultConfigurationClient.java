@@ -60,6 +60,7 @@ public class VaultConfigurationClient implements ConfigurationClient {
     /**
      * Default Constructor.
      *
+     * @param configHttpClient          The http client
      * @param vaultClientConfiguration  Vault Client Configuration
      * @param applicationConfiguration  The application configuration
      * @param environment               The environment
@@ -133,6 +134,7 @@ public class VaultConfigurationClient implements ConfigurationClient {
     /**
      * Builds the keys used to get vault properties.
      *
+     * @param applicationName The application name
      * @return list of vault keys
      */
     protected Map<Integer, String> buildVaultKeys(@Nullable String applicationName) {
@@ -156,7 +158,6 @@ public class VaultConfigurationClient implements ConfigurationClient {
         }
         return vaultKeys;
     }
-
 
     @Override
     public String getDescription() {
