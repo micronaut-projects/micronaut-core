@@ -549,7 +549,7 @@ public class MediaType implements CharSequence {
     /**
      * {@inheritDoc}
      * <p>
-     * Beware that the parameters are not taken into account.
+     * Only the name is matched. Parameters are not included.
      */
     @Override
     public boolean equals(Object o) {
