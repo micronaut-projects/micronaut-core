@@ -67,7 +67,6 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     GroovyClassElement(SourceUnit sourceUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, Map<String, Map<String, ClassNode>> genericInfo) {
         super(sourceUnit, classNode, annotationMetadata);
         this.classNode = classNode;
-        this.sourceUnit = sourceUnit;
         this.genericInfo = genericInfo;
     }
 
