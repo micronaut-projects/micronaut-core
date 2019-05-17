@@ -84,7 +84,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     @Override
     public Map<String, ClassElement> getTypeArguments(@Nonnull String type) {
         if (StringUtils.isNotEmpty(type)) {
-            Map<String, Map<String, Object>> data = visitorContext.getGenericUtils().buildTypeArgumentInfo(classElement);
+            Map<String, Map<String, Object>> data = visitorContext.getGenericUtils().buildGenericTypeArgumentInfo(classElement);
             Map<String, Object> forType = data.get(type);
             if (forType != null) {
                 Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
@@ -393,7 +393,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
      */
     Map<String, Map<String, TypeMirror>> getGenericTypeInfo() {
         if (genericTypeInfo == null) {
-            genericTypeInfo = visitorContext.getGenericUtils().buildTypeArgumentElementInfo(classElement);
+            genericTypeInfo = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement);
         }
         return genericTypeInfo;
     }

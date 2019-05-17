@@ -96,6 +96,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement {
      * Constant representing zero arguments. Used by generated code, do not remove.
      */
     @SuppressWarnings("unused")
+    @UsedByGeneratedCode
     Argument[] ZERO_ARGUMENTS = new Argument[0];
 
     /**

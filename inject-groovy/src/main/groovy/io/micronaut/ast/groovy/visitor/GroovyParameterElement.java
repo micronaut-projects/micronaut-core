@@ -24,6 +24,7 @@ import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.control.SourceUnit;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -58,10 +59,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @Override
     public ClassElement getGenericType() {
         ClassElement type = getType();
-        if (type != null) {
-            return methodElement.getGenericElement(parameter.getType(), type);
-        }
-        return type;
+        return methodElement.getGenericElement(parameter.getType(), type);
     }
 
     @Override
@@ -84,7 +82,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
         return parameter;
     }
 
-    @Nullable
+    @Nonnull
     @Override
     public ClassElement getType() {
         ClassNode t = parameter.getType();
