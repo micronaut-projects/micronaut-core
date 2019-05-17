@@ -159,7 +159,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @param visitorContext The visitor context
      * @return The class element
      */
-    protected ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext) {
+    protected @Nonnull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext) {
         return mirrorToClassElement(returnType, visitorContext, Collections.emptyMap());
     }
 
@@ -171,7 +171,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @param genericsInfo The generic informatino
      * @return The class element
      */
-    protected ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {
+    protected @Nonnull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {
         if (genericsInfo == null) {
             genericsInfo = Collections.emptyMap();
         }
@@ -243,7 +243,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             PrimitiveType pt = (PrimitiveType) returnType;
             return JavaPrimitiveElement.valueOf(pt.getKind().name());
         }
-        return null;
+        return new JavaVoidElement();
     }
 
     private Map<String, TypeMirror> resolveBoundGenerics(JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {

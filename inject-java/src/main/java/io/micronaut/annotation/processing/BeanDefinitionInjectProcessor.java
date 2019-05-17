@@ -711,7 +711,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             if (returnType instanceof DeclaredType) {
                 DeclaredType dt = (DeclaredType) returnType;
-                Map<String, Map<String, Object>> beanTypeArguments = genericUtils.buildTypeArgumentInfo(dt);
+                Map<String, Map<String, Object>> beanTypeArguments = genericUtils.buildGenericTypeArgumentInfo(dt);
                 beanMethodWriter.visitTypeArguments(beanTypeArguments);
             }
 
@@ -1687,7 +1687,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private void visitTypeArguments(TypeElement typeElement, BeanDefinitionWriter beanDefinitionWriter) {
-            Map<String, Map<String, Object>> typeArguments = genericUtils.buildTypeArgumentInfo(typeElement);
+            Map<String, Map<String, Object>> typeArguments = genericUtils.buildGenericTypeArgumentInfo(typeElement);
             beanDefinitionWriter.visitTypeArguments(
                     typeArguments
             );

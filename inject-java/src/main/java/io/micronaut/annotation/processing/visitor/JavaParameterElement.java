@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
@@ -52,12 +53,13 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     }
 
     @Override
+    @Nonnull
     public ClassElement getType() {
         TypeMirror parameterType = getNativeType().asType();
         return mirrorToClassElement(parameterType, visitorContext);
     }
 
-    @Nullable
+    @Nonnull
     @Override
     public ClassElement getGenericType() {
         TypeMirror returnType = getNativeType().asType();

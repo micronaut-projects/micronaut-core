@@ -21,6 +21,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
@@ -60,7 +61,7 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
         this.declaringClass = declaringClass;
     }
 
-    @Nullable
+    @Nonnull
     @Override
     public ClassElement getGenericReturnType() {
         Map<String, Map<String, TypeMirror>> info = declaringClass.getGenericTypeInfo();
@@ -73,6 +74,7 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
     }
 
     @Override
+    @Nonnull
     public ClassElement getReturnType() {
         TypeMirror returnType = executableElement.getReturnType();
         return mirrorToClassElement(returnType, visitorContext, Collections.emptyMap());

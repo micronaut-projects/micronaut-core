@@ -254,10 +254,14 @@ class AstGenericUtils {
                 if (v instanceof Class) {
                     te = ClassHelper.makeCached( (Class)v )
                 } else if(v instanceof String) {
-                    def ce = visitorContext.getClassElement(v).orElse(null)
-                    def nativeType = ce?.nativeType
-                    if (nativeType instanceof ClassNode) {
-                        te = (ClassNode) nativeType
+                    String className = v.toString()
+                    te = findGenericClassInNode(classNode, className)
+                    if (te == null) {
+                        def ce = visitorContext.getClassElement(className).orElse(null)
+                        def nativeType = ce?.nativeType
+                        if (nativeType instanceof ClassNode) {
+                            te = (ClassNode) nativeType
+                        }
                     }
                 }
                 if (te != null) {
@@ -267,6 +271,43 @@ class AstGenericUtils {
             elements.put(entry.getKey(), submap)
         }
         return elements
+    }
+
+    static ClassNode findGenericClassInNode(ClassNode classNode, String className) {
+        GenericsType[] genericsTypes = classNode.getGenericsTypes()
+
+        if (ArrayUtils.isNotEmpty(genericsTypes)) {
+            for (gt in genericsTypes) {
+                if (gt.type?.name == className) {
+                    return gt.type
+                }
+            }
+        }
+
+        def interfaces = classNode.getInterfaces()
+        for (i in interfaces) {
+            if (i.name == classNode.name) {
+                continue
+            }
+            def node = findGenericClassInNode(i, className)
+            if (node != null) {
+                return node
+            }
+        }
+
+        if (!classNode.isInterface()) {
+            def superClass = classNode.getSuperClass()
+
+            while (superClass != null && superClass.name != ClassHelper.OBJECT) {
+                def node = findGenericClassInNode(superClass, className)
+                if (node != null) {
+                    return node
+                }
+                superClass = superClass.getSuperClass()
+            }
+        }
+
+        return null
     }
 
     static void populateTypeArguments(ClassNode typeElement, Map<String, Map<String, Object>> typeArguments) {
@@ -379,10 +420,16 @@ class AstGenericUtils {
                         ClassNode[] upperBounds = value.getUpperBounds()
                         if (upperBounds != null) {
                             for (ClassNode upperBound : upperBounds) {
-                                def newMap = new LinkedHashMap()
-                                map.put(name, Collections.singletonMap(cn.name, newMap))
+                                if (upperBound.isGenericsPlaceHolder()) {
+                                    map.put(name, resolveTypeReference(upperBound, boundTypes))
+                                } else {
+                                    def newMap = new LinkedHashMap()
+                                    map.put(name, Collections.singletonMap(upperBound.name, newMap))
+                                    if (cn.isUsingGenerics()) {
+                                        extractPlaceholders(upperBound, newMap, boundTypes)
+                                    }
+                                }
 
-                                extractPlaceholders(upperBound, newMap, boundTypes)
                             }
                         }
                     } else if (!value.isPlaceholder()) {
