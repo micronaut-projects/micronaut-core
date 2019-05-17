@@ -45,7 +45,7 @@ public class MockingVaultServerV2Controller {
     public static final String ENABLED = "enable.mock.vault-config-v2";
     public final static Logger LOGGER = LoggerFactory.getLogger(MockingVaultServerV2Controller.class);
 
-    @Get("/v1/{backend}/data/{vaultKey:.*}")
+    @Get("/v2/{backend}/data/{vaultKey:.*}")
     public Publisher<VaultResponseV2> readConfigurationValuesV2(@Nonnull String backend,
                                                               @Nonnull String vaultKey) {
         return getVaultResponseV2(backend, vaultKey);

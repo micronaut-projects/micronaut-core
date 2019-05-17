@@ -16,6 +16,7 @@
 
 package io.micronaut.discovery.vault.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Introspected;
 
@@ -83,7 +84,15 @@ public abstract class AbstractVaultResponse<T> {
     /**
      * @return The data object
      */
-    public abstract Map<String, Object> getData();
+    @JsonIgnore
+    public abstract Map<String, Object> getSecrets();
+
+    /**
+     * @return The data
+     */
+    public T getData() {
+        return data;
+    }
 
     /**
      * Set the data object.

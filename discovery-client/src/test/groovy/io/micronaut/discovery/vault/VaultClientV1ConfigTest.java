@@ -85,14 +85,14 @@ public class VaultClientV1ConfigTest {
         VaultResponseV1 response = vaultServerHttpClientV1.toBlocking().retrieve(request, VaultResponseV1.class);
 
         assertNotNull(response);
-        assertTrue(response.getData().containsKey("vault-backend-key-one"));
-        assertEquals(response.getData().get("vault-backend-key-one"), "vault-config-sample");
+        assertTrue(response.getSecrets().containsKey("vault-backend-key-one"));
+        assertEquals(response.getSecrets().get("vault-backend-key-one"), "vault-config-sample");
 
-        assertTrue(response.getData().containsKey("vault-backend-name"));
-        assertEquals(response.getData().get("vault-backend-name"), "backendv1-vault-config-sample");
+        assertTrue(response.getSecrets().containsKey("vault-backend-name"));
+        assertEquals(response.getSecrets().get("vault-backend-name"), "backendv1-vault-config-sample");
 
-        assertTrue(response.getData().containsKey("vault-backend-kv-version"));
-        assertEquals(response.getData().get("vault-backend-kv-version"), "v1-vault-config-sample");
+        assertTrue(response.getSecrets().containsKey("vault-backend-kv-version"));
+        assertEquals(response.getSecrets().get("vault-backend-kv-version"), "v1-vault-config-sample");
     }
 
     @Test
@@ -101,14 +101,14 @@ public class VaultClientV1ConfigTest {
         VaultResponseV1 response = vaultServerHttpClientV1.toBlocking().retrieve(request, VaultResponseV1.class);
 
         assertNotNull(response);
-        assertTrue(response.getData().containsKey("vault-backend-key-one"));
-        assertEquals(response.getData().get("vault-backend-key-one"), "vault-config-sample/prod");
+        assertTrue(response.getSecrets().containsKey("vault-backend-key-one"));
+        assertEquals(response.getSecrets().get("vault-backend-key-one"), "vault-config-sample/prod");
 
-        assertTrue(response.getData().containsKey("vault-backend-name"));
-        assertEquals(response.getData().get("vault-backend-name"), "backendv1-vault-config-sample/prod");
+        assertTrue(response.getSecrets().containsKey("vault-backend-name"));
+        assertEquals(response.getSecrets().get("vault-backend-name"), "backendv1-vault-config-sample/prod");
 
-        assertTrue(response.getData().containsKey("vault-backend-kv-version"));
-        assertEquals(response.getData().get("vault-backend-kv-version"), "v1-vault-config-sample/prod");
+        assertTrue(response.getSecrets().containsKey("vault-backend-kv-version"));
+        assertEquals(response.getSecrets().get("vault-backend-kv-version"), "v1-vault-config-sample/prod");
     }
 
     @Test

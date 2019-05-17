@@ -63,7 +63,7 @@ public class VaultResponseV2 extends AbstractVaultResponse<VaultResponseData> {
     }
 
     @Override
-    public Map<String, Object> getData() {
+    public Map<String, Object> getSecrets() {
         return this.data.getData();
     }
 }

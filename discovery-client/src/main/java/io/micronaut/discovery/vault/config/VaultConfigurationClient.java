@@ -104,7 +104,7 @@ public class VaultConfigurationClient implements ConfigurationClient {
             propertySources.add(
                     Flowable.fromPublisher(
                             configHttpClient.readConfigurationValues(token, engine, entry.getValue()))
-                            .map(data -> PropertySource.of(entry.getValue(), data.getData(), entry.getKey()))
+                            .map(data -> PropertySource.of(entry.getValue(), data.getSecrets(), entry.getKey()))
                             .onErrorResumeNext(throwable -> {
                                 //TODO: Discover why the below hack is necessary
                                 Throwable t = (Throwable) throwable;

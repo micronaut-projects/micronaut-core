@@ -81,36 +81,36 @@ public class VaultClientV2ConfigTest {
 
     @Test
     public void testReadValuesFromVaultServerWithoutProfile() throws Exception {
-        HttpRequest request = HttpRequest.GET("/v1/backendv2/data/vault-config-sample");
+        HttpRequest request = HttpRequest.GET("/v2/backendv2/data/vault-config-sample");
         VaultResponseV2 response = vaultServerHttpClientV2.toBlocking().retrieve(request, VaultResponseV2.class);
 
         assertNotNull(response);
-        assertTrue(response.getData().containsKey("vault-backend-key-one"));
-        assertEquals(response.getData().get("vault-backend-key-one"), "vault-config-sample");
+        assertTrue(response.getSecrets().containsKey("vault-backend-key-one"));
+        assertEquals(response.getSecrets().get("vault-backend-key-one"), "vault-config-sample");
 
-        assertTrue(response.getData().containsKey("vault-backend-name"));
-        assertEquals(response.getData().get("vault-backend-name"), "backendv2-vault-config-sample");
+        assertTrue(response.getSecrets().containsKey("vault-backend-name"));
+        assertEquals(response.getSecrets().get("vault-backend-name"), "backendv2-vault-config-sample");
 
-        assertTrue(response.getData().containsKey("vault-backend-kv-version"));
-        assertEquals(response.getData().get("vault-backend-kv-version"), "v2-vault-config-sample");
+        assertTrue(response.getSecrets().containsKey("vault-backend-kv-version"));
+        assertEquals(response.getSecrets().get("vault-backend-kv-version"), "v2-vault-config-sample");
     }
 
     @Test
     public void testReadValuesFromVaultServerV2() throws Exception {
-        HttpRequest request = HttpRequest.GET("/v1/backendv2/data/vault-config-sample/prod");
+        HttpRequest request = HttpRequest.GET("/v2/backendv2/data/vault-config-sample/prod");
         VaultResponseV2 response = vaultServerHttpClientV2.toBlocking().retrieve(request, VaultResponseV2.class);
 
         assertNotNull(response);
-        assertNotNull(response.getData());
+        assertNotNull(response.getSecrets());
 
-        assertTrue(response.getData().containsKey("vault-backend-key-one"));
-        assertEquals(response.getData().get("vault-backend-key-one"), "vault-config-sample/prod");
+        assertTrue(response.getSecrets().containsKey("vault-backend-key-one"));
+        assertEquals(response.getSecrets().get("vault-backend-key-one"), "vault-config-sample/prod");
 
-        assertTrue(response.getData().containsKey("vault-backend-name"));
-        assertEquals(response.getData().get("vault-backend-name"), "backendv2-vault-config-sample/prod");
+        assertTrue(response.getSecrets().containsKey("vault-backend-name"));
+        assertEquals(response.getSecrets().get("vault-backend-name"), "backendv2-vault-config-sample/prod");
 
-        assertTrue(response.getData().containsKey("vault-backend-kv-version"));
-        assertEquals(response.getData().get("vault-backend-kv-version"), "v2-vault-config-sample/prod");
+        assertTrue(response.getSecrets().containsKey("vault-backend-kv-version"));
+        assertEquals(response.getSecrets().get("vault-backend-kv-version"), "v2-vault-config-sample/prod");
     }
 
     @Test

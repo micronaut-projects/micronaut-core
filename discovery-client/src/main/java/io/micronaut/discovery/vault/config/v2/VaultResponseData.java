@@ -35,8 +35,8 @@ import java.util.Map;
 @Introspected
 public class VaultResponseData {
 
-    private Map<String, Object> data;
-    private Map<String, Object> metadata;
+    private final Map<String, Object> data;
+    private final Map<String, Object> metadata;
 
     /**
      * Constructor for VaultResponseData.
@@ -61,27 +61,10 @@ public class VaultResponseData {
     }
 
     /**
-     * Set the data map.
-     *
-     * @param data the data map
-     */
-    public void setData(final Map<String, Object> data) {
-        this.data = data;
-    }
-
-    /**
      * @return The metadata map
      */
     public Map<String, Object> getMetadata() {
         return metadata;
     }
 
-    /**
-     * Set the metadata map.
-     *
-     * @param metadata the metadata map
-     */
-    public void setMetadata(final Map<String, Object> metadata) {
-        this.metadata = metadata;
-    }
 }
