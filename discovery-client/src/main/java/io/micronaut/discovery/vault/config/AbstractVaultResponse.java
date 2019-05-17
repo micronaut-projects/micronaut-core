@@ -26,7 +26,7 @@ import java.util.Map;
 /**
  *  Vault Response Envelope.
  *
- *  @param <T> type of the generic
+ *  @param <T> type of the data
  *
  *  @author thiagolocatelli
  *  @since 1.2.0
