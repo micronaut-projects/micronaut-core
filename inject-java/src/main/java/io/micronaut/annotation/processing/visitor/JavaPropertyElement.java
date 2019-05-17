@@ -21,7 +21,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.lang.model.element.ExecutableElement;
 
 /**
