@@ -56,6 +56,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
 
     /**
      * Default constructor.
+     * @param sourceUnit The source unit
      * @param annotatedNode The annotated node
      * @param annotationMetadata The annotation metadata
      */
