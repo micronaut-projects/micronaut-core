@@ -13,30 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.util;
 
-import io.micronaut.core.util.Toggleable;
+package io.micronaut.http.server.util;
+
+import io.micronaut.context.annotation.DefaultImplementation;
+import io.micronaut.http.HttpRequest;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
- * {@link RequestIpAddressesResolver} implementation which resolves IP Address from an HTTP Header.
- * @author Sergio del Amo
+ * Resolves the client IP address from the request.
+ *
+ * @author James Kleeh
  * @since 1.2.0
  */
-public interface HttpHeaderRequestIpAddressesResolverConfiguration extends Toggleable {
+@DefaultImplementation(DefaultHttpClientAddressResolver.class)
+public interface HttpClientAddressResolver {
 
     /**
-     *
-     * @return HTTP Header name.
+     * @param request The current request
+     * @return The client address
      */
-    @Nonnull
-    String getHeaderName();
+    @Nullable
+    String resolve(@Nonnull HttpRequest request);
 
-    /**
-     *
-     * @return The delimiter used eg. {@value ,} to separate IPs in the Http Header value.
-     */
-    @Nonnull
-    String getDelimiter();
 }
