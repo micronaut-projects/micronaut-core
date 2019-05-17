@@ -22,7 +22,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /**
  * Models a route parameter.
