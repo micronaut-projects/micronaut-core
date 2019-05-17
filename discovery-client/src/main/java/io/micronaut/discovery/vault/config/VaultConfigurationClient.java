@@ -149,10 +149,13 @@ public class VaultConfigurationClient implements ConfigurationClient {
             vaultKeys.put(baseOrder + appIncrement, applicationName);
         }
 
-        for (String listActiveName : environment.getActiveNames()) {
-            vaultKeys.put(envOrder, DEFAULT_APPLICATION + "/" + listActiveName);
+        List<String> reverseOrderActiveNames = new ArrayList<>(environment.getActiveNames());
+        Collections.reverse(reverseOrderActiveNames);
+        for (String activeName : reverseOrderActiveNames) {
+            vaultKeys.put(envOrder + appIncrement, DEFAULT_APPLICATION + "/" + activeName);
+            appIncrement += 10;
             if (applicationName != null) {
-                vaultKeys.put(envOrder + appIncrement, applicationName + "/" + listActiveName);
+                vaultKeys.put(envOrder + appIncrement, applicationName + "/" + activeName);
                 appIncrement += 10;
             }
         }
