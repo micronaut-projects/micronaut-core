@@ -1,7 +1,8 @@
-package io.micronaut.http.server.util
+package io.micronaut.http.server.netty.util
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.server.util.HttpHostResolver
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 

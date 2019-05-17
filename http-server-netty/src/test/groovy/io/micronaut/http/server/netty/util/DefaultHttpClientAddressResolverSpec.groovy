@@ -1,7 +1,8 @@
-package io.micronaut.http.server.util
+package io.micronaut.http.server.netty.util
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.server.util.HttpClientAddressResolver
 import spock.lang.Specification
 
 class DefaultHttpClientAddressResolverSpec extends Specification {
