@@ -1,8 +1,7 @@
-package io.micronaut.docs.replaces
+package io.micronaut.docs.requires
 
 import groovy.sql.Sql
 import io.micronaut.context.annotation.Requires
-import io.micronaut.docs.requires.Book
 
 import javax.inject.Singleton
 import javax.sql.DataSource
@@ -11,6 +10,7 @@ import java.sql.SQLException
 // tag::replaces[]
 @Singleton
 @Requires(beans = DataSource.class)
+@Requires(property = "datasource.url")
 class JdbcBookService implements BookService {
 
     DataSource dataSource
