@@ -30,6 +30,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
@@ -48,6 +49,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
+@Sharable
 public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResponse<?>> {
     public static final String ID = "micronaut-http-encoder";
     private static final Logger LOG = LoggerFactory.getLogger(HttpResponseEncoder.class);

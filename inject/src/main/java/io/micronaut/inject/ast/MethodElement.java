@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
-import javax.annotation.Nullable;
+import javax.annotation.Nonnull;
 
 /**
  * Stores data about an element that references a method.
@@ -28,7 +28,8 @@ public interface MethodElement extends MemberElement {
     /**
      * @return The return type of the method
      */
-    @Nullable ClassElement getReturnType();
+    @Nonnull
+    ClassElement getReturnType();
 
     /**
      * @return The method parameters
@@ -41,7 +42,7 @@ public interface MethodElement extends MemberElement {
      * @return The return type of the method
      * @since 1.1.1
      */
-    default @Nullable ClassElement getGenericReturnType() {
+    default @Nonnull ClassElement getGenericReturnType() {
         return getReturnType();
     }
 }

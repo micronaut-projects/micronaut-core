@@ -68,9 +68,9 @@ public class GenericUtils {
      * @param dt The declared type
      * @return The type argument information
      */
-    Map<String, Map<String, Object>> buildTypeArgumentInfo(DeclaredType dt) {
+    Map<String, Map<String, Object>> buildGenericTypeArgumentInfo(DeclaredType dt) {
         Element element = dt.asElement();
-        return buildTypeArgumentInfo(element, dt);
+        return buildGenericTypeArgumentInfo(element, dt);
     }
 
     /**
@@ -79,8 +79,8 @@ public class GenericUtils {
      * @param element The element
      * @return The type argument information
      */
-    public Map<String, Map<String, Object>> buildTypeArgumentInfo(@Nonnull Element element) {
-        return buildTypeArgumentInfo(element, null);
+    public Map<String, Map<String, Object>> buildGenericTypeArgumentInfo(@Nonnull Element element) {
+        return buildGenericTypeArgumentInfo(element, null);
     }
 
     /**
@@ -89,8 +89,8 @@ public class GenericUtils {
      * @param element The element
      * @return The type argument information
      */
-    public Map<String, Map<String, TypeMirror>> buildTypeArgumentElementInfo(@Nonnull Element element) {
-        Map<String, Map<String, Object>> data = buildTypeArgumentInfo(element, null);
+    public Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentElementInfo(@Nonnull Element element) {
+        Map<String, Map<String, Object>> data = buildGenericTypeArgumentInfo(element, null);
         Map<String, Map<String, TypeMirror>> elements = new HashMap<>(data.size());
         for (Map.Entry<String, Map<String, Object>> entry : data.entrySet()) {
             Map<String, Object> value = entry.getValue();
@@ -113,7 +113,7 @@ public class GenericUtils {
      * @param dt The declared type
      * @return The type argument information
      */
-    private Map<String, Map<String, Object>> buildTypeArgumentInfo(@Nonnull Element element, @Nullable DeclaredType dt) {
+    private Map<String, Map<String, Object>> buildGenericTypeArgumentInfo(@Nonnull Element element, @Nullable DeclaredType dt) {
 
         Map<String, Map<String, Object>> beanTypeArguments = new HashMap<>();
         if (dt != null) {
