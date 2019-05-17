@@ -13,26 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.util;
 
+package io.micronaut.http.server.util;
+
+import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.http.HttpRequest;
 
 import javax.annotation.Nonnull;
-import java.util.List;
+import javax.annotation.Nullable;
 
 /**
- * Resolves the orginating IP Addresses for a given Request.
- * @author Sergio del Amo
+ * Resolves the client IP address from the request.
+ *
+ * @author James Kleeh
  * @since 1.2.0
  */
-public interface RequestIpAddressesResolver {
-    String PREFIX = "micronaut.http.originating-ips";
+@DefaultImplementation(DefaultHttpClientAddressResolver.class)
+public interface HttpClientAddressResolver {
 
     /**
-     *
-     * @param request The Http Request
-     * @return List of IP Addresses
+     * @param request The current request
+     * @return The client address
      */
-    @Nonnull
-    List<String> requestIpAddresses(@Nonnull HttpRequest<?> request);
+    @Nullable
+    String resolve(@Nonnull HttpRequest request);
+
 }
