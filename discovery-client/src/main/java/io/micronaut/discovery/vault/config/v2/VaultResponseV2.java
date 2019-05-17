@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package io.micronaut.discovery.vault.config.client.v2.response;
+package io.micronaut.discovery.vault.config.v2;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.discovery.vault.config.client.AbstractVaultResponse;
+import io.micronaut.discovery.vault.config.AbstractVaultResponse;
 
 import javax.annotation.concurrent.Immutable;
 import java.util.List;
@@ -60,5 +60,10 @@ public class VaultResponseV2 extends AbstractVaultResponse<VaultResponseData> {
 
         super(data, leaseDuration, leaseId, requestId, wrapInfo, renewable,
                 warnings);
+    }
+
+    @Override
+    public Map<String, Object> getData() {
+        return this.data.getData();
     }
 }

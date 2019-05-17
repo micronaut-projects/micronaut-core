@@ -2,7 +2,7 @@ package io.micronaut.discovery.vault;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
-import io.micronaut.discovery.vault.config.client.v1.response.VaultResponseV1;
+import io.micronaut.discovery.vault.config.v1.VaultResponseV1;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.LoadBalancer;

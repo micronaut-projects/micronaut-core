@@ -2,7 +2,7 @@ package io.micronaut.discovery.vault;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
-import io.micronaut.discovery.vault.config.client.v2.response.VaultResponseV2;
+import io.micronaut.discovery.vault.config.v2.VaultResponseV2;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.LoadBalancer;
@@ -85,14 +85,14 @@ public class VaultClientV2ConfigTest {
         VaultResponseV2 response = vaultServerHttpClientV2.toBlocking().retrieve(request, VaultResponseV2.class);
 
         assertNotNull(response);
-        assertTrue(response.getData().getData().containsKey("vault-backend-key-one"));
-        assertEquals(response.getData().getData().get("vault-backend-key-one"), "vault-config-sample");
+        assertTrue(response.getData().containsKey("vault-backend-key-one"));
+        assertEquals(response.getData().get("vault-backend-key-one"), "vault-config-sample");
 
-        assertTrue(response.getData().getData().containsKey("vault-backend-name"));
-        assertEquals(response.getData().getData().get("vault-backend-name"), "backendv2-vault-config-sample");
+        assertTrue(response.getData().containsKey("vault-backend-name"));
+        assertEquals(response.getData().get("vault-backend-name"), "backendv2-vault-config-sample");
 
-        assertTrue(response.getData().getData().containsKey("vault-backend-kv-version"));
-        assertEquals(response.getData().getData().get("vault-backend-kv-version"), "v2-vault-config-sample");
+        assertTrue(response.getData().containsKey("vault-backend-kv-version"));
+        assertEquals(response.getData().get("vault-backend-kv-version"), "v2-vault-config-sample");
     }
 
     @Test
@@ -103,14 +103,14 @@ public class VaultClientV2ConfigTest {
         assertNotNull(response);
         assertNotNull(response.getData());
 
-        assertTrue(response.getData().getData().containsKey("vault-backend-key-one"));
-        assertEquals(response.getData().getData().get("vault-backend-key-one"), "vault-config-sample/prod");
+        assertTrue(response.getData().containsKey("vault-backend-key-one"));
+        assertEquals(response.getData().get("vault-backend-key-one"), "vault-config-sample/prod");
 
-        assertTrue(response.getData().getData().containsKey("vault-backend-name"));
-        assertEquals(response.getData().getData().get("vault-backend-name"), "backendv2-vault-config-sample/prod");
+        assertTrue(response.getData().containsKey("vault-backend-name"));
+        assertEquals(response.getData().get("vault-backend-name"), "backendv2-vault-config-sample/prod");
 
-        assertTrue(response.getData().getData().containsKey("vault-backend-kv-version"));
-        assertEquals(response.getData().getData().get("vault-backend-kv-version"), "v2-vault-config-sample/prod");
+        assertTrue(response.getData().containsKey("vault-backend-kv-version"));
+        assertEquals(response.getData().get("vault-backend-kv-version"), "v2-vault-config-sample/prod");
     }
 
     @Test

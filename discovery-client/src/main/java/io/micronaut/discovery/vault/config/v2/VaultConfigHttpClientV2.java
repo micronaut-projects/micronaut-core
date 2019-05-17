@@ -14,25 +14,35 @@
  * limitations under the License.
  */
 
-package io.micronaut.discovery.vault.config.client.v2;
+package io.micronaut.discovery.vault.config.v2;
 
-import io.micronaut.discovery.vault.VaultClientConfiguration;
-import io.micronaut.discovery.vault.config.client.v2.response.VaultResponseV2;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.discovery.vault.config.VaultClientConfiguration;
+import io.micronaut.discovery.vault.config.VaultClientConfiguration.VaultClientDiscoveryConfiguration;
+import io.micronaut.discovery.vault.config.VaultConfigHttpClient;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nonnull;
 
 /**
- * Vault Client KV Version 1 - Operations.
+ *  A non-blocking HTTP client for Vault - KV v2.
  *
  *  @author thiagolocatelli
  *  @since 1.2.0
  */
-public interface VaultConfigHttpClientV2Operations {
+@Client(value = VaultClientConfiguration.VAULT_CLIENT_CONFIG_ENDPOINT, configuration = VaultClientConfiguration.class)
+@BootstrapContextCompatible
+public interface VaultConfigHttpClientV2 extends VaultConfigHttpClient<VaultResponseV2> {
+
+    /**
+     * Vault Http Client description.
+     */
+    String CLIENT_DESCRIPTION = "vault-config-client-v2";
 
     /**
      * Reads an application configuration from Spring Config Server.
@@ -45,12 +55,18 @@ public interface VaultConfigHttpClientV2Operations {
     @Get("/v1/{backend}/data/{vaultKey}")
     @Produces(single = true)
     @Retryable(
-            attempts = "${" + VaultClientConfiguration.VaultClientConnectionPoolConfiguration.PREFIX + ".retry-count:3}",
-            delay = "${" + VaultClientConfiguration.VaultClientConnectionPoolConfiguration.PREFIX + ".retry-delay:1s}"
+            attempts = "${" + VaultClientDiscoveryConfiguration.PREFIX + ".retry-count:3}",
+            delay = "${" + VaultClientDiscoveryConfiguration.PREFIX + ".retry-delay:1s}"
     )
-    @Nonnull
+    @Override
     Publisher<VaultResponseV2> readConfigurationValues(
             @Nonnull @Header("X-Vault-Token") String token,
             @Nonnull String backend,
             @Nonnull String vaultKey);
+
+    @Override
+    default String getDescription() {
+        return CLIENT_DESCRIPTION;
+    }
+
 }

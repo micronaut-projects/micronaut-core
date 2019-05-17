@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package io.micronaut.discovery.vault;
+package io.micronaut.discovery.vault.config;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
-import io.micronaut.discovery.vault.condition.RequiresVaultClientConfig;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
@@ -31,15 +30,17 @@ import javax.inject.Inject;
  *  @author thiagolocatelli
  *  @since 1.2.0
  */
-@RequiresVaultClientConfig
-@ConfigurationProperties(VaultClientConstants.PREFIX)
+@ConfigurationProperties(VaultClientConfiguration.PREFIX)
 @BootstrapContextCompatible
 public class VaultClientConfiguration extends HttpClientConfiguration {
+
+    public static final String PREFIX = "vault.client";
+
 
     /**
      * Vault Server Endpoint.
      */
-    public static final String VAULT_CLIENT_CONFIG_ENDPOINT = "${" + VaultClientConstants.PREFIX + ".uri}";
+    public static final String VAULT_CLIENT_CONFIG_ENDPOINT = "${" + VaultClientConfiguration.PREFIX + ".uri}";
 
     /**
      * Vault Secret Engine versions.
@@ -169,6 +170,9 @@ public class VaultClientConfiguration extends HttpClientConfiguration {
      */
     @ConfigurationProperties(ConfigDiscoveryConfiguration.PREFIX)
     @BootstrapContextCompatible
-    public static class VaultClientDiscoveryConfiguration extends ConfigDiscoveryConfiguration { }
+    public static class VaultClientDiscoveryConfiguration extends ConfigDiscoveryConfiguration {
+
+        public static final String PREFIX = VaultClientConfiguration.PREFIX + "." + ConfigDiscoveryConfiguration.PREFIX;
+    }
 
 }

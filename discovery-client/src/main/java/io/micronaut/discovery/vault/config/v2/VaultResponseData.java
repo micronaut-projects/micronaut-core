@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.discovery.vault.config.client.v2.response;
+package io.micronaut.discovery.vault.config.v2;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;

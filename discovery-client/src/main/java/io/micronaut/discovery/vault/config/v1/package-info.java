@@ -20,4 +20,10 @@
  *  @author thiagolocatelli
  *  @since 1.2.0
  */
-package io.micronaut.discovery.vault.config.client.v2;
+@Configuration
+@Requires(property = VaultClientConfiguration.PREFIX + ".kv-version", value = "V1")
+package io.micronaut.discovery.vault.config.v1;
+
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.discovery.vault.config.VaultClientConfiguration;

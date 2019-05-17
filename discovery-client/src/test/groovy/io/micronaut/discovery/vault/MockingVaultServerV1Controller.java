@@ -19,7 +19,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.discovery.vault.config.client.v1.response.VaultResponseV1;
+import io.micronaut.discovery.vault.config.v1.VaultResponseV1;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.reactivex.Flowable;
