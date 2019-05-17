@@ -21,6 +21,7 @@ import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -48,7 +49,7 @@ class RouteParameterElement implements ParameterElement, AnnotationMetadataDeleg
         return delegate;
     }
 
-    @Nullable
+    @Nonnull
     @Override
     public ClassElement getType() {
         return delegate.getType();
