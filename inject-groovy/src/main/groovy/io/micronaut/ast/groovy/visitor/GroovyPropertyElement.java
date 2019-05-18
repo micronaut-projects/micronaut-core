@@ -22,7 +22,7 @@ import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.control.SourceUnit;
 
-import javax.annotation.Nullable;
+import javax.annotation.Nonnull;
 
 /**
  * Implementation of {@link PropertyElement} for Groovy.
@@ -67,7 +67,7 @@ class GroovyPropertyElement extends AbstractGroovyElement implements PropertyEle
         this.declaringElement = declaringElement;
     }
 
-    @Nullable
+    @Nonnull
     @Override
     public ClassElement getType() {
         return type;
