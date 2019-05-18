@@ -50,9 +50,9 @@ import java.util.function.Consumer;
 
 public abstract class AbstractGroovyElement implements AnnotationMetadataDelegate, Element {
 
+    protected final SourceUnit sourceUnit;
     private final AnnotatedNode annotatedNode;
     private AnnotationMetadata annotationMetadata;
-    protected final SourceUnit sourceUnit;
 
     /**
      * Default constructor.
