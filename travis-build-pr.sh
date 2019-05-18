@@ -2,6 +2,7 @@
 set -e
 EXIT_STATUS=0
 
+./generateKeystore.sh
 ./gradlew --stop
 ./gradlew testClasses
 ./gradlew check -x test-suite:test --no-daemon || EXIT_STATUS=$?

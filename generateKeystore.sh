@@ -1,0 +1,19 @@
+#!/bin/bash
+
+echo "Command openssl genrsa:"
+openssl genrsa -des3 -out keystore.key -passout pass:foobar
+
+echo "Command openssl req:"
+openssl req -new -x509 -key keystore.key -out keystore.crt -passin pass:foobar -subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department/CN=example.local"
+
+echo "Command openssl pkcs12:"
+openssl pkcs12 -inkey keystore.key -in keystore.crt -export -out keystore.p12 -password pass:foobar -passin pass:foobar
+
+echo "Command keytool -importkeystore:"
+keytool -importkeystore -srckeystore keystore.p12 -srcstoretype PKCS12 -srcstorepass foobar -destkeystore keystore -storepass foobar -noprompt
+
+cp keystore.p12 ./http-client/src/test/resources/keystore.p12
+
+echo "127.0.0.1        example.local" | sudo tee -a /etc/hosts
+
+
