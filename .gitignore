@@ -20,3 +20,5 @@ bin/
 *.iws
 .kotlintest
 */.kotlintest/
+keystore.p12
+
