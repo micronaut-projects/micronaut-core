@@ -8,6 +8,26 @@ If you are interested in contributing to Micronaut and are looking for issues to
 
 Micronaut can be imported into IntelliJ IDEA by opening the `build.gradle` file.
 
+## SSL Setup for localhost development
+
+In a temp directory such as $HOME/temp:
+
+When asked for a keystore password, use:  foobar
+When asked for a Common Name or FQDN, use: example.local
+
+openssl genrsa -des3 -out keystore.key
+openssl req -new -x509 -key keystore.key -out keystore.crt
+openssl pkcs12 -inkey keystore.key -in keystore.crt -export -out keystore.p12
+keytool -importkeystore -srckeystore keystore.p12 -srcstoretype PKCS12 -destkeystore keystore
+
+Back to your micronaut-core directory:
+
+Copy $HOME/temp/keystore.p12 to ./http-client/src/test/resources/keystore.p12
+
+Edit /etc/hosts and add the line:
+
+127.0.0.1       example.local
+
 ## Running Tests
 
 To run the tests use `./gradlew check`. 

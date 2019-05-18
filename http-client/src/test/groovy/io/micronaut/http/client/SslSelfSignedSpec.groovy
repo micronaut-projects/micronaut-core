@@ -31,13 +31,17 @@ import spock.lang.Specification
 class SslSelfSignedSpec extends Specification {
 
     @Shared
+    int port = SocketUtils.findAvailableTcpPort()
+
+    @Shared
     String host = Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST)
 
     @Shared
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run([
             'micronaut.ssl.enabled': true,
-            'micronaut.ssl.buildSelfSigned': true
+            'micronaut.ssl.buildSelfSigned': true,
+            'micronaut.ssl.port': port
     ])
 
     @Shared
@@ -49,7 +53,7 @@ class SslSelfSignedSpec extends Specification {
 
     void "expect the url to be https"() {
         expect:
-        embeddedServer.getURL().toString() == "https://${host}:8443"
+        embeddedServer.getURL().toString() == "https://${host}:" + port.toString()
     }
 
     void "test send https request"() {
@@ -72,4 +76,5 @@ class SslSelfSignedSpec extends Specification {
         }
 
     }
+
 }
