@@ -351,20 +351,6 @@ public class GenericUtils {
                 } else {
                     return modelUtils.resolveTypeReference(mirror);
                 }
-            case BOOLEAN:
-            case BYTE:
-            case CHAR:
-            case DOUBLE:
-            case FLOAT:
-            case INT:
-            case LONG:
-            case SHORT:
-                Optional<Class> type = ClassUtils.getPrimitiveType(mirror.toString());
-                if (type.isPresent()) {
-                    return type.get();
-                } else {
-                    throw new IllegalStateException("Unknown primitive type: " + mirror.toString());
-                }
             default:
                 return modelUtils.resolveTypeReference(mirror);
         }
