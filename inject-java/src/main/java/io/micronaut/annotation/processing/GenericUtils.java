@@ -359,7 +359,7 @@ public class GenericUtils {
             case INT:
             case LONG:
             case SHORT:
-                Optional<Class> type = ClassUtils.getPrimitiveType(mirror.toString());
+                Optional<Class> type = io.micronaut.core.reflect.ClassUtils.getPrimitiveType(mirror.toString());
                 if (type.isPresent()) {
                     return type.get();
                 } else {
