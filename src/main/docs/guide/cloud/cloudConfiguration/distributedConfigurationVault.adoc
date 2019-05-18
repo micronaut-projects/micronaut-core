@@ -1,4 +1,4 @@
-Since 1.1, Micronaut features a native https://www.vaultproject.io/[HashiCorp Vault] for those who have not switched to a dedicated more complete solution like Consul.
+Since 1.2, Micronaut features a native https://www.vaultproject.io/[HashiCorp Vault] for those who have not switched to a dedicated more complete solution like Consul.
 
 To enable support for Vault Configuration simply add the following configuration to your `bootstrap.yml` file:
 
