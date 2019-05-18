@@ -44,20 +44,35 @@ public class MockingVaultServerV2Controller {
                                                                 @Nonnull String vaultKey) {
         Map<String, Object> properties = new HashMap<>();
 
-        if (vaultKey.equals("myapp/test")) {
+        if (vaultKey.equals("myapp/second")) {
             properties.put("v2-secret-1", 1);
-        } else if (vaultKey.equals("application/test")) {
+        } else if (vaultKey.equals("application/second")) {
             properties.put("v2-secret-1", 2);
             properties.put("v2-secret-2", 1);
-        } else if (vaultKey.equals("myapp")) {
+        } else if (vaultKey.equals("myapp/first")) {
             properties.put("v2-secret-1", 3);
             properties.put("v2-secret-2", 2);
             properties.put("v2-secret-3", 1);
-        } else if (vaultKey.equals("application")) {
+        } else if (vaultKey.equals("application/first")) {
             properties.put("v2-secret-1", 4);
             properties.put("v2-secret-2", 3);
             properties.put("v2-secret-3", 2);
             properties.put("v2-secret-4", 1);
+        } else if (vaultKey.equals("myapp")) {
+            properties.put("v2-secret-1", 5);
+            properties.put("v2-secret-2", 4);
+            properties.put("v2-secret-3", 3);
+            properties.put("v2-secret-4", 2);
+            properties.put("v2-secret-5", 1);
+        } else if (vaultKey.equals("application")) {
+            properties.put("v2-secret-1", 6);
+            properties.put("v2-secret-2", 5);
+            properties.put("v2-secret-3", 4);
+            properties.put("v2-secret-4", 3);
+            properties.put("v2-secret-5", 2);
+            properties.put("v2-secret-6", 1);
+        } else {
+            return Flowable.empty();
         }
 
         VaultResponseData vaultResponseData = new VaultResponseData(properties, Collections.emptyMap());

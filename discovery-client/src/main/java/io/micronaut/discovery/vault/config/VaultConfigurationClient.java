@@ -54,7 +54,6 @@ public class VaultConfigurationClient implements ConfigurationClient {
     private final VaultConfigHttpClient<?> configHttpClient;
     private final VaultClientConfiguration vaultClientConfiguration;
     private final ApplicationConfiguration applicationConfiguration;
-    private final Environment environment;
     private final ExecutorService executorService;
 
     /**
@@ -69,12 +68,10 @@ public class VaultConfigurationClient implements ConfigurationClient {
     public VaultConfigurationClient(VaultConfigHttpClient<?> configHttpClient,
                                     VaultClientConfiguration vaultClientConfiguration,
                                     ApplicationConfiguration applicationConfiguration,
-                                    Environment environment,
                                     @Named(TaskExecutors.IO) @Nullable ExecutorService executorService) {
         this.configHttpClient = configHttpClient;
         this.vaultClientConfiguration = vaultClientConfiguration;
         this.applicationConfiguration = applicationConfiguration;
-        this.environment = environment;
         this.executorService = executorService;
     }
 
@@ -100,10 +97,11 @@ public class VaultConfigurationClient implements ConfigurationClient {
         String token = vaultClientConfiguration.getToken();
         String engine = vaultClientConfiguration.getSecretEngineName();
 
-        buildVaultKeys(applicationName).entrySet().forEach(entry -> {
+        buildVaultKeys(applicationName, activeNames).entrySet().forEach(entry -> {
             propertySources.add(
                     Flowable.fromPublisher(
                             configHttpClient.readConfigurationValues(token, engine, entry.getValue()))
+                            .filter(data -> !data.getSecrets().isEmpty())
                             .map(data -> PropertySource.of(entry.getValue(), data.getSecrets(), entry.getKey()))
                             .onErrorResumeNext(throwable -> {
                                 //TODO: Discover why the below hack is necessary
@@ -137,26 +135,21 @@ public class VaultConfigurationClient implements ConfigurationClient {
      * @param applicationName The application name
      * @return list of vault keys
      */
-    protected Map<Integer, String> buildVaultKeys(@Nullable String applicationName) {
+    protected Map<Integer, String> buildVaultKeys(@Nullable String applicationName, Set<String> environmentNames) {
         Map<Integer, String> vaultKeys = new HashMap<>();
 
         int baseOrder = EnvironmentPropertySource.POSITION + 100;
         int envOrder = baseOrder + 200;
-        int appIncrement = 10;
 
-        vaultKeys.put(baseOrder, DEFAULT_APPLICATION);
+        vaultKeys.put(++baseOrder, DEFAULT_APPLICATION);
         if (applicationName != null) {
-            vaultKeys.put(baseOrder + appIncrement, applicationName);
+            vaultKeys.put(++baseOrder, applicationName);
         }
 
-        List<String> reverseOrderActiveNames = new ArrayList<>(environment.getActiveNames());
-        Collections.reverse(reverseOrderActiveNames);
-        for (String activeName : reverseOrderActiveNames) {
-            vaultKeys.put(envOrder + appIncrement, DEFAULT_APPLICATION + "/" + activeName);
-            appIncrement += 10;
+        for (String activeName : environmentNames) {
+            vaultKeys.put(++envOrder, DEFAULT_APPLICATION + "/" + activeName);
             if (applicationName != null) {
-                vaultKeys.put(envOrder + appIncrement, applicationName + "/" + activeName);
-                appIncrement += 10;
+                vaultKeys.put(++envOrder, applicationName + "/" + activeName);
             }
         }
         return vaultKeys;

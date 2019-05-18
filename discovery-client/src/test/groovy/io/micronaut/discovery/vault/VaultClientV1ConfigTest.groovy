@@ -44,13 +44,15 @@ class VaultClientV1ConfigTest extends Specification {
                 "vault.client.token": "testtoken",
                 "vault.client.secret-engine-name": "backendv1",
                 "vault.client.uri": embeddedServer.getURL().toString()
-        ])
+        ], "first", "second")
 
         expect:
         1 == context.getRequiredProperty("v1-secret-1", Integer.class)
         1 == context.getRequiredProperty("v1-secret-2", Integer.class)
         1 == context.getRequiredProperty("v1-secret-3", Integer.class)
         1 == context.getRequiredProperty("v1-secret-4", Integer.class)
+        1 == context.getRequiredProperty("v1-secret-5", Integer.class)
+        1 == context.getRequiredProperty("v1-secret-6", Integer.class)
 
         cleanup:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "")
