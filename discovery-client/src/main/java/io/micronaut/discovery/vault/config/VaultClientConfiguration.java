@@ -36,25 +36,28 @@ public class VaultClientConfiguration extends HttpClientConfiguration {
 
     public static final String PREFIX = "vault.client";
 
-
     /**
      * Vault Server Endpoint.
      */
     public static final String VAULT_CLIENT_CONFIG_ENDPOINT = "${" + VaultClientConfiguration.PREFIX + ".uri}";
 
+    private static final String DEFAULT_URI = "http://locahost:8200";
+    private static final Boolean DEFAULT_FAIL_FAST = false;
+    private static final String DEFAULT_SECRET_ENGINE = "secret";
+    private static final VaultKvVersion DEFAULT_KV_VERSION = VaultKvVersion.V2;
     /**
      * Vault Secret Engine versions.
      */
-    public enum VaultKvVersion { V1, V2 };
+    public enum VaultKvVersion { V1, V2 }
 
     private final VaultClientConnectionPoolConfiguration vaultClientConnectionPoolConfiguration;
     private final VaultClientDiscoveryConfiguration vaultClientDiscoveryConfiguration = new VaultClientDiscoveryConfiguration();
 
-    private String uri = "http://locahost:8200";
+    private String uri = DEFAULT_URI;
     private String token;
-    private VaultKvVersion kvVersion = VaultKvVersion.V2;
-    private String secretEngineName = "secret";
-    private boolean failFast = false;
+    private VaultKvVersion kvVersion = DEFAULT_KV_VERSION;
+    private String secretEngineName = DEFAULT_SECRET_ENGINE;
+    private boolean failFast = DEFAULT_FAIL_FAST;
 
     /**
      * @param vaultClientConnectionPoolConfiguration Vault Client Connection Pool Configuration
@@ -86,7 +89,7 @@ public class VaultClientConfiguration extends HttpClientConfiguration {
     }
 
     /**
-     * Set the Vault Server Uri.
+     * Set the Vault Server Uri. Default value ({@value #DEFAULT_URI}).
      *
      * @param uri Vault Server Uri
      */
@@ -118,7 +121,7 @@ public class VaultClientConfiguration extends HttpClientConfiguration {
     }
 
     /**
-     * Set the version of the Vault Secret engine.
+     * Set the version of the Vault Secret engine. V1 or V2. Default value (V2).
      *
      * @param kvVersion The version of the Vault Secret engine
      */
@@ -134,7 +137,7 @@ public class VaultClientConfiguration extends HttpClientConfiguration {
     }
 
     /**
-     * Set the name of the Vault Secret engine name.
+     * Set the name of the Vault Secret engine name. Default value ({@value #DEFAULT_SECRET_ENGINE}).
      *
      * @param secretEngineName Vault Secret engine name
      */
@@ -150,7 +153,8 @@ public class VaultClientConfiguration extends HttpClientConfiguration {
     }
 
     /**
-     * Set flag to indicate that failure to connect to HashiCorp Vault is fatal.
+     * If set to true an exception will be thrown if configuration is not found
+     * for the application or any of its environments. Default value ({@value #DEFAULT_FAIL_FAST}).
      *
      * @param failFast Flag to fail fast
      */

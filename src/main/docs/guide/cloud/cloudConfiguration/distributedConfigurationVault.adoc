@@ -1,4 +1,4 @@
-Since 1.2, Micronaut features a native https://www.vaultproject.io/[HashiCorp Vault] for those who have not switched to a dedicated more complete solution like Consul.
+Micronaut features support for integration with https://www.vaultproject.io/[HashiCorp Vault] as a distributed configuration source.
 
 To enable support for Vault Configuration simply add the following configuration to your `bootstrap.yml` file:
 
@@ -15,16 +15,11 @@ vault:
     client:
         config:
             enabled: true
-        uri: http://localhost:8200
-        token: ${VAULT_TOKEN}
-        kv-version: V1
-        secret-engine-name: backendv1
-        fail-fast: false
 ----
 
 include::{includedir}configurationProperties/io.micronaut.discovery.vault.VaultClientConfiguration.adoc[]
 
-Micronaut will use the configured `micronaut.application.name` to lookup property sources for the application from Vault configured via `vault.client.uri`.
+Micronaut will use the configured `micronaut.application.name` to lookup property sources for the application from Vault.
 
 .Configuration Resolution Precedence
 |===
@@ -36,11 +31,11 @@ Micronaut will use the configured `micronaut.application.name` to lookup propert
 |`/[APPLICATION_NAME]`
 |Application specific configuration
 
-|`/application/prod`
-|Configuration shared by all applications for the `prod` api:context.env.Environment[]
+|`/application/[ENV_NAME]`
+|Configuration shared by all applications for an active environment name
 
-|`/[APPLICATION_NAME]/prod`
-|Application specific configuration for an active api:context.env.Environment[]
+|`/[APPLICATION_NAME]/[ENV_NAME]`
+|Application specific configuration for an active environment name
 
 |===
 
