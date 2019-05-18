@@ -62,7 +62,6 @@ public class VaultConfigurationClient implements ConfigurationClient {
      * @param configHttpClient          The http client
      * @param vaultClientConfiguration  Vault Client Configuration
      * @param applicationConfiguration  The application configuration
-     * @param environment               The environment
      * @param executorService           Executor Service
      */
     public VaultConfigurationClient(VaultConfigHttpClient<?> configHttpClient,
@@ -133,6 +132,7 @@ public class VaultConfigurationClient implements ConfigurationClient {
      * Builds the keys used to get vault properties.
      *
      * @param applicationName The application name
+     * @param environmentNames The active environments
      * @return list of vault keys
      */
     protected Map<Integer, String> buildVaultKeys(@Nullable String applicationName, Set<String> environmentNames) {

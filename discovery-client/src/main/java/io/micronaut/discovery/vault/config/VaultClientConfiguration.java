@@ -45,6 +45,7 @@ public class VaultClientConfiguration extends HttpClientConfiguration {
     private static final Boolean DEFAULT_FAIL_FAST = false;
     private static final String DEFAULT_SECRET_ENGINE = "secret";
     private static final VaultKvVersion DEFAULT_KV_VERSION = VaultKvVersion.V2;
+
     /**
      * Vault Secret Engine versions.
      */
