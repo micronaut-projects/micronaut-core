@@ -50,6 +50,7 @@ public class GenericUtils {
     private final Elements elementUtils;
     private final Types typeUtils;
     private final ModelUtils modelUtils;
+    private final ClassUtils classUtils;
 
     /**
      * @param elementUtils The {@link Elements}
@@ -359,7 +360,7 @@ public class GenericUtils {
             case INT:
             case LONG:
             case SHORT:
-                Optional<Class> type = io.micronaut.core.reflect.ClassUtils.getPrimitiveType(mirror.toString());
+                Optional<Class> type = classUtils.getPrimitiveType(mirror.toString());
                 if (type.isPresent()) {
                     return type.get();
                 } else {
