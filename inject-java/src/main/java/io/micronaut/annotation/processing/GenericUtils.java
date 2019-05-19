@@ -50,7 +50,6 @@ public class GenericUtils {
     private final Elements elementUtils;
     private final Types typeUtils;
     private final ModelUtils modelUtils;
-    private final ClassUtils classUtils;
 
     /**
      * @param elementUtils The {@link Elements}
@@ -165,7 +164,7 @@ public class GenericUtils {
      * @param interfaceName The interface
      * @return The generic type or null
      */
-    protected TypeMirror interfaceGenericTypeFor(TypeElement element, String interfaceName) {
+    private TypeMirror interfaceGenericTypeFor(TypeElement element, String interfaceName) {
         List<? extends TypeMirror> typeMirrors = interfaceGenericTypesFor(element, interfaceName);
         return typeMirrors.isEmpty() ? null : typeMirrors.get(0);
     }
@@ -319,6 +318,7 @@ public class GenericUtils {
      */
     protected Object resolveTypeReference(TypeMirror mirror, Map<String, Object> boundTypes) {
         TypeKind kind = mirror.getKind();
+        Optional<Class> type = ClassUtils.getPrimitiveType(mirror.toString());
         switch (kind) {
             case TYPEVAR:
                 TypeVariable tv = (TypeVariable) mirror;
@@ -336,10 +336,8 @@ public class GenericUtils {
                     return Object.class.getName();
                 } else if (extendsBound != null) {
                     return resolveTypeReference(typeUtils.erasure(extendsBound), boundTypes);
-                } else if (superBound != null) {
-                    return resolveTypeReference(superBound, boundTypes);
                 } else {
-                    return resolveTypeReference(typeUtils.getWildcardType(extendsBound, superBound), boundTypes);
+                    return resolveTypeReference(superBound, boundTypes);
                 }
             case ARRAY:
                 ArrayType arrayType = (ArrayType) mirror;
@@ -360,7 +358,6 @@ public class GenericUtils {
             case INT:
             case LONG:
             case SHORT:
-                Optional<Class> type = classUtils.getPrimitiveType(mirror.toString());
                 if (type.isPresent()) {
                     return type.get();
                 } else {
