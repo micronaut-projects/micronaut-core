@@ -857,8 +857,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (declaringClass != ClassHelper.OBJECT_TYPE) {
 
                 defineBeanDefinition(concreteClass)
-                Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, GenericsUtils.createGenericsSpec(concreteClass))
-                Map<String, ClassNode> genericsSpec = AstGenericUtils.createGenericsSpec(methodNode, GenericsUtils.createGenericsSpec(concreteClass))
+                def typeSpec = GenericsUtils.createGenericsSpec(concreteClass)
+                Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, typeSpec)
+                Map<String, ClassNode> genericsSpec = AstGenericUtils.createGenericsSpec(methodNode, typeSpec)
 
                 Map<String, Object> paramsToType = [:]
                 Map<String, Object> genericParams = [:]
@@ -1132,7 +1133,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        Map<String, Object> resolveGenericTypes(Parameter parameter, Map<String, ClassNode> boundTypes = Collections.emptyMap()) {
+        Map<String, Object> resolveGenericTypes(
+                Parameter parameter,
+                Map<String, ClassNode> boundTypes = Collections.emptyMap()) {
             ClassNode parameterType = parameter.type
             GenericsType[] genericsTypes = parameterType.genericsTypes
             if (genericsTypes != null && genericsTypes.length > 0) {

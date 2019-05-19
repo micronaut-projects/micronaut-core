@@ -250,6 +250,18 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 .channel(eventLoopGroupFactory.serverSocketChannelClass())
                 .childHandler(new ChannelInitializer() {
                     final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
+                    final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
+                    final RoutingInBoundHandler routingHandler = new RoutingInBoundHandler(
+                        beanLocator,
+                        router,
+                        mediaTypeCodecRegistry,
+                        customizableResponseTypeHandlerRegistry,
+                        staticResourceResolver,
+                        serverConfiguration,
+                        requestArgumentSatisfier,
+                        executorSelector,
+                        ioExecutor
+                    );
                     final LoggingHandler loggingHandler = serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(serverConfiguration.getLogLevel().get()) : null;
 
                     @Override
@@ -287,7 +299,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                         pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
                         pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
-                        pipeline.addLast(HttpResponseEncoder.ID, new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration));
+                        pipeline.addLast(HttpResponseEncoder.ID, responseDecoder);
                         pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
                                 getWebSocketSessionRepository(),
                                 router,
@@ -296,17 +308,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                                 mediaTypeCodecRegistry,
                                 applicationContext
                         ));
-                        pipeline.addLast(MICRONAUT_HANDLER, new RoutingInBoundHandler(
-                            beanLocator,
-                            router,
-                            mediaTypeCodecRegistry,
-                            customizableResponseTypeHandlerRegistry,
-                            staticResourceResolver,
-                            serverConfiguration,
-                            requestArgumentSatisfier,
-                            executorSelector,
-                            ioExecutor
-                        ));
+                        pipeline.addLast(MICRONAUT_HANDLER, routingHandler);
                         registerMicronautChannelHandlers(pipeline);
                     }
                 });

@@ -84,6 +84,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.DecoderResult;
@@ -133,6 +134,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
+@Sharable
 class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
