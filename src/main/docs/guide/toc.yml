@@ -140,7 +140,8 @@ cloud:
   cloudConfiguration:
     title: Cloud Configuration
     distributedConfiguration: Distributed Configuration
-    distributedConfigurationConsul: Consul Support
+    distributedConfigurationConsul: HashiCorp Consul Support
+    distributedConfigurationVault: HashiCorp Vault Support
     distributedConfigurationSpringCloud: Spring Cloud Config Support
     distributedConfigurationAwsParameterStore: AWS Parameter Store Support
   serviceDiscovery:
