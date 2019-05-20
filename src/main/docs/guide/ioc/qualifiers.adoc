@@ -8,8 +8,6 @@ To qualify by name you can use the link:{jeeapi}/javax/inject/Named.html[Named] 
 
 snippet::io.micronaut.docs.inject.qualifiers.named.Engine,io.micronaut.docs.inject.qualifiers.named.V6Engine,io.micronaut.docs.inject.qualifiers.named.V8Engine,io.micronaut.docs.inject.qualifiers.named.Vehicle[tags="class",indent=0]
 
-
-
 <1> The `Engine` interface defines the common contract
 <2> The `V6Engine` class is the first implementation
 <3> The `V8Engine` class is the second implementation
@@ -22,19 +20,11 @@ You can also declare link:{jeeapi}/javax/inject/Named.html[@Named] at the class 
 
 In addition to being able to qualify by name, you can build your own qualifiers using the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] annotation. For example, consider the following annotation:
 
-[source,groovy]
-----
-include::{testsdir}/qualifiers/annotation/V8.groovy[tags=imports, indent=0]
-
-include::{testsdir}/qualifiers/annotation/V8.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.qualifiers.annotation.V8[tags="imports,class",indent=0]
 
 The above annotation is itself annotated with the `@Qualifier` annotation to designate it as a qualifier. You can then use the annotation at any injection point in your code. For example:
 
-[source,groovy]
-----
-include::{testsdir}/qualifiers/annotation/Vehicle.groovy[tags=constructor, indent=0]
-----
+snippet::io.micronaut.docs.qualifiers.annotation.Vehicle[tags="constructor",indent=0]
 
 == Primary and Secondary Beans
 
@@ -42,39 +32,19 @@ api:context.annotation.Primary[] is a qualifier that indicates that a bean is th
 
 Consider the following example:
 
-[source,java]
-----
-include::{testshttpservernetty}/context/annotation/primary/ColorPicker.groovy[tags=clazz, indent=0]
-----
+snippet::io.micronaut.docs.context.annotation.primary.ColorPicker[tags=clazz, indent=0]
 
 Given a common interface called `ColorPicker` that is implemented by multiple classes.
 
-.The Primary Bean
-[source,java]
-----
-include::{testshttpservernetty}/context/annotation/primary/Green.groovy[tags=imports, indent=0]
-
-include::{testshttpservernetty}/context/annotation/primary/Green.groovy[tags=clazz, indent=0]
-----
+snippet::io.micronaut.docs.context.annotation.primary.Green[tags="imports,clazz", indent=0, title="The Primary Bean"]
 
 The `Green` bean is a `ColorPicker`, but is annotated with `@Primary`.
 
-.Another Bean of the Same Type
-[source,java]
-----
-include::{testshttpservernetty}/context/annotation/primary/Blue.groovy[tags=imports, indent=0]
-
-include::{testshttpservernetty}/context/annotation/primary/Blue.groovy[tags=clazz, indent=0]
-----
+snippet::io.micronaut.docs.context.annotation.primary.Blue[tags="imports,clazz", indent=0, title="Another Bean of the Same Type"]
 
 The `Blue` bean is also a `ColorPicker` and hence you have two possible candidates when injecting the `ColorPicker` interface. Since `Green` is the primary it will always be favoured.
 
-
-
-[source,java]
-----
-include::{testshttpservernetty}/context/annotation/primary/TestController.groovy[tags=clazz, indent=0]
-----
+snippet::io.micronaut.docs.context.annotation.primary.TestController[tags="clazz", indent=0]
 
 <1> Although there are two `ColorPicker` beans, `Green` gets injected due to the `@Primary` annotation.
 

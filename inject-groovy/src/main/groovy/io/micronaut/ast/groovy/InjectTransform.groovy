@@ -857,8 +857,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (declaringClass != ClassHelper.OBJECT_TYPE) {
 
                 defineBeanDefinition(concreteClass)
-                Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, GenericsUtils.createGenericsSpec(concreteClass))
-                Map<String, ClassNode> genericsSpec = AstGenericUtils.createGenericsSpec(methodNode, GenericsUtils.createGenericsSpec(concreteClass))
+                def typeSpec = GenericsUtils.createGenericsSpec(concreteClass)
+                Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, typeSpec)
+                Map<String, ClassNode> genericsSpec = AstGenericUtils.createGenericsSpec(methodNode, typeSpec)
 
                 Map<String, Object> paramsToType = [:]
                 Map<String, Object> genericParams = [:]
@@ -912,7 +913,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         if (hasExplicitAround) {
                             addError("Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.", methodNode)
                         } else {
-                            addError("Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.", methodNode)
+                            addError("Public method inherits AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.", methodNode)
                         }
                     } else {
                         Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
@@ -1132,7 +1133,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        Map<String, Object> resolveGenericTypes(Parameter parameter, Map<String, ClassNode> boundTypes = Collections.emptyMap()) {
+        Map<String, Object> resolveGenericTypes(
+                Parameter parameter,
+                Map<String, ClassNode> boundTypes = Collections.emptyMap()) {
             ClassNode parameterType = parameter.type
             GenericsType[] genericsTypes = parameterType.genericsTypes
             if (genericsTypes != null && genericsTypes.length > 0) {
@@ -1662,7 +1665,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         private void visitConfigurationBuilder(AnnotationMetadata annotationMetadata, ClassNode classNode, BeanDefinitionVisitor writer) {
             Boolean allowZeroArgs = annotationMetadata.getValue(ConfigurationBuilder.class, "allowZeroArgs", Boolean.class).orElse(false)
             List<String> prefixes = Arrays.asList(annotationMetadata.getValue(ConfigurationBuilder.class, "prefixes", String[].class).orElse(["set"] as String[]))
-            String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, "configurationPrefix", String.class).orElse("")
+            String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, String.class).orElse("")
             Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet())
             Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet())
 

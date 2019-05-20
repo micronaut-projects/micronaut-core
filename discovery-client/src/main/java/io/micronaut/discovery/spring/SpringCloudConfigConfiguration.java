@@ -41,7 +41,7 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
     public static final String PREFIX = SpringCloudConstants.PREFIX + ".config";
     public static final String SPRING_CLOUD_CONFIG_ENDPOINT = "${" + SpringCloudConfigConfiguration.PREFIX + ".uri}";
 
-    private String uri = "http://locahost:8888";
+    private String uri = "http://localhost:8888";
     private String label;
     private boolean failFast;
 

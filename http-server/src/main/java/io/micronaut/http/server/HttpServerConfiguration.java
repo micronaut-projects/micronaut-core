@@ -22,6 +22,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.server.cors.CorsOriginConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.io.File;
 import java.nio.charset.Charset;
@@ -107,6 +108,8 @@ public class HttpServerConfiguration {
     private String serverHeader;
     private boolean dateHeader = DEFAULT_DATEHEADER;
     private boolean logHandledExceptions = DEFAULT_LOG_HANDLED_EXCEPTIONS;
+    private HostResolutionConfiguration hostResolution;
+    private String clientAddressHeader;
 
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
@@ -142,13 +145,6 @@ public class HttpServerConfiguration {
      */
     public Charset getDefaultCharset() {
         return defaultCharset;
-    }
-
-    /**
-     * @param defaultCharset The default charset to use
-     */
-    public void setDefaultCharset(Charset defaultCharset) {
-        this.defaultCharset = defaultCharset;
     }
 
     /**
@@ -234,6 +230,28 @@ public class HttpServerConfiguration {
      */
     public boolean isLogHandledExceptions() {
         return logHandledExceptions;
+    }
+
+    /**
+     * @return The host resolution configuration
+     */
+    @Nullable
+    public HostResolutionConfiguration getHostResolution() {
+        return hostResolution;
+    }
+
+    /**
+     * @return Which header stores the original client
+     */
+    public String getClientAddressHeader() {
+        return clientAddressHeader;
+    }
+
+    /**
+     * @param defaultCharset The default charset to use
+     */
+    public void setDefaultCharset(Charset defaultCharset) {
+        this.defaultCharset = defaultCharset;
     }
 
     /**
@@ -345,6 +363,20 @@ public class HttpServerConfiguration {
      */
     public void setLogHandledExceptions(boolean logHandledExceptions) {
         this.logHandledExceptions = logHandledExceptions;
+    }
+
+    /**
+     * @param hostResolution The host resolution configuration
+     */
+    public void setHostResolution(HostResolutionConfiguration hostResolution) {
+        this.hostResolution = hostResolution;
+    }
+
+    /**
+     * @param clientAddressHeader The header that stores the original client address
+     */
+    public void setClientAddressHeader(String clientAddressHeader) {
+        this.clientAddressHeader = clientAddressHeader;
     }
 
     /**
@@ -493,8 +525,10 @@ public class HttpServerConfiguration {
     public static class CorsConfiguration implements Toggleable {
 
         public static final boolean DEFAULT_ENABLED = false;
+        public static final boolean DEFAULT_SINGLE_HEADER = false;
 
         private boolean enabled = DEFAULT_ENABLED;
+        private boolean singleHeader = DEFAULT_SINGLE_HEADER;
 
         private Map<String, CorsOriginConfiguration> configurations = Collections.emptyMap();
 
@@ -522,6 +556,13 @@ public class HttpServerConfiguration {
         }
 
         /**
+         * @return Whether headers should be combined into a single header
+         */
+        public boolean isSingleHeader() {
+            return singleHeader;
+        }
+
+        /**
          * Sets whether CORS is enabled. Default value ({@value #DEFAULT_ENABLED})
          * @param enabled True if CORS is enabled
          */
@@ -535,6 +576,86 @@ public class HttpServerConfiguration {
          */
         public void setConfigurations(Map<String, CorsOriginConfiguration> configurations) {
             this.configurations = configurations;
+        }
+
+        /**
+         * Sets whether CORS header values should be joined into a single header. Default value ({@value #DEFAULT_SINGLE_HEADER}).
+         *
+         * @param singleHeader The single header flag
+         */
+        public void setSingleHeader(boolean singleHeader) {
+            this.singleHeader = singleHeader;
+        }
+    }
+
+    /**
+     * Configuration for host resolution with the {@link io.micronaut.http.server.util.HttpHostResolver}.
+     */
+    @ConfigurationProperties("host-resolution")
+    public static class HostResolutionConfiguration {
+
+        private static final Boolean DEFAULT_PORT_IN_HOST = false;
+
+        private String hostHeader;
+        private String protocolHeader;
+        private String portHeader;
+        private boolean portInHost = DEFAULT_PORT_IN_HOST;
+
+        /**
+         * @return The host header name
+         */
+        public String getHostHeader() {
+            return hostHeader;
+        }
+
+        /**
+         * @param hostHeader The header name that stores the host
+         */
+        public void setHostHeader(String hostHeader) {
+            this.hostHeader = hostHeader;
+        }
+
+        /**
+         * @return The protocol header name
+         */
+        public String getProtocolHeader() {
+            return protocolHeader;
+        }
+
+        /**
+         * @param protocolHeader The header name that stores the protocol
+         */
+        public void setProtocolHeader(String protocolHeader) {
+            this.protocolHeader = protocolHeader;
+        }
+
+        /**
+         * @return The port header name
+         */
+        public String getPortHeader() {
+            return portHeader;
+        }
+
+        /**
+         * @param portHeader The header name that stores the port
+         */
+        public void setPortHeader(String portHeader) {
+            this.portHeader = portHeader;
+        }
+
+        /**
+         * @return If the host header supports a port
+         */
+        public boolean isPortInHost() {
+            return portInHost;
+        }
+
+        /**
+         * @param portInHost True if the host header supports a port
+         *                   appended with {@code :}. Default value ({@value #DEFAULT_PORT_IN_HOST}).
+         */
+        public void setPortInHost(boolean portInHost) {
+            this.portInHost = portInHost;
         }
     }
 }

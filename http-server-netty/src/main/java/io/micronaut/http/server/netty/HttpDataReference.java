@@ -213,7 +213,7 @@ public class HttpDataReference {
                 if (byteBuf instanceof CompositeByteBuf) {
                     CompositeByteBuf compositeByteBuf = (CompositeByteBuf) byteBuf;
                     return createDelegate(compositeByteBuf.component(index), (buf, count) -> {
-                        ((CompositeByteBuf) buf).removeComponent(index);
+                        compositeByteBuf.removeComponent(index);
                         removeComponent(index);
                         return true;
                     });

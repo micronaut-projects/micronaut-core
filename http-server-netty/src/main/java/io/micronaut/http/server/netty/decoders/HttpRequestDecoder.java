@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.decoders;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
@@ -71,9 +72,27 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
             LOG.debug("Server {}:{} Received Request: {} {}", embeddedServer.getHost(), embeddedServer.getPort(), msg.method(), msg.uri());
         }
         try {
-            out.add(new NettyHttpRequest<>(msg, ctx, conversionService, configuration));
+            NettyHttpRequest<Object> request = new NettyHttpRequest<>(msg, ctx, conversionService, configuration);
+            ctx.executor().execute(() -> {
+                try {
+                    embeddedServer.getApplicationContext().publishEvent(
+                            new HttpRequestReceivedEvent(request)
+                    );
+                } catch (Exception e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error publishing Http request received event: " + e.getMessage(), e);
+                    }
+                }
+            });
+            out.add(request);
         } catch (IllegalArgumentException e) {
-            new NettyHttpRequest<>(new DefaultHttpRequest(msg.protocolVersion(), msg.method(), "/"), ctx, conversionService, configuration);
+            // this configured the request in the channel as an attribute
+            new NettyHttpRequest<>(
+                    new DefaultHttpRequest(msg.protocolVersion(), msg.method(), "/"),
+                    ctx,
+                    conversionService,
+                    configuration
+            );
             final Throwable cause = e.getCause();
             ctx.fireExceptionCaught(cause != null ? cause : e);
         }

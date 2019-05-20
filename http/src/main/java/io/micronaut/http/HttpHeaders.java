@@ -214,6 +214,11 @@ public interface HttpHeaders extends Headers {
     String EXPIRES = "Expires";
 
     /**
+     * {@code "Forwarded"}.
+     */
+    String FORWARDED = "Forwarded";
+
+    /**
      * {@code "From"}.
      */
     String FROM = "From";

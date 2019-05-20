@@ -4,7 +4,7 @@ The major advantage here is that you pay a slight cost at compile time, but at r
 
 == Using Micronaut with Java 9+
 
-Micronaut is built with Java 8, however works fine with Java 9/10 and above as well. The classes that Micronaut generates sit along side existing classes within the same package, hence do not violate anything regarding the Java module system.
+Micronaut is built with Java 8, however works fine with Java 9/10 and above as well. The classes that Micronaut generates sit alongside existing classes within the same package, hence do not violate anything regarding the Java module system.
 
 There are some considerations to take into account when using Java 9/10 with Micronaut.
 

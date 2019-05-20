@@ -728,7 +728,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             if (returnType instanceof DeclaredType) {
                 DeclaredType dt = (DeclaredType) returnType;
-                Map<String, Map<String, Object>> beanTypeArguments = genericUtils.buildTypeArgumentInfo(dt);
+                Map<String, Map<String, Object>> beanTypeArguments = genericUtils.buildGenericTypeArgumentInfo(dt);
                 beanMethodWriter.visitTypeArguments(beanTypeArguments);
             }
 
@@ -956,12 +956,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
             // shouldn't visit around advice on an introduction advice instance
             if (!(beanWriter instanceof AopProxyWriter)) {
-                boolean hasAround = hasConstraints || methodAnnotationMetadata.hasStereotype(AROUND_TYPE) ;
-                if (isAopProxyType || hasAround) {
-                    if (isAopProxyType && !hasAround && !method.getModifiers().contains(Modifier.PUBLIC)) {
-                        // ignore methods that are not public and have no explicit advise
-                        return;
-                    }
+                boolean hasAround = hasConstraints || methodAnnotationMetadata.hasStereotype(AROUND_TYPE);
+                if ((isAopProxyType && method.getModifiers().contains(Modifier.PUBLIC)) || (hasAround && !modelUtils.isAbstract(concreteClass))) {
 
                     Object[] interceptorTypes = methodAnnotationMetadata.getAnnotationNamesByStereotype(AROUND_TYPE)
                             .toArray();
@@ -1579,7 +1575,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(builderElement);
             Boolean allowZeroArgs = annotationMetadata.getValue(ConfigurationBuilder.class, "allowZeroArgs", Boolean.class).orElse(false);
             List<String> prefixes = Arrays.asList(annotationMetadata.getValue(ConfigurationBuilder.class, "prefixes", String[].class).orElse(new String[]{"set"}));
-            String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, "configurationPrefix", String.class).orElse("");
+            String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, String.class).orElse("");
             Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet());
             Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet());
 
@@ -1709,7 +1705,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         private void visitTypeArguments(TypeElement typeElement, BeanDefinitionWriter beanDefinitionWriter) {
-            Map<String, Map<String, Object>> typeArguments = genericUtils.buildTypeArgumentInfo(typeElement);
+            Map<String, Map<String, Object>> typeArguments = genericUtils.buildGenericTypeArgumentInfo(typeElement);
             beanDefinitionWriter.visitTypeArguments(
                     typeArguments
             );
@@ -1854,6 +1850,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 TypeMirror typeMirror = paramElement.asType();
                 TypeKind kind = typeMirror.getKind();
+
                 switch (kind) {
                     case ARRAY:
                         ArrayType arrayType = (ArrayType) typeMirror;

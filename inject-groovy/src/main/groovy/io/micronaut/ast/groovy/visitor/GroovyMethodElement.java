@@ -24,13 +24,11 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.control.SourceUnit;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -51,8 +49,8 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     private Map<String, ClassNode> genericsSpec = null;
 
     /**
-     * @param declaringClass The declaring class
-     * @param sourceUnit The source unit
+     * @param declaringClass     The declaring class
+     * @param sourceUnit         The source unit
      * @param methodNode         The {@link MethodNode}
      * @param annotationMetadata The annotation metadata
      */
@@ -103,7 +101,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         return methodNode;
     }
 
-    @Nullable
+    @Nonnull
     @Override
     public ClassElement getGenericReturnType() {
         ClassNode returnType = methodNode.getReturnType();
@@ -113,36 +111,25 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     /**
      * Obtains the generic element if present otherwise returns the raw element.
-     * @param type The type
+     *
+     * @param type       The type
      * @param rawElement The raw element
      * @return The class element
      */
-    @Nonnull ClassElement getGenericElement(@Nonnull ClassNode type, @Nonnull ClassElement rawElement) {
+    @Nonnull
+    ClassElement getGenericElement(@Nonnull ClassNode type, @Nonnull ClassElement rawElement) {
         Map<String, ClassNode> genericsSpec = getGenericsSpec();
 
-        if (CollectionUtils.isNotEmpty(genericsSpec)) {
-            ClassElement classNode = resolveGenericType(genericsSpec, type, rawElement);
-            if (classNode != null) {
-                return classNode;
-            } else {
-                GenericsType[] genericsTypes = type.getGenericsTypes();
-                if (genericsTypes != null) {
-                    genericsSpec = alignNewGenericsInfo(genericsTypes, genericsSpec);
-                    return new GroovyClassElement(sourceUnit, type, rawElement.getAnnotationMetadata(), Collections.singletonMap(
-                            type.getName(),
-                            genericsSpec
-                    ));
-                }
-            }
-        }
-        return rawElement;
+        return getGenericElement(sourceUnit, type, rawElement, genericsSpec);
     }
 
     /**
      * Resolves the generics spec for this method.
+     *
      * @return The generic spec
      */
-    @Nonnull Map<String, ClassNode> getGenericsSpec() {
+    @Nonnull
+    Map<String, ClassNode> getGenericsSpec() {
         if (genericsSpec == null) {
             Map<String, Map<String, ClassNode>> info = declaringClass.getGenericTypeInfo();
             if (CollectionUtils.isNotEmpty(info)) {
@@ -160,22 +147,8 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         return genericsSpec;
     }
 
-    private ClassElement resolveGenericType(Map<String, ClassNode> typeGenericInfo, ClassNode returnType, ClassElement rawElement) {
-        if (returnType.isGenericsPlaceHolder()) {
-            String unresolvedName = returnType.getUnresolvedName();
-            ClassNode classNode = typeGenericInfo.get(unresolvedName);
-            if (classNode != null) {
-                if (classNode.isGenericsPlaceHolder()) {
-                    return resolveGenericType(typeGenericInfo, classNode, rawElement);
-                } else {
-                    return new GroovyClassElement(sourceUnit, classNode, rawElement.getAnnotationMetadata());
-                }
-            }
-        }
-        return null;
-    }
-
     @Override
+    @Nonnull
     public ClassElement getReturnType() {
         ClassNode returnType = methodNode.getReturnType();
         if (returnType.isEnum()) {
