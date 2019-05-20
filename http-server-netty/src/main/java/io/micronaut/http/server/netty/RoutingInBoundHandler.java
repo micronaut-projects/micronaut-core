@@ -25,6 +25,7 @@ import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
@@ -985,8 +986,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             // here we transform the result of the controller action into a MutableHttpResponse
             Flowable<MutableHttpResponse<?>> routePublisher = resultEmitter.map((message) -> {
                 RouteMatch<?> routeMatch = finalRoute;
-                HttpResponse<?> response = messageToResponse(routeMatch, message);
-                MutableHttpResponse<?> finalResponse = (MutableHttpResponse<?>) response;
+                MutableHttpResponse<?> finalResponse = messageToResponse(routeMatch, message);
+                if (requestReference.get().getMethod().equals(HttpMethod.HEAD)) {
+                    finalResponse.getBody()
+                            .filter(ReferenceCounted.class::isInstance)
+                            .map(ReferenceCounted.class::cast)
+                            .ifPresent(ReferenceCounted::release);
+                    finalResponse.body(null);
+                }
                 HttpStatus status = finalResponse.getStatus();
 
                 if (status.getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
