@@ -19,6 +19,7 @@ import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.VOID;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 
 import javax.annotation.Nonnull;
