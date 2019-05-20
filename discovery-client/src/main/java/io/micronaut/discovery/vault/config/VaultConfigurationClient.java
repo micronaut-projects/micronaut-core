@@ -139,7 +139,7 @@ public class VaultConfigurationClient implements ConfigurationClient {
         Map<Integer, String> vaultKeys = new HashMap<>();
 
         int baseOrder = EnvironmentPropertySource.POSITION + 100;
-        int envOrder = baseOrder + 200;
+        int envOrder = baseOrder + 50;
 
         vaultKeys.put(++baseOrder, DEFAULT_APPLICATION);
         if (applicationName != null) {
