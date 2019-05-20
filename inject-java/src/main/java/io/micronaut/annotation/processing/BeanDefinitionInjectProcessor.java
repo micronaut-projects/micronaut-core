@@ -112,7 +112,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             am.hasStereotype(ANN_CONSTRAINT) || am.hasStereotype(ANN_VALID);
 
     private JavaConfigurationMetadataBuilder metadataBuilder;
-    private Map<String, TypeElement> beanDefinitions;
+    private Set<String> beanDefinitions;
     private Set<String> processed = new HashSet<>();
     private boolean processingOver;
 
@@ -120,7 +120,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     public final synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils, annotationUtils);
-        this.beanDefinitions = new LinkedHashMap<>();
+        this.beanDefinitions = new LinkedHashSet<>();
     }
 
     @Override
@@ -154,14 +154,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
 
                         String name = typeElement.getQualifiedName().toString();
-                        if (!beanDefinitions.containsKey(name)) {
+                        if (!beanDefinitions.contains(name)) {
                             if (!processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
                                 boolean isInterface = JavaModelUtils.resolveKind(typeElement, ElementKind.INTERFACE).isPresent();
                                 if (!isInterface) {
-                                    beanDefinitions.put(name, typeElement);
+                                    beanDefinitions.add(name);
                                 } else {
                                     if (annotationUtils.hasStereotype(typeElement, INTRODUCTION_TYPE)) {
-                                        beanDefinitions.put(name, typeElement);
+                                        beanDefinitions.add(name);
                                     }
                                 }
                             }
@@ -178,10 +178,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         int count = beanDefinitions.size();
         if (count > 0) {
             note("Creating bean classes for %s type elements", count);
-            beanDefinitions.forEach((key, classElement) -> {
-                String className = classElement.getQualifiedName().toString();
+            beanDefinitions.forEach(className -> {
                 if (processed.add(className)) {
-                    final TypeElement refreshedClassElement = elementUtils.getTypeElement(classElement.getQualifiedName());
+                    final TypeElement refreshedClassElement = elementUtils.getTypeElement(className);
                     final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(refreshedClassElement);
                     refreshedClassElement.accept(visitor, className);
                     if (visitor.processNextRound) {
