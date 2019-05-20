@@ -19,7 +19,6 @@ import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.VOID;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 
 import javax.annotation.Nonnull;
@@ -181,7 +180,7 @@ public class GenericUtils {
             DeclaredType declaredType = (DeclaredType) tm;
             Element declaredElement = declaredType.asElement();
             if (declaredElement instanceof TypeElement) {
-               TypeElement te = (TypeElement) declaredElement;
+                TypeElement te = (TypeElement) declaredElement;
                 if (interfaceName.equals(te.getQualifiedName().toString())) {
                     return declaredType.getTypeArguments();
                 }
@@ -318,7 +317,6 @@ public class GenericUtils {
      */
     protected Object resolveTypeReference(TypeMirror mirror, Map<String, Object> boundTypes) {
         TypeKind kind = mirror.getKind();
-        Optional<Class> type = ClassUtils.getPrimitiveType(mirror.toString());
         switch (kind) {
             case TYPEVAR:
                 TypeVariable tv = (TypeVariable) mirror;
@@ -336,6 +334,8 @@ public class GenericUtils {
                     return Object.class.getName();
                 } else if (extendsBound != null) {
                     return resolveTypeReference(typeUtils.erasure(extendsBound), boundTypes);
+                } else if (superBound != null) {
+                    return resolveTypeReference(superBound, boundTypes);
                 } else {
                     return resolveTypeReference(typeUtils.getWildcardType(extendsBound, superBound), boundTypes);
                 }
@@ -349,19 +349,6 @@ public class GenericUtils {
                     return reference + "[]";
                 } else {
                     return modelUtils.resolveTypeReference(mirror);
-                }
-            case BOOLEAN:
-            case BYTE:
-            case CHAR:
-            case DOUBLE:
-            case FLOAT:
-            case INT:
-            case LONG:
-            case SHORT:
-                if (type.isPresent()) {
-                    return type.get();
-                } else {
-                    throw new IllegalStateException("Unknown primitive type: " + mirror.toString());
                 }
             default:
                 return modelUtils.resolveTypeReference(mirror);
@@ -392,8 +379,8 @@ public class GenericUtils {
                                 return (DeclaredType) typeMirror;
                             case TYPEVAR:
                                 return resolveTypeVariable(element, (TypeVariable) typeMirror);
-                           default:
-                               return null;
+                            default:
+                                return null;
                         }
                     }
                 }
@@ -612,11 +599,11 @@ public class GenericUtils {
 
     private void resolveGenericTypeParameterForPrimitiveOrArray(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror, Map<String, Object> boundTypes) {
         resolvedParameters.put(
-            parameterName,
-            Collections.singletonMap(
-                resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
-                resolveGenericTypes(mirror, boundTypes)
-            )
+                parameterName,
+                Collections.singletonMap(
+                        resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
+                        resolveGenericTypes(mirror, boundTypes)
+                )
         );
     }
 }
