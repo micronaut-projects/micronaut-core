@@ -54,6 +54,7 @@ class Test {
 
     @io.micronaut.context.annotation.Executable
     void test(@javax.validation.constraints.Size(max=1024) byte[] id) {
+    
     }
 }
 ''', 'test', 'id')
