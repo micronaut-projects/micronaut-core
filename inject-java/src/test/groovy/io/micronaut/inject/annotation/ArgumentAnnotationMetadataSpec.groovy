@@ -17,7 +17,9 @@ package io.micronaut.inject.annotation
 
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.AbstractTypeElementSpec
+
 import javax.inject.Named
+import javax.validation.constraints.Size
 
 class ArgumentAnnotationMetadataSpec extends AbstractTypeElementSpec {
 
@@ -52,7 +54,6 @@ class Test {
 
     @io.micronaut.context.annotation.Executable
     void test(@javax.validation.constraints.Size(max=1024) byte[] id) {
-
     }
 }
 ''', 'test', 'id')

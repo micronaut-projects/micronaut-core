@@ -337,7 +337,7 @@ public class GenericUtils {
                 } else if (extendsBound != null) {
                     return resolveTypeReference(typeUtils.erasure(extendsBound), boundTypes);
                 } else {
-                    return resolveTypeReference(superBound, boundTypes);
+                    return resolveTypeReference(typeUtils.getWildcardType(extendsBound, superBound), boundTypes);
                 }
             case ARRAY:
                 ArrayType arrayType = (ArrayType) mirror;
