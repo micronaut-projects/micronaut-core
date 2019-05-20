@@ -180,7 +180,7 @@ public class GenericUtils {
             DeclaredType declaredType = (DeclaredType) tm;
             Element declaredElement = declaredType.asElement();
             if (declaredElement instanceof TypeElement) {
-                TypeElement te = (TypeElement) declaredElement;
+               TypeElement te = (TypeElement) declaredElement;
                 if (interfaceName.equals(te.getQualifiedName().toString())) {
                     return declaredType.getTypeArguments();
                 }
@@ -379,8 +379,8 @@ public class GenericUtils {
                                 return (DeclaredType) typeMirror;
                             case TYPEVAR:
                                 return resolveTypeVariable(element, (TypeVariable) typeMirror);
-                            default:
-                                return null;
+                           default:
+                               return null;
                         }
                     }
                 }
@@ -599,11 +599,11 @@ public class GenericUtils {
 
     private void resolveGenericTypeParameterForPrimitiveOrArray(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror, Map<String, Object> boundTypes) {
         resolvedParameters.put(
-                parameterName,
-                Collections.singletonMap(
-                        resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
-                        resolveGenericTypes(mirror, boundTypes)
-                )
+            parameterName,
+            Collections.singletonMap(
+                resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
+                resolveGenericTypes(mirror, boundTypes)
+            )
         );
     }
 }
