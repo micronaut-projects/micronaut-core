@@ -1,0 +1,42 @@
+Micronaut features support for integration with https://www.vaultproject.io/[HashiCorp Vault] as a distributed configuration source.
+
+To enable support for Vault Configuration simply add the following configuration to your `bootstrap.yml` file:
+
+.Integrating with HashiCorp Vault
+[source,yaml]
+----
+micronaut:
+    application:
+        name: hello-world
+    config-client:
+        enabled: true
+
+vault:
+    client:
+        config:
+            enabled: true
+----
+
+include::{includedir}configurationProperties/io.micronaut.discovery.vault.VaultClientConfiguration.adoc[]
+
+Micronaut will use the configured `micronaut.application.name` to lookup property sources for the application from Vault.
+
+.Configuration Resolution Precedence
+|===
+|Folder|Description
+
+|`/application`
+|Configuration shared by all applications
+
+|`/[APPLICATION_NAME]`
+|Application specific configuration
+
+|`/application/[ENV_NAME]`
+|Configuration shared by all applications for an active environment name
+
+|`/[APPLICATION_NAME]/[ENV_NAME]`
+|Application specific configuration for an active environment name
+
+|===
+
+See the https://www.vaultproject.io/api/secret/kv/index.html[Documentation for HashiCorp Vault] for more information on how to setup the server.
