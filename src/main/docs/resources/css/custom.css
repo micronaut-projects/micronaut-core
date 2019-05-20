@@ -236,3 +236,24 @@ a:hover,
     border-bottom-left-radius: 5px;
     border-bottom-right-radius: 5px;
 }
+
+/*
+
+Changes to make individual pages render properly
+
+*/
+#col1 {
+    padding-top: 100px;
+}
+
+#col2 {
+    display: none !important;
+}
+
+.corner-all #table-of-content {
+    display: none;
+}
+
+.corner-all .project {
+    display: none;
+}
