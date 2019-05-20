@@ -42,7 +42,7 @@ import java.lang.annotation.Target;
  * <pre><code>
  *  {@literal @}EachProperty("foo.bar")
  *   public class ExampleConfiguration {
- *      ExampleConfiguration({@literal @}Argument String name) {
+ *      ExampleConfiguration({@literal @}Parameter String name) {
  *          ...
  *      }
  *   }
