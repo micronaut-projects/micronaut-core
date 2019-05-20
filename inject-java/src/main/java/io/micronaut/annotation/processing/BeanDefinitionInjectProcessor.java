@@ -181,15 +181,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitions.forEach((key, classElement) -> {
                 String className = classElement.getQualifiedName().toString();
                 if (processed.add(className)) {
-                    final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(classElement);
-                    classElement.accept(visitor, className);
+                    final TypeElement refreshedClassElement = elementUtils.getTypeElement(classElement.getQualifiedName());
+                    final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(refreshedClassElement);
+                    refreshedClassElement.accept(visitor, className);
                     if (visitor.processNextRound) {
                         processed.remove(className);
                     } else {
                         visitor.getBeanDefinitionWriters().forEach((name, writer) -> {
                             String beanDefinitionName = writer.getBeanDefinitionName();
                             if (processed.add(beanDefinitionName)) {
-                                processBeanDefinitions(classElement, writer);
+                                processBeanDefinitions(refreshedClassElement, writer);
                             }
                         });
                     }
@@ -1275,7 +1276,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return;
             }
 
-
             boolean isParent = !declaringClass.getQualifiedName().equals(this.concreteClass.getQualifiedName());
             ExecutableElement overridingMethod = modelUtils.overridingOrHidingMethod(method, this.concreteClass).orElse(method);
             TypeElement overridingClass = modelUtils.classElementFor(overridingMethod);
@@ -1854,20 +1854,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 TypeMirror typeMirror = paramElement.asType();
                 TypeKind kind = typeMirror.getKind();
-                if (kind == TypeKind.ERROR) {
-                    TypeElement refreshedElement = processingEnv.getElementUtils().getTypeElement(typeMirror.toString());
-                    if (refreshedElement == null) {
-                        // if the unresolvable type is in the same enclosing type as the bean, the enclosing type is omitted from the
-                        // type mirror in error, so attempt again, prepending the enclosing type
-                        // constructor <enclosed by> class <enclosed by> enclosing type (package / outer class)
-                        refreshedElement = processingEnv.getElementUtils().getTypeElement(element.getEnclosingElement().getEnclosingElement().toString() + "." + typeMirror.toString());
-                    }
-                    if (refreshedElement != null) {
-                        typeMirror = refreshedElement.asType();
-                        kind = typeMirror.getKind();
-                    }
-                }
-
                 switch (kind) {
                     case ARRAY:
                         ArrayType arrayType = (ArrayType) typeMirror;
