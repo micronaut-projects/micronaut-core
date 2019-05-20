@@ -164,7 +164,7 @@ public class GenericUtils {
      * @param interfaceName The interface
      * @return The generic type or null
      */
-    private TypeMirror interfaceGenericTypeFor(TypeElement element, String interfaceName) {
+    protected TypeMirror interfaceGenericTypeFor(TypeElement element, String interfaceName) {
         List<? extends TypeMirror> typeMirrors = interfaceGenericTypesFor(element, interfaceName);
         return typeMirrors.isEmpty() ? null : typeMirrors.get(0);
     }
