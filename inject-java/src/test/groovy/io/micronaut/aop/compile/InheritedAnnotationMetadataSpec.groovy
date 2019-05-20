@@ -94,8 +94,8 @@ interface MyInterface {
 }
 ''')
         then:
-        !beanDefinition.isAbstract()
         beanDefinition != null
+        !beanDefinition.isAbstract()
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 1
         beanDefinition.executableMethods[0].hasAnnotation(Blocking)
@@ -107,5 +107,66 @@ interface MyInterface {
 
         then:
         instance.someMethod() == 'test'
+    }
+
+    void "test that a bean definition is not created for an abstract class"() {
+        when:
+        ApplicationContext ctx = buildContext('test.$ServiceDefinition$Intercepted', '''
+package test;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.annotation.*;
+import io.micronaut.core.order.Ordered;
+import java.lang.annotation.*;
+import javax.inject.Singleton;
+
+interface ContractService {
+
+    @SomeAnnot
+    void interfaceServiceMethod();
+}
+
+abstract class BaseService {
+
+    @SomeAnnot
+    public void baseServiceMethod() {}
+}
+
+@Singleton
+class Service extends BaseService implements ContractService {
+
+    @SomeAnnot
+    public void serviceMethod() {}
+    
+    public void interfaceServiceMethod() {}
+}
+
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.METHOD, ElementType.PARAMETER})
+@Around
+@Type(SomeInterceptor.class)
+@interface SomeAnnot {}
+
+@Singleton
+class SomeInterceptor implements MethodInterceptor<Object, Object>, Ordered {
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        return context.proceed();
+    }
+}
+
+''')
+        then:
+        Class clazz = ctx.classLoader.loadClass("test.ContractService")
+        ctx.getBean(clazz)
+
+        when:
+        ctx.classLoader.loadClass("test.\$BaseServiceDefinition\$Intercepted")
+
+        then:
+        thrown(ClassNotFoundException)
     }
 }
