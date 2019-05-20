@@ -13,15 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
  * Spring Cloud Config client service operations.
  *
  * @author Thiago Locatelli
  * @since 1.0
  */
-@RequiresSpringCloudConfig
-@Configuration
 package io.micronaut.discovery.spring.config.client;
-
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.discovery.spring.condition.RequiresSpringCloudConfig;

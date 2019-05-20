@@ -15,49 +15,44 @@
  */
 package io.micronaut.discovery.spring;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.discovery.spring.config.client.ConfigServerPropertySource;
+import io.micronaut.discovery.spring.config.client.ConfigServerResponse;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Produces;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.discovery.spring.config.client.SpringCloudConfigOperations;
-import io.micronaut.discovery.spring.config.client.response.ConfigServerPropertySource;
-import io.micronaut.discovery.spring.config.client.response.ConfigServerResponse;
-import io.micronaut.http.annotation.Controller;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.*;
 
 @Controller("/")
 @Requires(property = MockSpringCloudConfigServer.ENABLED)
-public class MockSpringCloudConfigServer implements SpringCloudConfigOperations {
+public class MockSpringCloudConfigServer {
 
     public static final String ENABLED = "enable.mock.spring-cloud-config";
 
     final static Logger LOGGER = LoggerFactory.getLogger(MockSpringCloudConfigServer.class);
 
-    @Override
-    public @Nonnull Publisher<ConfigServerResponse> readValues(@Nonnull String applicationName,
-                                                               @Nullable String profiles) {
+    @Get("/{applicationName}{/profiles}")
+    @Produces(single = true)
+    public Publisher<ConfigServerResponse> readValues(@Nonnull String applicationName,
+                                                      @Nullable String profiles) {
         return getConfigServerResponse(applicationName, profiles, null);
     }
 
-    @Override
-    public @Nonnull Publisher<ConfigServerResponse> readValues(@Nonnull String applicationName,
-                                                               @Nullable String profiles,
-                                                               @Nullable String label) {
+    @Get("/{applicationName}{/profiles}{/label}")
+    @Produces(single = true)
+    public Publisher<ConfigServerResponse> readValues(@Nonnull String applicationName,
+                                                      @Nullable String profiles,
+                                                      @Nullable String label) {
         return getConfigServerResponse(applicationName, profiles, label);
     }
 

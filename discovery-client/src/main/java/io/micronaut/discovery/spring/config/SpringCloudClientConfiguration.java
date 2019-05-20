@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.discovery.spring;
+package io.micronaut.discovery.spring.config;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
-import io.micronaut.discovery.spring.condition.RequiresSpringCloudConfig;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
@@ -33,17 +32,19 @@ import java.util.Optional;
  *  @author graemerocher
  *  @since 1.0
  */
-@RequiresSpringCloudConfig
-@ConfigurationProperties(SpringCloudConfigConfiguration.PREFIX)
+@ConfigurationProperties(SpringCloudClientConfiguration.PREFIX)
 @BootstrapContextCompatible
-public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
+public class SpringCloudClientConfiguration extends HttpClientConfiguration {
 
-    public static final String PREFIX = SpringCloudConstants.PREFIX + ".config";
-    public static final String SPRING_CLOUD_CONFIG_ENDPOINT = "${" + SpringCloudConfigConfiguration.PREFIX + ".uri}";
+    public static final String PREFIX = "spring.cloud.config";
+    public static final String SPRING_CLOUD_CONFIG_ENDPOINT = "${" + SpringCloudClientConfiguration.PREFIX + ".uri}";
 
-    private String uri = "http://localhost:8888";
+    private static final String DEFAULT_URI = "http://localhost:8888";
+    private static final Boolean DEFAULT_FAIL_FAST = false;
+
+    private String uri = DEFAULT_URI;
     private String label;
-    private boolean failFast;
+    private boolean failFast = DEFAULT_FAIL_FAST;
 
     private final SpringCloudConnectionPoolConfiguration springCloudConnectionPoolConfiguration;
     private final SpringConfigDiscoveryConfiguration springConfigDiscoveryConfiguration = new SpringConfigDiscoveryConfiguration();
@@ -51,7 +52,7 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
     /**
      * Default constructor.
      */
-    public SpringCloudConfigConfiguration() {
+    public SpringCloudClientConfiguration() {
         this.springCloudConnectionPoolConfiguration = new SpringCloudConnectionPoolConfiguration();
     }
 
@@ -60,7 +61,7 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
      * @param applicationConfiguration The application configuration
      */
     @Inject
-    public SpringCloudConfigConfiguration(SpringCloudConnectionPoolConfiguration springCloudConnectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
+    public SpringCloudClientConfiguration(SpringCloudConnectionPoolConfiguration springCloudConnectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.springCloudConnectionPoolConfiguration = springCloudConnectionPoolConfiguration;
     }
@@ -85,7 +86,7 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
     }
 
     /**
-     * Set the Spring Cloud config server uri.
+     * Set the Spring Cloud config server uri.  Default value ({@value #DEFAULT_URI}).
      *
      * @param uri Spring Cloud config server uri
      */
@@ -109,7 +110,9 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
     }
 
     /**
-     * Set flag to indicate that failure to connect to Spring Cloud config is fatal.
+     *
+     * If set to true an exception will be thrown if configuration is not found.
+     * Default value ({@value #DEFAULT_FAIL_FAST}).
      *
      * @param failFast  flag to fail fast
      */
@@ -144,7 +147,7 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
         /**
          * The full prefix for this configuration.
          */
-        public static final String PREFIX = SpringCloudConfigConfiguration.PREFIX + "." + ConfigDiscoveryConfiguration.PREFIX;
+        public static final String PREFIX = SpringCloudClientConfiguration.PREFIX + "." + ConfigDiscoveryConfiguration.PREFIX;
 
     }
 }

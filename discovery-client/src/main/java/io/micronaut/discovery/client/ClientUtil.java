@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery.client;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -31,7 +32,7 @@ public class ClientUtil {
      * @param separator The separator string
      * @return Set of names to be used for each PropertySource
      */
-    public static Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames, String separator) {
+    public static Set<String> calcPropertySourceNames(String prefix, Collection<String> activeNames, String separator) {
         Set<String> propertySourceNames;
         if (prefix.contains(separator)) {
 
