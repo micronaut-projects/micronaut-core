@@ -37,7 +37,18 @@ public interface PropertySourceLoader extends Toggleable, PropertySourceLocator,
      */
     @Override
     default Optional<PropertySource> load(Environment environment) {
-        return load(Environment.DEFAULT_NAME, environment, null);
+        return load(Environment.DEFAULT_NAME, environment);
+    }
+
+    /**
+     * Load a {@link PropertySource} for the given {@link Environment}.
+     *
+     * @param resourceName    The resourceName of the resource to load
+     * @param resourceLoader  The {@link ResourceLoader} to retrieve the resource
+     * @return An optional of {@link PropertySource}
+     */
+    default Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader) {
+        return load(resourceName, resourceLoader, null);
     }
 
     /**
@@ -47,6 +58,20 @@ public interface PropertySourceLoader extends Toggleable, PropertySourceLocator,
      * @param resourceLoader  The {@link ResourceLoader} to retrieve the resource
      * @param environmentName The environment name to load. Null if the default environment is to be used
      * @return An optional of {@link PropertySource}
+     * @deprecated Use {@link #load(String, ResourceLoader)} or {@link #loadEnv(String, ResourceLoader, ActiveEnvironment)} (String, ResourceLoader, ActiveEnvironment)} instead
      */
+    @Deprecated
     Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader, @Nullable String environmentName);
+
+    /**
+     * Load a {@link PropertySource} for the given {@link Environment}.
+     *
+     * @param resourceName        The resourceName of the resource to load
+     * @param resourceLoader      The {@link ResourceLoader} to retrieve the resource
+     * @param activeEnvironment   The environment to load
+     * @return An optional of {@link PropertySource}
+     */
+    default Optional<PropertySource> loadEnv(String resourceName, ResourceLoader resourceLoader, ActiveEnvironment activeEnvironment) {
+        return load(resourceName, resourceLoader, activeEnvironment.getName());
+    }
 }
