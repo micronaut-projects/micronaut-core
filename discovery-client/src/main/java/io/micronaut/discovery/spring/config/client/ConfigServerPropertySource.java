@@ -45,7 +45,7 @@ public class ConfigServerPropertySource {
     @JsonCreator
     @Internal
     protected ConfigServerPropertySource(@JsonProperty("name") String name,
-                                      @JsonProperty("source") Map<String, Object> source) {
+                                         @JsonProperty("source") Map<String, Object> source) {
         this.name = name;
         this.source = source == null ? Collections.emptyMap() : Collections.unmodifiableMap(source);
     }

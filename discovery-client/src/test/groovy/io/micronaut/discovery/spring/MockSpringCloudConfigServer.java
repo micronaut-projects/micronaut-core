@@ -66,22 +66,66 @@ public class MockSpringCloudConfigServer {
         configServerResponse.setLabel(label);
         configServerResponse.setState(null);
         configServerResponse.setVersion(null);
-        List<String> list = Arrays.asList(profilesArray);
-        List<String> newList = new ArrayList<>(list);
-        Collections.reverse(newList);
-        for (String profile: newList) {
-            Map<String, Object> sourceDev = new HashMap<>();
-            sourceDev.put("environment-name", profile);
-            ConfigServerPropertySource configServerPropertySourceDev = new ConfigServerPropertySource("classpath:/configclientdemo-" + profile + ".properties", sourceDev) {};
+        List<String> profileList = Arrays.asList(profilesArray);
+        Collections.reverse(profileList);
+
+        for (String profile: profileList) {
+
+            if (profile.equals("second") && applicationName.equals("myapp")) {
+                Map<String, Object> properties = new HashMap<>();
+                properties.put("config-secret-1", 1);
+                ConfigServerPropertySource configServerPropertySourceDev = new ConfigServerPropertySource(applicationName + "[" + profile + "]", properties) {};
+                configServerResponse.getPropertySources().add(configServerPropertySourceDev);
+
+                properties = new HashMap<>();
+                properties.put("config-secret-1", 2);
+                properties.put("config-secret-2", 1);
+
+                configServerPropertySourceDev = new ConfigServerPropertySource("application[" + profile + "]", properties) {};
+                configServerResponse.getPropertySources().add(configServerPropertySourceDev);
+            }
+
+            if (profile.equals("first") && applicationName.equals("myapp")) {
+                Map<String, Object> properties = new HashMap<>();
+                properties.put("config-secret-1", 3);
+                properties.put("config-secret-2", 2);
+                properties.put("config-secret-3", 1);
+                ConfigServerPropertySource configServerPropertySourceDev = new ConfigServerPropertySource(applicationName + "[" + profile + "]", properties) {
+                };
+                configServerResponse.getPropertySources().add(configServerPropertySourceDev);
+
+                properties = new HashMap<>();
+                properties.put("config-secret-1", 4);
+                properties.put("config-secret-2", 3);
+                properties.put("config-secret-3", 2);
+                properties.put("config-secret-4", 1);
+
+                configServerPropertySourceDev = new ConfigServerPropertySource("application[" + profile + "]", properties) {
+                };
+                configServerResponse.getPropertySources().add(configServerPropertySourceDev);
+            }
+        }
+
+        if (applicationName.equals("myapp")) {
+            Map<String, Object> properties = new HashMap<>();
+            properties.put("config-secret-1", 5);
+            properties.put("config-secret-2", 4);
+            properties.put("config-secret-3", 3);
+            properties.put("config-secret-4", 2);
+            properties.put("config-secret-5", 1);
+            ConfigServerPropertySource configServerPropertySourceDev = new ConfigServerPropertySource(applicationName, properties) {};
             configServerResponse.getPropertySources().add(configServerPropertySourceDev);
 
-        }
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-        try {
-            LOGGER.info(objectMapper.writeValueAsString(configServerResponse));
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            properties = new HashMap<>();
+            properties.put("config-secret-1", 6);
+            properties.put("config-secret-2", 5);
+            properties.put("config-secret-3", 4);
+            properties.put("config-secret-4", 3);
+            properties.put("config-secret-5", 2);
+            properties.put("config-secret-6", 1);
+
+            configServerPropertySourceDev = new ConfigServerPropertySource("application", properties) {};
+            configServerResponse.getPropertySources().add(configServerPropertySourceDev);
         }
 
         return Publishers.just(configServerResponse);
