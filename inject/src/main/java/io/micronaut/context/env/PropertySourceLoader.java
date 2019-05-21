@@ -18,7 +18,6 @@ package io.micronaut.context.env;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.Toggleable;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Optional;
 

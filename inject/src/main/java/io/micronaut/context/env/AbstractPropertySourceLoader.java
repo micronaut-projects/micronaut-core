@@ -15,8 +15,6 @@
  */
 package io.micronaut.context.env;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.order.Ordered;
@@ -24,7 +22,6 @@ import io.micronaut.core.util.Toggleable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
