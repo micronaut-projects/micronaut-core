@@ -1986,6 +1986,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
     }
 
-    private static class PostponeToNextRoundException extends RuntimeException {}
+    /**
+     * Exception to indicate postponing processing to next round
+     */
+    private static class PostponeToNextRoundException extends RuntimeException {
+
+    }
 
 }
