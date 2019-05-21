@@ -61,7 +61,7 @@ public interface PropertiesInfoSource extends InfoSource {
         Optional<ResourceLoader> resourceLoader = resourceResolver.getSupportingLoader(propertiesPath);
         if (resourceLoader.isPresent()) {
             PropertiesPropertySourceLoader propertySourceLoader = new PropertiesPropertySourceLoader();
-            return propertySourceLoader.load(propertiesPath, resourceLoader.get(), null);
+            return propertySourceLoader.load(propertiesPath, resourceLoader.get());
         }
 
         return Optional.empty();
