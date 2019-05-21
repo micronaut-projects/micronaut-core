@@ -1987,7 +1987,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     }
 
     /**
-     * Exception to indicate postponing processing to next round
+     * Exception to indicate postponing processing to next round.
      */
     private static class PostponeToNextRoundException extends RuntimeException {
 
