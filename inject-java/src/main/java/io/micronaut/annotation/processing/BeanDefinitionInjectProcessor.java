@@ -182,16 +182,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if (processed.add(className)) {
                     final TypeElement refreshedClassElement = elementUtils.getTypeElement(className);
                     final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(refreshedClassElement);
-                    refreshedClassElement.accept(visitor, className);
-                    if (visitor.processNextRound) {
-                        processed.remove(className);
-                    } else {
+                    try {
+                        refreshedClassElement.accept(visitor, className);
                         visitor.getBeanDefinitionWriters().forEach((name, writer) -> {
                             String beanDefinitionName = writer.getBeanDefinitionName();
                             if (processed.add(beanDefinitionName)) {
                                 processBeanDefinitions(refreshedClassElement, writer);
                             }
                         });
+                    } catch (PostponeToNextRoundException e) {
+                        processed.remove(className);
                     }
                 }
             });
@@ -311,7 +311,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private ConfigurationMetadata configurationMetadata;
         private ExecutableElementParamInfo constructorParameterInfo;
         private AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
-        private boolean processNextRound;
 
         /**
          * @param concreteClass The {@link TypeElement}
@@ -576,8 +575,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
 
+            TypeKind returnKind = method.getReturnType().getKind();
+            if ((returnKind == TypeKind.ERROR) && !processingOver) {
+                throw new PostponeToNextRoundException();
+            }
+
             // handle @Bean annotation for @Factory class
-            if (isFactoryType && methodAnnotationMetadata.hasDeclaredStereotype(Bean.class, Scope.class) && method.getReturnType().getKind() == TypeKind.DECLARED) {
+            if (isFactoryType && methodAnnotationMetadata.hasDeclaredStereotype(Bean.class, Scope.class) && returnKind == TypeKind.DECLARED) {
                 visitBeanFactoryMethod(method);
                 return null;
             }
@@ -1414,6 +1418,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 TypeMirror type = variable.asType();
+                if ((type.getKind() == TypeKind.ERROR) && !processingOver) {
+                    throw new PostponeToNextRoundException();
+                }
+
                 Object fieldType = modelUtils.resolveTypeReference(type);
 
                 if (isValue) {
@@ -1849,6 +1857,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 TypeMirror typeMirror = paramElement.asType();
                 TypeKind kind = typeMirror.getKind();
+                if ((kind == TypeKind.ERROR) && !processingOver) {
+                    throw new PostponeToNextRoundException();    
+                }
 
                 switch (kind) {
                     case ARRAY:
@@ -1912,10 +1923,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                             Object argType = modelUtils.classOfPrimitiveFor(typeName);
                             params.addParameter(argName, argType, argType);
-                        } else if (processingOver) {
-                            error(element, "Unprocessable element type [%s] for param [%s] of element %s", kind, paramElement, element);
                         } else {
-                            processNextRound = true;
+                            error(element, "Unprocessable element type [%s] for param [%s] of element %s", kind, paramElement, element);
                         }
                 }
             });
@@ -1976,4 +1985,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return name.hashCode();
         }
     }
+
+    /**
+     * Exception to indicate postponing processing to next round.
+     */
+    private static class PostponeToNextRoundException extends RuntimeException {
+
+    }
+
 }
