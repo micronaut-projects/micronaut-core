@@ -53,7 +53,7 @@ tracing:
 
 By default Jaeger will be configured to send traces to a locally running Jaeger agent.
 
-TIP: Or alternatively if you have the Micronaut CLI installed you can configure Zipkin when creating your service with: `mn create-app hello-world --features tracing-jaeger`
+TIP: Or alternatively if you have the Micronaut CLI installed you can configure Jaeger when creating your service with: `mn create-app hello-world --features tracing-jaeger`
 
 
 == Jaeger Configuration
@@ -62,7 +62,7 @@ There are many configuration options available for the Jaeger client that sends 
 
 Below is an example of customizing JaegerConfiguration configuration:
 
-.Customizing Zipkin Configuration
+.Customizing Jaeger Configuration
 [source,yaml]
 ----
 tracing:
