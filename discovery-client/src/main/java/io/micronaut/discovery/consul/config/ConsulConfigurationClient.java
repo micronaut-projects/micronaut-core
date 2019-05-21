@@ -51,7 +51,6 @@ import javax.inject.Singleton;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A {@link ConfigurationClient} for Consul.
@@ -354,6 +353,9 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         return null;
     }
 
+    /**
+     * A local property source.
+     */
     private static class LocalSource {
 
         private final boolean appSpecific;

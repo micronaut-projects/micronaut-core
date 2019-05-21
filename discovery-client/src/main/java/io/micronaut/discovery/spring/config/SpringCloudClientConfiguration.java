@@ -37,9 +37,10 @@ import java.util.Optional;
 public class SpringCloudClientConfiguration extends HttpClientConfiguration {
 
     public static final String PREFIX = "spring.cloud.config";
-    public static final String SPRING_CLOUD_CONFIG_ENDPOINT = "${" + SpringCloudClientConfiguration.PREFIX + ".uri}";
 
     private static final String DEFAULT_URI = "http://localhost:8888";
+    public static final String SPRING_CLOUD_CONFIG_ENDPOINT = "${" + SpringCloudClientConfiguration.PREFIX + ".uri:`" + DEFAULT_URI + "`}";
+
     private static final Boolean DEFAULT_FAIL_FAST = false;
 
     private String uri = DEFAULT_URI;
