@@ -21,7 +21,7 @@ package io.micronaut.cli.profile
  * @author Graeme Rocher
  * @since 1.0
  */
-interface ProfileCommand extends ResetableCommand {
+interface ProfileCommand extends Command {
     /**
      * @return The profile of the command
      */
