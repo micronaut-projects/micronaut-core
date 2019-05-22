@@ -34,7 +34,7 @@ import picocli.CommandLine.Model.CommandSpec
  * @since 1.0
  */
 @CompileStatic
-abstract class ArgumentCompletingCommand implements ResetableCommand, Completer {
+abstract class ArgumentCompletingCommand implements Command, Completer {
 
     CommandSpec commandSpec
 
@@ -53,8 +53,4 @@ abstract class ArgumentCompletingCommand implements ResetableCommand, Completer 
         return new PicocliCompleter(commandSpec).complete(buffer, cursor, candidates)
     }
 
-    @Override
-    void reset() {
-
-    }
 }

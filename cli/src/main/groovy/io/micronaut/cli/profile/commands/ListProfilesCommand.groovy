@@ -16,6 +16,7 @@
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileStatic
+import io.micronaut.cli.profile.Command
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
@@ -32,7 +33,7 @@ import picocli.CommandLine.Model.CommandSpec
  */
 @CompileStatic
 @CommandLine.Command(name = 'list-profiles', description = 'Lists the available profiles')
-class ListProfilesCommand implements ResetableCommand, ProfileRepositoryAware {
+class ListProfilesCommand implements Command, ProfileRepositoryAware {
 
     final String name = "list-profiles"
 
@@ -62,8 +63,4 @@ class ListProfilesCommand implements ResetableCommand, ProfileRepositoryAware {
         return true
     }
 
-    @Override
-    void reset() {
-
-    }
 }
