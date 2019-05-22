@@ -41,8 +41,4 @@ interface Command extends Named {
      */
     boolean handle(ExecutionContext executionContext)
 
-    /**
-     * Resets the command state
-     */
-    void reset()
 }
