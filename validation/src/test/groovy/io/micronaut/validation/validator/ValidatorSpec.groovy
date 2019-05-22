@@ -20,6 +20,8 @@ import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotNull
 import javax.validation.constraints.Size
+import javax.validation.metadata.BeanDescriptor
+import javax.validation.metadata.ConstraintDescriptor
 
 class ValidatorSpec extends Specification {
 
@@ -246,6 +248,22 @@ class ValidatorSpec extends Specification {
         violations.size() == 2
         violations[0].propertyPath.toString() == 'saveChild.arrayTest.integers[0]'
 
+    }
+
+    void "test bean descriptor"() {
+        given:
+        BeanDescriptor beanDescriptor = validator.getConstraintsForClass(Book)
+
+        def descriptors = beanDescriptor.getConstraintsForProperty("authors")
+                .getConstraintDescriptors()
+
+        expect:
+        beanDescriptor.isBeanConstrained()
+        beanDescriptor.getConstrainedProperties().size() == 4
+        descriptors.size() == 1
+        descriptors.first().annotation instanceof Size
+        descriptors.first().annotation.min() == 1
+        descriptors.first().annotation.max() == 10
     }
 }
 
