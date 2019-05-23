@@ -22,6 +22,7 @@ import io.micronaut.core.util.Toggleable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
@@ -38,7 +39,6 @@ import java.util.Set;
  */
 public abstract class AbstractPropertySourceLoader implements PropertySourceLoader, Toggleable, Ordered {
 
-
     /**
      * Default position for the property source loader.
      */
@@ -52,29 +52,32 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
     }
 
     @Override
-    public Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader, String environmentName) {
+    public Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader, @Nullable String environmentName) {
+        if (environmentName != null) {
+            return loadEnv(resourceName, resourceLoader, ActiveEnvironment.of(environmentName, 0));
+        } else {
+            return load(resourceLoader, resourceName, getOrder());
+        }
+    }
+
+    @Override
+    public Optional<PropertySource> loadEnv(String resourceName, ResourceLoader resourceLoader, ActiveEnvironment activeEnvironment) {
+        return load(resourceLoader, resourceName + "-" + activeEnvironment.getName(), this.getOrder() + 1 + activeEnvironment.getPriority());
+    }
+
+    private Optional<PropertySource> load(ResourceLoader resourceLoader, String fileName, int order) {
         if (isEnabled()) {
             Set<String> extensions = getExtensions();
             for (String ext : extensions) {
-                String fileName = resourceName;
-                if (environmentName != null) {
-                    fileName += "-" + environmentName;
-                }
                 String qualifiedName = fileName;
                 fileName += "." + ext;
                 Map<String, Object> finalMap = loadProperties(resourceLoader, qualifiedName, fileName);
 
-                int order = this.getOrder();
-                if (environmentName != null) {
-                    order++; // higher precedence than the default
-                }
                 if (!finalMap.isEmpty()) {
-                    int finalOrder = order;
                     MapPropertySource newPropertySource = new MapPropertySource(qualifiedName, finalMap) {
                         @Override
                         public int getOrder() {
-
-                            return finalOrder;
+                            return order;
                         }
                     };
                     return Optional.of(newPropertySource);

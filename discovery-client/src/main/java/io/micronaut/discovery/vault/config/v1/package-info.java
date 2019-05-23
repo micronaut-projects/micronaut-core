@@ -15,9 +15,15 @@
  */
 
 /**
- * Model classes for responses from Spring Cloud config server.
+ *  Vault Client Configuration.
  *
- * @author graemerocher
- * @since 1.1.0
+ *  @author thiagolocatelli
+ *  @since 1.2.0
  */
-package io.micronaut.discovery.spring.config.client.response;
+@Configuration
+@Requires(property = VaultClientConfiguration.PREFIX + ".kv-version", value = "V1")
+package io.micronaut.discovery.vault.config.v1;
+
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.discovery.vault.config.VaultClientConfiguration;

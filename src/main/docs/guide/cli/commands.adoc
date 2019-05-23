@@ -8,12 +8,16 @@ Profile: service
 The service profile
 
 Provided Commands:
-------------------
-  create-bean        Creates a singleton bean
-  create-client      Creates a client interface
-  create-controller  Creates a controller and associated test
-  create-job         Creates a job with scheduled method
-  help               Prints help information for a specific command
+--------------------
+  create-bean              Creates a singleton bean
+  create-client            Creates a client interface
+  create-controller        Creates a controller and associated test
+  create-job               Creates a job with scheduled method
+  create-test              Creates a simple test for the project's testing framework
+  create-websocket-client  Creates a Websocket client
+  create-websocket-server  Creates a Websocket server
+  help                     Prints help information for a specific command
+
 
 Provided Features:
 ------------------

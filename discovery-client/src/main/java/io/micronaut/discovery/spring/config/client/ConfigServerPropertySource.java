@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.discovery.spring.config.client.response;
+package io.micronaut.discovery.spring.config.client;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -45,7 +45,7 @@ public class ConfigServerPropertySource {
     @JsonCreator
     @Internal
     protected ConfigServerPropertySource(@JsonProperty("name") String name,
-                                      @JsonProperty("source") Map<String, Object> source) {
+                                         @JsonProperty("source") Map<String, Object> source) {
         this.name = name;
         this.source = source == null ? Collections.emptyMap() : Collections.unmodifiableMap(source);
     }

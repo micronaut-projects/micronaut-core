@@ -13,10 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Spring Cloud Config and Vault annotations.
+ *  Vault Client Configuration.
  *
- * @author Thiago Locatelli
- * @since 1.0
+ *  @author thiagolocatelli
+ *  @since 1.2.0
  */
-package io.micronaut.discovery.spring.condition;
+@Requires(property = VaultClientConfiguration.PREFIX + ".kv-version", value = "V2")
+@Configuration
+package io.micronaut.discovery.vault.config.v2;
+
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.discovery.vault.config.VaultClientConfiguration;

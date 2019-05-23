@@ -129,6 +129,9 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         if (scheme == null) {
             scheme = request.getUri().getScheme();
         }
+        if (scheme == null) {
+            scheme = embeddedServer.get().getScheme();
+        }
 
         String host = null;
         if (hostHeader != null) {
@@ -137,6 +140,10 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         if (host == null) {
             host = request.getUri().getHost();
         }
+        if (host == null) {
+            host = embeddedServer.get().getHost();
+        }
+
         Integer port;
         if (isPortInHost && host != null && host.contains(":")) {
             String[] parts = host.split(":");

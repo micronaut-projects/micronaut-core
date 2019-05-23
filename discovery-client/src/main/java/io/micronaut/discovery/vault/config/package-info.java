@@ -13,14 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * This package contains client APIs, service discovery and distributed configuration integration between Micronaut
- * and Spring Cloud Config Server and Vault.
+ *  Classes related to using HashiCorp Vault as a distributed configuration client.
  *
- * @author Thiago Locatelli
- * @since 1.0
+ *  @author thiagolocatelli
+ *  @since 1.2.0
  */
+@Requires(property = ConfigurationClient.ENABLED, value = "true", defaultValue = "false")
+@Requires(property = VaultClientConfiguration.PREFIX + "." + ConfigDiscoveryConfiguration.PREFIX + ".enabled", value = "true")
 @Configuration
-package io.micronaut.discovery.spring;
+package io.micronaut.discovery.vault.config;
 
 import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
+import io.micronaut.discovery.config.ConfigurationClient;

@@ -112,7 +112,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             am.hasStereotype(ANN_CONSTRAINT) || am.hasStereotype(ANN_VALID);
 
     private JavaConfigurationMetadataBuilder metadataBuilder;
-    private Map<String, TypeElement> beanDefinitions;
+    private Set<String> beanDefinitions;
     private Set<String> processed = new HashSet<>();
     private boolean processingOver;
 
@@ -120,7 +120,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     public final synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils, annotationUtils);
-        this.beanDefinitions = new LinkedHashMap<>();
+        this.beanDefinitions = new LinkedHashSet<>();
     }
 
     @Override
@@ -154,14 +154,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
 
                         String name = typeElement.getQualifiedName().toString();
-                        if (!beanDefinitions.containsKey(name)) {
+                        if (!beanDefinitions.contains(name)) {
                             if (!processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
                                 boolean isInterface = JavaModelUtils.resolveKind(typeElement, ElementKind.INTERFACE).isPresent();
                                 if (!isInterface) {
-                                    beanDefinitions.put(name, typeElement);
+                                    beanDefinitions.add(name);
                                 } else {
                                     if (annotationUtils.hasStereotype(typeElement, INTRODUCTION_TYPE)) {
-                                        beanDefinitions.put(name, typeElement);
+                                        beanDefinitions.add(name);
                                     }
                                 }
                             }
@@ -178,20 +178,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         int count = beanDefinitions.size();
         if (count > 0) {
             note("Creating bean classes for %s type elements", count);
-            beanDefinitions.forEach((key, classElement) -> {
-                String className = classElement.getQualifiedName().toString();
+            beanDefinitions.forEach(className -> {
                 if (processed.add(className)) {
-                    final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(classElement);
-                    classElement.accept(visitor, className);
-                    if (visitor.processNextRound) {
-                        processed.remove(className);
-                    } else {
+                    final TypeElement refreshedClassElement = elementUtils.getTypeElement(className);
+                    final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(refreshedClassElement);
+                    try {
+                        refreshedClassElement.accept(visitor, className);
                         visitor.getBeanDefinitionWriters().forEach((name, writer) -> {
                             String beanDefinitionName = writer.getBeanDefinitionName();
                             if (processed.add(beanDefinitionName)) {
-                                processBeanDefinitions(classElement, writer);
+                                processBeanDefinitions(refreshedClassElement, writer);
                             }
                         });
+                    } catch (PostponeToNextRoundException e) {
+                        processed.remove(className);
                     }
                 }
             });
@@ -311,7 +311,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private ConfigurationMetadata configurationMetadata;
         private ExecutableElementParamInfo constructorParameterInfo;
         private AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
-        private boolean processNextRound;
 
         /**
          * @param concreteClass The {@link TypeElement}
@@ -576,8 +575,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
 
+            TypeKind returnKind = method.getReturnType().getKind();
+            if ((returnKind == TypeKind.ERROR) && !processingOver) {
+                throw new PostponeToNextRoundException();
+            }
+
             // handle @Bean annotation for @Factory class
-            if (isFactoryType && methodAnnotationMetadata.hasDeclaredStereotype(Bean.class, Scope.class) && method.getReturnType().getKind() == TypeKind.DECLARED) {
+            if (isFactoryType && methodAnnotationMetadata.hasDeclaredStereotype(Bean.class, Scope.class) && returnKind == TypeKind.DECLARED) {
                 visitBeanFactoryMethod(method);
                 return null;
             }
@@ -955,12 +959,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
             // shouldn't visit around advice on an introduction advice instance
             if (!(beanWriter instanceof AopProxyWriter)) {
-                boolean hasAround = hasConstraints || methodAnnotationMetadata.hasStereotype(AROUND_TYPE) ;
-                if (isAopProxyType || hasAround) {
-                    if (isAopProxyType && !hasAround && !method.getModifiers().contains(Modifier.PUBLIC)) {
-                        // ignore methods that are not public and have no explicit advise
-                        return;
-                    }
+                boolean hasAround = hasConstraints || methodAnnotationMetadata.hasStereotype(AROUND_TYPE);
+                if ((isAopProxyType && method.getModifiers().contains(Modifier.PUBLIC)) || (hasAround && !modelUtils.isAbstract(concreteClass))) {
 
                     Object[] interceptorTypes = methodAnnotationMetadata.getAnnotationNamesByStereotype(AROUND_TYPE)
                             .toArray();
@@ -1275,7 +1275,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return;
             }
 
-
             boolean isParent = !declaringClass.getQualifiedName().equals(this.concreteClass.getQualifiedName());
             ExecutableElement overridingMethod = modelUtils.overridingOrHidingMethod(method, this.concreteClass).orElse(method);
             TypeElement overridingClass = modelUtils.classElementFor(overridingMethod);
@@ -1419,6 +1418,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 TypeMirror type = variable.asType();
+                if ((type.getKind() == TypeKind.ERROR) && !processingOver) {
+                    throw new PostponeToNextRoundException();
+                }
+
                 Object fieldType = modelUtils.resolveTypeReference(type);
 
                 if (isValue) {
@@ -1854,18 +1857,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 TypeMirror typeMirror = paramElement.asType();
                 TypeKind kind = typeMirror.getKind();
-                if (kind == TypeKind.ERROR) {
-                    TypeElement refreshedElement = processingEnv.getElementUtils().getTypeElement(typeMirror.toString());
-                    if (refreshedElement == null) {
-                        // if the unresolvable type is in the same enclosing type as the bean, the enclosing type is omitted from the
-                        // type mirror in error, so attempt again, prepending the enclosing type
-                        // constructor <enclosed by> class <enclosed by> enclosing type (package / outer class)
-                        refreshedElement = processingEnv.getElementUtils().getTypeElement(element.getEnclosingElement().getEnclosingElement().toString() + "." + typeMirror.toString());
-                    }
-                    if (refreshedElement != null) {
-                        typeMirror = refreshedElement.asType();
-                        kind = typeMirror.getKind();
-                    }
+                if ((kind == TypeKind.ERROR) && !processingOver) {
+                    throw new PostponeToNextRoundException();    
                 }
 
                 switch (kind) {
@@ -1930,10 +1923,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                             Object argType = modelUtils.classOfPrimitiveFor(typeName);
                             params.addParameter(argName, argType, argType);
-                        } else if (processingOver) {
-                            error(element, "Unprocessable element type [%s] for param [%s] of element %s", kind, paramElement, element);
                         } else {
-                            processNextRound = true;
+                            error(element, "Unprocessable element type [%s] for param [%s] of element %s", kind, paramElement, element);
                         }
                 }
             });
@@ -1994,4 +1985,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             return name.hashCode();
         }
     }
+
+    /**
+     * Exception to indicate postponing processing to next round.
+     */
+    private static class PostponeToNextRoundException extends RuntimeException {
+
+    }
+
 }
