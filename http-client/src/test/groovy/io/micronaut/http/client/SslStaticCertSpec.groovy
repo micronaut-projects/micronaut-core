@@ -40,7 +40,15 @@ class SslStaticCertSpec extends Specification {
             'micronaut.ssl.keyStore.path': 'classpath:keystore.p12',
             'micronaut.ssl.keyStore.password': 'foobar',
             'micronaut.ssl.keyStore.type': 'PKCS12',
-            'micronaut.ssl.ciphers': 'TLS_DH_anon_WITH_AES_128_CBC_SHA'
+            'micronaut.ssl.protocols': ['TLSv1.2'],
+            'micronaut.ssl.ciphers': ['TLS_RSA_WITH_AES_128_CBC_SHA',
+                                      'TLS_RSA_WITH_AES_256_CBC_SHA',
+                                      'TLS_RSA_WITH_AES_128_GCM_SHA256',
+                                      'TLS_RSA_WITH_AES_256_GCM_SHA384',
+                                      'TLS_DHE_RSA_WITH_AES_128_GCM_SHA256',
+                                      'TLS_DHE_RSA_WITH_AES_256_GCM_SHA384',
+                                      'TLS_DHE_DSS_WITH_AES_128_GCM_SHA256',
+                                      'TLS_DHE_DSS_WITH_AES_256_GCM_SHA384'],
     ])
 
     @Shared
@@ -64,6 +72,10 @@ class SslStaticCertSpec extends Specification {
 
         then:
         response.body() == "Hello"
+
+        cleanup:
+        client.stop()
+        context.stop()
     }
 
     @Controller('/')
