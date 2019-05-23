@@ -29,7 +29,7 @@ import io.micronaut.http.annotation.*;
 public class IssuesController {
 
     @Get("/{number}") // <2>
-    String issue(Integer number) {
+    String issue(@PathVariable Integer number) {
         return "Issue # " + number + "!"; // <3>
     }
 }

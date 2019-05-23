@@ -23,7 +23,7 @@ For example, the following defines a URI template and the `name` parameter is us
 ----
 @Post("/{name}")
 Single<Pet> save(
-    @NotBlank String name, // <1>
+    @PathVariable @NotBlank String name, // <1>
     @Body @Valid Pet pet) // <2>
 ----
 
@@ -52,6 +52,10 @@ The following table summarizes the parameter annotations, their purpose and prov
 |ann:http.annotation.QueryValue[]
 |Allows customizing the name of the URI parameter to bind from
 |`@QueryValue('userAge') Integer age`
+
+|ann:http.annotation.PathVariable[]
+|Used to bind a parameter exclusively from a <<routing, Path Variable>>.
+|`@PathVariable Long id`
 
 |ann:http.annotation.RequestAttribute[]
 |Allows specifying parameters that should be set as request attributes
