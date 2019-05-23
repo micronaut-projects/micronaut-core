@@ -53,6 +53,10 @@ The following table summarizes the parameter annotations, their purpose and prov
 |Allows customizing the name of the URI parameter to bind from
 |`@QueryValue('userAge') Integer age`
 
+|ann:http.annotation.PathVariable[]
+|Used to bind a parameter exclusively from a <<routing, Path Variable>>.
+|`@PathVariable Long id`
+
 |ann:http.annotation.RequestAttribute[]
 |Allows specifying parameters that should be set as request attributes
 |`@RequestAttribute Integer locationId`
