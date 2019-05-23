@@ -47,18 +47,16 @@ public class UnsatisfiedRouteException extends RoutingException {
     }
 
     private static String buildMessage(Argument<?> argument) {
-        Optional<String> bindableOpt = argument.getAnnotationMetadata().getAnnotationNameByStereotype(Bindable.class);
-        if (bindableOpt.isPresent()) {
-            String bindable = bindableOpt.get();
-            Optional<Class<? extends Annotation>> classOptional = argument.getAnnotationMetadata().getAnnotationType(bindable);
-            if (classOptional.isPresent()) {
-                Class<? extends Annotation> clazz = classOptional.get();
-                Optional<Object> valOptional = argument.getAnnotationMetadata().getValue(clazz);
-                if (valOptional.isPresent()) {
-                    return "Required " + clazz.getSimpleName() + " [" + valOptional.get().toString() + "] not specified";
-                } else {
-                    return "Required " + clazz.getSimpleName() + " [" + argument + "] not specified";
-                }
+
+        Optional<Class<? extends Annotation>> classOptional = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class);
+
+        if (classOptional.isPresent()) {
+            Class<? extends Annotation> clazz = classOptional.get();
+            Optional<Object> valOptional = argument.getAnnotationMetadata().getValue(clazz);
+            if (valOptional.isPresent()) {
+                return "Required " + clazz.getSimpleName() + " [" + valOptional.get().toString() + "] not specified";
+            } else {
+                return "Required " + clazz.getSimpleName() + " [" + argument + "] not specified";
             }
         }
 
