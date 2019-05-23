@@ -94,7 +94,7 @@ public class AnnotatedFunctionRouteBuilder
             String functionName = beanDefinition.getValue(FunctionBean.class, String.class).orElse(methodName);
             String functionMethod = beanDefinition.getValue(FunctionBean.class, "method", String.class).orElse(null);
 
-            List<UriRoute> routes = new ArrayList<>();
+            List<UriRoute> routes = new ArrayList<>(2);
             MediaType[] consumes = method.getValue(Consumes.class, String[].class).map((types) ->
                     Arrays.stream(types).map(MediaType::new).toArray(MediaType[]::new)
             ).orElse(null);
