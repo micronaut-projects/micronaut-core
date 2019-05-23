@@ -17,6 +17,7 @@ package io.micronaut.http.client.docs.annotation.headers;
 
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.docs.annotation.Pet;
 import io.micronaut.http.client.docs.annotation.PetOperations;
@@ -35,6 +36,6 @@ public interface PetClient extends PetOperations {
     Single<Pet> save(String name, int age);
 
     @Get("/{name}")
-    Single<Pet> get(String name);
+    Single<Pet> get(@PathVariable String name);
 }
 // end::class[]

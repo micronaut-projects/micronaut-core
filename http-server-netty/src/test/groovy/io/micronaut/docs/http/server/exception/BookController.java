@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Produces;
 
 @Requires(property = "spec.name", value = "ExceptionHandlerSpec")
@@ -27,7 +28,7 @@ import io.micronaut.http.annotation.Produces;
 public class BookController {
     @Produces(MediaType.TEXT_PLAIN)
     @Get("/stock/{isbn}")
-    Integer stock(String isbn) {
+    Integer stock(@PathVariable String isbn) {
         throw new OutOfStockException();
     }
 }

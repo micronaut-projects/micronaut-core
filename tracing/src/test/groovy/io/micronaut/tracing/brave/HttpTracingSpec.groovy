@@ -21,6 +21,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.PathVariable
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -222,13 +223,13 @@ class HttpTracingSpec extends Specification {
         @Inject TracedClient tracedClient
 
         @Get("/hello/{name}")
-        String hello(String name) {
+        String hello(@PathVariable String name) {
             spanCustomizer.tag("foo", "bar")
             return name
         }
 
         @Get("/rxjava/{name}")
-        Single<String> rxjava(String name) {
+        Single<String> rxjava(@PathVariable String name) {
             Single.fromCallable({->
                 spanCustomizer.tag("foo", "bar")
                 return name
@@ -236,17 +237,17 @@ class HttpTracingSpec extends Specification {
         }
 
         @Get("/error/{name}")
-        String error(String name) {
+        String error(@PathVariable String name) {
             throw new RuntimeException("bad")
         }
 
         @Get("/nested/{name}")
-        String nested(String name) {
+        String nested(@PathVariable String name) {
             tracedClient.hello(name)
         }
 
         @Get("/nestedError/{name}")
-        String nestedError(String name) {
+        String nestedError(@PathVariable String name) {
             tracedClient.error(name)
         }
     }
@@ -254,9 +255,9 @@ class HttpTracingSpec extends Specification {
     @Client('/traced')
     static interface TracedClient {
         @Get("/hello/{name}")
-        String hello(String name)
+        String hello(@PathVariable String name)
 
         @Get("/error/{name}")
-        String error(String name)
+        String error(@PathVariable String name)
     }
 }

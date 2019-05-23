@@ -48,7 +48,7 @@ import io.micronaut.http.annotation.*
 class HelloController {
 
     @Get("/hello/{name}")
-    fun hello(name: String): String {
+    fun hello(@PathVariable name: String): String {
         return "Hello $name"
     }
 }

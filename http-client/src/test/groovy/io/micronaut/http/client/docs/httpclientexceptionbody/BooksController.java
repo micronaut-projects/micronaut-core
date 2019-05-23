@@ -20,6 +20,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,7 +31,7 @@ import java.util.Map;
 public class BooksController {
 
     @Get("/{isbn}")
-    public HttpResponse find(String isbn) {
+    public HttpResponse find(@PathVariable String isbn) {
         if (isbn.equals("1680502395")) {
             Map<String, Object> m = new HashMap<>();
             m.put("status", 401);

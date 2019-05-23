@@ -47,7 +47,7 @@ public class ShoppingController {
 
     // tag::add[]
     @Post("/cart/{name}")
-    Cart addItem(Session session, @NotBlank String name) { // <2>
+    Cart addItem(Session session, @PathVariable @NotBlank String name) { // <2>
         Cart cart = session.get(ATTR_CART, Cart.class).orElseGet(() -> { // <3>
             Cart newCart = new Cart();
             session.put(ATTR_CART, newCart); // <4>

@@ -82,7 +82,7 @@ Consider this interface:
 ----
 interface HelloOperations {
     @Get("/hello/{name}")
-    String hello(String name);
+    String hello(@PathVariable String name);
 }
 ----
 
@@ -93,7 +93,7 @@ At compile time the parameter name `name` is lost and becomes simply `arg0` when
 ----
 interface HelloOperations {
     @Get("/hello/{name}")
-    String hello(@QueryValue("name") String name);
+    String hello(@PathVariable("name") String name);
 }
 ----
 

@@ -210,7 +210,7 @@ import io.micronaut.http.annotation.*;
 class Foo {
 
     @Get("/{name}")
-    String abc(@Header("pet-name") String name, @QueryValue("name") String pathName) {
+    String abc(@Header("pet-name") String name, @PathVariable("name") String pathName) {
         return "abc";
     }
 }

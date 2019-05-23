@@ -18,6 +18,7 @@ package io.micronaut.docs.client.versioning;
 // tag::imports[]
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.client.annotation.Client;
 import io.reactivex.Single;
 // end::imports[]
@@ -28,10 +29,10 @@ import io.reactivex.Single;
 public interface HelloClient {
 
     @Get("/greeting/{name}")
-    String sayHello(String name);
+    String sayHello(@PathVariable String name);
 
     @Version("2")
     @Get("/greeting/{name}")
-    Single<String> sayHelloTwo(String name); // <2>
+    Single<String> sayHelloTwo(@PathVariable String name); // <2>
 }
 // end::clazz[]

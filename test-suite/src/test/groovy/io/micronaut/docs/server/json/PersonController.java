@@ -23,6 +23,7 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
@@ -48,7 +49,7 @@ public class PersonController {
     }
 
     @Get("/{name}")
-    public Maybe<Person> get(String name) {
+    public Maybe<Person> get(@PathVariable String name) {
         if (inMemoryDatastore.containsKey(name)) {
             return Maybe.just(inMemoryDatastore.get(name));
         }
