@@ -28,6 +28,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -105,7 +106,7 @@ class CompletableFutureCrudSpec extends Specification {
         AtomicLong currentId = new AtomicLong(0)
 
         @Override
-        CompletableFuture<Book> get(Long id) {
+        CompletionStage<Book> get(Long id) {
             Book book = books.get(id)
             return CompletableFuture.completedFuture(book)
         }
@@ -141,7 +142,7 @@ class CompletableFutureCrudSpec extends Specification {
     static interface BookApi {
 
         @Get("/{id}")
-        CompletableFuture<Book> get(Long id)
+        CompletionStage<Book> get(Long id)
 
         @Get
         CompletableFuture<List<Book>> list()

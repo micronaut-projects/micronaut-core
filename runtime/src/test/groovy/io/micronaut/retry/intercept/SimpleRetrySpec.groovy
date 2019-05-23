@@ -25,6 +25,7 @@ import spock.lang.Specification
 
 import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 import java.util.concurrent.ExecutionException
 
 /**
@@ -108,6 +109,35 @@ class SimpleRetrySpec extends Specification {
         counterService.count = 0
         def single = counterService.getCountCompletable()
         single.get()
+
+        then:"The original exception is thrown"
+        def e = thrown(ExecutionException)
+        e.cause.message == "Bad count"
+
+        cleanup:
+        context.stop()
+    }
+
+    void "test simply retry with completion stage"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+        MyRetryListener listener = context.getBean(MyRetryListener)
+
+        when:"A method is annotated retry"
+        int result = counterService.getCountCompletionStage().toCompletableFuture().get()
+
+
+        then:"It executes until successful"
+        listener.events.size() == 2
+        result == 3
+
+        when:"The threshold can never be met"
+        listener.reset()
+        counterService.countThreshold = 10
+        counterService.count = 0
+        def single = counterService.getCountCompletionStage()
+        single.toCompletableFuture().get()
 
         then:"The original exception is thrown"
         def e = thrown(ExecutionException)
@@ -212,6 +242,7 @@ class SimpleRetrySpec extends Specification {
         int countIncludes = 0
         int countExcludes = 0
         int countCompletion = 0
+        int _countCompletionStage = 0
         int countThreshold = 3
 
         @Retryable(attempts = '5', delay = '5ms')
@@ -279,6 +310,17 @@ class SimpleRetrySpec extends Specification {
                     throw new IllegalStateException("Bad count")
                 }
                 return countCompletion
+            })
+        }
+
+        @Retryable(attempts = '5', delay = '5ms')
+        CompletionStage<Integer> getCountCompletionStage() {
+            CompletableFuture.supplyAsync({ ->
+                _countCompletionStage++
+                if(_countCompletionStage < countThreshold) {
+                    throw new IllegalStateException("Bad count")
+                }
+                return _countCompletionStage
             })
         }
     }

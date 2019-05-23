@@ -32,6 +32,7 @@ import spock.util.concurrent.PollingConditions
 
 import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 
 /**
  * @author Graeme Rocher
@@ -66,6 +67,7 @@ class SyncCacheSpec extends Specification {
         result == 1
         counterService.flowableValue("test").blockingFirst() == 1
         counterService.futureValue("test").get() == 1
+        counterService.stageValue("test").toCompletableFuture().get() == 1
         counterService.singleValue("test").blockingGet() == 1
         counterService.getValue("test") == 1
         counterService.getValue("test") == 1
@@ -77,6 +79,7 @@ class SyncCacheSpec extends Specification {
         result == 2
         counterService.flowableValue("test").blockingFirst() == 1
         counterService.futureValue("test").get() == 1
+        counterService.stageValue("test").toCompletableFuture().get() == 1
         counterService.getValue("test") == 1
 
         when:
@@ -88,6 +91,7 @@ class SyncCacheSpec extends Specification {
         counterService.reset("test")
         then:
         counterService.futureValue("test").get() == 0
+        counterService.stageValue("test").toCompletableFuture().get() == 0
 
 
 
@@ -97,6 +101,7 @@ class SyncCacheSpec extends Specification {
         then:
         counterService.getValue("test") == 3
         counterService.futureValue("test").get() == 3
+        counterService.stageValue("test").toCompletableFuture().get() == 3
 
         when:
         result = counterService.increment("test")
@@ -105,6 +110,7 @@ class SyncCacheSpec extends Specification {
         result == 4
         counterService.getValue("test") == 4
         counterService.futureValue("test").get() == 4
+        counterService.stageValue("test").toCompletableFuture().get() == 4
 
         when:
         result = counterService.futureIncrement("test").get()
@@ -113,6 +119,7 @@ class SyncCacheSpec extends Specification {
         result == 5
         counterService.getValue("test") == 5
         counterService.futureValue("test").get() == 5
+        counterService.stageValue("test").toCompletableFuture().get() == 5
 
         when:
         counterService.reset()
@@ -233,6 +240,11 @@ class SyncCacheSpec extends Specification {
 
         @Cacheable
         CompletableFuture<Integer> futureValue(String name) {
+            return CompletableFuture.completedFuture(counters.computeIfAbsent(name, { 0 }))
+        }
+
+        @Cacheable
+        CompletionStage<Integer> stageValue(String name) {
             return CompletableFuture.completedFuture(counters.computeIfAbsent(name, { 0 }))
         }
 
