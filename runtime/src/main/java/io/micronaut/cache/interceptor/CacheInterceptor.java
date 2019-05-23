@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
@@ -115,7 +116,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
         if (context.hasStereotype(CacheConfig.class)) {
             ReturnType returnTypeObject = context.getReturnType();
             Class returnType = returnTypeObject.getType();
-            if (CompletableFuture.class.isAssignableFrom(returnType)) {
+            if (CompletionStage.class.isAssignableFrom(returnType)) {
                 return interceptCompletableFuture(context, returnTypeObject, returnType);
             } else if (Publishers.isConvertibleToPublisher(returnType)) {
                 return interceptPublisher(context, returnTypeObject, returnType);

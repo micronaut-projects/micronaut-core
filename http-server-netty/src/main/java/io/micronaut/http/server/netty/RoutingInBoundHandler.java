@@ -116,6 +116,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -964,7 +965,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Class<?> javaReturnType = genericReturnType.getType();
 
             AtomicReference<io.micronaut.http.HttpRequest<?>> requestReference = new AtomicReference<>(request);
-            boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
+            boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
             boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
             boolean isSingle =
                     isReactiveReturnType && Publishers.isSingle(javaReturnType) ||
