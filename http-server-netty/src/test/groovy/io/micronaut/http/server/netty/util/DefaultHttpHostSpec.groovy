@@ -288,6 +288,27 @@ class DefaultHttpHostSpec extends Specification {
         server.close()
     }
 
+    void "test host retrieved from host header with no URI"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
+        def request = Stub(HttpRequest) {
+            getHeaders() >> new MockHttpHeaders([
+                    "Host": ["micronaut"],
+            ])
+            getUri() >> new URI("/")
+        }
+
+        when:
+        String host = hostResolver.resolve(request)
+
+        then:
+        host == "http://micronaut"
+
+        cleanup:
+        server.close()
+    }
+
+
     void "test host retrieved from host header with port"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
@@ -331,7 +352,7 @@ class DefaultHttpHostSpec extends Specification {
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
         def request = Stub(HttpRequest) {
             getHeaders() >> new MockHttpHeaders([:])
-            getUri() >> new URI("")
+            getUri() >> new URI("/")
         }
 
         when:
