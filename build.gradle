@@ -745,6 +745,20 @@ subprojects { Project subproject ->
     }
 
     task allDeps(type: DependencyReportTask) {}
+
+    task keystorePrep(type: Exec) {
+        workingDir "$projectDir"
+        File file = new File("${projectDir}/src/test/resources/keystore.p12")
+        if (!file.exists()) {
+            commandLine 'sh', '-c', "../generateKeystore.sh keystore.p12"
+        }
+    }
+
+    afterEvaluate {
+        if (subproject.name == "http-client") {
+            check.dependsOn("keystorePrep")
+        }
+    }
 }
 
 apply from: "gradle/docs.gradle"
@@ -796,3 +810,6 @@ dependencyUpdates.resolutionStrategy {
         }
     }
 }
+
+
+
