@@ -104,12 +104,6 @@ httpServer:
     https: Securing the Server with HTTPS
   views:
     title: Server Side View Rendering
-    thymeleaf: Thymeleaf
-    handlebars: Handlebars.java
-    velocity: Apache Velocity
-    freemarker: Apache Freemarker
-    csp: CSP Header Support
-    views-security: Security Integration
   openapi: OpenAPI / Swagger Support
   graphql: GraphQL Support
 httpClient:
