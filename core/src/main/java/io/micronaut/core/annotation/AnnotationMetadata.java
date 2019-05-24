@@ -19,6 +19,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 
 import javax.annotation.Nonnull;
@@ -456,7 +457,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return The {@link AnnotationValue}
      */
     @Override
-    default @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@Nonnull Class<T> annotationClass) {
+    default @Nonnull <T extends Annotation> Optional<AnnotationValue<T>>    findAnnotation(@Nonnull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         Repeatable repeatable = annotationClass.getAnnotation(Repeatable.class);
         if (repeatable != null) {
@@ -551,7 +552,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return An {@link Optional} class
      */
-    default @Nonnull Optional<Class> classValue(@Nonnull String annotation) {
+    default @Nonnull Optional<Class<?>> classValue(@Nonnull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return classValue(annotation, VALUE_MEMBER);
     }
@@ -563,11 +564,13 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return An {@link Optional} class
      */
-    default @Nonnull Optional<Class> classValue(@Nonnull String annotation, @Nonnull String member) {
+    default @Nonnull Optional<Class<?>> classValue(@Nonnull String annotation, @Nonnull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
-        return getValue(annotation, member, Class.class);
+        Optional value = getValue(annotation, member, Class.class);
+        //noinspection unchecked
+        return value;
     }
 
     /**
@@ -576,10 +579,10 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return An {@link Optional} class
      */
-    default @Nonnull Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation) {
+    default @Nonnull Optional<Class<?>> classValue(@Nonnull Class<? extends Annotation> annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
 
-        return classValue(annotation.getName());
+        return classValue(annotation, VALUE_MEMBER);
     }
 
     /**
@@ -589,12 +592,14 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return An {@link Optional} class
      */
-    default @Nonnull Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default @Nonnull Optional<Class<?>> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
         return classValue(annotation.getName(), member);
     }
+
+
 
     /**
      * The value as an {@link OptionalInt} for the given annotation and member.
@@ -612,6 +617,97 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * The value as an {@link OptionalInt} for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return THe {@link OptionalInt} value
+     */
+    default @Nonnull OptionalInt intValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return intValue(annotation.getName(), member);
+    }
+
+    /**
+     * The value as an {@link OptionalInt} for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @return THe {@link OptionalInt} value
+     */
+    default @Nonnull OptionalInt intValue(@Nonnull Class<? extends Annotation> annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return intValue(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The value as an optional string for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return The string value if it is present
+     */
+    default @Nonnull Optional<String> stringValue(@Nonnull String annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return getValue(annotation, member, String.class);
+    }
+
+    /**
+     * The value as an optional string for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return The string value if it is present
+     */
+    default @Nonnull Optional<String> stringValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return stringValue(annotation.getName(), member);
+    }
+
+    /**
+     * The values as string array for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return The string values if it is present
+     */
+    default @Nonnull String[] stringValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return StringUtils.EMPTY_STRING_ARRAY;
+    }
+
+    /**
+     * The values as string array for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @return The string values if it is present
+     */
+    default @Nonnull String[] stringValues(@Nonnull Class<? extends Annotation> annotation) {
+        return stringValues(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The value as an optional string for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @return The string value if it is present
+     */
+    default @Nonnull Optional<String> stringValue(@Nonnull Class<? extends Annotation> annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return stringValue(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The value as an optional string for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @return The string value if it is present
+     */
+    default @Nonnull Optional<String> stringValue(@Nonnull String annotation) {
+        return stringValue(annotation, VALUE_MEMBER);
+    }
+
+    /**
      * The value as an {@link OptionalDouble} for the given annotation and member.
      *
      * @param annotation The annotation
@@ -624,6 +720,29 @@ public interface AnnotationMetadata extends AnnotationSource {
 
         Optional<Double> result = getValue(annotation, member, Double.class);
         return result.map(OptionalDouble::of).orElseGet(OptionalDouble::empty);
+    }
+
+    /**
+     * The value as an {@link OptionalDouble} for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return THe {@link OptionalDouble} value
+     */
+    default @Nonnull OptionalDouble doubleValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return doubleValue(annotation.getName(), member);
+    }
+
+    /**
+     * The value as an {@link OptionalDouble} for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @return THe {@link OptionalDouble} value
+     */
+    default @Nonnull OptionalDouble doubleValue(@Nonnull Class<? extends Annotation> annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return doubleValue(annotation, VALUE_MEMBER);
     }
 
     /**
@@ -709,7 +828,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Returns whether the value of the given member is <em>true</em>.
+     * Returns whether the value of the given member is present.
      *
      * @param annotation The annotation class
      * @param member     The annotation member

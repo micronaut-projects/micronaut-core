@@ -2254,7 +2254,7 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
         if (qualifier == null) {
-            Optional<String> optional = beanDefinition.getValue(javax.inject.Named.class, String.class);
+            Optional<String> optional = beanDefinition.stringValue(javax.inject.Named.class);
             qualifier = (Qualifier<T>) optional.map(name -> Qualifiers.byAnnotation(beanDefinition, name)).orElse(null);
         }
         return qualifier;

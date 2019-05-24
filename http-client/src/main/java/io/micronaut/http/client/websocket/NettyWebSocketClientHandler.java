@@ -101,7 +101,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         this.originatingRequest = request;
         this.emitter = emitter;
         this.webSocketStateBinderRegistry = new WebSocketStateBinderRegistry(requestBinderRegistry != null ? requestBinderRegistry : new DefaultRequestBinderRegistry(ConversionService.SHARED));
-        String clientPath = webSocketBean.getBeanDefinition().getValue(ClientWebSocket.class, String.class).orElse("");
+        String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
         UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
         this.matchInfo = matchTemplate.match(request.getPath()).orElse(null);
     }
