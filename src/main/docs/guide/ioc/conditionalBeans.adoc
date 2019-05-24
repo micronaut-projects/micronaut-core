@@ -12,11 +12,11 @@ NOTE: Kotlin currently does not support repeatable annotations. Use the `@Requir
 
 If you have multiple requirements that you find you may need to repeat on multiple beans then you can define a meta-annotation with the requirements:
 
-snippet::io.micronaut.docs.requires.RequiresJdbc[tags="annotation",indent=0, title="Using a @Requires meta-annotation"]
+snippet::io.micronaut.docs.requires.RequiresJdbc[tags="annotation",indent=0, title="Creating a @RequiresJdbc meta-annotation"]
 
 In the above example an annotation called `RequiresJdbc` is defined that can then be used on the `JdbcBookService` instead:
 
-.Using a @Requires meta-annotation
+.Using a meta-annotation
 [source,java]
 ----
 @RequiresJdbc
