@@ -18,6 +18,8 @@ if [ "$1." == "." ]; then
     cp keystore.p12 ./http-client/build/resources/test/keystore.p12
   fi
 else
+  PWD=`pwd`
+  echo Copying keystore.p12 from $PWD
   cp keystore.p12 ./src/test/resources/$1
   if [ -f ./build/resources/test/$1 ]; then
     cp keystore.p12 ./build/resources/test/$1

@@ -14,11 +14,15 @@ Micronaut can be imported into IntelliJ IDEA by opening the `build.gradle` file.
 
 ## SSL Setup for localhost development
 
-From the project root directory, execute the command:
+To pass tests, you should not need to do anything to set up SSL.
+
+In the project root directory, there is a shell script to generate an X.509 PKCS12 keystore which is used by the unit tests:
 
 ./generateKeystore.sh
 
-This command also gets invoked by travis-build-pr.sh so that tests will pass during CI checks.
+This command gets invoked automatically by travis-build-pr.sh so that tests will pass during CI checks, and it gets invoked automatically by ./gradlew check.
+
+The generated ./http-client/src/main/resources/keystore.p12 is in the .gitignore, so the keystores you generate will not be committed to the master repo.
 
 ## Docker Setup
 
