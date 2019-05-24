@@ -34,6 +34,9 @@ class SslStaticCertSpec extends Specification {
     String host = Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST)
 
     @Shared
+    int port = SocketUtils.findAvailableTcpPort()
+
+    @Shared
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run([
             'micronaut.ssl.enabled': true,
@@ -41,6 +44,7 @@ class SslStaticCertSpec extends Specification {
             'micronaut.ssl.keyStore.password': 'foobar',
             'micronaut.ssl.keyStore.type': 'PKCS12',
             'micronaut.ssl.protocols': ['TLSv1.2'],
+            'micronaut.ssl.port': port,
             'micronaut.ssl.ciphers': ['TLS_RSA_WITH_AES_128_CBC_SHA',
                                       'TLS_RSA_WITH_AES_256_CBC_SHA',
                                       'TLS_RSA_WITH_AES_128_GCM_SHA256',
@@ -60,7 +64,7 @@ class SslStaticCertSpec extends Specification {
 
     void "expect the url to be https"() {
         expect:
-        embeddedServer.getURL().toString() == "https://${host}:8443"
+        embeddedServer.getURL().toString() == "https://${host}:${port}"
     }
 
     void "test send https request"() {
@@ -72,10 +76,6 @@ class SslStaticCertSpec extends Specification {
 
         then:
         response.body() == "Hello"
-
-        cleanup:
-        client.stop()
-        context.stop()
     }
 
     @Controller('/')
