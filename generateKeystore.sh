@@ -14,9 +14,13 @@ keytool -importkeystore -srckeystore keystore.p12 -srcstoretype PKCS12 -srcstore
 
 if [ "$1." == "." ]; then
   cp keystore.p12 ./http-client/src/test/resources/keystore.p12
-  cp keystore.p12 ./http-client/build/resources/test/keystore.p12
+  if [ -f ./http-client/build/resources/test/keystore.p12 ]; then
+    cp keystore.p12 ./http-client/build/resources/test/keystore.p12
+  fi
 else
   cp keystore.p12 ./src/test/resources/$1
-  cp keystore.p12 ./build/resources/test/$1
+  if [ -f ./build/resources/test/$1 ]; then
+    cp keystore.p12 ./build/resources/test/$1
+  fi
 fi
 
