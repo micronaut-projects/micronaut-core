@@ -30,7 +30,6 @@ include "session"
 include "spring"
 include "tracing"
 include "validation"
-include "views"
 include "websocket"
 
 // test suites
