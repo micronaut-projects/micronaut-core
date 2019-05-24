@@ -4,6 +4,10 @@
 
 If you are interested in contributing to Micronaut and are looking for issues to work on, take a look at the issues tagged with [help wanted](https://github.com/micronaut-projects/micronaut-core/issues?q=is%3Aopen+is%3Aissue+label%3A%22status%3A+help+wanted%22).
 
+## JDK Setup
+
+Micronaut currently requires JDK 8
+
 ## IDE Setup
 
 Micronaut can be imported into IntelliJ IDEA by opening the `build.gradle` file.
@@ -16,11 +20,23 @@ From the project root directory, execute the command:
 
 This command also gets invoked by travis-build-pr.sh so that tests will pass during CI checks.
 
+## Docker Setup
+
+Micronaut tests currently require docker to be installed.
+
+For debian/ubuntu:
+
+```bash
+sudo apt install docker.io
+sudo usermod -a -G docker $USER
+# then reboot for the permission changes to take effect
+```
+
 ## Running Tests
 
-To run the tests use `./gradlew check`. 
+To run the tests use `./gradlew check`.
 
-[Geb](http://gebish.org) functional tests are ignored unless you specify the geb environment via system property. 
+[Geb](http://gebish.org) functional tests are ignored unless you specify the geb environment via system property.
 
 To run with Chrome `./gradlew -Dgeb.env=chrome check`.
 
@@ -80,17 +96,17 @@ Once you are satisfied with your changes:
 
 ## Checkstyle
 
-We want to keep the code clean, following good practices about organization, javadoc and style as much as possible. 
+We want to keep the code clean, following good practices about organization, javadoc and style as much as possible.
 
 Micronaut uses [Checkstyle](http://checkstyle.sourceforge.net/) to make sure that all the code follows those standards. The configuration file is defined in `config/checkstyle/checkstyle.xml` and to execute the Checkstyle you
 need to run:
- 
+
 ```
 ./gradlew <module-name>:checkstyleMain
 ```
 
 Before start contributing with new code it is recommended to install IntelliJ [CheckStyle-IDEA](https://plugins.jetbrains.com/plugin/1065-checkstyle-idea) plugin and configure it to use Micronaut's checkstyle configuration file.
-  
+
 IntelliJ will mark in red the issues Checkstyle finds. For example:
 
 ![](https://github.com/micronaut-projects/micronaut-core/raw/master/src/main/docs/resources/img/checkstyle-issue.png)
