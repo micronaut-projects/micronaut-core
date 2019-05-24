@@ -17,6 +17,7 @@ package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.format.Format
+import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -24,6 +25,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Head
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
@@ -42,26 +44,25 @@ import java.time.LocalDate
  * @author Graeme Rocher
  * @since 1.0
  */
-class HttpGetSpec extends Specification {
+class HttpHeadSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer)
 
-    void "test simple get request"() {
+    void "test simple head request"() {
         given:
         HttpClient client = HttpClient.create(embeddedServer.getURL())
 
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/simple").header("Accept-Encoding", "gzip")
+                HttpRequest.HEAD("/head/simple").header("Accept-Encoding", "gzip")
         ))
         Optional<String> body = flowable.map({res ->
             res.getBody(String)}
         ).blockingFirst()
 
         then:
-        body.isPresent()
-        body.get() == 'success'
+        !body.isPresent()
 
         cleanup:
         client.stop()
@@ -75,14 +76,14 @@ class HttpGetSpec extends Specification {
 
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/doesntexist")
+                HttpRequest.HEAD("/head/doesntexist")
         ))
 
         flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Page Not Found"
+        e.message == "Not Found"
         e.status == HttpStatus.NOT_FOUND
 
         cleanup:
@@ -96,16 +97,16 @@ class HttpGetSpec extends Specification {
 
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/error"), Argument.of(String), Argument.of(String)
+                HttpRequest.HEAD("/head/error"), Argument.of(String), Argument.of(String)
         ))
 
         flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Server error"
+        e.message == "Internal Server Error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
-        e.response.getBody(String).get() == "Server error"
+        !e.response.getBody(String).isPresent()
 
         cleanup:
         client.stop()
@@ -118,14 +119,14 @@ class HttpGetSpec extends Specification {
 
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/jsonError"), Argument.of(String), Argument.of(Map)
+                HttpRequest.HEAD("/get/jsonError"), Argument.of(String), Argument.of(Map)
         ))
 
         flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "{foo=bar}"
+        e.message == "Internal Server Error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
 
         cleanup:
@@ -139,7 +140,7 @@ class HttpGetSpec extends Specification {
 
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/doesntexist")
+                HttpRequest.GET("/head/doesntexist")
         ))
 
         def response = flowable.onErrorReturn({ error ->
@@ -168,15 +169,14 @@ class HttpGetSpec extends Specification {
 
         when:
         HttpResponse<String> response = client.exchange(
-                HttpRequest.GET("/get/simple"),
+                HttpRequest.HEAD("/head/simple"),
                 String
         )
 
         def body = response.getBody()
 
         then:
-        body.isPresent()
-        body.get() == 'success'
+        !body.isPresent()
 
         cleanup:
         asyncClient.stop()
@@ -189,15 +189,14 @@ class HttpGetSpec extends Specification {
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/simple"), String
+                HttpRequest.HEAD("/head/simple"), String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
         def body = response.getBody()
 
         then:
         response.status == HttpStatus.OK
-        body.isPresent()
-        body.get() == 'success'
+        !body.isPresent()
 
         cleanup:
         client.stop()
@@ -210,23 +209,20 @@ class HttpGetSpec extends Specification {
 
         when:
         Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/pojo"), Book
+                HttpRequest.HEAD("/head/pojo"), Book
         ))
 
         HttpResponse<Book> response = flowable.blockingFirst()
         Optional<Book> body = response.getBody()
 
         then:
-        response.contentType.isPresent()
-        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
+        !response.contentType.isPresent()
+        response.contentLength == -1
         response.status == HttpStatus.OK
-        body.isPresent()
-        body.get().title == 'The Stand'
-
+        !body.isPresent()
 
         cleanup:
         client.stop()
-
     }
 
     void "test simple retrieve request with POJO"() {
@@ -236,14 +232,12 @@ class HttpGetSpec extends Specification {
 
         when:
         Flowable<Book> flowable = Flowable.fromPublisher(client.retrieve(
-                HttpRequest.GET("/get/pojo"), Book
-        ))
-
-        Book book = flowable.blockingFirst()
+                HttpRequest.HEAD("/head/pojo"), Book
+        )).blockingFirst()
 
         then:
-        book != null
-        book.title == "The Stand"
+        def ex = thrown(HttpClientResponseException)
+        ex.message == "Empty body"
 
 
         cleanup:
@@ -257,27 +251,17 @@ class HttpGetSpec extends Specification {
 
         when:
         Flowable<HttpResponse<List<Book>>> flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/pojoList"), Argument.of(List, Book)
+                HttpRequest.HEAD("/head/pojoList"), Argument.of(List, Book)
         ))
 
         HttpResponse<List<Book>> response = flowable.blockingFirst()
         Optional<List<Book>> body = response.getBody()
 
         then:
-        response.contentType.isPresent()
-        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
+        !response.contentType.isPresent()
+        response.contentLength == -1
         response.status == HttpStatus.OK
-        body.isPresent()
-
-
-        when:
-        List<Book> list = body.get()
-
-        then:
-        list.size() == 1
-        list.get(0) instanceof Book
-        list.get(0).title == 'The Stand'
-
+        !body.isPresent()
 
         cleanup:
         client.stop()
@@ -288,21 +272,37 @@ class HttpGetSpec extends Specification {
         MyGetHelper helper = embeddedServer.applicationContext.getBean(MyGetHelper)
 
         expect:
-        helper.simple() == "success"
-        helper.simpleSlash() == "success"
-        helper.simplePreceedingSlash() == "success"
-        helper.simpleDoubleSlash() == "success"
-        helper.queryParam() == "a!b"
+        helper.simple() == null
+        helper.simpleSlash() == null
+        helper.simplePreceedingSlash() == null
+        helper.simpleDoubleSlash() == null
+        helper.queryParam() == null
     }
 
     void "test query parameter with @Client interface"() {
         given:
         MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
 
-        expect:
-        client.queryParam('{"service":["test"]}') == '{"service":["test"]}'
-        client.queryParam('foo', 'bar') == 'foo-bar'
-        client.queryParam('foo%', 'bar') == 'foo%-bar'
+        when:
+        client.queryParam('{"service":["test"]}')
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.message == "Empty body"
+
+        when:
+        client.queryParam('foo', 'bar')
+
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.message == "Empty body"
+
+        when:
+        client.queryParam('foo%', 'bar')
+
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.message == "Empty body"
     }
 
     void "test body availability"() {
@@ -311,7 +311,7 @@ class HttpGetSpec extends Specification {
 
         when:
         Flowable<HttpResponse> flowable = client.exchange(
-                HttpRequest.GET("/get/simple")
+                HttpRequest.HEAD("/head/simple")
         )
         String body
         flowable.firstOrError().subscribe((Consumer){ HttpResponse res ->
@@ -322,30 +322,13 @@ class HttpGetSpec extends Specification {
 
         then:
         conditions.eventually {
-            assert body == 'success'
+            body == null
         }
 
         cleanup:
         client.stop()
     }
 
-    void "test blocking body availability"() {
-        given:
-        HttpClient backing = HttpClient.create(embeddedServer.getURL())
-        BlockingHttpClient client = backing.toBlocking()
-
-        when:
-        HttpResponse res = client.exchange(
-                HttpRequest.GET("/get/simple")
-        )
-        String body = res.getBody(String).orElse(null)
-
-        then:
-        body == null
-
-        cleanup:
-        backing.stop()
-    }
 
     void "test that Optional.empty() should return 404"() {
         given:
@@ -353,14 +336,14 @@ class HttpGetSpec extends Specification {
 
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/empty")
+                HttpRequest.HEAD("/head/empty")
         ))
 
         HttpResponse<Optional<String>> response = flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Page Not Found"
+        e.message == "Not Found"
         e.status == HttpStatus.NOT_FOUND
 
         cleanup:
@@ -374,12 +357,12 @@ class HttpGetSpec extends Specification {
 
         when:
         String body = client.toBlocking().retrieve(
-                HttpRequest.GET("/get/notEmpty"), String
+                HttpRequest.HEAD("/head/notEmpty"), String
         )
 
-
         then:
-        body == "not empty"
+        def ex = thrown(HttpClientResponseException)
+        ex.message == "Empty body"
 
         cleanup:
         client.stop()
@@ -392,36 +375,33 @@ class HttpGetSpec extends Specification {
         Date d = new Date(2018, 10, 20)
         LocalDate dt = LocalDate.now()
 
-        expect:
-        client.formatDate(d) == d.toString()
-        client.formatDateQuery(d) == d.toString()
-        client.formatDateTime(dt) == dt.toString()
-        client.formatDateTimeQuery(dt) == dt.toString()
-    }
+        when:
+        client.formatDate(d)
 
-    void "test controller slash concatenation"() {
-        given:
-        BlockingHttpClient client = HttpClient.create(embeddedServer.getURL()).toBlocking()
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.message == "Empty body"
 
-        expect:
-        client.retrieve("/noslash/slash") == "slash"
-        client.retrieve("/noslash/slash/") == "slash"
-        client.retrieve("/noslash/noslash") == "noslash"
-        client.retrieve("/noslash/noslash/") == "noslash"
-        client.retrieve("/slash/slash") == "slash"
-        client.retrieve("/slash/slash/") == "slash"
-        client.retrieve("/slash/noslash") == "noslash"
-        client.retrieve("/slash/noslash/") == "noslash"
+        when:
+        client.formatDateQuery(d)
 
-        client.retrieve("/ending-slash/slash") == "slash"
-        client.retrieve("/ending-slash/slash/") == "slash"
-        client.retrieve("/ending-slash/noslash") == "noslash"
-        client.retrieve("/ending-slash/noslash/") == "noslash"
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.message == "Empty body"
 
-        client.retrieve("/noslash") == "noslash"
-        client.retrieve("/noslash/") == "noslash"
-        client.retrieve("/slash") == "slash"
-        client.retrieve("/slash/") == "slash"
+        when:
+        client.formatDateTime(dt)
+
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.message == "Empty body"
+
+        when:
+        client.formatDateTimeQuery(dt)
+
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.message == "Empty body"
     }
 
     void "test a request with a custom host header"() {
@@ -430,19 +410,19 @@ class HttpGetSpec extends Specification {
 
         when:
         String body = client.toBlocking().retrieve(
-                HttpRequest.GET("/get/host").header("Host", "http://foo.com"), String
+                HttpRequest.HEAD("/head/host").header("Host", "http://foo.com"), String
         )
 
-
         then:
-        body == "http://foo.com"
+        def ex = thrown(HttpClientResponseException)
+        ex.message == "Empty body"
 
         cleanup:
         client.stop()
         client.close()
     }
 
-    @Controller("/get")
+    @Controller("/head")
     static class GetController {
 
         @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
@@ -516,64 +496,6 @@ class HttpGetSpec extends Specification {
         }
     }
 
-
-    @Controller("noslash")
-    static class NoSlashController {
-
-        @Get("/slash")
-        String slash() {
-            "slash"
-        }
-
-        @Get("noslash")
-        String noSlash() {
-            "noslash"
-        }
-    }
-
-
-    @Controller("/slash")
-    static class SlashController {
-
-        @Get("/slash")
-        String slash() {
-            "slash"
-        }
-
-        @Get("noslash")
-        String noSlash() {
-            "noslash"
-        }
-    }
-
-    @Controller("/ending-slash/")
-    static class EndingSlashController {
-
-        @Get("/slash/")
-        String slash() {
-            "slash"
-        }
-
-        @Get("noslash/")
-        String noSlash() {
-            "noslash"
-        }
-    }
-
-    @Controller
-    static class SlashRootController {
-
-        @Get("/slash")
-        String slash() {
-            "slash"
-        }
-
-        @Get("noslash")
-        String noSlash() {
-            "noslash"
-        }
-    }
-
     static class Book {
         String title
     }
@@ -582,39 +504,39 @@ class HttpGetSpec extends Specification {
         String message
     }
 
-    @Client("/get")
+    @Client("/head")
     static interface MyGetClient {
-        @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
+        @Head(value = "/simple")
         String simple()
 
-        @Get("/pojo")
+        @Head("/pojo")
         Book pojo()
 
-        @Get("/pojoList")
+        @Head("/pojoList")
         List<Book> pojoList()
 
-        @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
+        @Head(value = "/error")
         HttpResponse error()
 
-        @Get("/jsonError")
+        @Head("/jsonError")
         HttpResponse jsonError()
 
-        @Get("/queryParam")
+        @Head("/queryParam")
         String queryParam(@QueryValue String foo)
 
-        @Get("/multipleQueryParam")
+        @Head("/multipleQueryParam")
         String queryParam(@QueryValue String foo, @QueryValue String bar)
 
-        @Get("/date/{myDate}")
+        @Head("/date/{myDate}")
         String formatDate(@Format('yyyy-MM-dd') Date myDate)
 
-        @Get("/dateTime/{myDate}")
+        @Head("/dateTime/{myDate}")
         String formatDateTime(@Format('yyyy-MM-dd') LocalDate myDate)
 
-        @Get("/dateQuery")
+        @Head("/dateQuery")
         String formatDateQuery(@QueryValue @Format('yyyy-MM-dd') Date myDate)
 
-        @Get("/dateTimeQuery")
+        @Head("/dateTimeQuery")
         String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate)
 
     }
@@ -624,30 +546,30 @@ class HttpGetSpec extends Specification {
         private final RxStreamingHttpClient rxClientSlash
         private final RxStreamingHttpClient rxClient
 
-        MyGetHelper(@Client("/get/") RxStreamingHttpClient rxClientSlash,
-                    @Client("/get") RxStreamingHttpClient rxClient) {
+        MyGetHelper(@Client("/head/") RxStreamingHttpClient rxClientSlash,
+                    @Client("/head") RxStreamingHttpClient rxClient) {
             this.rxClient = rxClient
             this.rxClientSlash = rxClientSlash
         }
 
         String simple() {
-            rxClient.toBlocking().exchange(HttpRequest.GET("simple"), String).body()
+            rxClient.toBlocking().exchange(HttpRequest.HEAD("simple"), String).body()
         }
 
         String simplePreceedingSlash() {
-            rxClient.toBlocking().exchange(HttpRequest.GET("/simple"), String).body()
+            rxClient.toBlocking().exchange(HttpRequest.HEAD("/simple"), String).body()
         }
 
         String simpleSlash() {
-            rxClientSlash.toBlocking().exchange(HttpRequest.GET("simple"), String).body()
+            rxClientSlash.toBlocking().exchange(HttpRequest.HEAD("simple"), String).body()
         }
 
         String simpleDoubleSlash() {
-            rxClientSlash.toBlocking().exchange(HttpRequest.GET("/simple"), String).body()
+            rxClientSlash.toBlocking().exchange(HttpRequest.HEAD("/simple"), String).body()
         }
 
         String queryParam() {
-            rxClient.toBlocking().exchange(HttpRequest.GET("/queryParam?foo=a!b"), String).body()
+            rxClient.toBlocking().exchange(HttpRequest.HEAD("/queryParam?foo=a!b"), String).body()
         }
     }
 }

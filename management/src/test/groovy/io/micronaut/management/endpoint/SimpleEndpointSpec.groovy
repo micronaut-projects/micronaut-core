@@ -54,6 +54,24 @@ class SimpleEndpointSpec extends Specification {
         server.close()
     }
 
+    void "test read simple endpoint with HEAD"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['endpoints.simple.myValue':'foo'], Environment.TEST)
+        RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
+
+        when:
+        def response = rxClient.exchange(HttpRequest.HEAD("/simple"), String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == null
+
+        cleanup:
+        rxClient.close()
+        server.close()
+    }
+
     void "test read simple endpoint with argument"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
