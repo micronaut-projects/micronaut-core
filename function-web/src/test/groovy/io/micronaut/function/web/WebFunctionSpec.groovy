@@ -66,6 +66,22 @@ class WebFunctionSpec extends Specification {
         embeddedServer.stop()
     }
 
+    void "test string supplier with HEAD"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.HEAD('/supplier/string'), String)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == null
+
+        cleanup:
+        embeddedServer.stop()
+    }
+
     void "test pojo supplier"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
