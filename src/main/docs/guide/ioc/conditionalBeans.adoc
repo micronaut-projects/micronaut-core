@@ -4,12 +4,7 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[Requires] annotatio
 
 Consider the following example:
 
-.Using @Requires
-[source,java]
-----
-include::{testsjava}/requires/JdbcBookService.java[tags=requires, indent=0]
-}
-----
+snippet::io.micronaut.docs.requires.JdbcBookService[tags="requires",indent=0, title="Using @Requires"]
 
 The above bean defines two requirements. The first indicates that a `DataSource` bean must be present for the bean to load. The second requirement ensures that the `datasource.url` property is set before loading the `JdbcBookService` bean.
 
@@ -17,16 +12,11 @@ NOTE: Kotlin currently does not support repeatable annotations. Use the `@Requir
 
 If you have multiple requirements that you find you may need to repeat on multiple beans then you can define a meta-annotation with the requirements:
 
-
-.Using a @Requires meta-annotation
-[source,java]
-----
-include::{testsjava}/requires/RequiresJdbc.java[tags=annotation, indent=0]
-----
+snippet::io.micronaut.docs.requires.RequiresJdbc[tags="annotation",indent=0, title="Creating a @RequiresJdbc meta-annotation"]
 
 In the above example an annotation called `RequiresJdbc` is defined that can then be used on the `JdbcBookService` instead:
 
-.Using a @Requires meta-annotation
+.Using a meta-annotation
 [source,java]
 ----
 @RequiresJdbc
@@ -34,6 +24,7 @@ public class JdbcBookService implements BookService {
     ...
 }
 ----
+// TODO any way to make this multi-lang also?
 
 If you have multiple beans that need to fulfill a given requirement before loading then you may want to consider a bean configuration group, as explained in the next section.
 
