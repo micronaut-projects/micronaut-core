@@ -236,24 +236,13 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     private void handleReadHttpContent(ChannelHandlerContext ctx, HttpContent content) {
         if (!ignoreBodyRead) {
+            ctx.fireChannelRead(content);
+
             if (content instanceof LastHttpContent) {
-
-                if (content.content().readableBytes() > 0 ||
-                    !((LastHttpContent) content).trailingHeaders().isEmpty()) {
-                    // It has data or trailing headers, send them
-                    ctx.fireChannelRead(content);
-                } else {
-                    ReferenceCountUtil.release(content);
-                }
-
                 removeHandlerIfActive(ctx, ctx.name() + "-body-publisher");
                 currentlyStreamedMessage = null;
                 consumedInMessage(ctx);
-
-            } else {
-                ctx.fireChannelRead(content);
             }
-
         } else {
             ReferenceCountUtil.release(content);
             if (content instanceof LastHttpContent) {
