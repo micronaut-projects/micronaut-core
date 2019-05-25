@@ -19,9 +19,11 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.TypeConvention;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -397,6 +399,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     private UriRoute buildBeanRoute(HttpMethod httpMethod, String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         io.micronaut.context.Qualifier<?> qualifier = beanDefinition.getAnnotationTypeByStereotype(Qualifier.class).map(aClass -> Qualifiers.byAnnotation(beanDefinition, aClass)).orElse(null);
+        if (qualifier == null && beanDefinition.isIterable() && beanDefinition instanceof NameResolver) {
+            qualifier = ((NameResolver) beanDefinition).resolveName()
+                    .map(Qualifiers::byName).orElse(null);
+        }
         MethodExecutionHandle<?, Object> executionHandle = executionHandleLocator.findExecutionHandle(beanDefinition.getBeanType(), qualifier, method.getMethodName(), method.getArgumentTypes())
                 .orElseThrow(() -> new RoutingException("No such route: " + beanDefinition.getBeanType().getName() + "." + method));
         return buildRoute(httpMethod, uri, executionHandle);
@@ -423,11 +429,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
             this.acceptedMediaTypes = mediaTypes;
-            targetMethod.getValue(Produces.class, MediaType[].class).ifPresent(produces ->
-                    this.producesMediaTypes = Arrays.asList(produces)
-            );
 
-
+            MediaType[] types = MediaType.of(targetMethod.stringValues(Produces.class));
+            if (ArrayUtils.isNotEmpty(types)) {
+                this.producesMediaTypes = Arrays.asList(types);
+            }
             this.conditions.add(req -> {
                 if (!permitsRequestBody()) {
                     return true;

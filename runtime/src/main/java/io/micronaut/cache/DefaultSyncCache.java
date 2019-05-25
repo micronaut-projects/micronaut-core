@@ -46,7 +46,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachBean(DefaultCacheConfiguration.class)
+@EachBean(CacheConfiguration.class)
 public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.cache.Cache> {
 
     private final CacheConfiguration cacheConfiguration;
@@ -61,7 +61,7 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
      * @param applicationContext The application context
      * @param conversionService To convert the value from the cache into given required type
      */
-    @Inject public DefaultSyncCache(
+    public DefaultSyncCache(
             DefaultCacheConfiguration cacheConfiguration,
             ApplicationContext applicationContext,
             ConversionService<?> conversionService) {
@@ -75,6 +75,7 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
      * @param applicationContext The application context
      * @param conversionService To convert the value from the cache into given required type
      */
+    @Inject
     public DefaultSyncCache(
             CacheConfiguration cacheConfiguration,
             ApplicationContext applicationContext,
@@ -199,12 +200,12 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
     private Map<String, Object> getCaffeineCacheData(Cache caffeineCache) {
 
         Policy policy = caffeineCache.policy();
-        Policy.Eviction eviction = (Policy.Eviction) policy.eviction().orElse(null);
+        Optional<Policy.Eviction> eviction = policy.eviction();
         Policy.Expiration expireAfterAccess = (Policy.Expiration) policy.expireAfterAccess().orElse(null);
         Policy.Expiration expireAfterWrite = (Policy.Expiration) policy.expireAfterWrite().orElse(null);
-        Long maximumSize = (!eviction.isWeighted() ? eviction.getMaximum() : null);
-        Long maximumWeight = (eviction.isWeighted() ? eviction.getMaximum() : null);
-        Long weightedSize = (eviction.weightedSize().isPresent() ? eviction.weightedSize().getAsLong() : null);
+        Long maximumSize = eviction.filter(e -> !e.isWeighted()).map(e -> e.getMaximum()).orElse(null);
+        Long maximumWeight = eviction.filter(e -> e.isWeighted()).map(e -> e.getMaximum()).orElse(null);
+        Long weightedSize = eviction.flatMap(e -> e.weightedSize().isPresent() ? Optional.of(e.weightedSize().getAsLong()) : Optional.empty()).orElse(null);
         boolean isRecordingStats = policy.isRecordingStats();
 
         Map<String, Object> values = new LinkedHashMap<>(8);

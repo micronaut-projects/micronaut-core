@@ -103,5 +103,9 @@ interface Feature {
      */
     Integer getMaxJavaVersion()
 
+    /**
+     * @return Whether the feature is supported for a specific java version
+     */
     boolean isSupported(Integer javaVersion)
+
 }

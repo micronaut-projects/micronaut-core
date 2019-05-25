@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.processing.JavaModelUtils;
 
@@ -49,7 +50,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
     private final TypeElement classElement;
     private final JavaVisitorContext visitorContext;
-    private final List<? extends TypeMirror> typeArguments;
+    private Map<String, Map<String, TypeMirror>> genericTypeInfo;
 
     /**
      * @param classElement       The {@link TypeElement}
@@ -60,20 +61,46 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
-        this.typeArguments = Collections.emptyList();
     }
 
     /**
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
-     * @param typeArguments      The type arguments
+     * @param genericsInfo       The generic type info
      */
-    JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, List<? extends TypeMirror> typeArguments) {
+    JavaClassElement(
+            TypeElement classElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext,
+            Map<String, Map<String, TypeMirror>> genericsInfo) {
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
-        this.typeArguments = typeArguments;
+        this.genericTypeInfo = genericsInfo;
+    }
+
+    @Nonnull
+    @Override
+    public Map<String, ClassElement> getTypeArguments(@Nonnull String type) {
+        if (StringUtils.isNotEmpty(type)) {
+            Map<String, Map<String, Object>> data = visitorContext.getGenericUtils().buildGenericTypeArgumentInfo(classElement);
+            Map<String, Object> forType = data.get(type);
+            if (forType != null) {
+                Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
+                for (Map.Entry<String, Object> entry : forType.entrySet()) {
+                    Object v = entry.getValue();
+                    ClassElement ce = v != null ? visitorContext.getClassElement(v.toString()).orElse(null) : null;
+                    if (ce == null) {
+                        return Collections.emptyMap();
+                    } else {
+                        typeArgs.put(entry.getKey(), ce);
+                    }
+                }
+                return Collections.unmodifiableMap(typeArgs);
+            }
+        }
+        return Collections.emptyMap();
     }
 
     @Override
@@ -168,10 +195,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                         if (classElement != null) {
                             getterReturnType = classElement;
                         } else {
-                            getterReturnType = mirrorToClassElement(returnType, visitorContext);
+                            getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo);
                         }
                     } else {
-                        getterReturnType = mirrorToClassElement(returnType, visitorContext);
+                        getterReturnType = mirrorToClassElement(returnType, visitorContext, JavaClassElement.this.genericTypeInfo);
                     }
 
                     if (getterReturnType != null) {
@@ -182,7 +209,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                         beanPropertyData.getter = executableElement;
                         if (beanPropertyData.setter != null) {
                             TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();
-                            ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext);
+                            ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
                             if (setterParameterType == null || !setterParameterType.getName().equals(getterReturnType.getName())) {
                                 beanPropertyData.setter = null; // not a compatible setter
                             }
@@ -191,7 +218,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                 } else if (NameUtils.isSetterName(methodName) && executableElement.getParameters().size() == 1) {
                     String propertyName = NameUtils.getPropertyNameForSetter(methodName);
                     TypeMirror typeMirror = executableElement.getParameters().get(0).asType();
-                    ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext);
+                    ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext, JavaClassElement.this.genericTypeInfo);
 
                     if (setterParameterType != null) {
 
@@ -211,10 +238,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
             private void configureDeclaringType(TypeElement declaringTypeElement, BeanPropertyData beanPropertyData) {
                 if (beanPropertyData.declaringType == null && !classElement.equals(declaringTypeElement)) {
-                    beanPropertyData.declaringType = new JavaClassElement(
-                            declaringTypeElement,
-                            visitorContext.getAnnotationUtils().getAnnotationMetadata(declaringTypeElement),
-                            visitorContext
+                    beanPropertyData.declaringType = mirrorToClassElement(
+                            declaringTypeElement.asType(),
+                            visitorContext,
+                            genericTypeInfo
                     );
                 }
             }
@@ -236,6 +263,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                                 .getAnnotationUtils()
                                 .newAnnotationBuilder().buildForMethod(value.getter);
                     }
+
                     JavaPropertyElement propertyElement = new JavaPropertyElement(
                             value.declaringType == null ? this : value.declaringType,
                             value.getter,
@@ -255,6 +283,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                         public Optional<MethodElement> getWriteMethod() {
                             if (value.setter != null) {
                                 return Optional.of(new JavaMethodElement(
+                                        JavaClassElement.this,
                                         value.setter,
                                         visitorContext.getAnnotationUtils().newAnnotationBuilder().buildForMethod(value.setter),
                                         visitorContext
@@ -266,6 +295,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                         @Override
                         public Optional<MethodElement> getReadMethod() {
                             return Optional.of(new JavaMethodElement(
+                                    JavaClassElement.this,
                                     value.getter,
                                     annotationMetadata,
                                     visitorContext
@@ -325,37 +355,47 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         return false;
     }
 
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return super.getAnnotationMetadata();
+    }
+
     @Nonnull
     @Override
     public Optional<ConstructorElement> getPrimaryConstructor() {
         final AnnotationUtils annotationUtils = visitorContext.getAnnotationUtils();
         return Optional.ofNullable(visitorContext.getModelUtils().concreteConstructorFor(classElement, annotationUtils)).map(executableElement -> {
             final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(executableElement);
-            return new JavaConstructorElement(executableElement, annotationMetadata, visitorContext);
+            return new JavaConstructorElement(this, executableElement, annotationMetadata, visitorContext);
         });
     }
 
     @Override
-    public @Nonnull Map<String, ClassElement> getTypeArguments() {
+    public @Nonnull
+    Map<String, ClassElement> getTypeArguments() {
         List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
-        if (typeParameters.size() == typeArguments.size()) {
-            Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
-            Iterator<? extends TypeMirror> tai = typeArguments.iterator();
+        Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
 
-            Map<String, ClassElement> map = new LinkedHashMap<>();
-            while (tpi.hasNext()) {
-                TypeParameterElement tpe = tpi.next();
-                TypeMirror typeMirror = tai.next();
-
-                ClassElement classElement = mirrorToClassElement(typeMirror, visitorContext);
-                if (classElement != null) {
-                    map.put(tpe.toString(), classElement);
-                }
+        Map<String, ClassElement> map = new LinkedHashMap<>();
+        while (tpi.hasNext()) {
+            TypeParameterElement tpe = tpi.next();
+            ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo);
+            if (classElement != null) {
+                map.put(tpe.toString(), classElement);
             }
-
-            return Collections.unmodifiableMap(map);
         }
-        return Collections.emptyMap();
+
+        return Collections.unmodifiableMap(map);
+    }
+
+    /**
+     * @return The generic type info for this class.
+     */
+    Map<String, Map<String, TypeMirror>> getGenericTypeInfo() {
+        if (genericTypeInfo == null) {
+            genericTypeInfo = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement);
+        }
+        return genericTypeInfo;
     }
 
     /**

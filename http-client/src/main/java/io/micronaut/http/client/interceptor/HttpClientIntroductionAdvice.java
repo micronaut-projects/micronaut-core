@@ -79,6 +79,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Introduction advice that implements the {@link Client} annotation.
@@ -265,7 +266,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     body = definedValue;
                 } else if (annotationMetadata.isAnnotationPresent(Header.class)) {
 
-                    String headerName = annotationMetadata.getValue(Header.class, String.class).orElse(null);
+                    String headerName = annotationMetadata.stringValue(Header.class).orElse(null);
                     if (StringUtils.isEmpty(headerName)) {
                         headerName = NameUtils.hyphenate(argumentName);
                     }
@@ -273,7 +274,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     conversionService.convert(definedValue, String.class)
                         .ifPresent(o -> headers.put(finalHeaderName, o));
                 } else if (annotationMetadata.isAnnotationPresent(CookieValue.class)) {
-                    String cookieName = annotationMetadata.getValue(CookieValue.class, String.class).orElse(null);
+                    String cookieName = annotationMetadata.stringValue(CookieValue.class).orElse(null);
                     if (StringUtils.isEmpty(cookieName)) {
                         cookieName = argumentName;
                     }
@@ -283,7 +284,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         .ifPresent(o -> cookies.add(new NettyCookie(finalCookieName, o)));
 
                 } else if (annotationMetadata.isAnnotationPresent(QueryValue.class)) {
-                    String parameterName = annotationMetadata.getValue(QueryValue.class, String.class).orElse(null);
+                    String parameterName = annotationMetadata.stringValue(QueryValue.class).orElse(null);
                     conversionService.convert(definedValue, ConversionContext.of(String.class).with(annotationMetadata)).ifPresent(o -> {
                         if (!StringUtils.isEmpty(parameterName)) {
                             paramMap.put(parameterName, o);
@@ -293,7 +294,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         }
                     });
                 } else if (annotationMetadata.isAnnotationPresent(RequestAttribute.class)) {
-                    String attributeName = annotationMetadata.getValue(Annotation.class, String.class).orElse(null);
+                    String attributeName = annotationMetadata.stringValue(RequestAttribute.class).orElse(null);
                     if (StringUtils.isEmpty(attributeName)) {
                         attributeName = NameUtils.hyphenate(argumentName);
                     }
@@ -301,7 +302,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     conversionService.convert(definedValue, Object.class)
                         .ifPresent(o -> attributes.put(finalAttributeName, o));
                 } else if (annotationMetadata.isAnnotationPresent(PathVariable.class)) {
-                    String parameterName = annotationMetadata.getValue(PathVariable.class, String.class).orElse(null);
+                    String parameterName = annotationMetadata.stringValue(PathVariable.class).orElse(null);
                     conversionService.convert(definedValue, ConversionContext.of(String.class).with(annotationMetadata)).ifPresent(o -> {
                         if (!StringUtils.isEmpty(o)) {
                             paramMap.put(parameterName, o);
@@ -350,7 +351,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (body != null) {
                 request.body(body);
 
-                MediaType[] contentTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
+                MediaType[] contentTypes = MediaType.of(context.stringValues(Produces.class));
+                if (ArrayUtils.isEmpty(contentTypes)) {
+                    contentTypes = DEFAULT_ACCEPT_TYPES;
+                }
                 if (ArrayUtils.isNotEmpty(contentTypes)) {
                     request.contentType(contentTypes[0]);
                 }
@@ -377,7 +381,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
-            MediaType[] acceptTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
+            MediaType[] acceptTypes = MediaType.of(context.stringValues(Consumes.class));
+            if (ArrayUtils.isEmpty(acceptTypes)) {
+                acceptTypes = DEFAULT_ACCEPT_TYPES;
+            }
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             final Class<?> methodDeclaringType = declaringType;
@@ -524,32 +531,44 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
 
                 if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
-                    return blockingHttpClient.exchange(
-                        request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), errorType
-                    );
+                    return handleBlockingCall(javaReturnType, () ->
+                            blockingHttpClient.exchange(request,
+                                    returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT),
+                                    errorType
+                    ));
                 } else if (void.class == javaReturnType) {
-                    blockingHttpClient.exchange(request, null, errorType);
-                    return null;
+                    return handleBlockingCall(javaReturnType, () ->
+                            blockingHttpClient.exchange(request, null, errorType));
                 } else {
-                    try {
-                        return blockingHttpClient.retrieve(
-                                request, returnType.asArgument(), errorType
-                        );
-                    } catch (RuntimeException t) {
-                        if (t instanceof HttpClientResponseException && ((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
-                            if (javaReturnType == Optional.class) {
-                                return Optional.empty();
-                            }
-                            return null;
-                        } else {
-                            throw t;
-                        }
-                    }
+                    return handleBlockingCall(javaReturnType, () ->
+                            blockingHttpClient.retrieve(request, returnType.asArgument(), errorType));
                 }
             }
         }
         // try other introduction advice
         return context.proceed();
+    }
+
+    private Object handleBlockingCall(Class returnType, Supplier<Object> supplier) {
+        try {
+            if (void.class == returnType) {
+                supplier.get();
+                return null;
+            } else {
+                return supplier.get();
+            }
+        } catch (RuntimeException t) {
+            if (t instanceof HttpClientResponseException && ((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
+                if (returnType == Optional.class) {
+                    return Optional.empty();
+                } else if (HttpResponse.class.isAssignableFrom(returnType)) {
+                    return ((HttpClientResponseException) t).getResponse();
+                }
+                return null;
+            } else {
+                throw t;
+            }
+        }
     }
 
     private ClientVersioningConfiguration getVersioningConfiguration(AnnotationValue<Client> clientAnnotation) {

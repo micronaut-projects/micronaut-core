@@ -21,6 +21,7 @@ import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
 import groovy.json.JsonSlurper
 import io.micronaut.annotation.processing.AnnotationUtils
+import io.micronaut.annotation.processing.GenericUtils
 import io.micronaut.annotation.processing.JavaConfigurationMetadataBuilder
 import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.inject.AbstractTypeElementSpec
@@ -471,13 +472,14 @@ class GrandParentProperties {
         def types = JavacTypes.instance(context)
         def env = JavacProcessingEnvironment.instance(new Context())
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, env.filer) {
+        GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
+        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils,genericUtils, env.filer) {
         }
 
         JavaConfigurationMetadataBuilder builder = new JavaConfigurationMetadataBuilder(
                 elements,
                 types,
-                new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, env.filer) {}
+                new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {}
         )
         builder
     }

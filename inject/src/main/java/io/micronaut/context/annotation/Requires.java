@@ -54,9 +54,7 @@ public @interface Requires {
     String[] notEnv() default {};
 
     /**
-     * Expresses that the given property should be set for the bean to load. By default the value of the property
-     * should be "yes", "YES", "true", "TRUE", "y" or "Y" for it to be considered to be set. If a different value is
-     * to be used then the {@link #value()} method should be used.
+     * Expresses that the given property should be set for the bean to load.
      *
      * @return The property that should be set.
      */

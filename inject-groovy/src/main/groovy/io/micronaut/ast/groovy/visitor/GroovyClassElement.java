@@ -48,6 +48,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     private final SourceUnit sourceUnit;
     private final ClassNode classNode;
+    private Map<String, Map<String, ClassNode>> genericInfo;
 
     /**
      * @param sourceUnit         The source unit
@@ -55,9 +56,20 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
      * @param annotationMetadata The annotation metadata
      */
     GroovyClassElement(SourceUnit sourceUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
+        this(sourceUnit, classNode, annotationMetadata, null);
+    }
+
+    /**
+     * @param sourceUnit         The source unit
+     * @param classNode          The {@link ClassNode}
+     * @param annotationMetadata The annotation metadata
+     * @param genericInfo        The generic info
+     */
+    GroovyClassElement(SourceUnit sourceUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, Map<String, Map<String, ClassNode>> genericInfo) {
         super(classNode, annotationMetadata);
         this.classNode = classNode;
         this.sourceUnit = sourceUnit;
+        this.genericInfo = genericInfo;
     }
 
     @Override
@@ -85,12 +97,81 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     public Optional<ConstructorElement> getPrimaryConstructor() {
         return Optional.ofNullable(findConcreteConstructor(classNode.getDeclaredConstructors())).map(constructorNode -> {
             final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, constructorNode);
-            return new GroovyConstructorElement(sourceUnit, constructorNode, annotationMetadata);
+            return new GroovyConstructorElement(this, sourceUnit, constructorNode, annotationMetadata);
         });
     }
 
+    /**
+     * Builds and returns the generic type information.
+     *
+     * @return The generic type info
+     */
+    public Map<String, Map<String, ClassNode>> getGenericTypeInfo() {
+        if (genericInfo == null) {
+            genericInfo = AstGenericUtils.buildAllGenericElementInfo(classNode, new GroovyVisitorContext(sourceUnit));
+        }
+        return genericInfo;
+    }
+
+    @Nonnull
     @Override
-    public @Nonnull Map<String, ClassElement> getTypeArguments() {
+    public Map<String, ClassElement> getTypeArguments(@Nonnull String type) {
+        if (type != null) {
+            Map<String, Map<String, ClassNode>> allData = getGenericTypeInfo();
+
+            Map<String, ClassNode> thisSpec = allData.get(getName());
+            Map<String, ClassNode> forType = allData.get(type);
+            if (forType != null) {
+                Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
+                for (Map.Entry<String, ClassNode> entry : forType.entrySet()) {
+                    ClassNode classNode = entry.getValue();
+
+                    ClassElement rawElement = new GroovyClassElement(sourceUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
+                            sourceUnit,
+                            classNode
+                    ));
+                    if (thisSpec != null) {
+                        rawElement = getGenericElement(sourceUnit, classNode, rawElement, thisSpec);
+                    }
+                    typeArgs.put(entry.getKey(), rawElement);
+                }
+                return Collections.unmodifiableMap(typeArgs);
+            }
+
+        }
+        return Collections.emptyMap();
+    }
+
+    @Override
+    public @Nonnull
+    Map<String, ClassElement> getTypeArguments() {
+        Map<String, Map<String, ClassNode>> genericInfo = getGenericTypeInfo();
+        Map<String, ClassNode> info = genericInfo.get(classNode.getName());
+        if (info != null) {
+            GenericsType[] genericsTypes = classNode.redirect().getGenericsTypes();
+            if (genericsTypes != null) {
+                Map<String, ClassElement> typeArgumentMap = new HashMap<>(genericsTypes.length);
+                for (GenericsType gt : genericsTypes) {
+                    String name = gt.getName();
+                    ClassNode cn = info.get(name);
+                    while (cn != null && cn.isGenericsPlaceHolder()) {
+                        name = cn.getUnresolvedName();
+                        cn = info.get(name);
+                    }
+
+                    if (cn != null) {
+                        typeArgumentMap.put(name, new GroovyClassElement(
+                                sourceUnit,
+                                cn,
+                                AstAnnotationUtils.getAnnotationMetadata(sourceUnit, cn)
+                        ));
+                    }
+                }
+                if (CollectionUtils.isNotEmpty(typeArgumentMap)) {
+                    return typeArgumentMap;
+                }
+            }
+        }
         Map<String, ClassNode> spec = AstGenericUtils.createGenericsSpec(classNode);
         if (!spec.isEmpty()) {
             Map<String, ClassElement> map = new LinkedHashMap<>(spec.size());
@@ -223,6 +304,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
             classNode = classNode.getSuperClass();
         }
         if (!props.isEmpty()) {
+            GroovyClassElement thisElement = this;
             for (Map.Entry<String, GetterAndSetter> entry : props.entrySet()) {
                 String propertyName = entry.getKey();
                 GetterAndSetter value = entry.getValue();
@@ -248,6 +330,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                         public Optional<MethodElement> getWriteMethod() {
                             if (value.setter != null) {
                                 return Optional.of(new GroovyMethodElement(
+                                        thisElement,
                                         sourceUnit,
                                         value.setter,
                                         groovyAnnotationMetadataBuilder.buildForMethod(value.setter)
@@ -258,7 +341,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
                         @Override
                         public Optional<MethodElement> getReadMethod() {
-                            return Optional.of(new GroovyMethodElement(sourceUnit, value.getter, annotationMetadata));
+                            return Optional.of(new GroovyMethodElement(thisElement, sourceUnit, value.getter, annotationMetadata));
                         }
                     };
                     propertyElements.add(propertyElement);
@@ -324,7 +407,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     @Override
     public boolean isAssignable(String type) {
-        return AstClassUtils.isSubclassOf(classNode, type);
+        return AstClassUtils.isSubclassOfOrImplementsInterface(classNode, type);
     }
 
     private ConstructorNode findConcreteConstructor(List<ConstructorNode> constructors) {

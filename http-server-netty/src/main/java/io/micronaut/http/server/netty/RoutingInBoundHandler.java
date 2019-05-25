@@ -44,6 +44,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpServerFilter;
+import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
@@ -81,6 +82,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.DecoderResult;
@@ -130,6 +132,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
+@Sharable
 class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
@@ -218,10 +221,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             return;
         }
 
-        exceptionCaughtInternal(ctx, cause, nettyHttpRequest);
+        exceptionCaughtInternal(ctx, cause, nettyHttpRequest, true);
     }
 
-    private void exceptionCaughtInternal(ChannelHandlerContext ctx, Throwable cause, NettyHttpRequest nettyHttpRequest) {
+    private void exceptionCaughtInternal(ChannelHandlerContext ctx,
+                                         Throwable cause,
+                                         NettyHttpRequest nettyHttpRequest,
+                                         boolean nettyException) {
         RouteMatch<?> errorRoute = null;
         // find the origination of of the route
         RouteMatch<?> originalRoute = nettyHttpRequest.getMatchedRoute();
@@ -298,7 +304,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Flowable<? extends MutableHttpResponse<?>> filteredPublisher = filterPublisher(
                         requestReference,
                         routePublisher,
-                        ctx.channel().eventLoop());
+                        ctx.channel().eventLoop(),
+                        nettyException);
 
                 subscribeToResponsePublisher(
                         ctx,
@@ -320,7 +327,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
 
             Optional<ExceptionHandler> exceptionHandler = beanLocator
-                    .findBean(ExceptionHandler.class, Qualifiers.byTypeArguments(cause.getClass(), Object.class));
+                    .findBean(ExceptionHandler.class, Qualifiers.byTypeArgumentsClosest(cause.getClass(), Object.class));
 
             if (exceptionHandler.isPresent()) {
                 ExceptionHandler handler = exceptionHandler.get();
@@ -343,7 +350,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     Flowable<? extends MutableHttpResponse<?>> filteredPublisher = filterPublisher(
                             requestReference,
                             routePublisher,
-                            ctx.channel().eventLoop());
+                            ctx.channel().eventLoop(),
+                            nettyException);
 
                     subscribeToResponsePublisher(
                             ctx,
@@ -380,7 +388,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Flowable<? extends MutableHttpResponse<?>> filteredPublisher = filterPublisher(
                         requestReference,
                         routePublisher,
-                        ctx.channel().eventLoop());
+                        ctx.channel().eventLoop(),
+                        nettyException);
 
                 subscribeToResponsePublisher(
                         ctx,
@@ -550,7 +559,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Flowable<? extends MutableHttpResponse<?>> responsePublisher = filterPublisher(
                     requestReference,
                     Flowable.just(defaultResponse),
-                    ctx.channel().eventLoop()
+                    ctx.channel().eventLoop(),
+                    false
             );
             subscribeToResponsePublisher(
                     ctx,
@@ -589,7 +599,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         Flowable<? extends MutableHttpResponse<?>> responsePublisher = filterPublisher(
                 requestReference,
                 Flowable.just(res),
-                ctx.channel().eventLoop()
+                ctx.channel().eventLoop(),
+                false
         );
         subscribeToResponsePublisher(
                 ctx,
@@ -1005,7 +1016,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Flowable<? extends MutableHttpResponse<?>> filteredPublisher = filterPublisher(
                     requestReference,
                     routePublisher,
-                    executor
+                    executor,
+                    false
             );
 
             boolean isStreaming = isReactiveReturnType && !isSingle;
@@ -1196,7 +1208,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnError(Throwable t) {
-                exceptionCaughtInternal(context, t, (NettyHttpRequest) requestReference.get());
+                exceptionCaughtInternal(context, t, (NettyHttpRequest) requestReference.get(), false);
             }
         });
     }
@@ -1409,9 +1421,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private Flowable<? extends MutableHttpResponse<?>> filterPublisher(
             AtomicReference<HttpRequest<?>> requestReference,
-            Publisher<MutableHttpResponse<?>> routePublisher, ExecutorService executor) {
+            Publisher<MutableHttpResponse<?>> routePublisher,
+            ExecutorService executor,
+            boolean skipOncePerRequest) {
         Publisher<? extends io.micronaut.http.MutableHttpResponse<?>> finalPublisher;
         List<HttpFilter> filters = new ArrayList<>(router.findFilters(requestReference.get()));
+        if (skipOncePerRequest) {
+            filters.removeIf(filter -> filter instanceof OncePerRequestHttpServerFilter);
+        }
         if (!filters.isEmpty()) {
             // make the action executor the last filter in the chain
             filters.add((HttpServerFilter) (req, chain) -> routePublisher);

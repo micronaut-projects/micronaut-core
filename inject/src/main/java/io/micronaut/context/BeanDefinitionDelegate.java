@@ -48,9 +48,6 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     protected final Map<String, Object> attributes = new HashMap<>();
 
     private BeanDefinitionDelegate(BeanDefinition<T> definition) {
-        if (!(definition instanceof BeanFactory)) {
-            throw new IllegalArgumentException("Delegate can only be used for bean factories");
-        }
         this.definition = definition;
     }
 
@@ -168,7 +165,18 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
-        resolutionContext.putAll(attributes);
+        LinkedHashMap<String, Object> oldAttributes = null;
+        if (!attributes.isEmpty()) {
+            oldAttributes = new LinkedHashMap<>(attributes.size());
+            for (Map.Entry<String, Object> entry: attributes.entrySet()) {
+                String key = entry.getKey();
+                if (resolutionContext.containsKey(key)) {
+                    oldAttributes.put(key, resolutionContext.get(key));
+                }
+                resolutionContext.put(key, entry.getValue());
+            }
+        }
+
         try {
             if (this.definition instanceof ParametrizedBeanFactory) {
                 ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
@@ -193,10 +201,17 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                     return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
                 }
             }
-            return ((BeanFactory<T>) this.definition).build(resolutionContext, context, definition);
+            if (this.definition instanceof BeanFactory) {
+                return ((BeanFactory<T>) this.definition).build(resolutionContext, context, definition);
+            } else {
+                throw new IllegalStateException("Cannot construct a dynamically registered singleton");
+            }
         } finally {
             for (String key : attributes.keySet()) {
                 resolutionContext.remove(key);
+            }
+            if (oldAttributes != null) {
+                resolutionContext.putAll(oldAttributes);
             }
         }
     }

@@ -493,7 +493,11 @@ abstract class AbstractProfile implements Profile {
         def parseResult = context.parseResult
         while (parseResult.hasSubcommand()) { parseResult = parseResult.subcommand() }
         Command cmd = parseResult.commandSpec().userObject() as Command
-        return cmd.handle(context)
+        boolean result = cmd.handle(context)
+        if (cmd instanceof ResetableCommand) {
+            cmd.reset()
+        }
+        return result
     }
 
     @Override

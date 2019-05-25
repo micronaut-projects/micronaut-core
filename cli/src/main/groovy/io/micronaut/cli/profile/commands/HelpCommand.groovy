@@ -23,6 +23,7 @@ import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
 import io.micronaut.cli.profile.ProjectContext
 import io.micronaut.cli.profile.ProjectContextAware
+import io.micronaut.cli.profile.ResetableCommand
 import picocli.CommandLine
 import picocli.CommandLine.Model.CommandSpec
 
@@ -51,7 +52,7 @@ class HelpCommand implements ProfileCommand, ProjectContextAware, ProfileReposit
 
     @CommandLine.Parameters(paramLabel = "COMMAND",
             description = "The COMMAND to display the usage help message for.")
-    private String[] commands = new String[0];
+    private String[] commands = new String[0]
 
     private CommandLine self
     private PrintStream out
@@ -110,4 +111,5 @@ class HelpCommand implements ProfileCommand, ProjectContextAware, ProfileReposit
     boolean handle(ExecutionContext executionContext) {
         run()
     }
+
 }

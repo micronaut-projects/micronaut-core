@@ -32,6 +32,7 @@ import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProjectContext
+import io.micronaut.cli.profile.ResetableCommand
 import io.micronaut.cli.profile.commands.ArgumentCompletingCommand
 import io.micronaut.cli.profile.commands.CommandRegistry
 import io.micronaut.cli.profile.commands.CommonOptionsMixin
@@ -234,7 +235,12 @@ class MicronautCli {
             if (parseResult.hasSubcommand()) {
                 def pr = parseResult
                 while (pr.hasSubcommand()) { pr = pr.subcommand() } // most specific subcommand
-                return executeCommand(pr.commandSpec().userObject() as Command, pr) ? 0 : 1
+                Command command = pr.commandSpec().userObject() as Command
+                int result =  executeCommand(command, pr) ? 0 : 1
+                if (command instanceof ResetableCommand) {
+                    command.reset()
+                }
+                return result
             } else if (parseResult.unmatched()) {
                 return getBaseUsage()
             } else {
@@ -245,7 +251,12 @@ class MicronautCli {
                     def pr = context.parseResult
                     assertNoUnmatchedArguments(pr)
                     while (pr.hasSubcommand()) { pr = pr.subcommand() } // most specific subcommand
-                    return executeCommand(pr.commandSpec().userObject() as Command, pr)
+                    Command command = pr.commandSpec().userObject() as Command
+                    boolean result =  executeCommand(command, pr)
+                    if (command instanceof ResetableCommand) {
+                        command.reset()
+                    }
+                    return result
                 }] as Profile
 
                 startInteractiveMode(console)
@@ -642,6 +653,7 @@ class MicronautCli {
             }
             return false
         }
+
     }
 
     @Canonical
@@ -655,6 +667,7 @@ class MicronautCli {
             micronautCli.keepRunning = false
             return true
         }
+
     }
 
     private static String[] splitCommandLine(String commandLine) {

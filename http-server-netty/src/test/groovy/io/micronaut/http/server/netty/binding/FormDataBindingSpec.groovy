@@ -109,6 +109,22 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         then:
         response == 'ABC    DEF    '
     }
+
+    void "test url encoded request with very small chunk size bind to pogo"() {
+        when:
+        URL url = new URL(embeddedServer.getURL(), '/form/saml/test/small-form/pogo')
+        HttpURLConnection conn = url.openConnection()
+        conn.readTimeout = 30000
+        conn.chunkedStreamingMode = 18 // A value of 18 will fail, 19 is enough to get the '='
+        conn.setDoOutput(true)
+        conn.setRequestProperty ("Content-Type", MediaType.APPLICATION_FORM_URLENCODED)
+        def requestStream = conn.getOutputStream()
+        requestStream.write('aaa0123456789=ABC%20%20%20%20&bbb0123456789=DEF%20%20%20%20'.getBytes())
+        requestStream.close()
+        def response = conn.getInputStream().text
+        then:
+        response == 'ABC    DEF    '
+    }
     
     @Controller(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
     static class FormController {
@@ -154,6 +170,16 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         public String processTempFormData(String aaa0123456789, String bbb0123456789) {
             return aaa0123456789 + bbb0123456789
         }
+
+        @Post(uri = "/small-form/pogo", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        public String processTempFormData(UrlEncodedPogo pogo) {
+            return pogo.aaa0123456789 + pogo.bbb0123456789
+        }
+    }
+
+    static class UrlEncodedPogo {
+        String aaa0123456789
+        String bbb0123456789
     }
 
     @Client('/form/saml/test')

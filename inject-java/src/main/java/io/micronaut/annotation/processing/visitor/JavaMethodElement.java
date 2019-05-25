@@ -21,12 +21,12 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.annotation.Nonnull;
+import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -41,19 +41,30 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
     private final ExecutableElement executableElement;
     private final JavaVisitorContext visitorContext;
+    private final JavaClassElement declaringClass;
 
     /**
+     * @param declaringClass     The declaring class
      * @param executableElement  The {@link ExecutableElement}
      * @param annotationMetadata The annotation metadata
      * @param visitorContext The visitor context
      */
     JavaMethodElement(
+            JavaClassElement declaringClass,
             ExecutableElement executableElement,
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext) {
         super(executableElement, annotationMetadata, visitorContext);
         this.executableElement = executableElement;
         this.visitorContext = visitorContext;
+        this.declaringClass = declaringClass;
+    }
+
+    @Nonnull
+    @Override
+    public ClassElement getGenericReturnType() {
+        Map<String, Map<String, TypeMirror>> info = declaringClass.getGenericTypeInfo();
+        return mirrorToClassElement(executableElement.getReturnType(), visitorContext, info);
     }
 
     @Override
@@ -62,29 +73,42 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
     }
 
     @Override
+    @Nonnull
     public ClassElement getReturnType() {
         TypeMirror returnType = executableElement.getReturnType();
-        return mirrorToClassElement(returnType, visitorContext);
+        return mirrorToClassElement(returnType, visitorContext, Collections.emptyMap());
     }
 
     @Override
     public ParameterElement[] getParameters() {
         List<? extends VariableElement> parameters = executableElement.getParameters();
         return parameters.stream().map((Function<VariableElement, ParameterElement>) variableElement ->
-                new JavaParameterElement(variableElement, visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement), visitorContext)
+                new JavaParameterElement(declaringClass, variableElement, visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement), visitorContext)
         ).toArray(ParameterElement[]::new);
     }
 
     @Override
     public ClassElement getDeclaringType() {
-        final Element enclosingElement = executableElement.getEnclosingElement();
-        if (!(enclosingElement instanceof TypeElement)) {
-            throw new IllegalStateException("Enclosing element should be a type element");
+        Element enclosingElement = executableElement.getEnclosingElement();
+        if (enclosingElement instanceof TypeElement) {
+            TypeElement te = (TypeElement) enclosingElement;
+            if (declaringClass.getName().equals(te.getQualifiedName().toString())) {
+                return declaringClass;
+            } else {
+                return new JavaClassElement(
+                        te,
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(te),
+                        visitorContext,
+                        declaringClass.getGenericTypeInfo()
+                );
+            }
+        } else {
+            return declaringClass;
         }
-        return new JavaClassElement(
-                (TypeElement) enclosingElement,
-                visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
-                visitorContext
-        );
+    }
+
+    @Override
+    public ClassElement getOwningType() {
+        return declaringClass;
     }
 }

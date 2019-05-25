@@ -37,9 +37,7 @@ import io.micronaut.scheduling.TaskExecutors;
 import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Singleton;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -189,20 +187,14 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         for (String beanKey : refreshableBeans.keySet()) {
             BeanRegistration beanRegistration = refreshableBeans.get(beanKey);
             BeanDefinition definition = beanRegistration.getBeanDefinition();
-            Optional<String[]> opt = definition.getValue(Refreshable.class, String[].class);
-            if (opt.isPresent()) {
-                String[] strings = opt.get();
-                if (!ArrayUtils.isEmpty(strings)) {
-                    List<String> prefixes = Arrays.asList(strings);
-                    for (String prefix : prefixes) {
-                        for (String k : keys) {
-                            if (k.startsWith(prefix)) {
-                                disposeOfBean(beanKey);
-                            }
+            String[] strings = definition.stringValues(Refreshable.class);
+            if (!ArrayUtils.isEmpty(strings)) {
+                for (String prefix : strings) {
+                    for (String k : keys) {
+                        if (k.startsWith(prefix)) {
+                            disposeOfBean(beanKey);
                         }
                     }
-                } else {
-                    disposeOfBean(beanKey);
                 }
             } else {
                 disposeOfBean(beanKey);

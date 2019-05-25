@@ -26,9 +26,6 @@ include "multitenancy"
 include "router"
 include "runtime"
 include "runtime-osx"
-include "security"
-include "security-jwt"
-include "security-session"
 include "session"
 include "spring"
 include "tracing"
@@ -42,11 +39,12 @@ include "test-suite-kotlin"
 include "test-suite-groovy"
 include "test-utils"
 
+// benchmarks
+include "benchmarks"
+
 // configurations
 include "configurations:cassandra"
 include "configurations:hibernate-validator"
 include "configurations:jmx"
-include "configurations:openapi"
 include "configurations:picocli"
-include "configurations:security-ldap"
 

@@ -4,10 +4,18 @@
 
 If you are interested in contributing to Micronaut and are looking for issues to work on, take a look at the issues tagged with [help wanted](https://github.com/micronaut-projects/micronaut-core/issues?q=is%3Aopen+is%3Aissue+label%3A%22status%3A+help+wanted%22).
 
+## JDK Setup
+
+Micronaut currently requires JDK 8
+
 ## IDE Setup
 
 Micronaut can be imported into IntelliJ IDEA by opening the `build.gradle` file.
 
+## Docker Setup
+
+Micronaut tests currently require docker to be installed.
+ 
 ## Running Tests
 
 To run the tests use `./gradlew check`. 

@@ -17,6 +17,7 @@ package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileStatic
 import io.micronaut.cli.profile.Command
+import io.micronaut.cli.profile.ResetableCommand
 import jline.console.completer.ArgumentCompleter
 import jline.console.completer.Completer
 import picocli.AutoComplete
@@ -51,4 +52,5 @@ abstract class ArgumentCompletingCommand implements Command, Completer {
     int complete(String buffer, int cursor, List<CharSequence> candidates) {
         return new PicocliCompleter(commandSpec).complete(buffer, cursor, candidates)
     }
+
 }

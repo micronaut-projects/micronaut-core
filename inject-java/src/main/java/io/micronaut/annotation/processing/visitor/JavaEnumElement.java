@@ -21,7 +21,6 @@ import io.micronaut.inject.ast.EnumElement;
 
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.TypeMirror;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -38,10 +37,9 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
      * @param visitorContext The visitor context
-     * @param typeArguments The type arguments
      */
-    JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, List<? extends TypeMirror> typeArguments) {
-        super(classElement, annotationMetadata, visitorContext, typeArguments);
+    JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
+        super(classElement, annotationMetadata, visitorContext, Collections.emptyMap());
     }
 
     @Override

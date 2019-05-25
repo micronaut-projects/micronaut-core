@@ -715,7 +715,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     @Override
     public <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters) {
         WebSocketBean<T> webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
-        String uri = webSocketBean.getBeanDefinition().getValue(ClientWebSocket.class, String.class).orElse("/ws");
+        String uri = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("/ws");
         uri = UriTemplate.of(uri).expand(parameters);
         MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
@@ -828,7 +828,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 }
                 NettyStreamedHttpResponse<ByteBuffer<?>> nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
-                return httpContentFlowable.map((Function<HttpContent, io.micronaut.http.HttpResponse<ByteBuffer<?>>>) message -> {
+                return httpContentFlowable
+                        .filter(message -> !(message.content() instanceof EmptyByteBuf))
+                        .map((Function<HttpContent, io.micronaut.http.HttpResponse<ByteBuffer<?>>>) message -> {
                     ByteBuf byteBuf = message.content();
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Streaming Response Received Chunk (length: {})", byteBuf.readableBytes());
@@ -914,7 +916,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 }
                 NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
-                return httpContentFlowable.map(contentMapper);
+                return httpContentFlowable.filter(message -> !(message.content() instanceof EmptyByteBuf)).map(contentMapper);
             });
         };
     }
@@ -1465,7 +1467,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             throw new CodecException("Cannot encode value [" + o + "]. No possible encoders found");
                         });
 
-                        if (!isSingle && requestContentType == MediaType.APPLICATION_JSON_TYPE) {
+                        if (!isSingle && MediaType.APPLICATION_JSON_TYPE.equals(requestContentType)) {
                             requestBodyPublisher = requestBodyPublisher.map(new Function<HttpContent, HttpContent>() {
                                 boolean first = true;
 
@@ -1723,6 +1725,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandler<FullHttpResponse>(false) {
 
             AtomicBoolean complete = new AtomicBoolean(false);
+            boolean keepAlive = true;
 
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
@@ -1803,6 +1806,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             }
                         }
                     }
+                    if (!HttpUtil.isKeepAlive(fullResponse)) {
+                        keepAlive = false;
+                    }
                     pipeline.remove(this);
 
                 }
@@ -1811,7 +1817,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             @Override
             public void handlerRemoved(ChannelHandlerContext ctx) {
                 if (channelPool != null) {
-                    channelPool.release(channel);
+                    final Channel ch = ctx.channel();
+                    if (!keepAlive) {
+                        ch.closeFuture().addListener((future ->
+                                channelPool.release(ch)
+                        ));
+                    } else {
+                        channelPool.release(ch);
+                    }
                 }
             }
 
@@ -1837,6 +1850,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         }
                     }
                 } finally {
+                    keepAlive = false;
                     pipeline.remove(this);
                 }
             }

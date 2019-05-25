@@ -87,7 +87,7 @@ public class Qualifiers {
                 return byType(aClass.get());
             }
         } else if (Named.class == type) {
-            Optional<String> value = metadata.getValue(type, String.class);
+            Optional<String> value = metadata.stringValue(type);
             if (value.isPresent()) {
                 return byName(value.get());
             }
@@ -144,6 +144,18 @@ public class Qualifiers {
      */
     public static <T> Qualifier<T> byTypeArguments(Class... typeArguments) {
         return new TypeArgumentQualifier<>(typeArguments);
+    }
+
+    /**
+     * Build a qualifier for the given generic type arguments. Only the closest
+     * matches will be returned.
+     *
+     * @param typeArguments The generic type arguments
+     * @param <T>           The component type
+     * @return The qualifier
+     */
+    public static <T> Qualifier<T> byTypeArgumentsClosest(Class... typeArguments) {
+        return new ClosestTypeArgumentQualifier<>(typeArguments);
     }
 
     /**

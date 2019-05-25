@@ -204,6 +204,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             isInterface,
             parent.getAnnotationMetadata());
         startClass(classWriter, getInternalName(proxyFullName), getTypeReference(targetClassFullName));
+        processAlreadyVisitedMethods(parent);
     }
 
     /**
@@ -270,6 +271,14 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 isInterface,
                 annotationMetadata);
         startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
+    }
+
+    /**
+     * Is the target bean being proxied.
+     * @return True if the target bean is being proxied
+     */
+    public boolean isProxyTarget() {
+        return isProxyTarget;
     }
 
     @Override
@@ -366,13 +375,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     /**
      * Visit a method that is to be proxied.
-     *
-     * @param declaringType              The declaring type of the method. Either a Class or a string representing the name of the type
+     *  @param declaringType              The declaring type of the method. Either a Class or a string representing the name of the type
      * @param returnType                 The return type of the method. Either a Class or a string representing the name of the type
      * @param genericReturnType          The generic return type
      * @param returnTypeGenericTypes     Map containing the return generic types
      * @param methodName                 The method name
      * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap. Can be null or empty.
+     * @param genericParameters          The generic argument types
      * @param argumentAnnotationMetadata The argument annotation metadata
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         metadata
@@ -383,6 +392,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                   Map<String, Object> returnTypeGenericTypes,
                                   String methodName,
                                   Map<String, Object> argumentTypes,
+                                  Map<String, Object> genericParameters,
                                   Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                   Map<String, Map<String, Object>> genericTypes,
                                   AnnotationMetadata annotationMetadata) {
@@ -395,6 +405,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             returnTypeGenericTypes,
             methodName,
             argumentTypes,
+            genericParameters,
             argumentAnnotationMetadata,
             genericTypes,
             annotationMetadata);
@@ -457,7 +468,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
             };
             executableMethodWriter.makeInner(proxyInternalName, classWriter);
-            executableMethodWriter.visitMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, argumentAnnotationMetadata, genericTypes);
+            executableMethodWriter.visitMethod(
+                    declaringType,
+                    returnType,
+                    genericReturnType,
+                    returnTypeGenericTypes,
+                    methodName,
+                    argumentTypes,
+                    genericParameters,
+                    argumentAnnotationMetadata,
+                    genericTypes
+            );
 
             proxiedMethods.add(executableMethodWriter);
             proxiedMethodsRefSet.add(methodKey);
@@ -1012,6 +1033,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         Map<String, Object> returnTypeGenericTypes,
         String methodName,
         Map<String, Object> argumentTypes,
+        Map<String, Object> genericArgumentTypes,
         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
         Map<String, Map<String, Object>> genericTypes,
         AnnotationMetadata annotationMetadata) {
@@ -1023,6 +1045,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 returnTypeGenericTypes,
                 methodName,
                 argumentTypes,
+                genericArgumentTypes,
                 argumentAnnotationMetadata,
                 genericTypes,
                 annotationMetadata
@@ -1336,6 +1359,35 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             proxyConstructorGenerator.invokeStatic(TYPE_INTERCEPTOR_CHAIN, Method.getMethod(RESOLVE_AROUND_INTERCEPTORS_METHOD));
         }
         proxyConstructorGenerator.visitInsn(AASTORE);
+    }
+
+    private void processAlreadyVisitedMethods(BeanDefinitionWriter parent) {
+        final List<BeanDefinitionWriter.MethodVisitData> postConstructMethodVisits = parent.getPostConstructMethodVisits();
+        for (BeanDefinitionWriter.MethodVisitData methodVisit : postConstructMethodVisits) {
+            visitPostConstructMethod(
+                    methodVisit.getDeclaringType(),
+                    methodVisit.isRequiresReflection(),
+                    methodVisit.getReturnType(),
+                    methodVisit.getMethodName(),
+                    methodVisit.getArgumentTypes(),
+                    methodVisit.getArgumentAnnotationMetadata(),
+                    methodVisit.getGenericTypes(),
+                    methodVisit.getAnnotationMetadata()
+            );
+        }
+        final List<BeanDefinitionWriter.MethodVisitData> preDestroyMethodVisits = parent.getPreDestroyMethodVisits();
+        for (BeanDefinitionWriter.MethodVisitData methodVisit : preDestroyMethodVisits) {
+            visitPreDestroyMethod(
+                    methodVisit.getDeclaringType(),
+                    methodVisit.isRequiresReflection(),
+                    methodVisit.getReturnType(),
+                    methodVisit.getMethodName(),
+                    methodVisit.getArgumentTypes(),
+                    methodVisit.getArgumentAnnotationMetadata(),
+                    methodVisit.getGenericTypes(),
+                    methodVisit.getAnnotationMetadata()
+            );
+        }
     }
 
     /**

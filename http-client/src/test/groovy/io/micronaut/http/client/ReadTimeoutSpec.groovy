@@ -166,7 +166,72 @@ class ReadTimeoutSpec extends Specification {
         clientContext.close()
     }
 
+    void "test connection pool under load - no keep alive"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'3s',
+                'micronaut.http.client.pool.enabled':true,
+                'micronaut.http.client.pool.max-connections':10
+        )
+        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
 
+        when:"Another request is made"
+        def integer = new AtomicInteger()
+        def result = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+
+        then:"Ensure the read timeout was reset in the connection in the pool"
+        result == result2
+
+        when:"issue a whole bunch of requests"
+        def results = Flowable.concat((1..50).collect() {
+            client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String)
+        }).toList().blockingGet()
+
+        then:"Every result is correct"
+        results.size() == 50
+        results.every() { it == result }
+
+
+        cleanup:
+        client.close()
+        clientContext.close()
+    }
+
+    void "test connection pool under load - no keep alive 2"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'3s',
+                'micronaut.http.client.pool.enabled':true,
+                'micronaut.http.client.pool.max-connections':10
+        )
+        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:"Another request is made"
+        def integer = new AtomicInteger()
+        def result = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+        def result2 = client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+
+        then:"Ensure the read timeout was reset in the connection in the pool"
+        result == result2
+
+        when:"issue a whole bunch of requests"
+        def results = (1..25).collect() { // larger than available connections
+            CompletableFuture.supplyAsync({->
+                client.retrieve(HttpRequest.GET('/timeout/no-keep-alive/' + integer.incrementAndGet()), String).blockingFirst()
+            })
+
+        }.collect({ it.get()})
+
+        then:"Every result is correct"
+        results.size() == 25
+        results.every() { it == result }
+
+
+        cleanup:
+        client.close()
+        clientContext.close()
+    }
 
     void "test read timeout setting with connection pool"() {
         given:

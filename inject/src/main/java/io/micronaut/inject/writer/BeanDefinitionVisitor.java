@@ -47,8 +47,8 @@ public interface BeanDefinitionVisitor {
      * @param requiresReflection Whether invoking the constructor requires reflection.
      */
     void visitBeanDefinitionConstructor(
-        AnnotationMetadata annotationMetadata,
-        boolean requiresReflection
+            AnnotationMetadata annotationMetadata,
+            boolean requiresReflection
     );
 
     /**
@@ -239,7 +239,8 @@ public interface BeanDefinitionVisitor {
                                String methodName,
                                Map<String, Object> argumentTypes,
                                Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-                               Map<String, Map<String, Object>> genericTypes, AnnotationMetadata annotationMetadata);
+                               Map<String, Map<String, Object>> genericTypes,
+                               AnnotationMetadata annotationMetadata);
 
     /**
      * Visits a method injection point.
@@ -277,6 +278,8 @@ public interface BeanDefinitionVisitor {
      * @param methodName                 The method name
      * @param argumentTypes              The argument types. Note: an ordered map should be used such as LinkedHashMap.
      *                                   Can be null or empty.
+     * @param genericArgumentTypes       The generic argument types. Note: an ordered map should be used such as LinkedHashMap.
+     *                                   Can be null or empty.
      * @param argumentAnnotationMetadata The argument annotation metadata
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         The annotation metadata for the method
@@ -288,6 +291,7 @@ public interface BeanDefinitionVisitor {
                                                  Map<String, Object> returnTypeGenericTypes,
                                                  String methodName,
                                                  Map<String, Object> argumentTypes,
+                                                 Map<String, Object> genericArgumentTypes,
                                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                                  Map<String, Map<String, Object>> genericTypes,
                                                  @Nullable AnnotationMetadata annotationMetadata);
@@ -353,10 +357,10 @@ public interface BeanDefinitionVisitor {
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderField(
-        Object type,
-        String field,
-        AnnotationMetadata annotationMetadata,
-        ConfigurationMetadataBuilder metadataBuilder);
+            Object type,
+            String field,
+            AnnotationMetadata annotationMetadata,
+            ConfigurationMetadataBuilder metadataBuilder);
 
     /**
      * Begin defining a configuration builder.
@@ -368,10 +372,10 @@ public interface BeanDefinitionVisitor {
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
-        Object type,
-        String methodName,
-        AnnotationMetadata annotationMetadata,
-        ConfigurationMetadataBuilder metadataBuilder);
+            Object type,
+            String methodName,
+            AnnotationMetadata annotationMetadata,
+            ConfigurationMetadataBuilder metadataBuilder);
 
     /**
      * Visit a configuration builder method.
@@ -385,12 +389,12 @@ public interface BeanDefinitionVisitor {
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
-        String prefix,
-        String configurationPrefix,
-        Object returnType,
-        String methodName,
-        Object paramType,
-        Map<String, Object> generics);
+            String prefix,
+            String configurationPrefix,
+            Object returnType,
+            String methodName,
+            Object paramType,
+            Map<String, Object> generics);
 
     /**
      * Visit a configuration builder method that accepts a long and a TimeUnit.
@@ -402,10 +406,10 @@ public interface BeanDefinitionVisitor {
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderDurationMethod(
-        String prefix,
-        String configurationPrefix,
-        Object returnType,
-        String methodName);
+            String prefix,
+            String configurationPrefix,
+            Object returnType,
+            String methodName);
 
     /**
      * Finalize a configuration builder field.

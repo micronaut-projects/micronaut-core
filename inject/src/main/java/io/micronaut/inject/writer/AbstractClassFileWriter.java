@@ -52,6 +52,9 @@ import java.util.*;
 @Internal
 public abstract class AbstractClassFileWriter implements Opcodes {
 
+    protected static final Type TYPE_ARGUMENT = Type.getType(Argument.class);
+    protected static final Type TYPE_ARGUMENT_ARRAY = Type.getType(Argument[].class);
+    protected static final String ZERO_ARGUMENTS_CONSTANT = "ZERO_ARGUMENTS";
     protected static final String CONSTRUCTOR_NAME = "<init>";
     protected static final String DESCRIPTOR_DEFAULT_CONSTRUCTOR = "()V";
     protected static final Method METHOD_DEFAULT_CONSTRUCTOR = new Method(CONSTRUCTOR_NAME, DESCRIPTOR_DEFAULT_CONSTRUCTOR);
@@ -101,8 +104,95 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     /**
      * Pushes type arguments onto the stack.
+     *
      * @param generatorAdapter The generator adapter
-     * @param types The type references
+     * @param declaringElement     The declaring class element of the generics
+     * @param types            The type references
+     */
+    protected static void pushTypeArgumentElements(
+            GeneratorAdapter generatorAdapter,
+            TypedElement declaringElement,
+            Map<String, ClassElement> types) {
+        if (types == null || types.isEmpty()) {
+            generatorAdapter.visitInsn(ACONST_NULL);
+            return;
+        }
+        Set<String> visitedTypes = new HashSet<>(5);
+        pushTypeArgumentElements(generatorAdapter, declaringElement, types, visitedTypes);
+    }
+
+    private static void pushTypeArgumentElements(
+            GeneratorAdapter generatorAdapter,
+            TypedElement declaringElement,
+            Map<String, ClassElement> types,
+            Set<String> visitedTypes) {
+        if (visitedTypes.contains(declaringElement.getName())) {
+            generatorAdapter.getStatic(
+                    TYPE_ARGUMENT,
+                    ZERO_ARGUMENTS_CONSTANT,
+                    TYPE_ARGUMENT_ARRAY
+            );
+        } else {
+            visitedTypes.add(declaringElement.getName());
+
+            int len = types.size();
+            // Build calls to Argument.create(...)
+            pushNewArray(generatorAdapter, Argument.class, len);
+            int i = 0;
+            for (Map.Entry<String, ClassElement> entry : types.entrySet()) {
+                // the array index
+                generatorAdapter.push(i);
+                String argumentName = entry.getKey();
+                ClassElement classElement = entry.getValue();
+                Object classReference = toClassReference(classElement);
+                Map<String, ClassElement> typeArguments = null;
+
+                if (!classElement.getName().equals(declaringElement.getName())) {
+                    typeArguments = classElement.getTypeArguments();
+                }
+                if (CollectionUtils.isNotEmpty(typeArguments)) {
+                    buildArgumentWithGenerics(generatorAdapter, argumentName, classReference, classElement, typeArguments, visitedTypes);
+                } else {
+                    buildArgument(generatorAdapter, argumentName, classReference);
+                }
+
+                // store the type reference
+                generatorAdapter.visitInsn(AASTORE);
+                // if we are not at the end of the array duplicate array onto the stack
+                if (i != (len - 1)) {
+                    generatorAdapter.visitInsn(DUP);
+                }
+                i++;
+            }
+        }
+
+    }
+
+    private static Object toClassReference(ClassElement classElement) {
+        String n = classElement.getName();
+        Object classReference;
+        if (classElement.isPrimitive()) {
+            if (classElement.isArray()) {
+                classReference = ClassUtils.arrayTypeForPrimitive(n).map(t -> (Object) t).orElse(n);
+            } else {
+                classReference = ClassUtils.getPrimitiveType(n).map(t -> (Object) t).orElse(n);
+            }
+        } else {
+            if (classElement.isArray()) {
+                classReference = n + "[]";
+            } else {
+                classReference = n;
+            }
+        }
+        return classReference;
+    }
+
+
+    /**
+     * Pushes type arguments onto the stack.
+     *
+     * @param generatorAdapter The generator adapter
+     * @param types            The type references
      */
     protected static void pushTypeArguments(GeneratorAdapter generatorAdapter, Map<String, Object> types) {
         if (types == null || types.isEmpty()) {
@@ -136,9 +226,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     /**
      * Builds an argument instance.
+     *
      * @param generatorAdapter The generator adapter.
-     * @param argumentName The argument name
-     * @param objectType The object type
+     * @param argumentName     The argument name
+     * @param objectType       The object type
      */
     protected static void buildArgument(GeneratorAdapter generatorAdapter, String argumentName, Object objectType) {
         // 1st argument: the type
@@ -154,7 +245,39 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         );
     }
 
+
     /**
+     * Builds generic type arguments recursively.
+     *  @param generatorAdapter The generator adapter to use
+     * @param argumentName     The argument name
+     * @param typeReference    The type name
+     * @param classElement     The class element that declares the generics
+     * @param typeArguments    The nested type arguments
+     * @param visitedTypes
+     */
+    private static void buildArgumentWithGenerics(
+            GeneratorAdapter generatorAdapter, String argumentName,
+            Object typeReference,
+            ClassElement classElement,
+            Map<String, ClassElement> typeArguments, Set<String> visitedTypes) {
+        // 1st argument: the type
+        generatorAdapter.push(getTypeReference(typeReference));
+        // 2nd argument: the name
+        generatorAdapter.push(argumentName);
+        // 3rd argument, more generics
+        pushTypeArgumentElements(generatorAdapter, classElement, typeArguments, visitedTypes);
+
+        // Argument.create( .. )
+        invokeInterfaceStaticMethod(
+                generatorAdapter,
+                Argument.class,
+                METHOD_CREATE_ARGUMENT_WITH_GENERICS
+        );
+    }
+
+    /**
+     * This method should be replaced by the above method.
+     *
      * @param generatorAdapter The {@link GeneratorAdapter}
      * @param argumentName     The argument name
      * @param nestedTypeObject The nested type object
@@ -277,6 +400,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     /**
      * Obtain the type for a given element.
+     *
      * @param type The element type
      * @return The type
      */
@@ -307,6 +431,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     /**
      * Converts a map of class elements to type arguments.
+     *
      * @param typeArguments The type arguments
      * @return The type arguments
      */
@@ -329,12 +454,13 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     /**
      * Converts a map of class elements to type arguments.
+     *
      * @param parameters The parametesr
      * @return The type arguments
      */
     @NotNull
-    protected  Map<String, Map<String, Object>>  toTypeArguments(ParameterElement... parameters) {
-        final LinkedHashMap<String, Map<String, Object>>  map = new LinkedHashMap<>(parameters.length);
+    protected Map<String, Map<String, Object>> toTypeArguments(ParameterElement... parameters) {
+        final LinkedHashMap<String, Map<String, Object>> map = new LinkedHashMap<>(parameters.length);
         for (ParameterElement ce : parameters) {
             final ClassElement type = ce.getType();
             if (type == null) {
@@ -350,6 +476,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     /**
      * Converts a parameters to type arguments.
+     *
      * @param parameters The parameters
      * @return The type arguments
      */
@@ -930,10 +1057,10 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             Type superType = Type.getType(superClass);
             Type superConstructor = Type.getType(superClass.getDeclaredConstructor(argumentTypes));
             cv.visitMethodInsn(INVOKESPECIAL,
-                superType.getInternalName(),
-                CONSTRUCTOR_NAME,
-                superConstructor.getDescriptor(),
-                false);
+                    superType.getInternalName(),
+                    CONSTRUCTOR_NAME,
+                    superConstructor.getDescriptor(),
+                    false);
         } catch (NoSuchMethodException e) {
             throw new ClassGenerationException("Micronaut version on compile classpath doesn't match", e);
         }
@@ -947,9 +1074,9 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected static void invokeInterfaceStaticMethod(MethodVisitor visitor, Class targetType, Method method) {
         Type type = Type.getType(targetType);
         String owner = type.getSort() == Type.ARRAY ? type.getDescriptor()
-            : type.getInternalName();
+                : type.getInternalName();
         visitor.visitMethodInsn(Opcodes.INVOKESTATIC, owner, method.getName(),
-            method.getDescriptor(), true);
+                method.getDescriptor(), true);
     }
 
     /**
@@ -1102,7 +1229,8 @@ public abstract class AbstractClassFileWriter implements Opcodes {
 
     /**
      * Push the instantiation of the given type.
-     * @param generatorAdapter The generator adaptor
+     *
+     * @param generatorAdapter  The generator adaptor
      * @param typeToInstantiate The type to instantiate.
      */
     protected void pushNewInstance(GeneratorAdapter generatorAdapter, Type typeToInstantiate) {

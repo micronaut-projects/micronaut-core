@@ -105,6 +105,17 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 LOG.trace("Received upstream bytes of length: " + message.length);
             }
 
+            if (message.length == 0) {
+                if (needMoreInput()) {
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("More input required to parse JSON. Demanding more.");
+                    }
+                    upstreamSubscription.request(1);
+                    upstreamDemand++;
+                }
+                return;
+            }
+
             ByteArrayFeeder byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
             boolean consumed = false;
             boolean needMoreInput = byteFeeder.needMoreInput();

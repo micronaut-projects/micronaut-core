@@ -21,6 +21,7 @@ import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
+import io.micronaut.cli.profile.ResetableCommand
 import picocli.CommandLine
 import picocli.CommandLine.Model.CommandSpec
 
@@ -61,4 +62,5 @@ class ListProfilesCommand implements Command, ProfileRepositoryAware {
         }
         return true
     }
+
 }

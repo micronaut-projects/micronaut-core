@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Internal
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassNode
@@ -75,7 +76,16 @@ class AstAnnotationUtils {
      * @return The metadata
      */
     static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, AnnotatedNode parent, AnnotatedNode annotatedNode, boolean inheritTypeAnnotations) {
-        new GroovyAnnotationMetadataBuilder(sourceUnit).buildForParent(parent, annotatedNode, inheritTypeAnnotations)
+        newBuilder(sourceUnit).buildForParent(parent, annotatedNode, inheritTypeAnnotations)
+    }
+
+    /**
+     * Creates a new annotation builder for the given source unit
+     * @param sourceUnit The unit
+     * @return the builder
+     */
+    static GroovyAnnotationMetadataBuilder newBuilder(SourceUnit sourceUnit) {
+        new GroovyAnnotationMetadataBuilder(sourceUnit)
     }
 
     /**
@@ -139,10 +149,14 @@ class AstAnnotationUtils {
     /**
      * Whether the node is annotated with any non internal annotations
      *
+     * @param declaringType The declaring type
      * @param annotatedNode The annotated node
      * @return True if it is
      */
-    static boolean isAnnotated(AnnotatedNode annotatedNode) {
+    static boolean isAnnotated(String declaringType, AnnotatedNode annotatedNode) {
+        if (AbstractAnnotationMetadataBuilder.isMetadataMutated(declaringType, annotatedNode)) {
+            return true
+        }
         for (ann in annotatedNode.annotations) {
             if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(ann.classNode.name)) {
                 return true

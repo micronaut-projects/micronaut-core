@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
@@ -244,8 +245,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             for (BeanDefinition candidate : candidates) {
                 if (candidate.hasDeclaredStereotype(EachProperty.class)) {
 
-                    String property = candidate.getValue(EachProperty.class, String.class).orElse(null);
-                    String primaryPrefix = candidate.getValue(EachProperty.class, "primary", String.class).orElse(null);
+                    String property = candidate.stringValue(EachProperty.class).orElse(null);
+                    String primaryPrefix = candidate.stringValue(EachProperty.class, "primary").orElse(null);
 
                     if (StringUtils.isNotEmpty(property)) {
                         Map entries = getProperty(property, Map.class, Collections.emptyMap());
@@ -267,7 +268,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
                     }
                 } else if (candidate.hasDeclaredStereotype(EachBean.class)) {
-                    Class dependentType = candidate.getValue(EachBean.class, Class.class).orElse(null);
+                    Class dependentType = candidate.classValue(EachBean.class).orElse(null);
                     if (dependentType == null) {
                         transformedCandidates.add(candidate);
                         continue;
@@ -313,7 +314,43 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         }
                     }
                 } else {
-                    transformedCandidates.add(candidate);
+                    if (candidate.hasStereotype(ConfigurationReader.class)) {
+
+                        candidate.getValue(ConfigurationReader.class, "prefix", String.class)
+                                .ifPresent(prefix -> {
+                                    int starIndex = prefix.indexOf("*");
+                                    if (starIndex > -1) {
+                                        String eachProperty = prefix.substring(0, starIndex);
+                                        if (eachProperty.endsWith(".")) {
+                                            eachProperty = eachProperty.substring(0, eachProperty.length() - 1);
+                                        }
+
+                                        if (StringUtils.isNotEmpty(eachProperty)) {
+                                            Map entries = getProperty(eachProperty, Map.class, Collections.emptyMap());
+                                            if (!entries.isEmpty()) {
+                                                for (Object key : entries.keySet()) {
+
+                                                    BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                                    delegate.put(EachProperty.class.getName(), delegate.getBeanType());
+                                                    delegate.put(Named.class.getName(), key.toString());
+
+                                                    if (delegate.isEnabled(this) &&
+                                                            containsProperties(prefix.replace("*", key.toString()))) {
+                                                        transformedCandidates.add(delegate);
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
+                                        }
+
+                                    } else {
+                                        transformedCandidates.add(candidate);
+                                    }
+                                });
+                    } else {
+                        transformedCandidates.add(candidate);
+                    }
                 }
             }
             if (LOG.isDebugEnabled()) {
@@ -441,6 +478,17 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     private static class BootstrapEnvironment extends DefaultEnvironment {
         BootstrapEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... activeEnvironments) {
             super(new ApplicationContextConfiguration() {
+                @Override
+                public Optional<Boolean> getDeduceEnvironments() {
+                    return Optional.of(false);
+                }
+
+                @Nonnull
+                @Override
+                public ClassLoader getClassLoader() {
+                    return resourceLoader.getClassLoader();
+                }
+
                 @Nonnull
                 @Override
                 public List<String> getEnvironments() {

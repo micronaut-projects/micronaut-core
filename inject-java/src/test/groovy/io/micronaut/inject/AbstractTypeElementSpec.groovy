@@ -21,6 +21,7 @@ import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AnnotationUtils
+import io.micronaut.annotation.processing.GenericUtils
 import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
@@ -174,7 +175,8 @@ abstract class AbstractTypeElementSpec extends Specification {
         def env = JavacProcessingEnvironment.instance(new Context())
         def elements = JavacElements.instance(new Context())
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, env.filer) {
+        GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
+        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {
         }
         JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, env.typeUtils, modelUtils, env.filer)
         return builder

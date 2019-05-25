@@ -56,7 +56,20 @@ ext {
                     version: gormVersion,
                     group  : 'org.grails',
                     name   : 'grails-datastore-core',
-                    modules: ['grails-datastore-gorm', 'grails-datastore-gorm-hibernate5']
+                    modules: [
+                            'grails-datastore-gorm',
+                            'grails-datastore-async',
+                            'grails-datastore-gorm-async',
+                            'grails-datastore-gorm-support',
+                            'grails-datastore-gorm-test',
+                            'grails-datastore-gorm-validation',
+                            'grails-datastore-gorm-web'
+                    ]
+            ],
+            'gorm.hibernate'                       : [
+                    version: gormHibernateVersion,
+                    group  : 'org.grails',
+                    name   : 'grails-datastore-gorm-hibernate5'
             ],
             jackson                    : [
                     version: jacksonVersion,
@@ -176,6 +189,11 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-netflix-archaius',
                     modules:['micronaut-netflix-hystrix', 'micronaut-netflix-ribbon']
+            ],
+            'micronaut.openapi': [
+                    version:micronautOpenApi,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-openapi'
             ],
             kafka                      : [
                     version: kafkaVersion,
@@ -409,6 +427,16 @@ ext {
                     version: methvinDirectoryWatcherVersion,
                     group  : 'io.methvin',
                     name   : 'directory-watcher'
+            ],
+            security                   : [
+                    version : micronautSecurityVersion,
+                    group   : 'io.micronaut',
+                    modules : ['micronaut-security', 'micronaut-security-jwt', 'micronaut-security-session']
+            ],
+            'security-configurations'  : [
+                    version : micronautSecurityVersion,
+                    group   : 'io.micronaut.configuration',
+                    modules : ['micronaut-security-ldap']
             ]
     ]
 
@@ -520,7 +548,8 @@ subprojects { Project subproject ->
 
         if (
         !subproject.name.startsWith('test-') &&
-                !subproject.toString().contains('build-projects')
+                !subproject.toString().contains('build-projects') &&
+                        !subproject.toString().contains('benchmarks')
         ) {
 
             apply from: "${rootProject.rootDir}/gradle/publishing.gradle"

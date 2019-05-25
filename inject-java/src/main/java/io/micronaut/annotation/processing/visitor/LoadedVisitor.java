@@ -27,7 +27,6 @@ import javax.annotation.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -45,6 +44,7 @@ public class LoadedVisitor implements Ordered {
     private final String classAnnotation;
     private final String elementAnnotation;
     private final JavaVisitorContext visitorContext;
+    private JavaClassElement rootClassElement;
 
     /**
      * @param visitor               The {@link TypeElementVisitor}
@@ -134,49 +134,54 @@ public class LoadedVisitor implements Ordered {
             return e;
         } else if (element instanceof ExecutableElement) {
             ExecutableElement executableElement = (ExecutableElement) element;
-            if (executableElement.getSimpleName().toString().equals("<init>")) {
-                final JavaConstructorElement e = new JavaConstructorElement(
-                        executableElement,
-                        annotationMetadata, visitorContext);
-                visitor.visitConstructor(
-                        e,
-                        visitorContext
-                );
-                return e;
-            } else {
-                final JavaMethodElement e = new JavaMethodElement(
-                        executableElement,
-                        annotationMetadata, visitorContext);
-                visitor.visitMethod(
-                        e,
-                        visitorContext
-                );
-                return e;
+            if (rootClassElement != null) {
+
+                if (executableElement.getSimpleName().toString().equals("<init>")) {
+                    final JavaConstructorElement e = new JavaConstructorElement(
+                            rootClassElement,
+                            executableElement,
+                            annotationMetadata,
+                            visitorContext);
+                    visitor.visitConstructor(
+                            e,
+                            visitorContext
+                    );
+                    return e;
+                } else {
+                    final JavaMethodElement e = new JavaMethodElement(
+                            rootClassElement,
+                            executableElement,
+                            annotationMetadata, visitorContext);
+                    visitor.visitMethod(
+                            e,
+                            visitorContext
+                    );
+                    return e;
+                }
             }
         } else if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
             boolean isEnum = JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent();
             if (isEnum) {
-                final JavaEnumElement e = new JavaEnumElement(
-                        typeElement,
-                        annotationMetadata,
-                        visitorContext,
-                        Collections.emptyList());
-                visitor.visitClass(
-                        e,
-                        visitorContext
-                );
-                return e;
-            } else {
-                final JavaClassElement e = new JavaClassElement(
+                this.rootClassElement = new JavaEnumElement(
                         typeElement,
                         annotationMetadata,
                         visitorContext);
                 visitor.visitClass(
-                        e,
+                        rootClassElement,
                         visitorContext
                 );
-                return e;
+                return rootClassElement;
+            } else {
+                this.rootClassElement =  new JavaClassElement(
+                        typeElement,
+                        annotationMetadata,
+                        visitorContext);
+                visitor.visitClass(
+                        rootClassElement,
+                        visitorContext
+                );
+                return rootClassElement;
             }
         }
         return null;

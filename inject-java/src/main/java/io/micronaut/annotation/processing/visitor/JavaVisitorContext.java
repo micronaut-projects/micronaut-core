@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
+import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -65,6 +66,8 @@ public class JavaVisitorContext implements VisitorContext {
     private final ModelUtils modelUtils;
     private final AnnotationProcessingOutputVisitor outputVisitor;
     private final MutableConvertibleValues<Object> visitorAttributes;
+    private final GenericUtils genericUtils;
+    private final ProcessingEnvironment proccessingEnv;
     private @Nullable JavaFileManager standardFileManager;
 
     /**
@@ -75,6 +78,7 @@ public class JavaVisitorContext implements VisitorContext {
      * @param annotationUtils The annotation utils
      * @param types Type types
      * @param modelUtils The model utils
+     * @param genericUtils The generic type utils
      * @param filer The filer
      * @param visitorAttributes The attributes
      */
@@ -85,6 +89,7 @@ public class JavaVisitorContext implements VisitorContext {
             AnnotationUtils annotationUtils,
             Types types,
             ModelUtils modelUtils,
+            GenericUtils genericUtils,
             Filer filer,
             MutableConvertibleValues<Object> visitorAttributes) {
         this.messager = messager;
@@ -92,18 +97,10 @@ public class JavaVisitorContext implements VisitorContext {
         this.annotationUtils = annotationUtils;
         this.types = types;
         this.modelUtils = modelUtils;
+        this.genericUtils = genericUtils;
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.visitorAttributes = visitorAttributes;
-
-        final Optional<Method> contextMethod = ReflectionUtils.getMethod(processingEnv.getClass(), "getContext");
-        if (contextMethod.isPresent()) {
-            final Object context = ReflectionUtils.invokeMethod(processingEnv, contextMethod.get());
-            if (context != null) {
-
-                final Optional<Method> getMethod = ReflectionUtils.getMethod(context.getClass(), "get", Class.class);
-                getMethod.ifPresent(method -> this.standardFileManager = ReflectionUtils.invokeMethod(context, method, JavaFileManager.class));
-            }
-        }
+        this.proccessingEnv = processingEnv;
     }
 
     @Nonnull
@@ -111,6 +108,8 @@ public class JavaVisitorContext implements VisitorContext {
     public Iterable<URL> getClasspathResources(@Nonnull String path) {
         // reflective hack required because no way to get the JavaFileManager
         // from public processor API
+        info("EXPERIMENTAL: Compile time resource scanning is experimental", null);
+        JavaFileManager standardFileManager = getStandardFileManager(proccessingEnv).orElse(null);
         if (standardFileManager != null) {
             try {
                 final ClassLoader classLoader = standardFileManager
@@ -131,7 +130,7 @@ public class JavaVisitorContext implements VisitorContext {
     public Optional<ClassElement> getClassElement(String name) {
         TypeElement typeElement = elements.getTypeElement(name);
         return Optional.ofNullable(typeElement).map(typeElement1 ->
-                new JavaClassElement(typeElement1, annotationUtils.getAnnotationMetadata(typeElement1), this, Collections.emptyList())
+                new JavaClassElement(typeElement1, annotationUtils.getAnnotationMetadata(typeElement1), this, Collections.emptyMap())
         );
     }
 
@@ -252,6 +251,14 @@ public class JavaVisitorContext implements VisitorContext {
         return types;
     }
 
+    /**
+     * The generic utils object.
+     * @return The generic utils
+     */
+    public GenericUtils getGenericUtils() {
+        return genericUtils;
+    }
+
     @Override
     public MutableConvertibleValues<Object> put(CharSequence key, @Nullable Object value) {
         visitorAttributes.put(key, value);
@@ -306,5 +313,26 @@ public class JavaVisitorContext implements VisitorContext {
                 populateClassElements(stereotypes, (PackageElement) enclosedElement, classElements);
             }
         }
+    }
+
+    private Optional<JavaFileManager> getStandardFileManager(ProcessingEnvironment processingEnv) {
+        if (this.standardFileManager == null) {
+
+            final Optional<Method> contextMethod = ReflectionUtils.getMethod(processingEnv.getClass(), "getContext");
+            if (contextMethod.isPresent()) {
+                final Object context = ReflectionUtils.invokeMethod(processingEnv, contextMethod.get());
+                try {
+                    if (context != null) {
+
+                        final Optional<Method> getMethod = ReflectionUtils.getMethod(context.getClass(), "get", Class.class);
+                        this.standardFileManager = (JavaFileManager)
+                                getMethod.map(method -> ReflectionUtils.invokeMethod(context, method, JavaFileManager.class)).orElse(null);
+                    }
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+        }
+        return Optional.ofNullable(this.standardFileManager);
     }
 }

@@ -8,9 +8,13 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.reflect.exception.InstantiationException
+import io.micronaut.core.type.Argument
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
+import spock.lang.Issue
 
 import javax.annotation.processing.SupportedAnnotationTypes
 import javax.persistence.Column
@@ -20,6 +24,43 @@ import javax.persistence.Version
 import javax.validation.constraints.Size
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1645")
+    void "test recusive generics 2"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Test<T extends B> {
+    private T child;
+    public T getChild() {
+        return child;
+    } 
+}
+class B<T extends Test> {}
+
+''')
+        expect:
+        introspection != null
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1607')
+    void "test recursive generics"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+import io.micronaut.inject.visitor.beans.RecursiveGenerics;
+
+@io.micronaut.core.annotation.Introspected
+class Test extends RecursiveGenerics<Test> {
+
+}
+''')
+        expect:
+        introspection != null
+    }
 
     void "test build introspection"() {
         given:
@@ -501,6 +542,7 @@ package test;
 import io.micronaut.core.annotation.*;
 import javax.validation.constraints.*;
 import java.util.*;
+import io.micronaut.core.convert.TypeConverter;
 
 @Introspected
 class Test extends ParentBean {
@@ -513,6 +555,16 @@ class Test extends ParentBean {
     private String[] stringArray;
     private int[] primitiveArray;
     private boolean flag;
+    private TypeConverter<String, Collection> genericsTest;
+    private TypeConverter<String, Object[]> genericsArrayTest;
+    
+    public TypeConverter<String, Collection> getGenericsTest() {
+        return genericsTest;
+    }
+    
+    public TypeConverter<String, Object[]> getGenericsArrayTest() {
+        return genericsArrayTest;
+    }
     
     public String getReadOnly() {
         return readOnly;
@@ -593,7 +645,7 @@ class ParentBean {
         introspection != null
         introspection.hasAnnotation(Introspected)
         introspection.instantiate().getClass().name == 'test.Test'
-        introspection.getBeanProperties().size() == 8
+        introspection.getBeanProperties().size() == 10
         introspection.getProperty("name").isPresent()
         introspection.getProperty("name", String).isPresent()
         !introspection.getProperty("name", Integer).isPresent()
@@ -606,6 +658,8 @@ class ParentBean {
         BeanProperty primitiveArrayProp = introspection.getProperty("primitiveArray").get()
         BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
         BeanProperty listOfBytes = introspection.getProperty("listOfBytes").get()
+        BeanProperty genericsTest = introspection.getProperty("genericsTest").get()
+        BeanProperty genericsArrayTest = introspection.getProperty("genericsArrayTest").get()
         def readOnlyProp = introspection.getProperty("readOnly", String).get()
         def instance = introspection.instantiate()
 
@@ -618,7 +672,18 @@ class ParentBean {
         boolProp.get(instance) == false
         nameProp.get(instance) == null
         ageProp.get(instance) == 0
+        genericsTest != null
+        genericsTest.type == TypeConverter
+        genericsTest.asArgument().typeParameters.size() == 2
+        genericsTest.asArgument().typeParameters[0].type == String
+        genericsTest.asArgument().typeParameters[1].type == Collection
+        genericsTest.asArgument().typeParameters[1].typeParameters.length == 1
+        genericsArrayTest.type == TypeConverter
+        genericsArrayTest.asArgument().typeParameters.size() == 2
+        genericsArrayTest.asArgument().typeParameters[0].type == String
+        genericsArrayTest.asArgument().typeParameters[1].type == Object[].class
         stringArrayProp.get(instance) == null
+        stringArrayProp.type == String[]
         primitiveArrayProp.get(instance) == null
         ageProp.hasAnnotation(Size)
         listOfBytes.asArgument().getFirstTypeVariable().get().type == byte[].class

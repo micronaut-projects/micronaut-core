@@ -41,6 +41,7 @@ import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.SourceUnit
 
+import javax.annotation.Nonnull
 import java.lang.annotation.Annotation
 import java.lang.annotation.Repeatable
 import java.lang.reflect.Array
@@ -60,6 +61,19 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit
+    }
+
+    @Override
+    protected boolean isMethodOrClassElement(AnnotatedNode element) {
+        return element instanceof ClassNode || element instanceof MethodNode
+    }
+
+    @Override
+    protected String getDeclaringType(@Nonnull AnnotatedNode element) {
+        if (element instanceof ClassNode) {
+            return element.name
+        }
+        return element.declaringClass?.name
     }
 
     @Override
@@ -97,7 +111,11 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     @Override
     protected Optional<AnnotatedNode> getAnnotationMirror(String annotationName) {
         ClassNode cn = ClassUtils.forName(annotationName, GroovyAnnotationMetadataBuilder.classLoader).map({ Class cls -> ClassHelper.make(cls)}).orElseGet({->ClassHelper.make(annotationName)})
-        return Optional.of((AnnotatedNode)cn)
+        if (cn.name != ClassHelper.OBJECT) {
+            return Optional.of((AnnotatedNode)cn)
+        } else {
+            return Optional.empty()
+        }
     }
 
     @Override
@@ -177,19 +195,24 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                 if (classNode.isResolved()) {
                     Class resolved = classNode.getTypeClass()
                     for (MethodNode method: methods) {
-                        def defaultValue = resolved.getDeclaredMethod(method.getName()).defaultValue
-                        if (defaultValue != null) {
-                            if (defaultValue instanceof Class) {
-                                defaultValues.put(method, new ClassExpression(ClassHelper.makeCached((Class)defaultValue)))
-                            } else {
-                                if (defaultValue instanceof String) {
-                                    if (StringUtils.isNotEmpty((String)defaultValue)) {
+                        try {
+                            def defaultValue = resolved.getDeclaredMethod(method.getName()).defaultValue
+                            if (defaultValue != null) {
+                                if (defaultValue instanceof Class) {
+                                    defaultValues.put(method, new ClassExpression(ClassHelper.makeCached((Class)defaultValue)))
+                                } else {
+                                    if (defaultValue instanceof String) {
+                                        if (StringUtils.isNotEmpty((String)defaultValue)) {
+                                            defaultValues.put(method, new ConstantExpression(defaultValue))
+                                        }
+                                    } else {
                                         defaultValues.put(method, new ConstantExpression(defaultValue))
                                     }
-                                } else {
-                                    defaultValues.put(method, new ConstantExpression(defaultValue))
                                 }
                             }
+                        } catch (NoSuchMethodError e) {
+                            // method no longer exists alias annotation
+                            // ignore and continue
                         }
                     }
                 } else {

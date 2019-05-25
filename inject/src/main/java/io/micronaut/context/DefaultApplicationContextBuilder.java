@@ -37,10 +37,10 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private List<String> packages = new ArrayList<>();
     private Map<String, Object> properties = new LinkedHashMap<>();
     private List<PropertySource> propertySources = new ArrayList<>();
-    private ClassPathResourceLoader classPathResourceLoader;
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
     private Boolean deduceEnvironments = null;
+    private ClassLoader classLoader = getClass().getClassLoader();
 
     /**
      * Default constructor.
@@ -58,11 +58,17 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
 
     @Override
     public @Nonnull ClassPathResourceLoader getResourceLoader() {
-        if (classPathResourceLoader == null) {
-            return ClassPathResourceLoader.defaultLoader(getClassLoader());
+        if (classLoader != null) {
+            return ClassPathResourceLoader.defaultLoader(classLoader);
         } else {
-            return classPathResourceLoader;
+            return ClassPathResourceLoader.defaultLoader(getClass().getClassLoader());
         }
+    }
+
+    @Nonnull
+    @Override
+    public ClassLoader getClassLoader() {
+        return this.classLoader;
     }
 
     @Override
@@ -116,8 +122,9 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @Nonnull ApplicationContextBuilder mainClass(Class mainClass) {
         if (mainClass != null) {
-            ClassLoader classLoader = mainClass.getClassLoader();
-            this.classPathResourceLoader = ClassPathResourceLoader.defaultLoader(classLoader);
+            if (this.classLoader == null) {
+                this.classLoader = mainClass.getClassLoader();
+            }
             String name = mainClass.getPackage().getName();
             if (StringUtils.isNotEmpty(name)) {
                 packages(name);
@@ -129,7 +136,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @Nonnull ApplicationContextBuilder classLoader(ClassLoader classLoader) {
         if (classLoader != null) {
-            this.classPathResourceLoader = ClassPathResourceLoader.defaultLoader(classLoader);
+            this.classLoader = classLoader;
         }
         return this;
     }

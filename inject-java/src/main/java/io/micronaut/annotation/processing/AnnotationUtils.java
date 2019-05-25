@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -57,6 +58,7 @@ public class AnnotationUtils {
     private final Filer filer;
     private final MutableConvertibleValues<Object> visitorAttributes;
     private final ProcessingEnvironment processingEnv;
+    private final GenericUtils genericUtils;
 
     /**
      * Default constructor.
@@ -66,6 +68,7 @@ public class AnnotationUtils {
      * @param messager          The messager
      * @param types             The types
      * @param modelUtils        The model utils
+     * @param genericUtils      The generic utils
      * @param filer             The filer
      * @param visitorAttributes The visitor attributes
      */
@@ -75,12 +78,14 @@ public class AnnotationUtils {
             Messager messager,
             Types types,
             ModelUtils modelUtils,
+            GenericUtils genericUtils,
             Filer filer,
             MutableConvertibleValues<Object> visitorAttributes) {
         this.elementUtils = elementUtils;
         this.messager = messager;
         this.types = types;
         this.modelUtils = modelUtils;
+        this.genericUtils = genericUtils;
         this.filer = filer;
         this.visitorAttributes = visitorAttributes;
         this.processingEnv = processingEnv;
@@ -94,6 +99,7 @@ public class AnnotationUtils {
      * @param messager          The messager
      * @param types             The types
      * @param modelUtils        The model utils
+     * @param genericUtils      The generic utils
      * @param filer             The filer
      */
     protected AnnotationUtils(
@@ -102,8 +108,9 @@ public class AnnotationUtils {
             Messager messager,
             Types types,
             ModelUtils modelUtils,
+            GenericUtils genericUtils,
             Filer filer) {
-        this(processingEnv, elementUtils, messager, types, modelUtils, filer, new MutableConvertibleValuesMap<>());
+        this(processingEnv, elementUtils, messager, types, modelUtils, genericUtils, filer, new MutableConvertibleValuesMap<>());
     }
 
     /**
@@ -180,10 +187,14 @@ public class AnnotationUtils {
     /**
      * Check whether the method is annotated.
      *
+     * @param declaringType The declaring type
      * @param method The method
      * @return True if it is annotated with non internal annotations
      */
-    public boolean isAnnotated(ExecutableElement method) {
+    public boolean isAnnotated(String declaringType, ExecutableElement method) {
+        if (AbstractAnnotationMetadataBuilder.isMetadataMutated(declaringType, method)) {
+            return true;
+        }
         List<? extends AnnotationMirror> annotationMirrors = method.getAnnotationMirrors();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             String typeName = annotationMirror.getAnnotationType().toString();
@@ -223,6 +234,7 @@ public class AnnotationUtils {
                 this,
                 types,
                 modelUtils,
+                genericUtils,
                 filer,
                 visitorAttributes
         );

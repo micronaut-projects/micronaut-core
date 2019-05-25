@@ -40,4 +40,5 @@ interface Command extends Named {
      * @return Whether the command should continue
      */
     boolean handle(ExecutionContext executionContext)
+
 }

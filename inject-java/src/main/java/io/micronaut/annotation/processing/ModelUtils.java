@@ -84,7 +84,7 @@ public class ModelUtils {
      * @param element The element
      * @return The {@link TypeElement}
      */
-    @Nullable final TypeElement classElementFor(Element element) {
+    @Nullable public final TypeElement classElementFor(Element element) {
         while (element != null && !(JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))) {
             element = element.getEnclosingElement();
         }
@@ -106,6 +106,39 @@ public class ModelUtils {
 
         String packageName = packageElement.getQualifiedName().toString();
         return elementBinaryName.toString().replaceFirst(packageName + "\\.", "");
+    }
+
+    /**
+     * Resolves a setter method for a field.
+     *
+     * @param field The field
+     * @return An optional setter method
+     */
+    Optional<ExecutableElement> findGetterMethodFor(Element field) {
+        String getterName = getterNameFor(field);
+        // FIXME refine this to discover one of possible overloaded methods with correct signature (i.e. single arg of field type)
+        TypeElement typeElement = classElementFor(field);
+        if (typeElement == null) {
+            return Optional.empty();
+        }
+
+        List<? extends Element> elements = typeElement.getEnclosedElements();
+        List<ExecutableElement> methods = ElementFilter.methodsIn(elements);
+        return methods.stream()
+                .filter(method -> {
+                    String methodName = method.getSimpleName().toString();
+                    if (getterName.equals(methodName)) {
+                        Set<Modifier> modifiers = method.getModifiers();
+                        return
+                                // it's not static
+                                !modifiers.contains(STATIC)
+                                        // it's either public or package visibility
+                                        && modifiers.contains(PUBLIC)
+                                        || !(modifiers.contains(PRIVATE) || modifiers.contains(PROTECTED));
+                    }
+                    return false;
+                })
+                .findFirst();
     }
 
     /**
@@ -145,6 +178,20 @@ public class ModelUtils {
                 return false;
             })
             .findFirst();
+    }
+
+    /**
+     * The name of a getter for the given field.
+     *
+     * @param field The field in question
+     * @return The getter name
+     */
+    String getterNameFor(Element field) {
+        String methodNamePrefix = "get";
+        if (field.asType().getKind() == TypeKind.BOOLEAN) {
+            methodNamePrefix = "is";
+        }
+        return methodNamePrefix + NameUtils.capitalize(field.getSimpleName().toString());
     }
 
     /**

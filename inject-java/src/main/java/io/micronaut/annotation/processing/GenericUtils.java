@@ -19,9 +19,10 @@ import static javax.lang.model.type.TypeKind.ARRAY;
 import static javax.lang.model.type.TypeKind.VOID;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.Parameterizable;
 import javax.lang.model.element.TypeElement;
@@ -35,12 +36,7 @@ import javax.lang.model.type.WildcardType;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.lang.reflect.Array;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Utility methods for dealing with generic type signatures.
@@ -59,10 +55,84 @@ public class GenericUtils {
      * @param typeUtils    The {@link Types}
      * @param modelUtils   The {@link ModelUtils}
      */
-    GenericUtils(Elements elementUtils, Types typeUtils, ModelUtils modelUtils) {
+    protected GenericUtils(Elements elementUtils, Types typeUtils, ModelUtils modelUtils) {
         this.elementUtils = elementUtils;
         this.typeUtils = typeUtils;
         this.modelUtils = modelUtils;
+    }
+
+    /**
+     * Builds type argument information for the given type.
+     *
+     * @param dt The declared type
+     * @return The type argument information
+     */
+    Map<String, Map<String, Object>> buildGenericTypeArgumentInfo(DeclaredType dt) {
+        Element element = dt.asElement();
+        return buildGenericTypeArgumentInfo(element, dt);
+    }
+
+    /**
+     * Builds type argument information for the given type.
+     *
+     * @param element The element
+     * @return The type argument information
+     */
+    public Map<String, Map<String, Object>> buildGenericTypeArgumentInfo(@Nonnull Element element) {
+        return buildGenericTypeArgumentInfo(element, null);
+    }
+
+    /**
+     * Builds type argument information for the given type.
+     *
+     * @param element The element
+     * @return The type argument information
+     */
+    public Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentElementInfo(@Nonnull Element element) {
+        Map<String, Map<String, Object>> data = buildGenericTypeArgumentInfo(element, null);
+        Map<String, Map<String, TypeMirror>> elements = new HashMap<>(data.size());
+        for (Map.Entry<String, Map<String, Object>> entry : data.entrySet()) {
+            Map<String, Object> value = entry.getValue();
+            HashMap<String, TypeMirror> submap = new HashMap<>(value.size());
+            for (Map.Entry<String, Object> genericEntry : value.entrySet()) {
+                TypeElement te = elementUtils.getTypeElement(genericEntry.getValue().toString());
+                if (te != null) {
+                    submap.put(genericEntry.getKey(), te.asType());
+                }
+            }
+            elements.put(entry.getKey(), submap);
+        }
+        return elements;
+    }
+
+    /**
+     * Builds type argument information for the given type.
+     *
+     * @param element The element
+     * @param dt The declared type
+     * @return The type argument information
+     */
+    private Map<String, Map<String, Object>> buildGenericTypeArgumentInfo(@Nonnull Element element, @Nullable DeclaredType dt) {
+
+        Map<String, Map<String, Object>> beanTypeArguments = new HashMap<>();
+        if (dt != null) {
+
+            List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
+            if (CollectionUtils.isNotEmpty(typeArguments)) {
+                TypeElement typeElement = (TypeElement) element;
+
+                Map<String, Object> directTypeArguments = resolveBoundTypes(dt);
+                if (CollectionUtils.isNotEmpty(directTypeArguments)) {
+                    beanTypeArguments.put(typeElement.getQualifiedName().toString(), directTypeArguments);
+                }
+            }
+        }
+
+        if (element instanceof TypeElement) {
+            TypeElement typeElement = (TypeElement) element;
+            populateTypeArguments(typeElement, beanTypeArguments);
+        }
+        return beanTypeArguments;
     }
 
     /**
@@ -191,9 +261,9 @@ public class GenericUtils {
                             TypeMirror upperBound = tv.getUpperBound();
                             TypeMirror lowerBound = tv.getLowerBound();
                             if (upperBound.getKind() != TypeKind.NULL) {
-                                resolvedParameters.put(parameterName, resolveTypeReference(upperBound, Collections.emptyMap()));
+                                resolvedParameters.put(parameterName, resolveTypeReference(upperBound, boundTypes));
                             } else if (lowerBound.getKind() != TypeKind.NULL) {
-                                resolvedParameters.put(parameterName, resolveTypeReference(lowerBound, Collections.emptyMap()));
+                                resolvedParameters.put(parameterName, resolveTypeReference(lowerBound, boundTypes));
                             }
                         }
                         continue;
@@ -254,7 +324,7 @@ public class GenericUtils {
                 if (boundTypes.containsKey(name)) {
                     return boundTypes.get(name);
                 } else {
-                    return modelUtils.resolveTypeReference(mirror);
+                    return resolveTypeReference(tv.getUpperBound(), boundTypes);
                 }
             case WILDCARD:
                 WildcardType wcType = (WildcardType) mirror;
@@ -280,20 +350,6 @@ public class GenericUtils {
                 } else {
                     return modelUtils.resolveTypeReference(mirror);
                 }
-            case BOOLEAN:
-            case BYTE:
-            case CHAR:
-            case DOUBLE:
-            case FLOAT:
-            case INT:
-            case LONG:
-            case SHORT:
-                Optional<Class> type = ClassUtils.getPrimitiveType(mirror.toString());
-                if (type.isPresent()) {
-                    return type.get();
-                } else {
-                    throw new IllegalStateException("Unknown primitive type: " + mirror.toString());
-                }
             default:
                 return modelUtils.resolveTypeReference(mirror);
         }
@@ -317,8 +373,14 @@ public class GenericUtils {
                     List<? extends TypeMirror> bounds = typeParameter.getBounds();
                     if (bounds.size() == 1) {
                         TypeMirror typeMirror = bounds.get(0);
-                        if (typeMirror.getKind() == TypeKind.DECLARED) {
-                            return (DeclaredType) typeMirror;
+                        TypeKind kind = typeMirror.getKind();
+                        switch (kind) {
+                            case DECLARED:
+                                return (DeclaredType) typeMirror;
+                            case TYPEVAR:
+                                return resolveTypeVariable(element, (TypeVariable) typeMirror);
+                           default:
+                               return null;
                         }
                     }
                 }
@@ -350,6 +412,89 @@ public class GenericUtils {
         return boundTypes;
     }
 
+    /**
+     * Takes a type element and the bound generic information and re-aligns for the new type.
+     * @param typeElement The type element
+     * @param typeArguments The type arguments
+     * @param genericsInfo The generic info
+     * @return The aligned generics
+     */
+    public Map<String, Map<String, TypeMirror>> alignNewGenericsInfo(
+            TypeElement typeElement,
+            List<? extends TypeMirror> typeArguments,
+            Map<String, TypeMirror> genericsInfo) {
+        String typeName = typeElement.getQualifiedName().toString();
+        List<? extends TypeParameterElement> typeParameters = typeElement.getTypeParameters();
+        if (typeArguments.size() == typeParameters.size()) {
+
+            Map<String, TypeMirror> resolved = new HashMap<>(typeArguments.size());
+            Iterator<? extends TypeMirror> i = typeArguments.iterator();
+            for (TypeParameterElement typeParameter : typeParameters) {
+                TypeMirror typeParameterMirror = i.next();
+                String variableName = typeParameter.getSimpleName().toString();
+                resolveVariableForMirror(genericsInfo, resolved, variableName, typeParameterMirror);
+            }
+            return Collections.singletonMap(
+                    typeName,
+                    resolved
+            );
+        }
+        return Collections.emptyMap();
+    }
+
+    private void resolveVariableForMirror(
+            Map<String, TypeMirror> genericsInfo,
+            Map<String, TypeMirror> resolved,
+            String variableName,
+            TypeMirror mirror) {
+        if (mirror instanceof TypeVariable) {
+            TypeVariable tv = (TypeVariable) mirror;
+            resolveTypeVariable(genericsInfo, resolved, variableName, tv);
+        } else {
+            if (mirror instanceof WildcardType) {
+                WildcardType wt = (WildcardType) mirror;
+                TypeMirror extendsBound = wt.getExtendsBound();
+                resolveVariableForMirror(genericsInfo, resolved, variableName, extendsBound);
+            } else if (mirror instanceof DeclaredType) {
+                resolved.put(variableName, mirror);
+            } else if (mirror instanceof ArrayType) {
+                resolved.put(variableName, mirror);
+            }
+        }
+    }
+
+    private void resolveTypeVariable(
+            Map<String, TypeMirror> genericsInfo,
+            Map<String, TypeMirror> resolved,
+            String variableName,
+            TypeVariable variable) {
+        String name = variable.toString();
+        TypeMirror element = genericsInfo.get(name);
+        if (element != null) {
+            resolved.put(variableName, element);
+        } else {
+            TypeMirror upperBound = variable.getUpperBound();
+            if (upperBound instanceof TypeVariable) {
+                resolveTypeVariable(genericsInfo, resolved, variableName, (TypeVariable) upperBound);
+            } else if (upperBound instanceof DeclaredType) {
+                resolved.put(
+                        variableName,
+                        upperBound
+                );
+            } else {
+                TypeMirror lowerBound = variable.getLowerBound();
+                if (lowerBound instanceof TypeVariable) {
+                    resolveTypeVariable(genericsInfo, resolved, variableName, (TypeVariable) lowerBound);
+                } else if (lowerBound instanceof DeclaredType) {
+                    resolved.put(
+                            variableName,
+                            lowerBound
+                    );
+                }
+            }
+        }
+    }
+
     private void resolveGenericTypeParameter(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror, Map<String, Object> boundTypes) {
         if (mirror instanceof DeclaredType) {
             DeclaredType declaredType = (DeclaredType) mirror;
@@ -370,14 +515,84 @@ public class GenericUtils {
             }
         } else if (mirror instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) mirror;
-            TypeMirror upperBound = tv.getUpperBound();
-            if (upperBound instanceof DeclaredType) {
-                resolveGenericTypeParameter(
-                        resolvedParameters,
+            String variableName = tv.toString();
+            if (boundTypes.containsKey(variableName)) {
+                resolvedParameters.put(
                         parameterName,
-                        upperBound,
-                        boundTypes
+                        boundTypes.get(variableName)
                 );
+            } else {
+                TypeMirror upperBound = tv.getUpperBound();
+                if (upperBound instanceof DeclaredType) {
+                    resolveGenericTypeParameter(
+                            resolvedParameters,
+                            parameterName,
+                            upperBound,
+                            boundTypes
+                    );
+                }
+            }
+        }
+    }
+
+    private void populateTypeArguments(TypeElement typeElement, Map<String, Map<String, Object>> typeArguments) {
+        TypeElement current = typeElement;
+        while (current != null) {
+
+            populateTypeArgumentsForInterfaces(typeArguments, current);
+            TypeMirror superclass = current.getSuperclass();
+
+            if (superclass.getKind() == TypeKind.NONE) {
+                current = null;
+            } else {
+                if (superclass instanceof DeclaredType) {
+                    DeclaredType dt = (DeclaredType) superclass;
+                    List<? extends TypeMirror> superArguments = dt.getTypeArguments();
+
+
+                    Element te = dt.asElement();
+                    if (te instanceof TypeElement) {
+                        TypeElement child = current;
+                        current = (TypeElement) te;
+                        if (CollectionUtils.isNotEmpty(superArguments)) {
+                            Map<String, Object> boundTypes = typeArguments.get(child.getQualifiedName().toString());
+                            if (boundTypes == null) {
+                                boundTypes = Collections.emptyMap();
+                            }
+                            Map<String, Object> types = resolveGenericTypes(dt, current, boundTypes);
+
+                            String name = current.getQualifiedName().toString();
+                            typeArguments.put(name, types);
+                        }
+
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    private void populateTypeArgumentsForInterfaces(Map<String, Map<String, Object>> typeArguments, TypeElement child) {
+        for (TypeMirror anInterface : child.getInterfaces()) {
+            if (anInterface instanceof DeclaredType) {
+                DeclaredType declaredType = (DeclaredType) anInterface;
+                Element element = declaredType.asElement();
+                if (element instanceof TypeElement) {
+                    TypeElement te = (TypeElement) element;
+                    String name = te.getQualifiedName().toString();
+                    if (!typeArguments.containsKey(name)) {
+                        Map<String, Object> boundTypes = typeArguments.get(child.getQualifiedName().toString());
+                        if (boundTypes == null) {
+                            boundTypes = Collections.emptyMap();
+                        }
+                        Map<String, Object> types = resolveGenericTypes(declaredType, te, boundTypes);
+                        typeArguments.put(name, types);
+                    }
+                    populateTypeArgumentsForInterfaces(typeArguments, te);
+                }
             }
         }
     }

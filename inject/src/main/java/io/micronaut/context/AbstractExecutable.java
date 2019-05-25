@@ -16,13 +16,13 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.ArrayUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Objects;
@@ -35,7 +35,6 @@ import java.util.Objects;
  */
 @Internal
 abstract class AbstractExecutable implements Executable {
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractExecutableMethod.class);
 
     protected final Class declaringType;
     protected final String methodName;
@@ -87,8 +86,6 @@ abstract class AbstractExecutable implements Executable {
 
     @Override
     public Argument[] getArguments() {
-        // initialize
-        initialize();
         return arguments;
     }
 
@@ -99,33 +96,22 @@ abstract class AbstractExecutable implements Executable {
      * @throws NoSuchMethodError if the method doesn't exist
      */
     public final Method getTargetMethod() {
-        Method method = initialize();
         if (method == null) {
-            if (LOG.isWarnEnabled()) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Type [{}] previously declared a method [{}] which has been removed or changed. It is recommended you re-compile the class or library against the latest version to remove this warning.", declaringType, methodName);
-                }
-            }
-            throw ReflectionUtils.newNoSuchMethodError(declaringType, methodName, argTypes);
+            Method resolvedMethod = resolveTargetMethod();
+            resolvedMethod.setAccessible(true);
+            this.method = resolvedMethod;
         }
-        return method;
+        return this.method;
     }
 
-    private Method initialize() {
-        if (method == null) {
-            Method method = ReflectionUtils.getMethod(declaringType, methodName, argTypes).orElse(null);
-            if (method != null) {
-
-                // instrument the arguments with annotation data from the method
-                method.setAccessible(true);
-                this.method = method;
-                return method;
-            } else {
-                return null;
-            }
-
-        } else {
-            return method;
-        }
+    /**
+     * Resolves the target method.
+     * @return The target method
+     */
+    @Nonnull
+    @UsedByGeneratedCode
+    protected Method resolveTargetMethod() {
+        return ReflectionUtils.getRequiredMethod(declaringType, methodName, argTypes);
     }
+
 }

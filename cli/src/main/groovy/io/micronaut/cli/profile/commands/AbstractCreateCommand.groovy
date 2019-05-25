@@ -28,6 +28,7 @@ import io.micronaut.cli.profile.OneOfFeatureGroup
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
+import io.micronaut.cli.profile.ResetableCommand
 import io.micronaut.cli.util.NameUtils
 import io.micronaut.cli.util.VersionInfo
 import picocli.CommandLine.Command
@@ -49,7 +50,7 @@ import java.nio.file.attribute.BasicFileAttributes
  */
 @CompileStatic
 @Command()
-abstract class AbstractCreateCommand extends ArgumentCompletingCommand implements ProfileRepositoryAware {
+abstract class AbstractCreateCommand extends ArgumentCompletingCommand implements ProfileRepositoryAware, ResetableCommand {
     public static final String ENCODING = System.getProperty("file.encoding") ?: "UTF-8"
 
     protected static final String APPLICATION_YML = "application.yml"
@@ -70,6 +71,8 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
     @Mixin
     private CommonOptionsMixin autoHelp // adds help, and version options to the command
+
+    private Map<URL, File> unzippedDirectories = new LinkedHashMap<URL, File>()
 
     String appname
     String groupname
@@ -339,14 +342,14 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
                 appendFeatureFiles(skeletonDir, cmd.build)
 
+                List<String> featureExcludes = ['**/' + APPLICATION_YML]
+                featureExcludes.addAll(profileInstance.skeletonExcludes)
+
                 if (skeletonDir.exists()) {
-                    copySrcToTarget(ant, skeletonDir, ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
-                    copySrcToTarget(ant, new File(skeletonDir, cmd.build + "-build"), ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
+                    copySrcToTarget(ant, skeletonDir, featureExcludes, profileInstance.binaryExtensions)
+                    copySrcToTarget(ant, new File(skeletonDir, cmd.build + "-build"), featureExcludes, profileInstance.binaryExtensions)
                     ant.chmod(dir: targetDirectory, includes: profileInstance.executablePatterns.join(' '), perm: 'u+x')
                 }
-
-                deleteDirectory(tmpDir)
-                deleteDirectory(skeletonDir)
             }
             replaceBuildTokens(cmd.build, profileInstance, features, projectTargetDirectory)
 
@@ -361,6 +364,18 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             MicronautConsole.getInstance().error "Cannot find profile $profileName"
             return false
         }
+    }
+
+    @Override
+    void reset() {
+        variables = [:]
+        inplace = false
+        profile = null
+        features = []
+        appname = null
+        groupname = null
+        defaultpackagename = null
+        targetDirectory = null
     }
 
     protected void messageOnComplete(MicronautConsole console, CreateServiceCommandObject command, File targetDir) {
@@ -386,8 +401,6 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         }
         return true
     }
-
-    private Map<URL, File> unzippedDirectories = new LinkedHashMap<URL, File>()
 
     @CompileDynamic
     protected File unzipProfile(AntBuilder ant, Resource location) {
@@ -538,8 +551,9 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
             requestedFeatures.removeAll(allFeatureNames)
             requestedFeatures.each { String invalidFeature ->
+                int idx = Math.min(invalidFeature.size(), 2)
                 List possibleSolutions = allFeatureNames.findAll {
-                    it.substring(0, 2) == invalidFeature.substring(0, 2)
+                    it.substring(0, idx) == invalidFeature.substring(0, idx)
                 }
                 StringBuilder warning = new StringBuilder("Feature ${invalidFeature} does not exist in the profile ${profile.name}!")
                 if (possibleSolutions) {
@@ -728,6 +742,11 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         variables['version'] = micronautVersion
         variables['app.name'] = appname
         variables['app.group'] = groupname
+        variables['jansi'] = isWindows() ? "false" : "true"
+    }
+
+    private boolean isWindows() {
+        System.getProperty("os.name")?.toLowerCase(Locale.ENGLISH)?.contains("windows")
     }
 
     private String establishGroupAndAppName(String groupAndAppName) {
@@ -844,14 +863,6 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                     }
                 }
             }
-        }
-    }
-
-    private void deleteDirectory(File directory) {
-        try {
-            directory?.deleteDir()
-        } catch (Throwable t) {
-            // Ignore error deleting temporal directory
         }
     }
 
