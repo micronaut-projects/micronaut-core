@@ -291,4 +291,24 @@ public final class StringUtils {
                 .filter(StringUtils::isNotEmpty)
                 .orElse(null);
     }
+
+    /**
+     * Is the boolean string true. Values that represent true are: yes, y, on, and true.
+     * @param booleanString The boolean string
+     * @return True if it is a valid value
+     */
+    public static boolean isTrue(String booleanString) {
+        if (booleanString == null) {
+            return false;
+        }
+        switch (booleanString) {
+            case "yes":
+            case "y":
+            case "on":
+            case "true":
+                return true;
+            default:
+                return false;
+        }
+    }
 }

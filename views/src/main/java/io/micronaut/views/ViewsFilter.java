@@ -114,8 +114,8 @@ public class ViewsFilter implements HttpServerFilter {
 
                     if (optionalView.isPresent()) {
 
-                        MediaType type = route.getValue(Produces.class, MediaType.class)
-                                .orElse((route.getValue(View.class).isPresent() || body instanceof ModelAndView) ? MediaType.TEXT_HTML_TYPE : MediaType.APPLICATION_JSON_TYPE);
+                        MediaType type = route.stringValue(Produces.class).map(MediaType::new)
+                                .orElse((route.isPresent(View.class, AnnotationMetadata.VALUE_MEMBER) || body instanceof ModelAndView) ? MediaType.TEXT_HTML_TYPE : MediaType.APPLICATION_JSON_TYPE);
                         Optional<ViewsRenderer> optionalViewsRenderer = beanLocator.findBean(ViewsRenderer.class,
                                 new ProducesMediaTypeQualifier<>(type));
 
@@ -203,9 +203,9 @@ public class ViewsFilter implements HttpServerFilter {
      */
     @SuppressWarnings("WeakerAccess")
     protected Optional<String> resolveView(AnnotationMetadata route, Object responseBody) {
-        Optional optionalViewName = route.getValue(View.class);
+        Optional<String> optionalViewName = route.stringValue(View.class);
         if (optionalViewName.isPresent()) {
-            return Optional.of((String) optionalViewName.get());
+            return optionalViewName;
         } else if (responseBody instanceof ModelAndView) {
             return ((ModelAndView) responseBody).getView();
         }

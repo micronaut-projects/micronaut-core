@@ -51,7 +51,7 @@ public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<C
     public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
         ConvertibleValues<io.micronaut.http.cookie.Cookie> parameters = source.getCookies();
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        String parameterName = annotationMetadata.getValue(CookieValue.class, String.class)
+        String parameterName = annotationMetadata.stringValue(CookieValue.class)
                                                  .orElse(argument.getArgument().getName());
         return doBind(argument, parameters, parameterName);
     }

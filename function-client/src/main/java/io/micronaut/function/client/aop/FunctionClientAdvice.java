@@ -73,7 +73,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
             body = parameterValueMap;
         }
 
-        String functionName = context.getValue(Named.class, String.class)
+        String functionName = context.stringValue(Named.class)
                 .orElse(NameUtils.hyphenate(context.getMethodName(), true));
 
         Flowable<FunctionDefinition> functionDefinition = Flowable.fromPublisher(discoveryClient.getFunction(functionName));

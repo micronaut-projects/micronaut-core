@@ -69,7 +69,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
                 // ignore http client filters
                 continue;
             }
-            String[] patterns = beanDefinition.getValue(Filter.class, String[].class).orElse(null);
+            String[] patterns = beanDefinition.stringValues(Filter.class);
             if (ArrayUtils.isNotEmpty(patterns)) {
                 HttpMethod[] methods = beanDefinition.getValue(Filter.class, "methods", HttpMethod[].class).orElse(null);
                 String first = patterns[0];
