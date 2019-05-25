@@ -57,7 +57,7 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        String executorName = context.getValue(Async.class, String.class).orElse(TaskExecutors.SCHEDULED);
+        String executorName = context.stringValue(Async.class).orElse(TaskExecutors.SCHEDULED);
         ExecutorService executorService = beanLocator.findBean(ExecutorService.class, Qualifiers.byName(executorName)).orElseThrow(() ->
             new TaskExecutionException("No ExecutorService named [" + executorName + "] configured in application context")
         );

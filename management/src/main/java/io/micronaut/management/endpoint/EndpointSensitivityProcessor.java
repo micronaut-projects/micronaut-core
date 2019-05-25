@@ -60,7 +60,7 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
 
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        Optional<String> optionalId = beanDefinition.getValue(Endpoint.class, String.class);
+        Optional<String> optionalId = beanDefinition.stringValue(Endpoint.class);
         optionalId.ifPresent((id) -> {
 
             EndpointConfiguration configuration = endpointConfigurations.stream()
@@ -71,8 +71,7 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
             boolean sensitive = configuration
                 .isSensitive()
                 .orElseGet(() -> beanDefinition
-                    .getValue(Endpoint.class, "defaultSensitive", Boolean.class)
-                    .orElse(Endpoint.SENSITIVE));
+                    .isTrue(Endpoint.class, "defaultSensitive"));
 
             endpointMethods.put(method, sensitive);
         });

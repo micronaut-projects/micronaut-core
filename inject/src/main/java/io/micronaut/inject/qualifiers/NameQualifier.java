@@ -119,7 +119,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
                 if (candidate instanceof NameResolver) {
                     candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
                 } else {
-                    Optional<String> annotation = candidate.getAnnotationMetadata().getValue(Named.class, String.class);
+                    Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(Named.class);
                     candidateName = annotation.orElse(candidate.getBeanType().getSimpleName());
                 }
 
@@ -153,7 +153,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
                     if (candidate instanceof NameResolver) {
                         candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
                     } else {
-                        Optional<String> annotation = candidate.getAnnotationMetadata().getValue(Named.class, String.class);
+                        Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(Named.class);
                         candidateName = annotation.orElse(candidate.getBeanType().getSimpleName());
                     }
 
