@@ -13,7 +13,7 @@ A useful benefit of Spring's approach is that it allows overriding existing bean
 
 Any existing bean can be replaced by another bean that declares ann:context.annotation.Replaces[]. For example, consider the following class:
 
-snippet::io.micronaut.docs.requires.JdbcBookService[tags="requires",indent=0, title="JdbcBookService.java"]
+snippet::io.micronaut.docs.requires.JdbcBookService[tags="requires",indent=0, title="JdbcBookService"]
 
 You can define a class in `src/test/java` that replaces this class just for your tests:
 

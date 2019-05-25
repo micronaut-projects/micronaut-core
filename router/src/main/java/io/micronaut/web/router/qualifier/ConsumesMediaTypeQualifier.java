@@ -16,13 +16,13 @@
 package io.micronaut.web.router.qualifier;
 
 import io.micronaut.context.Qualifier;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.inject.BeanType;
 
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -49,14 +49,13 @@ public class ConsumesMediaTypeQualifier<T> implements Qualifier<T> {
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         return candidates.filter(candidate -> {
-                Optional<MediaType[]> consumes = candidate.getAnnotationMetadata().getValue(Consumes.class, MediaType[].class);
-                if (consumes.isPresent()) {
-                    Set<String> consumedTypes = Arrays.stream(consumes.get()).map(MediaType::getExtension).collect(Collectors.toSet());
-                    return consumedTypes.contains(contentType.getExtension());
-                }
-                return false;
+            MediaType[] consumes = MediaType.of(candidate.getAnnotationMetadata().stringValues(Consumes.class));
+            if (ArrayUtils.isNotEmpty(consumes)) {
+                Set<String> consumedTypes = Arrays.stream(consumes).map(MediaType::getExtension).collect(Collectors.toSet());
+                return consumedTypes.contains(contentType.getExtension());
             }
-        );
+            return false;
+        });
     }
 
     @Override

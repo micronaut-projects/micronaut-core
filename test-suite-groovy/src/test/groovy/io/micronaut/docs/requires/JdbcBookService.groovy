@@ -7,7 +7,7 @@ import javax.inject.Singleton
 import javax.sql.DataSource
 import java.sql.SQLException
 
-// tag::replaces[]
+// tag::requires[]
 @Singleton
 @Requires(beans = DataSource.class)
 @Requires(property = "datasource.url")
@@ -15,7 +15,7 @@ class JdbcBookService implements BookService {
 
     DataSource dataSource
 
-// end::replaces[]
+// end::requires[]
 
     @Override
     Book findBook(String title) {

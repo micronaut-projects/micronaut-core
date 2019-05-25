@@ -91,16 +91,12 @@ public class AnnotatedFunctionRouteBuilder
         if (beanDefinition.hasAnnotation(FunctionBean.class)) {
             String methodName = method.getMethodName();
             Class<?> declaringType = method.getDeclaringType();
-            String functionName = beanDefinition.getValue(FunctionBean.class, String.class).orElse(methodName);
-            String functionMethod = beanDefinition.getValue(FunctionBean.class, "method", String.class).orElse(null);
+            String functionName = beanDefinition.stringValue(FunctionBean.class).orElse(methodName);
+            String functionMethod = beanDefinition.stringValue(FunctionBean.class, "method").orElse(null);
 
             List<UriRoute> routes = new ArrayList<>(2);
-            MediaType[] consumes = method.getValue(Consumes.class, String[].class).map((types) ->
-                    Arrays.stream(types).map(MediaType::new).toArray(MediaType[]::new)
-            ).orElse(null);
-            MediaType[] produces = method.getValue(Produces.class, String[].class).map((types) ->
-                    Arrays.stream(types).map(MediaType::new).toArray(MediaType[]::new)
-            ).orElse(null);
+            MediaType[] consumes = Arrays.stream(method.stringValues(Consumes.class)).map(MediaType::new).toArray(MediaType[]::new);
+            MediaType[] produces = Arrays.stream(method.stringValues(Produces.class)).map(MediaType::new).toArray(MediaType[]::new);
 
             if (Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
                 if (methodName.equals("accept") || methodName.equals("apply") || methodName.equals(functionMethod)) {

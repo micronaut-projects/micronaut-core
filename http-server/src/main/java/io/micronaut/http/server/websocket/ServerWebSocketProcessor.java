@@ -63,7 +63,7 @@ public class ServerWebSocketProcessor extends DefaultRouteBuilder implements Exe
 
         if (method.isAnnotationPresent(OnMessage.class) || method.isAnnotationPresent(OnOpen.class)) {
             mappedWebSockets.add(beanType);
-            String uri = beanDefinition.getValue(ServerWebSocket.class, String.class).orElse("/ws");
+            String uri = beanDefinition.stringValue(ServerWebSocket.class).orElse("/ws");
 
             UriRoute route = GET(uri, method);
 
