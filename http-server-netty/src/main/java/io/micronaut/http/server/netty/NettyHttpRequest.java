@@ -183,10 +183,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     protected Object buildBody() {
         if (!receivedData.isEmpty()) {
             Map body = new LinkedHashMap(receivedData.size());
-            boolean isUrlEncoded = getContentType().map(ct -> ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false);
 
             for (AbstractHttpData data: receivedData.values()) {
-                String newValue = getContent(data, isUrlEncoded);
+                String newValue = getContent(data);
                 //noinspection unchecked
                 body.compute(data.getName(), (key, oldValue) -> {
                     if (oldValue == null) {
@@ -220,13 +219,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
     }
 
-    private String getContent(AbstractHttpData data, boolean urlDecode) {
+    private String getContent(AbstractHttpData data) {
         String newValue;
         try {
             newValue = data.getString(serverConfiguration.getDefaultCharset());
-            if (urlDecode) {
-                newValue = URLDecoder.decode(newValue, StandardCharsets.UTF_8.name());
-            }
         } catch (IOException e) {
             throw new InternalServerException("Error retrieving or decoding the value for: " + data.getName());
         }

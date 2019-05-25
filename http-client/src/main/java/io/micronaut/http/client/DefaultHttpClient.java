@@ -828,7 +828,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 }
                 NettyStreamedHttpResponse<ByteBuffer<?>> nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
-                return httpContentFlowable.map((Function<HttpContent, io.micronaut.http.HttpResponse<ByteBuffer<?>>>) message -> {
+                return httpContentFlowable
+                        .filter(message -> !(message.content() instanceof EmptyByteBuf))
+                        .map((Function<HttpContent, io.micronaut.http.HttpResponse<ByteBuffer<?>>>) message -> {
                     ByteBuf byteBuf = message.content();
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Streaming Response Received Chunk (length: {})", byteBuf.readableBytes());
@@ -914,7 +916,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 }
                 NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
-                return httpContentFlowable.map(contentMapper);
+                return httpContentFlowable.filter(message -> !(message.content() instanceof EmptyByteBuf)).map(contentMapper);
             });
         };
     }
