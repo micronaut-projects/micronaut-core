@@ -137,6 +137,7 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
      * Internal environment aware annotation metadata delegate.
      */
     private final class ConstructorAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
+
         ConstructorAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
             super(targetMetadata);
         }

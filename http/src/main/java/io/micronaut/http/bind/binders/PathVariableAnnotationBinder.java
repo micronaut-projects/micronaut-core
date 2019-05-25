@@ -63,7 +63,7 @@ public class PathVariableAnnotationBinder<T> extends AbstractAnnotatedArgumentBi
 
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         boolean hasAnnotation = annotationMetadata.hasAnnotation(PathVariable.class);
-        String parameterName = annotationMetadata.getValue(PathVariable.class, String.class).orElse(argument.getName());
+        String parameterName = annotationMetadata.stringValue(PathVariable.class).orElse(argument.getName());
         // If we need to bind all request params to command object
         // checks if the variable is defined with modifier char *
         // eg. ?pojo*

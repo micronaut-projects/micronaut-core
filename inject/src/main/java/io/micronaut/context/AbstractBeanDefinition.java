@@ -747,7 +747,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (context instanceof ApplicationContext) {
             // can't use orElseThrow here due to compiler bug
             try {
-                String valueAnnStr = argument.getAnnotationMetadata().getValue(Value.class, String.class).orElse(null);
+                String valueAnnStr = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
                 Class argumentType = argument.getType();
 
                 if (isInnerConfiguration(argumentType)) {
@@ -799,7 +799,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (context instanceof ApplicationContext) {
             MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
             Argument argument = injectionPoint.getArguments()[argIndex];
-            String valueAnnStr = argument.getAnnotationMetadata().getValue(Value.class, String.class).orElse(null);
+            String valueAnnStr = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
             String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class type = argument.getType();
@@ -1016,7 +1016,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             if (context instanceof ApplicationContext) {
                 ApplicationContext propertyResolver = (ApplicationContext) context;
                 AnnotationMetadata argMetadata = argument.getAnnotationMetadata();
-                Optional<String> valAnn = argMetadata.getValue(Value.class, String.class);
+                Optional<String> valAnn = argMetadata.stringValue(Value.class);
                 String prop = valAnn.orElseGet(() ->
                         argMetadata.getValue(Property.class, "name", String.class)
                                 .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."))
@@ -1168,7 +1168,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         try {
             if (context instanceof PropertyResolver) {
                 final AnnotationMetadata annotationMetadata = injectionPoint.getAnnotationMetadata();
-                String valueAnnVal = annotationMetadata.getValue(Value.class, String.class).orElse(null);
+                String valueAnnVal = annotationMetadata.stringValue(Value.class).orElse(null);
                 Class<?> fieldType = injectionPoint.getType();
                 if (isInnerConfiguration(fieldType)) {
                     Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint.asArgument(), true);
@@ -1242,7 +1242,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (context instanceof ApplicationContext) {
             FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
             final AnnotationMetadata annotationMetadata = injectionPoint.getAnnotationMetadata();
-            String valueAnnVal = annotationMetadata.getValue(Value.class, String.class).orElse(null);
+            String valueAnnVal = annotationMetadata.stringValue(Value.class).orElse(null);
             String valString = resolvePropertyValueName(resolutionContext, injectionPoint, valueAnnVal, annotationMetadata);
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class fieldType = injectionPoint.getType();
