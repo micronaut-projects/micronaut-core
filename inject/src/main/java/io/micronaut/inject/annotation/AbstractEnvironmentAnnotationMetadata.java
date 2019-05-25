@@ -103,14 +103,14 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
 
     @Nonnull
     @Override
-    public Optional<Class<?>> classValue(@Nonnull String annotation, @Nonnull String member) {
+    public Optional<Class> classValue(@Nonnull String annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
         return annotationMetadata.classValue(annotation, member, valueMapper);
     }
 
     @Nonnull
     @Override
-    public Optional<Class<?>> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    public Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
         return annotationMetadata.classValue(annotation, member, valueMapper);
     }

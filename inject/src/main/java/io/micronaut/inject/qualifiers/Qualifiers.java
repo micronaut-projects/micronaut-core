@@ -82,7 +82,7 @@ public class Qualifiers {
      */
     public static <T> Qualifier<T> byAnnotation(AnnotationMetadata metadata, Class<? extends Annotation> type) {
         if (Type.class == type) {
-            Optional<Class<?>> aClass = metadata.classValue(type);
+            Optional<Class> aClass = metadata.classValue(type);
             if (aClass.isPresent()) {
                 return byType(aClass.get());
             }
@@ -111,7 +111,7 @@ public class Qualifiers {
      */
     public static <T> Qualifier<T> byAnnotation(AnnotationMetadata metadata, String type) {
         if (Type.class.getName().equals(type)) {
-            Optional<Class<?>> aClass = metadata.classValue(type);
+            Optional<Class> aClass = metadata.classValue(type);
             if (aClass.isPresent()) {
                 return byType(aClass.get());
             }

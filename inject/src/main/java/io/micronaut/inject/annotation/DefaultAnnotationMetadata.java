@@ -134,9 +134,26 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
     }
 
+    @Override
+    public boolean isPresent(@Nonnull String annotation, @Nonnull String member) {
+        boolean isPresent = false;
+        if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
+            Map<CharSequence, Object> values = allAnnotations.get(annotation);
+            if (values != null) {
+                isPresent = values.containsKey(member);
+            } else if (allStereotypes != null) {
+                values = allStereotypes.get(annotation);
+                if (values != null) {
+                    isPresent = values.containsKey(member);
+                }
+            }
+        }
+        return isPresent;
+    }
+
     @Nonnull
     @Override
-    public Optional<Class<?>> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    public Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         return classValue(annotation, member, null);
     }
 
@@ -147,14 +164,15 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The class value
      */
-    Optional<Class<?>> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
+    Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
         if (repeatable != null) {
             Object v = getRawSingleValue(repeatable.value().getName(), VALUE_MEMBER, valueMapper);
             if (v instanceof AnnotationValue) {
-                return ((AnnotationValue<?>) v).classValue(member, valueMapper);
+                Optional o = ((AnnotationValue<?>) v).classValue(member, valueMapper);
+                return o;
             }
             return Optional.empty();
         } else {
@@ -164,7 +182,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Nonnull
     @Override
-    public Optional<Class<?>> classValue(@Nonnull String annotation, @Nonnull String member) {
+    public Optional<Class> classValue(@Nonnull String annotation, @Nonnull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         return classValue(annotation, member, null);
@@ -179,7 +197,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @return The class value
      */
     @Internal
-    Optional<Class<?>> classValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+    Optional<Class> classValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
 
         if (rawValue instanceof AnnotationClassValue) {

@@ -33,7 +33,6 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      *
      * @return An {@link Optional} class
      */
-    @Nonnull
     default Optional<Class<?>> classValue() {
         return classValue(AnnotationMetadata.VALUE_MEMBER);
     }

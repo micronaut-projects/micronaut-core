@@ -250,22 +250,22 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default @Nonnull Optional<Class<?>> classValue(@Nonnull String annotation) {
+    default @Nonnull Optional<Class> classValue(@Nonnull String annotation) {
         return getAnnotationMetadata().classValue(annotation);
     }
 
     @Override
-    default @Nonnull Optional<Class<?>> classValue(@Nonnull String annotation, @Nonnull String member) {
+    default @Nonnull Optional<Class> classValue(@Nonnull String annotation, @Nonnull String member) {
         return getAnnotationMetadata().classValue(annotation, member);
     }
 
     @Override
-    default @Nonnull Optional<Class<?>> classValue(@Nonnull Class<? extends Annotation> annotation) {
+    default @Nonnull Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation) {
         return getAnnotationMetadata().classValue(annotation);
     }
 
     @Override
-    default @Nonnull Optional<Class<?>> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default @Nonnull Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         return getAnnotationMetadata().classValue(annotation, member);
     }
 

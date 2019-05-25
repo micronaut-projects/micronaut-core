@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.util.ArrayUtils;
@@ -184,8 +185,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                     });
                 } else {
                     Class exceptionType = null;
-                    if (method.isPresent(Error.class, "value")) {
-                        Optional<Class<?>> annotationValue = method.classValue(Error.class);
+                    if (method.isPresent(Error.class, AnnotationMetadata.VALUE_MEMBER)) {
+                        Optional<Class> annotationValue = method.classValue(Error.class);
                         if (annotationValue.isPresent()) {
                             if (Throwable.class.isAssignableFrom(annotationValue.get())) {
                                 exceptionType = annotationValue.get();

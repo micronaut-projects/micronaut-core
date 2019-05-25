@@ -68,7 +68,7 @@ public class JsonViewServerFilter implements HttpServerFilter {
 
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        Optional<Class<?>> viewClass = request.getAttribute(HttpAttributes.ROUTE_MATCH, AnnotationMetadata.class)                                                          .flatMap(ann -> ann.classValue(JsonView.class));
+        Optional<Class> viewClass = request.getAttribute(HttpAttributes.ROUTE_MATCH, AnnotationMetadata.class)                                                          .flatMap(ann -> ann.classValue(JsonView.class));
         final Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
         if (viewClass.isPresent()) {
             return Flowable.fromPublisher(responsePublisher).switchMap(response -> {
