@@ -715,7 +715,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     @Override
     public <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters) {
         WebSocketBean<T> webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
-        String uri = webSocketBean.getBeanDefinition().getValue(ClientWebSocket.class, String.class).orElse("/ws");
+        String uri = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("/ws");
         uri = UriTemplate.of(uri).expand(parameters);
         MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
         Publisher<URI> uriPublisher = resolveRequestURI(request);

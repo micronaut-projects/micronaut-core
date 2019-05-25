@@ -84,11 +84,12 @@ public class BeanIntrospectionModule extends SimpleModule {
         final Boolean required = argument.isAnnotationPresent(Nonnull.class) ||
                 annotationMetadata.getValue(JsonProperty.class, "required", Boolean.class).orElse(false);
 
+        int index = annotationMetadata.intValue(JsonProperty.class, "index").orElse(-1);
         return PropertyMetadata.construct(
                 required,
-                annotationMetadata.getValue(JsonPropertyDescription.class, String.class).orElse(null),
-                annotationMetadata.getValue(JsonProperty.class, "index", Integer.class).orElse(null),
-                annotationMetadata.getValue(JsonProperty.class, "defaultValue", String.class).orElse(null)
+                annotationMetadata.stringValue(JsonPropertyDescription.class).orElse(null),
+                index > -1 ? index : null,
+                annotationMetadata.stringValue(JsonProperty.class, "defaultValue").orElse(null)
         );
     }
 
@@ -136,10 +137,10 @@ public class BeanIntrospectionModule extends SimpleModule {
                             } else if ("links".equals(n)) {
                                 propertyName = Resource.LINKS;
                             } else {
-                                propertyName = beanProperty.getValue(JsonProperty.class, String.class).orElse(beanProperty.getName());
+                                propertyName = beanProperty.stringValue(JsonProperty.class).orElse(beanProperty.getName());
                             }
                         } else {
-                            propertyName = beanProperty.getValue(JsonProperty.class, String.class).orElse(beanProperty.getName());
+                            propertyName = beanProperty.stringValue(JsonProperty.class).orElse(beanProperty.getName());
                         }
                         BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
                                 propertyName,
@@ -159,7 +160,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(properties);
                     Map<String, BeanProperty> named = new LinkedHashMap<>(properties.size());
                     for (BeanProperty<Object, Object> beanProperty : beanProperties) {
-                        final Optional<String> n = beanProperty.getValue(JsonProperty.class, String.class);
+                        final Optional<String> n = beanProperty.stringValue(JsonProperty.class);
                         n.ifPresent(s -> named.put(s, beanProperty));
                     }
                     for (int i = 0; i < properties.size(); i++) {
@@ -275,7 +276,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                             final JavaType javaType = newType(argument, typeFactory);
                             final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
                             PropertyMetadata propertyMetadata = newPropertyMetadata(argument, annotationMetadata);
-                            final String simpleName = annotationMetadata.getValue(JsonProperty.class, String.class).orElse(argument.getName());
+                            final String simpleName = annotationMetadata.stringValue(JsonProperty.class).orElse(argument.getName());
                             props[i] = new CreatorProperty(
                                     PropertyName.construct(simpleName),
                                     javaType,

@@ -77,14 +77,12 @@ public class CspFilter implements HttpServerFilter {
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
 
         return Flowable.fromPublisher(chain.proceed(request))
-                .doOnNext(response -> {
-                    cspConfiguration.getPolicyDirectives()
-                            .map(StringUtils::trimToNull)
-                            .ifPresent(directives -> {
-                        String header = cspConfiguration.isReportOnly() ? CSP_REPORT_ONLY_HEADER : CSP_HEADER;
-                        response.getHeaders().add(header, directives);
-                    });
-                });
+                .doOnNext(response -> cspConfiguration.getPolicyDirectives()
+                        .map(StringUtils::trimToNull)
+                        .ifPresent(directives -> {
+                    String header = cspConfiguration.isReportOnly() ? CSP_REPORT_ONLY_HEADER : CSP_HEADER;
+                    response.getHeaders().add(header, directives);
+                }));
     }
 
 }

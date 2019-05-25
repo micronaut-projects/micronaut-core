@@ -87,7 +87,7 @@ public class Qualifiers {
                 return byType(aClass.get());
             }
         } else if (Named.class == type) {
-            Optional<String> value = metadata.getValue(type, String.class);
+            Optional<String> value = metadata.stringValue(type);
             if (value.isPresent()) {
                 return byName(value.get());
             }
