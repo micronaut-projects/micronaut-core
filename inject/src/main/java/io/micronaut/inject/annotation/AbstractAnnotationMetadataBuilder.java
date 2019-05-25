@@ -820,7 +820,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
         }
         if (!annotationMetadata.hasDeclaredStereotype(Scope.class) && annotationMetadata.hasDeclaredStereotype(DefaultScope.class)) {
-            Optional<String> value = annotationMetadata.getValue(DefaultScope.class, String.class);
+            Optional<String> value = annotationMetadata.stringValue(DefaultScope.class);
             value.ifPresent(name -> annotationMetadata.addDeclaredAnnotation(name, Collections.emptyMap()));
         }
         return annotationMetadata;

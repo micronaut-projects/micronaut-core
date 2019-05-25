@@ -365,7 +365,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     protected abstract RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments);
 
     private String resolveInputName(Argument requiredArgument) {
-        String inputName = requiredArgument.getAnnotationMetadata().getValue(Bindable.class, String.class).orElse(null);
+        String inputName = requiredArgument.getAnnotationMetadata().stringValue(Bindable.class).orElse(null);
         if (StringUtils.isEmpty(inputName)) {
             inputName = requiredArgument.getName();
         }

@@ -553,7 +553,8 @@ subprojects { Project subproject ->
 
         if (
         !subproject.name.startsWith('test-') &&
-                !subproject.toString().contains('build-projects')
+                !subproject.toString().contains('build-projects') &&
+                        !subproject.toString().contains('benchmarks')
         ) {
 
             apply from: "${rootProject.rootDir}/gradle/publishing.gradle"

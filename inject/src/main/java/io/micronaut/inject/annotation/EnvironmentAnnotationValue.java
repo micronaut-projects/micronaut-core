@@ -41,7 +41,15 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
         super(target, AnnotationMetadataSupport.getDefaultValues(target.getAnnotationName()), EnvironmentConvertibleValuesMap.of(
                 environment,
                 target.getValues()
-        ));
+        ), environment != null ? o -> {
+            if (o instanceof String) {
+                String v = (String) o;
+                if (v.contains("${")) {
+                    return environment.getPlaceholderResolver().resolveRequiredPlaceholders(v);
+                }
+            }
+            return o;
+        } : null);
     }
 
 }

@@ -245,8 +245,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             for (BeanDefinition candidate : candidates) {
                 if (candidate.hasDeclaredStereotype(EachProperty.class)) {
 
-                    String property = candidate.getValue(EachProperty.class, String.class).orElse(null);
-                    String primaryPrefix = candidate.getValue(EachProperty.class, "primary", String.class).orElse(null);
+                    String property = candidate.stringValue(EachProperty.class).orElse(null);
+                    String primaryPrefix = candidate.stringValue(EachProperty.class, "primary").orElse(null);
 
                     if (StringUtils.isNotEmpty(property)) {
                         Map entries = getProperty(property, Map.class, Collections.emptyMap());
@@ -268,7 +268,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
                     }
                 } else if (candidate.hasDeclaredStereotype(EachBean.class)) {
-                    Class dependentType = candidate.getValue(EachBean.class, Class.class).orElse(null);
+                    Class dependentType = candidate.classValue(EachBean.class).orElse(null);
                     if (dependentType == null) {
                         transformedCandidates.add(candidate);
                         continue;

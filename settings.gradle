@@ -38,6 +38,9 @@ include "test-suite-kotlin"
 include "test-suite-groovy"
 include "test-utils"
 
+// benchmarks
+include "benchmarks"
+
 // configurations
 include "configurations:cassandra"
 include "configurations:hibernate-validator"

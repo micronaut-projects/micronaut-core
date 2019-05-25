@@ -16,7 +16,7 @@ snippet::io.micronaut.docs.requires.RequiresJdbc[tags="annotation",indent=0, tit
 
 In the above example an annotation called `RequiresJdbc` is defined that can then be used on the `JdbcBookService` instead:
 
-.Using a @Requires meta-annotation
+.Using a meta-annotation
 [source,java]
 ----
 @RequiresJdbc

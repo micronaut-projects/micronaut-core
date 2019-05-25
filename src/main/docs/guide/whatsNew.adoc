@@ -1,5 +1,11 @@
 Micronaut {version} includes the following changes:
 
+=== GraalVM 19 Native Image Support
+
+Micronaut {version} is the first version to support GraalVM 19's native image changes. 
+
+NOTE: Although GraalVM 19 is the first official stable release of GraalVM, Substrate and the `native-image` tool remain in early adopter / experimental status. Therefore support for native images in Micronaut also remains experimental at this stage.
+
 === Native Bean Validation Support
 
 Hibernate Validator is no longer a required dependency, with a new <<beanValidation,native implementation of Bean Validation>> available that is reflection free and supports reactive and AST level validations now available.

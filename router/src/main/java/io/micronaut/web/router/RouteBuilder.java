@@ -1168,8 +1168,8 @@ public interface RouteBuilder {
          */
         default @Nonnull
         String resolveUri(BeanDefinition<?> beanDefinition) {
-            String uri = beanDefinition.getValue(UriMapping.class, String.class).orElseGet(() ->
-                    beanDefinition.getValue(Controller.class, String.class).orElse(UriMapping.DEFAULT_URI)
+            String uri = beanDefinition.stringValue(UriMapping.class).orElseGet(() ->
+                    beanDefinition.stringValue(Controller.class).orElse(UriMapping.DEFAULT_URI)
             );
             uri = normalizeUri(uri);
             if (uri != null) {

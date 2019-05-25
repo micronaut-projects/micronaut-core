@@ -32,6 +32,7 @@ import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProjectContext
+import io.micronaut.cli.profile.ResetableCommand
 import io.micronaut.cli.profile.commands.ArgumentCompletingCommand
 import io.micronaut.cli.profile.commands.CommandRegistry
 import io.micronaut.cli.profile.commands.CommonOptionsMixin
@@ -236,7 +237,9 @@ class MicronautCli {
                 while (pr.hasSubcommand()) { pr = pr.subcommand() } // most specific subcommand
                 Command command = pr.commandSpec().userObject() as Command
                 int result =  executeCommand(command, pr) ? 0 : 1
-                command.reset()
+                if (command instanceof ResetableCommand) {
+                    command.reset()
+                }
                 return result
             } else if (parseResult.unmatched()) {
                 return getBaseUsage()
@@ -250,7 +253,9 @@ class MicronautCli {
                     while (pr.hasSubcommand()) { pr = pr.subcommand() } // most specific subcommand
                     Command command = pr.commandSpec().userObject() as Command
                     boolean result =  executeCommand(command, pr)
-                    command.reset()
+                    if (command instanceof ResetableCommand) {
+                        command.reset()
+                    }
                     return result
                 }] as Profile
 
@@ -649,10 +654,6 @@ class MicronautCli {
             return false
         }
 
-        @Override
-        void reset() {
-
-        }
     }
 
     @Canonical
@@ -667,10 +668,6 @@ class MicronautCli {
             return true
         }
 
-        @Override
-        void reset() {
-
-        }
     }
 
     private static String[] splitCommandLine(String commandLine) {

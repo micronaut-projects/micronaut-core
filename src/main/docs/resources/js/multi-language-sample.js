@@ -74,8 +74,29 @@ function postProcessCodeBlocks() {
     }
 
     function switchSampleLanguage(languageId, buildId) {
-        var multiLanguageSampleElements = [].slice.call(document.querySelectorAll(".multi-language-sample"));
 
+        // First make sure all the code sample sections are created
+        ensureMultiLanguageSampleSectionsHydrated(languageId, buildId);
+
+        [].slice.call(document.querySelectorAll(".multi-language-selector .language-option")).forEach(function (optionEl) {
+            if (optionEl.getAttribute("data-lang") === languageId || optionEl.getAttribute("data-lang") === buildId) {
+                optionEl.classList.add("selected");
+            } else {
+                optionEl.classList.remove("selected");
+            }
+        });
+
+        [].slice.call(document.querySelectorAll(".multi-language-text")).forEach(function (el) {
+            if (!el.classList.contains("lang-" + languageId) && !el.classList.contains("lang-" + buildId)) {
+                el.classList.add("hidden");
+            } else {
+                el.classList.remove("hidden");
+            }
+        });
+    }
+
+    function ensureMultiLanguageSampleSectionsHydrated(languageId, buildId) {
+        var multiLanguageSampleElements = [].slice.call(document.querySelectorAll(".multi-language-sample"));
         // Array of Arrays, each top-level array representing a single collection of samples
         var multiLanguageSets = [];
         for (var i = 0; i < multiLanguageSampleElements.length; i++) {
@@ -102,8 +123,11 @@ function postProcessCodeBlocks() {
                     sampleCollection[0].classList.remove("hidden");
                 }
 
+                // Add the multi-lang selector
                 if (sampleCollection[0].previousElementSibling == null ||
                     !sampleCollection[0].previousElementSibling.classList.contains("multi-language-selector")) {
+
+                    
                     var languageSelectorFragment = document.createDocumentFragment();
                     var multiLanguageSelectorElement = document.createElement("div");
                     multiLanguageSelectorElement.classList.add("multi-language-selector");
@@ -132,23 +156,25 @@ function postProcessCodeBlocks() {
                         multiLanguageSelectorElement.appendChild(optionEl);
                     });
                     sampleCollection[0].parentNode.insertBefore(languageSelectorFragment, sampleCollection[0]);
+                    // Insert title node prior to selector if title is present in sample collections, and remove duplicate title nodes
+                    if (sampleCollection[0].getElementsByClassName("title").length > 0) {
+                        var titleFragment =  document.createDocumentFragment();
+                        var titleContainerFragment = document.createElement("div");
+                        titleContainerFragment.classList.add("paragraph");
+                        titleFragment.appendChild(titleContainerFragment);
+                        var titleEl = sampleCollection[0].getElementsByClassName("title")[0].cloneNode(true);
+                        titleContainerFragment.appendChild(titleEl);
+                        sampleCollection.forEach(function(element) {
+                            var titleElementsToRemove = element.getElementsByClassName("title");
+                            if(titleElementsToRemove.length > 0) {
+                                for (var i = 0; i < titleElementsToRemove.length; i++) {
+                                    titleElementsToRemove[i].parentNode.removeChild(titleElementsToRemove[i]);
+                                }
+                            }
+                        });
+                        sampleCollection[0].parentNode.insertBefore(titleFragment, multiLanguageSelectorElement);
+                    }
                 }
-            }
-        });
-
-        [].slice.call(document.querySelectorAll(".multi-language-selector .language-option")).forEach(function (optionEl) {
-            if (optionEl.getAttribute("data-lang") === languageId || optionEl.getAttribute("data-lang") === buildId) {
-                optionEl.classList.add("selected");
-            } else {
-                optionEl.classList.remove("selected");
-            }
-        });
-
-        [].slice.call(document.querySelectorAll(".multi-language-text")).forEach(function (el) {
-            if (!el.classList.contains("lang-" + languageId) && !el.classList.contains("lang-" + buildId)) {
-                el.classList.add("hidden");
-            } else {
-                el.classList.remove("hidden");
             }
         });
     }
