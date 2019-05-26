@@ -586,6 +586,18 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * The value as an {@link OptionalLong} for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return THe {@link OptionalLong} value
+     */
+    default OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return longValue(annotation.getName(), member);
+    }
+
+    /**
      * The value of the annotation as a Class.
      *
      * @param annotation The annotation
