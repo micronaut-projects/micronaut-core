@@ -23,7 +23,9 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +39,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMetadataProvider {
+public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMetadataProvider, Type {
 
     /**
      * Constant for int argument. Used by generated code, do not remove.
@@ -109,12 +111,18 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
     /**
      * @return The name of the argument
      */
-    String getName();
+    @Nonnull String getName();
+
+    @Override
+    @Nonnull
+    default String getTypeName() {
+        return getName();
+    }
 
     /**
      * @return The type of the argument
      */
-    Class<T> getType();
+    @Nonnull Class<T> getType();
 
     /**
      * Whether the types are equivalent. The regular {@link Object#equals(Object)} implementation includes the argument
@@ -180,7 +188,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param arguments The arguments
      * @return The class array
      */
-    static Class[] toClassArray(Argument... arguments) {
+    static @Nonnull Class[] toClassArray(Argument... arguments) {
         if (ArrayUtils.isEmpty(arguments)) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         }
@@ -198,13 +206,15 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param arguments The arguments
      * @return The String representation
      */
-    static String toString(Argument... arguments) {
+    static @Nonnull String toString(Argument... arguments) {
         StringBuilder baseString = new StringBuilder();
-        for (int i = 0; i < arguments.length; i++) {
-            Argument argument = arguments[i];
-            baseString.append(argument.toString());
-            if (i != arguments.length - 1) {
-                baseString.append(',');
+        if (ArrayUtils.isNotEmpty(arguments)) {
+            for (int i = 0; i < arguments.length; i++) {
+                Argument argument = arguments[i];
+                baseString.append(argument.toString());
+                if (i != arguments.length - 1) {
+                    baseString.append(',');
+                }
             }
         }
         return baseString.toString();
@@ -220,6 +230,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @return The argument instance
      */
     @UsedByGeneratedCode
+    @Nonnull
     static <T> Argument<T> of(
         Class<T> type,
         String name,
@@ -238,6 +249,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @return The argument instance
      */
     @UsedByGeneratedCode
+    @Nonnull
     static <T> Argument<T> of(
         Class<T> type,
         String name,
@@ -255,6 +267,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @return The argument instance
      */
     @UsedByGeneratedCode
+    @Nonnull
     static <T> Argument<T> of(
         Class<T> type,
         String name) {
@@ -270,8 +283,12 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @return The argument instance
      */
     @UsedByGeneratedCode
+    @Nonnull
     static <T> Argument<T> of(
         Class<T> type, @Nullable Argument... typeParameters) {
+        if (ArrayUtils.isEmpty(typeParameters)) {
+            return of(type);
+        }
         return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
@@ -283,6 +300,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @return The argument instance
      */
     @UsedByGeneratedCode
+    @Nonnull
     static <T> Argument<T> of(
         Class<T> type) {
         return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
@@ -297,8 +315,9 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @return The argument instance
      */
     @UsedByGeneratedCode
+    @Nonnull
     static <T> Argument<T> of(Class<T> type, @Nullable Class<?>... typeParameters) {
-        if (typeParameters == null) {
+        if (ArrayUtils.isEmpty(typeParameters)) {
             return of(type);
         }
 
@@ -322,6 +341,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param <T>  list element type
      * @return The argument instance
      */
+    @Nonnull
     static <T> Argument<List<T>> listOf(Class<T> type) {
         //noinspection unchecked
         return of((Class<List<T>>) ((Class) List.class), type);
@@ -334,6 +354,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param <T>  set element type
      * @return The argument instance
      */
+    @Nonnull
     static <T> Argument<Set<T>> setOf(Class<T> type) {
         //noinspection unchecked
         return of((Class<Set<T>>) ((Class) Set.class), type);
@@ -348,6 +369,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param <V> The map value type
      * @return The argument instance
      */
+    @Nonnull
     static <K, V> Argument<Map<K, V>> mapOf(Class<K> keyType, Class<V> valueType) {
         //noinspection unchecked
         return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
