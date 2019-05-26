@@ -185,7 +185,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                             String finalName = propertySourceName;
                                             byte[] decoded = base64Decoder.decode(value);
                                             Map<String, Object> properties = propertySourceLoader.read(propertySourceName, decoded);
-                                            String envName = resolveEnvironment(fileName, activeNames);
+                                            String envName = ClientUtil.resolveEnvironment(fileName, activeNames);
                                             LocalSource localSource = propertySources.computeIfAbsent(propertySourceName, s -> new LocalSource(isApplicationSpecificConfigKey, envName, finalName));
                                             localSource.putAll(properties);
                                         }
@@ -206,7 +206,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                 }
                                 if (property != null && propertySourceNames != null) {
                                     for (String propertySourceName : propertySourceNames) {
-                                        String envName = resolveEnvironment(propertySourceName, activeNames);
+                                        String envName = ClientUtil.resolveEnvironment(propertySourceName, activeNames);
                                         LocalSource localSource = propertySources.computeIfAbsent(propertySourceName, s -> new LocalSource(isApplicationSpecificConfigKey, envName, propertySourceName));
                                         byte[] decoded = base64Decoder.decode(value);
                                         localSource.put(property, new String(decoded));
@@ -231,7 +231,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                             byte[] decoded = base64Decoder.decode(value);
                                             Map<String, Object> properties = propertySourceLoader.read(fullName, decoded);
                                             for (String propertySourceName : propertySourceNames) {
-                                                String envName = resolveEnvironment(propertySourceName, activeNames);
+                                                String envName = ClientUtil.resolveEnvironment(propertySourceName, activeNames);
                                                 LocalSource localSource = propertySources.computeIfAbsent(propertySourceName, s -> new LocalSource(isApplicationSpecificConfigKey, envName, propertySourceName));
                                                 localSource.putAll(properties);
                                             }
@@ -245,11 +245,10 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                     }
                 }
 
-
                 for (LocalSource localSource: propertySources.values()) {
                     int priority;
                     if (localSource.environment != null) {
-                        priority = envBasePriority + activeNames.indexOf(localSource.environment) + 1;
+                        priority = envBasePriority + (activeNames.indexOf(localSource.environment) * 2);
                     } else {
                         priority = basePriority + 1;
                     }
@@ -261,17 +260,6 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                 emitter.onComplete();
             }
         }, BackpressureStrategy.ERROR));
-    }
-
-    private String resolveEnvironment(String fileName, List<String> activeNames) {
-        if (fileName.endsWith("]")) {
-            int envIdx = fileName.indexOf('[') + 1;
-            String envName = fileName.substring(envIdx, fileName.length() - 1);
-            if (activeNames.contains(envName)) {
-                return envName;
-            }
-        }
-        return null;
     }
 
     private String resolvePropertySourceName(String rootName, String fileName, List<String> activeNames) {
