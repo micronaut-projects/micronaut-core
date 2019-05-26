@@ -731,17 +731,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (value instanceof CharSequence) {
             return new String[] { value.toString() };
         } else if (value instanceof String[]) {
-            if (valueMapper != null) {
-                String[] strs = (String[]) value;
-                String[] newStrs = new String[strs.length];
-                for (int i = 0; i < strs.length; i++) {
-                    String str = strs[i];
-                    newStrs[i] = valueMapper.apply(str).toString();
-                }
-                return newStrs;
-            } else {
-                return (String[]) value;
-            }
+            String[] strs = (String[]) value;
+            return resolveStringArray(strs, valueMapper);
         } else if (value != null) {
             if (value.getClass().isArray()) {
                 int len = Array.getLength(value);
@@ -758,6 +749,26 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             }
         }
         return null;
+    }
+
+    /**
+     * The string[] values for the given value.
+     * @param strs The strings
+     * @param valueMapper The value mapper
+     * @return The string[] or the original string
+     */
+    @Internal
+    public static String[] resolveStringArray(String[] strs, @Nullable Function<Object, Object> valueMapper) {
+        if (valueMapper != null) {
+            String[] newStrs = new String[strs.length];
+            for (int i = 0; i < strs.length; i++) {
+                String str = strs[i];
+                newStrs[i] = valueMapper.apply(str).toString();
+            }
+            return newStrs;
+        } else {
+            return strs;
+        }
     }
 
     /**

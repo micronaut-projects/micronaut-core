@@ -26,7 +26,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
-
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
@@ -247,6 +246,60 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         } else {
             return intValue(annotation.getName(), member);
         }
+    }
+
+    @Nonnull
+    @Override
+    public OptionalLong longValue(@Nonnull String annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return longValue(annotation, member, null);
+    }
+
+    @Nonnull
+    @Override
+    public OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return longValue(annotation, member, null);
+    }
+
+    /**
+     * Retrieve the long value and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param valueMapper The value mapper
+     * @return The long value
+     */
+    @Internal
+    OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+        final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            Object v = getRawSingleValue(repeatable.value().getName(), VALUE_MEMBER, valueMapper);
+            if (v instanceof AnnotationValue) {
+                return ((AnnotationValue<?>) v).longValue(member, valueMapper);
+            }
+            return OptionalLong.empty();
+        } else {
+            return longValue(annotation.getName(), member, valueMapper);
+        }
+    }
+
+    /**
+     * Retrieve the long value and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param valueMapper The value mapper
+     * @return The long value
+     */
+    @Nonnull
+    OptionalLong longValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+        Object rawValue = getRawSingleValue(annotation, member, valueMapper);
+        if (rawValue instanceof Number) {
+            return OptionalLong.of(((Number) rawValue).longValue());
+        }
+        return OptionalLong.empty();
     }
 
     /**
@@ -487,23 +540,48 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public @Nonnull
     <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
+        return getValue(annotation, member, requiredType, null);
+    }
+
+    /**
+     * Resolves the given value performing type conversion as necessary.
+     * @param annotation The annotation
+     * @param member The member
+     * @param requiredType The required type
+     * @param valueMapper The value mapper
+     * @param <T> The generic type
+     * @return The resolved value
+     */
+    @Nonnull
+    <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
-
         Optional<T> resolved = Optional.empty();
         if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
             if (values != null) {
-                resolved = ConversionService.SHARED.convert(
-                        values.get(member), requiredType
-                );
+                Object rawValue = values.get(member);
+                if (rawValue != null) {
+                    if (valueMapper != null) {
+                        rawValue = valueMapper.apply(rawValue);
+                    }
+                    resolved = ConversionService.SHARED.convert(
+                            rawValue, requiredType
+                    );
+                }
             } else if (allStereotypes != null) {
                 values = allStereotypes.get(annotation);
                 if (values != null) {
-                    resolved = ConversionService.SHARED.convert(
-                            values.get(member), requiredType
-                    );
+                    Object rawValue = values.get(member);
+                    if (rawValue != null) {
+                        if (valueMapper != null) {
+                            rawValue = valueMapper.apply(rawValue);
+                        }
+                        resolved = ConversionService.SHARED.convert(
+                                rawValue, requiredType
+                        );
+                    }
                 }
             }
         }

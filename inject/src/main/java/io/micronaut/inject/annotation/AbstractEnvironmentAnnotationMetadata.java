@@ -16,6 +16,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -51,6 +52,33 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     protected AbstractEnvironmentAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
         super(targetMetadata.declaredAnnotations, targetMetadata.allAnnotations);
         this.annotationMetadata = targetMetadata;
+    }
+
+    @Override
+    public <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
+        Environment environment = getEnvironment();
+        if (environment != null) {
+            return annotationMetadata.getValue(annotation, member, requiredType, o -> {
+                PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
+                if (o instanceof String) {
+                    String v = (String) o;
+                    if (v.contains("${")) {
+                        return placeholderResolver.resolveRequiredPlaceholders(v);
+                    }
+                } else if (o instanceof String[]) {
+                    return AnnotationValue.resolveStringArray((String[]) o, o1 -> {
+                        String v = (String) o1;
+                        if (v.contains("${")) {
+                            return placeholderResolver.resolveRequiredPlaceholders(v);
+                        }
+                        return v;
+                    });
+                }
+                return o;
+            });
+        } else {
+            return annotationMetadata.getValue(annotation, member, requiredType);
+        }
     }
 
     @Override
@@ -134,6 +162,18 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     public Optional<String> stringValue(@Nonnull String annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
         return annotationMetadata.stringValue(annotation, member, valueMapper);
+    }
+
+    @Override
+    public OptionalLong longValue(@Nonnull String annotation, @Nonnull String member) {
+        Function<Object, Object> valueMapper = getEnvironmentValueMapper();
+        return annotationMetadata.longValue(annotation, member, valueMapper);
+    }
+
+    @Override
+    public OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        Function<Object, Object> valueMapper = getEnvironmentValueMapper();
+        return annotationMetadata.longValue(annotation, member, valueMapper);
     }
 
     @Nonnull
