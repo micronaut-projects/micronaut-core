@@ -60,14 +60,11 @@ import java.util.concurrent.Future;
 public class AWSParameterStoreConfigClient implements ConfigurationClient {
     
     private static final Logger LOG = LoggerFactory.getLogger(AWSParameterStoreConfiguration.class);
-    private final int PRIORITY_TOP = 150;
-    private final int PRIORITY_DOWN = 100;
-    private final int PRIORITY_INCREMENT = 10;
     private final AWSClientConfiguration awsConfiguration;
     private final AWSParameterStoreConfiguration awsParameterStoreConfiguration;
     private final String serviceId;
     private AWSSimpleSystemsManagementAsync client;
-    private ExecutorService executionService;
+    private ExecutorService executorService;
 
 
     /**
@@ -105,7 +102,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
         if (!awsParameterStoreConfiguration.isEnabled()) {
             return Flowable.empty();
         }
-        Set<String> activeNames = environment.getActiveNames();
+        List<String> activeNames = new ArrayList<>(environment.getActiveNames());
         Optional<String> serviceId = Optional.ofNullable(this.serviceId);
 
 
@@ -128,7 +125,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                     configurationValues,
                     Flowable.fromPublisher(getParametersRecursive(applicationSpecificPath)));
         }
-        if (activeNames != null && activeNames.size() > 0) {
+        if (!activeNames.isEmpty()) {
             // look for the environment configs since we can't wildcard partial paths on aws
             for (String activeName : activeNames) {
                 String environmentSpecificPath = commonConfigPath + "_" + activeName;
@@ -146,7 +143,10 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
         }
 
-        final Map<String, Map<String, Object>> propertySources = new HashMap<>();
+        int basePriority = EnvironmentPropertySource.POSITION + 100;
+        int envBasePriority = basePriority + 50;
+
+        final Map<String, LocalSource> propertySources = new HashMap<>();
         final Flowable<ParametersWithBasePath> parameterFlowable = configurationValues;
         Flowable<PropertySource> propertySourceFlowable = Flowable.create(emitter -> {
             parameterFlowable.subscribe(
@@ -162,35 +162,33 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                             String fullName = key.substring(pathPrefix.length() + 1);
                             Set<String> propertySourceNames = calcPropertySourceNames(fullName, activeNames);
                             Map<String, Object> properties = convertParametersToMap(parametersWithBasePath);
+
                             for (String propertySourceName : propertySourceNames) {
-                                Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
-                                values.putAll(properties);
+                                String envName = ClientUtil.resolveEnvironment(propertySourceName, activeNames);
+                                LocalSource localSource = propertySources.computeIfAbsent(propertySourceName, s -> new LocalSource(isApplicationSpecificConfigKey, envName, propertySourceName));
+                                localSource.putAll(properties);
                             }
                         }
                     },
                     emitter::onError,
                     () -> {
-                        for (Map.Entry<String, Map<String, Object>> entry : propertySources.entrySet()) {
-                            String name = entry.getKey();
-                            int priority = EnvironmentPropertySource.POSITION + (name.endsWith("]") ? PRIORITY_TOP : PRIORITY_DOWN);
-                            if (hasApplicationSpecificConfig && name.startsWith(serviceId.get())) {
-                                priority += PRIORITY_INCREMENT;
+                        for (LocalSource localSource : propertySources.values()) {
+                            int priority;
+                            if (localSource.environment != null) {
+                                priority = envBasePriority + (activeNames.indexOf(localSource.environment) * 2);
+                            } else {
+                                priority = basePriority + 1;
                             }
-                            emitter.onNext(PropertySource.of(Route53ClientDiscoveryConfiguration.SERVICE_ID + '-' + name, entry.getValue(), priority));
+                            if (localSource.appSpecific) {
+                                priority++;
+                            }
+                            emitter.onNext(PropertySource.of(Route53ClientDiscoveryConfiguration.SERVICE_ID + '-' + localSource.name, localSource.values, priority));
                         }
                         emitter.onComplete();
                     });
         }, BackpressureStrategy.ERROR);
 
-        propertySourceFlowable = propertySourceFlowable.onErrorResumeNext(AWSParameterStoreConfigClient::onPropertySourceError);
-
-        if (executionService != null) {
-            return propertySourceFlowable.subscribeOn(io.reactivex.schedulers.Schedulers.from(
-                    executionService
-            ));
-        } else {
-            return propertySourceFlowable;
-        }
+        return propertySourceFlowable.onErrorResumeNext(AWSParameterStoreConfigClient::onPropertySourceError);
 
     }
 
@@ -248,12 +246,14 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
         Future<GetParametersByPathResult> future = client.getParametersByPathAsync(getRequest);
 
-        Flowable<GetParametersByPathResult> invokeFlowable = Flowable.fromFuture(future, Schedulers.io());
+        Flowable<GetParametersByPathResult> invokeFlowable;
+        if (executorService != null) {
+            invokeFlowable = Flowable.fromFuture(future, Schedulers.from(executorService));
+        } else {
+            invokeFlowable = Flowable.fromFuture(future);
+        }
 
-
-        invokeFlowable = invokeFlowable.onErrorResumeNext(AWSParameterStoreConfigClient::onGetParametersByPathResult);
-        return invokeFlowable;
-
+        return invokeFlowable.onErrorResumeNext(AWSParameterStoreConfigClient::onGetParametersByPathResult);
     }
 
     /**
@@ -268,23 +268,25 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
         Future<GetParametersResult> future = client.getParametersAsync(getRequest);
 
-        Flowable<GetParametersResult> invokeFlowable = Flowable.fromFuture(future, Schedulers.io());
+        Flowable<GetParametersResult> invokeFlowable;
+        if (executorService != null) {
+            invokeFlowable = Flowable.fromFuture(future, Schedulers.from(executorService));
+        } else {
+            invokeFlowable = Flowable.fromFuture(future);
+        }
 
-
-        invokeFlowable = invokeFlowable.onErrorResumeNext(AWSParameterStoreConfigClient::onGetParametersError);
-        return invokeFlowable;
-
+        return invokeFlowable.onErrorResumeNext(AWSParameterStoreConfigClient::onGetParametersError);
     }
 
     /**
      * Execution service to make call to AWS.
      *
-     * @param executionService ExectorService
+     * @param executorService ExecutorService
      */
     @Inject
-    void setExecutionService(@Named(TaskExecutors.IO) @Nullable ExecutorService executionService) {
-        if (executionService != null) {
-            this.executionService = executionService;
+    void setExecutionService(@Named(TaskExecutors.IO) @Nullable ExecutorService executorService) {
+        if (executorService != null) {
+            this.executorService = executorService;
         }
     }
 
@@ -295,7 +297,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      * @param activeNames active environment names
      * @return A set of calculated property names
      */
-    private Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames) {
+    private Set<String> calcPropertySourceNames(String prefix, List<String> activeNames) {
         return ClientUtil.calcPropertySourceNames(prefix, activeNames, "_");
     }
 
@@ -360,7 +362,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
         }
         LOG.info("Only nested parameters can contain value which is not key-pair. See {}", param.getName());
     }
-    
+
     /**
      * Simple container class to hold the list of parameters and a base path which was used to collect them.
      */
@@ -374,4 +376,31 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
         }
     }
 
+    /**
+     * A local property source.
+     */
+    private static class LocalSource {
+
+        private final boolean appSpecific;
+        private final String environment;
+        private final String name;
+        private final Map<String, Object> values = new LinkedHashMap<>();
+
+        LocalSource(boolean appSpecific,
+                    String environment,
+                    String name) {
+            this.appSpecific = appSpecific;
+            this.environment = environment;
+            this.name = name;
+        }
+
+        void put(String key, Object value) {
+            this.values.put(key, value);
+        }
+
+        void putAll(Map<String, Object> values) {
+            this.values.putAll(values);
+        }
+
+    }
 }
