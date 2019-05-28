@@ -40,7 +40,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances.</p>
@@ -634,7 +633,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     //initialize the halves
                     //ex 4, 2, 1 for A_B_C_D
                     for (int i = 0; i < halves.length; i++) {
-                        int start = (i == 0) ? permutations : halves[i-1];
+                        int start = (i == 0) ? permutations : halves[i - 1];
                         halves[i] = start / 2;
                     }
 
