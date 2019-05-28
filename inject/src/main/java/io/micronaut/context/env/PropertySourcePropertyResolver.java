@@ -52,6 +52,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
     private static final Logger LOG = ClassUtils.getLogger(PropertySourcePropertyResolver.class);
     private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{\\s?random\\.(\\S+?)\\}");
+    private static final char[] DOT_DASH = new char[] {'.', '-'};
 
     protected final ConversionService<?> conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
@@ -619,41 +620,51 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
         switch (convention) {
             case ENVIRONMENT_VARIABLE:
-                String[] tokens = property.split("_");
-                Set<String> properties = new HashSet<>(tokens.length);
+                String[] tokens = property.toLowerCase(Locale.ENGLISH).split("_");
 
                 if (tokens.length > 1) {
-                    properties.addAll(generatePropertiesCombinations(tokens, new StringBuilder(), '.'));
-                    properties.addAll(generatePropertiesCombinations(tokens, new StringBuilder(), '-'));
-                    return new ArrayList<>(properties);
+                    int separatorCount = tokens.length - 1;
+                    //halves is used to determine when to flip the separator
+                    int[] halves = new int[separatorCount];
+                    //stores the separator per half
+                    byte[] separator = new byte[separatorCount];
+                    //the total number of permutations. 2 to the power of the number of separators
+                    int permutations = (int) Math.pow(2, separatorCount);
+
+                    //initialize the halves
+                    //ex 4, 2, 1 for A_B_C_D
+                    for (int i = 0; i < halves.length; i++) {
+                        int start = (i == 0) ? permutations : halves[i-1];
+                        halves[i] = start / 2;
+                    }
+
+                    String[] properties = new String[permutations];
+                    for (int i = 0; i < permutations; i++) {
+                        int round = i + 1;
+                        StringBuilder builder = new StringBuilder();
+                        for (int t = 0; t < tokens.length; t++) {
+                            if (t > 0) {
+                                int idx = t - 1;
+                                builder.append(DOT_DASH[separator[idx]]);
+                                //if the round is divisible by the half, flip the separator
+                                if (round % halves[idx] == 0) {
+                                    separator[idx] ^= 1;
+                                }
+                            }
+                            builder.append(tokens[t]);
+                        }
+                        properties[i] = builder.toString();
+                    }
+
+                    return Arrays.asList(properties);
                 } else {
-                    return Collections.singletonList(property.toLowerCase(Locale.ENGLISH));
+                    return Collections.singletonList(tokens[0]);
                 }
             default:
                 return Collections.singletonList(
                         NameUtils.hyphenate(property, true)
                 );
         }
-    }
-
-    private List<String> generatePropertiesCombinations(String[] tokens, StringBuilder path, Character separator) {
-        Set<String> properties = new HashSet<>(tokens.length);
-        int len = tokens.length;
-        StringBuilder tmpPath = new StringBuilder(path.toString());
-        for (int i = 0; i < len; i++) {
-            String token = tokens[i];
-            if (i < (len - 1)) {
-                tmpPath.append(token.toLowerCase(Locale.ENGLISH)).append(separator);
-                String[] subTokens = Arrays.copyOfRange(tokens, i + 1, len);
-                properties.add(tmpPath + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining(".")));
-                properties.add(tmpPath + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining("-")));
-
-                properties.addAll(generatePropertiesCombinations(subTokens, tmpPath, '.'));
-                properties.addAll(generatePropertiesCombinations(subTokens, tmpPath, '-'));
-            }
-        }
-
-        return new ArrayList<>(properties);
     }
 
     private String trimIndex(String name) {
