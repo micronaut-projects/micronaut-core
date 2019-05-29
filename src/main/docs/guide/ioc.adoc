@@ -35,7 +35,7 @@ dependencies {
 <1> Apply the Annotation Processing plugin
 <2> Include the minimal dependencies required to perform dependency injection
 
-NOTE: For the Groovy language you should include `micronaut-inject-groovy` in the `compileOnly` scope.
+NOTE: For the Groovy language you should include `micronaut-inject-groovy` in the `compile` scope.
 
 The entry point for IoC is then the api:context.ApplicationContext[] interface, which includes a `run` method. The following example demonstrates using it:
 
