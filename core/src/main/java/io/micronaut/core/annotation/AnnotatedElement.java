@@ -30,13 +30,13 @@ public interface AnnotatedElement extends AnnotationMetadataProvider, Named {
      * @return Whether the element is nullable.
      */
     default boolean isDeclaredNullable() {
-        return getAnnotationMetadata().hasDeclaredAnnotation(AnnotationUtil.NULLABLE);
+        return getAnnotationMetadata().hasDeclaredAnnotation(AnnotationUtil.NULLABLE) || getAnnotationMetadata().hasDeclaredAnnotation("org.jetbrains.annotations.Nullable");
     }
 
     /**
      * @return Whether the element is nullable.
      */
     default boolean isNullable() {
-        return getAnnotationMetadata().hasAnnotation(AnnotationUtil.NULLABLE);
+        return getAnnotationMetadata().hasAnnotation(AnnotationUtil.NULLABLE) || getAnnotationMetadata().hasAnnotation("org.jetbrains.annotations.Nullable");
     }
 }
