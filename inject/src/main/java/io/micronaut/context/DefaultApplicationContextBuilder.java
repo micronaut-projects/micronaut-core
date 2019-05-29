@@ -41,6 +41,9 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Collection<String> configurationExcludes = new HashSet<>();
     private Boolean deduceEnvironments = null;
     private ClassLoader classLoader = getClass().getClassLoader();
+    private boolean envPropertySource = true;
+    private List<String> envVarIncludes = new ArrayList<>();
+    private List<String> envVarExcludes = new ArrayList<>();
 
     /**
      * Default constructor.
@@ -110,6 +113,28 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public @Nonnull ApplicationContextBuilder environmentPropertySource(boolean environmentPropertySource) {
+        this.envPropertySource = environmentPropertySource;
+        return this;
+    }
+
+    @Override
+    public @Nonnull ApplicationContextBuilder environmentVariableIncludes(@Nullable String... environmentVariables) {
+        if (environmentVariables != null) {
+            this.envVarIncludes.addAll(Arrays.asList(environmentVariables));
+        }
+        return this;
+    }
+
+    @Override
+    public @Nonnull ApplicationContextBuilder environmentVariableExcludes(@Nullable String... environmentVariables) {
+        if (environmentVariables != null) {
+            this.envVarExcludes.addAll(Arrays.asList(environmentVariables));
+        }
+        return this;
+    }
+
+    @Override
     public Optional<Boolean> getDeduceEnvironments() {
         return Optional.ofNullable(deduceEnvironments);
     }
@@ -117,6 +142,21 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @Nonnull List<String> getEnvironments() {
         return environments;
+    }
+
+    @Override
+    public boolean isEnvironmentPropertySource() {
+        return envPropertySource;
+    }
+
+    @Override
+    public @Nullable List<String> getEnvironmentVariableIncludes() {
+        return envVarIncludes.isEmpty() ? null : envVarIncludes;
+    }
+
+    @Override
+    public @Nullable List<String> getEnvironmentVariableExcludes() {
+        return envVarExcludes.isEmpty() ? null : envVarExcludes;
     }
 
     @Override
