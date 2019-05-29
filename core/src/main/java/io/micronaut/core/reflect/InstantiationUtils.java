@@ -17,14 +17,20 @@ package io.micronaut.core.reflect;
 
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
+import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.lang.reflect.Constructor;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -55,6 +61,71 @@ public class InstantiationUtils {
             }
             return Optional.empty();
         }
+    }
+
+    /**
+     * Try to instantiate the given class using {@link io.micronaut.core.beans.BeanIntrospector}
+     *
+     * @param type The type
+     * @param propertiesMap The properties values {@link Map} of the instance
+     * @param context The Conversion context
+     * @param <T> The generic type
+     * @return The instantiated instance or {@link Optional#empty()}
+     */
+    public static @Nonnull <T> Optional<T> tryInstantiate(@Nonnull Class<T> type, Map propertiesMap, ConversionContext context) {
+        ArgumentUtils.requireNonNull("type", type);
+        if (propertiesMap.isEmpty()) {
+            return tryInstantiate(type);
+        }
+
+        final Supplier<T> reflectionFallback = () -> {
+            Logger log = LoggerFactory.getLogger(InstantiationUtils.class);
+            if (log.isDebugEnabled()) {
+                log.debug("Tried, but could not instantiate type: " + type);
+            }
+            return null;
+        };
+
+        T result = BeanIntrospector.SHARED.findIntrospection(type).map(introspection -> {
+            T instance;
+            Map bindMap = new LinkedHashMap(propertiesMap.size());
+            Set<Map.Entry<?, ?>> entries = propertiesMap.entrySet();
+            for (Map.Entry<?, ?> entry : entries) {
+                Object key = entry.getKey();
+                bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
+            }
+
+            Argument[] constructorArguments = introspection.getConstructorArguments();
+            List<Object> arguments = new ArrayList<>(constructorArguments.length);
+            if (constructorArguments.length > 0) {
+                for (Argument<?> argument : constructorArguments) {
+                    if (bindMap.containsKey(argument.getName())) {
+                        Object converted = ConversionService.SHARED.convert(bindMap.get(argument.getName()), argument.getType(), ConversionContext.of(argument)).orElseThrow(() ->
+                                new ConversionErrorException(argument, context.getLastError()
+                                        .orElse(() -> new IllegalArgumentException("Value [" + bindMap.get(argument.getName()) + "] cannot be converted to type : " + argument.getType())))
+                        );
+                        arguments.add(converted);
+                    } else if (argument.isDeclaredNullable()) {
+                        arguments.add(null);
+                    } else {
+                        context.reject(new ConversionErrorException(argument, () -> new IllegalArgumentException("No Value found for argument " + argument.getName())));
+                    }
+                }
+                instance = introspection.instantiate(arguments.toArray());
+            } else {
+                instance = introspection.instantiate(type);
+                Collection<BeanProperty<T, Object>> beanProperties = introspection.getBeanProperties();
+                T finalInstance = instance;
+                beanProperties.forEach(beanProperty -> {
+                    if (bindMap.containsKey(beanProperty.getName()) || beanProperty.isDeclaredNullable()) {
+                        beanProperty.convertAndSet(finalInstance, bindMap.get(beanProperty.getName()));
+                    }
+                });
+                instance = finalInstance;
+            }
+            return instance;
+        }).orElseGet(reflectionFallback);
+        return Optional.ofNullable(result);
     }
 
     /**
