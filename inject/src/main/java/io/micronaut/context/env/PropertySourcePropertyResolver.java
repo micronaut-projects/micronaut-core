@@ -619,6 +619,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
         switch (convention) {
             case ENVIRONMENT_VARIABLE:
+                if (StringUtils.isEmpty(property)) {
+                    return Collections.singletonList(property);
+                }
                 String[] tokens = property.toLowerCase(Locale.ENGLISH).split("_");
 
                 if (tokens.length > 1) {
