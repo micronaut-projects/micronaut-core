@@ -20,6 +20,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
+import io.micronaut.core.reflect.exception.InstantiationException;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -58,9 +59,18 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
 
     @Override
     public Optional<Object> convert(Map map, Class<Object> targetType, ConversionContext context) {
-        Optional<Object> instance = InstantiationUtils.tryInstantiate(targetType, map, context);
-        if (instance.isPresent()) {
-            return instance;
+        try {
+            Optional<Object> instance = InstantiationUtils.tryInstantiate(targetType, map, context);
+            if (instance.isPresent()) {
+                return instance;
+            }
+        } catch (InstantiationException e) {
+            if (targetType.isInstance(map)) {
+                return Optional.of(map);
+            } else {
+                return InstantiationUtils
+                        .tryInstantiate(targetType);
+            }
         }
         if (targetType.isInstance(map)) {
             return Optional.of(map);
