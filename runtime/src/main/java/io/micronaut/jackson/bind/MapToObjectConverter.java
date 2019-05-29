@@ -58,6 +58,10 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
 
     @Override
     public Optional<Object> convert(Map map, Class<Object> targetType, ConversionContext context) {
+        Optional<Object> instance = InstantiationUtils.tryInstantiate(targetType, map, context);
+        if (instance.isPresent()) {
+            return instance;
+        }
         if (targetType.isInstance(map)) {
             return Optional.of(map);
         } else {
