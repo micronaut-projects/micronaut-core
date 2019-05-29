@@ -64,7 +64,7 @@ public class InstantiationUtils {
     }
 
     /**
-     * Try to instantiate the given class using {@link io.micronaut.core.beans.BeanIntrospector}
+     * Try to instantiate the given class using {@link io.micronaut.core.beans.BeanIntrospector}.
      *
      * @param type The type
      * @param propertiesMap The properties values {@link Map} of the instance
