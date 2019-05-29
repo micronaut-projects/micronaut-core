@@ -15,16 +15,14 @@
  */
 package io.micronaut.http.server.netty.binding
 
-import io.micronaut.http.HttpMethod
-import io.micronaut.http.HttpParameters
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.QueryValue
-import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.reactivex.Flowable
 import spock.lang.Unroll
 
 import javax.annotation.Nullable
@@ -64,21 +62,32 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/named'                              | null                        | HttpStatus.BAD_REQUEST
         HttpMethod.GET  | '/parameter/overlap/30'                         | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/overlap/30?max=50'                  | "Parameter Value: 30"       | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"    | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/optional?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/optional-list?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
-        HttpMethod.GET  | '/parameter?max=20'                             | "Parameter Value: 20"       | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/simple?max=20'                      | "Parameter Value: 20"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"     | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional?max=20'                    | "Parameter Value: 20"        | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]"  | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]"  | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional-list?values=10&values=20'  | "Parameter Value: [10, 20]"  | HttpStatus.OK
+        HttpMethod.GET  | '/parameter?max=20'                             | "Parameter Value: 20"        | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/simple?max=20'                      | "Parameter Value: 20"        | HttpStatus.OK
 
-        HttpMethod.GET  | '/parameter/optional'                           | "Parameter Value: 10"       | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/all?max=20'                         | "Parameter Value: 20"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional'                           | "Parameter Value: 10"        | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/all'                                | "Parameter Value: 10"        | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/all?max=20'                         | "Parameter Value: 20"        | HttpStatus.OK
 
-        HttpMethod.GET  | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"    | HttpStatus.OK
-        HttpMethod.POST | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/exploded?title=The%20Stand'         | "Parameter Value: The Stand" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"     | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"     | HttpStatus.OK
+    }
+
+    void "test exploded with no default constructor"() {
+        when:
+        Flowable<HttpResponse<String>> exchange = rxClient.exchange(HttpRequest.GET("/parameter/exploded?title=The%20Stand"), String)
+        HttpResponse<String> response = exchange.onErrorReturn({ t -> t.response }).blockingFirst()
+
+        then:
+        response.status() == HttpStatus.OK
+        response.getBody().isPresent()
+        response.getBody().get() == "Parameter Value: The Stand"
     }
 
     @Controller(value = "/parameter", produces = MediaType.TEXT_PLAIN)
@@ -164,6 +173,11 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             "Parameter Value: $name"
         }
 
+        @Get("/exploded{?book*}")
+        String exploded(Book book) {
+            "Parameter Value: $book.title"
+        }
+
         @Get('/queryName/{name}')
         String queryName(String name) {
             "Parameter Value: $name"
@@ -172,6 +186,22 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         @Post('/query')
         String queryPost(@QueryValue String name) {
             "Parameter Value: $name"
+        }
+
+        @Introspected
+        static class Book {
+
+            private String title
+            private String author
+
+            Book(String title, @Nullable String author) {
+                this.title = title
+                this.author = author
+            }
+
+            String getTitle() {
+                return title
+            }
         }
     }
 }
