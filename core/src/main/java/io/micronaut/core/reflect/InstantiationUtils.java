@@ -71,8 +71,9 @@ public class InstantiationUtils {
      * @param context The Conversion context
      * @param <T> The generic type
      * @return The instantiated instance or {@link Optional#empty()}
+     * @throws InstantiationException When an error occurs
      */
-    public static @Nonnull <T> Optional<T> tryInstantiate(@Nonnull Class<T> type, Map propertiesMap, ConversionContext context) {
+    public static @Nonnull <T> Optional<T> tryInstantiate(@Nonnull Class<T> type, Map propertiesMap, ConversionContext context) throws InstantiationException {
         ArgumentUtils.requireNonNull("type", type);
         if (propertiesMap.isEmpty()) {
             return tryInstantiate(type);
@@ -113,7 +114,7 @@ public class InstantiationUtils {
                 }
                 instance = introspection.instantiate(arguments.toArray());
             } else {
-                instance = introspection.instantiate(type);
+                instance = introspection.instantiate();
                 Collection<BeanProperty<T, Object>> beanProperties = introspection.getBeanProperties();
                 T finalInstance = instance;
                 beanProperties.forEach(beanProperty -> {
