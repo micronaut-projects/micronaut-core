@@ -619,13 +619,21 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
         switch (convention) {
             case ENVIRONMENT_VARIABLE:
-                if (StringUtils.isEmpty(property)) {
-                    return Collections.singletonList(property);
-                }
-                String[] tokens = property.toLowerCase(Locale.ENGLISH).split("_");
+                property = property.toLowerCase(Locale.ENGLISH);
 
-                if (tokens.length > 1) {
-                    int separatorCount = tokens.length - 1;
+                List<Integer> separatorIndexList = new ArrayList<>();
+                char[] propertyArr = property.toCharArray();
+                for (int i = 0; i < propertyArr.length; i++) {
+                    if (propertyArr[i] == '_') {
+                        separatorIndexList.add(i);
+                    }
+                }
+
+                if (!separatorIndexList.isEmpty()) {
+                    //store the index in the array where each separator is
+                    int[] separatorIndexes = separatorIndexList.stream().mapToInt(Integer::intValue).toArray();
+
+                    int separatorCount = separatorIndexes.length;
                     //halves is used to determine when to flip the separator
                     int[] halves = new int[separatorCount];
                     //stores the separator per half
@@ -641,26 +649,22 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     }
 
                     String[] properties = new String[permutations];
+
                     for (int i = 0; i < permutations; i++) {
                         int round = i + 1;
-                        StringBuilder builder = new StringBuilder();
-                        for (int t = 0; t < tokens.length; t++) {
-                            if (t > 0) {
-                                int idx = t - 1;
-                                builder.append(DOT_DASH[separator[idx]]);
-                                //if the round is divisible by the half, flip the separator
-                                if (round % halves[idx] == 0) {
-                                    separator[idx] ^= 1;
-                                }
+                        for (int s = 0; s < separatorCount; s++) {
+                            //mutate the array with the separator
+                            propertyArr[separatorIndexes[s]] = DOT_DASH[separator[s]];
+                            if (round % halves[s] == 0) {
+                                separator[s] ^= 1;
                             }
-                            builder.append(tokens[t]);
                         }
-                        properties[i] = builder.toString();
+                        properties[i] = new String(propertyArr);
                     }
 
                     return Arrays.asList(properties);
                 } else {
-                    return Collections.singletonList(tokens[0]);
+                    return Collections.singletonList(property);
                 }
             default:
                 return Collections.singletonList(
