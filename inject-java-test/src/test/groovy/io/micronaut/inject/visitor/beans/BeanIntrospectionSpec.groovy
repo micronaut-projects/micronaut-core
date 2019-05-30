@@ -168,6 +168,62 @@ class Book {
         context?.close()
     }
 
+    void "test default constructor "() {
+        given:
+        ApplicationContext context = buildContext('test.Book', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Book {
+
+    private String title;
+
+    public Book() {
+    }   
+
+    public String getTitle() {
+        return title;
+    }
+    
+    public void setTitle(String title) {
+        this.title = title;
+    }
+}
+''')
+        Class clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
+
+        expect:
+        reference != null
+
+        when:
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 1
+
+        when: "update introspectionMap"
+        BeanIntrospector introspector = BeanIntrospector.SHARED
+        def introspectionMap = introspector.getClass().getDeclaredField("introspectionMap")
+        introspectionMap.setAccessible(true)
+        introspectionMap.set(introspector, new HashMap())
+        Map map = (Map) introspectionMap.get(introspector)
+        map.put(reference.getName(), reference)
+
+        and:
+        def book = InstantiationUtils.tryInstantiate(introspection.getBeanType(), ["title": "The Stand"], ConversionContext.of(Argument.of(introspection.beanType)))
+        def prop = introspection.getRequiredProperty("title", String)
+
+        then:
+        prop.get(book.get()) == "The Stand"
+
+        cleanup:
+        context?.close()
+    }
+
+
 
     void "test multiple constructors with @JsonCreator"() {
         given:
