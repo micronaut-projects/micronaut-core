@@ -226,9 +226,14 @@ public class ModelUtils {
                     return annotationMetadata.hasStereotype(Inject.class) || annotationMetadata.hasStereotype(Creator.class);
                 }
         ).findFirst();
+
+        if (!element.isPresent()) {
+            element = constructors.stream().filter(ctor -> ctor.getParameters() == null || ctor.getParameters().isEmpty()).findFirst();
+        }
+
         if (!element.isPresent()) {
             element = constructors.stream().filter(ctor ->
-                ctor.getModifiers().contains(PUBLIC)
+                    ctor.getModifiers().contains(PUBLIC)
             ).findFirst();
         }
         return element.orElse(null);
