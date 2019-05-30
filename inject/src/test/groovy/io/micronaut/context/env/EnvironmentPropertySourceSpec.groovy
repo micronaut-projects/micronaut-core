@@ -71,4 +71,16 @@ class EnvironmentPropertySourceSpec extends Specification {
         cleanup:
         context.close()
     }
+
+    void "test a very large environment variable"() {
+        environmentVariables.set("A_B_C_D_E_F_G_H_I_J_K_L_M_N", "alphabet")
+        ApplicationContext context = ApplicationContext.build().start()
+
+        expect:
+        context.getProperty("a.b.c.d.e.f.g.h.i.j.k.l.m.n", String).isPresent()
+
+        cleanup:
+        context.close()
+    }
+
 }
