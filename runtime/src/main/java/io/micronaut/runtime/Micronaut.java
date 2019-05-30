@@ -198,6 +198,21 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
+    public @Nonnull Micronaut environmentPropertySource(boolean environmentPropertySource) {
+        return (Micronaut) super.environmentPropertySource(environmentPropertySource);
+    }
+
+    @Override
+    public @Nonnull Micronaut environmentVariableIncludes(@Nullable String... environmentVariables) {
+        return (Micronaut) super.environmentVariableIncludes(environmentVariables);
+    }
+
+    @Override
+    public @Nonnull Micronaut environmentVariableExcludes(@Nullable String... environmentVariables) {
+        return (Micronaut) super.environmentVariableExcludes(environmentVariables);
+    }
+
+    @Override
     public @Nonnull Micronaut mainClass(Class mainClass) {
         return (Micronaut) super.mainClass(mainClass);
     }
