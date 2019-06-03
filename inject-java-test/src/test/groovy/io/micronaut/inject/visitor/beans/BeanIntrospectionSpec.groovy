@@ -98,6 +98,7 @@ interface GroupThree {}
         reference.load()
     }
 
+    @Ignore
     void "test multiple constructors with primary constructor marked as @Creator"() {
         given:
         ApplicationContext context = buildContext('test.Book', '''
