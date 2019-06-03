@@ -221,6 +221,27 @@ class Test {
         metadata.getValue(Requires, "version").get() == "1.8"
     }
 
+    void "test read enum constants with custom toString()"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+
+@EnumAnn(EnumAnn.MyEnum.TWO)
+class Test {
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.synthesize(EnumAnn).value() == EnumAnn.MyEnum.TWO
+    }
+
     void "test read external constants"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\

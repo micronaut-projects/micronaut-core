@@ -255,6 +255,59 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
     }
 
+    @Override
+    public Optional<Boolean> booleanValue(@Nonnull String annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return booleanValue(annotation, member, null);
+    }
+
+    @Override
+    public Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return booleanValue(annotation, member, null);
+    }
+
+     /**
+     * Retrieve the boolean value and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param valueMapper The value mapper
+     * @return The boolean value
+     */
+    Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+        final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            Object v = getRawSingleValue(repeatable.value().getName(), VALUE_MEMBER, null);
+            if (v instanceof AnnotationValue) {
+                return ((AnnotationValue<?>) v).booleanValue(member, valueMapper);
+            }
+            return Optional.empty();
+        } else {
+            return booleanValue(annotation.getName(), member, valueMapper);
+        }
+    }
+
+    /**
+     * Retrieve the boolean value and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param valueMapper The value mapper
+     * @return The boolean value
+     */
+    @Nonnull
+    Optional<Boolean> booleanValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+        Object rawValue = getRawSingleValue(annotation, member, valueMapper);
+        if (rawValue instanceof Boolean) {
+            return Optional.of((Boolean) rawValue);
+        } else if (rawValue != null) {
+            return Optional.of(StringUtils.isTrue(rawValue.toString()));
+        }
+        return Optional.empty();
+    }
+
     @Nonnull
     @Override
     public OptionalLong longValue(@Nonnull String annotation, @Nonnull String member) {
