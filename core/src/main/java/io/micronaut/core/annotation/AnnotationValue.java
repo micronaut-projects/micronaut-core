@@ -344,6 +344,25 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
+     * The boolean value of the given member.
+     *
+     * @param member The annotation member
+     * @param valueMapper The value mapper
+     * @return An {@link Optional} boolean
+     */
+    public Optional<Boolean> booleanValue(@Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+        if (StringUtils.isNotEmpty(member)) {
+            Object o = getRawSingleValue(member, valueMapper);
+            if (o instanceof Boolean) {
+                return Optional.of((Boolean) o);
+            } else if (o instanceof CharSequence) {
+                return Optional.of(StringUtils.isTrue(o.toString()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
      * The double value of the given member.
      *
      * @param member The annotation member
@@ -429,6 +448,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Override
     public Optional<String> stringValue() {
         return stringValue(AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    @Override
+    public Optional<Boolean> booleanValue(@Nonnull String member) {
+        return booleanValue(member, null);
     }
 
     /**

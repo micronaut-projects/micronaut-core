@@ -31,6 +31,34 @@ import java.util.*;
  * @since 1.0
  */
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
+
+    @Override
+    default OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return getAnnotationMetadata().longValue(annotation, member);
+    }
+
+    @Override
+    default Optional<Boolean> booleanValue(@Nonnull String annotation, @Nonnull String member) {
+        return getAnnotationMetadata().booleanValue(annotation, member);
+    }
+
+    @Override
+    default Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return getAnnotationMetadata().booleanValue(annotation, member);
+    }
+
+    @Nonnull
+    @Override
+    default Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().booleanValue(annotation, AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    @Nonnull
+    @Override
+    default Optional<Boolean> booleanValue(@Nonnull String annotation) {
+        return getAnnotationMetadata().booleanValue(annotation, AnnotationMetadata.VALUE_MEMBER);
+    }
+
     @Nonnull
     @Override
     default String[] stringValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {

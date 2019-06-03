@@ -144,13 +144,31 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
     Optional<String> stringValue(@Nonnull String member);
 
     /**
-     * The double value of the given member.
+     * The string value of the given member.
      *
      * @return An {@link OptionalInt}
      */
     default Optional<String> stringValue() {
         return stringValue(AnnotationMetadata.VALUE_MEMBER);
     }
+
+    /**
+     * The boolean value of the given member.
+     *
+     * @param member The annotation member
+     * @return An {@link Optional} boolean
+     */
+    Optional<Boolean> booleanValue(@Nonnull String member);
+
+    /**
+     * The Boolean value of the given member.
+     *
+     * @return An {@link Optional} boolean
+     */
+    default Optional<Boolean> booleanValue() {
+        return booleanValue(AnnotationMetadata.VALUE_MEMBER);
+    }
+
 
     /**
      * The string value of the given member.
