@@ -126,6 +126,35 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         this.valueMapper = valueMapper;
     }
 
+    /**
+     * Return the enum value of the given member of the given enum type.
+     *
+     * @param member The annotation member
+     * @param enumType The required type
+     * @return An {@link Optional} of the enum value
+     * @param <E> The enum type
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public <E extends Enum> Optional<E> enumValue(@Nonnull String member, @Nonnull Class<E> enumType) {
+        ArgumentUtils.requireNonNull("enumType", enumType);
+        if (StringUtils.isNotEmpty(member)) {
+            Object o = getRawSingleValue(member, valueMapper);
+            if (o != null) {
+                if (enumType.isInstance(o)) {
+                    return Optional.of((E) o);
+                } else {
+                    try {
+                        E e = (E) Enum.valueOf(enumType, o.toString());
+                        return Optional.of(e);
+                    } catch (IllegalArgumentException ex) {
+                        return Optional.empty();
+                    }
+                }
+            }
+        }
+        return Optional.empty();
+    }
 
     /**
      * The value of the annotation as a Class.
@@ -147,6 +176,62 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @SuppressWarnings("unchecked")
     public Optional<Class<?>> classValue(@Nonnull String member) {
         return classValue(member, valueMapper);
+    }
+
+    /**
+     * The value of the given annotation member as a Class.
+     *
+     * @param member The annotation member
+     * @param requiredType The required type
+     * @return An {@link Optional} class
+     * @param <T> The required type
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> Optional<Class<? extends T>> classValue(@Nonnull String member, @Nonnull Class<T> requiredType) {
+        ArgumentUtils.requireNonNull("requiredType", requiredType);
+        if (StringUtils.isNotEmpty(member)) {
+            Object o = getRawSingleValue(member, valueMapper);
+            if (o instanceof AnnotationClassValue) {
+                Class<?> t = ((AnnotationClassValue<?>) o).getType().orElse(null);
+                if (t != null && requiredType.isAssignableFrom(t)) {
+                    return Optional.of((Class<? extends T>) t);
+                }
+                return Optional.empty();
+            } else if (o instanceof Class) {
+                Class t = (Class) o;
+                if (requiredType.isAssignableFrom(t)) {
+                    return Optional.of((Class<? extends T>) t);
+                }
+                return Optional.empty();
+            } else if (o != null) {
+                Class t = ClassUtils.forName(o.toString(), getClass().getClassLoader()).orElse(null);
+                if (t != null && requiredType.isAssignableFrom(t)) {
+                    return Optional.of((Class<? extends T>) t);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+
+    /**
+     * The value of the given annotation member as a Class.
+     *
+     * @param member The annotation member
+     * @param valueMapper The raw value mapper
+     * @return An {@link Optional} class
+     */
+    public Optional<Class<?>> classValue(@Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+        if (StringUtils.isNotEmpty(member)) {
+            Object o = getRawSingleValue(member, valueMapper);
+            if (o instanceof AnnotationClassValue) {
+                return ((AnnotationClassValue) o).getType();
+            } else if (o instanceof Class) {
+                return Optional.of(((Class) o));
+            }
+        }
+        return Optional.empty();
     }
 
     @Nonnull
@@ -184,25 +269,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
         }
         return ReflectionUtils.EMPTY_CLASS_ARRAY;
-    }
-
-    /**
-     * The value of the given annotation member as a Class.
-     *
-     * @param member The annotation member
-     * @param valueMapper The raw value mapper
-     * @return An {@link Optional} class
-     */
-    public Optional<Class<?>> classValue(@Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof AnnotationClassValue) {
-                return ((AnnotationClassValue) o).getType();
-            } else if (o instanceof Class) {
-                return Optional.of(((Class) o));
-            }
-        }
-        return Optional.empty();
     }
 
     /**
@@ -430,42 +496,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Override
     public boolean isFalse(String member) {
         return !isTrue(member);
-    }
-
-    /**
-     * The value of the given annotation member as a Class.
-     *
-     * @param member The annotation member
-     * @param requiredType The required type
-     * @return An {@link Optional} class
-     * @param <T> The required type
-     */
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T> Optional<Class<? extends T>> classValue(@Nonnull String member, @Nonnull Class<T> requiredType) {
-        ArgumentUtils.requireNonNull("requiredType", requiredType);
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof AnnotationClassValue) {
-                Class<?> t = ((AnnotationClassValue<?>) o).getType().orElse(null);
-                if (t != null && requiredType.isAssignableFrom(t)) {
-                    return Optional.of((Class<? extends T>) t);
-                }
-                return Optional.empty();
-            } else if (o instanceof Class) {
-                Class t = (Class) o;
-                if (requiredType.isAssignableFrom(t)) {
-                    return Optional.of((Class<? extends T>) t);
-                }
-                return Optional.empty();
-            } else if (o != null) {
-                Class t = ClassUtils.forName(o.toString(), getClass().getClassLoader()).orElse(null);
-                if (t != null && requiredType.isAssignableFrom(t)) {
-                    return Optional.of((Class<? extends T>) t);
-                }
-            }
-        }
-        return Optional.empty();
     }
 
     /**

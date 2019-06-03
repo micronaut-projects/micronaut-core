@@ -16,6 +16,7 @@
 package io.micronaut.web.router.version;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpRequest;
@@ -120,9 +121,7 @@ public class RouteVersionFilter implements RouteMatchFilter {
     }
 
     private <T, R> Optional<String> getVersion(UriRouteMatch<T, R> routeMatch) {
-        return Optional.ofNullable(
-                routeMatch.getExecutableMethod().getAnnotation(Version.class))
-                .flatMap(annotation -> annotation.getValue(String.class));
+        return routeMatch.getExecutableMethod().stringValue(Version.class);
     }
 
 }
