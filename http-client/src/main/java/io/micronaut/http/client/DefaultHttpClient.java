@@ -1296,7 +1296,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         continue;
                     }
                 }
-                String[] patterns = filterAnn.getValue(String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
+                String[] patterns = filterAnn.stringValues();
                 if (patterns.length == 0) {
                     filterList.add(filter);
                 } else {

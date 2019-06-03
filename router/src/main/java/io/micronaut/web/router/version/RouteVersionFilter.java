@@ -120,9 +120,7 @@ public class RouteVersionFilter implements RouteMatchFilter {
     }
 
     private <T, R> Optional<String> getVersion(UriRouteMatch<T, R> routeMatch) {
-        return Optional.ofNullable(
-                routeMatch.getExecutableMethod().getAnnotation(Version.class))
-                .flatMap(annotation -> annotation.getValue(String.class));
+        return routeMatch.getExecutableMethod().stringValue(Version.class);
     }
 
 }

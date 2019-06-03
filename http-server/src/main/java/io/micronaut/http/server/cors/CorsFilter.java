@@ -157,14 +157,14 @@ public class CorsFilter implements HttpServerFilter {
                 }
 
                 if (preflight) {
-                    Optional<List> accessControlHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.of(List.class, String.class));
+                    Optional<List<String>> accessControlHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.listOf(String.class));
 
                     List<String> allowedHeaders = config.getAllowedHeaders();
 
                     if (!isAny(allowedHeaders) && accessControlHeaders.isPresent()) {
                         if (!accessControlHeaders.get().stream()
                             .allMatch(header -> allowedHeaders.stream()
-                                .anyMatch(allowedHeader -> allowedHeader.equals(header.toString().trim())))) {
+                                .anyMatch(allowedHeader -> allowedHeader.equals(header.trim())))) {
                             return Optional.of(HttpResponse.status(HttpStatus.FORBIDDEN));
                         }
                     }
