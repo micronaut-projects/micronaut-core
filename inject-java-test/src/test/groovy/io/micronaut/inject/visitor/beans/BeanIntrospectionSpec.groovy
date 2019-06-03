@@ -153,7 +153,6 @@ class Book {
         BeanIntrospector introspector = BeanIntrospector.SHARED
         def introspectionMap = introspector.getClass().getDeclaredField("introspectionMap")
         introspectionMap.setAccessible(true)
-        introspectionMap.set(introspector, new HashMap())
         Map map = (Map) introspectionMap.get(introspector)
         map.put(reference.getName(), reference)
 
@@ -208,7 +207,6 @@ class Book {
         BeanIntrospector introspector = BeanIntrospector.SHARED
         def introspectionMap = introspector.getClass().getDeclaredField("introspectionMap")
         introspectionMap.setAccessible(true)
-        introspectionMap.set(introspector, new HashMap())
         Map map = (Map) introspectionMap.get(introspector)
         map.put(reference.getName(), reference)
 
