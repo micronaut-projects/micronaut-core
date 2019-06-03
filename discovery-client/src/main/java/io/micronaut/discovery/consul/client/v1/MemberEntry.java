@@ -25,7 +25,7 @@ import java.util.Map;
 
 /**
  * A member entry of a Consul cluster. See https://www.consul.io/api/agent.html
- * @author Alvaro Sánchez-Mariscal
+ * @author Álvaro Sánchez-Mariscal
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
 @Introspected

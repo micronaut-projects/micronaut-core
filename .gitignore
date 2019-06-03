@@ -20,3 +20,4 @@ bin/
 *.iws
 .kotlintest
 */.kotlintest/
+.nb-gradle

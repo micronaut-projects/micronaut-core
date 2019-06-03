@@ -25,7 +25,7 @@ import java.util.Map;
 
 /**
  * Configuration and member information of the local agent. See https://www.consul.io/api/agent.html
- * @author Alvaro Sánchez-Mariscal
+ * @author Álvaro Sánchez-Mariscal
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
 @Introspected
