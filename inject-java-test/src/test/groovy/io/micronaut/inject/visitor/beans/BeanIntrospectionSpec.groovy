@@ -16,7 +16,6 @@ import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
-import spock.lang.Ignore
 import spock.lang.Issue
 
 import javax.annotation.processing.SupportedAnnotationTypes
@@ -25,6 +24,7 @@ import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
 import javax.validation.constraints.Size
+import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
@@ -98,7 +98,6 @@ interface GroupThree {}
         reference.load()
     }
 
-    @Ignore
     void "test multiple constructors with primary constructor marked as @Creator"() {
         given:
         ApplicationContext context = buildContext('test.Book', '''
@@ -153,9 +152,10 @@ class Book {
 
         when: "update introspectionMap"
         BeanIntrospector introspector = BeanIntrospector.SHARED
-        def introspectionMap = introspector.getClass().getDeclaredField("introspectionMap")
-        introspectionMap.setAccessible(true)
-        Map map = (Map) introspectionMap.get(introspector)
+        Field introspectionMapField = introspector.getClass().getDeclaredField("introspectionMap")
+        introspectionMapField.setAccessible(true)
+        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>());
+        Map map = (Map) introspectionMapField.get(introspector)
         map.put(reference.getName(), reference)
 
         and:
@@ -166,10 +166,10 @@ class Book {
         prop.get(book.get()) == "The Stand"
 
         cleanup:
+        introspectionMapField.set(introspector, null)
         context?.close()
     }
 
-    @Ignore
     void "test default constructor "() {
         given:
         ApplicationContext context = buildContext('test.Book', '''
@@ -208,9 +208,10 @@ class Book {
 
         when: "update introspectionMap"
         BeanIntrospector introspector = BeanIntrospector.SHARED
-        def introspectionMap = introspector.getClass().getDeclaredField("introspectionMap")
-        introspectionMap.setAccessible(true)
-        Map map = (Map) introspectionMap.get(introspector)
+        Field introspectionMapField = introspector.getClass().getDeclaredField("introspectionMap")
+        introspectionMapField.setAccessible(true)
+        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>());
+        Map map = (Map) introspectionMapField.get(introspector)
         map.put(reference.getName(), reference)
 
         and:
@@ -218,13 +219,13 @@ class Book {
         def prop = introspection.getRequiredProperty("title", String)
 
         then:
-        prop.get(book.get()) == "The Stand"
+        prop.get(book.get()) == null
 
         cleanup:
+        introspectionMapField.set(introspector, null)
         context?.close()
     }
 
-    @Ignore
     void "test multiple constructors with @JsonCreator"() {
         given:
         ApplicationContext context = buildContext('test.Test', '''
