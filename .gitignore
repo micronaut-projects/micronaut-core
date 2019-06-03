@@ -21,3 +21,4 @@ bin/
 .kotlintest
 */.kotlintest/
 .nb-gradle
+.nb-gradle-properties
