@@ -37,12 +37,10 @@ class IntrospectionSpec : TestCase() {
     fun testNullable() {
         val introspection = BeanIntrospection.getIntrospection(Manufacturer::class.java)
         val manufacturer: Manufacturer = introspection.instantiate(null, "John")
-        print("Hello ${manufacturer.name}")
 
         val property : BeanProperty<Manufacturer, String> = introspection.getRequiredProperty("name", String::class.java)
         property.set(manufacturer, "Jane")
         val name = property.get(manufacturer)
-        print("Hey ${manufacturer.name}")
 
         assertEquals("Jane", name)
     }
