@@ -92,7 +92,7 @@ public class InstantiationUtils {
             List<Object> arguments = new ArrayList<>(constructorArguments.length);
 
             try {
-                if ( constructorArguments.length > 0) {
+                if (constructorArguments.length > 0) {
 
                     Map bindMap = new LinkedHashMap(propertiesMap.size());
                     Set<Map.Entry<?, ?>> entries = propertiesMap.entrySet();
