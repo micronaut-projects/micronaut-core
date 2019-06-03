@@ -125,6 +125,28 @@ class Test {
         topLevel.nested().num() == 10
     }
 
+    void "test read enum constants with custom toString()"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+
+@EnumAnn(EnumAnn.MyEnum.TWO)
+class Test {
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.synthesize(EnumAnn).value() == EnumAnn.MyEnum.TWO
+    }
+
+
     void "test read enum constants"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\
