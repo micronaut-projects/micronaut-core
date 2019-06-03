@@ -16,6 +16,7 @@ import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
+import spock.lang.Ignore
 import spock.lang.Issue
 
 import javax.annotation.processing.SupportedAnnotationTypes
@@ -167,6 +168,7 @@ class Book {
         context?.close()
     }
 
+    @Ignore
     void "test default constructor "() {
         given:
         ApplicationContext context = buildContext('test.Book', '''
@@ -221,8 +223,7 @@ class Book {
         context?.close()
     }
 
-
-
+    @Ignore
     void "test multiple constructors with @JsonCreator"() {
         given:
         ApplicationContext context = buildContext('test.Test', '''
