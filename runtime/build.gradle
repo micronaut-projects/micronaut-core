@@ -1,4 +1,5 @@
 shadowJar.enabled = true
+
 dependencies {
     for(proj in ['inject', 'http', 'aop']) {
         compile project(":$proj")
@@ -9,6 +10,7 @@ dependencies {
     compile dependencyVersion("validation")
     compile dependencyVersion("jackson.databind")
     compile dependencyVersion("rxjava2")
+    compile "com.fasterxml:aalto-xml:1.2.0"
 
     compile([
         dependencyVersion('jackson.datatype'),
