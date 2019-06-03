@@ -76,6 +76,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
      *
      * @param serviceId The service id
      * @param connectionPoolConfiguration The connection pool configuration
+     * @param sslConfiguration The SSL configuration
      * @param applicationConfiguration The application configuration
      */
     public ServiceHttpClientConfiguration(
