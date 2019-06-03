@@ -50,7 +50,9 @@ class ManualHttpServiceDefinitionSpec extends Specification {
                 'micronaut.http.services.bar.health-check':true,
                 'micronaut.http.services.bar.health-check-interval':'100ms',
                 'micronaut.http.services.bar.read-timeout':'10s',
-                'micronaut.http.services.bar.pool.enabled':true
+                'micronaut.http.services.bar.pool.enabled':true,
+                'micronaut.http.services.baz.url': firstApp.getURI(),
+                'micronaut.http.services.baz.path': '/manual/http/service',
         )
         TestClientFoo tcFoo = clientApp.getBean(TestClientFoo)
         TestClientBar tcBar = clientApp.getBean(TestClientBar)
@@ -81,11 +83,20 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         when:
         client = clientApp.getBean(RxHttpClient, Qualifiers.byName("bar"))
         result = client.retrieve(HttpRequest.POST('/', '')).blockingFirst()
+
         then:
         client.configuration == config
         result == 'created'
         tcBar.save() == 'created'
         tcBar.update() == "updated"
+
+        when: "a client that overrides the path is used"
+        TestClientBaz tcBaz = clientApp.getBean(TestClientBaz)
+
+        then:
+        tcBaz.index() == "ok-other"
+        tcBaz.save() == "created-other"
+        tcBaz.update() == "updated-other"
 
         cleanup:
         firstApp.close()
@@ -135,6 +146,18 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         String update()
     }
 
+    @Client(id = "baz", path = "/other/http/service")
+    static interface TestClientBaz {
+        @Get
+        String index()
+
+        @Post
+        String save()
+
+        @Put("update")
+        String update()
+    }
+
     @Controller('manual/http/service')
     static class TestController {
         @Get
@@ -150,6 +173,24 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         @Put("update")
         String update() {
             return "updated"
+        }
+    }
+
+    @Controller('other/http/service')
+    static class OtherController {
+        @Get
+        String index() {
+            return "ok-other"
+        }
+
+        @Post
+        String save() {
+            return "created-other"
+        }
+
+        @Put("update")
+        String update() {
+            return "updated-other"
         }
     }
 }

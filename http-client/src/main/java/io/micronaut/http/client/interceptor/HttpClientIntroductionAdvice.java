@@ -620,7 +620,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn) {
         String clientId = getClientId(clientAnn);
-        String path = clientAnn.get("path", String.class).orElse(null);
+        String path = clientAnn.stringValue("path").orElse(null);
         String clientKey = computeClientKey(clientId, path);
         if (clientKey == null) {
             return null;
@@ -628,8 +628,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         return clients.computeIfAbsent(clientKey, integer -> {
             HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(clientId)).orElse(null);
+            AnnotationValue<JacksonFeatures> jacksonFeatures = context.findAnnotation(JacksonFeatures.class).orElse(null);
+            Optional<Class<?>> configurationClass = clientAnn.classValue("configuration");
+
             if (null != clientBean) {
-                return clientBean;
+                if (path == null && jacksonFeatures == null && !configurationClass.isPresent()) {
+                    return clientBean;
+                }
             }
 
             LoadBalancer loadBalancer = loadBalancerResolver.resolve(clientId)
@@ -653,13 +658,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 HttpClientConfiguration.class,
                 Qualifiers.byName(clientId)
             );
-            Class<HttpClientConfiguration> defaultConfiguration = clientAnn.get("configuration", Class.class).orElse(HttpClientConfiguration.class);
+            Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>)configurationClass.orElse(HttpClientConfiguration.class);
             configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath);
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
                 defaultClient.setClientIdentifiers(clientId);
-                AnnotationValue<JacksonFeatures> jacksonFeatures = context.findAnnotation(JacksonFeatures.class).orElse(null);
 
                 if (jacksonFeatures != null) {
                     Optional<MediaTypeCodec> existingCodec = defaultClient.getMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE);
