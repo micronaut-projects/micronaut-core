@@ -308,59 +308,29 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      * @return map of the results, converted
      */
     private Map<String, Object> convertParametersToMap(ParametersWithBasePath parametersWithBasePath) {
-
         Map<String, Object> output = new HashMap<>();
         for (Parameter param : parametersWithBasePath.parameters) {
+            String key = param.getName().substring(parametersWithBasePath.basePath.length());
+            if (key.length() > 1) {
+                key = key.substring(1).replaceAll("/", ".");
+            }
+
             switch (param.getType()) {
                 case "StringList":
-                    // command delimited list back into a set/list and exvalues value to be key=value,key=value
+                    // command delimited list back into a set/list and evaluates value
                     String[] items = param.getValue().split(",");
-                    for (String item : items) {
-                        // now split to key value
-                        String[] keyValue = item.split("=");
-                        if (keyValue.length > 1) {
-                            output.put(keyValue[0], keyValue[1]);
-                        } else {
-                            addKeyFromPath(output, parametersWithBasePath, param, keyValue[0]);
-                        }
-                    }
+                    output.put(key, Arrays.asList(items));
                     break;
-
                 case "SecureString":
+                case "String":
                     // if decrypt is set to true on request KMS is supposed to decrypt these for us otherwise we get
                     // back an encoded encrypted string of gobbly gook. It uses the default account key unless
                     // one is specified in the config
-                    String[] keyValue = param.getValue().split("=");
-                    if (keyValue.length > 1) {
-                        output.put(keyValue[0], keyValue[1]);
-                    } else {
-                        addKeyFromPath(output, parametersWithBasePath, param, keyValue[0]);
-                    }
-
-                    break;
-
-                default:
-                case "String":
-                    String[] keyVal = param.getValue().split("=");
-                    if (keyVal.length > 1) {
-                        output.put(keyVal[0], keyVal[1]);
-                    } else {
-                        addKeyFromPath(output, parametersWithBasePath, param, keyVal[0]);
-                    }
+                    output.put(key, param.getValue());
                     break;
             }
         }
         return output;
-
-    }
-
-    private void addKeyFromPath(Map<String, Object> output, ParametersWithBasePath parametersWithBasePath, Parameter param, String value) {
-        String keyPath = param.getName().substring(parametersWithBasePath.basePath.length());
-        if (keyPath.length() > 1) {
-            output.put(keyPath.substring(1).replaceAll("/", "."), value);
-            return;
-        }
-        LOG.info("Only nested parameters can contain value which is not key-pair. See {}", param.getName());
     }
 
     /**
