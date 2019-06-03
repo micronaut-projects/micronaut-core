@@ -101,48 +101,34 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                 GetParametersResult result = new GetParametersResult()
 
                 ArrayList<Parameter> parameters = new ArrayList<Parameter>()
-
+                int end = 0
                 if (getRequest.names.contains("/config/application")) {
-                    Parameter parameter = new Parameter()
-                    parameter.name = "/config/application"
-                    parameter.value = "some.aws.value-1=6,some.aws.value-2=5,some.aws.value-3=4,some.aws.value-4=3,some.aws.value-5=2,some.aws.value-6=1"
-                    parameter.type = "StringList"
-                    parameters.add(parameter)
+                    end = 6
                 }
                 if (getRequest.names.contains("/config/amazon-test")) {
-                    Parameter parameter = new Parameter()
-                    parameter.name = "/config/amazon-test"
-                    parameter.value = "some.aws.value-1=5,some.aws.value-2=4,some.aws.value-3=3,some.aws.value-4=2,some.aws.value-5=1"
-                    parameter.type = "StringList"
-                    parameters.add(parameter)
+                    end = 5
                 }
                 if (getRequest.names.contains("/config/application_first")) {
-                    Parameter parameter = new Parameter()
-                    parameter.name = "/config/application_first"
-                    parameter.value = "some.aws.value-1=4,some.aws.value-2=3,some.aws.value-3=2,some.aws.value-4=1"
-                    parameter.type = "StringList"
-                    parameters.add(parameter)
+                    end = 4
                 }
                 if (getRequest.names.contains("/config/amazon-test_first")) {
-                    Parameter parameter = new Parameter()
-                    parameter.name = "/config/amazon-test_first"
-                    parameter.value = "some.aws.value-1=3,some.aws.value-2=2,some.aws.value-3=1"
-                    parameter.type = "StringList"
-                    parameters.add(parameter)
+                    end = 3
                 }
                 if (getRequest.names.contains("/config/application_second")) {
-                    Parameter parameter = new Parameter()
-                    parameter.name = "/config/application_second"
-                    parameter.value = "some.aws.value-1=2,some.aws.value-2=1"
-                    parameter.type = "StringList"
-                    parameters.add(parameter)
+                    end = 2
                 }
                 if (getRequest.names.contains("/config/amazon-test_second")) {
+                    end = 1
+                }
+                int start = 1
+                while (end > 0) {
                     Parameter parameter = new Parameter()
-                    parameter.name = "/config/amazon-test_second"
-                    parameter.value = "some.aws.value-1=1"
-                    parameter.type = "StringList"
+                    parameter.name = getRequest.names[0] + "/some/aws/value-" + start
+                    parameter.value = end.toString()
+                    parameter.type = "String"
                     parameters.add(parameter)
+                    start++
+                    end--
                 }
                 result.setParameters(parameters)
                 result
@@ -191,8 +177,8 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                 ArrayList<Parameter> parameters = new ArrayList<Parameter>()
                 if (getRequest.path == "/config/application") {
                     Parameter parameter = new Parameter()
-                    parameter.name = "/config/application"
-                    parameter.value = "encryptedValue=true"
+                    parameter.name = "/config/application/encryptedValue"
+                    parameter.value = "true"
                     parameter.type = "String"
                     parameters.add(parameter)
                 }
@@ -213,15 +199,15 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                 if (getRequest.names.contains("/config/application")) {
 
                     Parameter parameter = new Parameter()
-                    parameter.name = "/config/application"
-                    parameter.value = "datasource.url=mysql://blah"
+                    parameter.name = "/config/application/datasource/url"
+                    parameter.value = "mysql://blah"
                     parameter.type = "String"
                     parameters.add(parameter)
                 }
                 if (getRequest.names.contains("/config/application_test")) {
                     Parameter parameter1 = new Parameter()
-                    parameter1.name = "/config/application_test"
-                    parameter1.value = "foo=bar"
+                    parameter1.name = "/config/application_test/foo"
+                    parameter1.value = "bar"
                     parameter1.type = "String"
                     parameters.add(parameter1)
                 }
@@ -265,8 +251,8 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                 ArrayList<Parameter> parameters = new ArrayList<Parameter>()
                 if (getRequest.path == "/config/application") {
                     Parameter parameter = new Parameter()
-                    parameter.name = "/config/application"
-                    parameter.value = "encryptedValue=true"
+                    parameter.name = "/config/application/encryptedValue"
+                    parameter.value = "true"
                     parameter.type = "SecureString"
                     parameters.add(parameter)
                 }
@@ -287,15 +273,15 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                 if (getRequest.names.contains("/config/application")) {
 
                     Parameter parameter = new Parameter()
-                    parameter.name = "/config/application"
-                    parameter.value = "datasource.url=mysql://blah"
+                    parameter.name = "/config/application/datasource/url"
+                    parameter.value = "mysql://blah"
                     parameter.type = "SecureString"
                     parameters.add(parameter)
                 }
                 if (getRequest.names.contains("/config/application_test")) {
                     Parameter parameter1 = new Parameter()
-                    parameter1.name = "/config/application_test"
-                    parameter1.value = "foo=bar"
+                    parameter1.name = "/config/application_test/foo"
+                    parameter1.value = "bar"
                     parameter1.type = "SecureString"
                     parameters.add(parameter1)
                 }
