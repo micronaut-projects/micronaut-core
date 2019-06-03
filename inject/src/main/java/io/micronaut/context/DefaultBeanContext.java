@@ -1674,15 +1674,16 @@ public class DefaultBeanContext implements BeanContext {
                     }
 
                     final AnnotationValue<Replaces> replacesAnn = replacingCandidate.getAnnotation(Replaces.class);
-                    Optional<Class> beanType = replacesAnn.getValue(Class.class);
-                    Optional<Class> factory = replacesAnn.get("factory", Class.class);
+                    Optional<Class<?>> beanType = replacesAnn.classValue();
+                    Optional<Class<?>> factory = replacesAnn.classValue("factory");
                     if (replacesAnn.contains(NAMED_MEMBER)) {
 
-                        final String qualifier = replacesAnn.get(NAMED_MEMBER, String.class).orElse(null);
+                        final String qualifier = replacesAnn.stringValue(NAMED_MEMBER).orElse(null);
                         if (qualifier != null) {
                             final Class type = beanType.orElse(factory.orElse(null));
                             if (type != null) {
-                                final Optional qualified = Qualifiers.<T>byName(qualifier).qualify(type, Stream.of(definition));
+                                final Optional qualified = Qualifiers.<T>byName(qualifier)
+                                        .qualify(type, Stream.of(definition));
                                 if (qualified.isPresent()) {
                                     return true;
                                 }
@@ -1712,7 +1713,13 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private <T> Function<Class, Boolean> typeMatches(BeanType<T> definition, AnnotationMetadata annotationMetadata) {
-        Class<T> bt = definition.getBeanType();
+        Class<T> bt;
+
+        if (definition instanceof ProxyBeanDefinition) {
+            bt = ((ProxyBeanDefinition<T>) definition).getTargetType();
+        } else {
+            bt = definition.getBeanType();
+        }
 
         if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
             Class<? super T> superclass = bt.getSuperclass();
@@ -2290,7 +2297,7 @@ public class DefaultBeanContext implements BeanContext {
                 final List<AnnotationValue<Indexed>> indexes = beanDefinitionReference.getAnnotationMetadata().getAnnotationValuesByType(Indexed.class);
                 if (CollectionUtils.isNotEmpty(indexes)) {
                     for (AnnotationValue<Indexed> index : indexes) {
-                        final Class indexedType = index.getValue(Class.class).orElse(null);
+                        final Class indexedType = index.classValue().orElse(null);
                         if (indexedType != null) {
                             resolveTypeIndex(indexedType);
                         }
