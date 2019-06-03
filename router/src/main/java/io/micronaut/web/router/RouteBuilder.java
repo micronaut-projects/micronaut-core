@@ -158,19 +158,56 @@ public interface RouteBuilder {
      * @return The route
      */
     default StatusRoute status(HttpStatus status, Object instance, String method) {
-        return status(status, instance.getClass(), method, ReflectionUtils.EMPTY_CLASS_ARRAY);
+        return status(status, instance.getClass(), method, null, ReflectionUtils.EMPTY_CLASS_ARRAY);
     }
 
     /**
      * Register a route to handle the returned status code.
      *
-     * @param status         The status code
-     * @param type           The type
-     * @param method         The method
-     * @param parameterTypes The parameter types for the target method
+     * @param status   The status code
+     * @param instance The instance
+     * @param method   The method
+     * @param produces Content type intended to match
+     * @return The route
+     */
+    default StatusRoute status(HttpStatus status, Object instance, String method, String produces) {
+        return status(status, instance.getClass(), method, produces, ReflectionUtils.EMPTY_CLASS_ARRAY);
+    }
+
+    /**
+     * Register a route to handle the returned status code.
+     *
+     * @param status            The status code
+     * @param type              The type
+     * @param method            The method
+     * @param produces          Content type intended to match
+     * @param parameterTypes    The parameter types for the target method
+     * @return The route
+     */
+    StatusRoute status(HttpStatus status, Class type, String method, String produces, Class... parameterTypes);
+    
+    /**
+     * 
+     * @param status            The status code
+     * @param type              The type
+     * @param method            The method
+     * @param parameterTypes    The parameter types for the target method
      * @return The route
      */
     StatusRoute status(HttpStatus status, Class type, String method, Class... parameterTypes);
+
+    /**
+     * Register a route to handle the returned status code. This implementation considers the originatingClass for matching.
+     *
+     * @param originatingClass The class where the error originates from
+     * @param status           The status code
+     * @param type             The type
+     * @param method           The method
+     * @param parameterTypes   The parameter types for the target method
+     * @param produces Content type intended to match
+     * @return The route
+     */
+    StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, String produces, Class... parameterTypes);
 
     /**
      * Register a route to handle the returned status code. This implementation considers the originatingClass for matching.

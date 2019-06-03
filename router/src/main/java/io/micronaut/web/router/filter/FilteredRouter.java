@@ -85,6 +85,11 @@ public class FilteredRouter implements Router {
     }
 
     @Override
+    public <R> Optional<RouteMatch<R>> route(HttpStatus status, String produces) {
+        return router.route(status, produces);
+    }
+
+    @Override
     public <R> Optional<RouteMatch<R>> route(Class originatingClass, HttpStatus status) {
         return router.route(originatingClass, status);
     }
@@ -97,6 +102,11 @@ public class FilteredRouter implements Router {
     @Override
     public <R> Optional<RouteMatch<R>> route(Class originatingClass, Throwable error) {
         return router.route(originatingClass, error);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> route(Class originatingClass, HttpStatus status, String produceType) {
+        return router.route(originatingClass, status, produceType);
     }
 
     @Override

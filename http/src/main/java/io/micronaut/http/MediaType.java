@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -51,7 +52,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @TypeHint(value = MediaType[].class)
-public class MediaType implements CharSequence {
+public class MediaType implements CharSequence, Comparable<MediaType> {
 
     /**
      * Default file extension used for JSON.
@@ -336,6 +337,12 @@ public class MediaType implements CharSequence {
     protected final Map<CharSequence, String> parameters;
 
     private BigDecimal qualityNumberField;
+    
+    /**
+     * If part of a comma-separated list (e.g. in an Accept header) the placement
+     * in that list. This is relevant when assigning precedence for responses.
+     */
+    private int placementOrder;
 
     static {
         ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence -> {
@@ -358,7 +365,17 @@ public class MediaType implements CharSequence {
      * @param name The name of the media type. For example application/json
      */
     public MediaType(String name) {
-        this(name, null, Collections.emptyMap());
+        this(name, null, Collections.emptyMap(), 0);
+    }
+    
+    /**
+     * Constructs new media type for a given string as part of a comma-separated list,
+     * which may need to be ordered.
+     * @param name  The name of the media type. For example application/json
+     * @param order The placement order of the media type in the list.
+     */
+    public MediaType(String name, int order) {
+        this(name, null, Collections.emptyMap(), order);
     }
 
     /**
@@ -368,7 +385,7 @@ public class MediaType implements CharSequence {
      * @param params The parameters
      */
     public MediaType(String name, Map<String, String> params) {
-        this(name, null, params);
+        this(name, null, params, 0);
     }
 
     /**
@@ -378,8 +395,9 @@ public class MediaType implements CharSequence {
      * @param extension The extension of the file using this media type if it differs from the subtype
      */
     public MediaType(String name, String extension) {
-        this(name, extension, Collections.emptyMap());
+        this(name, extension, Collections.emptyMap(), 0);
     }
+    
 
     /**
      * Constructs a new media type for the given string and extension.
@@ -387,11 +405,13 @@ public class MediaType implements CharSequence {
      * @param name      The name of the media type. For example application/json
      * @param extension The extension of the file using this media type if it differs from the subtype
      * @param params    The parameters
+     * @param order     Intended placement order for this if in a comma-separated list
      */
-    public MediaType(String name, String extension, Map<String, String> params) {
+    public MediaType(String name, String extension, Map<String, String> params, int order) {
         if (name == null) {
             throw new IllegalArgumentException("Argument [name] cannot be null");
         }
+        placementOrder = order;
         String withoutArgs;
         if (name.contains(SEMICOLON)) {
             this.parameters = new LinkedHashMap<>();
@@ -431,6 +451,125 @@ public class MediaType implements CharSequence {
             parameters.putAll(params);
         }
     }
+    
+    @Override
+    public int compareTo(MediaType other) {
+        //The */* type is always last
+        if (type.equals("*")) {
+            return 1;
+        } else if (other.type.equals("*")) {
+            return -1;
+        }
+        if (other.type.equals(type)) {
+            //A type/* should always come after a type/subtype
+            if (other.subtype.equals("*") && !subtype.equals("*")) {
+                return -1;
+            }
+            //If the two have the same type and subtype we should look at the
+            //contentParam field, which can contain any number of parameters
+            if (other.subtype.equals(subtype)) {
+                boolean allInOther = true;
+                for (CharSequence param : parameters.keySet()) {
+                    if (!other.parameters.containsKey(param) || !other.parameters.get(param).equals(parameters.get(param))) {
+                        allInOther = false;
+                        break;
+                    }
+                }
+                //The other object's param list contains all the content params
+                //as this one plus more. Thus it is more specific and should come first.
+                if (allInOther && other.parameters.keySet().size() > parameters.keySet().size()) {
+                    return 1;
+                }
+                //The type, subtype, and params are all the same. These are duplicate entries and
+                //we should ignore order and q value and just treat them the same.
+                if (allInOther && other.parameters.keySet().size() == parameters.keySet().size()) {
+                    return 0;
+                }
+
+
+                for (CharSequence param : other.parameters.keySet()) {
+                    if (!parameters.containsKey(param) || !parameters.get(param).equals(other.parameters.get(param))) {
+                        allInOther = false;
+                        break;
+                    }
+                }
+
+                //This object's content param array contains all members in the other
+                //and more. This means this object is more specific and should go first.
+                if (allInOther && other.parameters.keySet().size() < parameters.keySet().size()) {
+                    return -1;
+                }
+            }
+        }
+        //If we get here the two types are of incomparable types and we must go off
+        //of their qValue and placement order.
+
+        //q defaults to 1 if not specified
+        BigDecimal qualVal = new BigDecimal(BigInteger.ONE);
+        if (parameters.get("q") != null) {
+            try {
+                qualVal = new BigDecimal(parameters.get("q"));
+            } catch (NumberFormatException nfe) {
+                qualVal = new BigDecimal(BigInteger.ONE);
+            }
+        }
+        BigDecimal otherQualVal = new BigDecimal(BigInteger.ONE);
+        if (other.parameters.get("q") != null) {
+            try {
+                qualVal = new BigDecimal(other.parameters.get("q"));
+            } catch (NumberFormatException nfe) {
+                qualVal = new BigDecimal(BigInteger.ONE);
+            }
+        }
+        //Other object has higher q and thus it should go first.
+        if (qualVal.compareTo(otherQualVal) != 0) {
+            return qualVal.compareTo(otherQualVal);
+        } else {
+            //q value is the same, so we go off the placement order.
+            return placementOrder - other.placementOrder;
+        }
+    }
+    
+    /**
+     * Determine if this requested content type can be satisfied by a given content type. e.g. text/* will be satisfied by test/html
+     * @param expectedContentType   Content type to match against
+     * @return if successful match
+     */
+    public boolean contentTypeMatch(String expectedContentType) {
+        MediaType expectedObj = new MediaType(expectedContentType);
+        return contentTypeMatch(expectedObj);
+    }
+    
+    /**
+     * Determine if this requested content type can be satisfied by a given content type. e.g. text/* will be satisfied by test/html
+     * @param expectedContentType   Content type to match against
+     * @return if successful match
+     */
+    public boolean contentTypeMatch(MediaType expectedContentType) {
+        String expectedType = expectedContentType.getType();
+        String expectedSubtype = expectedContentType.getSubtype();
+        boolean typeMatch = type.equals("*") || type.equalsIgnoreCase(expectedType);
+        boolean subtypeMatch = subtype.equals("*") || subtype.equalsIgnoreCase(expectedSubtype);
+        return typeMatch && subtypeMatch;
+    }
+    
+    /**
+     * Given a comma separated list of media types (as found in some Accept headers) parse them.
+     * in to appropriate order IAW RFC 7231
+     * @param commaSeparatedTypes   Comma-separated list of content types
+     * @return                      Ordered list
+     */
+    public static List<MediaType> sortMediaTypesByPrecedence(String commaSeparatedTypes) {
+        String[] splitList = commaSeparatedTypes.split(",");
+        List<MediaType> acceptedTypes = new ArrayList<>();
+        int i = 0;
+        for (String headerEntry : splitList) {
+            acceptedTypes.add(new MediaType(headerEntry.trim(), i++));
+        }
+        Collections.sort(acceptedTypes);
+        return acceptedTypes;
+    }
+    
 
     /**
      * @return The name of the mime type without any parameters

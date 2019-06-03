@@ -20,6 +20,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.filter.HttpFilter;
 
 import javax.inject.Inject;
@@ -181,7 +182,7 @@ public class DefaultRouter implements Router {
     @Override
     public <R> Optional<RouteMatch<R>> route(HttpStatus status) {
         for (StatusRoute statusRoute : statusRoutes) {
-            if (statusRoute.originatingType() == null) {
+            if (statusRoute.acceptingType() == null && null == statusRoute.originatingType()) {
                 Optional<RouteMatch<R>> match = statusRoute.match(status);
                 if (match.isPresent()) {
                     return match;
@@ -192,11 +193,41 @@ public class DefaultRouter implements Router {
     }
 
     @Override
+    public <R> Optional<RouteMatch<R>> route(HttpStatus status, String acceptHeaderContent) {
+        List<MediaType> acceptedTypes = MediaType.sortMediaTypesByPrecedence(acceptHeaderContent);
+        for (MediaType acceptContent : acceptedTypes) {
+            for (StatusRoute statusRoute : statusRoutes) {
+                if (statusRoute.originatingType() == null && statusRoute.acceptingType() != null) {
+                    Optional<RouteMatch<R>> match = statusRoute.match(status, acceptContent);
+                    if (match.isPresent()) {
+                        return match;
+                    }
+                }
+            }
+        }
+        return route(status);
+    }
+
+    @Override
     public <R> Optional<RouteMatch<R>> route(Class originatingClass, HttpStatus status) {
         for (StatusRoute statusRoute : statusRoutes) {
             Optional<RouteMatch<R>> match = statusRoute.match(originatingClass, status);
             if (match.isPresent()) {
                 return match;
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> route(Class originatingClass, HttpStatus status, String acceptHeaderContent) {
+        List<MediaType> acceptedTypes = MediaType.sortMediaTypesByPrecedence(acceptHeaderContent);
+        for (MediaType contentType : acceptedTypes) {
+            for (StatusRoute statusRoute : statusRoutes) {
+                Optional<RouteMatch<R>> match = statusRoute.match(originatingClass, status, contentType);
+                if (match.isPresent()) {
+                    return match;
+                }
             }
         }
         return Optional.empty();

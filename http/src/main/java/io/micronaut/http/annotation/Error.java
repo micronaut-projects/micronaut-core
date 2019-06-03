@@ -38,6 +38,12 @@ import java.lang.annotation.Target;
 public @interface Error {
 
     /**
+     * Content type intended to be produced by the error. Can be matched against request "Accept" header
+     * @return content type
+     */
+    String produces() default "";
+    
+    /**
      * @return The exception to map to
      */
     @AliasFor(member = "exception")
@@ -61,4 +67,5 @@ public @interface Error {
      * @return True if it should be global
      */
     boolean global() default false;
+    
 }

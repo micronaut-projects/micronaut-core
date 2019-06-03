@@ -52,6 +52,7 @@ public class RouteBuilderTests {
         assertEquals("Hello World", router.GET("/message/World").get().invoke());
         assertEquals("Book 1", router.GET("/books/1").get().invoke());
         assertEquals("not found", ((MethodBasedRouteMatch) router.route(HttpStatus.NOT_FOUND).get()).invoke());
+        assertEquals("Not found XML", ((MethodBasedRouteMatch) router.route(HttpStatus.NOT_FOUND, MediaType.APPLICATION_XML).get()).invoke());
         assertEquals("class not found: error", ((MethodBasedRouteMatch) router.route(new ClassNotFoundException("error")).get()).invoke());
 
         // test route state
@@ -117,6 +118,7 @@ public class RouteBuilderTests {
             error(ReflectiveOperationException.class, controller);
             // handle status codes
             status(HttpStatus.NOT_FOUND, controller, "notFound");
+            status(HttpStatus.NOT_FOUND, controller, "notFoundXML", MediaType.APPLICATION_XML);
 
             // REST resources
             resources(controller);
@@ -141,6 +143,8 @@ public class RouteBuilderTests {
         String update(Long id) { return "dummy"; }
 
         String notFound() { return "not found";}
+        
+        String notFoundXML() { return "Not found XML";}
 
         String classNotFound(ClassNotFoundException e) {
             return "class not found: " + e.getMessage();

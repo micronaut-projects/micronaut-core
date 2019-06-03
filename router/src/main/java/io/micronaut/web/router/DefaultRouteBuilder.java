@@ -181,7 +181,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     public StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, Class[] parameterTypes) {
         // do not allow multiple local status routes in the same controller
         // locally declared @Error routes will be allowed and will take precedence over globally defined ones
-        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == originatingClass)) {
+        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == originatingClass ||
+                route.acceptingType() == null)) {
             throw new RoutingException("Attempted to register multiple local routes for http status " + String.valueOf(status.getCode()));
         }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
@@ -196,9 +197,29 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
+    public StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, String produces, Class[] parameterTypes) {
+        // do not allow multiple local status routes in the same controller
+        // locally declared @Error routes will be allowed and will take precedence over globally defined ones
+        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == originatingClass &&
+                route.acceptingType().equals(new MediaType(produces)))) {
+            throw new RoutingException("Attempted to register multiple local routes for http status " + String.valueOf(status.getCode()));
+        }
+        Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+
+        MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
+                new RoutingException("No such route: " + type.getName() + "." + method)
+        );
+
+        DefaultStatusRoute statusRoute = new DefaultStatusRoute(originatingClass, status, executableHandle, conversionService, produces);
+        this.statusRoutes.add(statusRoute);
+        return statusRoute;
+    }
+
+    @Override
     public StatusRoute status(HttpStatus status, Class type, String method, Class[] parameterTypes) {
         // do not allow multiple @Error global routes defined for one status
-        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == null)) {
+        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && 
+                route.originatingType() == null && route.acceptingType() == null)) {
             throw new RoutingException("Attempted to register multiple global routes for http status " + String.valueOf(status.getCode()));
         }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
@@ -207,7 +228,25 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
-        DefaultStatusRoute statusRoute = new DefaultStatusRoute(status, executableHandle, conversionService);
+        DefaultStatusRoute statusRoute = new DefaultStatusRoute(null, status, executableHandle, conversionService);
+        this.statusRoutes.add(statusRoute);
+        return statusRoute;
+    }
+
+    @Override
+    public StatusRoute status(HttpStatus status, Class type, String method, String produces, Class[] parameterTypes) {
+        // do not allow multiple @Error global routes defined for one status
+        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && 
+                route.originatingType() == null && (route.acceptingType() != null && route.acceptingType().equals(new MediaType(produces))))) {
+            throw new RoutingException("Attempted to register multiple global routes for http status " + String.valueOf(status.getCode()));
+        }
+        Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+
+        MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
+            new RoutingException("No such route: " + type.getName() + "." + method)
+        );
+
+        DefaultStatusRoute statusRoute = new DefaultStatusRoute(null, status, executableHandle, conversionService, produces);
         this.statusRoutes.add(statusRoute);
         return statusRoute;
     }
@@ -651,6 +690,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         private final HttpStatus status;
         private final Class originatingClass;
+        private final String expectedContent;
 
         /**
          * @param status The HTTP Status
@@ -668,9 +708,21 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param conversionService The conversion service
          */
         public DefaultStatusRoute(Class originatingClass, HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+            this(originatingClass, status, targetMethod, conversionService, null);
+        }
+
+        /**
+         * @param originatingClass  The originating class
+         * @param status            The HTTP Status
+         * @param targetMethod      The target method execution handle
+         * @param conversionService The conversion service
+         * @param expectedContent   The content type this route is intended to work for
+         */
+        public DefaultStatusRoute(Class originatingClass, HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService, String expectedContent) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
             this.status = status;
+            this.expectedContent = expectedContent;
         }
 
         @Override
@@ -682,6 +734,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public HttpStatus status() {
             return status;
+        }
+
+        @Override
+        public MediaType acceptingType() {
+            return expectedContent == null ? null : new MediaType(expectedContent);
         }
 
         @SuppressWarnings("unchecked")
@@ -697,6 +754,24 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public <T> Optional<RouteMatch<T>> match(HttpStatus status) {
             if (this.originatingClass == null && this.status == status) {
+                return Optional.of(new StatusRouteMatch(status, this, conversionService));
+            }
+            return Optional.empty();
+        }
+
+        @Override
+        public <T> Optional<RouteMatch<T>> match(HttpStatus status, MediaType produces) {
+            if (this.originatingClass == null && this.status == status && 
+                    (StringUtils.isEmpty(this.expectedContent) || produces.contentTypeMatch(this.expectedContent))) {
+                return Optional.of(new StatusRouteMatch(status, this, conversionService));
+            }
+            return Optional.empty();
+        }
+
+        @Override
+        public <T> Optional<RouteMatch<T>> match(Class originatingClass, HttpStatus status, MediaType produces) {
+            if (originatingClass == this.originatingClass && this.status == status && 
+                    (StringUtils.isEmpty(this.expectedContent) || produces.contentTypeMatch(this.expectedContent))) {
                 return Optional.of(new StatusRouteMatch(status, this, conversionService));
             }
             return Optional.empty();
@@ -741,6 +816,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             DefaultStatusRoute that = (DefaultStatusRoute) o;
 
             if (status != null ? !status.equals(that.status) : that.status != null) {
+                return false;
+            }
+            if (expectedContent != null ? !expectedContent.equals(that.expectedContent) : that.expectedContent != null) {
                 return false;
             }
             return originatingClass != null ? originatingClass.equals(that.originatingClass) : that.originatingClass == null;

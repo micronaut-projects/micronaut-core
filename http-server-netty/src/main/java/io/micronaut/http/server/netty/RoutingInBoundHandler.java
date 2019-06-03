@@ -55,6 +55,7 @@ import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
@@ -526,7 +527,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (optionalFile.isPresent()) {
                 route = new BasicObjectRouteMatch(optionalFile.get());
             } else {
-                Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.NOT_FOUND);
+                String acceptHeaderValue = !StringUtils.isEmpty(nettyHttpRequest.getHeaders().get(HttpHeaderNames.ACCEPT)) ? 
+                        nettyHttpRequest.getHeaders().get(HttpHeaderNames.ACCEPT) : MediaType.APPLICATION_JSON;
+                Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.NOT_FOUND, acceptHeaderValue);
                 if (statusRoute.isPresent()) {
                     route = statusRoute.get();
                 } else {

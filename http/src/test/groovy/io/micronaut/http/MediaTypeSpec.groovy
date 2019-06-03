@@ -24,10 +24,46 @@ import spock.lang.Unroll
  * @since 1.0
  */
 class MediaTypeSpec extends Specification {
+    
+    void "test order types"() {
+        given:
+        List<MediaType> orderedList = MediaType.sortMediaTypesByPrecedence(commaSeparatedList);
+        
+        expect:
+        orderedList.size == expectedList.size
+        for (int i = 0; i < orderedList.size(); i++) {
+            assert(orderedList.get(i).equals(expectedList.get(i)) == true)
+        }
+        
+        where:
+        commaSeparatedList                                  | expectedList
+        "text/html"                                         | [new MediaType("text/html")]
+        "*/*, text/*, text/html"                            | [new MediaType("text/html"), new MediaType("text/*"), new MediaType("*/*")]
+        "audio/basic;q=.5, application/json"                | [new MediaType("application/json"), new MediaType("audio/basic;q=.5")]
+        "text/html;level=1, text/html;level=2;q=.3"         | [new MediaType("text/html;level=1"), new MediaType("text/html;level=2;q=.3")]
+        "text/*;blah=1, text/html;q=.3, audio/basic;q=.4"   | [new MediaType("audio/basic;q=.4"), new MediaType("text/html;q=.3"), new MediaType("text/*;blah=1")]
+        "text/plain, text/html, application/json;q=1"       | [new MediaType("text/plain"), new MediaType("text/html"), new MediaType("application/json;q=1")]
+    }
+    
+    void "test type match"() {
+        given:
+        boolean match = new MediaType(desiredType).contentTypeMatch(expectedType)
+        
+        expect:
+        match == expectedMatch
+        
+        where:
+        desiredType             | expectedType          | expectedMatch
+        "text/html"             | "text/html"           | true
+        "text/*"                | "text/html"           | true
+        "*/*"                   | "application/xml"     | true
+        "text/plain"            | "text/hml"            | false
+        "text/*"                | "application/json"    | false
+    }
 
     void "test media type"() {
         given:
-        MediaType mediaType = new MediaType(fullName, ext, parameters)
+        MediaType mediaType = new MediaType(fullName, ext, parameters, 0)
 
         expect:
         mediaType.toString() == fullName
@@ -63,7 +99,7 @@ class MediaTypeSpec extends Specification {
         MediaType mediaType2 = new MediaType("application/json;charset=utf-8")
 
         expect:
-        mediaType1 == mediaType2
+        mediaType1.equals(mediaType2)
     }
 
     @Unroll

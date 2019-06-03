@@ -81,6 +81,16 @@ public interface Router {
      * @return The {@link RouteMatch}
      */
     <R> Optional<RouteMatch<R>> route(HttpStatus status);
+    
+    /**
+     * 
+     * Found a {@link RouteMatch} for the given {@link io.micronaut.http.HttpStatus} code and content-type.
+     * @param <R>           The matched route
+     * @param status        The HTTP status
+     * @param produceType   Matching content-type
+     * @return the {@link RouteMatch}
+     */
+    <R> Optional<RouteMatch<R>> route(HttpStatus status, String produceType);
 
     /**
      * Found a {@link RouteMatch} for the given {@link io.micronaut.http.HttpStatus} code.
@@ -92,6 +102,17 @@ public interface Router {
      */
     <R> Optional<RouteMatch<R>> route(Class originatingClass, HttpStatus status);
 
+    /**
+     * Found a {@link RouteMatch} for the given {@link io.micronaut.http.HttpStatus} code and content-type.
+     *
+     * @param originatingClass The class the error originates from
+     * @param status        The HTTP status
+     * @param <R>           The matched route
+     * @param produceType   Matching content-type
+     * @return The {@link RouteMatch}
+     */
+    <R> Optional<RouteMatch<R>> route(Class originatingClass, HttpStatus status, String produceType);
+    
     /**
      * Match a route to an error.
      *

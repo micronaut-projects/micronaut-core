@@ -40,6 +40,12 @@ public interface StatusRoute extends MethodBasedRoute {
      * @return The status
      */
     HttpStatus status();
+    
+    /**
+     * 
+     * @return The accept header value this is intended to match
+     */
+    MediaType acceptingType();
 
     /**
      * Match the given HTTP status.
@@ -51,6 +57,16 @@ public interface StatusRoute extends MethodBasedRoute {
     <T> Optional<RouteMatch<T>> match(HttpStatus status);
 
     /**
+     * Match the given HTTP status and requested content-type.
+     *
+     * @param status    The status to match
+     * @param <T>       The matched route
+     * @param produces  Intended content-type to match
+     * @return The route match
+     */
+    <T> Optional<RouteMatch<T>> match(HttpStatus status, MediaType produces);
+
+    /**
      * Match the given HTTP status.
      *
      * @param originatingClass The class where the error originates from
@@ -59,6 +75,17 @@ public interface StatusRoute extends MethodBasedRoute {
      * @return The route match
      */
     <T> Optional<RouteMatch<T>> match(Class originatingClass, HttpStatus status);
+
+    /**
+     * Match the given HTTP status and requested content-type.
+     *
+     * @param originatingClass The class where the error originates from
+     * @param status    The status to match
+     * @param <T>       The matched route
+     * @param produces  Intended content-type to match
+     * @return The route match
+     */
+    <T> Optional<RouteMatch<T>> match(Class originatingClass, HttpStatus status, MediaType produces);
 
     @Override
     StatusRoute consumes(MediaType... mediaType);
