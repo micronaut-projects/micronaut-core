@@ -658,7 +658,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 HttpClientConfiguration.class,
                 Qualifiers.byName(clientId)
             );
-            Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>)configurationClass.orElse(HttpClientConfiguration.class);
+            Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>) configurationClass.orElse(HttpClientConfiguration.class);
             configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath);
             if (client instanceof DefaultHttpClient) {
