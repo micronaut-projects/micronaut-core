@@ -231,30 +231,6 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
     public static class ServiceSslClientConfiguration extends SslConfiguration {
 
         /**
-         * Overrides the default constructor and sets {@link #isEnabled()} to true.
-         *
-         * @param defaultSslConfiguration        The default SSL config
-         * @param defaultKeyConfiguration        The default key config
-         * @param defaultKeyStoreConfiguration   The default keystore config
-         * @param defaultTrustStoreConfiguration The Default truststore config
-         */
-        @Inject
-        public ServiceSslClientConfiguration(
-                DefaultSslConfiguration defaultSslConfiguration,
-                DefaultSslConfiguration.DefaultKeyConfiguration defaultKeyConfiguration,
-                DefaultSslConfiguration.DefaultKeyStoreConfiguration defaultKeyStoreConfiguration,
-                DefaultSslConfiguration.TrustStoreConfiguration defaultTrustStoreConfiguration) {
-            readExisting(defaultSslConfiguration, defaultKeyConfiguration, defaultKeyStoreConfiguration, defaultTrustStoreConfiguration);
-        }
-
-        /**
-         * The default client configuration.
-         */
-        public ServiceSslClientConfiguration() {
-
-        }
-
-        /**
          * Sets the key configuration.
          *
          * @param keyConfiguration The key configuration.
