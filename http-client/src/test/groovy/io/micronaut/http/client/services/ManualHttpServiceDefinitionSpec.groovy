@@ -21,9 +21,13 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Put
+import io.micronaut.http.client.ServiceHttpClientConfiguration
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.ssl.ClientSslConfiguration
+import io.micronaut.http.ssl.DefaultSslConfiguration
+import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -103,6 +107,27 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         clientApp.close()
     }
 
+    void 'test default client ssl configuration'() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'micronaut.http.services.foo.ssl.enabled':true,
+                'micronaut.http.services.foo.ssl.key.password':'blah',
+                'micronaut.http.services.foo.ssl.key-store.path':'blahpath',
+                'micronaut.http.services.foo.ssl.trust-store.path':'blahtrust',
+        )
+
+        ServiceHttpClientConfiguration clientConfiguration = ctx.getBean(ServiceHttpClientConfiguration, Qualifiers.byName("foo"))
+        SslConfiguration sslConfiguration = clientConfiguration.getSslConfiguration()
+
+        expect:
+        clientConfiguration
+        sslConfiguration.isEnabled()
+        sslConfiguration.getTrustStore().getPath().get() == 'blahtrust'
+        sslConfiguration.getKeyStore().getPath().get() == 'blahpath'
+
+        cleanup:
+        ctx.close()
+    }
 
     void "test that manually defining an HTTP client without URL doesn't create bean"() {
         given:
