@@ -315,19 +315,11 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                 key = key.substring(1).replaceAll("/", ".");
             }
 
-            switch (param.getType()) {
-                case "StringList":
-                    // command delimited list back into a set/list and evaluates value
-                    String[] items = param.getValue().split(",");
-                    output.put(key, Arrays.asList(items));
-                    break;
-                case "SecureString":
-                case "String":
-                    // if decrypt is set to true on request KMS is supposed to decrypt these for us otherwise we get
-                    // back an encoded encrypted string of gobbly gook. It uses the default account key unless
-                    // one is specified in the config
-                    output.put(key, param.getValue());
-                    break;
+            if (param.getType().equals("StringList")) {
+                String[] items = param.getValue().split(",");
+                output.put(key, Arrays.asList(items));
+            } else {
+                output.put(key, param.getValue());
             }
         }
         return output;
