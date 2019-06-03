@@ -85,7 +85,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public boolean isIterable() {
-        return get(EachProperty.class.getName(), Class.class) != null || definition.isIterable();
+        return classValue(EachProperty.class.getName()).isPresent() || definition.isIterable();
     }
 
     @Override

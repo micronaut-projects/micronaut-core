@@ -126,7 +126,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
             }
         } else {
             // must be new
-            String operationName = newSpan.getValue(String.class).orElse(null);
+            String operationName = newSpan.stringValue().orElse(null);
             Optional<String> hystrixCommand = context.getValue(HYSTRIX_ANNOTATION, String.class);
             if (StringUtils.isEmpty(operationName)) {
                 // try hystrix command name
@@ -233,7 +233,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
             AnnotationValue<SpanTag> spanTag = argumentValue.getAnnotation(SpanTag.class);
             Object v = argumentValue.getValue();
             if (spanTag != null && v != null) {
-                String tagName = spanTag.getValue(String.class).orElse(argumentValue.getName());
+                String tagName = spanTag.stringValue().orElse(argumentValue.getName());
                 span.setTag(tagName, v.toString());
             }
         }
