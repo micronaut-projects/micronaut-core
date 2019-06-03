@@ -28,6 +28,7 @@ import javax.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * A class that uses the {@link BeanPropertyBinder} to bind maps to {@link Object} instances.
@@ -59,17 +60,19 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
 
     @Override
     public Optional<Object> convert(Map map, Class<Object> targetType, ConversionContext context) {
-        Optional<Object> instance;
-        try {
-            instance = InstantiationUtils.tryInstantiate(targetType, map, context);
-        } catch (InstantiationException e) {
-            if (targetType.isInstance(map)) {
-                instance = Optional.of(map);
-            } else {
-                instance = InstantiationUtils
-                        .tryInstantiate(targetType);
+        final Function<Map, Function<Object, Object>> propertiesBinderFunction = properties -> object -> {
+            Map<?, ?> theMap = properties;
+            Map bindMap = new LinkedHashMap(theMap.size());
+            for (Map.Entry<?, ?> entry : theMap.entrySet()) {
+                Object key = entry.getKey();
+                bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
             }
-        }
+            return beanPropertyBinder.get().bind(object, bindMap);
+        };
+
+        Optional<Object> instance = InstantiationUtils.tryInstantiate(targetType, map, context)
+                    .map(propertiesBinderFunction.apply(map));
+
         if (instance.isPresent()) {
             return instance;
         } else if (targetType.isInstance(map)) {
@@ -77,17 +80,7 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
         } else {
             return InstantiationUtils
                     .tryInstantiate(targetType)
-
-                    .map(object -> {
-                                Map<?, ?> theMap = map;
-                                Map bindMap = new LinkedHashMap(map.size());
-                                for (Map.Entry<?, ?> entry : theMap.entrySet()) {
-                                    Object key = entry.getKey();
-                                    bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
-                                }
-                                return beanPropertyBinder.get().bind(object, bindMap);
-                            }
-                    );
+                    .map(propertiesBinderFunction.apply(map));
         }
     }
 }
