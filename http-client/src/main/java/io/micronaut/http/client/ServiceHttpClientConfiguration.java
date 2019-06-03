@@ -18,15 +18,11 @@ package io.micronaut.http.client;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.http.ssl.ClientSslConfiguration;
-import io.micronaut.http.ssl.DefaultSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nullable;
-import javax.inject.Inject;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Collections;
@@ -80,6 +76,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
      *
      * @param serviceId The service id
      * @param connectionPoolConfiguration The connection pool configuration
+     * @param sslConfiguration The SSL configuration
      * @param applicationConfiguration The application configuration
      */
     public ServiceHttpClientConfiguration(
