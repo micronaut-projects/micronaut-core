@@ -20,7 +20,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
-import io.micronaut.core.reflect.exception.InstantiationException;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
