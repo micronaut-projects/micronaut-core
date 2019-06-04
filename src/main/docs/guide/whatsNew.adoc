@@ -10,12 +10,26 @@ NOTE: Although GraalVM 19 is the first official stable release of GraalVM, Subst
 
 Hibernate Validator is no longer a required dependency, with a new <<beanValidation,native implementation of Bean Validation>> available that is reflection free and supports reactive and AST level validations now available.
 
+=== Micronaut Security 1.2 update
+
+TODO
+
+=== Optional Beans Returned from Factories
+
+A ann:context.annotation.Factory[] bean can now return `null` if it is not possible to create the bean which will indicate to the dependency injection container that the bean does not exist. This allows for more complex logic within factory beans that can conditionally disable the bean if certain conditions are not met.
+
+=== HashiCorp Vault Support
+
+Initial support distributed configuration for https://www.vaultproject.io[HashiCorp Vault] has been added. See the documentation on <<distributedConfigurationVault,HashiCorp Vault Support>> for more information. Thanks to https://github.com/thiagolocatelli[Thiago Locatelli] for this contribution.
+
+=== Oracle Cloud Support
+
+Initial support for environment detection and cloud metadata for Oracle Cloud has been added. Thanks to https://github.com/recursivecodes[Todd Sharp] for this contribution.
+
 === Dependency Upgrades
 
 - Groovy `2.5.4` -> `2.5.6`
-- TODO
-
-=== Conditional Beans with Factories
-
-The use of `@Requires` is the preferred method for dealing with conditional beans, however it does not fit all use cases. When using `@EachProperty` it is common to require additional beans based on the configuration. `@EachBean` allows a bean to be created for each configuration, however a common use case is creating a bean only if some configuration property condition is met. To allow for this use case, it is now possible to return `null` from `@Factory` methods.
-
+- Micronaut SQL `1.1.1` -> `1.2.0.M1`
+- Micronaut Micrometer `1.1.0` -> `1.2.0.RC1`
+- Micronaut Security `1.1.1` -> `1.2.0.M1`
+- Micronaut Views `1.1.3` -> `1.2.0.RC1`
