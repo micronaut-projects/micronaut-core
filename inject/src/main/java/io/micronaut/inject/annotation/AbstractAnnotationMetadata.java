@@ -72,7 +72,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
             return null;
         }
         if (hasAnnotation(annotationClass) || hasStereotype(annotationClass)) {
-            String annotationName = annotationClass.getName().intern();
+            String annotationName = annotationClass.getName();
             return (T) annotationMap.computeIfAbsent(annotationName, s -> {
                 ConvertibleValues<Object> annotationValues = findAnnotation(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
@@ -89,7 +89,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         if (declaredAnnotationMap == null) {
             return null;
         }
-        String annotationName = annotationClass.getName().intern();
+        String annotationName = annotationClass.getName();
         if (hasAnnotation(annotationName) || hasStereotype(annotationName)) {
             return (T) declaredAnnotationMap.computeIfAbsent(annotationName, s -> {
                 ConvertibleValues<Object> annotationValues = findAnnotation(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());

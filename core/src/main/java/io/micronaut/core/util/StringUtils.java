@@ -107,7 +107,7 @@ public final class StringUtils {
         }
         List<String> strings = new ArrayList<>(objects.length);
         for (Object object : objects) {
-            strings.add(object.toString().intern());
+            strings.add(object.toString());
         }
         return Collections.unmodifiableList(strings);
     }
@@ -132,7 +132,7 @@ public final class StringUtils {
         Map<String, Object> answer = new HashMap<>((int) (len / 2 / 0.75));
         int i = 0;
         while (i < values.length - 1) {
-            String key = values[i++].toString().intern();
+            String key = values[i++].toString();
             Object val = values[i++];
             answer.put(key, val);
         }

@@ -61,7 +61,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values) {
-        this.annotationName = annotationName.intern();
+        this.annotationName = annotationName;
         this.convertibleValues = newConvertibleValues(values);
         this.values = values;
         this.defaultValues = Collections.emptyMap();
@@ -75,7 +75,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues) {
-        this.annotationName = annotationName.intern();
+        this.annotationName = annotationName;
         this.convertibleValues = newConvertibleValues(values);
         this.values = values;
         this.defaultValues = defaultValues != null ? defaultValues : Collections.emptyMap();
@@ -88,7 +88,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @SuppressWarnings("unchecked")
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName) {
-        this.annotationName = annotationName.intern();
+        this.annotationName = annotationName;
         this.convertibleValues = ConvertibleValues.EMPTY;
         this.values = Collections.emptyMap();
         this.defaultValues = Collections.emptyMap();
@@ -100,7 +100,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param convertibleValues The convertible values
      */
     public AnnotationValue(String annotationName, ConvertibleValues<Object> convertibleValues) {
-        this.annotationName = annotationName.intern();
+        this.annotationName = annotationName;
         this.convertibleValues = convertibleValues;
         Map<String, Object> existing = convertibleValues.asMap();
         this.values = new HashMap<>(existing.size());
