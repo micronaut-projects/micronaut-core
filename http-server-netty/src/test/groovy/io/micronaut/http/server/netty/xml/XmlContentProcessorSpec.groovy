@@ -1,23 +1,52 @@
 package io.micronaut.http.server.netty.xml
 
-import com.fasterxml.aalto.AsyncByteArrayFeeder
-import com.fasterxml.aalto.AsyncXMLInputFactory
-import com.fasterxml.aalto.AsyncXMLStreamReader
-import com.fasterxml.aalto.stax.InputFactoryImpl
-import spock.lang.Ignore
+import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.RxHttpClient
+import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
-@Ignore
 class XmlContentProcessorSpec extends Specification {
 
-    void "test reading xml"() {
-        InputFactoryImpl inputF = new InputFactoryImpl() // sub-class of XMLStreamReader2
-        byte[] input_part1 = "<product><id>3</id></product>".getBytes("UTF-8") // would come from File, over the net etc
-        AsyncXMLStreamReader<AsyncByteArrayFeeder> parser = inputF.createAsyncFor(input_part1)
-        parser.getInputFeeder().endOfInput()
-        parser.close()
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [:])
 
-        expect:
-        1 == 1
+    void "test sending a single book"() {
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        List<Book> books = client.retrieve(
+                HttpRequest.POST("/xml/stream", '<book><title>First Book</title></book>')
+                        .contentType(MediaType.TEXT_XML_TYPE), Book.class).toList().blockingGet()
+
+        then:
+        books.size() == 1
+        books[0].title == "First Book"
     }
+
+    @Controller("/xml/stream")
+    static class StreamController {
+
+        @Post(consumes = MediaType.TEXT_XML)
+        Flowable<Book> stream(Flowable<Book> books) {
+            return books
+        }
+
+        @Post(uri = "/list", consumes = MediaType.TEXT_XML)
+        Flowable<Book> streamList(Flowable<List<Book>> books) {
+            return books.flatMap({ bookList -> Flowable.fromIterable(bookList) })
+        }
+
+    }
+
+    static class Book {
+        String title
+    }
+
+
 }
