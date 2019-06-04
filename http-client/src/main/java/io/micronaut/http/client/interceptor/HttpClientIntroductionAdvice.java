@@ -360,6 +360,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
+            request.setAttribute(HttpAttributes.INVOCATION_CONTEXT, context);
             // Set the URI template used to make the request for tracing purposes
             request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(clientAnnotation, uriTemplate.toString()));
             String serviceId = clientAnnotation.stringValue().orElse(null);
