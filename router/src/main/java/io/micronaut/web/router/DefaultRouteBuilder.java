@@ -181,7 +181,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     public StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, Class[] parameterTypes) {
         // do not allow multiple local status routes in the same controller
         // locally declared @Error routes will be allowed and will take precedence over globally defined ones
-        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == originatingClass ||
+        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == originatingClass &&
                 route.acceptingType() == null)) {
             throw new RoutingException("Attempted to register multiple local routes for http status " + String.valueOf(status.getCode()));
         }
@@ -201,7 +201,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         // do not allow multiple local status routes in the same controller
         // locally declared @Error routes will be allowed and will take precedence over globally defined ones
         if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == originatingClass &&
-                route.acceptingType().equals(new MediaType(produces)))) {
+                route.acceptingType() != null && route.acceptingType().equals(new MediaType(produces)))) {
             throw new RoutingException("Attempted to register multiple local routes for http status " + String.valueOf(status.getCode()));
         }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);

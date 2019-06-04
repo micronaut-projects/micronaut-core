@@ -158,7 +158,7 @@ public interface RouteBuilder {
      * @return The route
      */
     default StatusRoute status(HttpStatus status, Object instance, String method) {
-        return status(status, instance.getClass(), method, null, ReflectionUtils.EMPTY_CLASS_ARRAY);
+        return status(status, instance.getClass(), method, ReflectionUtils.EMPTY_CLASS_ARRAY);
     }
 
     /**

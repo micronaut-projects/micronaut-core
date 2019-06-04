@@ -18,11 +18,13 @@ package io.micronaut.context.router;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import org.junit.Test;
 import io.micronaut.web.router.*;
+import io.micronaut.web.router.exceptions.RoutingException;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -118,14 +120,33 @@ public class RouteBuilderTests {
             error(ReflectiveOperationException.class, controller);
             // handle status codes
             status(HttpStatus.NOT_FOUND, controller, "notFound");
+            boolean failedToFail = false;
+            try {
+                status(HttpStatus.NOT_FOUND, controller, "notFound");
+                failedToFail = true;
+            } catch (RoutingException re) { }
+                        
             status(HttpStatus.NOT_FOUND, controller, "notFoundXML", MediaType.APPLICATION_XML);
 
+            try {
+                status(HttpStatus.NOT_FOUND, controller, "notFoundXML", MediaType.APPLICATION_XML);
+            } catch (RoutingException re) { }
+            
+            status(BookController.class, HttpStatus.NOT_FOUND, controller.getClass(), "notFoundXML", MediaType.APPLICATION_XML, ReflectionUtils.EMPTY_CLASS_ARRAY);
+
+            try {
+                status(BookController.class, HttpStatus.NOT_FOUND, controller.getClass(), "notFoundXML", MediaType.APPLICATION_XML, null);
+                failedToFail = true;
+            } catch (RoutingException re) { }
+            
             // REST resources
             resources(controller);
 //            resources(Book.class);
 //            single(Book.class).nest(()->
 //                resources(Author.class)
 //            );
+
+            assertFalse(failedToFail);
         }
     }
 

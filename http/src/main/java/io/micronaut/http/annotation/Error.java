@@ -18,6 +18,7 @@ package io.micronaut.http.annotation;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.http.HttpStatus;
 
 import java.lang.annotation.Documented;
@@ -41,6 +42,7 @@ public @interface Error {
      * Content type intended to be produced by the error. Can be matched against request "Accept" header
      * @return content type
      */
+    @AliasFor(annotation = Produces.class, member = AnnotationMetadata.VALUE_MEMBER)
     String produces() default "";
     
     /**

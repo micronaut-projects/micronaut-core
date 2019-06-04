@@ -181,7 +181,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
 
         httpMethodsHandlers.put(Error.class, (BeanDefinition bean, ExecutableMethod method) -> {
                 boolean isGlobal = method.isTrue(Error.class, "global");
-                Optional<String> produceType = method.stringValue(Error.class, "produces");
+                Optional<String> produceType = method.stringValue(Produces.class, "value");
                 Class declaringType = bean.getBeanType();
                 if (method.isPresent(Error.class, "status")) {
                     Optional<HttpStatus> value = method.getValue(Error.class, "status", HttpStatus.class);
