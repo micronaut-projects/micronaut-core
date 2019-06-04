@@ -37,7 +37,7 @@ public abstract class AbstractBeanConfiguration extends AbstractBeanContextCondi
      * @param thePackage The package name
      */
     protected AbstractBeanConfiguration(String thePackage) {
-        this.packageName = thePackage.intern();
+        this.packageName = thePackage;
     }
 
     @Override

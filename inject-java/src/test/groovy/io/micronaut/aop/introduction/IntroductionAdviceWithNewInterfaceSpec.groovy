@@ -144,7 +144,7 @@ interface MyBean  {
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
         listenerAdviceInterceptor.recievedMessages.clear()
-        
+
         then:"the methods are invocable"
         listenerAdviceInterceptor.recievedMessages.isEmpty()
         instance.getFoo() == "good"
