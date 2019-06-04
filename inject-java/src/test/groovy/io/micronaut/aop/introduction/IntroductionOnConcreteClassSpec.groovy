@@ -14,6 +14,7 @@ class IntroductionOnConcreteClassSpec extends Specification {
     void "test introduction of new interface on concrete class"() {
         when:
         ConcreteClass cc = applicationContext.getBean(ConcreteClass)
+        def listenerAdviceInterceptor = applicationContext.getBean(ListenerAdviceInterceptor)
 
         then:
         cc instanceof ApplicationEventListener
@@ -23,7 +24,12 @@ class IntroductionOnConcreteClassSpec extends Specification {
         def event = new StartupEvent(applicationContext)
         cc.onApplicationEvent(event)
 
+
         then:
-        applicationContext.getBean(ListenerAdviceInterceptor).recievedMessages.contains(event)
+        listenerAdviceInterceptor.recievedMessages.contains(event)
+
+        cleanup:
+        listenerAdviceInterceptor.recievedMessages.clear()
+
     }
 }
