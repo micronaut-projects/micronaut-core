@@ -1,5 +1,9 @@
 Micronaut {version} includes the following changes:
 
+=== Environment Order and Priority
+
+In previous versions of Micronaut, the property sources for an active environment had no priority over any other active environment. It was non deterministic which environment's properties would override other environments. Now the last environment supplied has the highest priority. For example, if an application is started with `-Dmicronaut.environments=first,second`, `application-second.yml` will override properties in `application-first.yml`. This change affects all sources of properties, including distributed configuration sources.
+
 === GraalVM 19 Native Image Support
 
 Micronaut {version} is the first version to support GraalVM 19's native image changes. 
@@ -10,9 +14,13 @@ NOTE: Although GraalVM 19 is the first official stable release of GraalVM, Subst
 
 Hibernate Validator is no longer a required dependency, with a new <<beanValidation,native implementation of Bean Validation>> available that is reflection free and supports reactive and AST level validations now available.
 
+=== @Validated and @Valid
+
+It is no longer necessary to apply the `@Validated` annotation to beans that accept `@Valid` arguments.
+
 === Micronaut Security 1.2 update
 
-TODO
+Support for OAuth 2.0 and OpenID clients has been added to the Micronaut security module through a new dependency: `micronaut-security-oauth2`. It is now very easy to add support for login through an OAuth providers. See the https://micronaut-projects.github.io/micronaut-security/latest/guide/#oauth[Oauth section] in the security documentation for more information.
 
 === Optional Beans Returned from Factories
 
@@ -25,6 +33,28 @@ Initial support distributed configuration for https://www.vaultproject.io[HashiC
 === Oracle Cloud Support
 
 Initial support for environment detection and cloud metadata for Oracle Cloud has been added. Thanks to https://github.com/recursivecodes[Todd Sharp] for this contribution.
+
+=== @Client and Manual Service Discovery
+
+If a service is configured statically with `micronaut.http.services.*`, it was previously not possible to override the configuration with the ann:http.client.annotation.Client[] annotation. It is now possible to override the configuration, which will result in a new client being created for the given client class.
+
+=== Client and Server Host Resolution
+
+New beans have been added to support lookup of the client address and the current server host. The implementations are aware of proxy headers and are configurable to look for custom headers. The api:http.server.util.HttpHostResolver[] can be injected to resolve the current server hostname and api:http.server.util.HttpClientAddressResolver[] can be injected to resolve the client address of the current request.
+
+=== Default Implementation Support
+
+When writing libraries for Micronaut, it is often the case that users will want to override part of your implementation. The most common way of doing so is creating custom beans that use the ann:context.annotation.Replaces[] annotation to replace your implementation. Because the ann:context.annotation.Replaces[] annotation requires a class argument to indicate which implementation to replace, it was required to make the implementation part of the public API. The class needed to be public because the user would need to reference the class directly in the annotation.
+
+A new annotation has been added to solve this problem: ann:context.annotation.DefaultImplementation[]. See the section on <<replaces,Bean Replacements>> for more information.
+
+=== HEAD Routes
+
+For each route registered with the server that responds to GET requests, an additional route will be registered that responds to HEAD requests and will not include the body. This only applies to routes created by Micronaut through annotations. Any GET routes registered by custom route builders will not have corresponding HEAD routes added automatically.
+
+=== Request Scope
+
+A new bean scope has been created to allow for beans that only exist in the scope of a given HTTP request. See ann:runtime.http.scope.RequestScope[].
 
 === Dependency Upgrades
 
