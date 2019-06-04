@@ -360,6 +360,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
+            request.setAttribute(HttpAttributes.INVOCATION_CONTEXT, context);
             // Set the URI template used to make the request for tracing purposes
             request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(clientAnnotation, uriTemplate.toString()));
             String serviceId = clientAnnotation.stringValue().orElse(null);
@@ -658,7 +659,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 HttpClientConfiguration.class,
                 Qualifiers.byName(clientId)
             );
-            Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>)configurationClass.orElse(HttpClientConfiguration.class);
+            Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>) configurationClass.orElse(HttpClientConfiguration.class);
             configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath);
             if (client instanceof DefaultHttpClient) {
