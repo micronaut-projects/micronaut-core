@@ -56,7 +56,7 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
      */
     @UsedByGeneratedCode
     public AnnotationClassValue(Class<T> theClass) {
-        this.name = theClass.getName().intern();
+        this.name = theClass.getName();
         this.theClass = theClass;
         this.instantiated = false;
         this.instance = null;
@@ -72,7 +72,7 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
     @Internal
     public AnnotationClassValue(@Nonnull String name, boolean instantiated) {
         ArgumentUtils.requireNonNull("name", name);
-        this.name = name.intern();
+        this.name = name;
         this.theClass = null;
         this.instance = null;
         this.instantiated = instantiated;
@@ -89,7 +89,7 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
     public AnnotationClassValue(@Nonnull T instance) {
         ArgumentUtils.requireNonNull("instance", instance);
         this.theClass = (Class<T>) instance.getClass();
-        this.name = theClass.getName().intern();
+        this.name = theClass.getName();
         this.instance = instance;
         this.instantiated = true;
     }

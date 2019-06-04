@@ -67,7 +67,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         this.introspection = introspection;
         this.type = type;
         this.beanType = introspection.getBeanType();
-        this.name = name.intern();
+        this.name = name;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
         this.typeArguments = typeArguments;
     }
