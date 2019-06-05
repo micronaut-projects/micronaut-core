@@ -21,10 +21,11 @@ import org.slf4j.LoggerFactory;
 
 import javax.xml.stream.XMLStreamException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static javax.xml.stream.XMLStreamConstants.*;
 
-public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<Map> {
+public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(XmlContentProcessor.class);
 
@@ -33,6 +34,8 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<M
     private boolean streamArray;
     private LinkedList<Map.Entry<String, Map<String, Object>>> data;
     private volatile String currentElement;
+    private AtomicInteger elementNestLevel = new AtomicInteger();
+    private volatile String arrayName;
 
 
     /**
@@ -44,7 +47,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<M
     }
 
     @Override
-    public void subscribe(Subscriber<? super Map> downstreamSubscriber) {
+    public void subscribe(Subscriber<? super Object> downstreamSubscriber) {
         AsyncXMLInputFactory inputFactory = new InputFactoryImpl();
         parser = inputFactory.createAsyncForByteArray();
         feeder = parser.getInputFeeder();
@@ -107,6 +110,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<M
             doOnError(new XMLStreamException("Unexpected end-of-input"));
         } else {
             try {
+                processXml();
                 parser.close();
                 super.doOnComplete();
             } catch (XMLStreamException e) {
@@ -123,9 +127,10 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<M
             } else if (event == START_ELEMENT) {
                 currentElement = parser.getLocalName();
                 Map.Entry<String, Map<String, Object>> last = data.peekLast();
-                if (last != null && last.getValue().containsKey(currentElement) && streamArray) {
+                if (last != null && last.getValue().containsKey(currentElement) && streamArray && elementNestLevel.get() == 1) {
+                    arrayName = currentElement;
                     Object lastValue = data.peekLast().getValue().remove(currentElement);
-                    currentDownstreamSubscriber().ifPresent(subscriber -> subscriber.onNext((Map) lastValue));
+                    currentDownstreamSubscriber().ifPresent(subscriber -> subscriber.onNext(lastValue));
                 }
                 Map<String, Object> attributes = new LinkedHashMap<>();
                 int attributeCount = parser.getAttributeCount();
@@ -133,6 +138,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<M
                     attributes.put(parser.getAttributeName(i).getLocalPart(), parser.getAttributeValue(i));
                 }
                 data.offer(new AbstractMap.SimpleEntry<>(currentElement, attributes));
+                elementNestLevel.getAndIncrement();
             } else if (event == CHARACTERS) {
                 Map<String, Object> lastValue = data.getLast().getValue();
                 if (lastValue.isEmpty()) {
@@ -147,6 +153,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<M
                     }
                 });
             } else if (event == END_ELEMENT) {
+                elementNestLevel.decrementAndGet();
                 Map.Entry<String, Map<String, Object>> last = data.peekLast();
                 if (last.getKey().equals(currentElement)) {
                     last = data.removeLast();
@@ -156,26 +163,33 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<M
                         Object lastValue = last.getValue();
                         data.peekLast().getValue().compute(last.getKey(), (key, value) -> {
                             if (value == null) {
-                                return value;
+                                return lastValue;
                             } else if (value instanceof List) {
                                 ((List) value).add(lastValue);
+                                arrayName = currentElement;
                                 return value;
                             } else {
                                 List<Object> list = new ArrayList<>();
                                 list.add(value);
                                 list.add(lastValue);
+                                arrayName = currentElement;
                                 return list;
                             }
                         });
                     }
                 }
                 currentElement = data.peekLast().getKey();
-            }/* else if (event == END_DOCUMENT) {
-                Map.Entry<String, Map<String, Object>> last = data.removeLast();
-                if (!last.getValue().isEmpty()) {
-
-                }
-            }*/
+            } else if (event == END_DOCUMENT) {
+                Map<String, Object> last = data.removeLast().getValue();
+                currentDownstreamSubscriber().ifPresent(subscriber -> {
+                    if (arrayName != null) {
+                        subscriber.onNext(last.get(arrayName));
+                    } else {
+                        subscriber.onNext(last);
+                    }
+                });
+                break;
+            }
 
             event = parser.next();
         }
