@@ -25,6 +25,15 @@ It is no longer necessary to apply the ann:validation.Validated[] annotation to 
 
 Support for OAuth 2.0 and OpenID clients has been added to the Micronaut security module through a new dependency: `micronaut-security-oauth2`. It is now very easy to add support for login through an OAuth providers. See the https://micronaut-projects.github.io/micronaut-security/latest/guide/#oauth[Oauth section] in the security documentation for more information.
 
+=== Micronaut Micrometer 1.2 Update
+
+https://micronaut-projects.github.io/micronaut-micrometer/1.2.x/guide/[Micronaut Micrometer has been updated to 1.2] which includes the following new features:
+
+* Support for GraalVM native images
+* Meter registry support for Datadog, Influx and Elastic
+
+Thanks to https://github.com/thiagolocatelli[Thiago Locatelli] for this contribution.
+
 === Optional Beans Returned from Factories
 
 A ann:context.annotation.Factory[] bean can now return `null` if it is not possible to create the bean which will indicate to the dependency injection container that the bean does not exist. This allows for more complex logic within factory beans that can conditionally disable the bean if certain conditions are not met.
