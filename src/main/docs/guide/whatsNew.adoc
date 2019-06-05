@@ -1,24 +1,27 @@
 Micronaut {version} includes the following changes:
 
-=== Environment Order and Priority
-
-In previous versions of Micronaut, the property sources for an active environment had no priority over any other active environment. It was non deterministic which environment's properties would override other environments. Now the last environment supplied has the highest priority. For example, if an application is started with `-Dmicronaut.environments=first,second`, `application-second.yml` will override properties in `application-first.yml`. This change affects all sources of properties, including distributed configuration sources.
-
-=== GraalVM 19 Native Image Support
-
-Micronaut {version} is the first version to support GraalVM 19's native image changes. 
-
-NOTE: Although GraalVM 19 is the first official stable release of GraalVM, Substrate and the `native-image` tool remain in early adopter / experimental status. Therefore support for native images in Micronaut also remains experimental at this stage.
-
 === Native Bean Validation Support
 
-Hibernate Validator is no longer a required dependency, with a new <<beanValidation,native implementation of Bean Validation>> available that is reflection free and supports reactive and AST level validations now available.
+Hibernate Validator is no longer a required dependency to activate bean validation, with a new <<beanValidation,native implementation of Bean Validation>> available that is reflection free and supports reactive and AST level validations now available.
 
-=== @Validated and @Valid
+The `micronaut-validation` dependency is all that it is needed now and provides the following benefits over Hibernate Validator:
 
-It is no longer necessary to apply the `@Validated` annotation to beans that accept `@Valid` arguments.
+* Reflection Free
+* Compile Time Computed Bean Metadata resulting in lower memory requirements
+* Reduction in JAR size by 2MB
+* Reduction in startup time by 300ms which was the cost of initializing Hibernate validator
+* Out-of-the-box GraalVM native image support
+* Reduction in GraalVM native image size by 10MB
 
-=== Micronaut Security 1.2 update
+=== Reactive Bean Validation Support
+
+In previous versions of Micronaut manual validation had to be applied to reactive flows. You can now declare `@Valid` on method parameters that receive a reactive type and validation will automatically be applied.
+
+=== Implicit @Validated and @Valid
+
+It is no longer necessary to apply the ann:validation.Validated[] annotation to beans that accept `@Valid` arguments or use any `javax.validation` annotation.
+
+=== Micronaut Security 1.2 Update
 
 Support for OAuth 2.0 and OpenID clients has been added to the Micronaut security module through a new dependency: `micronaut-security-oauth2`. It is now very easy to add support for login through an OAuth providers. See the https://micronaut-projects.github.io/micronaut-security/latest/guide/#oauth[Oauth section] in the security documentation for more information.
 
@@ -55,6 +58,10 @@ For each route registered with the server that responds to GET requests, an addi
 === Request Scope
 
 A new bean scope has been created to allow for beans that only exist in the scope of a given HTTP request. See ann:runtime.http.scope.RequestScope[].
+
+=== Environment Order and Priority
+
+In previous versions of Micronaut, the property sources for an active environment had no priority over any other active environment. It was non deterministic which environment's properties would override other environments. Now the last environment supplied has the highest priority. For example, if an application is started with `-Dmicronaut.environments=first,second`, `application-second.yml` will override properties in `application-first.yml`. This change affects all sources of properties, including distributed configuration sources.
 
 === Dependency Upgrades
 
