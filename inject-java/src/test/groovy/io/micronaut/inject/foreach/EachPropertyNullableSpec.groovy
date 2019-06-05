@@ -57,4 +57,40 @@ class EachPropertyNullableSpec extends Specification {
         cleanup:
         applicationContext.close()
     }
+
+    void 'test list injection with EachProperties'() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext(Environment.TEST)
+        applicationContext.environment.addPropertySource(MapPropertySource.of(
+                Environment.TEST,
+                [
+                        'someconf.one.foo': true,
+                        'someconf.two.foo': false
+                ]
+        ))
+        applicationContext.registerSingleton(NonBeanClass.class, new NonBeanClass(11), Qualifiers.byName("one"))
+        applicationContext.registerSingleton(NonBeanClass.class, new NonBeanClass(22), Qualifiers.byName("one"))
+        applicationContext.registerSingleton(NonBeanClass.class, new NonBeanClass(33))
+
+        applicationContext.start()
+
+        when:
+        SomeConfiguration bean = applicationContext.getBean(SomeConfiguration)
+
+        then:
+        noExceptionThrown()
+        bean.getNameQualifier() == 'one'
+        bean.getOtherBeans().collect { it.getPort() }.sort() == [11, 22]
+
+        when:
+        SomeConfiguration bean2 = applicationContext.getBean(SomeConfiguration, Qualifiers.byName("two"))
+
+        then:
+        noExceptionThrown()
+        bean2.getNameQualifier() == 'two'
+        bean2.getOtherBeans().size() == 0
+
+        cleanup:
+        applicationContext.close()
+    }
 }

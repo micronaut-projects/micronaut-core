@@ -19,21 +19,29 @@ import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 
 import javax.annotation.Nullable;
+import java.util.List;
 
 @EachProperty("someconf")
 public class SomeConfiguration {
 
     private final MyConfiguration otherConfig;
+    private final List<NonBeanClass> otherBeans;
     private final String nameQualifier;
 
     SomeConfiguration(@Nullable @Parameter MyConfiguration otherConfig,
+                      @Parameter List<NonBeanClass> otherBeans,
                       @Parameter String name) {
         this.otherConfig = otherConfig;
+        this.otherBeans = otherBeans;
         this.nameQualifier = name;
     }
 
     public MyConfiguration getOtherConfig() {
         return otherConfig;
+    }
+
+    public List<NonBeanClass> getOtherBeans() {
+        return otherBeans;
     }
 
     public String getNameQualifier() {
