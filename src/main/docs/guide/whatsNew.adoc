@@ -63,6 +63,10 @@ A new bean scope has been created to allow for beans that only exist in the scop
 
 In previous versions of Micronaut, the property sources for an active environment had no priority over any other active environment. It was non deterministic which environment's properties would override other environments. Now the last environment supplied has the highest priority. For example, if an application is started with `-Dmicronaut.environments=first,second`, `application-second.yml` will override properties in `application-first.yml`. This change affects all sources of properties, including distributed configuration sources.
 
+== RSS 2.0 and iTunes Podcast
+
+This version references the https://micronaut-projects.github.io/micronaut-rss/latest/guide/index.html[RSS configuration] which eases the generation of a RSS 2.0 feed or an iTunes Podcast feed in a Micronaut app.
+
 === Dependency Upgrades
 
 - Groovy `2.5.4` -> `2.5.6`
