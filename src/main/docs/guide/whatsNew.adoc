@@ -34,6 +34,15 @@ https://micronaut-projects.github.io/micronaut-micrometer/1.2.x/guide/[Micronaut
 
 Thanks to https://github.com/thiagolocatelli[Thiago Locatelli] for this contribution.
 
+=== Micronaut SQL 1.2 Update
+
+The https://micronaut-projects.github.io/micronaut-sql/1.2.x/guide/index.html[Micronaut SQL] module has been updated with support for the following new features:
+
+* Improved Entity Scan support for JPA
+* Integration with Micronaut 1.2 Validator for JPA
+* GraalVM `native-image` metadata
+
+
 === Optional Beans Returned from Factories
 
 A ann:context.annotation.Factory[] bean can now return `null` if it is not possible to create the bean which will indicate to the dependency injection container that the bean does not exist. This allows for more complex logic within factory beans that can conditionally disable the bean if certain conditions are not met.
