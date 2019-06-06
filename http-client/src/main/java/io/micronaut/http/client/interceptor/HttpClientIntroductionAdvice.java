@@ -160,8 +160,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         Class<?> declaringType = context.getDeclaringType();
         if (Closeable.class == declaringType || AutoCloseable.class == declaringType) {
-            String clientId = clientAnnotation.getValue(String.class).orElse(null);
-            String path = clientAnnotation.get("path", String.class).orElse(null);
+            String clientId = clientAnnotation.stringValue().orElse(null);
+            String path = clientAnnotation.stringValue("path").orElse(null);
             String clientKey = computeClientKey(clientId, path);
             clients.remove(clientKey);
             httpClient.close();
@@ -203,15 +203,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             List<AnnotationValue<Header>> headerAnnotations = context.getAnnotationValuesByType(Header.class);
             for (AnnotationValue<Header> headerAnnotation : headerAnnotations) {
-                String headerName = headerAnnotation.get("name", String.class).orElse(null);
-                String headerValue = headerAnnotation.getValue(String.class).orElse(null);
+                String headerName = headerAnnotation.stringValue("name").orElse(null);
+                String headerValue = headerAnnotation.stringValue().orElse(null);
                 if (StringUtils.isNotEmpty(headerName) && StringUtils.isNotEmpty(headerValue)) {
                     headers.put(headerName, headerValue);
                 }
             }
 
             context.findAnnotation(Version.class)
-                    .flatMap(versionAnnotation -> versionAnnotation.getValue(String.class))
+                    .flatMap(AnnotationValue::stringValue)
                     .filter(StringUtils::isNotEmpty)
                     .ifPresent(version -> {
 
@@ -228,7 +228,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             List<AnnotationValue<RequestAttribute>> attributeAnnotations = context.getAnnotationValuesByType(RequestAttribute.class);
             for (AnnotationValue<RequestAttribute> attributeAnnotation : attributeAnnotations) {
-                String attributeName = attributeAnnotation.get("name", String.class).orElse(null);
+                String attributeName = attributeAnnotation.stringValue("name").orElse(null);
                 Object attributeValue = attributeAnnotation.getValue(Object.class).orElse(null);
                 if (StringUtils.isNotEmpty(attributeName) && attributeValue != null) {
                     attributes.put(attributeName, attributeValue);
@@ -360,10 +360,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
+            request.setAttribute(HttpAttributes.INVOCATION_CONTEXT, context);
             // Set the URI template used to make the request for tracing purposes
             request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(clientAnnotation, uriTemplate.toString()));
-            String serviceId = clientAnnotation.getValue(String.class).orElse(null);
-            Argument<?> errorType = clientAnnotation.get("errorType", Class.class).map((Function<Class, Argument>) Argument::of).orElse(HttpClient.DEFAULT_ERROR_TYPE);
+            String serviceId = clientAnnotation.stringValue().orElse(null);
+            Argument<?> errorType = clientAnnotation.classValue("errorType").map((Function<Class, Argument>) Argument::of).orElse(HttpClient.DEFAULT_ERROR_TYPE);
             request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
 
 
@@ -597,11 +598,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @return resolved template contents
      */
     private String resolveTemplate(AnnotationValue<Client> clientAnnotation, String templateString) {
-        String path = clientAnnotation.get("path", String.class).orElse(null);
+        String path = clientAnnotation.stringValue("path").orElse(null);
         if (StringUtils.isNotEmpty(path)) {
             return path + templateString;
         } else {
-            String value = clientAnnotation.getValue(String.class).orElse(null);
+            String value = clientAnnotation.stringValue().orElse(null);
             if (StringUtils.isNotEmpty(value)) {
                 if (value.startsWith("/")) {
                     return value + templateString;
@@ -620,7 +621,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn) {
         String clientId = getClientId(clientAnn);
-        String path = clientAnn.get("path", String.class).orElse(null);
+        String path = clientAnn.stringValue("path").orElse(null);
         String clientKey = computeClientKey(clientId, path);
         if (clientKey == null) {
             return null;
@@ -628,8 +629,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         return clients.computeIfAbsent(clientKey, integer -> {
             HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(clientId)).orElse(null);
+            AnnotationValue<JacksonFeatures> jacksonFeatures = context.findAnnotation(JacksonFeatures.class).orElse(null);
+            Optional<Class<?>> configurationClass = clientAnn.classValue("configuration");
+
             if (null != clientBean) {
-                return clientBean;
+                if (path == null && jacksonFeatures == null && !configurationClass.isPresent()) {
+                    return clientBean;
+                }
             }
 
             LoadBalancer loadBalancer = loadBalancerResolver.resolve(clientId)
@@ -653,13 +659,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 HttpClientConfiguration.class,
                 Qualifiers.byName(clientId)
             );
-            Class<HttpClientConfiguration> defaultConfiguration = clientAnn.get("configuration", Class.class).orElse(HttpClientConfiguration.class);
+            Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>) configurationClass.orElse(HttpClientConfiguration.class);
             configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath);
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
                 defaultClient.setClientIdentifiers(clientId);
-                AnnotationValue<JacksonFeatures> jacksonFeatures = context.findAnnotation(JacksonFeatures.class).orElse(null);
 
                 if (jacksonFeatures != null) {
                     Optional<MediaTypeCodec> existingCodec = defaultClient.getMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE);
@@ -716,7 +721,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     private String getClientId(AnnotationValue<Client> clientAnn) {
-        String clientId = clientAnn.getValue(String.class).orElse(null);
+        String clientId = clientAnn.stringValue().orElse(null);
         if (clientId == null) {
             throw new HttpClientException("Either the id or value of the @Client annotation must be specified");
         }

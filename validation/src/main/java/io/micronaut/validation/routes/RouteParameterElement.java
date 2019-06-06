@@ -40,7 +40,7 @@ class RouteParameterElement implements ParameterElement, AnnotationMetadataDeleg
      */
     RouteParameterElement(ParameterElement delegate) {
         this.delegate = delegate;
-        this.name = delegate.findAnnotation(Bindable.class).flatMap(av -> av.getValue(String.class)).orElse(delegate.getName());
+        this.name = delegate.stringValue(Bindable.class).orElse(delegate.getName());
     }
 
     @Override

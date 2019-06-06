@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -91,9 +92,8 @@ public class ServiceHttpClientFactory {
         Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
         boolean isHealthCheck = configuration.isHealthCheck();
 
-        LoadBalancer loadBalancer = loadBalancerFactory.create(instanceList);
-
         Optional<String> path = configuration.getPath();
+        LoadBalancer loadBalancer = loadBalancerFactory.create(instanceList);
         DefaultHttpClient httpClient;
         if (path.isPresent()) {
             httpClient = beanContext.createBean(DefaultHttpClient.class, loadBalancer, configuration, path.get());
@@ -109,8 +109,7 @@ public class ServiceHttpClientFactory {
                 return httpClient.exchange(HttpRequest.GET(healthCheckURI)).onErrorResumeNext(throwable -> {
                     if (throwable instanceof HttpClientResponseException) {
                         HttpClientResponseException responseException = (HttpClientResponseException) throwable;
-                        HttpResponse response = responseException.getResponse();
-                        //noinspection unchecked
+                        HttpResponse<ByteBuffer> response = (HttpResponse<ByteBuffer>) responseException.getResponse();
                         return Flowable.just(response);
                     }
                     return Flowable.just(HttpResponse.serverError());

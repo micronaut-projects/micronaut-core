@@ -15,6 +15,12 @@
  */
 package io.micronaut.context.env;
 
+import javax.annotation.Nullable;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Loads properties from environment variables via {@link System#getenv()}.
  *
@@ -37,7 +43,17 @@ public class EnvironmentPropertySource extends MapPropertySource {
      * Default constructor.
      */
     public EnvironmentPropertySource() {
-        super(NAME, System.getenv());
+        super(NAME, getEnv(null, null));
+    }
+
+    /**
+     * Allows for control over which environment variables are included.
+     *
+     * @param includes The environment variables to include in configuration
+     * @param excludes The environment variables to exclude from configuration
+     */
+    public EnvironmentPropertySource(@Nullable List<String> includes, @Nullable List<String> excludes) {
+        super(NAME, getEnv(includes, excludes));
     }
 
     @Override
@@ -48,5 +64,25 @@ public class EnvironmentPropertySource extends MapPropertySource {
     @Override
     public PropertyConvention getConvention() {
         return PropertyConvention.ENVIRONMENT_VARIABLE;
+    }
+
+    private static Map getEnv(@Nullable List<String> includes, @Nullable List<String> excludes) {
+        Map<String, String> env;
+        if (includes != null || excludes != null) {
+            env = new HashMap<>(System.getenv());
+            Iterator<String> it = env.keySet().iterator();
+            while (it.hasNext()) {
+                String envVar = it.next();
+                if (excludes != null && excludes.contains(envVar)) {
+                    it.remove();
+                }
+                if (includes != null && !includes.contains(envVar)) {
+                    it.remove();
+                }
+            }
+        } else {
+            env = System.getenv();
+        }
+        return env;
     }
 }

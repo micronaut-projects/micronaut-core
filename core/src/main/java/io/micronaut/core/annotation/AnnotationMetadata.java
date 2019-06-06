@@ -717,27 +717,6 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * The values as string array for the given annotation and member.
-     *
-     * @param annotation The annotation
-     * @param member     The member
-     * @return The string values if it is present
-     */
-    default @Nonnull String[] stringValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
-        return StringUtils.EMPTY_STRING_ARRAY;
-    }
-
-    /**
-     * The values as string array for the given annotation and member.
-     *
-     * @param annotation The annotation
-     * @return The string values if it is present
-     */
-    default @Nonnull String[] stringValues(@Nonnull Class<? extends Annotation> annotation) {
-        return stringValues(annotation, VALUE_MEMBER);
-    }
-
-    /**
      * The value as an optional string for the given annotation and member.
      *
      * @param annotation The annotation
@@ -756,6 +735,74 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default @Nonnull Optional<String> stringValue(@Nonnull String annotation) {
         return stringValue(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The value as an optional boolean for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return The string value if it is present
+     */
+    default Optional<Boolean> booleanValue(@Nonnull String annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return getValue(annotation, member, Boolean.class);
+    }
+
+    /**
+     * The value as an optional boolean for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return The string value if it is present
+     */
+    default Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return booleanValue(annotation.getName(), member);
+    }
+
+    /**
+     * The value as an optional boolean for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @return The string value if it is present
+     */
+    default @Nonnull Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return booleanValue(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The value as an optional boolean for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @return The string value if it is present
+     */
+    default @Nonnull Optional<Boolean> booleanValue(@Nonnull String annotation) {
+        return booleanValue(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The values as string array for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @param member     The member
+     * @return The string values if it is present
+     */
+    default @Nonnull String[] stringValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return StringUtils.EMPTY_STRING_ARRAY;
+    }
+
+    /**
+     * The values as string array for the given annotation and member.
+     *
+     * @param annotation The annotation
+     * @return The string values if it is present
+     */
+    default @Nonnull String[] stringValues(@Nonnull Class<? extends Annotation> annotation) {
+        return stringValues(annotation, VALUE_MEMBER);
     }
 
     /**

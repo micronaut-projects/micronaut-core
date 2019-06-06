@@ -70,7 +70,6 @@ public interface ApplicationContextBuilder {
      */
     @Nonnull ApplicationContextBuilder properties(@Nullable Map<String, Object> properties);
 
-
     /**
      * Additional property sources.
      *
@@ -78,6 +77,30 @@ public interface ApplicationContextBuilder {
      * @return This builder
      */
     @Nonnull ApplicationContextBuilder propertySources(@Nullable PropertySource... propertySources);
+
+    /**
+     * Set whether environment variables should contribute to configuration.
+     *
+     * @param environmentPropertySource The boolean
+     * @return This builder
+     */
+    @Nonnull ApplicationContextBuilder environmentPropertySource(boolean environmentPropertySource);
+
+    /**
+     * Which environment variables should contribute to configuration.
+     *
+     * @param environmentVariables The environment variables
+     * @return This builder
+     */
+    @Nonnull ApplicationContextBuilder environmentVariableIncludes(@Nullable String... environmentVariables);
+
+    /**
+     * Which environment variables should not contribute to configuration.
+     *
+     * @param environmentVariables The environment variables
+     * @return This builder
+     */
+    @Nonnull ApplicationContextBuilder environmentVariableExcludes(@Nullable String... environmentVariables);
 
     /**
      * The main class used by this application.
@@ -101,8 +124,6 @@ public interface ApplicationContextBuilder {
      * @return The built, but not running {@link ApplicationContext}
      */
     @Nonnull ApplicationContext build();
-
-
 
     /**
      * Allow customizing the configurations that will be loaded.

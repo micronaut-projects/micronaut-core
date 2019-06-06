@@ -53,6 +53,24 @@ import java.util.*;
  */
 public class RequiresCondition implements Condition {
 
+    public static final String MEMBER_PROPERTY = "property";
+    public static final String MEMBER_NOT_EQUALS = "notEquals";
+    public static final String MEMBER_DEFAULT_VALUE = "defaultValue";
+    public static final String MEMBER_PATTERN = "pattern";
+    public static final String MEMBER_MISSING_PROPERTY = "missingProperty";
+    public static final String MEMBER_ENV = "env";
+    public static final String MEMBER_NOT_ENV = "notEnv";
+    public static final String MEMBER_CONDITION = "condition";
+    public static final String MEMBER_SDK = "sdk";
+    public static final String MEMBER_VERSION = "version";
+    public static final String MEMBER_MISSING_CLASSES = "missing";
+    public static final String MEMBER_RESOURCES = "resources";
+    public static final String MEMBER_CONFIGURATION = "configuration";
+    public static final String MEMBER_CLASSES = "classes";
+    public static final String MEMBER_ENTITIES = "entities";
+    public static final String MEMBER_BEANS = "beans";
+    public static final String MEMBER_MISSING_BEANS = "missingBeans";
+
     private final AnnotationMetadata annotationMetadata;
 
     /**
@@ -97,13 +115,13 @@ public class RequiresCondition implements Condition {
      */
     protected boolean matchesConfiguration(ConditionContext context, AnnotationValue<Requires> requirements) {
 
-        String configurationName = requirements.get("configuration", String.class).orElse(null);
+        String configurationName = requirements.stringValue(MEMBER_CONFIGURATION).orElse(null);
         if (StringUtils.isEmpty(configurationName)) {
             return true;
         }
 
         BeanContext beanContext = context.getBeanContext();
-        String minimumVersion = requirements.get("version", String.class).orElse(null);
+        String minimumVersion = requirements.stringValue(MEMBER_VERSION).orElse(null);
         Optional<BeanConfiguration> beanConfiguration = beanContext.findBeanConfiguration(configurationName);
         if (!beanConfiguration.isPresent()) {
             context.fail("Required configuration [" + configurationName + "] is not active");
@@ -164,7 +182,7 @@ public class RequiresCondition implements Condition {
         // need this check because when this method is called with a BeanDefinitionReference the context
         // is not yet initialized so we cannot know if beans are present or not
         // check only that the classes are present for the beans requirement
-        matchesPresenceOfClasses(context, requirements, "beans");
+        matchesPresenceOfClasses(context, requirements, MEMBER_BEANS);
     }
 
     /**
@@ -189,15 +207,15 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesProperty(ConditionContext context, AnnotationValue<Requires> requirements) {
-        String property = requirements.get("property", String.class).orElse(null);
+        String property = requirements.stringValue(MEMBER_PROPERTY).orElse(null);
         if (StringUtils.isNotEmpty(property)) {
-            String value = requirements.get("value", String.class).orElse(null);
+            String value = requirements.stringValue().orElse(null);
             BeanContext beanContext = context.getBeanContext();
             if (beanContext instanceof PropertyResolver) {
                 PropertyResolver propertyResolver = (PropertyResolver) beanContext;
-                String notEquals = requirements.get("notEquals", String.class).orElse(null);
-                String defaultValue = requirements.get("defaultValue", String.class).orElse(null);
-                String pattern = requirements.get("pattern", String.class).orElse(null);
+                String notEquals = requirements.stringValue(MEMBER_NOT_EQUALS).orElse(null);
+                String defaultValue = requirements.stringValue(MEMBER_DEFAULT_VALUE).orElse(null);
+                String pattern = requirements.stringValue(MEMBER_PATTERN).orElse(null);
 
                 boolean hasNotEquals = StringUtils.isNotEmpty(notEquals);
                 boolean hasPattern = StringUtils.isNotEmpty(pattern);
@@ -243,7 +261,7 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesMissingProperty(ConditionContext context, AnnotationValue<Requires> requirements) {
-        String property = requirements.get("missingProperty", String.class).orElse(null);
+        String property = requirements.stringValue(MEMBER_MISSING_PROPERTY).orElse(null);
         if (StringUtils.isNotEmpty(property)) {
             BeanContext beanContext = context.getBeanContext();
             if (beanContext instanceof PropertyResolver) {
@@ -258,9 +276,9 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesEnvironment(ConditionContext context, AnnotationValue<Requires> requirements) {
-        String[] env = requirements.get("env", String[].class).orElse(null);
+        String[] env = requirements.stringValues(MEMBER_ENV);
         if (ArrayUtils.isEmpty(env)) {
-            env = requirements.get("notEnv", String[].class).orElse(null);
+            env = requirements.stringValues(MEMBER_NOT_ENV);
             if (ArrayUtils.isNotEmpty(env)) {
                 BeanContext beanContext = context.getBeanContext();
                 if (beanContext instanceof ApplicationContext) {
@@ -294,13 +312,12 @@ public class RequiresCondition implements Condition {
 
     @SuppressWarnings("unchecked")
     private boolean matchesCustomConditions(ConditionContext context, AnnotationValue<Requires> requirements) {
-        Class<? extends Condition> conditionClass = requirements.get("condition", Class.class).orElse(null);
+        Class<? extends Condition> conditionClass = (Class<? extends Condition>) requirements.classValue(MEMBER_CONDITION).orElse(null);
         if (conditionClass == TrueCondition.class) {
             return true;
         } else if (conditionClass != null) {
             // try first via instantiated metadata
-
-            Optional<? extends Condition> condition = requirements.get("condition", conditionClass);
+            Optional<? extends Condition> condition = requirements.get(MEMBER_CONDITION, conditionClass);
             if (!condition.isPresent()) {
                 condition = InstantiationUtils.tryInstantiate(conditionClass);
             }
@@ -336,8 +353,8 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesSdk(ConditionContext context, AnnotationValue<Requires> requirements) {
-        Requires.Sdk sdk = requirements.get("sdk", Requires.Sdk.class).orElse(null);
-        String version = requirements.get("version", String.class).orElse(null);
+        Requires.Sdk sdk = requirements.enumValue(MEMBER_SDK, Requires.Sdk.class).orElse(null);
+        String version = requirements.stringValue(MEMBER_VERSION).orElse(null);
         if (sdk != null && StringUtils.isNotEmpty(version)) {
 
             switch (sdk) {
@@ -407,12 +424,12 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesPresenceOfClasses(ConditionContext context, AnnotationValue<Requires> convertibleValues) {
-        return matchesPresenceOfClasses(context, convertibleValues, "classes");
+        return matchesPresenceOfClasses(context, convertibleValues, MEMBER_CLASSES);
     }
 
     private boolean matchesAbsenceOfClasses(ConditionContext context, AnnotationValue<Requires> requirements) {
-        if (requirements.contains("missing")) {
-            Optional<AnnotationClassValue[]> classNames = requirements.get("missing", AnnotationClassValue[].class);
+        if (requirements.contains(MEMBER_MISSING_CLASSES)) {
+            Optional<AnnotationClassValue[]> classNames = requirements.get(MEMBER_MISSING_CLASSES, AnnotationClassValue[].class);
             if (classNames.isPresent()) {
                 AnnotationClassValue[] classValues = classNames.get();
                 if (ArrayUtils.isNotEmpty(classValues)) {
@@ -433,7 +450,7 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchAbsenceOfClassNames(ConditionContext context, AnnotationValue<Requires> requirements) {
-        final String[] classNameArray = requirements.get("missing", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
+        final String[] classNameArray = requirements.stringValues(MEMBER_MISSING_CLASSES);
         final ClassLoader classLoader = context.getBeanContext().getClassLoader();
         for (String name : classNameArray) {
             if (ClassUtils.isPresent(name, classLoader)) {
@@ -478,7 +495,7 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesPresenceOfEntities(ConditionContext context, AnnotationValue<Requires> annotationValue) {
         if (annotationValue.contains("entities")) {
-            Optional<AnnotationClassValue[]> classNames = annotationValue.get("entities", AnnotationClassValue[].class);
+            Optional<AnnotationClassValue[]> classNames = annotationValue.get(MEMBER_ENTITIES, AnnotationClassValue[].class);
             if (classNames.isPresent()) {
                 BeanContext beanContext = context.getBeanContext();
                 if (beanContext instanceof ApplicationContext) {
@@ -505,7 +522,7 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesPresenceOfBeans(ConditionContext context, AnnotationValue<Requires> requirements) {
-        Class[] beans = requirements.get("beans", Class[].class).orElse(null);
+        Class[] beans = requirements.classValues(MEMBER_BEANS);
         if (ArrayUtils.isNotEmpty(beans)) {
             BeanContext beanContext = context.getBeanContext();
             for (Class type : beans) {
@@ -519,7 +536,7 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesAbsenceOfBeans(ConditionContext context, AnnotationValue<Requires> requirements) {
-        Class[] missingBeans = requirements.get("missingBeans", Class[].class).orElse(null);
+        Class[] missingBeans = requirements.classValues(MEMBER_MISSING_BEANS);
         AnnotationMetadataProvider component = context.getComponent();
         if (ArrayUtils.isNotEmpty(missingBeans) && component instanceof BeanDefinition) {
             BeanDefinition bd = (BeanDefinition) component;
@@ -545,7 +562,7 @@ public class RequiresCondition implements Condition {
     }
 
     private boolean matchesPresenceOfResources(ConditionContext context, AnnotationValue<Requires> requirements) {
-        final String[] resourcePaths = requirements.get("resources", String[].class).orElse(null);
+        final String[] resourcePaths = requirements.stringValues(MEMBER_RESOURCES);
         if (ArrayUtils.isNotEmpty(resourcePaths)) {
             final BeanContext beanContext = context.getBeanContext();
             ResourceResolver resolver;

@@ -39,6 +39,17 @@ class ReplacesSpec extends Specification {
         b.a instanceof A2
     }
 
+    void "test that a bean that has AOP advice applied can be replaced"() {
+        given:
+        BeanContext context = BeanContext.run()
+
+        expect:
+        context.getBeansOfType(H).size() == 1
+        context.getBean(H).test("foo") == "replacement foo"
+        cleanup:
+        context.close()
+    }
+
     void "test that named beans can be replaced"() {
         given:
         BeanContext context = BeanContext.run()
