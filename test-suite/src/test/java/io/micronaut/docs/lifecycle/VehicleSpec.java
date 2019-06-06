@@ -1,9 +1,7 @@
 package io.micronaut.docs.lifecycle;
 
 import io.micronaut.context.DefaultBeanContext;
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.junit.Test;
-import spock.lang.Specification;
 
 import static org.junit.Assert.assertTrue;
 
@@ -14,7 +12,7 @@ public class VehicleSpec {
         // tag::start[]
         Vehicle vehicle = new DefaultBeanContext().start().getBean(Vehicle.class);
 
-        DefaultGroovyMethods.println(this, vehicle.start());
+        System.out.println(vehicle.start());
         // end::start[]
 
         assertTrue(vehicle.getEngine() instanceof V8Engine);
