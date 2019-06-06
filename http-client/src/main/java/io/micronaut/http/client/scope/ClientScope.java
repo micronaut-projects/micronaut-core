@@ -92,7 +92,7 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
         if (!(provider instanceof ParametrizedProvider)) {
             throw new DependencyInjectionException(resolutionContext, argument, "ClientScope called with invalid bean provider");
         }
-        String value = annotation.getValue(String.class).orElseThrow(() ->
+        String value = annotation.stringValue().orElseThrow(() ->
                 new DependencyInjectionException(resolutionContext, argument, "No value specified for @Client")
         );
         LoadBalancer loadBalancer = loadBalancerResolver.resolve(value)

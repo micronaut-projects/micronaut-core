@@ -21,9 +21,13 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Put
+import io.micronaut.http.client.ServiceHttpClientConfiguration
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.ssl.ClientSslConfiguration
+import io.micronaut.http.ssl.DefaultSslConfiguration
+import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -50,7 +54,9 @@ class ManualHttpServiceDefinitionSpec extends Specification {
                 'micronaut.http.services.bar.health-check':true,
                 'micronaut.http.services.bar.health-check-interval':'100ms',
                 'micronaut.http.services.bar.read-timeout':'10s',
-                'micronaut.http.services.bar.pool.enabled':true
+                'micronaut.http.services.bar.pool.enabled':true,
+                'micronaut.http.services.baz.url': firstApp.getURI(),
+                'micronaut.http.services.baz.path': '/manual/http/service',
         )
         TestClientFoo tcFoo = clientApp.getBean(TestClientFoo)
         TestClientBar tcBar = clientApp.getBean(TestClientBar)
@@ -81,17 +87,47 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         when:
         client = clientApp.getBean(RxHttpClient, Qualifiers.byName("bar"))
         result = client.retrieve(HttpRequest.POST('/', '')).blockingFirst()
+
         then:
         client.configuration == config
         result == 'created'
         tcBar.save() == 'created'
         tcBar.update() == "updated"
 
+        when: "a client that overrides the path is used"
+        TestClientBaz tcBaz = clientApp.getBean(TestClientBaz)
+
+        then:
+        tcBaz.index() == "ok-other"
+        tcBaz.save() == "created-other"
+        tcBaz.update() == "updated-other"
+
         cleanup:
         firstApp.close()
         clientApp.close()
     }
 
+    void 'test default client ssl configuration'() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'micronaut.http.services.foo.ssl.enabled':true,
+                'micronaut.http.services.foo.ssl.key.password':'blah',
+                'micronaut.http.services.foo.ssl.key-store.path':'blahpath',
+                'micronaut.http.services.foo.ssl.trust-store.path':'blahtrust',
+        )
+
+        ServiceHttpClientConfiguration clientConfiguration = ctx.getBean(ServiceHttpClientConfiguration, Qualifiers.byName("foo"))
+        SslConfiguration sslConfiguration = clientConfiguration.getSslConfiguration()
+
+        expect:
+        clientConfiguration
+        sslConfiguration.isEnabled()
+        sslConfiguration.getTrustStore().getPath().get() == 'blahtrust'
+        sslConfiguration.getKeyStore().getPath().get() == 'blahpath'
+
+        cleanup:
+        ctx.close()
+    }
 
     void "test that manually defining an HTTP client without URL doesn't create bean"() {
         given:
@@ -135,6 +171,18 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         String update()
     }
 
+    @Client(id = "baz", path = "/other/http/service")
+    static interface TestClientBaz {
+        @Get
+        String index()
+
+        @Post
+        String save()
+
+        @Put("update")
+        String update()
+    }
+
     @Controller('manual/http/service')
     static class TestController {
         @Get
@@ -150,6 +198,24 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         @Put("update")
         String update() {
             return "updated"
+        }
+    }
+
+    @Controller('other/http/service')
+    static class OtherController {
+        @Get
+        String index() {
+            return "ok-other"
+        }
+
+        @Post
+        String save() {
+            return "created-other"
+        }
+
+        @Put("update")
+        String update() {
+            return "updated-other"
         }
     }
 }

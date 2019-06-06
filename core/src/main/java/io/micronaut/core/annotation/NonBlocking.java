@@ -21,7 +21,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * A marker annotation for methods that are blocking.
+ * A marker annotation for methods that are non-blocking.
  *
  * @author Graeme Rocher
  * @since 1.0

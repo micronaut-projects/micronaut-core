@@ -72,7 +72,19 @@ public abstract class AbstractConsulClient implements ConsulClient {
     }
 
     @Override
+    public Publisher<List<String>> getServiceIds() {
+        if (!consulConfiguration.getDiscovery().isEnabled()) {
+            return Publishers.just(Collections.emptyList());
+        } else {
+            return ConsulClient.super.getServiceIds();
+        }
+    }
+
+    @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+        if (!consulConfiguration.getDiscovery().isEnabled()) {
+            return Publishers.just(Collections.emptyList());
+        }
         serviceId = NameUtils.hyphenate(serviceId);
         if (SERVICE_ID.equals(serviceId)) {
             return Publishers.just(

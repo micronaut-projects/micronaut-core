@@ -1,8 +1,1 @@
-The easiest way to see changes made to a fresh new app for a given profile between Micronaut versions is to use the next
-Github Repositories to generate a diff.
-
-|===
-|Application Profile
-|https://github.com/micronaut-profiles-versions/service-versions[service] Default profile used by `create-app` command.
-|https://github.com/micronaut-profiles-versions/function-versions[function] profile used by `create-function` command.
-|===
+The easiest way to see version dependency updates and other changes for a new version of Micronaut, is to produce one clean application using the older and one using the newer version of the `mn` CLI, and then comparing those directories.

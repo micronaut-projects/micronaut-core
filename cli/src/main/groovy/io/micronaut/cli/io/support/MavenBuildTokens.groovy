@@ -142,7 +142,11 @@ class MavenBuildTokens extends BuildTokens {
                 groupId(artifact.groupId)
                 artifactId(artifact.artifactId)
                 if (artifact.groupId.startsWith("io.micronaut")) {
-                    version("\${micronaut.version}")
+                    if (!artifact.version || artifact.version == 'BOM') {
+                        version("\${micronaut.version}")
+                    } else {
+                        version(artifact.version)
+                    }
                 } else {
                     version(artifact.version)
                 }
