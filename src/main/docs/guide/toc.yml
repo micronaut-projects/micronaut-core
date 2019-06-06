@@ -7,6 +7,7 @@ quickStart:
     title: Build/Install the CLI
     installSdkman: Install with Sdkman
     installHomebrew: Install with Homebrew
+    installMacPorts: Install with MacPorts
     installWindows: Install through Binary on Windows
     buildSource: Building from Source
   creatingServer: Creating a Server Application
