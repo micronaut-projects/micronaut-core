@@ -1,6 +1,7 @@
 package io.micronaut.docs.lifecycle
 
-import javax.annotation.PreDestroy
+// tag::class[]
+import javax.annotation.PreDestroy // <1>
 import javax.inject.Singleton
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -8,9 +9,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 class PreDestroyBean : AutoCloseable {
 
     var stopped = AtomicBoolean(false)
-    @PreDestroy
+
+    @PreDestroy // <2>
     @Throws(Exception::class)
     override fun close() {
         stopped.compareAndSet(false, true)
     }
 }
+// end::class[]
