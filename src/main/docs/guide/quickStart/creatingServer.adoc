@@ -26,6 +26,8 @@ See the section <<runningSpecificPort, Running Server on a Specific Port>> in th
 
 In order to create a service that responds to "Hello World" you first need a controller. The following is an example of a controller:
 
+The below snippet needs a package definition to compile
+
 snippet::io.micronaut.docs.server.intro.HelloController[tags="imports,class"]
 
 <1> The class is defined as a controller with the link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation mapped to the path `/hello`
