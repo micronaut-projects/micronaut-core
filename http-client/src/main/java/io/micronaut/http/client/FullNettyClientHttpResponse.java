@@ -165,11 +165,28 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         }
 
         Optional<T> result = convertedBodies.computeIfAbsent(type, argument -> {
+            Optional<B> existing = getBody();
             final boolean isOptional = argument.getType() == Optional.class;
             final Argument finalArgument = isOptional ? argument.getFirstTypeVariable().orElse(argument) : argument;
-            ByteBuf content = nettyHttpResponse.content();
-            Optional<T> converted = convertByteBuf(content, finalArgument);
-
+            Optional<T> converted;
+            if (existing.isPresent()) {
+                converted = existing.flatMap(b -> {
+                    if (b instanceof ByteBuffer) {
+                        ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
+                        return convertByteBuf(bytebuf, finalArgument);
+                    } else {
+                        final Optional opt = ConversionService.SHARED.convert(b, ConversionContext.of(finalArgument));
+                        if (!opt.isPresent()) {
+                            ByteBuf content = nettyHttpResponse.content();
+                            return convertByteBuf(content, finalArgument);
+                        }
+                        return opt;
+                    }
+                });
+            } else {
+                ByteBuf content = nettyHttpResponse.content();
+                converted = convertByteBuf(content, finalArgument);
+            }
             if (isOptional) {
                 return Optional.of(converted);
             } else {
