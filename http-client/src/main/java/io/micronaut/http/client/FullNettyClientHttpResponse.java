@@ -28,7 +28,6 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -200,6 +199,9 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         return result;
     }
 
+    /**
+     * Parse the body with the default body type.
+     */
     void parseBody() {
         this.body = getBody(defaultBodyType).orElse(null);
     }
