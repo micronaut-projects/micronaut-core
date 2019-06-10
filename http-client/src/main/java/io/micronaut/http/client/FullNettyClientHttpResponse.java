@@ -63,8 +63,9 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     private final Map<Argument, Optional> convertedBodies = new HashMap<>();
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory;
-    private final B body;
     private boolean complete;
+    private final Argument<B> defaultBodyType;
+    private B body;
 
     /**
      * @param fullHttpResponse       The full Http response
@@ -78,7 +79,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
             Argument<B> bodyType, boolean errorStatus) {
-
         this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
@@ -90,16 +90,17 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             if (HttpResponse.class.isAssignableFrom(bodyType.getType())) {
                 Optional<Argument<?>> responseBodyType = bodyType.getFirstTypeVariable();
                 if (responseBodyType.isPresent()) {
-                    Argument<B> finalResponseBodyType = (Argument<B>) responseBodyType.get();
-                    this.body = !errorStatus || isParseableBodyType(finalResponseBodyType.getType()) ? getBody(finalResponseBodyType).orElse(null) : null;
-                } else {
-                    this.body = null;
+                    bodyType = (Argument<B>) responseBodyType.get();
+                    rawBodyType = bodyType.getType();
                 }
+            }
+            if (!errorStatus || isParseableBodyType(rawBodyType)) {
+                defaultBodyType = bodyType;
             } else {
-                this.body = !errorStatus || isParseableBodyType(rawBodyType) ? getBody(bodyType).orElse(null) : null;
+                defaultBodyType = null;
             }
         } else {
-            this.body = null;
+            defaultBodyType = null;
         }
     }
 
@@ -164,41 +165,26 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         }
 
         Optional<T> result = convertedBodies.computeIfAbsent(type, argument -> {
-                    Optional<B> existing = getBody();
-                    final boolean isOptional = argument.getType() == Optional.class;
-                    final Argument finalArgument = isOptional ? argument.getFirstTypeVariable().orElse(argument) : argument;
-                    Optional<T> converted;
-                    if (existing.isPresent()) {
-                        converted = getBody().flatMap(b -> {
+            final boolean isOptional = argument.getType() == Optional.class;
+            final Argument finalArgument = isOptional ? argument.getFirstTypeVariable().orElse(argument) : argument;
+            ByteBuf content = nettyHttpResponse.content();
+            Optional<T> converted = convertByteBuf(content, finalArgument);
 
-                            if (b instanceof ByteBuffer) {
-                                ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
-                                return convertByteBuf(bytebuf, finalArgument);
-                            } else {
-                                final Optional opt = ConversionService.SHARED.convert(b, ConversionContext.of(finalArgument));
-                                if (!opt.isPresent()) {
-                                    ByteBuf content = nettyHttpResponse.content();
-                                    return convertByteBuf(content, finalArgument);
-                                }
-                                return opt;
-                            }
-                        });
-                    } else {
-                        ByteBuf content = nettyHttpResponse.content();
-                        converted = convertByteBuf(content, finalArgument);
-                    }
-                    if (isOptional) {
-                        return Optional.of(converted);
-                    } else {
-                        return converted;
-                    }
-                }
+            if (isOptional) {
+                return Optional.of(converted);
+            } else {
+                return converted;
+            }
+        });
 
-        );
         if (LOG.isTraceEnabled() && !result.isPresent()) {
             LOG.trace("Unable to convert response body to target type {}", javaType);
         }
         return result;
+    }
+
+    void parseBody() {
+        this.body = getBody(defaultBodyType).orElse(null);
     }
 
     private boolean isParseableBodyType(Class<?> rawBodyType) {
@@ -234,14 +220,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
                 Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
                 if (foundCodec.isPresent()) {
                     MediaTypeCodec codec = foundCodec.get();
-                    try {
-                        return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
-                    } catch (CodecException e) {
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("Unable to decode response body using codec " + codec.getClass().getSimpleName() + ":" + e.getMessage(), e);
-                        }
-                        return Optional.empty();
-                    }
+                    return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
                 }
             }
         } else if (!hasContentType && LOG.isTraceEnabled()) {

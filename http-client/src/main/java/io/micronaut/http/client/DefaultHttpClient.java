@@ -1761,11 +1761,16 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         headers.remove(HttpHeaderNames.CONTENT_LENGTH);
                     }
                     boolean errorStatus = statusCode >= 400;
+
                     FullNettyClientHttpResponse<O> response
                             = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType, errorStatus);
 
                     if (complete.compareAndSet(false, true)) {
                         if (errorStatus) {
+                            try {
+                                response.parseBody();
+                            } catch (Exception ignored) {
+                            }
                             try {
                                 HttpClientResponseException clientError;
                                 if (errorType != HttpClient.DEFAULT_ERROR_TYPE) {
@@ -1788,12 +1793,22 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                 }
                                 emitter.onError(clientError);
                             } catch (Exception e) {
-                                emitter.onError(new HttpClientException("Exception occurred decoding error response: " + e.getMessage(), e));
+                                emitter.onError(new HttpClientResponseException("Exception occurred decoding error response: " + e.getMessage(), e, response, new HttpClientErrorDecoder() {
+                                    @Override
+                                    public Class<?> getErrorType(MediaType mediaType) {
+                                        return null;
+                                    }
+                                }));
                             }
                         } else {
-                            emitter.onNext(response);
+                            try {
+                                response.parseBody();
+                                emitter.onNext(response);
+                                emitter.onComplete();
+                            } catch (Exception e) {
+                                emitter.onError(new HttpClientResponseException("Exception occurred decoding response: " + e.getMessage(), e, response));
+                            }
                             response.onComplete();
-                            emitter.onComplete();
                         }
                     }
                 } finally {
