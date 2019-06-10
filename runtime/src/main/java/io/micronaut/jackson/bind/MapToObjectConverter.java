@@ -27,6 +27,7 @@ import javax.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
@@ -59,10 +60,9 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
 
     @Override
     public Optional<Object> convert(Map map, Class<Object> targetType, ConversionContext context) {
-        final Function<Map, Function<Object, Object>> propertiesBinderFunction = properties -> object -> {
-            Map<?, ?> theMap = properties;
-            Map bindMap = new LinkedHashMap(theMap.size());
-            for (Map.Entry<?, ?> entry : theMap.entrySet()) {
+        final BiFunction<Object, Map<?, ?>, Object> propertiesBinderFunction = (object, properties) -> {
+            Map bindMap = new LinkedHashMap(properties.size());
+            for (Map.Entry entry : properties.entrySet()) {
                 Object key = entry.getKey();
                 bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
             }
@@ -70,7 +70,7 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
         };
 
         Optional<Object> instance = InstantiationUtils.tryInstantiate(targetType, map, context)
-                    .map(propertiesBinderFunction.apply(map));
+                    .map(object -> propertiesBinderFunction.apply(object, map));
 
         if (instance.isPresent()) {
             return instance;
@@ -79,7 +79,7 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
         } else {
             return InstantiationUtils
                     .tryInstantiate(targetType)
-                    .map(propertiesBinderFunction.apply(map));
+                    .map(object -> propertiesBinderFunction.apply(object, map));
         }
     }
 }
