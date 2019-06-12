@@ -10,6 +10,7 @@ import java.io.Serializable;
 public class GenericController<T, ID extends Serializable> {
     @Post
     Mono<HttpResponse<T>> save(@Body T entity) {
-        return Mono.just(HttpResponse.created(entity));
+        assert entity instanceof Status;
+        return Mono.just(HttpResponse.created((entity)));
     }
 }
