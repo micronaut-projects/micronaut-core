@@ -315,7 +315,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
         private AtomicInteger factoryMethodIndex = new AtomicInteger(0);
         private Set<Name> visitedTypes = new HashSet<>();
-
         /**
          * @param concreteClass The {@link TypeElement}
          */
@@ -754,10 +753,18 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 beanMethodWriter.visitTypeArguments(beanTypeArguments);
             }
 
-            beanDefinitionWriters.put(beanMethod.getSimpleName(), beanMethodWriter);
-
             final String beanMethodName = beanMethod.getSimpleName().toString();
             final Map<String, Object> beanMethodParameters = beanMethodParams.getParameters();
+
+            StringBuilder methodKey = new StringBuilder(beanMethodName)
+                    .append("(")
+                    .append(beanMethodParameters.values().stream()
+                        .map(Object::toString)
+                        .collect(Collectors.joining(",")))
+                    .append(")");
+
+            beanDefinitionWriters.put(new DynamicName(methodKey), beanMethodWriter);
+
             final Object beanMethodDeclaringType = modelUtils.resolveTypeReference(beanMethod.getEnclosingElement());
             AnnotationMetadata methodAnnotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(
                     producedElement,
@@ -808,15 +815,33 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     @Override
                     protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
                         ExecutableElement method = (ExecutableElement) element;
-                        Map<String, Object> boundTypes = genericUtils.resolveBoundTypes(type);
-                        ExecutableElementParamInfo params = populateParameterData(producedTypeName, method, boundTypes);
                         Object owningType = modelUtils.resolveTypeReference(method.getEnclosingElement());
                         if (owningType == null) {
                             throw new IllegalStateException("Owning type cannot be null");
                         }
                         TypeMirror returnTypeMirror = method.getReturnType();
-                        Object resolvedReturnType = genericUtils.resolveTypeReference(returnTypeMirror, boundTypes);
-                        Map<String, Object> returnTypeGenerics = genericUtils.resolveGenericTypes(returnTypeMirror, boundTypes);
+
+                        TypeMirror returnType = method.getReturnType();
+
+                        Map<String, Object> returnTypeGenerics = new HashMap<>();
+                        genericUtils.resolveBoundGenerics((TypeElement) method.getEnclosingElement(),
+                                returnType,
+                                genericUtils.buildGenericTypeArgumentElementInfo(concreteClass))
+                                .forEach((key, value) ->
+                                        returnTypeGenerics.put(key, modelUtils.resolveTypeReference(value)));
+
+                        //Object resolvedReturnType = genericUtils.resolveTypeReference(returnType, returnTypeGenerics);
+                        Object resolvedReturnType = modelUtils.resolveTypeReference(returnType);
+
+                        TypeElement enclosingElement = (TypeElement) method.getEnclosingElement();
+
+                        Map<String, Object> boundTypes = genericUtils.buildGenericTypeArgumentInfo(concreteClass).get(enclosingElement.getQualifiedName().toString());
+                        if (boundTypes == null) {
+                            boundTypes = Collections.emptyMap();
+                        }
+
+                        ExecutableElementParamInfo params = populateParameterData(null, method, boundTypes);
+
                         String methodName = method.getSimpleName().toString();
                         Map<String, Object> methodParameters = params.getParameters();
                         Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
@@ -871,25 +896,40 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     @Override
                     protected void accept(DeclaredType type, Element element, BeanDefinitionWriter beanWriter) {
                         ExecutableElement method = (ExecutableElement) element;
-                        Map<String, Object> boundTypes = genericUtils.resolveBoundTypes(type);
-                        ExecutableElementParamInfo params = populateParameterData(producedTypeName, method, boundTypes);
                         Object owningType = modelUtils.resolveTypeReference(method.getEnclosingElement());
                         if (owningType == null) {
                             throw new IllegalStateException("Owning type cannot be null");
                         }
                         TypeMirror returnTypeMirror = method.getReturnType();
-                        Object resolvedReturnType = genericUtils.resolveTypeReference(returnTypeMirror, boundTypes);
-                        Map<String, Object> returnTypeGenerics = genericUtils.resolveGenericTypes(returnTypeMirror, boundTypes);
                         String methodName = method.getSimpleName().toString();
-                        Map<String, Object> methodParameters = params.getParameters();
-                        Map<String, Object> genericParameters = params.getGenericParameters();
-                        Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
-                        Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
 
                         AnnotationMetadata annotationMetadata = new AnnotationMetadataReference(
                                 beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                 methodAnnotationMetadata
                         );
+
+                        Map<String, Object> returnTypeGenerics = new HashMap<>();
+                        genericUtils.resolveBoundGenerics((TypeElement) method.getEnclosingElement(),
+                                returnType,
+                                genericUtils.buildGenericTypeArgumentElementInfo(type.asElement()))
+                                .forEach((key, value) ->
+                                        returnTypeGenerics.put(key, modelUtils.resolveTypeReference(value)));
+
+                        TypeElement enclosingElement = (TypeElement) method.getEnclosingElement();
+
+                        Map<String, Object> boundTypes = genericUtils.buildGenericTypeArgumentInfo(type).get(enclosingElement.getQualifiedName().toString());
+                        if (boundTypes == null) {
+                            boundTypes = Collections.emptyMap();
+                        }
+
+                        Object resolvedReturnType = genericUtils.resolveTypeReference(returnTypeMirror, boundTypes);
+
+                        ExecutableElementParamInfo params = populateParameterData(producedTypeName, method, boundTypes);
+
+                        Map<String, Object> methodParameters = params.getParameters();
+                        Map<String, Object> genericParameters = params.getGenericParameters();
+                        Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
+                        Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
 
                         beanMethodWriter.visitExecutableMethod(
                                 owningType,
@@ -937,8 +977,23 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         void visitExecutableMethod(ExecutableElement method, AnnotationMetadata methodAnnotationMetadata) {
             TypeMirror returnType = method.getReturnType();
 
-            Map<String, Object> returnTypeGenerics = genericUtils.resolveGenericTypes(returnType, Collections.emptyMap());
-            ExecutableElementParamInfo params = populateParameterData(null, method, Collections.emptyMap());
+            Map<String, Object> returnTypeGenerics = new HashMap<>();
+            genericUtils.resolveBoundGenerics((TypeElement) method.getEnclosingElement(),
+                    returnType,
+                    genericUtils.buildGenericTypeArgumentElementInfo(concreteClass))
+                    .forEach((key, value) ->
+                            returnTypeGenerics.put(key, modelUtils.resolveTypeReference(value)));
+
+            Object resolvedReturnType = modelUtils.resolveTypeReference(returnType);
+
+            TypeElement enclosingElement = (TypeElement) method.getEnclosingElement();
+
+            Map<String, Object> boundTypes = genericUtils.buildGenericTypeArgumentInfo(concreteClass).get(enclosingElement.getQualifiedName().toString());
+            if (boundTypes == null) {
+                boundTypes = Collections.emptyMap();
+            }
+
+            ExecutableElementParamInfo params = populateParameterData(null, method, boundTypes);
 
             BeanDefinitionVisitor beanWriter = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
 
@@ -953,7 +1008,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 typeRef = modelUtils.resolveTypeReference(concreteClass);
             }
 
-            Object resolvedReturnType = modelUtils.resolveTypeReference(returnType);
             ExecutableMethodWriter executableMethodWriter = beanWriter.visitExecutableMethod(
                     typeRef,
                     resolvedReturnType,
@@ -1837,7 +1891,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             String beanDefinitionPackage = definingPackageElement.getQualifiedName().toString();
             String shortClassName = modelUtils.simpleBinaryNameFor(producedElement);
             String upperCaseMethodName = NameUtils.capitalize(method.getSimpleName().toString());
-            String factoryMethodBeanDefinitionName = beanDefinitionPackage + ".$" + concreteClass.getSimpleName().toString() + "$" + upperCaseMethodName + "Definition";
+            String factoryMethodBeanDefinitionName = beanDefinitionPackage + ".$" + concreteClass.getSimpleName().toString() + "$" + upperCaseMethodName + factoryMethodIndex.getAndIncrement() + "Definition";
             return new BeanDefinitionWriter(
                     packageName,
                     shortClassName,
@@ -1867,6 +1921,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     modelUtils.isPrivate(element),
                     elementMetadata
             );
+
             element.getParameters().forEach(paramElement -> {
 
                 String argName = paramElement.getSimpleName().toString();
