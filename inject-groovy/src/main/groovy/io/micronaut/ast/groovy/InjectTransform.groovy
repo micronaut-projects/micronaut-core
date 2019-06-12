@@ -303,6 +303,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         private BeanDefinitionVisitor beanWriter
         BeanDefinitionVisitor aopProxyWriter
         final AtomicInteger adaptedMethodIndex = new AtomicInteger(0)
+        final AtomicInteger factoryMethodIndex = new AtomicInteger(0)
 
         InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder) {
             this(sourceUnit, targetClassNode, null, configurationMetadataBuilder)
@@ -523,7 +524,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 String beanDefinitionPackage = concreteClass.packageName
                 String upperCaseMethodName = NameUtils.capitalize(methodNode.getName())
                 String factoryMethodBeanDefinitionName =
-                        beanDefinitionPackage + '.$' + concreteClass.nameWithoutPackage + '$' + upperCaseMethodName + "Definition"
+                        beanDefinitionPackage + '.$' + concreteClass.nameWithoutPackage + '$' + upperCaseMethodName + factoryMethodIndex.getAndIncrement() + "Definition"
 
                 BeanDefinitionWriter beanMethodWriter = new BeanDefinitionWriter(
                         producedType.packageName,
@@ -611,13 +612,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             Map<String, Object> targetGenericParams = [:]
                             Map<String, AnnotationMetadata> targetAnnotationMetadata = [:]
                             Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
-                            Map<String, ClassNode> boundTypes = AstGenericUtils.createGenericsSpec(classNode)
-                            Object resolvedReturnType = AstGenericUtils.resolveTypeReference(targetBeanMethodNode.returnType, boundTypes)
-                            Object returnTypeReference = resolveReturnType(classNode, targetBeanMethodNode, boundTypes)
-                            Map<String, Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(
-                                    targetBeanMethodNode.returnType,
-                                    boundTypes
-                            )
+
+                            Map<String, Map<String, ClassNode>> genericInfo = AstGenericUtils.buildAllGenericElementInfo(classNode, new GroovyVisitorContext(source))
+
+                            Map<String, ClassNode> declaringTypeGenericInfo = genericInfo.get(methodNode.declaringClass.name)
+                            if (declaringTypeGenericInfo == null) {
+                                declaringTypeGenericInfo = Collections.emptyMap()
+                            }
+
+                            Object resolvedReturnType = AstGenericUtils.resolveTypeReference(targetBeanMethodNode.returnType, declaringTypeGenericInfo)
+                            Object returnTypeReference = resolveReturnType(classNode, targetBeanMethodNode, declaringTypeGenericInfo)
+
+                            Map<String, Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, declaringTypeGenericInfo)
+
 
                             populateParameterData(
                                 targetBeanMethodNode,
@@ -625,7 +632,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 targetGenericParams,
                                 targetAnnotationMetadata,
                                 targetMethodGenericTypeMap,
-                                boundTypes)
+                                declaringTypeGenericInfo)
                             AnnotationMetadata annotationMetadata
                             if (AstAnnotationUtils.isAnnotated(producedType.name, methodNode)) {
                                 annotationMetadata = AstAnnotationUtils.newBuilder(source)
@@ -865,9 +872,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (declaringClass != ClassHelper.OBJECT_TYPE) {
 
                 defineBeanDefinition(concreteClass)
-                def typeSpec = GenericsUtils.createGenericsSpec(concreteClass)
-                Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, typeSpec)
-                Map<String, ClassNode> genericsSpec = AstGenericUtils.createGenericsSpec(methodNode, typeSpec)
+
+                Map<String, Map<String, ClassNode>> genericInfo = AstGenericUtils.buildAllGenericElementInfo(concreteClass, new GroovyVisitorContext(sourceUnit))
+
+                Map<String, ClassNode> declaringTypeGenericInfo = genericInfo.get(methodNode.declaringClass.name)
+                if (declaringTypeGenericInfo == null) {
+                    declaringTypeGenericInfo = Collections.emptyMap()
+                }
+
+                Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, declaringTypeGenericInfo)
 
                 Map<String, Object> paramsToType = [:]
                 Map<String, Object> genericParams = [:]
@@ -879,7 +892,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         genericParams,
                         argumentAnnotationMetadata,
                         genericTypeMap,
-                        genericsSpec
+                        declaringTypeGenericInfo
                 )
 
                 boolean preprocess = methodAnnotationMetadata.booleanValue(Executable.class, "processOnStartup").orElse(false)
@@ -898,7 +911,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ExecutableMethodWriter executableMethodWriter = getBeanWriter().visitExecutableMethod(
                         AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
                         AstGenericUtils.resolveTypeReference(methodNode.returnType),
-                        AstGenericUtils.resolveTypeReference(methodNode.returnType),
+                        AstGenericUtils.resolveTypeReference(methodNode.returnType, declaringTypeGenericInfo),
                         returnTypeGenerics,
                         methodName,
                         paramsToType,

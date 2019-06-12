@@ -182,7 +182,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             if (e instanceof TypeElement) {
                 TypeElement typeElement = (TypeElement) e;
                 Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
-                if (JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
+                if (visitorContext.getModelUtils().resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
                     return new JavaEnumElement(
                             typeElement,
                             visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
