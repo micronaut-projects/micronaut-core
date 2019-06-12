@@ -8,6 +8,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.server.netty.binding.generic.Status
 import reactor.core.publisher.Mono
+import spock.lang.Ignore
 
 class GenericControllerSpec extends AbstractMicronautSpec {
 
@@ -32,7 +33,8 @@ class GenericControllerSpec extends AbstractMicronautSpec {
     static abstract class GenericController<T, ID extends Serializable> {
         @Post
         Mono<HttpResponse<T>> save(@Body T entity) {
-            Mono.just(HttpResponse.created(entity))
+            assert entity instanceof Status
+            Mono.just(HttpResponse.created((T)entity))
         }
     }
 
