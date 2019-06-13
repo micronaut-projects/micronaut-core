@@ -23,7 +23,7 @@ import java.util.function.Function
 class ExecutableAnnotationOnFactorySpec extends AbstractTypeElementSpec {
     void "test executable annotation on factory"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc0','''\
 package test;
 
 import io.micronaut.inject.annotation.*;
