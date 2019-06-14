@@ -6,7 +6,7 @@ import io.micronaut.context.ApplicationContext
 
 internal class VehicleSpec : StringSpec({
 
-    "test start vehicle".config(enabled = false) {
+    "test start vehicle" {
         // tag::start[]
         val applicationContext = ApplicationContext.run(
                 mapOf(
