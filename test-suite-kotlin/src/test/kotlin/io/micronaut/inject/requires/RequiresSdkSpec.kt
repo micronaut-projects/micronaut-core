@@ -15,16 +15,18 @@
  */
 package io.micronaut.inject.requires
 
+import io.kotlintest.matchers.boolean.shouldBeFalse
+import io.kotlintest.matchers.boolean.shouldBeTrue
+import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import junit.framework.TestCase
 
-class RequiresSdkSpec: TestCase() {
+class RequiresSdkSpec: StringSpec({
 
-    fun testRequiresKotlinSDKworks() {
+    "test requires kotlin sdk works" {
         val context = ApplicationContext.run()
-        TestCase.assertFalse(context.containsBean(RequiresFuture::class.java))
-        TestCase.assertTrue(context.containsBean(RequiresOld::class.java))
+        context.containsBean(RequiresFuture::class.java).shouldBeFalse()
+        context.containsBean(RequiresOld::class.java).shouldBeTrue()
         context.close()
     }
 
-}
+})
