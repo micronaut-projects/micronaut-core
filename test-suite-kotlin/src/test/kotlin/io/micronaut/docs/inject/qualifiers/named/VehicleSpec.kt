@@ -1,18 +1,18 @@
 package io.micronaut.docs.inject.qualifiers.named
 
+import io.kotlintest.shouldBe
+import io.kotlintest.specs.StringSpec
 import io.micronaut.context.DefaultBeanContext
-import kotlin.test.Test
-import kotlin.test.assertEquals
 
-class VehicleSpec {
-    @Test
-    fun testStartVehicle() {
+class VehicleSpec : StringSpec({
+
+    "test start vehicle" {
         // tag::start[]
         val vehicle = DefaultBeanContext().start().getBean(Vehicle::class.java)
         println(vehicle.start())
         // end::start[]
 
-        assertEquals("Starting V8", vehicle.start())
+        vehicle.start().shouldBe("Starting V8")
     }
 
-}
+})

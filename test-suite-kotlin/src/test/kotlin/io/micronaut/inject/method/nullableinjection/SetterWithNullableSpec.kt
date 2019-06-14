@@ -15,23 +15,25 @@
  */
 package io.micronaut.inject.method.nullableinjection
 
+import io.kotlintest.matchers.types.shouldBeNull
+import io.kotlintest.shouldThrow
+import io.kotlintest.specs.StringSpec
 import io.micronaut.context.BeanContext
 import io.micronaut.context.exceptions.DependencyInjectionException
-import junit.framework.TestCase
 
-class SetterWithNullableSpec: TestCase() {
+class SetterWithNullableSpec: StringSpec({
 
-    fun testInjectionOfNullableObjects() {
+    "test injection of nullable objects" {
         val context = BeanContext.run()
         val b = context.getBean(B::class.java)
-        TestCase.assertNull(b.a)
+
+        b.a.shouldBeNull()
     }
 
-    fun testNormalInjectionStillFails() {
+    "test normal injection still fails" {
         val context = BeanContext.run()
-        try {
+        shouldThrow<DependencyInjectionException> {
             context.getBean(C::class.java)
-            TestCase.fail("Expected a DependencyInjectionException to be thrown")
-        } catch (e: DependencyInjectionException) {}
+        }
     }
-}
+})

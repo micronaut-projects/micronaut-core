@@ -15,14 +15,16 @@
  */
 package io.micronaut.inject.property
 
+import io.kotlintest.shouldBe
+import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import junit.framework.TestCase
 
-class MapFormatSpec: TestCase() {
+class MapFormatSpec: StringSpec({
 
-    fun testMapFormatOnProperty() {
+    "test map format on property" {
         val context = ApplicationContext.run(mapOf("text.properties.yyy.zzz" to 3, "test.properties.yyy.xxx" to 2, "test.properties.yyy.yyy" to 3))
         val config = context.getBean(ConfigProps::class.java)
-        TestCase.assertEquals(config.properties?.get("yyy.xxx"), 2)
+
+        config.properties?.get("yyy.xxx").shouldBe(2)
     }
-}
+})

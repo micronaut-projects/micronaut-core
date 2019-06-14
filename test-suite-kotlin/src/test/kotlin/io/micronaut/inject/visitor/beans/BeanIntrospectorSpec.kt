@@ -1,34 +1,36 @@
 package io.micronaut.inject.visitor.beans
 
+import io.kotlintest.matchers.boolean.shouldBeFalse
+import io.kotlintest.matchers.boolean.shouldBeTrue
+import io.kotlintest.shouldBe
+import io.kotlintest.shouldThrow
+import io.kotlintest.specs.StringSpec
 import io.micronaut.core.beans.BeanIntrospector
-import junit.framework.TestCase
 
-class BeanIntrospectorSpec : TestCase() {
+class BeanIntrospectorSpec : StringSpec({
 
-    fun testGetIntrospection() {
+    "test get introspection" {
         val introspection = BeanIntrospector.SHARED.getIntrospection(TestBean::class.java)
 
-        assertEquals(5, introspection.propertyNames.size)
-        assertTrue(introspection.getProperty("age").isPresent)
-        assertTrue(introspection.getProperty("name").isPresent)
+        introspection.propertyNames.size.shouldBe(5)
+        introspection.getProperty("age").isPresent.shouldBeTrue()
+        introspection.getProperty("name").isPresent.shouldBeTrue()
 
         val testBean = introspection.instantiate("fred", 10, arrayOf("one"))
 
-        assertEquals("fred", testBean.name)
-        assertFalse(testBean.flag)
+        testBean.name.shouldBe("fred")
+        testBean.flag.shouldBeFalse()
 
-        try {
+        shouldThrow<UnsupportedOperationException> {
             introspection.getProperty("name").get().set(testBean, "bob")
-            fail("Should have failed with unsupported operation, readonly")
-        } catch (e: UnsupportedOperationException) {
         }
 
-        assertEquals("default", testBean.stuff)
+        testBean.stuff.shouldBe("default")
 
         introspection.getProperty("stuff").get().set(testBean, "newvalue")
         introspection.getProperty("flag").get().set(testBean, true)
-        assertEquals(true, introspection.getProperty("flag", Boolean::class.java).get().get(testBean))
+        introspection.getProperty("flag", Boolean::class.java).get().get(testBean)?.shouldBeTrue()
 
-        assertEquals("newvalue", testBean.stuff)
+        testBean.stuff.shouldBe("newvalue")
     }
-}
+})
