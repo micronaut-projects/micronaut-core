@@ -404,6 +404,13 @@ public class GenericUtils {
         return boundTypes;
     }
 
+    /**
+     * Resolve the bound generics.
+     * @param declaringType The declaring type
+     * @param returnType The return type
+     * @param genericsInfo The generics information.
+     * @return The resolved generics
+     */
     protected Map<String, TypeMirror> resolveBoundGenerics(TypeElement declaringType, TypeMirror returnType, Map<String, Map<String, TypeMirror>> genericsInfo) {
 
         if (returnType instanceof NoType) {
@@ -480,6 +487,13 @@ public class GenericUtils {
         return Collections.emptyMap();
     }
 
+    /**
+     * Align new generic information for the given type parameters, type arguments and bound generics.
+     * @param typeParameters The type parameters
+     * @param typeArguments The type arguments
+     * @param genericsInfo The new generics info
+     * @return The generics info
+     */
     public Map<String, TypeMirror> alignNewGenericsInfo(
             List<? extends TypeParameterElement> typeParameters,
             List<? extends TypeMirror> typeArguments,
