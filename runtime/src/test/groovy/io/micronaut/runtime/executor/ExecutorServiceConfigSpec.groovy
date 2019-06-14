@@ -16,6 +16,7 @@
 package io.micronaut.runtime.executor
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.yaml.YamlPropertySourceLoader
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.executor.ExecutorConfiguration
@@ -91,7 +92,7 @@ class ExecutorServiceConfigSpec extends Specification {
         where:
         invalidateCache | environment
         true            | "test"
-//        false           | "test"
+        false           | "test"
     }
 
 
@@ -103,7 +104,6 @@ class ExecutorServiceConfigSpec extends Specification {
                 'micronaut.executors.one.nThreads':'5',
                 'micronaut.executors.two.type':'work_stealing'
         )
-
 
 
         when:
@@ -161,6 +161,36 @@ class ExecutorServiceConfigSpec extends Specification {
                 'micronaut.executors.two.type':'work_stealing'
         )
 
+
+        when:
+        Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
+
+        then:
+        executorServices.size() == 3
+        ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO)) instanceof ThreadPoolExecutor
+
+        when:
+        if(invalidateCache) {
+            ctx.invalidateCaches()
+        }
+        def configs = ctx.getBeansOfType(UserExecutorConfiguration)
+        def moreConfigs = ctx.getBeansOfType(ExecutorConfiguration)
+        executorServices = ctx.getBeansOfType(ExecutorService)
+
+        then:
+        executorServices.size() == 3
+        moreConfigs.size() == 3
+        configs.size() == 2
+
+        where:
+        invalidateCache | environment
+        true            | "test"
+        false           | "test"
+    }
+
+    void "test configure scheduled executor thread pool size"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(YamlPropertySourceLoade)
 
 
         when:
