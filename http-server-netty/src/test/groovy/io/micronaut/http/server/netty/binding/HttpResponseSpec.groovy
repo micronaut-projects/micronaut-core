@@ -67,6 +67,8 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         "accepted"            | HttpStatus.ACCEPTED           | null                       | [connection: 'close']
         "accepted-uri"        | HttpStatus.ACCEPTED           | null                       | [connection: 'close', 'location': 'http://example.com']
         "disallow"            | HttpStatus.METHOD_NOT_ALLOWED | null                       | [connection: "close", 'allow': 'DELETE']
+        "optional-response/false" | HttpStatus.OK             | null                       | [connection: 'close']
+        "optional-response/true"  | HttpStatus.NOT_FOUND      | null                       | ['content-type': 'application/json', 'content-length': '113', connection: 'close']
 
     }
 

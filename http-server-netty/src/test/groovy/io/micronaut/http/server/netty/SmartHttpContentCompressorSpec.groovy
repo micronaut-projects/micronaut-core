@@ -1,30 +1,32 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.http.server.netty
 
+import io.netty.handler.codec.http.DefaultHttpHeaders
+import io.netty.handler.codec.http.DefaultHttpResponse
+import io.netty.handler.codec.http.HttpHeaderNames
+import io.netty.handler.codec.http.HttpHeaders
+import io.netty.handler.codec.http.HttpResponse
+import io.netty.handler.codec.http.HttpResponseStatus
+import io.netty.handler.codec.http.HttpVersion
 import spock.lang.Specification
+import spock.lang.Unroll
 
 class SmartHttpContentCompressorSpec extends Specification {
 
     private static String compressible = "text/html"
     private static String inCompressible = "image/png"
 
-    void "test should skip"() {
+    @Unroll
+    void "test #type with #length"() {
         expect:
-        new SmartHttpContentCompressor(1024).shouldSkip(type, length) == expected
+        HttpHeaders headers = new DefaultHttpHeaders()
+        if (type != null) {
+            headers.add(HttpHeaderNames.CONTENT_TYPE, type)
+        }
+        if (length != null) {
+            headers.add(HttpHeaderNames.CONTENT_LENGTH, length)
+        }
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, headers)
+        new SmartHttpContentCompressor(new DefaultHttpCompressionStrategy(1024)).shouldSkip(response) == expected
 
         where:
         type           | length | expected

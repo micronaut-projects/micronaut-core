@@ -85,10 +85,10 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
 
     private String calculateInitialPath(ClassNode owningType, ClassNode declaringType) {
         AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, declaringType)
-        return annotationMetadata.getValue(ConfigurationReader.class, String.class)
+        return annotationMetadata.stringValue(ConfigurationReader.class)
                 .map(pathEvaluationFunction(annotationMetadata)).orElseGet( {->
             AnnotationMetadata ownerMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, owningType)
-            return ownerMetadata.getValue(ConfigurationReader.class, String.class)
+            return ownerMetadata.stringValue(ConfigurationReader.class)
                                 .map(pathEvaluationFunction(ownerMetadata)).orElseThrow({ ->
                 new IllegalStateException("Non @ConfigurationProperties type visited")
             })
@@ -122,7 +122,7 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
     private void prependSuperclasses(ClassNode declaringType, StringBuilder path) {
         ClassNode superclass = declaringType.getSuperClass()
         while (superclass != ClassHelper.OBJECT_TYPE) {
-            Optional<String> parentConfig = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, superclass).getValue(ConfigurationReader.class, String.class)
+            Optional<String> parentConfig = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, superclass).stringValue(ConfigurationReader.class)
             if (parentConfig.isPresent()) {
                 path.insert(0, parentConfig.get() + '.')
                 superclass = superclass.getSuperClass()

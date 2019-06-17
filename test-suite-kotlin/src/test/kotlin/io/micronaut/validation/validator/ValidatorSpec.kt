@@ -1,13 +1,12 @@
 package io.micronaut.validation.validator
 
 import io.micronaut.context.ApplicationContext
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.fail
 import javax.validation.ConstraintViolationException
 
 class ValidatorSpec {
-
 
     @Test
     fun testValidateInstance() {

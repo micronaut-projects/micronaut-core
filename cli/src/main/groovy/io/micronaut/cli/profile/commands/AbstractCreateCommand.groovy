@@ -28,6 +28,7 @@ import io.micronaut.cli.profile.OneOfFeatureGroup
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
+import io.micronaut.cli.profile.ResetableCommand
 import io.micronaut.cli.util.NameUtils
 import io.micronaut.cli.util.VersionInfo
 import picocli.CommandLine.Command
@@ -49,7 +50,7 @@ import java.nio.file.attribute.BasicFileAttributes
  */
 @CompileStatic
 @Command()
-abstract class AbstractCreateCommand extends ArgumentCompletingCommand implements ProfileRepositoryAware {
+abstract class AbstractCreateCommand extends ArgumentCompletingCommand implements ProfileRepositoryAware, ResetableCommand {
     public static final String ENCODING = System.getProperty("file.encoding") ?: "UTF-8"
 
     protected static final String APPLICATION_YML = "application.yml"

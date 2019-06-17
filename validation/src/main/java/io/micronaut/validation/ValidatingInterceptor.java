@@ -53,9 +53,8 @@ public class ValidatingInterceptor implements MethodInterceptor {
      */
     public static final int POSITION = InterceptPhase.VALIDATE.getPosition();
 
-    private final @Nullable
-    ExecutableValidator executableValidator;
-    private final ExecutableMethodValidator micronautValidator;
+    private final @Nullable ExecutableValidator executableValidator;
+    private final @Nullable ExecutableMethodValidator micronautValidator;
 
     /**
      * Creates ValidatingInterceptor from the validatorFactory.
@@ -79,8 +78,24 @@ public class ValidatingInterceptor implements MethodInterceptor {
             @Nullable Validator micronautValidator,
             @Nullable ValidatorFactory validatorFactory) {
 
-        this.micronautValidator = micronautValidator != null ? micronautValidator.forExecutables() : null;
-        this.executableValidator = validatorFactory != null ? validatorFactory.getValidator().forExecutables() : null;
+
+        if (validatorFactory != null) {
+
+            javax.validation.Validator validator = validatorFactory.getValidator();
+            if (validator instanceof Validator) {
+                this.micronautValidator = (ExecutableMethodValidator) validator;
+                this.executableValidator = null;
+            } else {
+                this.micronautValidator = null;
+                this.executableValidator = validator.forExecutables();
+            }
+        } else if (micronautValidator != null) {
+            this.micronautValidator = micronautValidator.forExecutables();
+            this.executableValidator = null;
+        } else {
+            this.micronautValidator = null;
+            this.executableValidator = null;
+        }
     }
 
     @Override

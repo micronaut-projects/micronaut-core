@@ -16,6 +16,7 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InvocationException;
@@ -46,7 +47,12 @@ import java.util.stream.Stream;
  */
 @Internal
 public class ReflectionUtils {
+    /**
+     * Constant for empty class array.
+     */
+    @UsedByGeneratedCode
     public static final Class[] EMPTY_CLASS_ARRAY = new Class[0];
+
     private static final Map<Class<?>, Class<?>> PRIMITIVES_TO_WRAPPERS =
         Collections.unmodifiableMap(new LinkedHashMap<Class<?>, Class<?>>() {
             {
@@ -233,6 +239,7 @@ public class ReflectionUtils {
      * @param argumentTypes The argument types
      * @return An {@link Optional} contains the method or empty
      */
+    @UsedByGeneratedCode
     public static Method getRequiredMethod(Class type, String name, Class... argumentTypes) {
         try {
             return type.getDeclaredMethod(name, argumentTypes);

@@ -32,6 +32,93 @@ import java.util.*;
  */
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
 
+    @Override
+    default OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return getAnnotationMetadata().longValue(annotation, member);
+    }
+
+    @Override
+    default Optional<Boolean> booleanValue(@Nonnull String annotation, @Nonnull String member) {
+        return getAnnotationMetadata().booleanValue(annotation, member);
+    }
+
+    @Override
+    default Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return getAnnotationMetadata().booleanValue(annotation, member);
+    }
+
+    @Nonnull
+    @Override
+    default Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().booleanValue(annotation, AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    @Nonnull
+    @Override
+    default Optional<Boolean> booleanValue(@Nonnull String annotation) {
+        return getAnnotationMetadata().booleanValue(annotation, AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    @Nonnull
+    @Override
+    default String[] stringValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return getAnnotationMetadata().stringValues(annotation, member);
+    }
+
+    @Nonnull
+    @Override
+    default String[] stringValues(@Nonnull Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().stringValues(annotation, AnnotationMetadata.VALUE_MEMBER);
+    }
+
+    @Nonnull
+    @Override
+    default OptionalInt intValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return getAnnotationMetadata().intValue(annotation, member);
+    }
+
+    @Nonnull
+    @Override
+    default OptionalInt intValue(@Nonnull Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().intValue(annotation);
+    }
+
+    @Nonnull
+    @Override
+    default Optional<String> stringValue(@Nonnull String annotation, @Nonnull String member) {
+        return getAnnotationMetadata().stringValue(annotation, member);
+    }
+
+    @Nonnull
+    @Override
+    default Optional<String> stringValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return getAnnotationMetadata().stringValue(annotation, member);
+    }
+
+    @Nonnull
+    @Override
+    default Optional<String> stringValue(@Nonnull Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().stringValue(annotation);
+    }
+
+    @Nonnull
+    @Override
+    default Optional<String> stringValue(@Nonnull String annotation) {
+        return getAnnotationMetadata().stringValue(annotation);
+    }
+
+    @Nonnull
+    @Override
+    default OptionalDouble doubleValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return getAnnotationMetadata().doubleValue(annotation, member);
+    }
+
+    @Nonnull
+    @Override
+    default OptionalDouble doubleValue(@Nonnull Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().doubleValue(annotation);
+    }
+
     @Nonnull
     @Override
     default Map<String, Object> getDefaultValues(@Nonnull String annotation) {

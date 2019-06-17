@@ -289,7 +289,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
     @Override
     public BeanDescriptor getConstraintsForClass(Class<?> clazz) {
-        throw new UnsupportedOperationException("BeanDescriptor metadata not supported by this implementation");
+        return new IntrospectedBeanDescriptor(
+                BeanIntrospection.getIntrospection(clazz)
+        );
     }
 
     @Override

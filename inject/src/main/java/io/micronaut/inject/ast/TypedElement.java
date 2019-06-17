@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
-import javax.annotation.Nullable;
+import javax.annotation.Nonnull;
 
 /**
  * An element that has an underlying type.
@@ -30,7 +30,7 @@ public interface TypedElement extends Element {
     /**
      * @return The type of the element
      */
-    @Nullable
+    @Nonnull
     ClassElement getType();
 
     /**
@@ -42,7 +42,7 @@ public interface TypedElement extends Element {
      * @return The generic type
      * @since 1.1.1
      */
-    @Nullable
+    @Nonnull
     default ClassElement getGenericType() {
         return getType();
     }

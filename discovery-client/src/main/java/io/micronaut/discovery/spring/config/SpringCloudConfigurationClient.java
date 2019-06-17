@@ -16,25 +16,22 @@
 package io.micronaut.discovery.spring.config;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.EnvironmentPropertySource;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.config.ConfigurationClient;
-import io.micronaut.discovery.spring.SpringCloudConfigConfiguration;
 import io.micronaut.discovery.spring.config.client.SpringCloudConfigClient;
-import io.micronaut.discovery.spring.config.client.response.ConfigServerPropertySource;
-import io.micronaut.discovery.spring.config.client.response.ConfigServerResponse;
-import io.micronaut.discovery.spring.condition.RequiresSpringCloudConfig;
+import io.micronaut.discovery.spring.config.client.ConfigServerPropertySource;
+import io.micronaut.discovery.spring.config.client.ConfigServerResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
-import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
-import io.reactivex.functions.Function;
+import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,37 +50,30 @@ import java.util.concurrent.ExecutorService;
  * @since 1.0
  */
 @Singleton
-@RequiresSpringCloudConfig
-@Requires(beans = SpringCloudConfigClient.class)
-@Requires(property = ConfigurationClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @BootstrapContextCompatible
 public class SpringCloudConfigurationClient implements ConfigurationClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(SpringCloudConfigurationClient.class);
 
     private final SpringCloudConfigClient springCloudConfigClient;
-    private final SpringCloudConfigConfiguration springCloudConfiguration;
+    private final SpringCloudClientConfiguration springCloudConfiguration;
     private final ApplicationConfiguration applicationConfiguration;
     private ExecutorService executionService;
-    private String uri;
 
     /**
      * @param springCloudConfigClient  The Spring Cloud client
      * @param springCloudConfiguration The Spring Cloud configuration
      * @param applicationConfiguration The application configuration
-     * @param uri                      The Spring cloud config server endpoint
      * @param executionService         The executor service to use
      */
     protected SpringCloudConfigurationClient(SpringCloudConfigClient springCloudConfigClient,
-                                             SpringCloudConfigConfiguration springCloudConfiguration,
+                                             SpringCloudClientConfiguration springCloudConfiguration,
                                              ApplicationConfiguration applicationConfiguration,
-                                             @Value(SpringCloudConfigConfiguration.SPRING_CLOUD_CONFIG_ENDPOINT) String uri,
                                              @Named(TaskExecutors.IO) @Nullable ExecutorService executionService) {
 
         this.springCloudConfigClient = springCloudConfigClient;
         this.springCloudConfiguration = springCloudConfiguration;
         this.applicationConfiguration = applicationConfiguration;
-        this.uri = uri;
         this.executionService = executionService;
     }
 
@@ -99,66 +89,53 @@ public class SpringCloudConfigurationClient implements ConfigurationClient {
         } else {
             String applicationName = configuredApplicationName.get();
             Set<String> activeNames = environment.getActiveNames();
-            String profiles = String.join(",", activeNames);
+            String profiles = StringUtils.trimToNull(String.join(",", activeNames));
 
-            if (StringUtils.isEmpty(profiles)) {
-                profiles = Environment.DEVELOPMENT;
-            }
-
-            if (LOG.isInfoEnabled()) {
-                LOG.info("Spring Cloud Config Active: {}", uri);
-                LOG.info("Application Name: {}, Application Profiles: {}, label: {}", applicationName, profiles,
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Spring Cloud Config Active: {}", springCloudConfiguration.getUri());
+                LOG.debug("Application Name: {}, Application Profiles: {}, label: {}", applicationName, profiles,
                          springCloudConfiguration.getLabel());
             }
 
-            Function<Throwable, Publisher<? extends ConfigServerResponse>> errorHandler = throwable -> {
-                if (throwable instanceof HttpClientResponseException) {
-                    HttpClientResponseException httpClientResponseException = (HttpClientResponseException) throwable;
-                    if (httpClientResponseException.getStatus() == HttpStatus.NOT_FOUND) {
-                        if (springCloudConfiguration.isFailFast()) {
-                            return Flowable.error(new IllegalStateException(
-                                    "Could not locate PropertySource and the fail fast property is set",
-                                    throwable));
+            Publisher<ConfigServerResponse> responsePublisher =
+                    springCloudConfiguration.getLabel() == null ?
+                    springCloudConfigClient.readValues(applicationName, profiles) :
+                    springCloudConfigClient.readValues(applicationName,
+                            profiles, springCloudConfiguration.getLabel());
+
+            Flowable<PropertySource> configurationValues = Flowable.fromPublisher(responsePublisher)
+                    .onErrorResumeNext(throwable -> {
+                        if (throwable instanceof HttpClientResponseException) {
+                            HttpClientResponseException httpClientResponseException = (HttpClientResponseException) throwable;
+                            if (httpClientResponseException.getStatus() == HttpStatus.NOT_FOUND && springCloudConfiguration.isFailFast()) {
+                                return Flowable.error(
+                                        new ConfigurationException("Could not locate PropertySource and the fail fast property is set", throwable));
+                            }
                         }
-                        LOG.warn("Could not locate PropertySource: ", throwable);
-                        return Flowable.empty();
-                    }
-                }
-                return Flowable.error(throwable);
-            };
-
-            Flowable<ConfigServerResponse> configurationValues =
-                    Flowable.fromPublisher(
-                            springCloudConfiguration.getLabel() == null ?
-                            springCloudConfigClient.readValues(applicationName, profiles) :
-                            springCloudConfigClient.readValues(
-                                    applicationName, profiles, springCloudConfiguration.getLabel()))
-                            .onErrorResumeNext(errorHandler);
-
-            Flowable<PropertySource> propertySourceFlowable = configurationValues.flatMap(configServerResponse -> Flowable.create(emitter -> {
-                List<ConfigServerPropertySource> propertySources = configServerResponse.getPropertySources();
-                if (CollectionUtils.isEmpty(propertySources)) {
-                    emitter.onComplete();
-                } else {
-                    int priority = Integer.MAX_VALUE;
-                    for (ConfigServerPropertySource propertySource : propertySources) {
-                        if (LOG.isInfoEnabled()) {
-                            LOG.info("Obtained property source [{}] from Spring Cloud Configuration Server", propertySource.getName());
+                        return Flowable.error(new ConfigurationException("Error reading distributed configuration from Spring Cloud: " + throwable.getMessage(), throwable));
+                    })
+                    .flatMap(response -> {
+                        List<ConfigServerPropertySource> springSources = response.getPropertySources();
+                        if (CollectionUtils.isEmpty(springSources)) {
+                            return Flowable.empty();
+                        }
+                        int baseOrder = EnvironmentPropertySource.POSITION + 100;
+                        List<PropertySource> propertySources = new ArrayList<>(springSources.size());
+                        //spring returns the property sources with the highest precedence first
+                        //reverse order and increment priority so the last (after reversed) item will
+                        //have the highest order
+                        for (int i = springSources.size() - 1; i >= 0; i--) {
+                            ConfigServerPropertySource springSource = springSources.get(i);
+                            propertySources.add(PropertySource.of(springSource.getName(), springSource.getSource(), ++baseOrder));
                         }
 
-                        emitter.onNext(PropertySource.of(propertySource.getName(), propertySource.getSource(), priority));
-                        priority -= 10;
-                    }
-                    emitter.onComplete();
-                }
-            }, BackpressureStrategy.ERROR));
+                        return Flowable.fromIterable(propertySources);
+                    });
 
             if (executionService != null) {
-                return propertySourceFlowable.subscribeOn(io.reactivex.schedulers.Schedulers.from(
-                        executionService
-                ));
+                return configurationValues.subscribeOn(Schedulers.from(executionService));
             } else {
-                return propertySourceFlowable;
+                return configurationValues;
             }
         }
     }

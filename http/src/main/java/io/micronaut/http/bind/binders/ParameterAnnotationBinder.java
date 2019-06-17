@@ -64,7 +64,7 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
 
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         boolean hasAnnotation = annotationMetadata.hasAnnotation(QueryValue.class);
-        String parameterName = annotationMetadata.getValue(QueryValue.class, String.class).orElse(argument.getName());
+        String parameterName = annotationMetadata.stringValue(QueryValue.class).orElse(argument.getName());
         // If we need to bind all request params to command object
         // checks if the variable is defined with modifier char *
         // eg. ?pojo*

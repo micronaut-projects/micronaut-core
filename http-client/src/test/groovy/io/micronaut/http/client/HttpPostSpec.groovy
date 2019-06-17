@@ -340,6 +340,21 @@ class HttpPostSpec extends Specification {
         response.body() == "request-object"
     }
 
+    void "test multiple params single body"() {
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        String data = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/bodyParts", '{"id":5,"name":"Sally"}')
+                        .contentType(MediaType.APPLICATION_JSON_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+
+                String
+        )
+
+        expect:
+        data == "5 - Sally"
+        context.getBean(PostClient).bodyParts("Joe", 6) == "6 - Joe"
+    }
+
     @Controller('/post')
     static class PostController {
 
@@ -429,6 +444,10 @@ class HttpPostSpec extends Specification {
             "request-object"
         }
 
+        @Post(uri = "/bodyParts", produces = MediaType.TEXT_PLAIN)
+        String bodyParts(String name, Integer id) {
+            "$id - $name"
+        }
     }
 
     @EqualsAndHashCode
@@ -446,5 +465,8 @@ class HttpPostSpec extends Specification {
 
         @Post("/noBody")
         String call()
+
+        @Post(uri = "/bodyParts", consumes = MediaType.TEXT_PLAIN)
+        String bodyParts(String name, Integer id)
     }
 }

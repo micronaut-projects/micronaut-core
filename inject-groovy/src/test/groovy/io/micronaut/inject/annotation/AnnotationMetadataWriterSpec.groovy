@@ -74,6 +74,28 @@ class Test {
         metadata.getValue("test.MyAnn","doubleArray", double[].class).get() == [1.1d] as double[]
     }
 
+    void "test read annotation on alias with primitive type"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\
+package test;
+
+import io.micronaut.inject.annotation.MultipleAlias;
+
+@MultipleAlias(primitiveAlias=10, bool=true)
+class Test {
+}
+''')
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.hasAnnotation(MultipleAlias)
+        metadata.getValue(Nested, "num", Integer).get() == 10
+        metadata.getValue(Nested, "bool", Boolean).get()
+    }
+
     void "test read annotation with annotation value"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\
@@ -102,6 +124,28 @@ class Test {
         then:
         topLevel.nested().num() == 10
     }
+
+    void "test read enum constants with custom toString()"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+
+@EnumAnn(EnumAnn.MyEnum.TWO)
+class Test {
+}
+''')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.synthesize(EnumAnn).value() == EnumAnn.MyEnum.TWO
+    }
+
 
     void "test read enum constants"() {
         given:

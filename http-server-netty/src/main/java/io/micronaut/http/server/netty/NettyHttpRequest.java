@@ -25,7 +25,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -45,9 +44,7 @@ import io.netty.util.ReferenceCounted;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.URLDecoder;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -183,10 +180,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     protected Object buildBody() {
         if (!receivedData.isEmpty()) {
             Map body = new LinkedHashMap(receivedData.size());
-            boolean isUrlEncoded = getContentType().map(ct -> ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false);
 
             for (AbstractHttpData data: receivedData.values()) {
-                String newValue = getContent(data, isUrlEncoded);
+                String newValue = getContent(data);
                 //noinspection unchecked
                 body.compute(data.getName(), (key, oldValue) -> {
                     if (oldValue == null) {
@@ -220,13 +216,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
     }
 
-    private String getContent(AbstractHttpData data, boolean urlDecode) {
+    private String getContent(AbstractHttpData data) {
         String newValue;
         try {
             newValue = data.getString(serverConfiguration.getDefaultCharset());
-            if (urlDecode) {
-                newValue = URLDecoder.decode(newValue, StandardCharsets.UTF_8.name());
-            }
         } catch (IOException e) {
             throw new InternalServerException("Error retrieving or decoding the value for: " + data.getName());
         }
@@ -366,6 +359,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     static NettyHttpRequest remove(ChannelHandlerContext ctx) {
         Channel channel = ctx.channel();
+
         io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
         return attr.getAndSet(null);
     }

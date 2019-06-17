@@ -62,6 +62,8 @@ class DefaultConversionServiceSpec extends Specification {
         ["monday"] as String[]  | DayOfWeek   | DayOfWeek.MONDAY
         ["monday"] as String[]  | DayOfWeek[] | [DayOfWeek.MONDAY] as DayOfWeek[]
         "monday,tuesday,monday" | Set         | ["monday", "tuesday"] as Set
+        "N/A"                   | Status      | Status.N_OR_A
+        ["OK", "N/A"]           | Status[]    | [Status.OK, Status.N_OR_A]
     }
 
     void "test conversion service with type arguments"() {

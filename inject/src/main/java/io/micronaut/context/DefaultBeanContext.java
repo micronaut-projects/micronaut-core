@@ -1220,13 +1220,23 @@ public class DefaultBeanContext implements BeanContext {
 
             // group the method references by annotation type such that we have a map of Annotation -> MethodReference
             // ie. Class<Scheduled> -> @Scheduled void someAnnotation()
-            Map<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> byAnnotation = methodStream
-                    .collect(
-                            Collectors.groupingBy((Function<ExecutableMethod<?, ?>, Class<? extends Annotation>>) executableMethod ->
-                                    executableMethod.getAnnotationTypeByStereotype(Executable.class)
-                                            .orElseThrow(() ->
-                                                    new IllegalStateException("BeanDefinition.requiresMethodProcessing() returned true but method has no @Executable definition. This should never happen. Please report an issue.")
-                                            )));
+            Map<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> byAnnotation = new HashMap<>();
+            methodStream.collect(Collectors.toList()).forEach(reference -> {
+                List<Class<? extends Annotation>> annotations = reference.getAnnotationTypesByStereotype(Executable.class);
+                if (annotations.isEmpty()) {
+                    throw new IllegalStateException("BeanDefinition.requiresMethodProcessing() returned true but method has no @Executable definition. This should never happen. Please report an issue.");
+                } else {
+                    annotations.forEach(annotation -> {
+                        byAnnotation.compute(annotation, (ann, list) -> {
+                            if (list == null) {
+                                list = new ArrayList<>();
+                            }
+                            list.add(reference);
+                            return list;
+                        });
+                    });
+                }
+            });
 
             // Find ExecutableMethodProcessor for each annotation and process the BeanDefinitionMethodReference
             for (Map.Entry<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> entry : byAnnotation.entrySet()) {
@@ -1686,15 +1696,16 @@ public class DefaultBeanContext implements BeanContext {
                     }
 
                     final AnnotationValue<Replaces> replacesAnn = replacingCandidate.getAnnotation(Replaces.class);
-                    Optional<Class> beanType = replacesAnn.getValue(Class.class);
-                    Optional<Class> factory = replacesAnn.get("factory", Class.class);
+                    Optional<Class<?>> beanType = replacesAnn.classValue();
+                    Optional<Class<?>> factory = replacesAnn.classValue("factory");
                     if (replacesAnn.contains(NAMED_MEMBER)) {
 
-                        final String qualifier = replacesAnn.get(NAMED_MEMBER, String.class).orElse(null);
+                        final String qualifier = replacesAnn.stringValue(NAMED_MEMBER).orElse(null);
                         if (qualifier != null) {
                             final Class type = beanType.orElse(factory.orElse(null));
                             if (type != null) {
-                                final Optional qualified = Qualifiers.<T>byName(qualifier).qualify(type, Stream.of(definition));
+                                final Optional qualified = Qualifiers.<T>byName(qualifier)
+                                        .qualify(type, Stream.of(definition));
                                 if (qualified.isPresent()) {
                                     return true;
                                 }
@@ -1724,7 +1735,13 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private <T> Function<Class, Boolean> typeMatches(BeanType<T> definition, AnnotationMetadata annotationMetadata) {
-        Class<T> bt = definition.getBeanType();
+        Class<T> bt;
+
+        if (definition instanceof ProxyBeanDefinition) {
+            bt = ((ProxyBeanDefinition<T>) definition).getTargetType();
+        } else {
+            bt = definition.getBeanType();
+        }
 
         if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
             Class<? super T> superclass = bt.getSuperclass();
@@ -1739,6 +1756,15 @@ public class DefaultBeanContext implements BeanContext {
         if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
             Class<? super T> superclass = bt.getSuperclass();
             return (clazz) -> clazz == superclass || clazz == bt;
+        }
+        if (annotationMetadata.hasAnnotation(DefaultImplementation.class)) {
+            Optional<Class> defaultImpl = annotationMetadata.getValue(DefaultImplementation.class, Class.class);
+            if (!defaultImpl.isPresent()) {
+                defaultImpl = annotationMetadata.getValue(DefaultImplementation.class, "name", Class.class);
+            }
+            if (defaultImpl.filter(impl -> impl == bt).isPresent()) {
+                return (clazz) -> clazz.isAssignableFrom(bt);
+            }
         }
 
         return (clazz) -> clazz == bt;
@@ -2276,7 +2302,7 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
         if (qualifier == null) {
-            Optional<String> optional = beanDefinition.getValue(javax.inject.Named.class, String.class);
+            Optional<String> optional = beanDefinition.stringValue(javax.inject.Named.class);
             qualifier = (Qualifier<T>) optional.map(name -> Qualifiers.byAnnotation(beanDefinition, name)).orElse(null);
         }
         return qualifier;
@@ -2312,7 +2338,7 @@ public class DefaultBeanContext implements BeanContext {
                 final List<AnnotationValue<Indexed>> indexes = beanDefinitionReference.getAnnotationMetadata().getAnnotationValuesByType(Indexed.class);
                 if (CollectionUtils.isNotEmpty(indexes)) {
                     for (AnnotationValue<Indexed> index : indexes) {
-                        final Class indexedType = index.getValue(Class.class).orElse(null);
+                        final Class indexedType = index.classValue().orElse(null);
                         if (indexedType != null) {
                             resolveTypeIndex(indexedType);
                         }

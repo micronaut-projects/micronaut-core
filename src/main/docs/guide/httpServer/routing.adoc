@@ -35,7 +35,8 @@ include::{testsuite}/server/routes/IssuesController.java[tags=class, indent=0]
 
 <1> The `@Controller` annotation is specified without an argument resulting in a base URI of `/issues`
 <2> The link:{api}/io/micronaut/http/annotation/Get.html[Get] annotation is used to map the method to an HTTP link:{api}/io/micronaut/http/HttpMethod.html#GET[GET] with a URI variable embedded in the URI called `number`
-<3> The value of the URI variable is referenced in the implementation
+<3> The method argument can be optionally annotated with link:{api}/io/micronaut/http/annotation/PathVariable.html[PathVariable]
+<4> The value of the URI variable is referenced in the implementation
 
 Micronaut will map the URI `/issues/{number}` for the above controller. We can assert this is the case by writing a unit test, this time in Java and JUnit:
 

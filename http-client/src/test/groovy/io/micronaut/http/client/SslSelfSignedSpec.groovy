@@ -34,10 +34,14 @@ class SslSelfSignedSpec extends Specification {
     String host = Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST)
 
     @Shared
+    int port = SocketUtils.findAvailableTcpPort()
+
+    @Shared
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run([
             'micronaut.ssl.enabled': true,
-            'micronaut.ssl.buildSelfSigned': true
+            'micronaut.ssl.buildSelfSigned': true,
+            'micronaut.ssl.port': port
     ])
 
     @Shared
@@ -49,7 +53,7 @@ class SslSelfSignedSpec extends Specification {
 
     void "expect the url to be https"() {
         expect:
-        embeddedServer.getURL().toString() == "https://${host}:8443"
+        embeddedServer.getURL().toString() == "https://${host}:${port}"
     }
 
     void "test send https request"() {

@@ -96,6 +96,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
     private final AtomicBoolean reading = new AtomicBoolean(false);
     private final Boolean deduceEnvironments;
+    private final ApplicationContextConfiguration configuration;
 
     /**
      * @param classLoader The class loader
@@ -188,6 +189,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     public DefaultEnvironment(@Nonnull ApplicationContextConfiguration configuration) {
         super(configuration.getConversionService());
+        this.configuration = configuration;
         Set<String> environments = new LinkedHashSet<>(3);
         List<String> specifiedNames = configuration.getEnvironments();
 
@@ -527,8 +529,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if (!this.propertySources.containsKey(SystemPropertiesPropertySource.NAME)) {
             propertySources.add(new SystemPropertiesPropertySource());
         }
-        if (!this.propertySources.containsKey(EnvironmentPropertySource.NAME)) {
-            propertySources.add(new EnvironmentPropertySource());
+        if (!this.propertySources.containsKey(EnvironmentPropertySource.NAME) && configuration.isEnvironmentPropertySource()) {
+            propertySources.add(new EnvironmentPropertySource(
+                    configuration.getEnvironmentVariableIncludes(),
+                    configuration.getEnvironmentVariableExcludes()));
         }
         return propertySources;
     }
@@ -578,12 +582,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private void loadPropertySourceFromLoader(String name, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) {
-        Optional<PropertySource> defaultPropertySource = propertySourceLoader.load(name, this, null);
+        Optional<PropertySource> defaultPropertySource = propertySourceLoader.load(name, this);
         defaultPropertySource.ifPresent(propertySources::add);
         Set<String> activeNames = getActiveNames();
-        for (String activeName : activeNames) {
-            Optional<PropertySource> propertySource = propertySourceLoader.load(name, this, activeName);
+        int i = 0;
+        for (String activeName: activeNames) {
+            Optional<PropertySource> propertySource = propertySourceLoader.loadEnv(name, this, ActiveEnvironment.of(activeName, i));
             propertySource.ifPresent(propertySources::add);
+            i++;
         }
     }
 

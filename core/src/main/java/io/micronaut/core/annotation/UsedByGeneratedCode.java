@@ -27,7 +27,7 @@ import java.lang.annotation.Target;
  * @author graemerocher
  * @since 1.0
  */
-@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE, ElementType.TYPE, ElementType.CONSTRUCTOR})
+@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE, ElementType.TYPE, ElementType.CONSTRUCTOR, ElementType.FIELD})
 @Retention(RetentionPolicy.SOURCE)
 @Internal
 public @interface UsedByGeneratedCode {

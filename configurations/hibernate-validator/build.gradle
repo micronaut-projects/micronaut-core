@@ -1,5 +1,6 @@
 dependencies {
     compileOnly project(":inject-java")
+    compileOnly project(":graal")
     compile project(":inject")
     compile project(":validation")
     compile 'org.hibernate:hibernate-validator:6.0.13.Final'

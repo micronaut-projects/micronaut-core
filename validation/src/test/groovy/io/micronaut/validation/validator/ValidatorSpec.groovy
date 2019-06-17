@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.validation.validator.resolver.CompositeTraversableResolver
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -13,11 +14,14 @@ import javax.inject.Singleton
 import javax.validation.ConstraintViolation
 import javax.validation.ElementKind
 import javax.validation.Valid
+import javax.validation.ValidatorFactory
 import javax.validation.constraints.Max
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotNull
 import javax.validation.constraints.Size
+import javax.validation.metadata.BeanDescriptor
+import javax.validation.metadata.ConstraintDescriptor
 
 class ValidatorSpec extends Specification {
 
@@ -26,6 +30,16 @@ class ValidatorSpec extends Specification {
     ApplicationContext applicationContext = ApplicationContext.run()
     @Shared
     Validator validator = applicationContext.getBean(Validator)
+
+    void "test validator config"() {
+        given:
+        ValidatorConfiguration config = applicationContext.getBean(ValidatorConfiguration)
+        ValidatorFactory factory = applicationContext.getBean(ValidatorFactory)
+
+        expect:
+        config.traversableResolver instanceof CompositeTraversableResolver
+        factory instanceof DefaultValidatorFactory
+    }
 
     void "test simple bean validation"() {
         given:
@@ -234,6 +248,22 @@ class ValidatorSpec extends Specification {
         violations.size() == 2
         violations[0].propertyPath.toString() == 'saveChild.arrayTest.integers[0]'
 
+    }
+
+    void "test bean descriptor"() {
+        given:
+        BeanDescriptor beanDescriptor = validator.getConstraintsForClass(Book)
+
+        def descriptors = beanDescriptor.getConstraintsForProperty("authors")
+                .getConstraintDescriptors()
+
+        expect:
+        beanDescriptor.isBeanConstrained()
+        beanDescriptor.getConstrainedProperties().size() == 4
+        descriptors.size() == 1
+        descriptors.first().annotation instanceof Size
+        descriptors.first().annotation.min() == 1
+        descriptors.first().annotation.max() == 10
     }
 }
 

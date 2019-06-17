@@ -20,6 +20,7 @@ import static io.micronaut.core.util.ArgumentUtils.check;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.inject.BeanType;
@@ -60,7 +61,9 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
             String typeName;
                 AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
                 // here we resolved the declared Qualifier of the bean
-                Optional<String> beanQualifier = annotationMetadata.findDeclaredAnnotation(Named.class).flatMap(namedAnnotationValue -> namedAnnotationValue.getValue(String.class));
+                Optional<String> beanQualifier = annotationMetadata
+                        .findDeclaredAnnotation(Named.class)
+                        .flatMap(AnnotationValue::stringValue);
                 typeName = beanQualifier.orElseGet(() -> {
                     if (candidate instanceof NameResolver) {
                         Optional<String> resolvedName = ((NameResolver) candidate).resolveName();
@@ -119,7 +122,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
                 if (candidate instanceof NameResolver) {
                     candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
                 } else {
-                    Optional<String> annotation = candidate.getAnnotationMetadata().getValue(Named.class, String.class);
+                    Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(Named.class);
                     candidateName = annotation.orElse(candidate.getBeanType().getSimpleName());
                 }
 
@@ -153,7 +156,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
                     if (candidate instanceof NameResolver) {
                         candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
                     } else {
-                        Optional<String> annotation = candidate.getAnnotationMetadata().getValue(Named.class, String.class);
+                        Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(Named.class);
                         candidateName = annotation.orElse(candidate.getBeanType().getSimpleName());
                     }
 

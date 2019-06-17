@@ -33,6 +33,7 @@ import io.micronaut.http.server.netty.*;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.buffer.EmptyByteBuf;
 import io.netty.util.ReferenceCounted;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
@@ -105,7 +106,11 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                         ArgumentConversionContext<?> conversionContext = context.with(targetType);
                         if (message instanceof ByteBufHolder) {
                             message = ((ByteBufHolder) message).content();
+                            if (message instanceof EmptyByteBuf) {
+                                return;
+                            }
                         }
+
                         Optional<?> converted = conversionService.convert(message, conversionContext);
 
                         if (converted.isPresent()) {

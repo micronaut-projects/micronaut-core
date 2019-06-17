@@ -39,22 +39,16 @@ import io.micronaut.jackson.env.JsonPropertySourceLoader;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import io.reactivex.Scheduler;
 import io.reactivex.functions.Function;
+import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
@@ -104,7 +98,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
             return Flowable.empty();
         }
 
-        Set<String> activeNames = environment.getActiveNames();
+        List<String> activeNames = new ArrayList<>(environment.getActiveNames());
         Optional<String> serviceId = consulConfiguration.getServiceId();
         ConsulConfiguration.ConsulConfigDiscoveryConfiguration configDiscoveryConfiguration = consulConfiguration.getConfiguration();
 
@@ -120,6 +114,13 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         String applicationSpecificPath = hasApplicationSpecificConfig ? path + serviceId.get() : null;
 
         String dc = configDiscoveryConfiguration.getDatacenter().orElse(null);
+
+        Scheduler scheduler = null;
+        if (executionService != null) {
+            scheduler = Schedulers.from(executionService);
+        }
+        List<Flowable<List<KeyValue>>> keyValueFlowables = new ArrayList<>();
+
         Function<Throwable, Publisher<? extends List<KeyValue>>> errorHandler = throwable -> {
             if (throwable instanceof HttpClientResponseException) {
                 HttpClientResponseException httpClientResponseException = (HttpClientResponseException) throwable;
@@ -127,23 +128,35 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                     return Flowable.empty();
                 }
             }
-            return Flowable.error(throwable);
+            return Flowable.error(new ConfigurationException("Error reading distributed configuration from Consul: " + throwable.getMessage(), throwable));
         };
-        Flowable<List<KeyValue>> configurationValues = Flowable.fromPublisher(consulClient.readValues(commonConfigPath, dc, null, null))
-            .onErrorResumeNext(errorHandler);
+
+        Flowable<List<KeyValue>> applicationConfig = Flowable.fromPublisher(
+                consulClient.readValues(commonConfigPath, dc, null, null))
+                .onErrorResumeNext(errorHandler);
+        if (scheduler != null) {
+            applicationConfig = applicationConfig.subscribeOn(scheduler);
+        }
+        keyValueFlowables.add(applicationConfig);
+
         if (hasApplicationSpecificConfig) {
-            configurationValues = Flowable.concat(
-                configurationValues,
-                Flowable.fromPublisher(consulClient.readValues(applicationSpecificPath, dc, null, null))
-                    .onErrorResumeNext(errorHandler)
-            );
+            Flowable<List<KeyValue>> appSpecificConfig = Flowable.fromPublisher(
+                    consulClient.readValues(applicationSpecificPath, dc, null, null))
+                    .onErrorResumeNext(errorHandler);
+            if (scheduler != null) {
+                appSpecificConfig = appSpecificConfig.subscribeOn(scheduler);
+            }
+            keyValueFlowables.add(appSpecificConfig);
         }
 
-        Flowable<PropertySource> propertySourceFlowable = configurationValues.flatMap(keyValues -> Flowable.create(emitter -> {
+        int basePriority = EnvironmentPropertySource.POSITION + 100;
+        int envBasePriority = basePriority + 50;
+
+        return Flowable.merge(keyValueFlowables).flatMap(keyValues -> Flowable.create(emitter -> {
             if (CollectionUtils.isEmpty(keyValues)) {
                 emitter.onComplete();
             } else {
-                Map<String, Map<String, Object>> propertySources = new HashMap<>();
+                Map<String, LocalSource> propertySources = new HashMap<>();
                 Base64.Decoder base64Decoder = Base64.getDecoder();
 
                 for (KeyValue keyValue : keyValues) {
@@ -169,10 +182,12 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                             propertySourceName = resolvePropertySourceName(serviceId.get(), fileName, activeNames);
                                         }
                                         if (propertySourceName != null) {
+                                            String finalName = propertySourceName;
                                             byte[] decoded = base64Decoder.decode(value);
                                             Map<String, Object> properties = propertySourceLoader.read(propertySourceName, decoded);
-                                            Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
-                                            values.putAll(properties);
+                                            String envName = ClientUtil.resolveEnvironment(fileName, activeNames);
+                                            LocalSource localSource = propertySources.computeIfAbsent(propertySourceName, s -> new LocalSource(isApplicationSpecificConfigKey, envName, finalName));
+                                            localSource.putAll(properties);
                                         }
                                     }
                                 }
@@ -191,9 +206,10 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                 }
                                 if (property != null && propertySourceNames != null) {
                                     for (String propertySourceName : propertySourceNames) {
-                                        Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
+                                        String envName = ClientUtil.resolveEnvironment(propertySourceName, activeNames);
+                                        LocalSource localSource = propertySources.computeIfAbsent(propertySourceName, s -> new LocalSource(isApplicationSpecificConfigKey, envName, propertySourceName));
                                         byte[] decoded = base64Decoder.decode(value);
-                                        values.put(property, new String(decoded));
+                                        localSource.put(property, new String(decoded));
                                     }
                                 }
                                 break;
@@ -215,8 +231,9 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                             byte[] decoded = base64Decoder.decode(value);
                                             Map<String, Object> properties = propertySourceLoader.read(fullName, decoded);
                                             for (String propertySourceName : propertySourceNames) {
-                                                Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
-                                                values.putAll(properties);
+                                                String envName = ClientUtil.resolveEnvironment(propertySourceName, activeNames);
+                                                LocalSource localSource = propertySources.computeIfAbsent(propertySourceName, s -> new LocalSource(isApplicationSpecificConfigKey, envName, propertySourceName));
+                                                localSource.putAll(properties);
                                             }
                                         }
                                     }
@@ -228,35 +245,24 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                     }
                 }
 
-                for (Map.Entry<String, Map<String, Object>> entry : propertySources.entrySet()) {
-                    String name = entry.getKey();
-                    int priority = EnvironmentPropertySource.POSITION + (name.endsWith("]") ? 150 : 100);
-                    if (hasApplicationSpecificConfig && name.startsWith(serviceId.get())) {
-                        priority += 10;
+                for (LocalSource localSource: propertySources.values()) {
+                    int priority;
+                    if (localSource.environment != null) {
+                        priority = envBasePriority + (activeNames.indexOf(localSource.environment) * 2);
+                    } else {
+                        priority = basePriority + 1;
                     }
-                    emitter.onNext(PropertySource.of(ConsulClient.SERVICE_ID + '-' + name, entry.getValue(), priority));
+                    if (localSource.appSpecific) {
+                        priority++;
+                    }
+                    emitter.onNext(PropertySource.of(ConsulClient.SERVICE_ID + '-' + localSource.name, localSource.values, priority));
                 }
                 emitter.onComplete();
             }
         }, BackpressureStrategy.ERROR));
-
-        propertySourceFlowable = propertySourceFlowable.onErrorResumeNext(throwable -> {
-            if (throwable instanceof ConfigurationException) {
-                return Flowable.error(throwable);
-            } else {
-                return Flowable.error(new ConfigurationException("Error reading distributed configuration from Consul: " + throwable.getMessage(), throwable));
-            }
-        });
-        if (executionService != null) {
-            return propertySourceFlowable.subscribeOn(io.reactivex.schedulers.Schedulers.from(
-                executionService
-            ));
-        } else {
-            return propertySourceFlowable;
-        }
     }
 
-    private String resolvePropertySourceName(String rootName, String fileName, Set<String> activeNames) {
+    private String resolvePropertySourceName(String rootName, String fileName, List<String> activeNames) {
         String propertySourceName = null;
         if (fileName.startsWith(rootName)) {
             String envString = fileName.substring(rootName.length());
@@ -305,7 +311,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         }
     }
 
-    private Set<String> resolvePropertySourceNames(String finalPath, String key, Set<String> activeNames) {
+    private Set<String> resolvePropertySourceNames(String finalPath, String key, List<String> activeNames) {
         Set<String> propertySourceNames = null;
         String prefix = key.substring(finalPath.length());
         int i = prefix.indexOf('/');
@@ -333,5 +339,33 @@ public class ConsulConfigurationClient implements ConfigurationClient {
             return property;
         }
         return null;
+    }
+
+    /**
+     * A local property source.
+     */
+    private static class LocalSource {
+
+        private final boolean appSpecific;
+        private final String environment;
+        private final String name;
+        private final Map<String, Object> values = new LinkedHashMap<>();
+
+        LocalSource(boolean appSpecific,
+                    String environment,
+                    String name) {
+            this.appSpecific = appSpecific;
+            this.environment = environment;
+            this.name = name;
+        }
+
+        void put(String key, Object value) {
+            this.values.put(key, value);
+        }
+
+        void putAll(Map<String, Object> values) {
+            this.values.putAll(values);
+        }
+
     }
 }

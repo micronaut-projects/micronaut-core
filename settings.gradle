@@ -30,7 +30,6 @@ include "session"
 include "spring"
 include "tracing"
 include "validation"
-include "views"
 include "websocket"
 
 // test suites
@@ -38,6 +37,9 @@ include "test-suite"
 include "test-suite-kotlin"
 include "test-suite-groovy"
 include "test-utils"
+
+// benchmarks
+include "benchmarks"
 
 // configurations
 include "configurations:cassandra"

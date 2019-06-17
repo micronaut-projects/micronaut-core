@@ -17,11 +17,12 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
-import javax.annotation.Nullable;
+import javax.annotation.Nonnull;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
 import java.util.Collections;
@@ -60,7 +61,7 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
         this.declaringClass = declaringClass;
     }
 
-    @Nullable
+    @Nonnull
     @Override
     public ClassElement getGenericReturnType() {
         Map<String, Map<String, TypeMirror>> info = declaringClass.getGenericTypeInfo();
@@ -73,6 +74,7 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
     }
 
     @Override
+    @Nonnull
     public ClassElement getReturnType() {
         TypeMirror returnType = executableElement.getReturnType();
         return mirrorToClassElement(returnType, visitorContext, Collections.emptyMap());
@@ -81,8 +83,13 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
     @Override
     public ParameterElement[] getParameters() {
         List<? extends VariableElement> parameters = executableElement.getParameters();
-        return parameters.stream().map((Function<VariableElement, ParameterElement>) variableElement ->
-                new JavaParameterElement(declaringClass, variableElement, visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement), visitorContext)
+        return parameters.stream().map((Function<VariableElement, ParameterElement>) variableElement -> {
+                    AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement);
+                    if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
+                        annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, "javax.annotation.Nullable", Collections.emptyMap());
+                    }
+                    return new JavaParameterElement(declaringClass, variableElement, annotationMetadata, visitorContext);
+                }
         ).toArray(ParameterElement[]::new);
     }
 

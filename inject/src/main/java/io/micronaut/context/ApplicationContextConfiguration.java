@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,6 +42,27 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      */
     default Optional<Boolean> getDeduceEnvironments() {
         return Optional.empty();
+    }
+
+    /**
+     * @return True if environment variables should contribute to configuration
+     */
+    default boolean isEnvironmentPropertySource() {
+        return true;
+    }
+
+    /**
+     * @return The environment variables to include in configuration
+     */
+    default @Nullable List<String> getEnvironmentVariableIncludes() {
+        return null;
+    }
+
+    /**
+     * @return The environment variables to exclude from configuration
+     */
+    default @Nullable List<String> getEnvironmentVariableExcludes() {
+        return null;
     }
 
     /**

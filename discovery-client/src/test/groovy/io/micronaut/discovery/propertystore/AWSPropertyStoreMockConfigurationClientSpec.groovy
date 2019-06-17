@@ -25,7 +25,9 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.EnvironmentPropertySource
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.env.PropertySourcePropertyResolver
 import io.micronaut.core.io.socket.SocketUtils
+import io.micronaut.core.order.OrderUtil
 import io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfigClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
@@ -76,7 +78,7 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
             futureTask.isDone() >> { return true }
             futureTask.get() >> {
                 GetParametersByPathResult result = new GetParametersByPathResult()
-                ArrayList<Parameter> parameters = new ArrayList<Parameter>()
+/*                ArrayList<Parameter> parameters = new ArrayList<Parameter>()
                 if (getRequest.path == "/config/application") {
                     Parameter parameter = new Parameter()
                     parameter.name = "/config/application"
@@ -84,7 +86,7 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                     parameter.type = "StringList"
                     parameters.add(parameter)
                 }
-                result.setParameters(parameters)
+                result.setParameters(parameters)*/
                 result;
             }
             return futureTask;
@@ -99,47 +101,66 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                 GetParametersResult result = new GetParametersResult()
 
                 ArrayList<Parameter> parameters = new ArrayList<Parameter>()
-
+                int end = 0
                 if (getRequest.names.contains("/config/application")) {
-
+                    end = 6
+                }
+                if (getRequest.names.contains("/config/amazon-test")) {
+                    end = 5
+                }
+                if (getRequest.names.contains("/config/application_first")) {
+                    end = 4
+                }
+                if (getRequest.names.contains("/config/amazon-test_first")) {
+                    end = 3
+                }
+                if (getRequest.names.contains("/config/application_second")) {
+                    end = 2
+                }
+                if (getRequest.names.contains("/config/amazon-test_second")) {
+                    end = 1
+                }
+                int start = 1
+                while (end > 0) {
                     Parameter parameter = new Parameter()
-                    parameter.name = "/config/application"
-                    parameter.value = "datasource.url=mysql://blah,datasource.driver=java.SomeDriver"
-                    parameter.type = "StringList"
+                    parameter.name = getRequest.names[0] + "/some/aws/value-" + start
+                    parameter.value = end.toString()
+                    parameter.type = "String"
                     parameters.add(parameter)
+                    start++
+                    end--
                 }
-                if (getRequest.names.contains("/config/application_test")) {
-                    Parameter parameter1 = new Parameter()
-                    parameter1.name = "/config/application_test"
-                    parameter1.value = "foo=bar"
-                    parameter1.type = "StringList"
-                    parameters.add(parameter1)
-                }
-
                 result.setParameters(parameters)
-                result;
+                result
             }
-            return futureTask;
+            return futureTask
         }
 
 
         when:
         def env = Mock(Environment)
-        env.getActiveNames() >> (['test'] as Set)
+        env.getActiveNames() >> (['first', 'second'] as Set)
         List<PropertySource> propertySources = Flowable.fromPublisher(client.getPropertySources(env)).toList().blockingGet()
+        propertySources.sort(OrderUtil.COMPARATOR)
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(propertySources as PropertySource[])
 
         then: "verify property source characteristics"
-        propertySources.size() == 2
+        propertySources.size() == 6
+        propertySources[0].name == "route53-application"
+        propertySources[1].name == "route53-amazon-test"
+        propertySources[2].name == "route53-application[first]"
+        propertySources[3].name == "route53-amazon-test[first]"
+        propertySources[4].name == "route53-application[second]"
+        propertySources[5].name == "route53-amazon-test[second]"
+
         propertySources[0].order > EnvironmentPropertySource.POSITION
-        propertySources[0].name == 'route53-application'
-        propertySources[0].get('datasource.url') == "mysql://blah"
-        propertySources[0].get('datasource.driver') == "java.SomeDriver"
-        propertySources[0].get('encryptedValue') == "true"
-        propertySources[0].toList().size() == 3
-        propertySources[1].name == 'route53-application[test]'
-        propertySources[1].get("foo") == "bar"
-        propertySources[1].order > propertySources[0].order
-        propertySources[1].toList().size() == 1
+
+        resolver.getRequiredProperty("some.aws.value-1", String) == "1"
+        resolver.getRequiredProperty("some.aws.value-2", String) == "1"
+        resolver.getRequiredProperty("some.aws.value-3", String) == "1"
+        resolver.getRequiredProperty("some.aws.value-4", String) == "1"
+        resolver.getRequiredProperty("some.aws.value-5", String) == "1"
+        resolver.getRequiredProperty("some.aws.value-6", String) == "1"
     }
 
 
@@ -156,8 +177,8 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                 ArrayList<Parameter> parameters = new ArrayList<Parameter>()
                 if (getRequest.path == "/config/application") {
                     Parameter parameter = new Parameter()
-                    parameter.name = "/config/application"
-                    parameter.value = "encryptedValue=true"
+                    parameter.name = "/config/application/encryptedValue"
+                    parameter.value = "true"
                     parameter.type = "String"
                     parameters.add(parameter)
                 }
@@ -178,15 +199,15 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                 if (getRequest.names.contains("/config/application")) {
 
                     Parameter parameter = new Parameter()
-                    parameter.name = "/config/application"
-                    parameter.value = "datasource.url=mysql://blah"
+                    parameter.name = "/config/application/datasource/url"
+                    parameter.value = "mysql://blah"
                     parameter.type = "String"
                     parameters.add(parameter)
                 }
                 if (getRequest.names.contains("/config/application_test")) {
                     Parameter parameter1 = new Parameter()
-                    parameter1.name = "/config/application_test"
-                    parameter1.value = "foo=bar"
+                    parameter1.name = "/config/application_test/foo"
+                    parameter1.value = "bar"
                     parameter1.type = "String"
                     parameters.add(parameter1)
                 }
@@ -230,8 +251,8 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                 ArrayList<Parameter> parameters = new ArrayList<Parameter>()
                 if (getRequest.path == "/config/application") {
                     Parameter parameter = new Parameter()
-                    parameter.name = "/config/application"
-                    parameter.value = "encryptedValue=true"
+                    parameter.name = "/config/application/encryptedValue"
+                    parameter.value = "true"
                     parameter.type = "SecureString"
                     parameters.add(parameter)
                 }
@@ -252,15 +273,15 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                 if (getRequest.names.contains("/config/application")) {
 
                     Parameter parameter = new Parameter()
-                    parameter.name = "/config/application"
-                    parameter.value = "datasource.url=mysql://blah"
+                    parameter.name = "/config/application/datasource/url"
+                    parameter.value = "mysql://blah"
                     parameter.type = "SecureString"
                     parameters.add(parameter)
                 }
                 if (getRequest.names.contains("/config/application_test")) {
                     Parameter parameter1 = new Parameter()
-                    parameter1.name = "/config/application_test"
-                    parameter1.value = "foo=bar"
+                    parameter1.name = "/config/application_test/foo"
+                    parameter1.value = "bar"
                     parameter1.type = "SecureString"
                     parameters.add(parameter1)
                 }

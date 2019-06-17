@@ -126,7 +126,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
 
         ReturnType<Object> returnType = context.getReturnType();
         Class<Object> javaReturnType = returnType.getType();
-        if (CompletableFuture.class.isAssignableFrom(javaReturnType)) {
+        if (CompletionStage.class.isAssignableFrom(javaReturnType)) {
             Object result = context.proceed();
             if (result == null) {
                 return result;

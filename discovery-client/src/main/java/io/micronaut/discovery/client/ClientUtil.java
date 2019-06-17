@@ -15,9 +15,7 @@
  */
 package io.micronaut.discovery.client;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 /**
  *  Helpers to reduce redundant code between different Client implementations.
@@ -31,7 +29,7 @@ public class ClientUtil {
      * @param separator The separator string
      * @return Set of names to be used for each PropertySource
      */
-    public static Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames, String separator) {
+    public static Set<String> calcPropertySourceNames(String prefix, Collection<String> activeNames, String separator) {
         Set<String> propertySourceNames;
         if (prefix.contains(separator)) {
 
@@ -54,6 +52,25 @@ public class ClientUtil {
             propertySourceNames = Collections.singleton(prefix);
         }
         return propertySourceNames;
+    }
+
+    /**
+     * Resolves the environment from a property source name created
+     * by {@link #calcPropertySourceNames(String, Collection, String)}.
+     *
+     * @param fileName The property source name
+     * @param activeNames The active environments
+     * @return The environment name
+     */
+    public static String resolveEnvironment(String fileName, Collection<String> activeNames) {
+        if (fileName.endsWith("]")) {
+            int envIdx = fileName.indexOf('[') + 1;
+            String envName = fileName.substring(envIdx, fileName.length() - 1);
+            if (activeNames.contains(envName)) {
+                return envName;
+            }
+        }
+        return null;
     }
 
 }

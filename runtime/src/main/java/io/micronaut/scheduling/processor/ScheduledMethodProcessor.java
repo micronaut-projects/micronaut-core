@@ -24,6 +24,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
 import io.micronaut.scheduling.TaskExceptionHandler;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.TaskScheduler;
@@ -41,6 +42,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 
 /**
@@ -92,9 +95,16 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             }
 
             String scheduler = scheduledAnnotation.get(MEMBER_SCHEDULER, String.class).orElse(TaskExecutors.SCHEDULED);
-            TaskScheduler taskScheduler = beanContext
-                .findBean(TaskScheduler.class, Qualifiers.byName(scheduler))
-                .orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
+            Optional<TaskScheduler> optionalTaskScheduler = beanContext
+                    .findBean(TaskScheduler.class, Qualifiers.byName(scheduler));
+
+            if (!optionalTaskScheduler.isPresent()) {
+                optionalTaskScheduler = beanContext.findBean(ExecutorService.class, Qualifiers.byName(scheduler))
+                        .filter(ScheduledExecutorService.class::isInstance)
+                        .map(ScheduledExecutorTaskScheduler::new);
+            }
+
+            TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
 
             Runnable task = () -> {
                 io.micronaut.context.Qualifier<Object> qualifer = beanDefinition
@@ -126,6 +136,8 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             };
 
             String cronExpr = scheduledAnnotation.get(MEMBER_CRON, String.class, null);
+            String fixedDelay = scheduledAnnotation.get(MEMBER_FIXED_DELAY, String.class).orElse(null);
+
             if (StringUtils.isNotEmpty(cronExpr)) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Scheduling cron task [{}] for method: {}", cronExpr, method);
@@ -143,22 +155,25 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
                 ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleAtFixedRate(initialDelay, duration, task);
                 scheduledTasks.add(scheduledFuture);
-            } else {
-                String fixedDelay = scheduledAnnotation.get(MEMBER_FIXED_DELAY, String.class).orElse(null);
-                if (StringUtils.isNotEmpty(fixedDelay)) {
-                    Optional<Duration> converted = conversionService.convert(fixedDelay, Duration.class);
-                    Duration duration = converted.orElseThrow(() ->
-                        new SchedulerConfigurationException(method, "Invalid fixed delay definition: " + fixedDelay)
-                    );
+            } else if (StringUtils.isNotEmpty(fixedDelay)) {
+                Optional<Duration> converted = conversionService.convert(fixedDelay, Duration.class);
+                Duration duration = converted.orElseThrow(() ->
+                    new SchedulerConfigurationException(method, "Invalid fixed delay definition: " + fixedDelay)
+                );
 
 
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Scheduling fixed delay task [{}] for method: {}", duration, method);
-                    }
-
-                    ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(initialDelay, duration, task);
-                    scheduledTasks.add(scheduledFuture);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Scheduling fixed delay task [{}] for method: {}", duration, method);
                 }
+
+                ScheduledFuture<?> scheduledFuture = taskScheduler.scheduleWithFixedDelay(initialDelay, duration, task);
+                scheduledTasks.add(scheduledFuture);
+            } else if (initialDelay != null) {
+                ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(initialDelay, task);
+
+                scheduledTasks.add(scheduledFuture);
+            } else {
+                throw new SchedulerConfigurationException(method, "Failed to schedule task. Invalid definition");
             }
         }
     }

@@ -47,6 +47,7 @@ try (ApplicationContext context = ApplicationContext.run()) { // <1>
     // do something with your bean
 }
 ----
+// TODO should this be converted? The commentary is calling out a specific language's feature
 
 <1> Run the api:context.ApplicationContext[]
 <2> Retrieve a bean that has been dependency injected

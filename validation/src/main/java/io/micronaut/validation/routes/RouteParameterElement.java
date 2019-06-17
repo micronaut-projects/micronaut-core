@@ -21,7 +21,7 @@ import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 
-import javax.annotation.Nullable;
+import javax.annotation.Nonnull;
 
 /**
  * Models a route parameter.
@@ -40,7 +40,7 @@ class RouteParameterElement implements ParameterElement, AnnotationMetadataDeleg
      */
     RouteParameterElement(ParameterElement delegate) {
         this.delegate = delegate;
-        this.name = delegate.findAnnotation(Bindable.class).flatMap(av -> av.getValue(String.class)).orElse(delegate.getName());
+        this.name = delegate.stringValue(Bindable.class).orElse(delegate.getName());
     }
 
     @Override
@@ -48,7 +48,7 @@ class RouteParameterElement implements ParameterElement, AnnotationMetadataDeleg
         return delegate;
     }
 
-    @Nullable
+    @Nonnull
     @Override
     public ClassElement getType() {
         return delegate.getType();
