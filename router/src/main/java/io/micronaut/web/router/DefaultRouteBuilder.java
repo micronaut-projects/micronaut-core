@@ -23,6 +23,7 @@ import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.TypeConvention;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -437,11 +438,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
             this.acceptedMediaTypes = mediaTypes;
-            targetMethod.getValue(Produces.class, MediaType[].class).ifPresent(produces ->
-                    this.producesMediaTypes = Arrays.asList(produces)
-            );
 
-
+            MediaType[] types = MediaType.of(targetMethod.stringValues(Produces.class));
+            if (ArrayUtils.isNotEmpty(types)) {
+                this.producesMediaTypes = Arrays.asList(types);
+            }
             this.conditions.add(req -> {
                 if (!permitsRequestBody()) {
                     return true;

@@ -284,4 +284,35 @@ class CorsFilterSpec extends Specification {
         response.getHeaders().getAll(ACCESS_CONTROL_ALLOW_HEADERS) == ['X-Header', 'Y-Header'] // Allow headers are echo'd from the request
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800' // Max age is set from config
     }
+
+    void "test handleResponse for preflight request with single header"() {
+        given:
+        def config = new HttpServerConfiguration.CorsConfiguration(singleHeader: true)
+        CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
+        originConfig.exposedHeaders = ['Foo-Header', 'Bar-Header']
+        config.configurations = new LinkedHashMap<String, CorsOriginConfiguration>()
+        config.configurations.put('foo', originConfig)
+        CorsFilter corsHandler = buildCorsHandler(config)
+        HttpRequest request = Mock(HttpRequest)
+        HttpHeaders headers = Mock(HttpHeaders)
+        request.getHeaders() >> headers
+        headers.getOrigin() >> Optional.of('http://www.foo.com')
+        request.getMethod() >> HttpMethod.OPTIONS
+
+
+        when:
+        headers.contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
+        HttpResponse response = corsHandler.handleRequest(request).get()
+
+        then: "the response is not modified"
+        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.of(List,String)) >> Optional.of(['X-Header', 'Y-Header'])
+        1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.class) >> Optional.of(HttpMethod.GET)
+        response.getHeaders().get(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
+        response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
+        response.getHeaders().get(VARY) == 'Origin' // The vary header is set
+        response.getHeaders().get(ACCESS_CONTROL_EXPOSE_HEADERS) == 'Foo-Header,Bar-Header' // Expose headers are set from config
+        response.getHeaders().get(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true' // Allow credentials header is set
+        response.getHeaders().get(ACCESS_CONTROL_ALLOW_HEADERS) == 'X-Header,Y-Header' // Allow headers are echo'd from the request
+        response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800' // Max age is set from config
+    }
 }

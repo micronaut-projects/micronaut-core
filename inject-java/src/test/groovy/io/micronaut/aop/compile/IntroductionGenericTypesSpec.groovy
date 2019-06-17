@@ -57,6 +57,7 @@ interface MyBean extends MyInterface<URL> {
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 2
         beanDefinition.executableMethods[0].methodName == 'getURL'
+        beanDefinition.executableMethods[0].targetMethod.returnType == URL
         beanDefinition.executableMethods[0].returnType.type == URL
         beanDefinition.executableMethods[1].returnType.type == List
         beanDefinition.executableMethods[1].returnType.asArgument().hasTypeVariables()
@@ -119,8 +120,8 @@ class SubPerson extends Person {}
         returnType(beanDefinition, "getPeopleArray").type.name.contains('test.SubPerson')
         returnType(beanDefinition, "getPeopleListArray").type == List
         returnType(beanDefinition, "getPeopleListArray").typeVariables['E'].type.isArray()
-
-
+        beanDefinition.findPossibleMethods("save").findFirst().get().targetMethod != null
+        beanDefinition.findPossibleMethods("getPerson").findFirst().get().targetMethod != null
 
 
         when:

@@ -43,6 +43,7 @@ import java.time.LocalDate
  * @since 1.0
  */
 class HttpGetSpec extends Specification {
+
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer)
 
@@ -95,7 +96,7 @@ class HttpGetSpec extends Specification {
 
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/error")
+                HttpRequest.GET("/get/error"), Argument.of(String), Argument.of(String)
         ))
 
         flowable.blockingFirst()
@@ -104,12 +105,12 @@ class HttpGetSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         e.message == "Server error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
+        e.response.getBody(String).get() == "Server error"
 
         cleanup:
         client.stop()
         client.close()
     }
-
 
     void "test 500 request with json body"() {
         given:
@@ -117,14 +118,14 @@ class HttpGetSpec extends Specification {
 
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
-                HttpRequest.GET("/get/jsonError")
+                HttpRequest.GET("/get/jsonError"), Argument.of(String), Argument.of(Map)
         ))
 
         flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error"
+        e.message == "{foo=bar}"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
 
         cleanup:

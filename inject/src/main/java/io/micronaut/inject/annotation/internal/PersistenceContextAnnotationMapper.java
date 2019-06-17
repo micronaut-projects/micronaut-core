@@ -51,7 +51,7 @@ public class PersistenceContextAnnotationMapper implements NamedAnnotationMapper
     public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         Optional<ClassElement> hibernateCurrentSession = visitorContext.getClassElement(TARGET_ANNOTATION);
         if (hibernateCurrentSession.isPresent()) {
-            String name = annotation.get("name", String.class).orElse(null);
+            String name = annotation.stringValue("name").orElse(null);
             List<AnnotationValue<?>> annotationValues = new ArrayList<>(3);
             annotationValues.add(AnnotationValue.builder(Inject.class).build());
             annotationValues.add(

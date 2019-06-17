@@ -15,7 +15,9 @@
  */
 package io.micronaut.inject.ast;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
 
 /**
  * Represents a parameter to a method or constructor.
@@ -28,6 +30,8 @@ public interface ParameterElement extends TypedElement {
     /**
      * @return The type of the parameter
      */
+    @NotNull
     @Override
-    @Nullable ClassElement getType();
+    @Nonnull
+    ClassElement getType();
 }

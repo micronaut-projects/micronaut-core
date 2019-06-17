@@ -1869,7 +1869,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         buildMethodVisitor.visitJumpInsn(GOTO, catchEnd);
 
                         buildMethodVisitor.visitLabel(catchStart);
-                        if (!argMetadata.hasSimpleDeclaredAnnotation(AnnotationUtil.NULLABLE)) {
+                        if (!argMetadata.hasAnnotation(AnnotationUtil.NULLABLE)) {
                             buildMethodVisitor.visitInsn(ACONST_NULL);
                             buildMethodVisitor.visitInsn(ARETURN);
                         } else {

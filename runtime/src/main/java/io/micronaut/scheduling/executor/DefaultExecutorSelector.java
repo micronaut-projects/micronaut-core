@@ -25,7 +25,7 @@ import io.micronaut.scheduling.TaskExecutors;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -72,6 +72,6 @@ public class DefaultExecutorSelector implements ExecutorSelector {
     }
 
     private boolean isNonBlocking(Class type) {
-        return Publishers.isConvertibleToPublisher(type) || CompletableFuture.class.isAssignableFrom(type);
+        return Publishers.isConvertibleToPublisher(type) || CompletionStage.class.isAssignableFrom(type);
     }
 }

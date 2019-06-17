@@ -107,7 +107,7 @@ public final class StringUtils {
         }
         List<String> strings = new ArrayList<>(objects.length);
         for (Object object : objects) {
-            strings.add(object.toString().intern());
+            strings.add(object.toString());
         }
         return Collections.unmodifiableList(strings);
     }
@@ -132,7 +132,7 @@ public final class StringUtils {
         Map<String, Object> answer = new HashMap<>((int) (len / 2 / 0.75));
         int i = 0;
         while (i < values.length - 1) {
-            String key = values[i++].toString().intern();
+            String key = values[i++].toString();
             Object val = values[i++];
             answer.put(key, val);
         }
@@ -290,5 +290,25 @@ public final class StringUtils {
                 .map(String::trim)
                 .filter(StringUtils::isNotEmpty)
                 .orElse(null);
+    }
+
+    /**
+     * Is the boolean string true. Values that represent true are: yes, y, on, and true.
+     * @param booleanString The boolean string
+     * @return True if it is a valid value
+     */
+    public static boolean isTrue(String booleanString) {
+        if (booleanString == null) {
+            return false;
+        }
+        switch (booleanString) {
+            case "yes":
+            case "y":
+            case "on":
+            case "true":
+                return true;
+            default:
+                return false;
+        }
     }
 }

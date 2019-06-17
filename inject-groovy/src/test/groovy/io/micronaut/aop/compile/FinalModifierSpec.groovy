@@ -73,7 +73,7 @@ class FinalModifierMyBean2 {
 ''')
         then:
         def e = thrown(RuntimeException)
-        e.message.contains 'Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.'
+        e.message.contains 'Public method inherits AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.'
     }
 
     void "test final modifier on method with explicit AOP advice doesn't compile"() {

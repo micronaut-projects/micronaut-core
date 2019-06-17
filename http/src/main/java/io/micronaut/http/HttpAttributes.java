@@ -61,7 +61,12 @@ public enum HttpAttributes implements CharSequence {
     /**
      * Attribute used to store the MediaTypeCodec. Used to override the registered codec per-request.
      */
-    MEDIA_TYPE_CODEC(Constants.PREFIX + ".mediaType.codec");
+    MEDIA_TYPE_CODEC(Constants.PREFIX + ".mediaType.codec"),
+
+    /**
+     * Attribute used to store the MethodInvocationContext by declarative client.
+     */
+    INVOCATION_CONTEXT(Constants.PREFIX + ".invocationContext");
 
     private final String name;
 

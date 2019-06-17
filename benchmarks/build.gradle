@@ -1,0 +1,23 @@
+plugins {
+    id "me.champeau.gradle.jmh" version "0.4.8"
+}
+
+dependencies {
+    annotationProcessor project(":inject-java")
+    annotationProcessor project(":validation")
+    compileOnly project(":inject-java")
+    compileOnly project(":validation")
+    compile project(":inject")
+    compile project(":validation")
+    compile project(":runtime")
+
+
+    jmh 'org.openjdk.jmh:jmh-core:1.21'
+    jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.21'
+}
+jmh {
+    duplicateClassesStrategy = 'warn'
+    warmupIterations = 2
+    iterations = 4
+    fork = 1
+}

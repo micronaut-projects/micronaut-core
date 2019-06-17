@@ -46,4 +46,16 @@ public @interface MultipleAlias {
     @AliasFor(annotation = ConfigurationReader.class, member = "value")
     @AliasFor(member = "value")
     String id() default "";
+
+    /**
+     * @return The prefix to use to resolve the properties
+     */
+    @AliasFor(annotation = Nested.class, member = "num")
+    int primitiveAlias() default 0;
+
+    /**
+     * @return The prefix to use to resolve the properties
+     */
+    @AliasFor(annotation = Nested.class, member = "bool")
+    boolean bool() default false;
 }

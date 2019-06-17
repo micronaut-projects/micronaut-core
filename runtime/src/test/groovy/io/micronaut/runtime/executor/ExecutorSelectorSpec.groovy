@@ -27,6 +27,7 @@ import spock.lang.Unroll
 
 import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 import java.util.concurrent.ExecutorService
 
 /**
@@ -56,6 +57,7 @@ class ExecutorSelectorSpec extends Specification {
         "someNonBlockingMethod" | false
         "someReactiveMethod"    | false
         "someFutureMethod"      | false
+        "someStageMethod"       | false
     }
 
 
@@ -78,5 +80,7 @@ class MyService {
     Single someReactiveMethod() {}
 
     CompletableFuture someFutureMethod() {}
+
+    CompletionStage someStageMethod() {}
 }
 

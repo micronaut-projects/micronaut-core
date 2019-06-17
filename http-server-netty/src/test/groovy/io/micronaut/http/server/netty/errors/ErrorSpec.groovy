@@ -80,7 +80,7 @@ class ErrorSpec extends AbstractMicronautSpec {
         def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
 
         then:
-        json.message == 'Method [POST] not allowed. Allowed methods: [GET]'
+        json.message.matches('Method \\[POST\\] not allowed. Allowed methods: \\[(GET|HEAD), (GET|HEAD)\\]')
         json._links.self.href == '/errors/server-error'
     }
 

@@ -43,7 +43,7 @@ import java.util.Properties;
  */
 @Factory
 @Requires(classes = HibernateValidator.class)
-@TypeHint(value = HibernateValidator.class)
+@TypeHint(value = {HibernateValidator.class, com.sun.el.ExpressionFactoryImpl.class})
 public class ValidatorFactoryProvider {
 
     @Inject

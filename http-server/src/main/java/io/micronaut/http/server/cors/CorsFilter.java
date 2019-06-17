@@ -29,6 +29,7 @@ import static io.micronaut.http.HttpHeaders.VARY;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -46,6 +47,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Responsible for handling CORS requests and responses.
@@ -108,8 +110,7 @@ public class CorsFilter implements HttpServerFilter {
                 if (CorsUtil.isPreflightRequest(request)) {
                     Optional<HttpMethod> result = headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.class);
                     setAllowMethods(result.get(), response);
-                    Argument<List> type = Argument.of(List.class, String.class);
-                    Optional<List> allowedHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, type);
+                    Optional<List> allowedHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.of(List.class, String.class));
                     allowedHeaders.ifPresent(val ->
                         setAllowHeaders(val, response)
                     );
@@ -156,14 +157,14 @@ public class CorsFilter implements HttpServerFilter {
                 }
 
                 if (preflight) {
-                    Optional<List> accessControlHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.of(List.class, String.class));
+                    Optional<List<String>> accessControlHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.listOf(String.class));
 
                     List<String> allowedHeaders = config.getAllowedHeaders();
 
                     if (!isAny(allowedHeaders) && accessControlHeaders.isPresent()) {
                         if (!accessControlHeaders.get().stream()
                             .allMatch(header -> allowedHeaders.stream()
-                                .anyMatch(allowedHeader -> allowedHeader.equals(header.toString().trim())))) {
+                                .anyMatch(allowedHeader -> allowedHeader.equals(header.trim())))) {
                             return Optional.of(HttpResponse.status(HttpStatus.FORBIDDEN));
                         }
                     }
@@ -193,7 +194,14 @@ public class CorsFilter implements HttpServerFilter {
      * @param response       The {@link MutableHttpResponse} object
      */
     protected void setExposeHeaders(List<String> exposedHeaders, MutableHttpResponse<?> response) {
-        exposedHeaders.forEach(header -> response.header(ACCESS_CONTROL_EXPOSE_HEADERS, header));
+        if (corsConfiguration.isSingleHeader()) {
+            String headerValue = String.join(",", exposedHeaders);
+            if (StringUtils.isNotEmpty(headerValue)) {
+                response.header(ACCESS_CONTROL_EXPOSE_HEADERS, headerValue);
+            }
+        } else {
+            exposedHeaders.forEach(header -> response.header(ACCESS_CONTROL_EXPOSE_HEADERS, header));
+        }
     }
 
     /**
@@ -224,10 +232,16 @@ public class CorsFilter implements HttpServerFilter {
      * @param optionalAllowHeaders A list with optional allow headers
      * @param response             The {@link MutableHttpResponse} object
      */
-    protected void setAllowHeaders(List optionalAllowHeaders, MutableHttpResponse response) {
-        optionalAllowHeaders.forEach(header ->
-            response.header(ACCESS_CONTROL_ALLOW_HEADERS, header.toString())
-        );
+    protected void setAllowHeaders(List<?> optionalAllowHeaders, MutableHttpResponse response) {
+        List<String> allowHeaders = optionalAllowHeaders.stream().map(Object::toString).collect(Collectors.toList());
+        if (corsConfiguration.isSingleHeader()) {
+            String headerValue = String.join(",", allowHeaders);
+            if (StringUtils.isNotEmpty(headerValue)) {
+                response.header(ACCESS_CONTROL_ALLOW_HEADERS, headerValue);
+            }
+        } else {
+            allowHeaders.forEach(header -> response.header(ACCESS_CONTROL_ALLOW_HEADERS, header));
+        }
     }
 
     /**

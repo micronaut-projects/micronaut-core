@@ -33,6 +33,7 @@ import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.ModuleNode;
 import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
@@ -88,19 +89,25 @@ public class GroovyVisitorContext implements VisitorContext {
         if (name == null) {
             return Optional.empty();
         }
-        List<ClassNode> classes = sourceUnit.getAST().getClasses();
-        for (ClassNode aClass : classes) {
-            if (name.equals(aClass.getName())) {
-                return Optional.of(new GroovyClassElement(sourceUnit, aClass, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, aClass)));
-            }
-        }
 
-        GroovyClassLoader classLoader = sourceUnit.getClassLoader();
-        if (classLoader != null) {
-            return ClassUtils.forName(name, classLoader).map(aClass -> {
-                ClassNode cn = ClassHelper.make(aClass);
-                return new GroovyClassElement(sourceUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, cn));
-            });
+        if (sourceUnit != null) {
+            ModuleNode ast = sourceUnit.getAST();
+            if (ast != null) {
+                List<ClassNode> classes = ast.getClasses();
+                for (ClassNode aClass : classes) {
+                    if (name.equals(aClass.getName())) {
+                        return Optional.of(new GroovyClassElement(sourceUnit, aClass, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, aClass)));
+                    }
+                }
+            }
+
+            GroovyClassLoader classLoader = sourceUnit.getClassLoader();
+            if (classLoader != null) {
+                return ClassUtils.forName(name, classLoader).map(aClass -> {
+                    ClassNode cn = ClassHelper.make(aClass);
+                    return new GroovyClassElement(sourceUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, cn));
+                });
+            }
         }
         return Optional.empty();
     }

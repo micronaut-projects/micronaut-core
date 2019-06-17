@@ -96,7 +96,7 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
             try {
                 path.pushConstructorResolve(this, requiredArgument);
                 String argumentName = requiredArgument.getName();
-                if (!requiredArgumentValues.containsKey(argumentName) && !requiredArgument.isDeclaredNullable()) {
+                if (!requiredArgumentValues.containsKey(argumentName) && !requiredArgument.isNullable()) {
                     if (eachBeanType.filter(type -> type == requiredArgument.getType()).isPresent()) {
                         return null;
                     }
