@@ -161,38 +161,6 @@ class ExecutorServiceConfigSpec extends Specification {
                 'micronaut.executors.two.type':'work_stealing'
         )
 
-
-        when:
-        Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
-
-        then:
-        executorServices.size() == 3
-        ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO)) instanceof ThreadPoolExecutor
-
-        when:
-        if(invalidateCache) {
-            ctx.invalidateCaches()
-        }
-        def configs = ctx.getBeansOfType(UserExecutorConfiguration)
-        def moreConfigs = ctx.getBeansOfType(ExecutorConfiguration)
-        executorServices = ctx.getBeansOfType(ExecutorService)
-
-        then:
-        executorServices.size() == 3
-        moreConfigs.size() == 3
-        configs.size() == 2
-
-        where:
-        invalidateCache | environment
-        true            | "test"
-        false           | "test"
-    }
-
-    void "test configure scheduled executor thread pool size"() {
-        given:
-        ApplicationContext ctx = ApplicationContext.run(YamlPropertySourceLoader)
-
-
         when:
         Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
 
