@@ -11,9 +11,7 @@ internal class EventListenerInterfaceSpec : AnnotationSpec() {
 
     @Before
     fun setup() {
-        server = ApplicationContext.run(EmbeddedServer::class.java,
-                mapOf("micronaut.application.name" to "listener test",
-                        "micronaut.server.port" to "-1"))
+        server = ApplicationContext.run(EmbeddedServer::class.java)
     }
 
     @After
