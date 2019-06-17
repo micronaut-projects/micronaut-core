@@ -190,7 +190,7 @@ class ExecutorServiceConfigSpec extends Specification {
 
     void "test configure scheduled executor thread pool size"() {
         given:
-        ApplicationContext ctx = ApplicationContext.run(YamlPropertySourceLoade)
+        ApplicationContext ctx = ApplicationContext.run(YamlPropertySourceLoader)
 
 
         when:
