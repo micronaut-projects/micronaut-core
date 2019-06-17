@@ -1,17 +1,30 @@
 package io.micronaut.docs.context.events.listener
 
 import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
+import io.kotlintest.specs.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
 
-internal class EventListenerAnnotationSpec : StringSpec({
+internal class EventListenerAnnotationSpec : AnnotationSpec() {
 
-    "test event listener was notified" {
-        val server: EmbeddedServer = ApplicationContext.run(EmbeddedServer::class.java)
-        val context = server.applicationContext
-        val listener = context.getBean(DoOnStartup::class.java)
+    lateinit var server: EmbeddedServer
+
+    @Before
+    fun setup() {
+        server = ApplicationContext.run(EmbeddedServer::class.java,
+                mapOf("micronaut.application.name" to "listener test",
+                        "micronaut.server.port" to "-1"))
+    }
+
+    @After
+    fun cleanup() {
+        server.close()
+    }
+
+    @Test
+    fun testEventListenerWasNotified() {
+        val listener = server.applicationContext.getBean(DoOnStartup::class.java)
 
         listener.invocationCounter.shouldBe(1)
     }
-})
+}
