@@ -2039,16 +2039,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             private void addReadTimeoutHandler(ChannelPipeline pipeline) {
                 if (readTimeoutMillis != null) {
                     // reset read timeout
+                  if (pipeline.get(HANDLER_READ_TIMEOUT) != null) {
+                    pipeline.replace(HANDLER_READ_TIMEOUT, HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+                  } else {
                     pipeline.addBefore(
                             HANDLER_HTTP_CLIENT_CODEC,
                             HANDLER_READ_TIMEOUT,
                             new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+                  }
                 }
             }
 
             @Override
             public void channelReleased(Channel ch) {
-                if (readTimeoutMillis != null) {
+                if (readTimeoutMillis != null && ch.pipeline().get(HANDLER_READ_TIMEOUT) != null) {
                     ch.pipeline().remove(HANDLER_READ_TIMEOUT);
                 }
             }
