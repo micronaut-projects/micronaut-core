@@ -24,6 +24,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.codec.CodecException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -77,6 +78,7 @@ class BindHttpClientExceptionBodySpec extends Specification {
         Optional<OtherError> jsonError = e.response.getBody(OtherError)
 
         then:
+        noExceptionThrown()
         !jsonError.isPresent()
     }
 
