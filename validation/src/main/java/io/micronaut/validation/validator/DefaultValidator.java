@@ -132,9 +132,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         final Collection<BeanProperty<Object, Object>> cascadeProperties =
                 ((BeanIntrospection<Object>) introspection).getIndexedProperties(Valid.class);
 
-        final Class<? extends Annotation> pojoConstraint = introspection.getAnnotationTypeByStereotype(Constraint.class).orElse(null);
+        final List<Class<? extends Annotation>> pojoConstraints = introspection.getAnnotationTypesByStereotype(Constraint.class);
 
-        if (CollectionUtils.isNotEmpty(constrainedProperties) || CollectionUtils.isNotEmpty(cascadeProperties) || pojoConstraint != null) {
+        if (CollectionUtils.isNotEmpty(constrainedProperties)
+                || CollectionUtils.isNotEmpty(cascadeProperties)
+                || CollectionUtils.isNotEmpty(pojoConstraints)) {
+
             DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(object, groups);
             Set<ConstraintViolation<T>> overallViolations = new HashSet<>(5);
             return doValidate(
@@ -144,7 +147,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     cascadeProperties,
                     context,
                     overallViolations,
-                    pojoConstraint
+                    pojoConstraints
             );
         }
         return Collections.emptySet();
@@ -879,7 +882,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             Collection<BeanProperty<Object, Object>> cascadeProperties,
             DefaultConstraintValidatorContext context,
             Set overallViolations,
-            Class<? extends Annotation> pojoConstraint) {
+            List<Class<? extends Annotation>> pojoConstraints) {
         @SuppressWarnings("unchecked")
         final Class<T> rootBeanClass = (Class<T>) rootBean.getClass();
         for (BeanProperty<Object, Object> constrainedProperty : constrainedProperties) {
@@ -897,7 +900,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     null);
         }
 
-        if (pojoConstraint != null) {
+        for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
             final ConstraintValidator<? extends Annotation, T> validator = constraintValidatorRegistry
                     .findConstraintValidator(pojoConstraint, rootBeanClass).orElse(null);
 
@@ -1184,7 +1187,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     cascadeNestedProperties,
                     context,
                     overallViolations,
-                    null
+                    Collections.emptyList()
             );
         }
     }
