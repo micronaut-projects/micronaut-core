@@ -1808,8 +1808,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             } catch (Exception e) {
                                 emitter.onError(new HttpClientResponseException("Exception occurred decoding response: " + e.getMessage(), e, response));
                             }
-                            response.onComplete();
                         }
+                        response.onComplete();
                     }
                 } finally {
                     if (fullResponse.refCnt() > 0) {
@@ -1825,7 +1825,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         keepAlive = false;
                     }
                     pipeline.remove(this);
-
                 }
             }
 
