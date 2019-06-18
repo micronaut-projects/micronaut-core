@@ -849,6 +849,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             context.addParameterNode(parameterName, parameterIndex);
             final List<Class<? extends Annotation>> constraintTypes =
                     annotationMetadata.getAnnotationTypesByStereotype(Constraint.class);
+
+            // Constraints applied to the parameter
             for (Class<? extends Annotation> constraintType : constraintTypes) {
                 final ConstraintValidator constraintValidator = constraintValidatorRegistry
                         .findConstraintValidator(constraintType, parameterType).orElse(null);
@@ -870,8 +872,55 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     }
                 }
             }
+
+            // Constraints applied to the class used as a parameter
+            final BeanIntrospection<Object> introspection = getBeanIntrospection(parameterType);
+            if (introspection != null) {
+                final List<Class<? extends Annotation>> pojoConstraints = introspection.getAnnotationTypesByStereotype(Constraint.class);
+
+                for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
+                    validatePojoInternal(rootClass, object, argumentValues, context, overallViolations, parameterType, parameterValue, pojoConstraint);
+                }
+            }
         } finally {
             context.removeLast();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> void validatePojoInternal(@Nonnull Class<T> rootClass,
+                                          @Nullable T object,
+                                          @Nonnull Collection<MutableArgumentValue<?>> argumentValues,
+                                          @Nonnull DefaultConstraintValidatorContext context,
+                                          @Nonnull Set overallViolations,
+                                          @Nonnull Class<?> parameterType,
+                                          @Nonnull Object parameterValue,
+                                          Class<? extends Annotation> pojoConstraint) {
+        final ConstraintValidator constraintValidator = constraintValidatorRegistry
+                .findConstraintValidator(pojoConstraint, parameterType).orElse(null);
+
+        if (constraintValidator != null) {
+            if (!constraintValidator.isValid((T) parameterValue, null, context)) {
+                final String propertyValue = "";
+                BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
+                if (beanIntrospection == null) {
+                    throw new ValidationException("Passed object [" + parameterValue + "] cannot be introspected. Please annotate with @Introspected");
+                }
+                AnnotationMetadata beanAnnotationMetadata = beanIntrospection.getAnnotationMetadata();
+                AnnotationValue<? extends Annotation> annotationValue = beanAnnotationMetadata.getAnnotation(pojoConstraint);
+
+                final String messageTemplate = buildMessageTemplate(annotationValue, beanAnnotationMetadata);
+                final Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, beanAnnotationMetadata);
+                overallViolations.add(new DefaultConstraintViolation(
+                        object,
+                        rootClass,
+                        null,
+                        parameterValue,
+                        messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
+                        messageTemplate,
+                        new PathImpl(context.currentPath),
+                        argumentValues));
+            }
         }
     }
 
@@ -901,39 +950,15 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         }
 
         for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
-            final ConstraintValidator<? extends Annotation, T> validator = constraintValidatorRegistry
-                    .findConstraintValidator(pojoConstraint, rootBeanClass).orElse(null);
-
-            if (validator != null) {
-                //noinspection unchecked
-                if (!validator.isValid((T) object, null, context)) {
-                    final String propertyValue = "";
-
-                    final BeanIntrospection<Object> introspection = getBeanIntrospection(object);
-                    if (introspection == null) {
-                        throw new ValidationException("Passed object [" + object + "] cannot be introspected. Please annotate with @Introspected");
-                    }
-                    AnnotationMetadata annotationMetadata = introspection.getAnnotationMetadata();
-                    AnnotationValue<? extends Annotation> annotationValue = annotationMetadata.getAnnotation(pojoConstraint);
-
-                    final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
-                    final Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, annotationMetadata);
-
-                    //noinspection unchecked
-                    overallViolations.add(
-                            new DefaultConstraintViolation(
-                                    rootBean,
-                                    rootBeanClass,
-                                    object,
-                                    propertyValue,
-                                    messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
-                                    messageTemplate,
-                                    new PathImpl(context.currentPath),
-                                    null
-                            )
-                    );
-                }
-            }
+            validatePojoInternal(
+                    rootBeanClass,
+                    rootBean,
+                    null,
+                    context,
+                    overallViolations,
+                    rootBeanClass,
+                    object,
+                    pojoConstraint);
         }
 
         // now handle cascading validation
