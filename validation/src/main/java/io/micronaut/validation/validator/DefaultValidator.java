@@ -132,7 +132,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         final Collection<BeanProperty<Object, Object>> cascadeProperties =
                 ((BeanIntrospection<Object>) introspection).getIndexedProperties(Valid.class);
 
-        if (CollectionUtils.isNotEmpty(constrainedProperties) || CollectionUtils.isNotEmpty(cascadeProperties)) {
+        final List<Class<? extends Annotation>> pojoConstraints = introspection.getAnnotationTypesByStereotype(Constraint.class);
+
+        if (CollectionUtils.isNotEmpty(constrainedProperties)
+                || CollectionUtils.isNotEmpty(cascadeProperties)
+                || CollectionUtils.isNotEmpty(pojoConstraints)) {
+
             DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(object, groups);
             Set<ConstraintViolation<T>> overallViolations = new HashSet<>(5);
             return doValidate(
@@ -141,7 +146,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     constrainedProperties,
                     cascadeProperties,
                     context,
-                    overallViolations
+                    overallViolations,
+                    pojoConstraints
             );
         }
         return Collections.emptySet();
@@ -875,7 +881,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             Collection<? extends BeanProperty<Object, Object>> constrainedProperties,
             Collection<BeanProperty<Object, Object>> cascadeProperties,
             DefaultConstraintValidatorContext context,
-            Set overallViolations) {
+            Set overallViolations,
+            List<Class<? extends Annotation>> pojoConstraints) {
         @SuppressWarnings("unchecked")
         final Class<T> rootBeanClass = (Class<T>) rootBean.getClass();
         for (BeanProperty<Object, Object> constrainedProperty : constrainedProperties) {
@@ -891,6 +898,42 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     context,
                     overallViolations,
                     null);
+        }
+
+        for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
+            final ConstraintValidator<? extends Annotation, T> validator = constraintValidatorRegistry
+                    .findConstraintValidator(pojoConstraint, rootBeanClass).orElse(null);
+
+            if (validator != null) {
+                //noinspection unchecked
+                if (!validator.isValid((T) object, null, context)) {
+                    final String propertyValue = "";
+
+                    final BeanIntrospection<Object> introspection = getBeanIntrospection(object);
+                    if (introspection == null) {
+                        throw new ValidationException("Passed object [" + object + "] cannot be introspected. Please annotate with @Introspected");
+                    }
+                    AnnotationMetadata annotationMetadata = introspection.getAnnotationMetadata();
+                    AnnotationValue<? extends Annotation> annotationValue = annotationMetadata.getAnnotation(pojoConstraint);
+
+                    final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
+                    final Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, annotationMetadata);
+
+                    //noinspection unchecked
+                    overallViolations.add(
+                            new DefaultConstraintViolation(
+                                    rootBean,
+                                    rootBeanClass,
+                                    object,
+                                    propertyValue,
+                                    messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
+                                    messageTemplate,
+                                    new PathImpl(context.currentPath),
+                                    null
+                            )
+                    );
+                }
+            }
         }
 
         // now handle cascading validation
@@ -1143,7 +1186,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     cascadeConstraints,
                     cascadeNestedProperties,
                     context,
-                    overallViolations
+                    overallViolations,
+                    Collections.emptyList()
             );
         }
     }
