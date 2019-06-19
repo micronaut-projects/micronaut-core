@@ -216,6 +216,9 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         }
 
         Optional<MediaType> contentType = getContentType();
+        System.out.println(content.refCnt());
+        System.out.println(content.readableBytes());
+        System.out.println(type.getType());
         if (content.refCnt() == 0 || content.readableBytes() == 0) {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Full HTTP response received an empty body");
