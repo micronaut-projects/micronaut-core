@@ -1333,6 +1333,17 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return filterList;
     }
 
+
+    /**
+     * Configures the HTTP proxy for the pipeline.
+     *
+     * @param pipeline The pipeline
+     * @param proxy    The proxy
+     */
+    protected void configureProxy(ChannelPipeline pipeline, Proxy proxy) {
+        configureProxy(pipeline, proxy.type(), proxy.address());
+    }
+
     /**
      * Configures the HTTP proxy for the pipeline.
      *
@@ -2165,11 +2176,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 ch.config().setAutoRead(false);
             }
 
-            Optional<SocketAddress> proxy = configuration.getProxyAddress();
-            if (proxy.isPresent()) {
-                Type proxyType = configuration.getProxyType();
-                SocketAddress proxyAddress = proxy.get();
-                configureProxy(p, proxyType, proxyAddress);
+            Proxy proxy = configuration.resolveProxy(sslContext != null, host, port);
+            if (!Proxy.NO_PROXY.equals(proxy)) {
+                configureProxy(p, proxy);
             }
 
             if (sslContext != null) {
