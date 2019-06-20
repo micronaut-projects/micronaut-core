@@ -514,6 +514,19 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     if (res instanceof FullNettyClientHttpResponse) {
                         ((FullNettyClientHttpResponse) res).onComplete();
                     }
+                }).doOnError(throwable -> {
+                    if (throwable instanceof HttpClientResponseException) {
+                        io.micronaut.http.HttpResponse<?> response = ((HttpClientResponseException) throwable).getResponse();
+                        Optional<ByteBuf> byteBuf = response.getBody(ByteBuf.class);
+                        byteBuf.ifPresent(bb -> {
+                            if (bb.refCnt() > 0) {
+                                ReferenceCountUtil.safeRelease(bb);
+                            }
+                        });
+                        if (response instanceof FullNettyClientHttpResponse) {
+                            ((FullNettyClientHttpResponse) response).onComplete();
+                        }
+                    }
                 }).blockingFirst();
             }
         };
