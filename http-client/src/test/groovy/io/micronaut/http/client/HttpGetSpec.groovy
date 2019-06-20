@@ -30,7 +30,9 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import io.reactivex.Single
 import io.reactivex.functions.Consumer
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -442,6 +444,45 @@ class HttpGetSpec extends Specification {
         client.close()
     }
 
+    void "test empty list returns ok"() {
+        given:
+        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+
+        when:
+        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList"), Argument.listOf(Book)).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        response.status == HttpStatus.OK
+        response.body().isEmpty()
+    }
+
+    void "test single empty list returns ok"() {
+        given:
+        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+
+        when:
+        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList/single"), Argument.listOf(Book)).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        response.status == HttpStatus.OK
+        response.body().isEmpty()
+    }
+
+    void "test mono empty list returns ok"() {
+        given:
+        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+
+        when:
+        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList/mono"), Argument.listOf(Book)).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        response.status == HttpStatus.OK
+        response.body().isEmpty()
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -458,6 +499,21 @@ class HttpGetSpec extends Specification {
         @Get("/pojoList")
         List<Book> pojoList() {
             return [ new Book(title: "The Stand") ]
+        }
+
+        @Get("/emptyList")
+        List<Book> emptyList() {
+            return []
+        }
+
+        @Get("/emptyList/single")
+        Single<List<Book>> emptyListSingle() {
+            return Single.just([])
+        }
+
+        @Get("/emptyList/mono")
+        Mono<List<Book>> emptyListMono() {
+            return Mono.just([])
         }
 
         @Get(value = "/error", produces = MediaType.TEXT_PLAIN)

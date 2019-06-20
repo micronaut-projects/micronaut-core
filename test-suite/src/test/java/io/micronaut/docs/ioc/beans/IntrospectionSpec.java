@@ -34,4 +34,16 @@ public class IntrospectionSpec extends TestCase {
         // end::wrapper[]
         assertEquals(20, newAge);
     }
+
+    public void testNullable() {
+        final BeanIntrospection<Manufacturer> introspection = BeanIntrospection.getIntrospection(Manufacturer.class);
+        Manufacturer manufacturer = introspection.instantiate(null, "John");
+        assertEquals("John", manufacturer.getName());
+
+        final BeanProperty<Manufacturer, String> property = introspection.getRequiredProperty("name", String.class);
+        property.set(manufacturer, "Fred");
+        String name = property.get(manufacturer);
+
+        assertEquals("Fred", name);
+    }
 }

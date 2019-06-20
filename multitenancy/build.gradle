@@ -12,5 +12,5 @@ dependencies {
     testCompile project(":session")
     testCompile project(":test-utils")
 
-    testCompile dependencyModuleVersion("micronaut.security", "micronaut-security-jwt")
+    testCompile "io.micronaut:micronaut-security-jwt:1.1.1"
 }
