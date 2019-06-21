@@ -70,7 +70,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
                     .toArray(RouteParameterElement[]::new);
 
             for (RouteValidationRule rule: rules) {
-                RouteValidationResult result = rule.validate(template, parameters);
+                RouteValidationResult result = rule.validate(template, parameters, element);
 
                 if (!result.isValid()) {
                     for (String err: result.getErrorMessages()) {

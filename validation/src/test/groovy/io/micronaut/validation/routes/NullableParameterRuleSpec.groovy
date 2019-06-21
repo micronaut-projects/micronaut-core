@@ -87,6 +87,70 @@ class Foo {
         ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
     }
 
+    void "test nullable parameter on a client"() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import javax.annotation.Nullable;
+import io.micronaut.http.client.annotation.*;
+
+@Client("/foo")
+interface Foo {
+
+    @Get("{/abc}")
+    String abc(@Nullable String abc);
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import java.util.Optional;
+import io.micronaut.http.client.annotation.*;
+
+@Client("/foo")
+interface Foo {
+
+    @Get("{/abc}")
+    String abc(Optional<String> abc);
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.client.annotation.*;
+
+@Client("/foo")
+interface Foo {
+
+    @Get("{/abc}")
+    String abc(String abc);
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+    }
+
     void "test query optional parameter"() {
         when:
         buildTypeElement("""
@@ -151,6 +215,95 @@ class Foo {
     String abc(String abc) {
         return "";
     }
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+    }
+
+    void "test required argument and optional parameter"() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import javax.annotation.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{abc}")
+    String abc(@Nullable String abc) {
+        return "";
+    }
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import java.util.Optional;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{abc}")
+    String abc(Optional<String> abc) {
+        return "";
+    }
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.client.annotation.*;
+import javax.annotation.Nullable;
+
+@Client("/foo")
+interface Foo {
+
+    @Get("/{abc}")
+    String abc(@Nullable String abc);
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.client.annotation.*;
+import java.util.Optional;
+
+@Client("/foo")
+interface Foo {
+
+    @Get("/{abc}")
+    String abc(Optional<String> abc);
 }
 
 """)

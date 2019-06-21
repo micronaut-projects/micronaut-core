@@ -16,6 +16,7 @@
 package io.micronaut.validation.routes.rules;
 
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
@@ -34,6 +35,6 @@ public interface RouteValidationRule {
      * @param parameters The route parameters
      * @return A {@link RouteValidationResult}
      */
-    RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters);
+    RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters, MethodElement method);
 
 }
