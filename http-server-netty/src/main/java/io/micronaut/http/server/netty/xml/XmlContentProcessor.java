@@ -163,6 +163,14 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
                         Object lastValue = last.getValue();
                         data.peekLast().getValue().compute(last.getKey(), (key, value) -> {
                             if (value == null) {
+                                if (lastValue instanceof Map) {
+                                    Map lastValueMap = ((Map) lastValue);
+                                    Object arrayValue = lastValueMap.get(arrayName);
+                                    if (arrayValue instanceof List) {
+                                        arrayName = null;
+                                        return arrayValue;
+                                    }
+                                }
                                 return lastValue;
                             } else if (value instanceof List) {
                                 ((List) value).add(lastValue);
