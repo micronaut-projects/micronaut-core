@@ -33,6 +33,7 @@ public interface RouteValidationRule {
      *
      * @param template The URI match template
      * @param parameters The route parameters
+     * @param method The route method
      * @return A {@link RouteValidationResult}
      */
     RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters, MethodElement method);
