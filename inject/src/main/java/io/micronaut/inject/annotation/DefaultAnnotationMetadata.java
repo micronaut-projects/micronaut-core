@@ -1016,7 +1016,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    protected static boolean areAnnotationDefaultsRegistered(String annotation) {
+    public static boolean areAnnotationDefaultsRegistered(String annotation) {
         return AnnotationMetadataSupport.hasDefaultValues(annotation);
     }
 
@@ -1029,7 +1029,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    protected static void registerAnnotationDefaults(String annotation, Map<String, Object> defaultValues) {
+    public static void registerAnnotationDefaults(String annotation, Map<String, Object> defaultValues) {
         AnnotationMetadataSupport.registerDefaultValues(annotation, defaultValues);
     }
 
@@ -1042,7 +1042,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    protected static void registerAnnotationDefaults(AnnotationClassValue<?> annotation, Map<String, Object> defaultValues) {
+    public static void registerAnnotationDefaults(AnnotationClassValue<?> annotation, Map<String, Object> defaultValues) {
         AnnotationMetadataSupport.registerDefaultValues(annotation, defaultValues);
     }
 
@@ -1054,7 +1054,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    protected static void registerAnnotationType(AnnotationClassValue<?> annotation) {
+    public static void registerAnnotationType(AnnotationClassValue<?> annotation) {
         AnnotationMetadataSupport.registerAnnotationType(annotation);
     }
 
