@@ -16,23 +16,21 @@
 package io.micronaut.docs.server.intro
 
 // tag::imports[]
+import io.kotlintest.shouldBe
+import io.kotlintest.specs.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
 
 // end::imports[]
 
 // tag::class-init[]
-class HelloControllerSpec() {
+class HelloControllerSpec : AnnotationSpec(){
     lateinit var server: EmbeddedServer
     lateinit var client: HttpClient
 
-    @BeforeTest
+    @BeforeEach
     fun setup() {
         // end::class-init[]
         server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName), Environment.TEST)
@@ -48,7 +46,7 @@ class HelloControllerSpec() {
                 .createBean(HttpClient::class.java, server.getURL())// <2>
     }
 
-    @AfterTest
+    @AfterEach
     fun teardown() {
         client?.close()
         server?.close()
@@ -58,7 +56,7 @@ class HelloControllerSpec() {
     fun testHelloWorldResponse() {
         val rsp: String = client.toBlocking() // <3>
                 .retrieve("/hello")
-        assertEquals("Hello World", rsp) // <4>
+        rsp.shouldBe("Hello World") // <4>
     }
 }
 //end::class[]

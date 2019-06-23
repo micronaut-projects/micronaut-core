@@ -1,12 +1,14 @@
 package io.micronaut.docs.ioc.beans
 
+import io.kotlintest.shouldBe
+import io.kotlintest.specs.StringSpec
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.beans.BeanWrapper
-import junit.framework.TestCase
 
-class IntrospectionSpec : TestCase() {
-    fun testRetrieveInspection() {
+class IntrospectionSpec : StringSpec ({
+
+    "test retrieve inspection" {
 
         // tag::usage[]
         val introspection = BeanIntrospection.getIntrospection(Person::class.java) // <1>
@@ -19,10 +21,10 @@ class IntrospectionSpec : TestCase() {
         print("Hello ${person.name}")
         // end::usage[]
 
-        assertEquals("Fred", name)
+        name.shouldBe("Fred")
     }
 
-    fun testBeanWrapper() {
+    "test bean wrapper" {
         // tag::wrapper[]
         val wrapper = BeanWrapper.getWrapper(Person("Fred")) // <1>
 
@@ -31,10 +33,10 @@ class IntrospectionSpec : TestCase() {
 
         println("Person's age now $newAge")
         // end::wrapper[]
-        TestCase.assertEquals(20, newAge)
+        newAge.shouldBe(20)
     }
 
-    fun testNullable() {
+    "test nullable" {
         val introspection = BeanIntrospection.getIntrospection(Manufacturer::class.java)
         val manufacturer: Manufacturer = introspection.instantiate(null, "John")
 
@@ -42,6 +44,6 @@ class IntrospectionSpec : TestCase() {
         property.set(manufacturer, "Jane")
         val name = property.get(manufacturer)
 
-        assertEquals("Jane", name)
+        name.shouldBe("Jane")
     }
-}
+})

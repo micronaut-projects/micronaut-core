@@ -15,26 +15,28 @@
  */
 package io.micronaut.inject.repeatable
 
+import io.kotlintest.matchers.boolean.shouldBeFalse
+import io.kotlintest.matchers.boolean.shouldBeTrue
+import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import junit.framework.TestCase
 
-class RepeatableSpec: TestCase() {
+class RepeatableSpec: StringSpec({
 
-    fun testBeanIsNotAvailable() {
+    "test bean is not available" {
         val context = ApplicationContext.run()
-        TestCase.assertFalse(context.containsBean(MultipleRequires::class.java))
+        context.containsBean(MultipleRequires::class.java).shouldBeFalse()
         context.close()
     }
 
-    fun testBeanIsNotAvailable2() {
+    "test another bean is not available" {
         val context = ApplicationContext.run(hashMapOf("foo" to "true") as Map<String, Any>)
-        TestCase.assertFalse(context.containsBean(MultipleRequires::class.java))
+        context.containsBean(MultipleRequires::class.java).shouldBeFalse()
         context.close()
     }
 
-    fun testBeanIsAvailable() {
+    "test bean is available" {
         val context = ApplicationContext.run(hashMapOf("foo" to "true", "bar" to "y") as Map<String, Any>)
-        TestCase.assertTrue(context.containsBean(MultipleRequires::class.java))
+        context.containsBean(MultipleRequires::class.java).shouldBeTrue()
         context.close()
     }
-}
+})
