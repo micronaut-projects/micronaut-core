@@ -8,7 +8,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Shared
 import spock.lang.Specification
 
-class EnvEndpointSpec extends Specification {
+class EnvironmentEndpointSpec extends Specification {
 
     @Shared
     private EmbeddedServer embeddedServer
@@ -19,7 +19,7 @@ class EnvEndpointSpec extends Specification {
         RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
-        client.exchange("/${EnvEndpoint.NAME}").blockingFirst()
+        client.exchange("/${EnvironmentEndpoint.NAME}").blockingFirst()
 
         then:
         HttpClientResponseException responseException = thrown()
@@ -34,7 +34,7 @@ class EnvEndpointSpec extends Specification {
         RxHttpClient client = buildClient()
 
         when:
-        Map result = client.exchange("/${EnvEndpoint.NAME}", Map).blockingFirst().body()
+        Map result = client.exchange("/${EnvironmentEndpoint.NAME}", Map).blockingFirst().body()
 
         then:
         result.activeEnvironments == ["test"]
@@ -51,7 +51,7 @@ class EnvEndpointSpec extends Specification {
         RxHttpClient client = buildClient()
 
         when:
-        Map result = client.exchange("/${EnvEndpoint.NAME}/context", Map).blockingFirst().body()
+        Map result = client.exchange("/${EnvironmentEndpoint.NAME}/context", Map).blockingFirst().body()
 
         then:
         result.order == 0
@@ -66,7 +66,7 @@ class EnvEndpointSpec extends Specification {
         RxHttpClient client = buildClient()
 
         when:
-        client.exchange("/${EnvEndpoint.NAME}/blah").blockingFirst()
+        client.exchange("/${EnvironmentEndpoint.NAME}/blah").blockingFirst()
 
         then:
         HttpClientResponseException responseException = thrown()

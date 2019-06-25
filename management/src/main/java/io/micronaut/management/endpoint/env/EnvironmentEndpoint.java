@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2019 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.management.endpoint.env;
 
 import io.micronaut.context.env.Environment;
@@ -9,22 +24,32 @@ import io.micronaut.management.endpoint.annotation.Selector;
 import java.util.*;
 
 /**
- * TODO: javadoc
+ * {@link Endpoint} that displays information about the environment and its property sources.
  *
  * @author Álvaro Sánchez-Mariscal
- * @since 1.0.0
+ * @since 1.2.0
  */
-@Endpoint(EnvEndpoint.NAME)
-public class EnvEndpoint {
+@Endpoint(EnvironmentEndpoint.NAME)
+public class EnvironmentEndpoint {
 
-    public final static String NAME = "env";
+    /**
+     * Endpoint name.
+     */
+    public static final String NAME = "env";
 
     private final Environment environment;
 
-    public EnvEndpoint(Environment environment) {
+    /**
+     * @param environment The {@link Environment}
+     */
+    public EnvironmentEndpoint(Environment environment) {
         this.environment = environment;
     }
 
+    /**
+     * @return The environment information as a map with the following keys: activeEnvironments, packages and
+     * propertySources.
+     */
     @Read
     public Map<String, Object> getEnvironmentInfo() {
         Map<String, Object> result = new LinkedHashMap<>();
@@ -39,6 +64,10 @@ public class EnvEndpoint {
         return result;
     }
 
+    /**
+     * @param propertySourceName The {@link PropertySource} name
+     * @return a map with all the properties defined in the property source if it exists; null otherwise.
+     */
     @Read
     public Map<String, Object> getProperties(@Selector String propertySourceName) {
         return environment.getPropertySources()
