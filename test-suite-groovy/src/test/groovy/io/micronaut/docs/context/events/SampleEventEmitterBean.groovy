@@ -5,15 +5,14 @@ import io.micronaut.context.event.ApplicationEventPublisher
 import javax.inject.Inject
 import javax.inject.Singleton
 
-
 @Singleton
-class MyBean {
+class SampleEventEmitterBean {
 
     @Inject
-    internal var eventPublisher: ApplicationEventPublisher? = null
+    ApplicationEventPublisher eventPublisher
 
-    internal fun doSomething() {
-        eventPublisher!!.publishEvent("SampleEvent")
+    void publishSampleEvent() {
+        eventPublisher.publishEvent(new SampleEvent())
     }
 
 }

@@ -1,22 +1,19 @@
 package io.micronaut.docs.context.events.async
 
 // tag::imports[]
-import io.micronaut.discovery.event.ServiceStartedEvent
+import io.micronaut.docs.context.events.SampleEvent
 import io.micronaut.runtime.event.annotation.EventListener
 import io.micronaut.scheduling.annotation.Async
 // end::imports[]
 import javax.inject.Singleton
 
-
-
-// tag::class[]
 @Singleton
-class DoOnStartup  {
+class SampleEventListener {
+    int invocationCounter = 0
 
     @EventListener
     @Async
-    void onStartup(ServiceStartedEvent event) {
-        // handle long events async
+    void onSampleEvent(SampleEvent event) {
+        invocationCounter++
     }
 }
-// end::class[]
