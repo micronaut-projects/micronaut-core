@@ -220,8 +220,9 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     /**
      * Writes out the byte code necessary to instantiate the given {@link DefaultAnnotationMetadata}.
      *
-     * @param owningType           The owning type
      * @param annotationMetadata   The annotation metadata
+     * @param classWriter          The class writer
+     * @param owningType           The owning type
      * @param loadTypeMethods      The generated load type methods
      */
     public static void writeAnnotationDefaults(DefaultAnnotationMetadata annotationMetadata, ClassWriter classWriter, Type owningType, Map<String, GeneratorAdapter> loadTypeMethods) {
