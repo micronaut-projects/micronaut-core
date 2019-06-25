@@ -6,13 +6,13 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 @Singleton
-public class MyBean {
+public class SampleEventEmitterBean {
 
     @Inject
     ApplicationEventPublisher eventPublisher;
 
-    void doSomething() {
-        eventPublisher.publishEvent("SampleEvent");
+    public void publishSampleEvent() {
+        eventPublisher.publishEvent(new SampleEvent());
     }
 
 }
