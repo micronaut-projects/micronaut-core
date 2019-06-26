@@ -11,6 +11,4 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":session")
     testCompile project(":test-utils")
-
-    testCompile "io.micronaut:micronaut-security-jwt:1.1.1"
 }

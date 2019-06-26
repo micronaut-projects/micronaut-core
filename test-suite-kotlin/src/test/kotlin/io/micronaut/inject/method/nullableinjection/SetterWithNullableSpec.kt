@@ -15,8 +15,12 @@
  */
 package io.micronaut.inject.method.nullableinjection
 
+import io.kotlintest.matchers.types.shouldBeNull
+import io.kotlintest.shouldThrow
+import io.kotlintest.specs.StringSpec
 import io.micronaut.context.BeanContext
 import io.micronaut.context.exceptions.DependencyInjectionException
+<<<<<<< HEAD
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
@@ -32,10 +36,27 @@ class SetterWithNullableSpec {
 
     @Test
     fun testNormalInjectionStillFails() {
+=======
+
+class SetterWithNullableSpec: StringSpec({
+
+    "test injection of nullable objects" {
         val context = BeanContext.run()
-        try {
+        val b = context.getBean(B::class.java)
+
+        b.a.shouldBeNull()
+    }
+
+    "test normal injection still fails" {
+>>>>>>> 1.1.x
+        val context = BeanContext.run()
+        shouldThrow<DependencyInjectionException> {
             context.getBean(C::class.java)
+<<<<<<< HEAD
             fail<Any>("Expected a DependencyInjectionException to be thrown")
         } catch (e: DependencyInjectionException) {}
+=======
+        }
+>>>>>>> 1.1.x
     }
-}
+})

@@ -194,7 +194,7 @@ class Test {
 }
 
 ''')
-        BeanDefinition definition = classLoader.loadClass('test.$Test$ExecutorServiceDefinition').newInstance()
+        BeanDefinition definition = classLoader.loadClass('test.$Test$ExecutorService0Definition').newInstance()
         expect:
         definition != null
         definition.hasStereotype(Factory) // inherits the factory annotations as stereotypes
@@ -228,7 +228,7 @@ interface Foo {
 }
 
 ''')
-        BeanDefinition definition = classLoader.loadClass('test.$Test$FooDefinition').newInstance()
+        BeanDefinition definition = classLoader.loadClass('test.$Test$Foo0Definition').newInstance()
         expect:
         definition != null
         definition.hasStereotype(Singleton)
@@ -265,7 +265,7 @@ interface Bar {
 
 
 ''')
-        BeanDefinition definition = classLoader.loadClass('test.$Test$FooDefinition').newInstance()
+        BeanDefinition definition = classLoader.loadClass('test.$Test$Foo0Definition').newInstance()
         expect:
         definition != null
         definition.hasStereotype(Singleton)
