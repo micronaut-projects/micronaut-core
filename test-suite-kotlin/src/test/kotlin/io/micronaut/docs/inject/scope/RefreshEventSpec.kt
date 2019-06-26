@@ -1,5 +1,9 @@
 package io.micronaut.docs.inject.scope
 
+import io.kotlintest.matchers.boolean.shouldBeTrue
+import io.kotlintest.shouldBe
+import io.kotlintest.shouldNotBe
+import io.kotlintest.specs.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
@@ -13,16 +17,13 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.Assert.*
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
+
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.annotation.PostConstruct
 import javax.inject.Inject
 
-class RefreshEventSpec {
+class RefreshEventSpec : AnnotationSpec() {
 
     lateinit var embeddedServer: EmbeddedServer
     lateinit var client: HttpClient
@@ -43,22 +44,22 @@ class RefreshEventSpec {
     fun publishingARefreshEventDestroysBeanWithRefreshableScope() {
         val firstResponse = fetchForecast()
 
-        assertTrue(firstResponse.contains("{\"forecast\":\"Scattered Clouds"))
+        firstResponse.contains("{\"forecast\":\"Scattered Clouds").shouldBeTrue()
 
         val secondResponse = fetchForecast()
 
-        assertEquals(firstResponse, secondResponse)
+        firstResponse.shouldBe(secondResponse)
 
         val response = evictForecast()
 
-        assertEquals(
-                // tag::evictResponse[]
-                "{\"msg\":\"OK\"}", response)// end::evictResponse[]
+        // tag::evictResponse[]
+        response.shouldBe("{\"msg\":\"OK\"}")
+        // end::evictResponse[]
 
         val thirdResponse = fetchForecast()
 
-        assertNotEquals(thirdResponse, secondResponse)
-        assertTrue(thirdResponse.contains("\"forecast\":\"Scattered Clouds"))
+        thirdResponse.shouldNotBe(secondResponse)
+        thirdResponse.contains("\"forecast\":\"Scattered Clouds").shouldBeTrue()
     }
 
     fun fetchForecast(): String {

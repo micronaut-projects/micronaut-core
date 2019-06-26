@@ -1,18 +1,17 @@
 package io.micronaut.docs.inject.intro
 
+import io.kotlintest.shouldBe
+import io.kotlintest.specs.StringSpec
 import io.micronaut.context.BeanContext
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
 
-class VehicleSpec {
-    @Test
-    fun testStartVehicle() {
+class VehicleSpec : StringSpec({
+    "test start vehicle" {
         // tag::start[]
         val vehicle = BeanContext.run().getBean(Vehicle::class.java)
         println(vehicle.start())
         // end::start[]
 
-        assertEquals("Starting V8", vehicle.start())
+        vehicle.start().shouldBe("Starting V8")
     }
 
-}
+})
