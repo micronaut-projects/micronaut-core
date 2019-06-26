@@ -12,9 +12,9 @@ class SampleEventListenerSpec : AnnotationSpec() {
     fun testEventListenerWasNotified() {
         val context = ApplicationContext.run()
         val emitter = context.getBean(SampleEventEmitterBean::class.java)
-        emitter.publishSampleEvent()
         val listener = context.getBean(SampleEventListener::class.java)
-
+        listener.invocationCounter.shouldBe(0)
+        emitter.publishSampleEvent()
         listener.invocationCounter.shouldBe(1)
     }
 }
