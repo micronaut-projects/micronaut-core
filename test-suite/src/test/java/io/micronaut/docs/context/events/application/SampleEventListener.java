@@ -14,7 +14,7 @@ public class SampleEventListener implements ApplicationEventListener<SampleEvent
 
     @Override
     public void onApplicationEvent(SampleEvent event) {
-        invocationCounter = invocationCounter++;
+        invocationCounter++;
     }
 
     public int getInvocationCounter() {

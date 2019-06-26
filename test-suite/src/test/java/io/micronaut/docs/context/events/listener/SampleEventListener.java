@@ -14,7 +14,7 @@ public class SampleEventListener {
 
     @EventListener
     public void onSampleEvent(SampleEvent event) {
-        invocationCounter = invocationCounter++;
+        invocationCounter++;
     }
 
     public int getInvocationCounter() {
