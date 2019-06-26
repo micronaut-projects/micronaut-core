@@ -222,6 +222,7 @@ management:
     loggersEndpoint: The Loggers Endpoint
     cachesEndpoint: The Caches Endpoint
     stopEndpoint: The Server Stop Endpoint
+    environmentEndpoint: The Environment Endpoint
 security:
   title: Security
 multitenancy:
