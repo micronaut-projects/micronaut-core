@@ -19,10 +19,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 
-import javax.annotation.Nonnull;
 import java.lang.annotation.Annotation;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Adapts an {@link AnnotationValue} to the environment.
@@ -33,8 +30,6 @@ import java.util.stream.Collectors;
  */
 @Internal
 class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A> {
-
-    private final Environment environment;
 
     /**
      * Default constructor.
@@ -55,20 +50,6 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
             }
             return o;
         } : null);
-        this.environment = environment;
     }
 
-    @Override
-    public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
-        return super.getAnnotations(member, type)
-                .stream()
-                .map(ann -> new EnvironmentAnnotationValue<T>(environment, ann)).collect(Collectors.toList());
-    }
-
-    @Override
-    public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
-        return super.getAnnotations(member)
-                .stream()
-                .map(ann -> new EnvironmentAnnotationValue<T>(environment, (AnnotationValue<T>) ann)).collect(Collectors.toList());
-    }
 }

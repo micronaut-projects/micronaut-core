@@ -28,7 +28,7 @@ class AliasForQualifierSpec extends AbstractTypeElementSpec {
 
     void "test that when an alias is created for a named qualifier the stereotypes are correct"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc0','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc','''\
 package test;
 
 import io.micronaut.inject.aliasfor.*;

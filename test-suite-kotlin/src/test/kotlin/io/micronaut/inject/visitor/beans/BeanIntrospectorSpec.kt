@@ -1,36 +1,37 @@
 package io.micronaut.inject.visitor.beans
 
-import io.kotlintest.matchers.boolean.shouldBeFalse
-import io.kotlintest.matchers.boolean.shouldBeTrue
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldThrow
-import io.kotlintest.specs.StringSpec
 import io.micronaut.core.beans.BeanIntrospector
+import junit.framework.TestCase
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
 
-class BeanIntrospectorSpec : StringSpec({
+class BeanIntrospectorSpec {
 
-    "test get introspection" {
+    @Test
+    fun testGetIntrospection() {
         val introspection = BeanIntrospector.SHARED.getIntrospection(TestBean::class.java)
 
-        introspection.propertyNames.size.shouldBe(5)
-        introspection.getProperty("age").isPresent.shouldBeTrue()
-        introspection.getProperty("name").isPresent.shouldBeTrue()
+        assertEquals(5, introspection.propertyNames.size)
+        assertTrue(introspection.getProperty("age").isPresent)
+        assertTrue(introspection.getProperty("name").isPresent)
 
         val testBean = introspection.instantiate("fred", 10, arrayOf("one"))
 
-        testBean.name.shouldBe("fred")
-        testBean.flag.shouldBeFalse()
+        assertEquals("fred", testBean.name)
+        assertFalse(testBean.flag)
 
-        shouldThrow<UnsupportedOperationException> {
+        try {
             introspection.getProperty("name").get().set(testBean, "bob")
+            fail<Any>("Should have failed with unsupported operation, readonly")
+        } catch (e: UnsupportedOperationException) {
         }
 
-        testBean.stuff.shouldBe("default")
+        assertEquals("default", testBean.stuff)
 
         introspection.getProperty("stuff").get().set(testBean, "newvalue")
         introspection.getProperty("flag").get().set(testBean, true)
-        introspection.getProperty("flag", Boolean::class.java).get().get(testBean)?.shouldBeTrue()
+        assertEquals(true, introspection.getProperty("flag", Boolean::class.java).get().get(testBean))
 
-        testBean.stuff.shouldBe("newvalue")
+        assertEquals("newvalue", testBean.stuff)
     }
-})
+}

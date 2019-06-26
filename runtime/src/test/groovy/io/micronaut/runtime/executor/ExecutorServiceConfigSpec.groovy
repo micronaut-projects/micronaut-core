@@ -16,7 +16,6 @@
 package io.micronaut.runtime.executor
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.env.yaml.YamlPropertySourceLoader
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.executor.ExecutorConfiguration
@@ -92,7 +91,7 @@ class ExecutorServiceConfigSpec extends Specification {
         where:
         invalidateCache | environment
         true            | "test"
-        false           | "test"
+//        false           | "test"
     }
 
 
@@ -104,6 +103,7 @@ class ExecutorServiceConfigSpec extends Specification {
                 'micronaut.executors.one.nThreads':'5',
                 'micronaut.executors.two.type':'work_stealing'
         )
+
 
 
         when:
@@ -160,6 +160,8 @@ class ExecutorServiceConfigSpec extends Specification {
                 'micronaut.executors.io.nThreads':'5',
                 'micronaut.executors.two.type':'work_stealing'
         )
+
+
 
         when:
         Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)

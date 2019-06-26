@@ -37,10 +37,4 @@ compileTestKotlin {
 
 test {
     useJUnitPlatform()
-    // show standard out and standard error of the test JVM(s) on the console
-    testLogging.showStandardStreams = true
-
-    testLogging {
-        events "PASSED", "FAILED", "SKIPPED", "STANDARD_OUT", "STANDARD_ERROR"
-    }
 }

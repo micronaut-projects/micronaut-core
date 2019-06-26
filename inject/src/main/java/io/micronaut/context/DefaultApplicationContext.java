@@ -430,7 +430,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     /**
-     * Bootstrap property source implementation.
+     * Bootstraop property source implementation.
      */
     @SuppressWarnings("MagicNumber")
     private static class BootstrapPropertySource implements PropertySource {

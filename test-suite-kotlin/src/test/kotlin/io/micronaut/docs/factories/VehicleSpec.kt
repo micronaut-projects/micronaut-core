@@ -15,13 +15,14 @@
  */
 package io.micronaut.docs.factories
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
 import io.micronaut.context.DefaultBeanContext
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
 
-internal class VehicleSpec : StringSpec({
+internal class VehicleSpec {
 
-    "test start vehicle" {
+    @Test
+    fun testStartVehicle() {
         // tag::start[]
         val vehicle = DefaultBeanContext()
                 .start()
@@ -29,6 +30,6 @@ internal class VehicleSpec : StringSpec({
         println(vehicle.start())
         // end::start[]
 
-        vehicle.start().shouldBe("Starting V8")
+        assertEquals("Starting V8", vehicle.start())
     }
-})
+}

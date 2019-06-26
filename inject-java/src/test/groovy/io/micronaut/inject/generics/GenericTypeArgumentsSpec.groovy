@@ -17,7 +17,6 @@ package io.micronaut.inject.generics
 
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.ExecutableMethod
 
 import java.util.function.Function
 
@@ -194,7 +193,7 @@ abstract class Foo<T, R> {
 
     void "test type arguments for factory"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc0','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc','''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -221,7 +220,7 @@ class Test {
 
     void "test type arguments for factory with inheritance"() {
         given:
-        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc0','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc','''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -246,33 +245,5 @@ interface Foo extends java.util.function.Function<String, Integer> {}
         definition.getTypeArguments(Function)[1].name == 'R'
         definition.getTypeArguments(Function)[0].type == String
         definition.getTypeArguments(Function)[1].type == Integer
-    }
-
-    void "test type arguments for methods"() {
-        BeanDefinition definition = buildBeanDefinition('test.StatusController', '''
-package test;
-
-import io.micronaut.http.annotation.*;
-
-class GenericController<T> {
-
-    @Post
-    T save(@Body T entity) {
-        return entity;
-    }
-}
-
-@Controller
-class StatusController extends GenericController<String> {
-
-}
-''')
-        List<ExecutableMethod> methods = definition.getExecutableMethods().toList()
-
-        expect:
-        definition != null
-        methods.size() == 1
-        methods[0].getArguments()[0].type == String
-        methods[0].getReturnType().getFirstTypeVariable().get().type == String
     }
 }

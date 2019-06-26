@@ -35,7 +35,12 @@ import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
+import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
@@ -552,41 +557,5 @@ public class ModelUtils {
             }
         }
         return result;
-    }
-
-    /**
-     * The Java APT throws an internal exception {code com.sun.tools.javac.code.Symbol$CompletionFailure} if a class is missing from the classpath and {@link Element#getKind()} is called. This method
-     * handles exceptions when calling the getKind() method to avoid this scenario and should be used instead of {@link Element#getKind()}.
-     *
-     * @param element The element
-     * @param expected The expected kind
-     * @return The kind if it is resolvable and matches the expected kind
-     */
-    public Optional<ElementKind> resolveKind(Element element, ElementKind expected) {
-        final Optional<ElementKind> elementKind = resolveKind(element);
-        if (elementKind.isPresent() && elementKind.get() == expected) {
-            return elementKind;
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * The Java APT throws an internal exception {code com.sun.tools.javac.code.Symbol$CompletionFailure} if a class is missing from the classpath and {@link Element#getKind()} is called. This method
-     * handles exceptions when calling the getKind() method to avoid this scenario and should be used instead of {@link Element#getKind()}.
-     *
-     * @param element The element
-     * @return The kind if it is resolvable
-     */
-    public Optional<ElementKind> resolveKind(Element element) {
-        if (element != null) {
-
-            try {
-                final ElementKind kind = element.getKind();
-                return Optional.of(kind);
-            } catch (Exception e) {
-                // ignore and fall through to empty
-            }
-        }
-        return Optional.empty();
     }
 }
