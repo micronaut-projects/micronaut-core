@@ -1,9 +1,5 @@
 package io.micronaut.docs.inject.scope
 
-import io.kotlintest.matchers.boolean.shouldBeTrue
-import io.kotlintest.shouldBe
-import io.kotlintest.shouldNotBe
-import io.kotlintest.specs.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
@@ -17,13 +13,16 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
-
+import org.junit.Assert.*
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.annotation.PostConstruct
 import javax.inject.Inject
 
-class RefreshEventSpec : AnnotationSpec() {
+class RefreshEventSpec {
 
     lateinit var embeddedServer: EmbeddedServer
     lateinit var client: HttpClient
@@ -44,22 +43,22 @@ class RefreshEventSpec : AnnotationSpec() {
     fun publishingARefreshEventDestroysBeanWithRefreshableScope() {
         val firstResponse = fetchForecast()
 
-        firstResponse.contains("{\"forecast\":\"Scattered Clouds").shouldBeTrue()
+        assertTrue(firstResponse.contains("{\"forecast\":\"Scattered Clouds"))
 
         val secondResponse = fetchForecast()
 
-        firstResponse.shouldBe(secondResponse)
+        assertEquals(firstResponse, secondResponse)
 
         val response = evictForecast()
 
-        // tag::evictResponse[]
-        response.shouldBe("{\"msg\":\"OK\"}")
-        // end::evictResponse[]
+        assertEquals(
+                // tag::evictResponse[]
+                "{\"msg\":\"OK\"}", response)// end::evictResponse[]
 
         val thirdResponse = fetchForecast()
 
-        thirdResponse.shouldNotBe(secondResponse)
-        thirdResponse.contains("\"forecast\":\"Scattered Clouds").shouldBeTrue()
+        assertNotEquals(thirdResponse, secondResponse)
+        assertTrue(thirdResponse.contains("\"forecast\":\"Scattered Clouds"))
     }
 
     fun fetchForecast(): String {

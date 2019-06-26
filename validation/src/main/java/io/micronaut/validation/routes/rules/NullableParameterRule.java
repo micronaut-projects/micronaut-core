@@ -19,7 +19,6 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
@@ -36,27 +35,22 @@ import java.util.*;
 public class NullableParameterRule implements RouteValidationRule {
 
     @Override
-    public RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters, MethodElement method) {
+    public RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters) {
 
         List<UriMatchVariable> variables = template.getVariables();
         List<String> errorMessages = new ArrayList<>();
 
-        boolean isClient = method.hasAnnotation("io.micronaut.http.client.annotation.Client");
-
-        //Optional variables can be required in clients
-        if (!isClient) {
-            for (UriMatchVariable variable : variables) {
-                if (variable.isOptional() && !variable.isExploded()) {
-                    Arrays.stream(parameters)
-                            .filter(p -> p.getName().equals(variable.getName()))
-                            .findFirst()
-                            .ifPresent(p -> {
-                                ClassElement type = p.getType();
-                                if (!isNullable(p) && type != null && !type.isAssignable(Optional.class)) {
-                                    errorMessages.add(String.format("The uri variable [%s] is optional, but the corresponding method argument [%s] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.", variable.getName(), p.toString()));
-                                }
-                            });
-                }
+        for (UriMatchVariable variable: variables) {
+            if (variable.isOptional() && !variable.isExploded()) {
+                Arrays.stream(parameters)
+                        .filter(p -> p.getName().equals(variable.getName()))
+                        .findFirst()
+                        .ifPresent(p -> {
+                            ClassElement type = p.getType();
+                            if (!isNullable(p) && type != null && !type.isAssignable(Optional.class)) {
+                                errorMessages.add(String.format("The uri variable [%s] is optional, but the corresponding method argument [%s] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.", variable.getName(), p.toString()));
+                            }
+                        });
             }
         }
 

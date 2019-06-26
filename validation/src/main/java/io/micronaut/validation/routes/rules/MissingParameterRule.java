@@ -17,7 +17,6 @@ package io.micronaut.validation.routes.rules;
 
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.validation.routes.RouteValidationResult;
@@ -37,7 +36,7 @@ import java.util.stream.Collectors;
 public class MissingParameterRule implements RouteValidationRule {
 
     @Override
-    public RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters, MethodElement method) {
+    public RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters) {
 
         List<String> variables = template.getVariableNames();
         List<String> routeVariables = Arrays.stream(parameters).map(ParameterElement::getName).collect(Collectors.toList());

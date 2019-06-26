@@ -17,6 +17,7 @@ package io.micronaut.multitenancy.propagation.cookie
 
 import io.micronaut.context.annotation.Requires
 import io.micronaut.multitenancy.tenantresolver.TenantResolver
+import io.micronaut.security.utils.SecurityService
 
 import javax.inject.Singleton
 import java.util.concurrent.ConcurrentHashMap

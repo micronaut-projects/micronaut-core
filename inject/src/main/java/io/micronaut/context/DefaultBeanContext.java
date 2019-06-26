@@ -2111,7 +2111,9 @@ public class DefaultBeanContext implements BeanContext {
                     return Optional.empty();
                 }
 
-                definition = lastChanceResolve(beanType, qualifier, throwNonUnique, beanDefinitionList);
+                Optional<BeanDefinition<T>> primary = beanDefinitionList.stream()
+                        .findFirst();
+                definition = primary.orElseGet(() -> lastChanceResolve(beanType, qualifier, throwNonUnique, beanDefinitionList));
             } else {
                 candidates.removeIf(BeanDefinition::isAbstract);
                 if (candidates.size() == 1) {
@@ -2121,7 +2123,14 @@ public class DefaultBeanContext implements BeanContext {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
                     }
-                    definition = lastChanceResolve(beanType, null, throwNonUnique, candidates);
+                    Optional<BeanDefinition<T>> primary = candidates.stream()
+                            .filter(BeanDefinition::isPrimary)
+                            .findFirst();
+                    if (primary.isPresent()) {
+                        definition = primary.get();
+                    } else {
+                        definition = lastChanceResolve(beanType, null, throwNonUnique, candidates);
+                    }
                 }
             }
         }
@@ -2178,14 +2187,6 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private <T> BeanDefinition<T> lastChanceResolve(Class<T> beanType, Qualifier<T> qualifier, boolean throwNonUnique, Collection<BeanDefinition<T>> candidates) {
-        if (candidates.size() > 1) {
-            List<BeanDefinition<T>> primary = candidates.stream()
-                    .filter(BeanDefinition::isPrimary)
-                    .collect(Collectors.toList());
-            if (!primary.isEmpty()) {
-                candidates = primary;
-            }
-        }
         if (candidates.size() == 1) {
             return candidates.iterator().next();
         } else {

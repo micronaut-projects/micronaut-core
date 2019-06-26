@@ -15,17 +15,17 @@
  */
 package io.micronaut.inject.field.nullableinjection
 
-import io.kotlintest.matchers.types.shouldBeNull
-import io.kotlintest.specs.StringSpec
 import io.micronaut.context.BeanContext
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Test
 
-class FieldNullableInjectionSpec : StringSpec({
+class FieldNullableInjectionSpec {
 
-    "test nullable field injection" {
+    @Test
+    fun testNullableFieldInjection() {
         val context = BeanContext.run()
         val b = context.getBean(B::class.java)
-
-        b.a.shouldBeNull()
+        assertNull(b.a)
     }
 
-})
+}

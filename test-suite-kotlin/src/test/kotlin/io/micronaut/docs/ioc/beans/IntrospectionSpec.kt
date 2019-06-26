@@ -1,14 +1,15 @@
 package io.micronaut.docs.ioc.beans
 
-import io.kotlintest.shouldBe
-import io.kotlintest.specs.StringSpec
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.beans.BeanWrapper
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
 
-class IntrospectionSpec : StringSpec ({
+class IntrospectionSpec {
 
-    "test retrieve inspection" {
+    @Test
+    fun testRetrieveInspection() {
 
         // tag::usage[]
         val introspection = BeanIntrospection.getIntrospection(Person::class.java) // <1>
@@ -21,10 +22,11 @@ class IntrospectionSpec : StringSpec ({
         print("Hello ${person.name}")
         // end::usage[]
 
-        name.shouldBe("Fred")
+        assertEquals("Fred", name)
     }
 
-    "test bean wrapper" {
+    @Test
+    fun testBeanWrapper() {
         // tag::wrapper[]
         val wrapper = BeanWrapper.getWrapper(Person("Fred")) // <1>
 
@@ -33,10 +35,10 @@ class IntrospectionSpec : StringSpec ({
 
         println("Person's age now $newAge")
         // end::wrapper[]
-        newAge.shouldBe(20)
+        assertEquals(20, newAge)
     }
 
-    "test nullable" {
+    fun testNullable() {
         val introspection = BeanIntrospection.getIntrospection(Manufacturer::class.java)
         val manufacturer: Manufacturer = introspection.instantiate(null, "John")
 
@@ -44,6 +46,6 @@ class IntrospectionSpec : StringSpec ({
         property.set(manufacturer, "Jane")
         val name = property.get(manufacturer)
 
-        name.shouldBe("Jane")
+        assertEquals("Jane", name)
     }
-})
+}
