@@ -10,7 +10,6 @@ import javax.inject.Singleton;
 // tag::class[]
 @Singleton
 public class SampleEventListener {
-
     private int invocationCounter = 0;
 
     @EventListener
@@ -22,6 +21,5 @@ public class SampleEventListener {
     public int getInvocationCounter() {
         return invocationCounter;
     }
-
 }
 // end::class[]
