@@ -110,6 +110,7 @@ public class HttpServerConfiguration {
     private boolean logHandledExceptions = DEFAULT_LOG_HANDLED_EXCEPTIONS;
     private HostResolutionConfiguration hostResolution;
     private String clientAddressHeader;
+    private String contextPath;
 
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
@@ -248,6 +249,13 @@ public class HttpServerConfiguration {
     }
 
     /**
+     * @return the context path for the web server
+     */
+    public String getContextPath() {
+        return contextPath;
+    }
+
+    /**
      * @param defaultCharset The default charset to use
      */
     public void setDefaultCharset(Charset defaultCharset) {
@@ -377,6 +385,16 @@ public class HttpServerConfiguration {
      */
     public void setClientAddressHeader(String clientAddressHeader) {
         this.clientAddressHeader = clientAddressHeader;
+    }
+
+    /**
+     * Sets the context path for the web server.
+     * The context should start with a "/" character but not end with a "/" character.
+     *
+     * @param contextPath the context path for the web server
+     */
+    public void setContextPath(String contextPath) {
+        this.contextPath = contextPath;
     }
 
     /**
