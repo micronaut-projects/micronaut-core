@@ -7,6 +7,7 @@ import io.micronaut.scheduling.annotation.Async
 // end::imports[]
 import javax.inject.Singleton
 
+// tag::class[]
 @Singleton
 class SampleEventListener {
     int invocationCounter = 0
@@ -17,3 +18,4 @@ class SampleEventListener {
         invocationCounter++
     }
 }
+// end::class[]
