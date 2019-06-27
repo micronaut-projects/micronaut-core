@@ -20,9 +20,9 @@ $ ./gradlew run
 [main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 972ms. Server Running: http://localhost:28933
 ----
 
-By default the Micronaut HTTP server is configured to run on port 8080.
+If you have created a Maven based project, use `./mvnw compile exec:exec` instead.
 
-See the section <<runningSpecificPort, Running Server on a Specific Port>> in the user guide for more options.
+By default the Micronaut HTTP server is configured to run on port 8080. See the section <<runningSpecificPort, Running Server on a Specific Port>> in the user guide for more options.
 
 In order to create a service that responds to "Hello World" you first need a controller. The following is an example of a controller:
 
