@@ -1,0 +1,22 @@
+The environment endpoint returns information about the link:{api}/io/micronaut/context/env/Environment.html[Environment] and its link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource]s.
+
+== Configuration
+
+To configure the info endpoint, supply configuration through `endpoints.info`.
+
+.Environment Endpoint Configuration Example
+[source,yaml]
+----
+endpoints:
+    env:
+        enabled: Boolean    # default: true
+        sensitive: Boolean  # default: true
+----
+
+== Getting information about the environment
+
+To execute the endpoint, send a `GET` request to `/env`.
+
+== Getting information about a particular `PropertySource`
+
+To execute the endpoint, send a `GET` request to `/env/{propertySourceName}`.
