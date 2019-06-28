@@ -19,10 +19,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 
-import javax.annotation.Nonnull;
 import java.lang.annotation.Annotation;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Adapts an {@link AnnotationValue} to the environment.
