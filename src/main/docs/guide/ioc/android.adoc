@@ -1,3 +1,5 @@
+// To move this to multi-lang, we would need to import android deps in build.gradle, and I'm unsure how we'd test it
+// It would be cool to have multi-lang capabilities that don't compile for situations like this
 Since Micronaut dependency injection is based on annotation processors and doesn't rely on reflection, it can be used on Android when using the Android plugin 3.0.0 or above.
 
 This allows you to use the same application framework for both your Android client and server implementation.
