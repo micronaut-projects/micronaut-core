@@ -18,7 +18,7 @@ class SampleEventListenerSpec : AnnotationSpec() {
         listener.invocationCounter.shouldBe(0)
         emitter.publishSampleEvent()
         
-        eventually(3.seconds) {
+        eventually(5.seconds) {
             listener.invocationCounter.shouldBe(1)
         }
     }
