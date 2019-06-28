@@ -110,7 +110,7 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
                         if (!m.hasAnnotation(SessionValue.class)) {
                             return Optional.empty();
                         } else {
-                            String attributeName = m.getValue(SessionValue.class, String.class).orElse(null);
+                            String attributeName = m.stringValue(SessionValue.class).orElse(null);
                             if (!StringUtils.isEmpty(attributeName)) {
                                 return Optional.of(attributeName);
                             } else {

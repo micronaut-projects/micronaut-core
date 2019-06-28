@@ -1841,7 +1841,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         Map<String, Integer> variableReplacements = new HashMap<>();
 
         if (!argumentTypes.isEmpty()) {
-            Optional<String> eachBeanArgument = ownerMetadata.getValue(EachBean.class, String.class);
+            Optional<String> eachBeanArgument = ownerMetadata.stringValue(EachBean.class);
             if (eachBeanArgument.isPresent()) {
                 int size = argumentTypes.size();
                 Iterator<Map.Entry<String, Object>> iterator = argumentTypes.entrySet().iterator();
