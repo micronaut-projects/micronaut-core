@@ -127,6 +127,55 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
+     * Resolves a map of properties for a member that is an array of annotations that have members called "name" or "key" to represent the key and "value" to represent the value.
+     *
+     * <p>For example consider the following annotation definition:</p>
+     *
+     *<pre class="code">
+     *&#064;PropertySource({ @Property(name="one",value="1"), @Property(name="two", value="2")})
+     *public class MyBean {
+     *        ...
+     *}</pre>
+     *
+     * <p>You can use this method to resolve the values of the {@code PropertySource} annotation such that the following assertion is true:</p>
+     *
+     *<pre class="code">
+     *annotationValue.getProperties("value") == [one:1, two:2]
+     *</pre>
+     *
+     * @param member The member
+     * @return The properties as a immutable map.
+     */
+    public @Nonnull Map<String, String> getProperties(@Nonnull String member) {
+        return getProperties(member, "name");
+    }
+
+    /**
+     * Resolve properties with a custom key member.
+     * @param member The member to resolve the properties from
+     * @param keyMember The member of the sub annotation that represents the key.
+     * @return The properties.
+     * @see #getProperties(String)
+     */
+    public Map<String, String> getProperties(@Nonnull String member, String keyMember) {
+        ArgumentUtils.requireNonNull("keyMember", keyMember);
+        if (StringUtils.isNotEmpty(member)) {
+            List<AnnotationValue<Annotation>> values = getAnnotations(member);
+            if (CollectionUtils.isNotEmpty(values)) {
+                Map<String, String> props = new LinkedHashMap<>(values.size());
+                for (AnnotationValue<Annotation> av : values) {
+                    String name = av.stringValue(keyMember).orElse(null);
+                    if (StringUtils.isNotEmpty(name)) {
+                        av.stringValue(AnnotationMetadata.VALUE_MEMBER, valueMapper).ifPresent(v -> props.put(name, v));
+                    }
+                }
+                return Collections.unmodifiableMap(props);
+            }
+        }
+        return Collections.emptyMap();
+    }
+
+    /**
      * Return the enum value of the given member of the given enum type.
      *
      * @param member The annotation member
