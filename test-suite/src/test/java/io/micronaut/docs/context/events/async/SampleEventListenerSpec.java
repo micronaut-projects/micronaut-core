@@ -19,7 +19,7 @@ public class SampleEventListenerSpec {
         SampleEventListener listener = context.getBean(SampleEventListener.class);
         assertEquals(0, listener.getInvocationCounter());
         emitter.publishSampleEvent();
-        await().atMost(5, SECONDS).until(listener::getInvocationCounter, equalTo(1));
+        await().atMost(10, SECONDS).until(listener::getInvocationCounter, equalTo(1));
     }
 
 }
