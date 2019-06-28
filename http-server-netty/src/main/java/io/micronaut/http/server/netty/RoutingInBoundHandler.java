@@ -1437,7 +1437,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         HttpStatus status = HttpStatus.OK;
 
         if (annotationMetadata.hasAnnotation(Status.class)) {
-            status = annotationMetadata.getValue(Status.class, HttpStatus.class).orElse(status);
+            status = annotationMetadata.stringValue(Status.class).map(HttpStatus::valueOf).orElse(status);
         }
 
         return HttpResponse.status(status);

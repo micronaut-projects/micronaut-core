@@ -1758,9 +1758,9 @@ public class DefaultBeanContext implements BeanContext {
             return (clazz) -> clazz == superclass || clazz == bt;
         }
         if (annotationMetadata.hasAnnotation(DefaultImplementation.class)) {
-            Optional<Class> defaultImpl = annotationMetadata.getValue(DefaultImplementation.class, Class.class);
+            Optional<Class> defaultImpl = annotationMetadata.classValue(DefaultImplementation.class);
             if (!defaultImpl.isPresent()) {
-                defaultImpl = annotationMetadata.getValue(DefaultImplementation.class, "name", Class.class);
+                defaultImpl = annotationMetadata.classValue(DefaultImplementation.class, "name");
             }
             if (defaultImpl.filter(impl -> impl == bt).isPresent()) {
                 return (clazz) -> clazz.isAssignableFrom(bt);

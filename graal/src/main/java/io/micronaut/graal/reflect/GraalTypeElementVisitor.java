@@ -101,7 +101,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 }
             } else if (element.hasAnnotation(TypeHint.class)) {
                 packages.add(element.getPackageName());
-                final String[] introspectedClasses = element.getValue(TypeHint.class, String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
+                final String[] introspectedClasses = element.stringValues(TypeHint.class);
                 final TypeHint typeHint = element.synthesize(TypeHint.class);
                 TypeHint.AccessType[] accessTypes = DEFAULT_ACCESS_TYPE;
 
