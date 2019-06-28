@@ -74,15 +74,6 @@ public class BaseApplication extends Application { // <1>
             ... // shortened for brevity, it is not necessary to implement other methods
         });
     }
-
-    @Override
-    public void onTerminate() {
-        super.onTerminate();
-        if(ctx != null && ctx.isRunning()) { // <4>
-            ctx.stop();
-        }
-    }
-
 }
 
 ----
@@ -90,5 +81,4 @@ public class BaseApplication extends Application { // <1>
 <1> Extend the `android.app.Application` class
 <2> Run the `ApplicationContext` with the `ANDROID` environment
 <3> To allow dependency injection of Android `Activity` instances register a `ActivityLifecycleCallbacks` instance
-<4> Stop the `ApplicationContext` when the application terminates
 
