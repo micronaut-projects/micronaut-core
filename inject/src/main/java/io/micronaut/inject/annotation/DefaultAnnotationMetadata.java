@@ -187,7 +187,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
         if (repeatable != null) {
             Object v = getRawSingleValue(repeatable.value().getName(), VALUE_MEMBER, valueMapper);
-            return enumValueOf(enumType, v);
+            if (v instanceof AnnotationValue) {
+                return ((AnnotationValue<?>) v).enumValue(member, enumType, valueMapper);
+            }
+            return Optional.empty();
         } else {
             return enumValue(annotation.getName(), member, enumType, valueMapper);
         }
@@ -228,7 +231,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
-        Object rawSingleValue = getRawSingleValue(annotation, member, null);
+        Object rawSingleValue = getRawValue(annotation, member);
         //noinspection unchecked
         Class<T>[] classes = (Class<T>[]) AnnotationValue.resolveClassValues(rawSingleValue);
         if (classes != null) {
@@ -246,10 +249,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (repeatable != null) {
             Object v = getRawSingleValue(repeatable.value().getName(), member, null);
             if (v instanceof AnnotationValue) {
-                //noinspection unchecked
-                return (Class<T>[]) ((AnnotationValue<?>) v).classValues(member);
+                Class<?>[] classes = ((AnnotationValue<?>) v).classValues(member);
+                return (Class<T>[]) classes;
             }
-            //noinspection unchecked
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         } else {
             return classValues(annotation.getName(), member);

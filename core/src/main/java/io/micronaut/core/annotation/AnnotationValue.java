@@ -186,6 +186,20 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Override
     @SuppressWarnings("unchecked")
     public <E extends Enum> Optional<E> enumValue(@Nonnull String member, @Nonnull Class<E> enumType) {
+        return enumValue(member, enumType, valueMapper);
+    }
+
+    /**
+     * Return the enum value of the given member of the given enum type.
+     *
+     * @param member The annotation member
+     * @param enumType The required type
+     * @param valueMapper The value mapper
+     * @return An {@link Optional} of the enum value
+     * @param <E> The enum type
+     */
+    @SuppressWarnings("unchecked")
+    public <E extends Enum> Optional<E> enumValue(@Nonnull String member, @Nonnull Class<E> enumType, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("enumType", enumType);
         if (StringUtils.isNotEmpty(member)) {
             Object o = getRawSingleValue(member, valueMapper);
@@ -204,6 +218,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         }
         return Optional.empty();
     }
+
 
     /**
      * The value of the annotation as a Class.
