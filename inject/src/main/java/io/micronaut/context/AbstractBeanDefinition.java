@@ -1737,7 +1737,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
 
         if (qualifier == null) {
-            Class<?>[] byType = annotationMetadata.findAnnotation(Type.class).map(av -> av.classValues(AnnotationMetadata.VALUE_MEMBER)).orElse(null);
+            Class<?>[] byType = annotationMetadata.hasDeclaredStereotype(Type.class) ? annotationMetadata.classValues(Type.class) : null;
             if (byType != null) {
                 qualifier = Qualifiers.byType(byType);
             } else {
