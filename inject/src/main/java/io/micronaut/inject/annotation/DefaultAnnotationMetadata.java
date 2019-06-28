@@ -21,6 +21,7 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -229,6 +230,34 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return Optional.empty();
     }
 
+    @Override
+    public <T> Class<T>[] classValues(@Nonnull String annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        Object rawSingleValue = getRawSingleValue(annotation, member, null);
+        //noinspection unchecked
+        return (Class<T>[]) AnnotationValue.resolveClassValues(rawSingleValue);
+    }
+
+    @Override
+    public <T> Class<T>[] classValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+        final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            Object v = getRawSingleValue(repeatable.value().getName(), member, null);
+            if (v instanceof AnnotationValue) {
+                //noinspection unchecked
+                return (Class<T>[]) ((AnnotationValue<?>) v).classValues(member);
+            }
+            //noinspection unchecked
+            return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        } else {
+            return classValues(annotation.getName(), member);
+        }
+    }
+
     @Nonnull
     @Override
     public Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
@@ -247,7 +276,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
         if (repeatable != null) {
-            Object v = getRawSingleValue(repeatable.value().getName(), VALUE_MEMBER, valueMapper);
+            Object v = getRawSingleValue(repeatable.value().getName(), member, valueMapper);
             if (v instanceof AnnotationValue) {
                 Optional o = ((AnnotationValue<?>) v).classValue(member, valueMapper);
                 return o;
