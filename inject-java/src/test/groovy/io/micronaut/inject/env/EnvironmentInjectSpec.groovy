@@ -45,11 +45,10 @@ class EnvironmentInjectSpec extends Specification {
 
         when:
         BeanDefinition beanDefinition = ctx.getBeanDefinition(B.class)
-        List<AnnotationValue> annotations = beanDefinition.getAnnotation(PropertySource).getAnnotations("value")
+        def props = beanDefinition.getAnnotation(PropertySource).getProperties("value")
 
         then:
-        annotations.size() == 1
-        annotations[0].getValue(String).get() == "hello"
+        props == [x:'hello']
 
     }
 }
