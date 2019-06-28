@@ -5,7 +5,9 @@ import io.micronaut.docs.context.events.SampleEventEmitterBean;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.Matchers.equalTo;
 
 // tag::class[]
 public class SampleEventListenerSpec {
@@ -17,7 +19,7 @@ public class SampleEventListenerSpec {
         SampleEventListener listener = context.getBean(SampleEventListener.class);
         assertEquals(0, listener.getInvocationCounter());
         emitter.publishSampleEvent();
-        assertEquals(1, listener.getInvocationCounter());
+        await().atMost(5, SECONDS).until(listener::getInvocationCounter, equalTo(1));
     }
 
 }
