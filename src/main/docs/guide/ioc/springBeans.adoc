@@ -1,3 +1,4 @@
+// Doesn't seem appropriate to multi-lang these samples TODO check
 The link:{api}/io/micronaut/spring/beans/MicronautBeanProcessor.html[MicronautBeanProcessor]
 class is a `BeanFactoryPostProcessor` which will add Micronaut beans to a
 Spring Application Context.  An instance of `MicronautBeanProcessor` should
