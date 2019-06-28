@@ -150,6 +150,78 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return isPresent;
     }
 
+    @Override
+    public <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, Class<E> enumType) {
+        return enumValue(annotation, VALUE_MEMBER, enumType, null);
+    }
+
+    @Override
+    public <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+        return enumValue(annotation, member, enumType, null);
+    }
+
+    @Override
+    public <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, Class<E> enumType) {
+        return enumValue(annotation, VALUE_MEMBER, enumType);
+    }
+
+    @Override
+    public <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+        return enumValue(annotation, member, enumType, null);
+    }
+
+    /**
+     * Retrieve the class value and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param enumType The enum type
+     * @param valueMapper The value mapper
+     * @param <E> The enum type
+     * @return The class value
+     */
+    @Internal
+    <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+        final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            Object v = getRawSingleValue(repeatable.value().getName(), VALUE_MEMBER, valueMapper);
+            return enumValueOf(enumType, v);
+        } else {
+            return enumValue(annotation.getName(), member, enumType, valueMapper);
+        }
+    }
+
+    /**
+     * Retrieve the class value and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param enumType The enum type
+     * @param valueMapper The value mapper
+     * @param <E> The enum type
+     * @return The class value
+     */
+    @Internal
+    <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+        Object rawValue = getRawSingleValue(annotation, member, valueMapper);
+        return enumValueOf(enumType, rawValue);
+    }
+
+    private <E extends Enum> Optional<E> enumValueOf(Class<E> enumType, Object rawValue) {
+        if (rawValue != null) {
+            if (enumType.isInstance(rawValue)) {
+                return Optional.of((E) rawValue);
+            } else {
+                try {
+                    return Optional.of((E) Enum.valueOf(enumType, rawValue.toString()));
+                } catch (Exception e) {
+                    return Optional.empty();
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     @Nonnull
     @Override
     public Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
@@ -175,7 +247,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
             return Optional.empty();
         } else {
-            return classValue(annotation.getName(), member);
+            return classValue(annotation.getName(), member, valueMapper);
         }
     }
 

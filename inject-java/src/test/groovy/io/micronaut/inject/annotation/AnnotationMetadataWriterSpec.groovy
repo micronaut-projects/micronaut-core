@@ -240,6 +240,10 @@ class Test {
         then:
         metadata != null
         metadata.synthesize(EnumAnn).value() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn, EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn, "value", EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn.name, EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn.name, "value", EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
     }
 
     void "test read external constants"() {
