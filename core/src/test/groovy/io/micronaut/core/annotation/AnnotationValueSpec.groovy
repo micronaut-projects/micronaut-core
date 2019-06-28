@@ -25,6 +25,7 @@ class AnnotationValueSpec extends Specification {
                        .build()
 
         expect:
+        av.classValues() == [AnnotationValueSpec] as Class[]
         av.classValue().get() == AnnotationValueSpec
         av.classValue("value").get() == AnnotationValueSpec
         av.classValue("value", Specification).get() == AnnotationValueSpec
