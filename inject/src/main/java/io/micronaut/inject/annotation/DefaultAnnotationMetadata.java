@@ -230,7 +230,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
         Object rawSingleValue = getRawSingleValue(annotation, member, null);
         //noinspection unchecked
-        return (Class<T>[]) AnnotationValue.resolveClassValues(rawSingleValue);
+        Class<T>[] classes = (Class<T>[]) AnnotationValue.resolveClassValues(rawSingleValue);
+        if (classes != null) {
+            return classes;
+        }
+        //noinspection unchecked
+        return ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
     @Override
