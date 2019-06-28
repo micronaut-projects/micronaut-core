@@ -4,6 +4,7 @@ import spock.lang.Specification
 
 class AnnotationValueSpec extends Specification {
 
+
     void "test class value"() {
         given:
         def av = AnnotationValue.builder("test.Foo")

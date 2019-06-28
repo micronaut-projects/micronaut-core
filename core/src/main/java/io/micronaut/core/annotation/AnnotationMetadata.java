@@ -559,6 +559,65 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * The value of the given enum.
+     *
+     * @param annotation The annotation
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An {@link Optional} enum value
+     */
+    default <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return enumValue(annotation, VALUE_MEMBER, enumType);
+    }
+
+    /**
+     * The value of the annotation as a Class.
+     *
+     * @param annotation The annotation
+     * @param member     The annotation member
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An {@link Optional} class
+     */
+    default <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return getValue(annotation, member, enumType);
+    }
+
+    /**
+     * The value of the annotation as a Class.
+     *
+     * @param annotation The annotation
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An {@link Optional} class
+     */
+    default <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+
+        return enumValue(annotation, VALUE_MEMBER, enumType);
+    }
+
+    /**
+     * The value of the annotation as a Class.
+     *
+     * @param annotation The annotation
+     * @param member     The annotation member
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An {@link Optional} class
+     */
+    default <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return enumValue(annotation.getName(), member, enumType);
+    }
+
+    /**
      * The value of the annotation as a Class.
      *
      * @param annotation The annotation
