@@ -32,6 +32,17 @@ class AnnotationValueSpec extends Specification {
         !av.classValue("value", URL).isPresent()
     }
 
+    void "test class values"() {
+        given:
+        def av = AnnotationValue.builder("test.Foo")
+                .values(AnnotationValueSpec, Specification)
+                .build()
+
+        expect:
+        av.classValues().contains(AnnotationValueSpec)
+        av.classValues().contains(Specification)
+    }
+
     void "test class value 2"() {
         given:
         def av = AnnotationValue.builder("test.Foo")

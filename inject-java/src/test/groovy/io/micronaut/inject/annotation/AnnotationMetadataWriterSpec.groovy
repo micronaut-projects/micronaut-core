@@ -143,6 +143,7 @@ class Test {
         then:
         metadata != null
         metadata.getValue(Timed, "percentiles", double[].class).get() == [1.1d] as double[]
+        metadata.doubleValue(Timed,"percentiles").asDouble == 1.1d
         metadata.getValue("test.MyAnn", "doubleArray", double[].class).get() == [1.1d] as double[]
     }
 
@@ -166,6 +167,7 @@ class Test {
         metadata.hasAnnotation(MyStereotype)
         // the value of @Type should be the the one declared on the the @MyStereotype annotation not the one declared on @Recoverable
         metadata.getValue(Type.class, String.class).get() == StubIntroducer.class.getName()
+        metadata.stringValue(Type.class).get() == StubIntroducer.class.getName()
         // the stereotypes should include meta annotation stereotypes
         metadata.getAnnotationNamesByStereotype(Around.class).contains(Recoverable.class.getName())
     }
@@ -217,6 +219,7 @@ class Test {
 
         then:
         metadata != null
+        metadata.enumValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
         metadata.getValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
         metadata.getValue(Requires, "version").get() == "1.8"
     }
