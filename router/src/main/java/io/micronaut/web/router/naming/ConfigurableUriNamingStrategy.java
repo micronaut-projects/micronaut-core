@@ -48,7 +48,7 @@ public class ConfigurableUriNamingStrategy extends HyphenatedUriNamingStrategy {
      */
     @Inject
     public ConfigurableUriNamingStrategy(@Value("${micronaut.server.context-path}") String contextPath) {
-        this.contextPath = contextPath;
+        this.contextPath = normalizeContextPath(contextPath);
     }
 
     @Override
@@ -70,4 +70,15 @@ public class ConfigurableUriNamingStrategy extends HyphenatedUriNamingStrategy {
     public @Nonnull String resolveUri(Class type, PropertyConvention id) {
         return contextPath + super.resolveUri(type, id);
     }
+
+    private String normalizeContextPath(String contextPath) {
+        if (contextPath.charAt(0) != '/') {
+            contextPath = '/' + contextPath;
+        }
+        if (contextPath.charAt(contextPath.length() - 1) == '/') {
+            contextPath = contextPath.substring(0, contextPath.length() - 1);
+        }
+        return contextPath;
+    }
 }
+

@@ -389,7 +389,6 @@ public class HttpServerConfiguration {
 
     /**
      * Sets the context path for the web server.
-     * The context should start with a "/" character but not end with a "/" character.
      *
      * @param contextPath the context path for the web server
      */
