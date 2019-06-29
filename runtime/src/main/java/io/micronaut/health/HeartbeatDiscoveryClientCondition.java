@@ -22,6 +22,8 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.discovery.CompositeDiscoveryClient;
 
+import static java.lang.Boolean.TRUE;
+
 /**
  * Custom condition to conditionally enable the heart beat.
  *
@@ -33,10 +35,10 @@ public final class HeartbeatDiscoveryClientCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
         final ApplicationContext beanContext = (ApplicationContext) context.getBeanContext();
-        final Boolean enabled = beanContext.getProperty(HeartbeatConfiguration.ENABLED, Boolean.class).orElse(null);
+        final Boolean enabled = beanContext.getProperty(HeartbeatConfiguration.ENABLED, Boolean.class).orElse(TRUE);
 
         final CompositeDiscoveryClient discoveryClient = beanContext.getBean(CompositeDiscoveryClient.class);
-        if ((enabled != null && enabled) || ArrayUtils.isNotEmpty(discoveryClient.getDiscoveryClients())) {
+        if (enabled || ArrayUtils.isNotEmpty(discoveryClient.getDiscoveryClients())) {
             return true;
         } else {
             context.fail("Heartbeat not enabled since no Discovery client active");
