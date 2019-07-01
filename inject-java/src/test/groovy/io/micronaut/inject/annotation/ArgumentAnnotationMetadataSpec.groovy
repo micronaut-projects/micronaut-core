@@ -25,7 +25,7 @@ class ArgumentAnnotationMetadataSpec extends AbstractTypeElementSpec {
 
     void "test basic argument metadata"() {
         given:
-        AnnotationMetadata metadata = buildFieldAnnotationMetadata('''
+        AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
 @javax.inject.Singleton
@@ -46,7 +46,7 @@ class Test {
 
     void "test basic annotation on a byte[] in executable method"() {
         given:
-        AnnotationMetadata metadata = buildFieldAnnotationMetadata('''
+        AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
 @javax.inject.Singleton
@@ -67,7 +67,7 @@ class Test {
 
     void "test argument metadata inheritance"() {
         given:
-        AnnotationMetadata metadata = buildFieldAnnotationMetadata('''
+        AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
 @javax.inject.Singleton
