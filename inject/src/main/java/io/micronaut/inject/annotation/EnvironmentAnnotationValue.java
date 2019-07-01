@@ -19,7 +19,11 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 
+import javax.annotation.Nonnull;
 import java.lang.annotation.Annotation;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.function.Function;
 
 /**
  * Adapts an {@link AnnotationValue} to the environment.
@@ -31,6 +35,9 @@ import java.lang.annotation.Annotation;
 @Internal
 class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A> {
 
+    private final Environment environment;
+    private static final IdentityHashMap<Environment, Function<Object, Object>> valueMapperCache = new IdentityHashMap<>(1);
+
     /**
      * Default constructor.
      *
@@ -38,10 +45,10 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
      * @param target The target
      */
     EnvironmentAnnotationValue(Environment environment, AnnotationValue<A> target) {
-        super(target, AnnotationMetadataSupport.getDefaultValues(target.getAnnotationName()), EnvironmentConvertibleValuesMap.of(
+/*        super(target, AnnotationMetadataSupport.getDefaultValues(target.getAnnotationName()), EnvironmentConvertibleValuesMap.of(
                 environment,
                 target.getValues()
-        ), environment != null ? o -> {
+        ), environment != null ? (o) -> {
             if (o instanceof String) {
                 String v = (String) o;
                 if (v.contains("${")) {
@@ -49,6 +56,38 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
                 }
             }
             return o;
-        } : null);
+        } : null);*/
+        super(target, AnnotationMetadataSupport.getDefaultValues(target.getAnnotationName()), EnvironmentConvertibleValuesMap.of(
+                environment,
+                target.getValues()
+        ), environment != null ? valueMapperCache.computeIfAbsent(environment, (env) -> (o) -> {
+            if (o instanceof String) {
+                String v = (String) o;
+                if (v.contains("${")) {
+                    return env.getPlaceholderResolver().resolveRequiredPlaceholders(v);
+                }
+            }
+            return o;
+        }) : null);
+        this.environment = environment;
+    }
+
+
+    @Override
+    public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
+        List<AnnotationValue<T>> annotationValues = super.getAnnotations(member, type);
+        for (int i = 0; i < annotationValues.size(); i++) {
+            annotationValues.set(i, new EnvironmentAnnotationValue<T>(environment, annotationValues.get(i)));
+        }
+        return annotationValues;
+    }
+
+    @Override
+    public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
+        List<AnnotationValue<T>> annotationValues = super.getAnnotations(member);
+        for (int i = 0; i < annotationValues.size(); i++) {
+            annotationValues.set(i, new EnvironmentAnnotationValue<T>(environment, annotationValues.get(i)));
+        }
+        return annotationValues;
     }
 }

@@ -708,7 +708,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      * @return The result
      */
-    public final @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
+    public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("type", type);
         Object v = values.get(member);
@@ -744,7 +744,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The result
      */
     @SuppressWarnings("unchecked")
-    public final @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
+    public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
         if (v instanceof AnnotationValue) {

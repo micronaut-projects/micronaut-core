@@ -50,5 +50,13 @@ class EnvironmentInjectSpec extends Specification {
         then:
         props == [x:'hello']
 
+        when:
+        AnnotationValue annotation = beanDefinition.getAnnotation(PropertySource)
+
+        then:
+        annotation.getAnnotations("value").size() == 1
+        annotation.getAnnotations("value")[0].getValue(String).get() == "hello"
+        annotation.getAnnotation("value", AnnotationValue).get().getValue(String).get() == "hello"
+        annotation.getAnnotations("value", AnnotationValue)[0].getValue(String).get() == "hello"
     }
 }
