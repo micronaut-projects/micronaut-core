@@ -63,10 +63,10 @@ abstract class AbstractTypeElementSpec extends Specification {
         return metadata
     }
 
-    AnnotationMetadata buildFieldAnnotationMetadata(String cls, String methodName, String fieldName) {
+    AnnotationMetadata buildMethodArgumentAnnotationMetadata(String cls, String methodName, String argumentName) {
         TypeElement element = buildTypeElement(cls)
         ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
-        VariableElement argument = method.parameters.find() { it.simpleName.toString() == fieldName }
+        VariableElement argument = method.parameters.find() { it.simpleName.toString() == argumentName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
         return metadata

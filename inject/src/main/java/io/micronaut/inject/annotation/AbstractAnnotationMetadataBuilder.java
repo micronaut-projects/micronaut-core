@@ -687,15 +687,18 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private void processAnnotationStereotype(A annotationMirror, DefaultAnnotationMetadata annotationMetadata, boolean isDeclared) {
         String parentAnnotationName = getAnnotationTypeName(annotationMirror);
-        T annotationType = getTypeForAnnotation(annotationMirror);
-        List<String> parentAnnotations = new ArrayList<>();
-        parentAnnotations.add(parentAnnotationName);
-        buildStereotypeHierarchy(
-                parentAnnotations,
-                annotationType,
-                annotationMetadata,
-                isDeclared
-        );
+        // don't bother with stereotypes for nullable annotations
+        if (!parentAnnotationName.endsWith(".Nullable")) {
+            T annotationType = getTypeForAnnotation(annotationMirror);
+            List<String> parentAnnotations = new ArrayList<>();
+            parentAnnotations.add(parentAnnotationName);
+            buildStereotypeHierarchy(
+                    parentAnnotations,
+                    annotationType,
+                    annotationMetadata,
+                    isDeclared
+            );
+        }
     }
 
     private void processAnnotationStereotype(List<String> parents, A annotationMirror, DefaultAnnotationMetadata metadata, boolean isDeclared) {

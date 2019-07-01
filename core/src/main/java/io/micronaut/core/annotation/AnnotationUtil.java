@@ -38,6 +38,8 @@ public class AnnotationUtil {
 
     public static final List<String> INTERNAL_ANNOTATION_NAMES = Arrays.asList(
         Retention.class.getName(),
+        "javax.annotation.meta.TypeQualifier",
+        "javax.annotation.meta.TypeQualifierNickname",
         "kotlin.annotation.Retention",
         Inherited.class.getName(),
         SuppressWarnings.class.getName(),
