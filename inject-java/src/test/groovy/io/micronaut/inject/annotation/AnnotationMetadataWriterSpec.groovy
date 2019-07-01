@@ -41,6 +41,28 @@ import java.lang.annotation.Retention
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
 
+    void "test javax nullable on field"() {
+        given:
+        AnnotationMetadata metadata = buildMethodAnnotationMetadata('''\
+package test;
+
+import javax.annotation.Nullable;
+
+class Test {
+    @Nullable
+    void testMethod() {}
+}
+''', 'testMethod')
+
+
+
+        expect:
+        metadata != null
+        metadata.declaredAnnotationNames.size() == 1
+        metadata.declaredStereotypes == null
+        metadata.annotationNames.size() == 1
+    }
+
     void "test write annotation metadata with primitive arrays"() {
         given:
         AnnotationMetadata toWrite = new DefaultAnnotationMetadata(
