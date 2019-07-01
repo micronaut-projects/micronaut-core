@@ -260,9 +260,20 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
+    public Environment removePropertySource(PropertySource propertySource) {
+        propertySources.remove(propertySource.getName());
+        if (isRunning() && !reading.get()) {
+            resetCaches();
+        }
+        return this;
+    }
+
+    @Override
     public DefaultEnvironment addPropertySource(String name, Map<String, ? super Object> values) {
         return (DefaultEnvironment) super.addPropertySource(name, values);
     }
+
+
 
     @Override
     public Environment addPackage(String pkg) {
