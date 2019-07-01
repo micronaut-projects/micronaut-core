@@ -225,6 +225,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * @param owningType           The owning type
      * @param loadTypeMethods      The generated load type methods
      */
+    @Internal
     public static void writeAnnotationDefaults(DefaultAnnotationMetadata annotationMetadata, ClassWriter classWriter, Type owningType, Map<String, GeneratorAdapter> loadTypeMethods) {
         final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
         if (CollectionUtils.isNotEmpty(annotationDefaultValues)) {
