@@ -13,5 +13,10 @@ dependencies {
     shadowCompile "org.ow2.asm:asm-commons:$asmVersion"
     shadowCompile "org.ow2.asm:asm-tree:$asmVersion"
     shadowCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+
+    compile([
+            dependencyVersion('jackson.datatype'),
+            dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
+    ])
 }
 

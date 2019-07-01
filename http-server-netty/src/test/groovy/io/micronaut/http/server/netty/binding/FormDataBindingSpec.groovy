@@ -15,19 +15,24 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import com.fasterxml.jackson.annotation.JsonProperty
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
-import io.micronaut.http.client.DefaultHttpClientConfiguration
-import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.annotation.Consumes
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Produces
+import io.micronaut.http.annotation.Status
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Post
 import spock.lang.Issue
+import javax.validation.Valid
 
 /**
  * @author Graeme Rocher
@@ -125,7 +130,55 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         then:
         response == 'ABC    DEF    '
     }
-    
+
+    void "Http Client and request form-url-encoded work with Map"() {
+        given:
+        HttpRequest request = HttpRequest.POST('/pojo/jsonproperty', new DeviceAuthentication(clientId: '12345').toMap())
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+
+        when:
+        HttpResponse<String>  rsp = client.exchange(request, String)
+
+        then:
+        rsp.status() == HttpStatus.OK
+        rsp.getBody().get() == '12345'
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1853")
+    void "Http Client and request form-url-encoded will use @JsonProperty annotation"() {
+        given:
+        HttpRequest request = HttpRequest.POST('/pojo/jsonproperty', new DeviceAuthentication(clientId: '12345'))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+
+        when:
+        HttpResponse<String> rsp = client.exchange(request, String)
+
+        then:
+        rsp.status() == HttpStatus.OK
+        rsp.getBody().get() == '12345'
+    }
+
+    @Controller('/pojo/jsonproperty')
+    static class PojoJsonPropertyController {
+        @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+        @Status(HttpStatus.OK)
+        @Produces(MediaType.TEXT_PLAIN)
+        @Post
+        String index(@Valid @Body DeviceAuthentication device) {
+            device.clientId
+        }
+    }
+
+    @Introspected
+    static class DeviceAuthentication {
+        @JsonProperty("client_id")
+        String clientId
+
+        Map<String, Object> toMap() {
+            [client_id: clientId]
+        }
+    }
+
     @Controller(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
     static class FormController {
         @Post('/simple')
@@ -143,7 +196,6 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
             Integer age
         }
     }
-
 
     @Controller('/form/saml/test')
     static class MainController {
