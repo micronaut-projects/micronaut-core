@@ -10,5 +10,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 public @interface SomeAnn {
     @NotBlank
+    @SomeAnn("good")
     String value();
 }
