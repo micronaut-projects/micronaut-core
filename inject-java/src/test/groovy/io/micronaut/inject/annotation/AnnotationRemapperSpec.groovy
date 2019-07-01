@@ -10,7 +10,7 @@ class AnnotationRemapperSpec extends AbstractTypeElementSpec {
 
     void "test nullable"() {
         given:
-        AnnotationMetadata metadata = buildFieldAnnotationMetadata('''
+        AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -31,7 +31,7 @@ class Test {
 
     void "test nonnull"() {
         given:
-        AnnotationMetadata metadata = buildFieldAnnotationMetadata('''
+        AnnotationMetadata metadata = buildMethodArgumentAnnotationMetadata('''
 package test;
 
 import edu.umd.cs.findbugs.annotations.NonNull;

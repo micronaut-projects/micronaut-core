@@ -76,6 +76,34 @@ class EnvironmentEndpointSpec extends Specification {
         doCleanup(client)
     }
 
+    void "it masks sensitive values"() {
+        given:
+        this.embeddedServer = ApplicationContext.run(EmbeddedServer,  [
+                'endpoints.env.sensitive': false,
+                'foo.bar':'baz',
+                'my.password':'1234',
+                'loginCredentials': 'blah',
+                'CLIENT_CERTIFICATE': 'longString',
+                'appKey': 'app',
+                'appSecret': 'app',
+                'apiToken': 'token'
+        ], Environment.TEST)
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        Map result = client.exchange("/${EnvironmentEndpoint.NAME}/context", Map).blockingFirst().body()
+
+        then:
+        result.properties['foo.bar'] == 'baz'
+        ['my.password', 'loginCredentials', 'CLIENT_CERTIFICATE', 'appKey', 'appSecret', 'apiToken'].each {
+            assert result.properties[it] == '*****'
+        }
+
+        cleanup:
+        doCleanup(client)
+
+    }
+
     private RxHttpClient buildClient() {
         this.embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.env.sensitive': false, 'foo.bar':'baz'], Environment.TEST)
         return embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
