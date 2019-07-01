@@ -219,7 +219,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     Environment addPropertySource(PropertySource propertySource);
 
     /**
-     * Removes a property source from this environmt
+     * Removes a property source from this environment.
      * @param propertySource The property source
      * @return This environment
      */
