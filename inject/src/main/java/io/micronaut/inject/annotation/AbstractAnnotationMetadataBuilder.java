@@ -872,7 +872,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private void processAnnotationStereotype(A annotationMirror, DefaultAnnotationMetadata annotationMetadata, boolean isDeclared) {
         T annotationType = getTypeForAnnotation(annotationMirror);
         String parentAnnotationName = getAnnotationTypeName(annotationMirror);
-        processAnnotationStereotypes(annotationMetadata, isDeclared, annotationType, parentAnnotationName);
+        if (!parentAnnotationName.endsWith(".Nullable")) {
+            processAnnotationStereotypes(annotationMetadata, isDeclared, annotationType, parentAnnotationName);
+        }
     }
 
     private void processAnnotationStereotypes(DefaultAnnotationMetadata annotationMetadata, boolean isDeclared, T annotationType, String annotationName) {
