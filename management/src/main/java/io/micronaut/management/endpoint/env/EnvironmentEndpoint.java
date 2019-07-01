@@ -22,6 +22,8 @@ import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
 
 import java.util.*;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * {@link Endpoint} that displays information about the environment and its property sources.
@@ -37,13 +39,21 @@ public class EnvironmentEndpoint {
      */
     public static final String NAME = "env";
 
+    public static final String[] PROPERTY_NAMES_TO_MASK = new String[] {
+            "password", "credential", "certificate", "key", "secret", "token"
+    };
+
     private final Environment environment;
+    private final List<Pattern> maskPatterns;
 
     /**
      * @param environment The {@link Environment}
      */
     public EnvironmentEndpoint(Environment environment) {
         this.environment = environment;
+        this.maskPatterns = Arrays.stream(PROPERTY_NAMES_TO_MASK)
+                .map(s -> Pattern.compile(".*" + s + ".*", Pattern.CASE_INSENSITIVE))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -80,7 +90,7 @@ public class EnvironmentEndpoint {
 
     private Map<String, Object> getAllProperties(PropertySource propertySource) {
         Map<String, Object> properties = new LinkedHashMap<>();
-        propertySource.forEach(k -> properties.put(k, propertySource.get(k)));
+        propertySource.forEach(k -> properties.put(k, maskProperty(k, propertySource.get(k))));
         return properties;
     }
 
@@ -91,5 +101,14 @@ public class EnvironmentEndpoint {
         propertySourceInfo.put("convention", propertySource.getConvention().name());
         propertySourceInfo.put("properties", getAllProperties(propertySource));
         return propertySourceInfo;
+    }
+
+    private Object maskProperty(String key, Object value) {
+        for (Pattern pattern : this.maskPatterns) {
+            if (pattern.matcher(key).matches()) {
+                return "*****";
+            }
+        }
+        return value;
     }
 }
