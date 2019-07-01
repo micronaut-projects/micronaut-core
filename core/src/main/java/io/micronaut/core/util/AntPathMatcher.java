@@ -53,7 +53,7 @@ package io.micronaut.core.util;
  * <p><b>N.B.</b>: This class was forked from Apache Shiro with modifications.</p>
  * <p>
  * <p>As per the Apache 2.0 license, the original copyright notice and all author and copyright information have
- * remained in tact.</p>
+ * remained intact.</p>
  *
  * @since 1.0
  */
