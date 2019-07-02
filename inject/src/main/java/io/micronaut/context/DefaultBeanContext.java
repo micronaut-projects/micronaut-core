@@ -460,7 +460,7 @@ public class DefaultBeanContext implements BeanContext {
                 BeanKey concreteKey = new BeanKey(singleton.getClass(), qualifier);
                 singletonObjects.put(concreteKey, new BeanRegistration<>(concreteKey, beanDefinition, singleton));
             } else {
-                NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(singleton.getClass());
+                NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(singleton.getClass(), qualifier);
                 if (qualifier instanceof Named) {
                     final BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(dynamicRegistration);
                     delegate.put(Named.class.getName(), ((Named) qualifier).getName());
@@ -2208,9 +2208,19 @@ public class DefaultBeanContext implements BeanContext {
 
     private <T> T createAndRegisterSingleton(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier) {
         synchronized (singletonObjects) {
-            T createdBean = doCreateBean(resolutionContext, definition, qualifier, true, null);
-            registerSingletonBean(definition, beanType, createdBean, qualifier, true);
-            return createdBean;
+            if (definition instanceof NoInjectionBeanDefinition) {
+                NoInjectionBeanDefinition<T> manuallyRegistered = (NoInjectionBeanDefinition) definition;
+                T bean = (T) singletonObjects.get(new BeanKey(beanType, manuallyRegistered.getQualifier()));
+                if (bean == null) {
+                    throw new IllegalStateException("Manually registered singleton no longer present in bean context");
+                }
+                registerSingletonBean(definition, beanType, bean, qualifier, true);
+                return bean;
+            } else {
+                T createdBean = doCreateBean(resolutionContext, definition, qualifier, true, null);
+                registerSingletonBean(definition, beanType, createdBean, qualifier, true);
+                return createdBean;
+            }
         }
     }
 
@@ -2848,11 +2858,19 @@ public class DefaultBeanContext implements BeanContext {
         private final Class<?> singletonClass;
         private final Map<Class<?>, List<Argument<?>>> typeArguments = new HashMap<>();
 
+        private final Qualifier<T> qualifier;
+
         /**
          * @param singletonClass The singleton class
          */
-        NoInjectionBeanDefinition(Class singletonClass) {
+        NoInjectionBeanDefinition(Class singletonClass, Qualifier<T> qualifier) {
             this.singletonClass = singletonClass;
+            this.qualifier = qualifier;
+        }
+
+        @Nullable
+        public Qualifier<T> getQualifier() {
+            return qualifier;
         }
 
         @Override
