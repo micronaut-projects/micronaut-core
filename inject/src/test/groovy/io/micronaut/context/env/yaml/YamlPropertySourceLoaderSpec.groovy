@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env.yaml
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.DefaultEnvironment
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySourceLoader
@@ -121,5 +122,12 @@ datasources.default: {}
         env.get("datasources.default", String).get() == "{}"
         env.get("datasources.default", Map).get() == [:]
 
+    }
+
+    void "test properties are resolved from yaml files"() {
+        ApplicationContext ctx = ApplicationContext.run("other")
+
+        expect:
+        ctx.containsProperty("other-config")
     }
 }
