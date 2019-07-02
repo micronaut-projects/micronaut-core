@@ -29,6 +29,7 @@ Support for OAuth 2.0 and OpenID clients has been added to the Micronaut securit
 
 https://micronaut-projects.github.io/micronaut-micrometer/1.2.x/guide/[Micronaut Micrometer has been updated to 1.2] which includes the following new features:
 
+* Update to Micrometer 1.2.0
 * Support for GraalVM native images
 * Meter registry support for AppOptics, Azure Monitor, Datadog, Dynatrace, Elastic, Ganglia, Humio, Influx, Jmx, Kairos, New Relic, SignalFX, Stackdriver and Wavefront
 
