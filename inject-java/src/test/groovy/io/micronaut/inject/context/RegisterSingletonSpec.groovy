@@ -17,6 +17,10 @@ package io.micronaut.inject.context
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.annotation.Type
+import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.inject.qualifiers.Qualifiers
+import spock.lang.Issue
 import spock.lang.Specification
 
 class RegisterSingletonSpec extends Specification {
@@ -30,8 +34,34 @@ class RegisterSingletonSpec extends Specification {
         context.registerSingleton(b)
 
         then:
+        context.getBean(B, Qualifiers.byTypeArguments())
         context.getBean(B) == b
         b.a != null
         b.a == context.getBean(A)
+
+        cleanup:
+        context.close()
     }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1851')
+    void "test register singleton with type qualifier"() {
+        when:
+        def context = BeanContext.run()
+
+        def s1 = new DefaultDynamicService<String>()
+        context.registerSingleton(DynamicService, s1, Qualifiers.byType(String))
+
+        then:
+        context.getBean(DynamicService, Qualifiers.byType(String))
+        context.getBean(DynamicService, Qualifiers.byTypeArguments(String))
+
+
+        cleanup:
+        context.close()
+    }
+
+    static interface DynamicService<T> {}
+
+    @Type(String)
+    static class DefaultDynamicService<T> implements DynamicService<T> {}
 }
