@@ -1867,6 +1867,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             }
         };
         pipeline.addLast(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, newHandler);
+        if (readTimeoutMillis != null) {
+            // reset read timeout
+            pipeline.addBefore(HANDLER_HTTP_CLIENT_CODEC, HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+        }
+
     }
 
     private ClientFilterChain buildChain(AtomicReference<io.micronaut.http.HttpRequest> requestWrapper, List<HttpClientFilter> filters) {
@@ -2038,29 +2043,15 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         // in the connection pooled scenario
                     }
                 });
-                addReadTimeoutHandler(ch.pipeline());
-            }
-
-            @Override
-            public void channelAcquired(Channel ch) {
-                final ChannelPipeline pipeline = ch.pipeline();
-                addReadTimeoutHandler(pipeline);
-            }
-
-            private void addReadTimeoutHandler(ChannelPipeline pipeline) {
-                if (readTimeoutMillis != null) {
-                    // reset read timeout
-                    pipeline.addBefore(
-                            HANDLER_HTTP_CLIENT_CODEC,
-                            HANDLER_READ_TIMEOUT,
-                            new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
-                }
             }
 
             @Override
             public void channelReleased(Channel ch) {
                 if (readTimeoutMillis != null) {
-                    ch.pipeline().remove(HANDLER_READ_TIMEOUT);
+                    ChannelPipeline pipeline = ch.pipeline();
+                    if (pipeline.context(HANDLER_READ_TIMEOUT) != null) {
+                        pipeline.remove(HANDLER_READ_TIMEOUT);
+                    }
                 }
             }
         };
@@ -2128,9 +2119,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             if (poolMap == null) {
                 // read timeout settings are not applied to streamed requests.
                 // instead idle timeout settings are applied.
-                if (!stream && readTimeoutMillis != null) {
-                    p.addLast(HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
-                } else {
+                if (stream && readTimeoutMillis == null) {
                     Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
                     if (readIdleTime.isPresent()) {
                         Duration duration = readIdleTime.get();
