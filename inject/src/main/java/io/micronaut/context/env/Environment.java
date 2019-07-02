@@ -219,6 +219,13 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     Environment addPropertySource(PropertySource propertySource);
 
     /**
+     * Removes a property source from this environment.
+     * @param propertySource The property source
+     * @return This environment
+     */
+    Environment removePropertySource(PropertySource propertySource);
+
+    /**
      * Add an application package. Application packages are candidates for scanning for tools that need it (such as JPA
      * or GORM).
      *
