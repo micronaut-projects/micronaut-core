@@ -2305,7 +2305,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             channelFuture.addListener(f -> {
                 try {
                     if (!f.isSuccess()) {
-                        emitter.onError(f.cause());
+                        if (!emitter.isCancelled()) {
+                            emitter.onError(f.cause());
+                        }
                     } else {
                         channel.read();
                     }
