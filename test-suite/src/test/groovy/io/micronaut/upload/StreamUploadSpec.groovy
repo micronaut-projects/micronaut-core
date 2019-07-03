@@ -102,7 +102,6 @@ class StreamUploadSpec extends AbstractMicronautSpec {
                 .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
                 .build()
 
-
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-file-upload", requestBody)

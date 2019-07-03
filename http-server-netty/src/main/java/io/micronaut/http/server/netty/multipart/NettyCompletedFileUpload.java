@@ -120,6 +120,11 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
     }
 
     @Override
+    public long getDefinedSize() {
+        return fileUpload.definedLength();
+    }
+
+    @Override
     public boolean isComplete() {
         return fileUpload.isCompleted();
     }
