@@ -1801,12 +1801,18 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                             response
                                     );
                                 }
-                                response.onComplete();
-                                emitter.onError(clientError);
+                                try {
+                                    emitter.onError(clientError);
+                                } finally {
+                                    response.onComplete();
+                                }
                             } catch (Throwable t) {
                                 if (t instanceof HttpClientResponseException) {
-                                    response.onComplete();
-                                    emitter.onError(t);
+                                    try {
+                                        emitter.onError(t);
+                                    } finally {
+                                        response.onComplete();
+                                    }
                                 } else {
                                     response.onComplete();
                                     FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
@@ -1822,8 +1828,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                             errorResponse,
                                             null
                                     );
-                                    errorResponse.onComplete();
-                                    emitter.onError(clientResponseError);
+                                    try {
+                                        emitter.onError(clientResponseError);
+                                    } finally {
+                                        errorResponse.onComplete();
+                                    }
                                 }
                             }
                         } else {
@@ -1849,8 +1858,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                         }
                                     }
                             );
-                            response.onComplete();
-                            emitter.onError(clientResponseError);
+                            try {
+                                emitter.onError(clientResponseError);
+                            } finally {
+                                response.onComplete();
+                            }
                         }
                     } else {
                         if (LOG.isWarnEnabled()) {
