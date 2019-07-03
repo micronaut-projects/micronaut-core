@@ -1798,13 +1798,46 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                     );
                                 }
                                 emitter.onError(clientError);
-                            } catch (Exception e) {
-                                emitter.onError(new HttpClientException("Exception occurred decoding error response: " + e.getMessage(), e));
+                            } catch (Throwable t) {
+                                if (t instanceof HttpClientResponseException) {
+                                    emitter.onError(t);
+                                } else {
+                                    HttpClientResponseException clientResponseError = new HttpClientResponseException(
+                                            "Error decoding HTTP error response body: " + t.getMessage(),
+                                            t,
+                                            new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, null, true),
+                                            null
+                                    );
+                                    emitter.onError(clientResponseError);
+                                }
                             }
                         } else {
                             emitter.onNext(response);
                             response.onComplete();
                             emitter.onComplete();
+                        }
+                    }
+                } catch (Throwable t) {
+                    if (complete.compareAndSet(false, true)) {
+                        if (t instanceof HttpClientResponseException) {
+                            emitter.onError(t);
+                        } else {
+                            HttpClientResponseException clientResponseError = new HttpClientResponseException(
+                                    "Error decoding HTTP response body: " + t.getMessage(),
+                                    t,
+                                    new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, null, true),
+                                    new HttpClientErrorDecoder() {
+                                        @Override
+                                        public Class<?> getErrorType(MediaType mediaType) {
+                                            return errorType.getType();
+                                        }
+                                    }
+                            );
+                            emitter.onError(clientResponseError);
+                        }
+                    } else {
+                        if (LOG.isWarnEnabled()) {
+                            LOG.warn("Exception fired after handler completed: " + t.getMessage(), t);
                         }
                     }
                 } finally {
