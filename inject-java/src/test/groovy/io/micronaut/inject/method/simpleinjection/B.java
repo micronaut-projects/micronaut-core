@@ -16,7 +16,9 @@
 package io.micronaut.inject.method.simpleinjection;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
+@Singleton
 public class B {
 
     private A a;
