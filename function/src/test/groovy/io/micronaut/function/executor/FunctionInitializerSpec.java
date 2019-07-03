@@ -18,9 +18,11 @@ package io.micronaut.function.executor;
 import org.junit.Assert;
 import org.junit.Test;
 
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author Graeme Rocher
@@ -30,7 +32,10 @@ public class FunctionInitializerSpec   {
 
     @Test
     public void testFunctionInitializer() {
-        Assert.assertEquals(2, new MathFunction().round(1.6f));
+        MathFunction mathFunction = new MathFunction();
+        Assert.assertEquals(1, MathFunction.initCount.get());
+        Assert.assertEquals(1, MathFunction.injectCount.get());
+        Assert.assertEquals(2, mathFunction.round(1.6f));
     }
 
     @Singleton
@@ -40,9 +45,24 @@ public class FunctionInitializerSpec   {
         }
     }
 
+    @Singleton
     public static class MathFunction extends FunctionInitializer {
+        static AtomicInteger initCount = new AtomicInteger(0);
+        static AtomicInteger injectCount = new AtomicInteger(0);
+
+
+        private MathService mathService;
+
         @Inject
-        MathService mathService;
+        public void setMathService(MathService mathService) {
+            this.mathService = mathService;
+            injectCount.incrementAndGet();
+        }
+
+        @PostConstruct
+        public void init() {
+            initCount.incrementAndGet();
+        }
 
         int round(float input) {
             return mathService.round(input);
