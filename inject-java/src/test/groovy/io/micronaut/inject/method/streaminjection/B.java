@@ -16,10 +16,12 @@
 package io.micronaut.inject.method.streaminjection;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@Singleton
 public class B {
     private Stream<A> all;
     private Stream<A> another;

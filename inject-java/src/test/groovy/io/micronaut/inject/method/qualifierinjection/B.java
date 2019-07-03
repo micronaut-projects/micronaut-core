@@ -19,7 +19,9 @@ import io.micronaut.inject.qualifiers.One;
 
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Singleton;
 
+@Singleton
 public class B {
     private A a;
     private A a2;

@@ -16,9 +16,11 @@
 package io.micronaut.inject.method.arrayinjection;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.List;
 
+@Singleton
 public class B {
     private List<A> all;
 

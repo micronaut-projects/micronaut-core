@@ -295,12 +295,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
      */
     class AnnBeanElementVisitor extends ElementScanner8<Object, Object> {
         private final TypeElement concreteClass;
+        private final AnnotationMetadata concreteClassMetadata;
         private final Map<Name, BeanDefinitionVisitor> beanDefinitionWriters;
         private final boolean isConfigurationPropertiesType;
         private final boolean isFactoryType;
         private final boolean isExecutableType;
         private final boolean isAopProxyType;
         private final OptionalValues<Boolean> aopSettings;
+        private final boolean isDeclaredBean;
         private ConfigurationMetadata configurationMetadata;
         private ExecutableElementParamInfo constructorParameterInfo;
         private AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
@@ -311,12 +313,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
          */
         AnnBeanElementVisitor(TypeElement concreteClass) {
             this.concreteClass = concreteClass;
+            this.concreteClassMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
             beanDefinitionWriters = new LinkedHashMap<>();
-            this.isFactoryType = annotationUtils.hasStereotype(concreteClass, Factory.class);
+            this.isFactoryType = concreteClassMetadata.hasStereotype(Factory.class);
             this.isConfigurationPropertiesType = isConfigurationProperties(concreteClass);
-            this.isAopProxyType = annotationUtils.hasStereotype(concreteClass, AROUND_TYPE) && !modelUtils.isAbstract(concreteClass);
-            this.aopSettings = isAopProxyType ? annotationUtils.getAnnotationMetadata(concreteClass).getValues(AROUND_TYPE, Boolean.class) : OptionalValues.empty();
-            this.isExecutableType = isAopProxyType || annotationUtils.hasStereotype(concreteClass, Executable.class);
+            this.isAopProxyType = concreteClassMetadata.hasStereotype(AROUND_TYPE) && !modelUtils.isAbstract(concreteClass);
+            this.aopSettings = isAopProxyType ? concreteClassMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.empty();
+            this.isExecutableType = isAopProxyType || concreteClassMetadata.hasStereotype(Executable.class);
+            this.isDeclaredBean = isExecutableType || isConfigurationPropertiesType || isFactoryType || concreteClassMetadata.hasStereotype(Scope.class) || concreteClassMetadata.hasStereotype(DefaultScope.class);
         }
 
         /**
@@ -567,6 +571,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
+            if (modelUtils.isStatic(method) || modelUtils.isAbstract(method)) {
+                return null;
+            }
+
+
             AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
 
             // handle @Bean annotation for @Factory class
@@ -575,15 +584,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            if (modelUtils.isStatic(method) || modelUtils.isAbstract(method)) {
-                return null;
-            }
 
             boolean injected = methodAnnotationMetadata.hasDeclaredStereotype(Inject.class);
             boolean postConstruct = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT);
             boolean preDestroy = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY);
             if (injected || postConstruct || preDestroy) {
-                visitAnnotatedMethod(method, o);
+                if (isDeclaredBean) {
+                    visitAnnotatedMethod(method, o);
+                } else if (injected) {
+                    // DEPRECATE: This behaviour should be deprecated in 2.0
+                    visitAnnotatedMethod(method, o);
+                }
                 return null;
             }
 
@@ -1309,7 +1320,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             boolean isParent = !declaringClass.getQualifiedName().equals(this.concreteClass.getQualifiedName());
             ExecutableElement overridingMethod = modelUtils.overridingOrHidingMethod(method, this.concreteClass).orElse(method);
             TypeElement overridingClass = modelUtils.classElementFor(overridingMethod);
-            boolean overridden = isParent && !overridingClass.getQualifiedName().equals(declaringClass.getQualifiedName());
+            boolean overridden = isParent && overridingClass != null && !overridingClass.getQualifiedName().equals(declaringClass.getQualifiedName());
 
             boolean isPackagePrivate = modelUtils.isPackagePrivate(method);
             boolean isPrivate = modelUtils.isPrivate(method);
