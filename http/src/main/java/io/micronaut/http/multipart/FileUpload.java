@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.multipart;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 
 import java.util.Optional;
@@ -25,6 +26,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public interface FileUpload {
 
     /**
@@ -54,6 +56,13 @@ public interface FileUpload {
      * @return The size of this part, in bytes.
      */
     long getSize();
+
+    /**
+     * Returns the defined content length of the part.
+     *
+     * @return The content length of this part, in bytes.
+     */
+    long getDefinedSize();
 
     /**
      * Returns whether the {@link FileUpload} has been fully uploaded or is in a partial state.
