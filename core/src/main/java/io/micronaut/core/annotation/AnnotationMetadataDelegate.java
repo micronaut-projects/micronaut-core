@@ -33,6 +33,46 @@ import java.util.*;
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
 
     @Override
+    default <T> Class<T>[] classValues(@Nonnull String annotation) {
+        return getAnnotationMetadata().classValues(annotation, VALUE_MEMBER);
+    }
+
+    @Override
+    default <T> Class<T>[] classValues(@Nonnull String annotation, @Nonnull String member) {
+        return getAnnotationMetadata().classValues(annotation, member);
+    }
+
+    @Override
+    default <T> Class<T>[] classValues(@Nonnull Class<? extends Annotation> annotation) {
+        return getAnnotationMetadata().classValues(annotation, VALUE_MEMBER);
+    }
+
+    @Override
+    default <T> Class<T>[] classValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return getAnnotationMetadata().classValues(annotation, member);
+    }
+
+    @Override
+    default <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, Class<E> enumType) {
+        return getAnnotationMetadata().enumValue(annotation, enumType);
+    }
+
+    @Override
+    default <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+        return getAnnotationMetadata().enumValue(annotation, member, enumType);
+    }
+
+    @Override
+    default <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, Class<E> enumType) {
+        return getAnnotationMetadata().enumValue(annotation, enumType);
+    }
+
+    @Override
+    default <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+        return getAnnotationMetadata().enumValue(annotation, member, enumType);
+    }
+
+    @Override
     default OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         return getAnnotationMetadata().longValue(annotation, member);
     }

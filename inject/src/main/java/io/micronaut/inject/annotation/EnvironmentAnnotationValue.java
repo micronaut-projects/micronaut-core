@@ -51,5 +51,4 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
             return o;
         } : null);
     }
-
 }

@@ -17,6 +17,7 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -595,6 +596,120 @@ public interface AnnotationMetadata extends AnnotationSource {
     default OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return longValue(annotation.getName(), member);
+    }
+
+    /**
+     * The value of the given enum.
+     *
+     * @param annotation The annotation
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An {@link Optional} enum value
+     */
+    default <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return enumValue(annotation, VALUE_MEMBER, enumType);
+    }
+
+    /**
+     * The value of the annotation as a Class.
+     *
+     * @param annotation The annotation
+     * @param member     The annotation member
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An {@link Optional} class
+     */
+    default <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return getValue(annotation, member, enumType);
+    }
+
+    /**
+     * The value of the annotation as a Class.
+     *
+     * @param annotation The annotation
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An {@link Optional} class
+     */
+    default <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+
+        return enumValue(annotation, VALUE_MEMBER, enumType);
+    }
+
+    /**
+     * The value of the annotation as a Class.
+     *
+     * @param annotation The annotation
+     * @param member     The annotation member
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An {@link Optional} class
+     */
+    default <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return enumValue(annotation.getName(), member, enumType);
+    }
+
+    /**
+     * The value of the annotation as a Class.
+     *
+     * @param annotation The annotation
+     * @return An {@link Optional} class
+     * @param <T> The type of the class
+     */
+    default @Nonnull <T> Class<T>[] classValues(@Nonnull String annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return classValues(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The value of the annotation as a Class.
+     *
+     * @param annotation The annotation
+     * @param member     The annotation member
+     * @return An {@link Optional} class
+     * @param <T> The type of the class
+     */
+    default @Nonnull <T> Class<T>[] classValues(@Nonnull String annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return getValue(annotation, member, Class[].class).orElse(ReflectionUtils.EMPTY_CLASS_ARRAY);
+    }
+
+    /**
+     * The value of the annotation as a Class.
+     *
+     * @param annotation The annotation
+     * @return An {@link Optional} class
+     * @param <T> The type of the class
+     */
+    default @Nonnull <T> Class<T>[] classValues(@Nonnull Class<? extends Annotation> annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+
+        return classValues(annotation, VALUE_MEMBER);
+    }
+
+    /**
+     * The value of the annotation as a Class.
+     *
+     * @param annotation The annotation
+     * @param member     The annotation member
+     * @return An {@link Optional} class
+     * @param <T> The type of the class
+     */
+    default @Nonnull <T> Class<T>[] classValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return classValues(annotation.getName(), member);
     }
 
     /**

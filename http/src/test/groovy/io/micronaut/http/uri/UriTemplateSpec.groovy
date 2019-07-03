@@ -315,6 +315,8 @@ class UriTemplateSpec extends Specification {
         'http://example.com/{keys*}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com/semi=%3B,dot=.,comma=%2C'
         'http://example.com/{+var}'              | [var: 'value']                                     | 'http://example.com/value' // Section 3.2.3 - Level 2 - Reserved Expansion: {+var}
         'http://example.com/{+hello}'            | [hello: "Hello World!"]                            | 'http://example.com/Hello%20World!'
+        'http://example.com/{+hello}'            | [hello: "foo/bar"]                                 | 'http://example.com/foo/bar'
+        'http://example.com/{+hello}'            | [hello: ""]                                        | 'http://example.com/'
         'http://example.com/{+half}'             | [half: '50%']                                      | 'http://example.com/50%25'
         'http://example.com/{base}index'         | [base: 'http://example.com/home/']                 | 'http://example.com/http%3A%2F%2Fexample.com%2Fhome%2Findex'
         'http://example.com/{+base}index'        | [base: 'http://example.com/home/']                 | 'http://example.com/http://example.com/home/index'

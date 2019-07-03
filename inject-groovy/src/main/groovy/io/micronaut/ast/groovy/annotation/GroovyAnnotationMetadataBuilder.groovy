@@ -34,7 +34,6 @@ import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
-import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.ast.expr.AnnotationConstantExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
@@ -42,6 +41,7 @@ import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.ListExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
+import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.SourceUnit
@@ -267,19 +267,22 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                 } else {
                     for (MethodNode method: methods) {
                         Statement stmt = method.code
+                        def expression = null
                         if (stmt instanceof ReturnStatement) {
-                            def expression = ((ReturnStatement) stmt).expression
-                            if (expression instanceof ConstantExpression) {
-                                ConstantExpression ce = (ConstantExpression) expression
-                                def v = ce.value
-                                if (v != null) {
-                                    if (v instanceof String) {
-                                        if (StringUtils.isNotEmpty((String)v)) {
-                                            defaultValues.put(method, new ConstantExpression(v))
-                                        }
-                                    } else {
-                                        defaultValues.put(method, (Expression)expression)
+                            expression = ((ReturnStatement) stmt).expression
+                        } else if (stmt instanceof ExpressionStatement) {
+                            expression = ((ExpressionStatement) stmt).expression
+                        }
+                        if (expression instanceof ConstantExpression) {
+                            ConstantExpression ce = (ConstantExpression) expression
+                            def v = ce.value
+                            if (v != null) {
+                                if (v instanceof String) {
+                                    if (StringUtils.isNotEmpty((String)v)) {
+                                        defaultValues.put(method, new ConstantExpression(v))
                                     }
+                                } else {
+                                    defaultValues.put(method, (Expression)expression)
                                 }
                             }
                         }

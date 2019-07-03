@@ -29,6 +29,7 @@ Support for OAuth 2.0 and OpenID clients has been added to the Micronaut securit
 
 https://micronaut-projects.github.io/micronaut-micrometer/1.2.x/guide/[Micronaut Micrometer has been updated to 1.2] which includes the following new features:
 
+* Update to Micrometer 1.2.0
 * Support for GraalVM native images
 * Meter registry support for AppOptics, Azure Monitor, Datadog, Dynatrace, Elastic, Ganglia, Humio, Influx, Jmx, Kairos, New Relic, SignalFX, Stackdriver and Wavefront
 
@@ -81,6 +82,10 @@ A new bean scope has been created to allow for beans that only exist in the scop
 
 In previous versions of Micronaut, the property sources for an active environment had no priority over any other active environment. It was non deterministic which environment's properties would override other environments. Now the last environment supplied has the highest priority. For example, if an application is started with `-Dmicronaut.environments=first,second`, `application-second.yml` will override properties in `application-first.yml`. This change affects all sources of properties, including distributed configuration sources.
 
+=== Environment Endpoint
+
+This version includes a new `/env` endpoint with information about the environment and its property sources See the <<environmentEndpoint, documentation>> for more information.
+
 == RSS 2.0 and iTunes Podcast
 
 This version references the https://micronaut-projects.github.io/micronaut-rss/latest/guide/index.html[RSS configuration] which eases the generation of a RSS 2.0 feed or an iTunes Podcast feed in a Micronaut app.
@@ -88,7 +93,8 @@ This version references the https://micronaut-projects.github.io/micronaut-rss/l
 === Dependency Upgrades
 
 - Groovy `2.5.4` -> `2.5.6`
-- Micronaut SQL `1.1.1` -> `1.2.0.M1`
-- Micronaut Micrometer `1.1.0` -> `1.2.0.RC1`
-- Micronaut Security `1.1.1` -> `1.2.0.M1`
+- Micronaut SQL `1.1.1` -> `1.2.0.RC1`
+- Micronaut Micrometer `1.1.0` -> `1.2.0.RC2`
+- Micrometer `1.1.5` -> `1.2.0`
+- Micronaut Security `1.1.1` -> `1.2.0.RC1`
 - Micronaut Views `1.1.3` -> `1.2.0.RC1`

@@ -127,6 +127,55 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
+     * Resolves a map of properties for a member that is an array of annotations that have members called "name" or "key" to represent the key and "value" to represent the value.
+     *
+     * <p>For example consider the following annotation definition:</p>
+     *
+     *<pre class="code">
+     *&#064;PropertySource({ @Property(name="one",value="1"), @Property(name="two", value="2")})
+     *public class MyBean {
+     *        ...
+     *}</pre>
+     *
+     * <p>You can use this method to resolve the values of the {@code PropertySource} annotation such that the following assertion is true:</p>
+     *
+     *<pre class="code">
+     *annotationValue.getProperties("value") == [one:1, two:2]
+     *</pre>
+     *
+     * @param member The member
+     * @return The properties as a immutable map.
+     */
+    public @Nonnull Map<String, String> getProperties(@Nonnull String member) {
+        return getProperties(member, "name");
+    }
+
+    /**
+     * Resolve properties with a custom key member.
+     * @param member The member to resolve the properties from
+     * @param keyMember The member of the sub annotation that represents the key.
+     * @return The properties.
+     * @see #getProperties(String)
+     */
+    public Map<String, String> getProperties(@Nonnull String member, String keyMember) {
+        ArgumentUtils.requireNonNull("keyMember", keyMember);
+        if (StringUtils.isNotEmpty(member)) {
+            List<AnnotationValue<Annotation>> values = getAnnotations(member);
+            if (CollectionUtils.isNotEmpty(values)) {
+                Map<String, String> props = new LinkedHashMap<>(values.size());
+                for (AnnotationValue<Annotation> av : values) {
+                    String name = av.stringValue(keyMember).orElse(null);
+                    if (StringUtils.isNotEmpty(name)) {
+                        av.stringValue(AnnotationMetadata.VALUE_MEMBER, valueMapper).ifPresent(v -> props.put(name, v));
+                    }
+                }
+                return Collections.unmodifiableMap(props);
+            }
+        }
+        return Collections.emptyMap();
+    }
+
+    /**
      * Return the enum value of the given member of the given enum type.
      *
      * @param member The annotation member
@@ -137,6 +186,20 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Override
     @SuppressWarnings("unchecked")
     public <E extends Enum> Optional<E> enumValue(@Nonnull String member, @Nonnull Class<E> enumType) {
+        return enumValue(member, enumType, valueMapper);
+    }
+
+    /**
+     * Return the enum value of the given member of the given enum type.
+     *
+     * @param member The annotation member
+     * @param enumType The required type
+     * @param valueMapper The value mapper
+     * @return An {@link Optional} of the enum value
+     * @param <E> The enum type
+     */
+    @SuppressWarnings("unchecked")
+    public <E extends Enum> Optional<E> enumValue(@Nonnull String member, @Nonnull Class<E> enumType, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("enumType", enumType);
         if (StringUtils.isNotEmpty(member)) {
             Object o = getRawSingleValue(member, valueMapper);
@@ -155,6 +218,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         }
         return Optional.empty();
     }
+
 
     /**
      * The value of the annotation as a Class.
@@ -644,7 +708,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      * @return The result
      */
-    public @Nonnull final <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
+    public final @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("type", type);
         Object v = values.get(member);
@@ -680,7 +744,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The result
      */
     @SuppressWarnings("unchecked")
-    public @Nonnull final <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
+    public final @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
         if (v instanceof AnnotationValue) {
@@ -840,16 +904,23 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             if (type != null) {
                 return new Class[] { type };
             }
-        } else if (value instanceof AnnotationClassValue[]) {
-            AnnotationClassValue<?>[] values = (AnnotationClassValue<?>[]) value;
-            return Arrays.stream(values).flatMap(av -> {
-                Optional<? extends Class<?>> t = av.getType();
-                return t.map(Stream::of).orElse(Stream.empty());
-            }).toArray(Class[]::new);
+        } else if (value instanceof Object[]) {
+            Object[] values = (Object[]) value;
+            if (values instanceof Class[]) {
+                return (Class<?>[]) values;
+            } else {
+                return Arrays.stream(values).flatMap(o -> {
+                    if (o instanceof AnnotationClassValue) {
+                        Optional<? extends Class<?>> type = ((AnnotationClassValue<?>) o).getType();
+                        return type.map(Stream::of).orElse(Stream.empty());
+                    } else if (o instanceof Class) {
+                        return Stream.of((Class) o);
+                    }
+                    return Stream.empty();
+                }).toArray(Class[]::new);
+            }
         } else if (value instanceof Class) {
             return new Class[] {(Class) value};
-        } else if (value instanceof Class[]) {
-            return (Class<?>[]) value;
         }
         return null;
     }

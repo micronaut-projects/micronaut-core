@@ -82,6 +82,16 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     }
 
     @Override
+    public <T> Class<T>[] classValues(@Nonnull String annotation, @Nonnull String member) {
+        return annotationMetadata.classValues(annotation, member);
+    }
+
+    @Override
+    public <T> Class<T>[] classValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        return annotationMetadata.classValues(annotation, member);
+    }
+
+    @Override
     public boolean isTrue(@Nonnull String annotation, @Nonnull String member) {
         Environment environment = getEnvironment();
         if (environment != null) {
@@ -141,6 +151,31 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     public Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
         return annotationMetadata.classValue(annotation, member, valueMapper);
+    }
+
+    @Override
+    public <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+        Function<Object, Object> valueMapper = getEnvironmentValueMapper();
+        return annotationMetadata.enumValue(annotation, member,  enumType, valueMapper);
+    }
+
+    @Override
+    public <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+        Function<Object, Object> valueMapper = getEnvironmentValueMapper();
+        return annotationMetadata.enumValue(annotation, member,  enumType, valueMapper);
+    }
+
+    @Override
+    public Optional<Boolean> booleanValue(@Nonnull String annotation, @Nonnull String member) {
+        Function<Object, Object> valueMapper = getEnvironmentValueMapper();
+        return annotationMetadata.booleanValue(annotation, member,  valueMapper);
+
+    }
+
+    @Override
+    public Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        Function<Object, Object> valueMapper = getEnvironmentValueMapper();
+        return annotationMetadata.booleanValue(annotation, member,  valueMapper);
     }
 
     @Nonnull
