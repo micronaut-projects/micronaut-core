@@ -1801,18 +1801,38 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                             response
                                     );
                                 }
-                                emitter.onError(clientError);
+                                try {
+                                    emitter.onError(clientError);
+                                } finally {
+                                    response.onComplete();
+                                }
                             } catch (Throwable t) {
                                 if (t instanceof HttpClientResponseException) {
-                                    emitter.onError(t);
+                                    try {
+                                        emitter.onError(t);
+                                    } finally {
+                                        response.onComplete();
+                                    }
                                 } else {
+                                    response.onComplete();
+                                    FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
+                                            fullResponse,
+                                            mediaTypeCodecRegistry,
+                                            byteBufferFactory,
+                                            null,
+                                            true
+                                    );
                                     HttpClientResponseException clientResponseError = new HttpClientResponseException(
                                             "Error decoding HTTP error response body: " + t.getMessage(),
                                             t,
-                                            new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, null, true),
+                                            errorResponse,
                                             null
                                     );
-                                    emitter.onError(clientResponseError);
+                                    try {
+                                        emitter.onError(clientResponseError);
+                                    } finally {
+                                        errorResponse.onComplete();
+                                    }
                                 }
                             }
                         } else {
@@ -1821,43 +1841,32 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             emitter.onComplete();
                         }
                     }
-                } catch (Throwable originalError) {
+                } catch (Throwable t) {
                     if (complete.compareAndSet(false, true)) {
-                        if (originalError instanceof HttpClientResponseException) {
-                            emitter.onError(originalError);
+                        if (t instanceof HttpClientResponseException) {
+                            emitter.onError(t);
                         } else {
-                            HttpClientResponseException clientResponseError;
+                            FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, null, true);
+                            HttpClientResponseException clientResponseError = new HttpClientResponseException(
+                                    "Error decoding HTTP response body: " + t.getMessage(),
+                                    t,
+                                    response,
+                                    new HttpClientErrorDecoder() {
+                                        @Override
+                                        public Class<?> getErrorType(MediaType mediaType) {
+                                            return errorType.getType();
+                                        }
+                                    }
+                            );
                             try {
-                                clientResponseError = new HttpClientResponseException(
-                                        "Error decoding HTTP response body: " + originalError.getMessage(),
-                                        originalError,
-                                        new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, errorType, true),
-                                        new HttpClientErrorDecoder() {
-                                            @Override
-                                            public Class<?> getErrorType(MediaType mediaType) {
-                                                return errorType.getType();
-                                            }
-                                        }
-                                );
                                 emitter.onError(clientResponseError);
-                            } catch (Throwable errorParsingError) {
-                                clientResponseError = new HttpClientResponseException(
-                                        "Error decoding HTTP response body: " + originalError.getMessage(),
-                                        originalError,
-                                        new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, null, true),
-                                        new HttpClientErrorDecoder() {
-                                            @Override
-                                            public Class<?> getErrorType(MediaType mediaType) {
-                                                return errorType.getType();
-                                            }
-                                        }
-                                );
-                                emitter.onError(clientResponseError);
+                            } finally {
+                                response.onComplete();
                             }
                         }
                     } else {
                         if (LOG.isWarnEnabled()) {
-                            LOG.warn("Exception fired after handler completed: " + originalError.getMessage(), originalError);
+                            LOG.warn("Exception fired after handler completed: " + t.getMessage(), t);
                         }
                     }
                 } finally {
