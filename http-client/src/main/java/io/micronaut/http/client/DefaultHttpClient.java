@@ -1284,9 +1284,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             if (filterOpt.isPresent()) {
                 AnnotationValue<Filter> filterAnn = filterOpt.get();
                 String[] clients = filterAnn.get("serviceId", String[].class).orElse(null);
-                if (!clientIdentifiers.isEmpty() && ArrayUtils.isNotEmpty(clients)) {
-                    if (Arrays.stream(clients).noneMatch(id -> clientIdentifiers.contains(id))) {
-                        // no matching clients
+                if (ArrayUtils.isNotEmpty(clients)) {
+                    if (!clientIdentifiers.isEmpty()) {
+                        if (Arrays.stream(clients).noneMatch(id -> clientIdentifiers.contains(id))) {
+                            // no matching clients
+                            continue;
+                        }
+                    } else {
                         continue;
                     }
                 }
