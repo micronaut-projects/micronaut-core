@@ -25,6 +25,8 @@ import io.micronaut.inject.BeanDefinition;
 
 import java.util.Collection;
 
+import static java.lang.Boolean.TRUE;
+
 /**
  * Custom condition to conditionally enable the heart beat.
  *
@@ -36,8 +38,8 @@ public final class HeartbeatDiscoveryClientCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
         final ApplicationContext beanContext = (ApplicationContext) context.getBeanContext();
-        final Boolean enabled = beanContext.getProperty(HeartbeatConfiguration.ENABLED, Boolean.class).orElse(null);
-        if (enabled != null && enabled) {
+        final Boolean enabled = beanContext.getProperty(HeartbeatConfiguration.ENABLED, Boolean.class).orElse(TRUE);
+        if (enabled) {
             return true;
         }
 
