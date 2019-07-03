@@ -28,6 +28,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -76,7 +77,8 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     FullNettyClientHttpResponse(
             FullHttpResponse fullHttpResponse,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
-            ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
+            ByteBufferFactory<ByteBufAllocator,
+            ByteBuf> byteBufferFactory,
             Argument<B> bodyType, boolean errorStatus) {
 
         this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
@@ -234,14 +236,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
                 Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
                 if (foundCodec.isPresent()) {
                     MediaTypeCodec codec = foundCodec.get();
-                    try {
-                        return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
-                    } catch (CodecException e) {
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("Unable to decode response body using codec " + codec.getClass().getSimpleName() + ":" + e.getMessage(), e);
-                        }
-                        return Optional.empty();
-                    }
+                    return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
                 }
             }
         } else if (!hasContentType && LOG.isTraceEnabled()) {
