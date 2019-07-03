@@ -16,8 +16,10 @@
 package io.micronaut.inject.method.setinjection;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import java.util.Set;
 
+@Singleton
 public class B {
     private Set<A> all;
 

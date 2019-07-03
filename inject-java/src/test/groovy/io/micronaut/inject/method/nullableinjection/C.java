@@ -16,7 +16,9 @@
 package io.micronaut.inject.method.nullableinjection;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
+@Singleton
 public class C {
 
     A a;

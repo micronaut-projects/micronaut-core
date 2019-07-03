@@ -20,6 +20,7 @@ import io.micronaut.aop.Adapter
 import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
+import io.micronaut.context.annotation.DefaultScope
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.PropertySource
 import io.micronaut.core.annotation.AnnotationClassValue
@@ -290,6 +291,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final boolean isFactoryClass
         final boolean isExecutableType
         final boolean isAopProxyType
+        final boolean isDeclaredBean
         final OptionalValues<Boolean> aopSettings
         final ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder
         ConfigurationMetadata configurationMetadata
@@ -327,6 +329,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             } else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean, Scope)) {
                 defineBeanDefinition(concreteClass)
             }
+            this.isDeclaredBean = isExecutableType || isConfigurationProperties || isFactoryClass || annotationMetadata.hasStereotype(Scope.class) || annotationMetadata.hasStereotype(DefaultScope.class)
         }
 
         BeanDefinitionVisitor getBeanWriter() {
@@ -685,9 +688,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 beanDefinitionWriters.put(methodNode, beanMethodWriter)
             } else if (methodAnnotationMetadata.hasStereotype(Inject.name, ProcessedTypes.POST_CONSTRUCT, ProcessedTypes.PRE_DESTROY)) {
-                defineBeanDefinition(concreteClass)
-
-                if (!isConstructor) {
+                if (isConstructor && methodAnnotationMetadata.hasStereotype(Inject)) {
+                    // constructor with explicit @Inject
+                    defineBeanDefinition(concreteClass)
+                } else if (!isConstructor) {
                     if (!methodNode.isStatic() && !methodNode.isAbstract()) {
                         boolean isParent = declaringClass != concreteClass
                         MethodNode overriddenMethod = isParent ? concreteClass.getMethod(methodName, methodNode.parameters) : methodNode
@@ -733,7 +737,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 Collections.emptyMap()
                         )
 
-                        if (methodAnnotationMetadata.hasStereotype(ProcessedTypes.POST_CONSTRUCT)) {
+                        if (isDeclaredBean && methodAnnotationMetadata.hasStereotype(ProcessedTypes.POST_CONSTRUCT)) {
+                            defineBeanDefinition(concreteClass)
                             def beanWriter = getBeanWriter()
                             if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
                                 beanWriter = aopProxyWriter
@@ -747,7 +752,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     argumentAnnotationMetadata,
                                     genericTypeMap,
                                     methodAnnotationMetadata)
-                        } else if (methodAnnotationMetadata.hasStereotype(ProcessedTypes.PRE_DESTROY)) {
+                        } else if (isDeclaredBean && methodAnnotationMetadata.hasStereotype(ProcessedTypes.PRE_DESTROY)) {
+                            defineBeanDefinition(concreteClass)
                             def beanWriter = getBeanWriter()
                             if (aopProxyWriter instanceof AopProxyWriter && !((AopProxyWriter)aopProxyWriter).isProxyTarget()) {
                                 beanWriter = aopProxyWriter
@@ -761,7 +767,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     argumentAnnotationMetadata,
                                     genericTypeMap,
                                     methodAnnotationMetadata)
-                        } else {
+                        } else if (methodAnnotationMetadata.hasStereotype(Inject.class)) {
+                            defineBeanDefinition(concreteClass)
                             getBeanWriter().visitMethodInjectionPoint(
                                     AstGenericUtils.resolveTypeReference(declaringClass),
                                     requiresReflection,
@@ -876,7 +883,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         declaringTypeGenericInfo
                 )
 
-                boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "processOnStartup", Boolean.class).orElse(false)
+                boolean preprocess = methodAnnotationMetadata.booleanValue(Executable.class, "processOnStartup").orElse(false)
                 if (preprocess) {
                     getBeanWriter().setRequiresMethodProcessing(true)
                 }
