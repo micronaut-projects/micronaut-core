@@ -147,6 +147,13 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             // the write method
             writeWriteMethod();
 
+            if (annotationMetadata != null && annotationMetadata instanceof DefaultAnnotationMetadata) {
+                final DefaultAnnotationMetadata annotationMetadata = (DefaultAnnotationMetadata) this.annotationMetadata;
+                if (!annotationMetadata.isEmpty()) {
+                    AnnotationMetadataWriter.writeAnnotationDefaults(annotationMetadata, classWriter, type, loadTypeMethods);
+                }
+            }
+
             if (readOnly) {
                 // override isReadOnly method
                 final GeneratorAdapter isReadOnly = startPublicMethodZeroArgs(classWriter, boolean.class, "isReadOnly");

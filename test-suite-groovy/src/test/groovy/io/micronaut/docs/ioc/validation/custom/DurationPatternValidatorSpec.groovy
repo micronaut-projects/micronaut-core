@@ -13,7 +13,6 @@ class DurationPatternValidatorSpec extends Specification {
 
     @Inject HolidayService holidayService
 
-    @PendingFeature(reason = "default message support not yet implemented")
     // tag::test[]
     void "test test custom validator"() {
         when:"A custom validator is used"
