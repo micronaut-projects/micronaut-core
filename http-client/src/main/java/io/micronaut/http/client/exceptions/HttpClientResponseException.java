@@ -101,7 +101,9 @@ public class HttpClientResponseException extends HttpClientException implements 
         Class<?> errorType = null;
         if (contentType.isPresent() && response.getStatus().getCode() > 399) {
             MediaType mediaType = contentType.get();
-            errorType = errorDecoder.getErrorType(mediaType);
+            if (errorDecoder != null) {
+                errorType = errorDecoder.getErrorType(mediaType);
+            }
         }
         return errorType;
     }
