@@ -17,16 +17,16 @@ public class Status {
     }
 
     @JsonPOJOBuilder
-    static class StatusBuilder {
+    public static class StatusBuilder {
 
         private String name;
 
-        StatusBuilder withName(String name) {
+        public StatusBuilder withName(String name) {
             this.name = name;
             return this;
         }
 
-        Status build() {
+        public Status build() {
             return new Status(name);
         }
     }
