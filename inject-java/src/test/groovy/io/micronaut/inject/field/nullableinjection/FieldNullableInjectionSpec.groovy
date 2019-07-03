@@ -32,6 +32,9 @@ class FieldNullableInjectionSpec extends Specification {
 
         then:"The implementation is not injected, but null is"
         b.a == null
+
+        cleanup:
+        context.close()
     }
 
     void "test normal injection still fails"() {
@@ -44,5 +47,24 @@ class FieldNullableInjectionSpec extends Specification {
 
         then:"The bean is not found"
         thrown(DependencyInjectionException)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test injecting a nullable provider"() {
+        given:
+        BeanContext context = new DefaultBeanContext()
+        context.start()
+
+        when:"A bean is obtained that has a constructor with @Inject"
+        D d = context.getBean(D)
+
+        then:"The bean is not found"
+        noExceptionThrown()
+        d.a == null
+
+        cleanup:
+        context.close()
     }
 }

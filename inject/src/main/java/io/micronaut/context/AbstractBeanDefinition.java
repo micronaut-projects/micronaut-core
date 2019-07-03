@@ -1698,6 +1698,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
+            if (argument.isNullable()) {
+                path.pop();
+                return null;
+            }
             throw new DependencyInjectionException(resolutionContext, argument, e);
         }
     }
@@ -1705,14 +1709,18 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private <B> B resolveBeanWithGenericsForField(BeanResolutionContext resolutionContext, FieldInjectionPoint injectionPoint, BeanResolver<B> beanResolver) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushFieldResolve(this, injectionPoint);
-
+        Argument argument = injectionPoint.asArgument();
         try {
-            Optional<Class> genericType = injectionPoint.getType().isArray() ? Optional.of(injectionPoint.getType().getComponentType()) : injectionPoint.asArgument().getFirstTypeVariable().map(Argument::getType);
+            Optional<Class> genericType = injectionPoint.getType().isArray() ? Optional.of(injectionPoint.getType().getComponentType()) : argument.getFirstTypeVariable().map(Argument::getType);
             Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint.asArgument());
             @SuppressWarnings("unchecked") B bean = (B) beanResolver.resolveBean(genericType.orElse(injectionPoint.getType()), qualifier);
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
+            if (argument.isNullable()) {
+                path.pop();
+                return null;
+            }
             throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
         }
     }
