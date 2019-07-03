@@ -16,6 +16,7 @@
 package io.micronaut.multitenancy.tenantresolver;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.multitenancy.exceptions.TenantNotFoundException;
@@ -34,7 +35,7 @@ import java.util.Optional;
  */
 @Requires(classes = {Session.class, HttpSessionFilter.class})
 @Requires(beans = SessionTenantResolverConfiguration.class)
-@Requires(property = SessionTenantResolverConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = SessionTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Singleton
 public class SessionTenantResolver implements TenantResolver {
 
