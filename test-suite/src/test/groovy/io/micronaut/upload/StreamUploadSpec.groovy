@@ -56,6 +56,25 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         file.length() == data.size()
     }
 
+    void "test upload on a validated controller"() {
+        given:
+        def data = '{"title":"Test"}'
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/validated/receive-file-upload", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE), String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+    }
+
     void "test releasing part datas late"() {
         given:
         MultipartBody requestBody = MultipartBody.builder()

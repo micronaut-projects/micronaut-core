@@ -536,12 +536,20 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             final Class<?> parameterType = argument.getType();
 
             final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+
+            final boolean hasValid = annotationMetadata.hasStereotype(Valid.class);
+            final boolean hasConstraint = annotationMetadata.hasStereotype(Constraint.class);
+
+            if (!hasValid && !hasConstraint) {
+                continue;
+            }
+
             final MutableArgumentValue<Object> argumentValue = (MutableArgumentValue<Object>) iterator.next();
             Object parameterValue = argumentValue.getValue();
 
             ValueExtractor<Object> valueExtractor = null;
             final boolean hasValue = parameterValue != null;
-            final boolean isValid = hasValue && annotationMetadata.hasStereotype(Valid.class);
+            final boolean isValid = hasValue && hasValid;
             final boolean isPublisher = hasValue && Publishers.isConvertibleToPublisher(parameterType);
             if (isPublisher) {
                 instrumentPublisherArgumentWithValidation(
