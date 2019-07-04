@@ -98,3 +98,11 @@ This version references the https://micronaut-projects.github.io/micronaut-rss/l
 - Micrometer `1.1.5` -> `1.2.0`
 - Micronaut Security `1.1.1` -> `1.2.0.RC1`
 - Micronaut Views `1.1.3` -> `1.2.0.RC1`
+- Netty `4.1.30.Final` -> `4.1.37.Final`
+- Neo4j Driver `1.7.2` -> `1.7.5`
+- Mongo Driver `3.8.0` -> `3.10.1`
+- Mongo Reactive Streams `1.10.0` -> `1.11.0`
+- Open Tracing `0.33.10` -> `0.33.13`
+- Kafka `2.1.1` -> `2.3.0`
+- Snake YAML `1.23` -> `1.24`
+- Lettuce `5.1.3.RELEASE` -> `5.1.7.RELEASE`
