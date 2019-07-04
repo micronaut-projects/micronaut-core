@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.convert
 
-
+import io.micronaut.core.convert.exceptions.ConversionErrorException
 import io.micronaut.core.type.Argument
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -64,6 +64,19 @@ class DefaultConversionServiceSpec extends Specification {
         "monday,tuesday,monday" | Set         | ["monday", "tuesday"] as Set
         "N/A"                   | Status      | Status.N_OR_A
         ["OK", "N/A"]           | Status[]    | [Status.OK, Status.N_OR_A]
+    }
+
+    void "test convert required"() {
+        given:
+        ConversionService conversionService = new DefaultConversionService()
+
+        when:
+        conversionService.convertRequired("junk", Integer)
+
+        then:
+        def e = thrown(ConversionErrorException)
+        e.conversionError.originalValue.get() == 'junk'
+        e.message == 'Failed to convert argument [integer] for value [junk] due to: For input string: "junk"'
     }
 
     void "test conversion service with type arguments"() {
