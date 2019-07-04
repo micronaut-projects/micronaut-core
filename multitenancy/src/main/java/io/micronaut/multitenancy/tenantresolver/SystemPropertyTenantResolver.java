@@ -15,9 +15,11 @@
  */
 package io.micronaut.multitenancy.tenantresolver;
 
-import javax.inject.Singleton;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.multitenancy.exceptions.TenantNotFoundException;
+
+import javax.inject.Singleton;
 import java.io.Serializable;
 
 /**
@@ -28,7 +30,7 @@ import java.io.Serializable;
  */
 @Singleton
 @Requires(beans = SystemPropertyTenantResolverConfiguration.class)
-@Requires(property = SystemPropertyTenantResolverConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = SystemPropertyTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class SystemPropertyTenantResolver implements TenantResolver {
 
     private SystemPropertyTenantResolverConfiguration systemPropertyTenantResolverConfiguration;

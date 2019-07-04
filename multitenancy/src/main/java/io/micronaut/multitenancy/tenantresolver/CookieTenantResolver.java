@@ -16,6 +16,7 @@
 package io.micronaut.multitenancy.tenantresolver;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.cookie.Cookie;
@@ -33,7 +34,7 @@ import java.util.Optional;
  */
 @Singleton
 @Requires(beans = CookieTenantResolverConfiguration.class)
-@Requires(property = CookieTenantResolverConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = CookieTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class CookieTenantResolver implements TenantResolver {
 
     /**

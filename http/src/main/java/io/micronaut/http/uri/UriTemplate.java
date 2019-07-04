@@ -667,7 +667,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 modBuff.delete(0, modBuff.length());
                                 buff.delete(0, buff.length());
                                 modifier = OPERATOR_NONE;
-
+                                if (!hasAnotherVar) {
+                                    operator = OPERATOR_NONE;
+                                }
                                 continue;
                             default:
                                 switch (modifier) {
@@ -940,7 +942,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     if (found.getClass().isArray()) {
                         found = Arrays.asList((Object[]) found);
                     }
-                    boolean isQuery = UriTemplateParser.this.operator == QUERY_OPERATOR;
+                    boolean isQuery = operator == QUERY_OPERATOR;
                     
                     if (modifierChar == EXPAND_MODIFIER) {
                         found = expandPOJO(found); // Turn POJO into a Map
@@ -967,14 +969,14 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         final StringJoiner joiner;
                         if (modifierChar == EXPAND_MODIFIER) {
 
-                            switch (UriTemplateParser.this.operator) {
+                            switch (operator) {
                                 case AND_OPERATOR:
                                 case QUERY_OPERATOR:
-                                    prefixToUse = String.valueOf(UriTemplateParser.this.operator);
+                                    prefixToUse = String.valueOf(operator);
                                     joiner = new StringJoiner(String.valueOf(AND_OPERATOR));
                                     break;
                                 case ';':
-                                    prefixToUse = String.valueOf(UriTemplateParser.this.operator);
+                                    prefixToUse = String.valueOf(operator);
                                     joiner = new StringJoiner(String.valueOf(prefixToUse));
                                     break;
                                 default:
@@ -1009,7 +1011,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     int len = result.length();
                     StringBuilder finalResult = new StringBuilder(previousHasContent && previousDelimiter != null ? previousDelimiter : "");
                     if (len == 0) {
-                        switch (UriTemplateParser.this.operator) {
+                        switch (operator) {
                             case SLASH_OPERATOR:
                                 break;
                             case ';':
@@ -1031,7 +1033,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     }
                     return finalResult.toString();
                 } else {
-                    switch (UriTemplateParser.this.operator) {
+                    switch (operator) {
                         case SLASH_OPERATOR:
                             return null;
                         default:

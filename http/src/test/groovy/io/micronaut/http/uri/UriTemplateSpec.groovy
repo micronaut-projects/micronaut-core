@@ -180,6 +180,7 @@ class UriTemplateSpec extends Specification {
         '{+half}'             | [half: '50%']                                      | '50%25'
         '{base}index'         | [base: 'http://example.com/home/']                 | 'http%3A%2F%2Fexample.com%2Fhome%2Findex'
         '{+base}index'        | [base: 'http://example.com/home/']                 | 'http://example.com/home/index'
+        '{+base}{hello}'      | [base: 'http://example.com/home/', hello: "Hello World!"] | 'http://example.com/home/Hello%20World%21'
         'O{+empty}X'          | [empty: '']                                        | 'OX'
         'O{+undef}X'          | [:]                                                | 'OX'
         '{+path}/here'        | [path: "/foo/bar"]                                 | '/foo/bar/here'
