@@ -14,7 +14,7 @@ def bintrayUser = System.getenv("BINTRAY_USER") ?: project.hasProperty("bintrayU
 def bintrayKey = System.getenv("BINTRAY_KEY") ?: project.hasProperty("bintrayKey") ? project.bintrayKey : ''
 def ossUser = System.getenv("SONATYPE_USERNAME") ?: project.hasProperty("sonatypeOssUsername") ? project.sonatypeOssUsername : ''
 def ossPass = System.getenv("SONATYPE_PASSWORD") ?: project.hasProperty("sonatypeOssPassword") ? project.sonatypeOssPassword : ''
-def packageName = githubSlug.substring(githubSlug.indexOf('/') + 1)
+def packageName = project.bintrayPackage
 
 task synchronizeWithMavenCentral() {
     description = "Syncs with Maven Central/Sonatype"
