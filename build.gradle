@@ -519,6 +519,8 @@ task testReportsAggregate {
     }
 }
 
+apply from: "${rootProject.rootDir}/gradle/centralSync.gradle"
+
 subprojects { Project subproject ->
 
     version project.projectVersion

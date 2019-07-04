@@ -23,6 +23,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
+import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
@@ -51,6 +52,20 @@ class ClientFilterSpec extends Specification{
 
         expect:
         myApi.name() == 'Fred'
+    }
+
+    void "test a client with no service ids doesn't match a filter with a service id"() {
+        given:
+        RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange("/filters/name", String.class)
+
+        then:
+        response.body() == 'Fred'
+
+        cleanup:
+        client.close()
     }
 
     @Controller('/filters')
@@ -91,8 +106,20 @@ class ClientFilterSpec extends Specification{
         }
     }
 
+    // this filter should not match the test
     @Filter(patterns = '/filters/**', serviceId = 'otherClient')
     static class AnotherFilter implements HttpClientFilter {
+
+        @Override
+        Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+            request.header("X-Auth-Lastname", "Flintstone")
+            return chain.proceed(request)
+        }
+    }
+
+    // this filter should not match the test
+    @Filter(serviceId = 'myClient')
+    static class MyClientFilter implements HttpClientFilter {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {

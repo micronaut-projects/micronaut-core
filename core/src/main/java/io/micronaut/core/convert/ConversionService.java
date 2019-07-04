@@ -15,8 +15,9 @@
  */
 package io.micronaut.core.convert;
 
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
-
+import javax.annotation.Nullable;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -114,5 +115,47 @@ public interface ConversionService<Impl extends ConversionService> {
      */
     default <T> Optional<T> convert(Object object, ArgumentConversionContext<T> context) {
         return convert(object, context.getArgument().getType(), context);
+    }
+
+    /**
+     * Convert the value to the given type.
+     * @param value The value
+     * @param type The type
+     * @param <T> The generic type
+     * @return The converted value
+     * @throws ConversionErrorException if the value cannot be converted
+     * @since 1.1.4
+     */
+    default @Nullable <T> T convertRequired(@Nullable Object value, Class<T> type) {
+        if (value == null) {
+            return null;
+        }
+        Argument<T> arg = Argument.of(type);
+        return convertRequired(value, arg);
+    }
+
+    /**
+     * Convert the value to the given type.
+     * @param value The value
+     * @param argument The argument
+     * @param <T> The generic type
+     * @return The converted value
+     * @throws ConversionErrorException if the value cannot be converted
+     * @since 1.1.4
+     */
+    default @Nullable <T> T convertRequired(@Nullable Object value, Argument<T> argument) {
+        ArgumentConversionContext<T> context = ConversionContext.of(argument);
+        return convert(
+                value,
+                argument.getType(),
+                context
+        ).orElseThrow(() -> {
+            Optional<ConversionError> lastError = context.getLastError();
+            if (lastError.isPresent()) {
+                return new ConversionErrorException(context.getArgument(), lastError.get());
+            } else {
+                return new ConversionErrorException(context.getArgument(), new IllegalArgumentException("Cannot convert type [" + value.getClass() + "] to target type: " + argument.getType() + ". Considering defining a TypeConverter bean to handle this case."));
+            }
+        });
     }
 }

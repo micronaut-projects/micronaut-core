@@ -1284,9 +1284,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             if (filterOpt.isPresent()) {
                 AnnotationValue<Filter> filterAnn = filterOpt.get();
                 String[] clients = filterAnn.get("serviceId", String[].class).orElse(null);
-                if (!clientIdentifiers.isEmpty() && ArrayUtils.isNotEmpty(clients)) {
-                    if (Arrays.stream(clients).noneMatch(id -> clientIdentifiers.contains(id))) {
-                        // no matching clients
+                if (ArrayUtils.isNotEmpty(clients)) {
+                    if (!clientIdentifiers.isEmpty()) {
+                        if (Arrays.stream(clients).noneMatch(id -> clientIdentifiers.contains(id))) {
+                            // no matching clients
+                            continue;
+                        }
+                    } else {
                         continue;
                     }
                 }
@@ -1786,14 +1790,69 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                             response
                                     );
                                 }
-                                emitter.onError(clientError);
-                            } catch (Exception e) {
-                                emitter.onError(new HttpClientException("Exception occurred decoding error response: " + e.getMessage(), e));
+                                try {
+                                    emitter.onError(clientError);
+                                } finally {
+                                    response.onComplete();
+                                }
+                            } catch (Throwable t) {
+                                if (t instanceof HttpClientResponseException) {
+                                    try {
+                                        emitter.onError(t);
+                                    } finally {
+                                        response.onComplete();
+                                    }
+                                } else {
+                                    response.onComplete();
+                                    FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
+                                            fullResponse,
+                                            mediaTypeCodecRegistry,
+                                            byteBufferFactory,
+                                            null,
+                                            true
+                                    );
+                                    errorResponse.onComplete();
+                                    HttpClientResponseException clientResponseError = new HttpClientResponseException(
+                                            "Error decoding HTTP error response body: " + t.getMessage(),
+                                            t,
+                                            errorResponse,
+                                            null
+                                    );
+                                    emitter.onError(clientResponseError);
+                                }
                             }
                         } else {
                             emitter.onNext(response);
                             response.onComplete();
                             emitter.onComplete();
+                        }
+                    }
+                } catch (Throwable t) {
+                    if (complete.compareAndSet(false, true)) {
+                        if (t instanceof HttpClientResponseException) {
+                            emitter.onError(t);
+                        } else {
+                            FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, null, true);
+                            HttpClientResponseException clientResponseError = new HttpClientResponseException(
+                                    "Error decoding HTTP response body: " + t.getMessage(),
+                                    t,
+                                    response,
+                                    new HttpClientErrorDecoder() {
+                                        @Override
+                                        public Class<?> getErrorType(MediaType mediaType) {
+                                            return errorType.getType();
+                                        }
+                                    }
+                            );
+                            try {
+                                emitter.onError(clientResponseError);
+                            } finally {
+                                response.onComplete();
+                            }
+                        }
+                    } else {
+                        if (LOG.isWarnEnabled()) {
+                            LOG.warn("Exception fired after handler completed: " + t.getMessage(), t);
                         }
                     }
                 } finally {
@@ -2296,7 +2355,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             channelFuture.addListener(f -> {
                 try {
                     if (!f.isSuccess()) {
-                        emitter.onError(f.cause());
+                        if (!emitter.isCancelled()) {
+                            emitter.onError(f.cause());
+                        }
                     } else {
                         channel.read();
                     }

@@ -1777,10 +1777,6 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    private void loadContextScopeBean(BeanDefinitionReference contextScopeBean) {
-        loadContextScopeBean(contextScopeBean, this::loadContextScopeBean);
-    }
-
     private void loadContextScopeBean(BeanDefinitionReference contextScopeBean, Consumer<BeanDefinition> beanDefinitionConsumer) {
         if (contextScopeBean.isEnabled(this)) {
             BeanDefinition beanDefinition = contextScopeBean.load(this);

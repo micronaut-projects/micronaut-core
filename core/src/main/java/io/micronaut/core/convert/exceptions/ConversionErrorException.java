@@ -40,6 +40,16 @@ public class ConversionErrorException extends RuntimeException {
     }
 
     /**
+     * @param argument The argument
+     * @param cause    The cause
+     */
+    public ConversionErrorException(Argument argument, Exception cause) {
+        super(cause.getMessage(), cause);
+        this.argument = argument;
+        this.conversionError = () -> cause;
+    }
+
+    /**
      * @return The argument that failed conversion.
      */
     public Argument getArgument() {

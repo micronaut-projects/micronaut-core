@@ -35,6 +35,7 @@ import javax.inject.Singleton;
 import javax.inject.Inject;
 import javax.inject.Named;
 
+@Singleton
 class MyBean {
     private A a;
     private A a2;
