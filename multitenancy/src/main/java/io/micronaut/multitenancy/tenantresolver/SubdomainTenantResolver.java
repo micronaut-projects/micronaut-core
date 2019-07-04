@@ -16,10 +16,12 @@
 package io.micronaut.multitenancy.tenantresolver;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.multitenancy.exceptions.TenantNotFoundException;
+
 import javax.inject.Singleton;
 import java.io.Serializable;
 import java.util.Optional;
@@ -31,7 +33,7 @@ import java.util.Optional;
  * @since 6.0
  */
 @Singleton
-@Requires(property = SubdomainTenantResolverConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = SubdomainTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class SubdomainTenantResolver implements TenantResolver {
 
     @Override

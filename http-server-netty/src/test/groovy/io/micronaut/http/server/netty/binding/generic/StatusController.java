@@ -7,4 +7,8 @@ import java.util.UUID;
 @Controller("/statuses/java")
 public class StatusController extends GenericController<Status, UUID> {
 
+    Status create(UUID id) {
+        return new Status.StatusBuilder()
+                .withName("status - " + id.toString()).build();
+    }
 }
