@@ -32,8 +32,8 @@ cache:
   directories:
     - $HOME/.gradle/caches/
     - $HOME/.gradle/wrapper/
-after_deploy:
-- "./gradlew sdkMajorRelease"
+#after_deploy:
+#- "./gradlew sdkMajorRelease"
 deploy:
   provider: releases
   api_key:
