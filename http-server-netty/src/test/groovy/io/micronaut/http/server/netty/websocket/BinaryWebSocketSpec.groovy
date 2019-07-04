@@ -20,6 +20,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.RxWebSocketClient
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -27,6 +28,8 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 class BinaryWebSocketSpec extends Specification{
+    
+    @Retry
     void "test binary websocket exchange"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.build('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
