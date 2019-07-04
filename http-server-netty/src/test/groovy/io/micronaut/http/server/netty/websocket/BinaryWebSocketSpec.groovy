@@ -28,7 +28,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 class BinaryWebSocketSpec extends Specification{
-    
+
     @Retry
     void "test binary websocket exchange"() {
         given:
