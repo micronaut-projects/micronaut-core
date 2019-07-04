@@ -72,7 +72,6 @@ class BindHttpClientExceptionBodySpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         e.response.status == HttpStatus.UNAUTHORIZED
-        e.message.startsWith("Error decoding HTTP error response body:")
 
         when:
         Optional<OtherError> jsonError = e.response.getBody(OtherError)

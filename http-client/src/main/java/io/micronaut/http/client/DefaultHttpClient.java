@@ -1822,17 +1822,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                             null,
                                             true
                                     );
+                                    errorResponse.onComplete();
                                     HttpClientResponseException clientResponseError = new HttpClientResponseException(
                                             "Error decoding HTTP error response body: " + t.getMessage(),
                                             t,
                                             errorResponse,
                                             null
                                     );
-                                    try {
-                                        emitter.onError(clientResponseError);
-                                    } finally {
-                                        errorResponse.onComplete();
-                                    }
+                                    emitter.onError(clientResponseError);
                                 }
                             }
                         } else {
