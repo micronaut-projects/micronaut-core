@@ -164,35 +164,46 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         }
 
         Optional<T> result = convertedBodies.computeIfAbsent(type, argument -> {
-                    Optional<B> existing = getBody();
-                    final boolean isOptional = argument.getType() == Optional.class;
-                    final Argument finalArgument = isOptional ? argument.getFirstTypeVariable().orElse(argument) : argument;
-                    Optional<T> converted;
-                    if (existing.isPresent()) {
-                        converted = getBody().flatMap(b -> {
+            Optional<B> existing = getBody();
+            final boolean isOptional = argument.getType() == Optional.class;
+            final Argument finalArgument = isOptional ? argument.getFirstTypeVariable().orElse(argument) : argument;
+            Optional<T> converted;
+            try {
+                if (existing.isPresent()) {
+                    converted = getBody().flatMap(b -> {
 
-                            if (b instanceof ByteBuffer) {
-                                ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
-                                return convertByteBuf(bytebuf, finalArgument);
-                            } else {
-                                final Optional opt = ConversionService.SHARED.convert(b, ConversionContext.of(finalArgument));
-                                if (!opt.isPresent()) {
-                                    ByteBuf content = nettyHttpResponse.content();
-                                    return convertByteBuf(content, finalArgument);
-                                }
-                                return opt;
+                        if (b instanceof ByteBuffer) {
+                            ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
+                            return convertByteBuf(bytebuf, finalArgument);
+                        } else {
+                            final Optional opt = ConversionService.SHARED.convert(b, ConversionContext.of(finalArgument));
+                            if (!opt.isPresent()) {
+                                ByteBuf content = nettyHttpResponse.content();
+                                return convertByteBuf(content, finalArgument);
                             }
-                        });
-                    } else {
-                        ByteBuf content = nettyHttpResponse.content();
-                        converted = convertByteBuf(content, finalArgument);
-                    }
-                    if (isOptional) {
-                        return Optional.of(converted);
-                    } else {
-                        return converted;
-                    }
+                            return opt;
+                        }
+                    });
+                } else {
+                    ByteBuf content = nettyHttpResponse.content();
+                    converted = convertByteBuf(content, finalArgument);
                 }
+            } catch (RuntimeException e) {
+                if (status.getCode() < 400) {
+                    throw e;
+                } else {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Error decoding HTTP error response body: " + e.getMessage(), e);
+                    }
+                    converted = Optional.empty();
+                }
+            }
+            if (isOptional) {
+                return Optional.of(converted);
+            } else {
+                return converted;
+            }
+        }
 
         );
         if (LOG.isTraceEnabled() && !result.isPresent()) {
