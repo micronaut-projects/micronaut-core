@@ -6,6 +6,7 @@ import io.kotlintest.shouldBe
 import io.kotlintest.specs.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.context.events.SampleEventEmitterBean
+import junit.framework.AssertionFailedError
 
 // tag::class[]
 class SampleEventListenerSpec : AnnotationSpec() {
@@ -19,7 +20,7 @@ class SampleEventListenerSpec : AnnotationSpec() {
         listener.invocationCounter.get().shouldBe(0)
         emitter.publishSampleEvent()
         
-        eventually(5.seconds) {
+        eventually(5.seconds,  AssertionFailedError::class.java) {
             println("Current value of counter: " + listener.invocationCounter.get())
             listener.invocationCounter.get().shouldBe(1)
         }
