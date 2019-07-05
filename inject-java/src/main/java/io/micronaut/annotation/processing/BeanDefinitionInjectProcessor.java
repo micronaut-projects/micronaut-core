@@ -1175,7 +1175,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     }
 
                                     Map members = CollectionUtils.mapOf(
-                                            Adapter.InternalAttributes.ADAPTED_BEAN, modelUtils.resolveTypeName(concreteClass.asType()),
+                                            Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(modelUtils.resolveTypeName(concreteClass.asType())),
                                             Adapter.InternalAttributes.ADAPTED_METHOD, method.getSimpleName().toString(),
                                             Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes
                                     );

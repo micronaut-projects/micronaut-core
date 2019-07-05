@@ -1572,7 +1572,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 }
 
                                 def values = CollectionUtils.mapOf(
-                                        Adapter.InternalAttributes.ADAPTED_BEAN, concreteClass.name,
+                                        Adapter.InternalAttributes.ADAPTED_BEAN, new AnnotationClassValue<>(concreteClass.name),
                                         Adapter.InternalAttributes.ADAPTED_METHOD, method.name,
                                         Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes
                                 )

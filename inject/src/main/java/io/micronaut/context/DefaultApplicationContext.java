@@ -316,7 +316,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 } else {
                     if (candidate.hasStereotype(ConfigurationReader.class)) {
 
-                        candidate.getValue(ConfigurationReader.class, "prefix", String.class)
+                        candidate.stringValue(ConfigurationReader.class, "prefix")
                                 .ifPresent(prefix -> {
                                     int starIndex = prefix.indexOf("*");
                                     if (starIndex > -1) {

@@ -972,7 +972,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     isReactiveReturnType && Publishers.isSingle(javaReturnType) ||
                             isResponsePublisher(genericReturnType, javaReturnType) ||
                                 isFuture ||
-                                    finalRoute.getAnnotationMetadata().getValue(Produces.class, "single", Boolean.class).orElse(false);
+                                    finalRoute.getAnnotationMetadata().booleanValue(Produces.class, "single").orElse(false);
 
             // build the result emitter. This result emitter emits the response from a controller action
             Flowable<?> resultEmitter = buildResultEmitter(

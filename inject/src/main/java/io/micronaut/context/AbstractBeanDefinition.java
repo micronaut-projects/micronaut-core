@@ -1018,7 +1018,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 AnnotationMetadata argMetadata = argument.getAnnotationMetadata();
                 Optional<String> valAnn = argMetadata.stringValue(Value.class);
                 String prop = valAnn.orElseGet(() ->
-                        argMetadata.getValue(Property.class, "name", String.class)
+                        argMetadata.stringValue(Property.class, "name")
                                 .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."))
                 );
                 ArgumentConversionContext<?> conversionContext = ConversionContext.of(argument);
@@ -1565,9 +1565,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (valueAnnStr != null) {
             valString = valueAnnStr;
         } else {
-            valString = annotationMetadata.getValue(Property.class, "name", String.class)
+            valString = annotationMetadata.stringValue(Property.class, "name")
                     .orElseGet(() ->
-                            argument.getAnnotationMetadata().getValue(Property.class, "name", String.class)
+                            argument.getAnnotationMetadata().stringValue(Property.class, "name")
                                     .orElseThrow(() ->
                                             new DependencyInjectionException(
                                                     resolutionContext,
@@ -1591,7 +1591,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (valueAnn != null) {
             valString = valueAnn;
         } else {
-            valString = annotationMetadata.getValue(Property.class, "name", String.class)
+            valString = annotationMetadata.stringValue(Property.class, "name")
                     .orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Value resolution attempted but @Value annotation is missing"));
 
             valString = substituteWildCards(resolutionContext, valString);
@@ -1609,7 +1609,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private String getConfigurationPropertiesPath(BeanResolutionContext resolutionContext) {
         String valString = getAnnotationMetadata()
-                .getValue(ConfigurationReader.class, "prefix", String.class)
+                .stringValue(ConfigurationReader.class, "prefix")
                 .orElseThrow(() -> new IllegalStateException("Resolve property path called for non @ConfigurationProperties bean"));
         valString = substituteWildCards(
                 resolutionContext,
@@ -1632,7 +1632,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         String attr = "cliPrefix";
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         if (annotationMetadata.isPresent(ConfigurationProperties.class, attr)) {
-            return annotationMetadata.getValue(ConfigurationProperties.class, attr, String.class).map(val -> val + name).orElse(null);
+            return annotationMetadata.stringValue(ConfigurationProperties.class, attr).map(val -> val + name).orElse(null);
         }
         return null;
     }

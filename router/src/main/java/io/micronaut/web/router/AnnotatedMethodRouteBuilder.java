@@ -183,7 +183,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                 boolean isGlobal = method.isTrue(Error.class, "global");
                 Class declaringType = bean.getBeanType();
                 if (method.isPresent(Error.class, "status")) {
-                    Optional<HttpStatus> value = method.getValue(Error.class, "status", HttpStatus.class);
+                    Optional<HttpStatus> value = method.enumValue(Error.class, "status", HttpStatus.class);
                     value.ifPresent(httpStatus -> {
                         if (isGlobal) {
                             status(httpStatus, declaringType, method.getMethodName(), method.getArgumentTypes());
