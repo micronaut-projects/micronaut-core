@@ -60,6 +60,10 @@ Initial support for environment detection and cloud metadata for Oracle Cloud ha
 
 If a service is configured statically with `micronaut.http.services.*`, it was previously not possible to override the configuration with the ann:http.client.annotation.Client[] annotation. It is now possible to override the configuration, which will result in a new client being created for the given client class.
 
+=== Completable Support
+
+The RxJava2 reactive type `io.reactivex.Completable` is now supported as a return type for controller and client methods.
+
 === Client and Server Host Resolution
 
 New beans have been added to support lookup of the client address and the current server host. The implementations are aware of proxy headers and are configurable to look for custom headers. The api:http.server.util.HttpHostResolver[] can be injected to resolve the current server hostname and api:http.server.util.HttpClientAddressResolver[] can be injected to resolve the client address of the current request.
