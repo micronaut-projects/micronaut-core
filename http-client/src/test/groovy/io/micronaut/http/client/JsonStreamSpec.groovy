@@ -30,6 +30,8 @@ import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
+import spock.lang.Issue
+import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -67,6 +69,25 @@ class JsonStreamSpec  extends Specification {
         jsonObjects.size() == 2
         jsonObjects[0].title == 'The Stand'
         jsonObjects[1].title == 'The Shining'
+
+        cleanup:
+        client.stop()
+
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1864')
+    @PendingFeature(reason = "Streaming JSON without specifying a accept header of 'application/x-json-stream' is not currently possible")
+    void "test read JSON stream raw data and demand all"() {
+        given:
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+
+        when:
+        List<Chunk> jsonObjects = client.jsonStream(HttpRequest.GET(
+                '/jsonstream/books/raw'
+        )).toList().blockingGet()
+
+        then:
+        jsonObjects.size() == 4
 
         cleanup:
         client.stop()
@@ -199,6 +220,16 @@ class JsonStreamSpec  extends Specification {
                 bookCount -> new LibraryStats(bookCount: bookCount)
             }
         }
+
+        @Get("/raw")
+        String rawData() {
+            return '''
+{"type":"ADDED"}
+{"type":"ADDED"}
+{"type":"ADDED"}
+{"type":"ADDED"}
+'''
+        }
     }
 
     static class Book {
@@ -207,6 +238,10 @@ class JsonStreamSpec  extends Specification {
 
     static class LibraryStats {
         Integer bookCount
+    }
+
+    static class Chunk {
+        String type
     }
 
 }
