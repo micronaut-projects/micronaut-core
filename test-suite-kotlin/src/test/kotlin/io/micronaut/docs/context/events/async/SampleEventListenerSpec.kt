@@ -6,7 +6,7 @@ import io.kotlintest.shouldBe
 import io.kotlintest.specs.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.context.events.SampleEventEmitterBean
-import junit.framework.AssertionFailedError
+import org.opentest4j.AssertionFailedError
 
 // tag::class[]
 class SampleEventListenerSpec : AnnotationSpec() {
