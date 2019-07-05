@@ -29,6 +29,7 @@ import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Completable
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.functions.Consumer
@@ -483,6 +484,17 @@ class HttpGetSpec extends Specification {
         response.body().isEmpty()
     }
 
+    void "test completable returns 200"() {
+        when:
+        MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
+        def ex = client.completableError().blockingGet()
+
+        then:
+        client.completable().blockingGet() == null
+        ex instanceof HttpClientResponseException
+        ex.message.contains("completable error")
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -569,6 +581,16 @@ class HttpGetSpec extends Specification {
         @Get("/host")
         String hostHeader(@Header String host) {
             return host
+        }
+
+        @Get("/completable")
+        Completable completable(){
+            return Completable.complete()
+        }
+
+        @Get("/completable/error")
+        Completable completableError() {
+            return Completable.error(new RuntimeException("completable error"))
         }
     }
 
@@ -673,6 +695,11 @@ class HttpGetSpec extends Specification {
         @Get("/dateTimeQuery")
         String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate)
 
+        @Get("/completable")
+        Completable completable()
+
+        @Get("/completable/error")
+        Completable completableError()
     }
 
     @javax.inject.Singleton
