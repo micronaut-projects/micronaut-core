@@ -16,8 +16,6 @@
 
 package io.micronaut.http.netty.graal;
 
-import com.oracle.svm.core.annotate.Alias;
-import com.oracle.svm.core.annotate.RecomputeFieldValue;
 import com.oracle.svm.core.annotate.Substitute;
 import com.oracle.svm.core.annotate.TargetClass;
 import io.micronaut.core.annotation.Experimental;
@@ -46,14 +44,5 @@ final class Target_io_netty_util_internal_logging_InternalLoggerFactory {
     private static InternalLoggerFactory newDefaultFactory(String name) {
         return JdkLoggerFactory.INSTANCE;
     }
-}
-
-/**
- * Substitutions for Caffeine UnsafeRefArrayAccess.
- */
-@TargetClass(className = "io.micronaut.caffeine.cache.UnsafeRefArrayAccess")
-final class Target_io_micronaut_caffeine_cache_UnsafeRefArrayAccess {
-    @Alias @RecomputeFieldValue(kind = RecomputeFieldValue.Kind.ArrayIndexShift, declClass = Object[].class)
-    public static int REF_ELEMENT_SHIFT;
 }
 //CHECKSTYLE:ON
