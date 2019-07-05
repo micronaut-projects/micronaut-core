@@ -1074,7 +1074,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     });
                 }
             }
-            return finalFlowable.subscribeOn(scheduler);
+            return finalFlowable;
         };
     }
 
