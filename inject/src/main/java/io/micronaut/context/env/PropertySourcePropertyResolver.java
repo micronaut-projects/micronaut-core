@@ -329,7 +329,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         // special handling for maps for resolving sub keys
         Properties properties = new Properties();
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
-        StringConvention keyConvention = annotationMetadata.getValue(MapFormat.class, "keyFormat", StringConvention.class)
+        StringConvention keyConvention = annotationMetadata.enumValue(MapFormat.class, "keyFormat", StringConvention.class)
                                                            .orElse(StringConvention.RAW);
         String prefix = name + '.';
         entries.entrySet().stream()
@@ -355,8 +355,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
-        StringConvention keyConvention = annotationMetadata.getValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(StringConvention.RAW);
-        MapFormat.MapTransformation transformation = annotationMetadata.getValue(
+        StringConvention keyConvention = annotationMetadata.enumValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(StringConvention.RAW);
+        MapFormat.MapTransformation transformation = annotationMetadata.enumValue(
                 MapFormat.class,
                 "transformation",
                 MapFormat.MapTransformation.class)

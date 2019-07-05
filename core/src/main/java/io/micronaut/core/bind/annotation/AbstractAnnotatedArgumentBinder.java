@@ -106,7 +106,7 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
             annotationValue = argument.getName();
         }
         return values.get(annotationValue, context).orElseGet(() ->
-                conversionService.convert(argument.getAnnotationMetadata().getValue(Bindable.class, DEFAULT_VALUE_MEMBER, String.class).orElse(null), context).orElse(null)
+                conversionService.convert(argument.getAnnotationMetadata().stringValue(Bindable.class, DEFAULT_VALUE_MEMBER).orElse(null), context).orElse(null)
         );
     }
 

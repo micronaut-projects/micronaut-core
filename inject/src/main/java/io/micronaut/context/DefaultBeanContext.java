@@ -1259,7 +1259,7 @@ public class DefaultBeanContext implements BeanContext {
                                                 if (LOG.isErrorEnabled()) {
                                                     LOG.error("Error processing bean method " + beanDefinition + "." + method + " with processor (" + processor + "): " + e.getMessage(), e);
                                                 }
-                                                Boolean shutdownOnError = method.getValue(Parallel.class, "shutdownOnError", Boolean.class).orElse(true);
+                                                Boolean shutdownOnError = method.booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                                                 if (shutdownOnError) {
                                                     stop();
                                                 }
@@ -1627,7 +1627,7 @@ public class DefaultBeanContext implements BeanContext {
                     }
                 } catch (Throwable e) {
                     LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + "] could not be loaded: " + e.getMessage(), e);
-                    Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().getValue(Parallel.class, "shutdownOnError", Boolean.class).orElse(true);
+                    Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                     if (shutdownOnError) {
                         stop();
                     }
@@ -1646,7 +1646,7 @@ public class DefaultBeanContext implements BeanContext {
                     }
                 } catch (Throwable e) {
                     LOG.error("Parallel Bean definition [" + beanDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
-                    Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().getValue(Parallel.class, "shutdownOnError", Boolean.class).orElse(true);
+                    Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                     if (shutdownOnError) {
                         stop();
                     }
