@@ -11,7 +11,7 @@ import io.micronaut.docs.context.events.SampleEventEmitterBean
 class SampleEventListenerSpec : AnnotationSpec() {
     
     @Test
-    @Ignore // TODO can't get this to pass on CI, any help is welcome
+//    @Ignore // TODO can't get this to pass on CI, any help is welcome
     fun testEventListenerWasNotified() {
         val context = ApplicationContext.run()
         val emitter = context.getBean(SampleEventEmitterBean::class.java)
@@ -20,6 +20,7 @@ class SampleEventListenerSpec : AnnotationSpec() {
         emitter.publishSampleEvent()
         
         eventually(5.seconds) {
+            println("Current value of counter: " + listener.invocationCounter)
             listener.invocationCounter.shouldBe(1)
         }
     }

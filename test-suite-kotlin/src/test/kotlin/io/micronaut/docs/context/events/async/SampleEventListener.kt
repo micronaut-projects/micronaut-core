@@ -10,11 +10,14 @@ import javax.inject.Singleton
 // tag::class[]
 @Singleton
 open class SampleEventListener {
+
+    @Volatile
     var invocationCounter = 0
 
     @EventListener
     @Async
     open fun onSampleEvent(event: SampleEvent) {
+        println("Incrementing invocation counter...")
         invocationCounter++
     }
 }
