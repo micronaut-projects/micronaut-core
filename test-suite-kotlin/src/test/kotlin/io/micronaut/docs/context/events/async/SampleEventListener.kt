@@ -4,6 +4,7 @@ package io.micronaut.docs.context.events.async
 import io.micronaut.docs.context.events.SampleEvent
 import io.micronaut.runtime.event.annotation.EventListener
 import io.micronaut.scheduling.annotation.Async
+import java.util.concurrent.atomic.AtomicInteger
 // end::imports[]
 import javax.inject.Singleton
 
@@ -11,14 +12,13 @@ import javax.inject.Singleton
 @Singleton
 open class SampleEventListener {
 
-    @Volatile
-    var invocationCounter = 0
+    var invocationCounter = AtomicInteger(0)
 
     @EventListener
     @Async
     open fun onSampleEvent(event: SampleEvent) {
         println("Incrementing invocation counter...")
-        invocationCounter++
+        invocationCounter.getAndIncrement()
     }
 }
 // end::class[]

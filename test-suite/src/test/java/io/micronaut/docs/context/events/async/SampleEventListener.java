@@ -6,20 +6,21 @@ import io.micronaut.runtime.event.annotation.EventListener;
 import io.micronaut.scheduling.annotation.Async;
 // end::imports[]
 import javax.inject.Singleton;
+import java.util.concurrent.atomic.AtomicInteger;
 
 // tag::class[]
 @Singleton
 public class SampleEventListener {
-    private int invocationCounter = 0;
+    private AtomicInteger invocationCounter = new AtomicInteger(0);
 
     @EventListener
     @Async
     public void onSampleEvent(SampleEvent event) {
-        invocationCounter++;
+        invocationCounter.getAndIncrement();
     }
 
     public int getInvocationCounter() {
-        return invocationCounter;
+        return invocationCounter.get();
     }
 }
 // end::class[]
