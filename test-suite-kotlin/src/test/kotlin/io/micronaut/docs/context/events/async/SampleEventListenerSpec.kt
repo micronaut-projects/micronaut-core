@@ -16,12 +16,12 @@ class SampleEventListenerSpec : AnnotationSpec() {
         val context = ApplicationContext.run()
         val emitter = context.getBean(SampleEventEmitterBean::class.java)
         val listener = context.getBean(SampleEventListener::class.java)
-        listener.invocationCounter.shouldBe(0)
+        listener.invocationCounter.get().shouldBe(0)
         emitter.publishSampleEvent()
         
         eventually(5.seconds) {
-            println("Current value of counter: " + listener.invocationCounter)
-            listener.invocationCounter.shouldBe(1)
+            println("Current value of counter: " + listener.invocationCounter.get())
+            listener.invocationCounter.get().shouldBe(1)
         }
     }
 }
