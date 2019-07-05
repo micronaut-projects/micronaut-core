@@ -97,6 +97,7 @@ import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.reactivex.BackpressureStrategy;
+import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.functions.LongConsumer;
 import io.reactivex.internal.operators.flowable.FlowableReplay;
@@ -983,7 +984,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     isSingle
             );
 
-
             // here we transform the result of the controller action into a MutableHttpResponse
             Flowable<MutableHttpResponse<?>> routePublisher = resultEmitter.map((message) -> {
                 RouteMatch<?> routeMatch = finalRoute;
@@ -1135,8 +1135,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         routePublisher = routePublisher.switchIfEmpty(Flowable.create((emitter) -> {
             HttpRequest<?> httpRequest = requestReference.get();
             MutableHttpResponse<?> response;
-            if (javaReturnType != void.class) {
-
+            if (javaReturnType == void.class || Completable.class.isAssignableFrom(javaReturnType)) {
+                // void return type with no response, nothing else to do
+                response = forStatus(annotationMetadata);
+            } else {
                 // handle re-mapping of errors
                 Optional<RouteMatch<Object>> statusRoute = Optional.empty();
                 // if declaringType is not null, this means its a locally marked method handler
@@ -1167,10 +1169,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 } else {
                     response = newNotFoundError(httpRequest);
                 }
-            } else {
-                // void return type with no response, nothing else to do
-                response = forStatus(annotationMetadata);
             }
+
             try {
                 emitter.onNext(response);
                 emitter.onComplete();
