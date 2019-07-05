@@ -6,5 +6,8 @@ dependencies {
     testCompile project(":validation")
     testCompile project(":inject")
     testCompile dependencyVersion("jcache")
-    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-spock")
+    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
 }
