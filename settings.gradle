@@ -42,5 +42,4 @@ include "test-utils"
 include "benchmarks"
 
 // configurations
-include "configurations:hibernate-validator"
 include "configurations:jmx"
