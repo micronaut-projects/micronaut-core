@@ -42,19 +42,27 @@ The https://micronaut-projects.github.io/micronaut-sql/1.2.x/guide/index.html[Mi
 * Improved Entity Scan support for JPA
 * Integration with Micronaut 1.2 Validator for JPA
 * GraalVM `native-image` metadata
+* Support for https://www.jooq.org[JOOQ]. Thanks to https://github.com/lightoze[Vladimir Kulev].
 
 === Micronaut Kafka 1.2 Update
+
+The https://micronaut-projects.github.io/micronaut-kafka/1.2.x/guide/index.html[Micronaut Kafka] module has been updated with support for the following new features:
 
 * Support for Kafka 2.3.0
 * Improved Exception Handling
 * Support for GraalVM `native-image`
 
+=== Micronaut Rabbit 1.1.1 Update
+
+The https://micronaut-projects.github.io/micronaut-rabbitmq/1.1.x/guide/index.html[Micronaut RabbitMQ] module has been updated with support for GraalVM `native-image`.
+
 === Micronaut Test 1.1 Update
+
+The https://micronaut-projects.github.io/micronaut-test/1.2.x/guide/index.html[Micronaut Test] module has been updated with support for the following new features:
 
 * Updated to JUnit 5.5
 * Support for Dependency Injection in Constructors and Methods for JUnit 5
 * Support for https://github.com/kotlintest/kotlintest[Kotlin Test]
-
 
 === Optional Beans Returned from Factories
 
