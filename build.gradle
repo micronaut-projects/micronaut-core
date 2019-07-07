@@ -126,6 +126,11 @@ ext {
                     name:'micronaut-kafka',
                     modules:['micronaut-kafka-streams']
             ],
+            'micronaut.cassandra': [
+                    version:micronautCassandraVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-cassandra'
+            ],
             'micronaut.hibernate.validator': [
                     version:micronautHibernateValidatorVersion,
                     group:'io.micronaut.configuration',
