@@ -43,6 +43,18 @@ The https://micronaut-projects.github.io/micronaut-sql/1.2.x/guide/index.html[Mi
 * Integration with Micronaut 1.2 Validator for JPA
 * GraalVM `native-image` metadata
 
+=== Micronaut Kafka 1.2 Update
+
+* Support for Kafka 2.3.0
+* Improved Exception Handling
+* Support for GraalVM `native-image`
+
+=== Micronaut Test 1.1 Update
+
+* Updated to JUnit 5.5
+* Support for Dependency Injection in Constructors and Methods for JUnit 5
+* Support for https://github.com/kotlintest/kotlintest[Kotlin Test]
+
 
 === Optional Beans Returned from Factories
 
@@ -110,3 +122,4 @@ This version references the https://micronaut-projects.github.io/micronaut-rss/l
 - Kafka `2.1.1` -> `2.3.0`
 - Snake YAML `1.23` -> `1.24`
 - Lettuce `5.1.3.RELEASE` -> `5.1.7.RELEASE`
+- JUnit `5.3.2` -> `5.5.0`
