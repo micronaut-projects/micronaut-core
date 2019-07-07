@@ -126,6 +126,16 @@ ext {
                     name:'micronaut-kafka',
                     modules:['micronaut-kafka-streams']
             ],
+            'micronaut.hibernate.validator': [
+                    version:micronautHibernateValidatorVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-hibernate-validator'
+            ],
+            'micronaut.picocli': [
+                    version:micronautPicocliVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-picocli'
+            ],
             'micronaut.rabbitmq': [
                     version:micronautRabbitMQVersion,
                     group:'io.micronaut.configuration',
