@@ -44,4 +44,3 @@ include "benchmarks"
 // configurations
 include "configurations:hibernate-validator"
 include "configurations:jmx"
-include "configurations:picocli"
