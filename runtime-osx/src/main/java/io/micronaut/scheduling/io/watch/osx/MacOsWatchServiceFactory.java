@@ -19,6 +19,7 @@ import com.sun.jna.Library;
 import io.methvin.watchservice.MacOSXListeningWatchService;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.scheduling.io.watch.FileWatchCondition;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 import io.micronaut.scheduling.io.watch.WatchServiceFactory;
 import org.slf4j.Logger;
@@ -35,7 +36,7 @@ import java.nio.file.WatchService;
  * @since 1.1.0
  */
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-@Requires(property = FileWatchConfiguration.PATHS)
+@Requires(condition = FileWatchCondition.class)
 @Requires(classes = {MacOSXListeningWatchService.class, Library.class})
 @Factory
 public class MacOsWatchServiceFactory {

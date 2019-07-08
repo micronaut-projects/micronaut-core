@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import javax.inject.Singleton;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
@@ -46,10 +47,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.1.0
  */
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-@Requires(property = FileWatchConfiguration.PATHS)
+@Requires(condition = FileWatchCondition.class)
 @Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
 @Requires(beans = WatchService.class)
 @Parallel
+@Singleton
 public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultWatchThread.class);
