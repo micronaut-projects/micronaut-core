@@ -351,7 +351,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                     ant.chmod(dir: targetDirectory, includes: profileInstance.executablePatterns.join(' '), perm: 'u+x')
                 }
             }
-            replaceBuildTokens(cmd.build, profileInstance, features, projectTargetDirectory)
+            replaceBuildTokens(cmd, profileInstance, features, projectTargetDirectory)
 
             messageOnComplete(cmd.console, cmd, projectTargetDirectory)
 
@@ -419,7 +419,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     }
 
     @CompileDynamic
-    protected void replaceBuildTokens(String build, Profile profile, List<Feature> features, File targetDirectory) {
+    protected void replaceBuildTokens(CreateServiceCommandObject cmd, Profile profile, List<Feature> features, File targetDirectory) {
         AntBuilder ant = new ConsoleAntBuilder()
 
         List<String> requestedFeatureNames = features.findAll { it.requested }*.name
@@ -445,9 +445,9 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         }
 
         BuildTokens buildTokens
-        if (build == "gradle") {
+        if (cmd.build == "gradle") {
             buildTokens = new GradleBuildTokens(appname, sourceLanguage, testFramework)
-        } else if (build == "maven") {
+        } else if (cmd.build == "maven") {
             buildTokens = new MavenBuildTokens(appname, sourceLanguage, testFramework)
         } else {
             return
@@ -458,6 +458,8 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         if (tokens == null) {
             return
         }
+
+        tokens.put("micronautVersion", cmd.micronautVersion)
 
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->
