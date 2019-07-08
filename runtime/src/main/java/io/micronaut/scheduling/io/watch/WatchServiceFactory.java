@@ -31,7 +31,7 @@ import java.nio.file.WatchService;
  * @since 1.1.0
  */
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-@Requires(property = FileWatchConfiguration.PATHS)
+@Requires(condition = FileWatchCondition.class)
 @Requires(missingClasses = "io.methvin.watchservice.MacOSXListeningWatchService")
 @Factory
 public class WatchServiceFactory {
