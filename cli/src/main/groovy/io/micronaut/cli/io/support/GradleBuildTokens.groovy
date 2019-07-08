@@ -33,9 +33,10 @@ import org.eclipse.aether.util.graph.selector.ExclusionDependencySelector
 class GradleBuildTokens extends BuildTokens {
 
     static final SCOPE_MAP = [
-            compile: 'compile',
-            runtime: 'runtime',
-            testCompile: 'testCompile',
+            compile: 'implementation',
+            runtime: 'runtimeOnly',
+            testRuntime: 'testRuntimeOnly',
+            testCompile: 'testImplementation',
             provided: 'developmentOnly'
     ]
 
