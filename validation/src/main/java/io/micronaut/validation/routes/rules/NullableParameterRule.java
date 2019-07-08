@@ -17,7 +17,6 @@ package io.micronaut.validation.routes.rules;
 
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.ast.ClassElement;

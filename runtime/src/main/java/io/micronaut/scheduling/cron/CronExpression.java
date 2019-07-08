@@ -130,7 +130,7 @@ import java.util.regex.Pattern;
  * the constraints of each field are met. Overlap of intervals are not allowed. That is: for
  * Day-of-week field &quot;FRI-MON&quot; is invalid,but &quot;FRI-SUN,MON&quot; is valid
  */
-public class CronExpression {
+public final class CronExpression {
 
     /**
      * Represents a field in the cron expression.
