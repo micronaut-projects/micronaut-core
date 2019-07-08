@@ -110,13 +110,14 @@ In previous versions of Micronaut, the property sources for an active environmen
 
 This version includes a new `/env` endpoint with information about the environment and its property sources See the <<environmentEndpoint, documentation>> for more information.
 
-== RSS 2.0 and iTunes Podcast
+== RSS 2.0 Module Included in BOM
 
-This version references the https://micronaut-projects.github.io/micronaut-rss/latest/guide/index.html[RSS configuration] which eases the generation of a RSS 2.0 feed or an iTunes Podcast feed in a Micronaut app.
+This version references the https://micronaut-projects.github.io/micronaut-rss/latest/guide/index.html[RSS configuration] which eases the generation of a RSS 2.0 feeds in a Micronaut app.
 
 === Dependency Upgrades
 
 - Groovy `2.5.4` -> `2.5.6`
+- Gradle `5.1.1` -> `Gradle 5.5` (for new applications)
 - Micronaut SQL `1.1.1` -> `1.2.0.RC1`
 - Micronaut Micrometer `1.1.0` -> `1.2.0.RC2`
 - Micrometer `1.1.5` -> `1.2.0`
