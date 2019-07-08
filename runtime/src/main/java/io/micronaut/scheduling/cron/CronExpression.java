@@ -174,7 +174,6 @@ public class CronExpression {
     private final SimpleField monthField;
     private final DayOfMonthField dayOfMonthField;
 
-
     private CronExpression(final String expr) {
         if (expr == null) {
             throw new IllegalArgumentException("expr is null"); //$NON-NLS-1$
