@@ -58,7 +58,7 @@ The https://micronaut-projects.github.io/micronaut-rabbitmq/1.1.x/guide/index.ht
 
 === Micronaut Test 1.1 Update
 
-The https://micronaut-projects.github.io/micronaut-test/1.2.x/guide/index.html[Micronaut Test] module has been updated with support for the following new features:
+The https://micronaut-projects.github.io/micronaut-test/1.1.x/guide/index.html[Micronaut Test] module has been updated with support for the following new features:
 
 * Updated to JUnit 5.5
 * Support for Dependency Injection in Constructors and Methods for JUnit 5
