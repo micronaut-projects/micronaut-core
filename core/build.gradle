@@ -13,5 +13,6 @@ dependencies {
     shadowCompile "org.ow2.asm:asm-commons:$asmVersion"
     shadowCompile "org.ow2.asm:asm-tree:$asmVersion"
     shadowCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+    testCompile group: 'com.diffblue', name: 'deeptestutils', version: '1.9.0'
 }
 
