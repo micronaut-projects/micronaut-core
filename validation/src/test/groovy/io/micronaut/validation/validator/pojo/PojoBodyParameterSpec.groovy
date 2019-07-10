@@ -26,6 +26,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
+import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -34,6 +35,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.annotation.Nullable
 import javax.validation.ConstraintViolationException
 import javax.validation.Valid
 import javax.validation.constraints.NotNull
@@ -51,7 +53,7 @@ class PojoBodyParameterSpec extends Specification {
 
     void 'test custom constraints in a Pojo are taken into account when it is used as a controller parameter'() {
         given:
-        HttpRequest req = HttpRequest.POST("/search/", new Search());
+        HttpRequest req = HttpRequest.POST("/search/", new Search())
 
         when:
         client.toBlocking().exchange(req, Argument.of(HttpResponse), Argument.of(HttpResponse))
@@ -68,7 +70,7 @@ class PojoBodyParameterSpec extends Specification {
 class SearchController {
 
     @Post("/")
-    HttpResponse search(@Body @NotNull @Valid Search search) {
+    HttpResponse search(@Nullable @Header("X-Temp") String temp, @Body @NotNull @Valid Search search) {
         return HttpResponse.ok()
     }
 
