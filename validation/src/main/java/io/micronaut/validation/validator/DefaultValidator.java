@@ -540,11 +540,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             final boolean hasValid = annotationMetadata.hasStereotype(Valid.class);
             final boolean hasConstraint = annotationMetadata.hasStereotype(Constraint.class);
 
+            final MutableArgumentValue<Object> argumentValue = (MutableArgumentValue<Object>) iterator.next();
+
             if (!hasValid && !hasConstraint) {
                 continue;
             }
 
-            final MutableArgumentValue<Object> argumentValue = (MutableArgumentValue<Object>) iterator.next();
             Object parameterValue = argumentValue.getValue();
 
             ValueExtractor<Object> valueExtractor = null;
