@@ -215,19 +215,7 @@ Synchronizing with Maven central. This may take a few minutes ...
 If this fails, log on to http://oss.sonatype.org/ using the centralUser credentials
 and progress through process manually -> Close -> Publish ... under staging repositories
 """
-        List<String> versions = []
-
-        try {
-            for(r in fetch("https://api.github.com/repos/micronaut-projects/micronaut-core/releases")) {
-                if (r.'tag_name') {
-                    versions.add(r.'tag_name')
-                }
-            }
-
-        } catch(e) {
-            println "Error $e.message Using Default Version"
-            versions = [projectVersion]
-        }
+        List<String> versions = [projectVersion]
 
         for(v in versions) {
             try {
