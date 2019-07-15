@@ -192,22 +192,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
                 }
             });
-
-            if (metadataBuilder.hasMetadata()) {
-                ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
-
-                try {
-                    for (ConfigurationMetadataWriter writer : writers) {
-                        try {
-                            writer.write(metadataBuilder, classWriterOutputVisitor);
-                        } catch (IOException e) {
-                            error("Error occurred writing configuration metadata: %s", e.getMessage());
-                        }
-                    }
-                } catch (ServiceConfigurationError e) {
-                    warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
-                }
-            }
             AnnotationUtils.invalidateCache();
         }
 
@@ -217,6 +201,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         */
         if (processingOver) {
             try {
+                writeConfigurationMetadata();
                 writeBeanDefinitionsToMetaInf();
             } finally {
                 AnnotationUtils.invalidateCache();
@@ -225,6 +210,24 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         return false;
+    }
+
+    private void writeConfigurationMetadata() {
+        if (metadataBuilder.hasMetadata()) {
+            ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
+
+            try {
+                for (ConfigurationMetadataWriter writer : writers) {
+                    try {
+                        writer.write(metadataBuilder, classWriterOutputVisitor);
+                    } catch (IOException e) {
+                        error("Error occurred writing configuration metadata: %s", e.getMessage());
+                    }
+                }
+            } catch (ServiceConfigurationError e) {
+                warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
+            }
+        }
     }
 
     /**
