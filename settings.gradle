@@ -40,6 +40,3 @@ include "test-utils"
 
 // benchmarks
 include "benchmarks"
-
-// configurations
-include "configurations:jmx"
