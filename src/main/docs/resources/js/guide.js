@@ -24,7 +24,7 @@ function switchTheme(persist) {
     var isDark = document.body.classList.contains("dark-mode");
     var sw = document.getElementById("theme-switcher");
 
-    if (isDark) {
+    if (!isDark) {
         sw.title = "Switch to light theme";
         sw.children[0].className = "fa fa-moon-o";
     } else {
