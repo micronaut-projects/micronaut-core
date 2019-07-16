@@ -309,6 +309,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             MediaType defaultResponseMediaType = errorRoute.getProduces().stream().findFirst().orElse(MediaType.APPLICATION_JSON_TYPE);
             try {
                 final MethodBasedRouteMatch<?, ?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
+                Class<?> javaReturnType = errorRoute.getReturnType().getType();
+                boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
+                boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
                 Flowable resultFlowable = Flowable.defer(() -> {
                       Object result = methodBasedRoute.execute();
                       MutableHttpResponse<?> response = errorResultToResponse(result);
@@ -319,7 +322,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                         methodBasedRoute.getDeclaringType(),
-                        methodBasedRoute.getReturnType().getType(),
+                        methodBasedRoute.getReturnType(),
+                        isReactiveReturnType,
                         methodBasedRoute.getAnnotationMetadata(),
                         requestReference,
                         resultFlowable);
@@ -365,7 +369,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                     Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                             handler.getClass(),
-                            HttpResponse.class,
+                            ReturnType.of(HttpResponse.class),
+                            false,
                             AnnotationMetadata.EMPTY_METADATA,
                             requestReference,
                             resultFlowable);
@@ -403,7 +408,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                         null,
-                        HttpResponse.class,
+                        ReturnType.of(HttpResponse.class),
+                        false,
                         AnnotationMetadata.EMPTY_METADATA,
                         requestReference,
                         resultFlowable);
@@ -1034,7 +1040,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             routePublisher = buildRoutePublisher(
                     finalRoute.getDeclaringType(),
-                    javaReturnType,
+                    genericReturnType,
+                    isReactiveReturnType,
                     finalRoute.getAnnotationMetadata(),
                     requestReference,
                     routePublisher
@@ -1126,7 +1133,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private Flowable<MutableHttpResponse<?>> buildRoutePublisher(
             Class<?> declaringType,
-            Class<?> javaReturnType,
+            ReturnType<?> genericReturnType,
+            boolean isReactiveReturnType,
             AnnotationMetadata annotationMetadata,
             AtomicReference<HttpRequest<?>> requestReference,
             Flowable<MutableHttpResponse<?>> routePublisher) {
@@ -1135,7 +1143,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         routePublisher = routePublisher.switchIfEmpty(Flowable.create((emitter) -> {
             HttpRequest<?> httpRequest = requestReference.get();
             MutableHttpResponse<?> response;
-            if (javaReturnType == void.class || Completable.class.isAssignableFrom(javaReturnType)) {
+            Class<?> javaReturnType = genericReturnType.getType();
+            boolean isVoid = javaReturnType == void.class ||
+                    Completable.class.isAssignableFrom(javaReturnType) ||
+                    (isReactiveReturnType && genericReturnType.getFirstTypeVariable()
+                            .filter(arg -> arg.getType() == Void.class).isPresent());
+
+            if (isVoid) {
                 // void return type with no response, nothing else to do
                 response = forStatus(annotationMetadata);
             } else {
