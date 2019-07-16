@@ -136,6 +136,11 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-hibernate-validator'
             ],
+            'micronaut.jmx': [
+                    version:micronautJmxVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-jmx'
+            ],
             'micronaut.picocli': [
                     version:micronautPicocliVersion,
                     group:'io.micronaut.configuration',
