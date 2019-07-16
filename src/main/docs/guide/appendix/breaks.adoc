@@ -6,7 +6,7 @@ The following changes could potentially be considered to be breaking changes, ho
 
 * The AWS distributed configuration through systems manager property store supported the notion of `key=value` in the value section of the configuration. This functionality has been removed because it did not consider properties that contain an `=` but are not in the format of `key=value`.
 
-
+* The return of reactive types with a generic of `Void` has been changed from always returning a 404 status to returning a 200, or whatever status is defined in the `@Status` annotation. This includes `CompletionStage`, RxJava2, and Reactor types. The change was made to be consistent with the behavior of methods that return `void`.
 
 ==== 1.1.0
 
