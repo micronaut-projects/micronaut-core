@@ -28,12 +28,14 @@ dependencies {
     annotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <2>
     compile "io.micronaut:micronaut-inject:{version}"
     ...
+    testAnnotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <3>
 }
 
 ----
 
 <1> Apply the Annotation Processing plugin
 <2> Include the minimal dependencies required to perform dependency injection
+<3> `annotationProcessor` will only scan you `src` directory. This is useful if you create beans in your `test` directory
 
 NOTE: For the Groovy language you should include `micronaut-inject-groovy` in the `compileOnly` scope.
 
