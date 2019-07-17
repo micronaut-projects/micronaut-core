@@ -17,7 +17,7 @@ A "Hello World" server application can be seen below:
 snippet::io.micronaut.docs.server.intro.HelloController[tags="imports,class"]
 
 <1> The class is defined as a controller with the link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation mapped to the path `/hello`
-<2> The scope of the `@Controller` is singleton
+<2> The method will respond to a GET request to `/hello` and returns a response with a `text/plain` content type
 <3> By defining method called `index`, by convention the method is exposed via the `/hello` URI
 
 
