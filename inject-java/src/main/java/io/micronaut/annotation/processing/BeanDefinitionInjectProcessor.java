@@ -307,6 +307,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private ExecutableElementParamInfo constructorParameterInfo;
         private AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
         private AtomicInteger factoryMethodIndex = new AtomicInteger(0);
+        private Set<Name> visitedTypes = new HashSet<>();
 
         /**
          * @param concreteClass The {@link TypeElement}
@@ -339,6 +340,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         @Override
         public Object visitType(TypeElement classElement, Object o) {
+            Name classElementQualifiedName = classElement.getQualifiedName();
+            if (visitedTypes.contains(classElementQualifiedName)) {
+                // bail out if already visited
+                return o;
+            }
+            visitedTypes.add(classElementQualifiedName);
             AnnotationMetadata typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(classElement);
             if (isConfigurationPropertiesType) {
 
@@ -368,7 +375,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             false
                     );
                 }
-                beanDefinitionWriters.put(classElement.getQualifiedName(), aopProxyWriter);
+                beanDefinitionWriters.put(classElementQualifiedName, aopProxyWriter);
                 visitIntroductionAdviceInterface(classElement, typeAnnotationMetadata, aopProxyWriter);
 
                 boolean isInterface = JavaModelUtils.isInterface(classElement);
@@ -388,9 +395,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 // don't process inner class unless this is the visitor for it
                 final Name qualifiedName = concreteClass.getQualifiedName();
                 if (!JavaModelUtils.isClass(enclosingElement) ||
-                        qualifiedName.equals(classElement.getQualifiedName())) {
+                        qualifiedName.equals(classElementQualifiedName)) {
 
-                    if (qualifiedName.equals(classElement.getQualifiedName())) {
+                    if (qualifiedName.equals(classElementQualifiedName)) {
                         ExecutableElement constructor = modelUtils.concreteConstructorFor(classElement, annotationUtils);
                         this.constructorParameterInfo = populateParameterData(null, constructor, Collections.emptyMap());
                         final boolean isBean = isAopProxyType ||
