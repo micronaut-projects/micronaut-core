@@ -29,6 +29,7 @@ dependencies {
     compile "io.micronaut:micronaut-inject:{version}"
     ...
     testAnnotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <3>
+    ...
 }
 
 ----
