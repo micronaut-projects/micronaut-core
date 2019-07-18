@@ -101,7 +101,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             } else if (value instanceof BigDecimal) {
                 return ((BigDecimal) value).compareTo(BigDecimal.valueOf(max)) < 0;
             }
-            return value.longValue() < max;
+            return value.longValue() <= max;
         };
 
     private final ConstraintValidator<Min, Number> minNumberValidator =
