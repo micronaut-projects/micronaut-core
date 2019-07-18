@@ -85,6 +85,27 @@ class Foo {
         then:
         def ex = thrown(RuntimeException)
         ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("{/abc}")
+    String abc(@PathVariable(defaultValue = "x") String abc) {
+        return "";
+    }
+}
+
+""")
+
+        then:
+        noExceptionThrown()
     }
 
     void "test query optional parameter"() {

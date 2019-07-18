@@ -48,6 +48,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     private String currentFieldName;
     private boolean streamArray;
     private boolean rootIsArray;
+    private boolean jsonStream;
 
     /**
      * Creates a new JacksonProcessor.
@@ -60,6 +61,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
             this.jsonFactory = jsonFactory;
             this.currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
             this.streamArray = streamArray;
+            this.jsonStream = true;
         } catch (IOException e) {
             throw new IllegalStateException("Failed to create non-blocking JSON parser: " + e.getMessage(), e);
         }
@@ -117,52 +119,56 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
             }
 
             ByteArrayFeeder byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
-            boolean consumed = false;
             boolean needMoreInput = byteFeeder.needMoreInput();
             if (!needMoreInput) {
                 currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
                 byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
             }
-            while (!consumed) {
-                if (byteFeeder.needMoreInput()) {
-                    byteFeeder.feedInput(message, 0, message.length);
-                    consumed = true;
-                }
 
-                JsonToken event;
-                while ((event = currentNonBlockingJsonParser.nextToken()) != JsonToken.NOT_AVAILABLE) {
-                    JsonNode root = asJsonNode(event);
-                    if (root != null) {
+            byteFeeder.feedInput(message, 0, message.length);
 
-                        boolean isLast = nodeStack.isEmpty();
-                        if (isLast) {
-                            byteFeeder.endOfInput();
-                        }
+            JsonToken event = currentNonBlockingJsonParser.nextToken();
+            if (event == JsonToken.START_ARRAY && nodeStack.peekFirst() == null) {
+                rootIsArray = true;
+                jsonStream = false;
+            }
 
-                        if (isLast && streamArray && root instanceof ArrayNode) {
-                            break;
-                        } else {
-                            currentDownstreamSubscriber()
-                                    .ifPresent(subscriber -> {
-                                            if (LOG.isTraceEnabled()) {
-                                                LOG.trace("Materialized new JsonNode call onNext...");
-                                            }
-                                            subscriber.onNext(root);
+            while (event != JsonToken.NOT_AVAILABLE) {
+                JsonNode root = asJsonNode(event);
+                if (root != null) {
+
+                    boolean isLast = nodeStack.isEmpty() && !jsonStream;
+                    if (isLast) {
+                        byteFeeder.endOfInput();
+                    }
+
+                    if (isLast && streamArray && root instanceof ArrayNode) {
+                        break;
+                    } else {
+                        currentDownstreamSubscriber()
+                                .ifPresent(subscriber -> {
+                                        if (LOG.isTraceEnabled()) {
+                                            LOG.trace("Materialized new JsonNode call onNext...");
                                         }
-                                    );
-                        }
-                        if (isLast) {
-                            break;
-                        }
+                                        subscriber.onNext(root);
+                                    }
+                                );
+                    }
+                    if (isLast) {
+                        break;
                     }
                 }
-                if (needMoreInput()) {
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("More input required to parse JSON. Demanding more.");
-                    }
-                    upstreamSubscription.request(1);
-                    upstreamDemand++;
+                event = currentNonBlockingJsonParser.nextToken();
+            }
+            if (jsonStream && nodeStack.isEmpty()) {
+                byteFeeder.endOfInput();
+            }
+            if (jsonStream || needMoreInput()) {
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("More input required to parse JSON. Demanding more.");
                 }
+                upstreamSubscription.request(1);
+                upstreamDemand++;
             }
         } catch (IOException e) {
             onError(e);

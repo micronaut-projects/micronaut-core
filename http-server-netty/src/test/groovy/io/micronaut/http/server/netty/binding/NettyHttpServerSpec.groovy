@@ -33,6 +33,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.exceptions.ServerStartupException
 import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.lang.Stepwise
 
@@ -44,6 +45,7 @@ import java.time.temporal.ChronoUnit
  * @since 1.0
  */
 @Stepwise
+@Retry // sometimes fails to bind port on Travis
 class NettyHttpServerSpec extends Specification {
 
     void "test Micronaut server running"() {
