@@ -833,7 +833,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         .map((Function<HttpContent, io.micronaut.http.HttpResponse<ByteBuffer<?>>>) message -> {
                     ByteBuf byteBuf = message.content();
                     if (log.isTraceEnabled()) {
-                        log.trace("HTTP Client Streaming Response Received Chunk (length: {})", byteBuf.readableBytes());
+                        log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}", byteBuf.readableBytes(), request.getMethod(), request.getUri());
                         traceBody("Response", byteBuf);
                     }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
@@ -878,7 +878,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         httpContentFlowable.map(content -> {
                             ByteBuf chunk = content.content();
                             if (log.isTraceEnabled()) {
-                                log.trace("HTTP Client Streaming Response Received Chunk (length: {})", chunk.readableBytes());
+                                log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}", chunk.readableBytes(), request.getMethod(), request.getUri());
                                 traceBody("Chunk", chunk);
                             }
                             try {
@@ -1598,7 +1598,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg);
                     HttpHeaders headers = msg.headers();
                     if (log.isTraceEnabled()) {
-                        log.trace("HTTP Client Streaming Response Received: {}", msg.status());
+                        log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());
                         traceHeaders(headers);
                     }
 
