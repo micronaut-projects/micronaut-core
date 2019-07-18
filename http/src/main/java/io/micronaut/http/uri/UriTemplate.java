@@ -173,10 +173,10 @@ public class UriTemplate implements Comparable<UriTemplate> {
      */
     public String expand(Map<String, Object> parameters) {
         StringBuilder builder = new StringBuilder();
-        boolean previousHasContent = false;
+        boolean anyPreviousHasContent = false;
         boolean anyPreviousHasOperator = false;
         for (PathSegment segment : segments) {
-            String result = segment.expand(parameters, previousHasContent, anyPreviousHasOperator);
+            String result = segment.expand(parameters, anyPreviousHasContent, anyPreviousHasOperator);
             if (result == null) {
                 break;
             }
@@ -184,8 +184,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 if (result.contains(String.valueOf(((UriTemplateParser.VariablePathSegment) segment).getOperator()))) {
                     anyPreviousHasOperator = true;
                 }
+                anyPreviousHasContent = anyPreviousHasContent || result.length() > 0;
             }
-            previousHasContent = result.length() > 0;
             builder.append(result);
         }
 

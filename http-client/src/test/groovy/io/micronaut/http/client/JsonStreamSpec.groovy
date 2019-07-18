@@ -30,6 +30,7 @@ import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -67,6 +68,29 @@ class JsonStreamSpec  extends Specification {
         jsonObjects.size() == 2
         jsonObjects[0].title == 'The Stand'
         jsonObjects[1].title == 'The Shining'
+
+        cleanup:
+        client.stop()
+
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1864')
+    void "test read JSON stream raw data and demand all"() {
+        given:
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+
+        when:
+        List<Chunk> jsonObjects = client.jsonStream(
+                HttpRequest.POST('/jsonstream/books/raw', '''
+{"type":"ADDED"}
+{"type":"ADDED"}
+{"type":"ADDED"}
+{"type":"ADDED"}
+''').contentType(MediaType.APPLICATION_JSON_STREAM_TYPE)
+    .accept(MediaType.APPLICATION_JSON_STREAM_TYPE), Chunk).toList().blockingGet()
+
+        then:
+        jsonObjects.size() == 4
 
         cleanup:
         client.stop()
@@ -199,6 +223,15 @@ class JsonStreamSpec  extends Specification {
                 bookCount -> new LibraryStats(bookCount: bookCount)
             }
         }
+
+        @Post(uri = "/raw", processes = MediaType.APPLICATION_JSON_STREAM)
+        String rawData(@Body Flowable<Chunk> chunks) {
+            return chunks
+                    .map({ chunk -> "{\"type\":\"${chunk.type}\"}"})
+                    .toList()
+                    .map({ chunkList -> "\n" + chunkList.join("\n")})
+                    .blockingGet()
+        }
     }
 
     static class Book {
@@ -207,6 +240,10 @@ class JsonStreamSpec  extends Specification {
 
     static class LibraryStats {
         Integer bookCount
+    }
+
+    static class Chunk {
+        String type
     }
 
 }
