@@ -285,9 +285,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      * Returns a combined Map of all properties in the catalog.
      *
      * @return Map of all properties
+     * @deprecated Use {@link #getAllProperties(MapFormat.MapTransformation)} instead
      */
+    @Deprecated
     public Map<String, Object> getAllProperties() {
+        return getAllProperties(MapFormat.MapTransformation.NESTED);
+    }
+
+    public Map<String, Object> getAllProperties(MapFormat.MapTransformation transformation) {
         Map<String, Object> map = new HashMap<>();
+        boolean isNested = transformation == MapFormat.MapTransformation.NESTED;
 
         Arrays
             .stream(catalog)
@@ -299,7 +306,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
                 Map finalMap = map;
                 int index = k.indexOf('.');
-                if (index != -1) {
+                if (index != -1 && isNested) {
                     String[] keys = k.split("\\.");
                     for (int i = 0; i < keys.length - 1; i++) {
                         if (!finalMap.containsKey(keys[i])) {
