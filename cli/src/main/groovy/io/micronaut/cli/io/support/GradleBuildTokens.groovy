@@ -20,10 +20,7 @@ import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.repository.MavenProfileRepository
 import io.micronaut.cli.util.VersionInfo
-import org.eclipse.aether.artifact.Artifact
 import org.eclipse.aether.graph.Dependency
-import org.eclipse.aether.graph.Exclusion
-import org.eclipse.aether.util.graph.selector.ExclusionDependencySelector
 
 /**
  * @author James Kleeh
@@ -31,14 +28,6 @@ import org.eclipse.aether.util.graph.selector.ExclusionDependencySelector
  */
 @InheritConstructors
 class GradleBuildTokens extends BuildTokens {
-
-    static final SCOPE_MAP = [
-            compile: 'implementation',
-            runtime: 'runtimeOnly',
-            testRuntime: 'testRuntimeOnly',
-            testCompile: 'testImplementation',
-            provided: 'developmentOnly'
-    ]
 
     Map getTokens(Profile profile, List<Feature> features) {
         Map tokens = [:]
@@ -55,13 +44,10 @@ class GradleBuildTokens extends BuildTokens {
 
         def repositories = (profile.repositories + defaultRepo).collect(repositoryUrl.curry(4)).unique().join(ln)
 
-        List<Dependency> dependencies = materializeDependencies(profile, features)
+        List<GradleDependency> dependencies = getDependencies(profile, features)
 
-        String dependencyString = dependencies.sort({ Dependency dep -> dep.scope }).collect() { Dependency dep ->
-            String scope = SCOPE_MAP.get(dep.scope)
-            if (scope == null) scope = dep.scope
-            String artifactStr = resolveArtifactString(dep, 4)
-            "    ${scope}${artifactStr}".toString()
+        String dependencyString = dependencies.sort({ GradleDependency dep -> dep.scope }).collect() { GradleDependency dep ->
+            dep.toString(4)
         }.unique().join(ln)
 
         def buildPlugins = profile.buildPlugins.collect() { String name ->
@@ -116,38 +102,22 @@ class GradleBuildTokens extends BuildTokens {
         ["services": serviceString]
     }
 
-    protected String resolveArtifactString(Dependency dep, int spaces) {
-        def artifact = dep.artifact
-        def v = artifact.version.replace('BOM', '')
-        StringBuilder artifactString = new StringBuilder()
-        if (dep.exclusions != null && !dep.exclusions.empty) {
-            artifactString.append('(')
-        } else {
-            artifactString.append(' ')
+    protected List<GradleDependency> getDependencies(Profile profile, List<Feature> features) {
+        List<Dependency> dependencies = super.materializeDependencies(profile, features)
+        List<GradleDependency> gradleDependencies = []
+        final String enforcedPlatform = ' platform("io.micronaut:micronaut-bom:$micronautVersion")'
+        gradleDependencies.add(new GradleDependency("implementation", enforcedPlatform))
+        if (sourceLanguage == "groovy") {
+            gradleDependencies.add(new GradleDependency("compileOnly", enforcedPlatform))
+            gradleDependencies.add(new GradleDependency("testCompileOnly", enforcedPlatform))
+        } else if (sourceLanguage == "java") {
+            gradleDependencies.add(new GradleDependency("annotationProcessor", enforcedPlatform))
+            gradleDependencies.add(new GradleDependency("testAnnotationProcessor", enforcedPlatform))
+        } else if (sourceLanguage == "kotlin") {
+            gradleDependencies.add(new GradleDependency("kapt", enforcedPlatform))
+            gradleDependencies.add(new GradleDependency("kaptTest", enforcedPlatform))
         }
-        artifactString.append('"')
-        artifactString.append(artifact.groupId)
-        artifactString.append(':').append(artifact.artifactId)
-        if (v) {
-            artifactString.append(':').append(v)
-        }
-        artifactString.append('"')
-
-        def ln = System.getProperty("line.separator")
-
-        if (dep.exclusions != null && !dep.exclusions.empty) {
-            artifactString.append(") {").append(ln)
-            for (e in dep.exclusions) {
-                artifactString.append(" " * (spaces)).append("    ")
-                    .append("exclude")
-
-                artifactString.append(" group: ").append('"').append(e.groupId).append('",')
-                artifactString.append(" module: ").append('"').append(e.artifactId).append('"')
-
-                artifactString.append(ln)
-            }
-            artifactString.append(" " * spaces).append("}")
-        }
-        return artifactString.toString()
+        gradleDependencies.addAll(dependencies.collect{ new GradleDependency(it) })
+        gradleDependencies
     }
 }
