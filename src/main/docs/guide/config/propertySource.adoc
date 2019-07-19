@@ -1,10 +1,6 @@
 Additional api:io.micronaut.context.env.PropertySource[] instances can be added to the environment prior to initializing the link:{api}/io/micronaut/context/ApplicationContext.html[ApplicationContext].
 
-.Initializing the Environment
-[source,java]
-----
-include::{testsjava}/env/EnvironmentTest.java[tags=envProps, indent=0]
-----
+snippet::io.micronaut.docs.context.env.EnvironmentSpec[tags="envProps",indent=0,title="Initializing the Environment"]
 
 The link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource.of] method can be used to create a `ProperySource` from a map of values.
 
