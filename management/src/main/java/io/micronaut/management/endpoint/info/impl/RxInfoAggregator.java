@@ -20,6 +20,7 @@ import io.micronaut.context.env.EmptyPropertySource;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcePropertyResolver;
 import io.micronaut.core.convert.format.MapFormat;
+import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.management.endpoint.info.InfoAggregator;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
 import io.micronaut.management.endpoint.info.InfoSource;
@@ -51,7 +52,7 @@ public class RxInfoAggregator implements InfoAggregator<Map<String, Object>> {
             list.stream()
                 .sorted((e1, e2) -> Integer.compare(e2.getKey(), e1.getKey()))
                 .forEach((entry) -> resolver.addPropertySource(entry.getValue()));
-            return resolver.getAllProperties(MapFormat.MapTransformation.NESTED);
+            return resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED);
         }).toFlowable();
     }
 

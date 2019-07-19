@@ -18,6 +18,7 @@ package io.micronaut.context.env
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.convert.format.MapFormat
+import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyResolver
 import org.junit.Rule
@@ -341,16 +342,19 @@ class PropertySourcePropertyResolverSpec extends Specification {
                 'foo.bar'          : 'two',
                 'my.property.one'  : 'one',
                 'my.property.two'  : '${foo.bar}',
-                'my.property.three': 'three'
+                'my.property.three': 'three',
+                'test-key.convention-test': 'key'
         ]
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values))
 
         expect:
-        resolver.getAllProperties(MapFormat.MapTransformation.NESTED).containsKey('my')
-        resolver.getAllProperties(MapFormat.MapTransformation.FLAT).containsKey('my.property.one')
-        resolver.getAllProperties(MapFormat.MapTransformation.FLAT).get('my.property.two') == 'two'
-        resolver.getAllProperties(MapFormat.MapTransformation.NESTED).get('my').get('property').get('two') == 'two'
+        resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED).containsKey('my')
+        resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.FLAT).containsKey('my.property.one')
+        resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.FLAT).get('my.property.two') == 'two'
+        resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED).get('my').get('property').get('two') == 'two'
+        resolver.getAllProperties(StringConvention.CAMEL_CASE, MapFormat.MapTransformation.FLAT).get('testKey.conventionTest') == 'key'
+        resolver.getAllProperties(StringConvention.CAMEL_CASE, MapFormat.MapTransformation.NESTED).get('testKey').get('conventionTest') == 'key'
     }
 
 }

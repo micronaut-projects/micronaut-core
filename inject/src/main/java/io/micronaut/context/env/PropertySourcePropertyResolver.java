@@ -285,14 +285,21 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      * Returns a combined Map of all properties in the catalog.
      *
      * @return Map of all properties
-     * @deprecated Use {@link #getAllProperties(MapFormat.MapTransformation)} instead
+     * @deprecated Use {@link #getAllProperties(StringConvention, MapFormat.MapTransformation)} instead
      */
     @Deprecated
     public Map<String, Object> getAllProperties() {
-        return getAllProperties(MapFormat.MapTransformation.NESTED);
+        return getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED);
     }
 
-    public Map<String, Object> getAllProperties(MapFormat.MapTransformation transformation) {
+    /**
+     * Returns a combined Map of all properties in the catalog.
+     *
+     * @param keyConvention The map key convention
+     * @param transformation The map format
+     * @return Map of all properties
+     */
+    public Map<String, Object> getAllProperties(StringConvention keyConvention, MapFormat.MapTransformation transformation) {
         Map<String, Object> map = new HashMap<>();
         boolean isNested = transformation == MapFormat.MapTransformation.NESTED;
 
@@ -302,7 +309,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             .map(Map::entrySet)
             .flatMap(Collection::stream)
             .forEach((Map.Entry<String, Object> entry) -> {
-                String k = entry.getKey();
+                String k = keyConvention.format(entry.getKey());
                 Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
                 Map finalMap = map;
                 int index = k.indexOf('.');
