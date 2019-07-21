@@ -1020,7 +1020,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         routeMatch = statusRoute.get();
                         httpRequest.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
 
-                        requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
+                        routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
 
                         if (routeMatch.isExecutable()) {
                             Object result;
@@ -1029,6 +1029,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 finalResponse = messageToResponse(routeMatch, result);
                             } catch (Throwable e) {
                                 throw new InternalServerException("Error executing status route [" + routeMatch + "]: " + e.getMessage(), e);
+                            }
+                        } else {
+                            if (LOG.isWarnEnabled()) {
+                                LOG.warn("Matched status route [" + routeMatch + "] not executed because one or more arguments could not be bound. Returning the original response.");
                             }
                         }
                     }
@@ -1164,8 +1168,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
 
                 if (statusRoute.isPresent()) {
-                    RouteMatch<Object> newRoute = statusRoute.get();
-                    requestArgumentSatisfier.fulfillArgumentRequirements(newRoute, httpRequest, true);
+                    RouteMatch<?> newRoute = requestArgumentSatisfier.fulfillArgumentRequirements(statusRoute.get(), httpRequest, true);
 
                     if (newRoute.isExecutable()) {
                         try {
@@ -1177,9 +1180,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         }
 
                     } else {
+                        if (LOG.isWarnEnabled()) {
+                            LOG.warn("Matched status route [" + newRoute + "] not executed because one or more arguments could not be bound. Returning a default response.");
+                        }
                         response = newNotFoundError(httpRequest);
                     }
-                    response.setAttribute(HttpAttributes.ROUTE_MATCH, statusRoute);
+                    response.setAttribute(HttpAttributes.ROUTE_MATCH, newRoute);
                 } else {
                     response = newNotFoundError(httpRequest);
                 }
