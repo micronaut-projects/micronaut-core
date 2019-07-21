@@ -116,12 +116,12 @@ class CustomStaticMappingGlobalSpec extends AbstractMicronautSpec {
         }
 
         @Error(status = HttpStatus.BAD_REQUEST, global = true)
-        HttpResponse badHandler() {
+        HttpResponse badHandler(HttpRequest request) {
             HttpResponse.status(HttpStatus.BAD_REQUEST, "You sent me bad stuff - from Test2Controller.badHandler()")
         }
 
         @Error(status = HttpStatus.NOT_FOUND, global = true)
-        HttpResponse notFoundHandler() {
+        HttpResponse notFoundHandler(HttpRequest request) {
             HttpResponse.status(HttpStatus.NOT_FOUND, "We cannot find anything - from Test2Controller.notFoundHandler()")
         }
     }
