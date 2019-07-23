@@ -36,6 +36,11 @@ When the `management` dependency is added to your project, the following built-i
 | `/env`
 |Returns information about the environment and its property sources (see <<environmentEndpoint, EnvironmentEndpoint>>)
 
+|api:management.endpoint.threads.ThreadDumpEndpoint[]
+| `/env`
+|Returns information about the current threads in the application)
+
+
 |===
 
 In addition, the following built-in endpoint(s) are provided by the `management` dependency but are not enabled by default:
