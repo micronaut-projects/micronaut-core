@@ -19,6 +19,7 @@ import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Internal
+import io.micronaut.core.order.Ordered
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.codehaus.groovy.ast.AnnotatedNode
@@ -44,7 +45,7 @@ import javax.annotation.Nullable
  */
 @Internal
 @CompileStatic
-class LoadedVisitor {
+class LoadedVisitor implements Ordered {
 
     private final SourceUnit sourceUnit
     private final TypeElementVisitor visitor
@@ -73,6 +74,10 @@ class LoadedVisitor {
         visitor
     }
 
+    @Override
+    int getOrder() {
+        return getVisitor().getOrder()
+    }
 
     boolean equals(o) {
         if (this.is(o)) return true
