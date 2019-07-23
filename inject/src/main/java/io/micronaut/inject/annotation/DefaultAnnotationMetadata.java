@@ -1507,6 +1507,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 if (len > 0) {
                     rawValue = Array.get(rawValue, 0);
                 }
+            } else if (rawValue instanceof Iterable) {
+                Iterator i = ((Iterable) rawValue).iterator();
+                if (i.hasNext()) {
+                    rawValue = i.next();
+                }
             }
         }
         if (valueMapper != null && rawValue instanceof CharSequence) {

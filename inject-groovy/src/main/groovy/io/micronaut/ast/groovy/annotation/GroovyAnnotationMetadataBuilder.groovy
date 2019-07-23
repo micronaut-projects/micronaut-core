@@ -318,15 +318,20 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             PropertyExpression pe = (PropertyExpression) annotationValue
             if (pe.objectExpression instanceof ClassExpression) {
                 ClassExpression ce = (ClassExpression) pe.objectExpression
-                if (ce.type.isResolved()) {
-                    Class typeClass = ce.type.typeClass
-                    try {
-                        def value = typeClass[pe.propertyAsString]
-                        if (value != null) {
-                            return value
+                ClassNode propertyType = ce.type
+                if (propertyType.isEnum()) {
+                    return pe.getPropertyAsString()
+                } else {
+                    if (propertyType.isResolved()) {
+                        Class typeClass = propertyType.typeClass
+                        try {
+                            def value = typeClass[pe.propertyAsString]
+                            if (value != null) {
+                                return value
+                            }
+                        } catch (e) {
+                            // ignore
                         }
-                    } catch (e) {
-                        // ignore
                     }
                 }
             }
