@@ -1,0 +1,20 @@
+The routes endpoint returns information about the threads running in your application.
+
+To execute the routes endpoint, send a GET request to /threaddump.
+
+== Configuration
+
+To configure the threaddump endpoint, supply configuration through `endpoints.threaddump`.
+
+.Routes Endpoint Configuration Example
+[source,yaml]
+----
+endpoints:
+    threaddump:
+        enabled: Boolean
+        sensitive: Boolean
+----
+
+== Customization
+
+The thread dump endpoint delegates to a link:{api}/io/micronaut/management/endpoint/threads/ThreadInfoMapper.html[ThreadInfoMapper]) that is responsible for transforming the `java.lang.management.ThreadInfo` objects into any other to be sent for serialization.
