@@ -2098,7 +2098,13 @@ public class DefaultBeanContext implements BeanContext {
                     LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
                 Stream<BeanDefinition<T>> candidateStream = candidates.stream().filter(c -> !c.isAbstract());
-                Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidateStream);
+                Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidateStream).filter((bt) -> {
+                    if (bt instanceof NoInjectionBeanDefinition) {
+                        NoInjectionBeanDefinition noInjectionBeanDefinition = (NoInjectionBeanDefinition) bt;
+                        return qualifier.contains(noInjectionBeanDefinition.qualifier);
+                    }
+                    return true;
+                });
                 List<BeanDefinition<T>> beanDefinitionList = qualified.collect(Collectors.toList());
                 if (beanDefinitionList.isEmpty()) {
                     if (LOG.isDebugEnabled()) {
@@ -2209,8 +2215,8 @@ public class DefaultBeanContext implements BeanContext {
                 if (reg == null) {
                     throw new IllegalStateException("Manually registered singleton no longer present in bean context");
                 }
-                registerSingletonBean(definition, beanType, reg.getBean(), qualifier, true);
-                return reg.getBean();
+                registerSingletonBean(definition, beanType, reg.bean, qualifier, true);
+                return reg.bean;
             } else {
                 T createdBean = doCreateBean(resolutionContext, definition, qualifier, true, null);
                 registerSingletonBean(definition, beanType, createdBean, qualifier, true);
