@@ -95,6 +95,24 @@ class Test {
                 .get() == 'bar'
     }
 
+    void "test annotation groovy bean introspection properties"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test {
+    String name
+}
+''')
+
+        expect:
+        introspection.getRequiredProperty("name", String).stringValue("foo.bar.Ann", 'foo')
+                .get() == 'bar'
+    }
+
     static class MyAnnotatingTypeElementVisitor implements TypeElementVisitor {
 
         @Override

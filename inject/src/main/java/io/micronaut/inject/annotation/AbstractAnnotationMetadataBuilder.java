@@ -670,7 +670,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private AnnotationMetadata lookupExisting(String declaringType, T element) {
-        return isMethodOrClassElement(element) ? MUTATED_ANNOTATION_METADATA.get(new MetadataKey(declaringType, element)) : null;
+        return MUTATED_ANNOTATION_METADATA.get(new MetadataKey(declaringType, element));
     }
 
     private void processAnnotationAlias(
