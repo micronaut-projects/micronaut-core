@@ -20,9 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
-import org.codehaus.groovy.ast.FieldNode;
-
-import javax.annotation.Nonnull;
 
 /**
  * Implementation of {@link PropertyElement} for Groovy.
