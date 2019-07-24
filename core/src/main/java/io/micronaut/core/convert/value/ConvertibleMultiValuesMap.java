@@ -79,7 +79,7 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
                 return conversionService.convert(values.get(0), conversionContext);
             } else if (hasValue && hasSingleEntry) {
                 T result = converted.get();
-                if (result instanceof List && ((List) result).isEmpty()) {
+                if (result instanceof Collection && ((Collection) result).isEmpty()) {
                     return conversionService.convert(values.get(0), conversionContext);
                 } else if (result instanceof Optional && !((Optional) result).isPresent()) {
                     return conversionService.convert(values.get(0), conversionContext);
