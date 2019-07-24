@@ -15,14 +15,22 @@
  */
 package io.micronaut.inject.configproperties.other;
 
+import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.inject.configuration.Engine;
 
 @ConfigurationProperties("parent")
 public class ParentConfigProperties {
 
     private String name;
-
     protected String nationality;
+
+    @ConfigurationBuilder(configurationPrefix = "engine", prefixes = "with")
+    protected Engine.Builder builder = Engine.builder();
+
+    public Engine.Builder getBuilder() {
+        return builder;
+    }
 
     public String getName() {
         return name;
