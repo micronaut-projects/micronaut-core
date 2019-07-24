@@ -23,7 +23,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MemberElement;
-import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.annotation.Nonnull;
 import javax.lang.model.element.Element;

@@ -315,6 +315,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
         private AtomicInteger factoryMethodIndex = new AtomicInteger(0);
         private Set<Name> visitedTypes = new HashSet<>();
+
         /**
          * @param concreteClass The {@link TypeElement}
          */
