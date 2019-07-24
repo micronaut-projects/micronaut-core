@@ -1622,7 +1622,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private void logException(Throwable cause) {
         //handling connection reset by peer exceptions
-        if (cause instanceof IOException && IGNORABLE_ERROR_MESSAGE.matcher(cause.getMessage()).matches()) {
+        String message = cause.getMessage();
+        if (cause instanceof IOException && message != null && IGNORABLE_ERROR_MESSAGE.matcher(message).matches()) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
             }
