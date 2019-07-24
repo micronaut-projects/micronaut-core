@@ -38,7 +38,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String MULTIPLIER = "multiplier";
     private static final String DELAY = "delay";
     private static final String MAX_DELAY = "maxDelay";
-    private static final String INCLUDES = "value";
+    private static final String INCLUDES = "includes";
     private static final String EXCLUDES = "excludes";
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
