@@ -58,7 +58,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/path/20/bar/10'                     | "Parameter Values: 20 10"    | HttpStatus.OK
         HttpMethod.GET  | '/parameter/path/20/bar'                        | "Parameter Values: 20 "      | HttpStatus.OK
         HttpMethod.GET  | '/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
-        HttpMethod.POST | '/parameter/save-again?max=30'                   | "Parameter Value: 30"       | HttpStatus.OK
+        HttpMethod.POST | '/parameter/save-again?max=30'                  | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/path/20'                            | "Parameter Value: 20"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/simple'                             | null                        | HttpStatus.BAD_REQUEST
         HttpMethod.GET  | '/parameter/named'                              | null                        | HttpStatus.BAD_REQUEST
@@ -66,9 +66,12 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/overlap/30?max=50'                  | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"    | HttpStatus.OK
         HttpMethod.GET  | '/parameter/optional?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
+
+        HttpMethod.GET  | '/parameter/set?values=10,20'                   | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/optional-list?values=10&values=20'   | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/set?values=10&values=20'            | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional-list?values=10&values=20'  | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter?max=20'                             | "Parameter Value: 20"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/simple?max=20'                      | "Parameter Value: 20"       | HttpStatus.OK
 
@@ -147,6 +150,12 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         String list(List<Integer> values) {
             assert values.every() { it instanceof Integer }
             "Parameter Value: ${values.inspect()}"
+        }
+
+        @Get("/set")
+        String set(Set<Integer> values) {
+            assert values.every() { it instanceof Integer }
+            "Parameter Value: ${values.toList().sort().inspect()}"
         }
 
         @Get("/optional-list")

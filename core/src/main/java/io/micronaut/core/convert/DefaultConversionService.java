@@ -707,20 +707,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
 
             ConversionContext newContext = context.with(componentType);
-            if (targetType.isInstance(object)) {
-                if (targetComponentType == Object.class) {
-                    return Optional.of(object);
-                }
-                List list = new ArrayList();
-                for (Object o : object) {
-                    Optional converted = convert(o, targetComponentType, newContext);
-                    if (converted.isPresent()) {
-                        list.add(converted.get());
-                    }
-                }
-                return CollectionUtils.convertCollection((Class) targetType, list);
+            if (targetType.isInstance(object) && targetComponentType == Object.class) {
+                return Optional.of(object);
             }
-            targetComponentType = Object.class;
             List list = new ArrayList();
             for (Object o : object) {
                 Optional<?> converted = convert(o, targetComponentType, newContext);
