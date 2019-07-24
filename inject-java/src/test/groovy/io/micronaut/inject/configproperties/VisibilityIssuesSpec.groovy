@@ -46,7 +46,10 @@ class VisibilityIssuesSpec extends AbstractTypeElementSpec {
         """)
 
         when:
-        def context = ApplicationContext.run('parent.child.age': 22, 'parent.name': 'Sally')
+        def context = ApplicationContext.run(
+                'parent.child.age': 22,
+                'parent.name': 'Sally',
+                'parent.child.engine.manufacturer': 'Chevy')
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
 
         then:
@@ -57,6 +60,7 @@ class VisibilityIssuesSpec extends AbstractTypeElementSpec {
         beanDefinition.injectedFields[0].name == "nationality"
         instance.getName() == null //methods that require reflection are not injected
         instance.getAge() == 22
+        instance.getBuilder().build().getManufacturer() == 'Chevy'
 
         cleanup:
         context.close()
