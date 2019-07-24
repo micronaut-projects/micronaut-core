@@ -686,9 +686,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             )
                     );
 
-                    boolean requiresReflection = modelUtils.isPrivate(method);
-
-                    if (!requiresReflection && modelUtils.isProtected(method)) {
+                    boolean requiresReflection = true;
+                    if (modelUtils.isPublic(method)) {
+                        requiresReflection = false;
+                    } else if (modelUtils.isPackagePrivate(method) || modelUtils.isProtected(method)) {
                         PackageElement declaringPackage = elementUtils.getPackageOf(declaringClass);
                         PackageElement concretePackage = elementUtils.getPackageOf(this.concreteClass);
                         requiresReflection = !declaringPackage.getQualifiedName().equals(concretePackage.getQualifiedName());
@@ -1521,16 +1522,26 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 String fieldName = field.getSimpleName().toString();
                 if (fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
-                    if (modelUtils.isPrivate(field)) {
+
+                    boolean accessible = false;
+                    if (modelUtils.isPublic(field)) {
+                        accessible = true;
+                    } else if (modelUtils.isPackagePrivate(field) || modelUtils.isProtected(field)) {
+                        PackageElement declaringPackage = elementUtils.getPackageOf(declaringClass);
+                        PackageElement concretePackage = elementUtils.getPackageOf(this.concreteClass);
+                        accessible = declaringPackage.getQualifiedName().equals(concretePackage.getQualifiedName());
+                    }
+
+                    if (accessible) {
+                        writer.visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, metadataBuilder);
+                    } else {
                         // Using the field would throw a IllegalAccessError, use the method instead
                         Optional<ExecutableElement> getterMethod = modelUtils.findGetterMethodFor(field);
                         if (getterMethod.isPresent()) {
                             writer.visitConfigBuilderMethod(fieldType, getterMethod.get().getSimpleName().toString(), fieldAnnotationMetadata, metadataBuilder);
                         } else {
-                            error(field, "ConfigurationBuilder applied to a private field must have a corresponding non-private getter method.");
+                            error(field, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
                         }
-                    } else {
-                        writer.visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, metadataBuilder);
                     }
                     try {
                         visitConfigurationBuilder(field, fieldTypeMirror, writer);

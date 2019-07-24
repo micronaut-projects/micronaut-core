@@ -38,12 +38,16 @@ class VisibilityIssuesSpec extends AbstractBeanDefinitionSpec {
         """)
 
         when:
-        def context = ApplicationContext.run('parent.name': 'Sally', 'parent.child.age': 22)
+        def context = ApplicationContext.run(
+                'parent.name': 'Sally',
+                'parent.child.age': 22,
+                'parent.child.engine.manufacturer': 'Chevy')
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
 
         then:
         instance.getName() == "Sally"
         instance.getAge() == 22
+        instance.getBuilder().build().getManufacturer() == 'Chevy'
 
         cleanup:
         context.close()
