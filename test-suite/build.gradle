@@ -30,12 +30,13 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-
+    
     testCompile dependencyVersion("jaeger")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     // tag::testcontainers-dependencies[]
     testCompile "org.testcontainers:spock:1.10.1"
     // end::testcontainers-dependencies[]
+    testCompile 'org.awaitility:awaitility:3.1.6'
 
     testRuntime dependencyVersion("tomcatJdbc")
     testRuntime dependencyVersion("h2")
