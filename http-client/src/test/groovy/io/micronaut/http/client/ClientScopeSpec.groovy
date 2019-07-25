@@ -37,6 +37,7 @@ import javax.inject.Singleton
  */
 @Retry
 class ClientScopeSpec extends Specification {
+
     @Shared int port = SocketUtils.findAvailableTcpPort()
 
     @Shared
@@ -44,7 +45,7 @@ class ClientScopeSpec extends Specification {
     ApplicationContext context = ApplicationContext.run(
             'from.config': '/',
             'micronaut.server.port':port,
-            'micronaut.http.clients.myService.url': "http://localhost:$port"
+            'micronaut.http.services.my-service.url': "http://localhost:$port"
     )
 
     @Shared
@@ -86,6 +87,16 @@ class ClientScopeSpec extends Specification {
         myJavaService.rxHttpClient == myService.rxHttpClient
     }
 
+    void "test client scope with path in annotation"() {
+        given:
+        MyService myService = context.getBean(MyService)
+        MyServiceField myServiceField = context.getBean(MyServiceField)
+
+        expect:
+        myService.getPath() == 'success'
+        myServiceField.getPath() == 'success'
+    }
+
     @Controller('/scope')
     static class ScopeController {
         @Get(produces = MediaType.TEXT_PLAIN)
@@ -103,11 +114,18 @@ class ClientScopeSpec extends Specification {
         @Inject @Client('${from.config}')
         RxHttpClient rxHttpClient
 
+        @Inject @Client(id = 'myService', path = '/scope')
+        RxHttpClient pathClient
+
         String get() {
             rxHttpClient != null
             client.toBlocking().retrieve(
                     HttpRequest.GET('/scope'), String
             )
+        }
+
+        String getPath() {
+            pathClient.toBlocking().retrieve("/", String)
         }
     }
 
@@ -120,11 +138,18 @@ class ClientScopeSpec extends Specification {
         @Inject @Client('${from.config}')
         protected RxHttpClient rxHttpClient
 
+        @Inject @Client(id = 'myService', path = '/scope')
+        protected RxHttpClient pathClient
+
         String get() {
             rxHttpClient != null
             client.toBlocking().retrieve(
                     HttpRequest.GET('/scope'), String
             )
+        }
+
+        String getPath() {
+            pathClient.toBlocking().retrieve("/", String)
         }
     }
 
