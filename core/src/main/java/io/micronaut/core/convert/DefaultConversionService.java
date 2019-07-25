@@ -673,7 +673,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             Argument<?> componentType = typeVariable.orElse(Argument.OBJECT_ARGUMENT);
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
 
-            ConversionContext newContext = context.with(componentType);
+            ConversionContext newContext = context.with(componentType).with(context.getAnnotationMetadata());
             Optional converted = convert(object, targetComponentType, newContext);
             if (converted.isPresent()) {
                 return Optional.of(converted);
