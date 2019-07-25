@@ -16,6 +16,11 @@
 package io.micronaut.docs.http.server.exception;
 
 //tag::clazz[]
-public class OutOfStockException extends RuntimeException {
+public class OutOfStockException extends RuntimeException implements HttpResponseProvider {
+  
+    @Override
+    public HttpResponse<?> getResponse() {
+        return HttpResponse.ok(0);
+    }
 }
 //end::clazz[]
