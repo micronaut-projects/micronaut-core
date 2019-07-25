@@ -5,16 +5,7 @@ You can hook into the creation of beans using one of the following interfaces:
 
 The `BeanInitializedEventListener` interface is commonly used in combination with link:{api}/io/micronaut/context/annotation/Factory.html[Factory] beans. Consider the following example:
 
-[source,groovy]
-----
-import javax.inject.*
-
-include::{testsdir}/events/factory/V8Engine.groovy[tags=class, indent=0]
-
-include::{testsdir}/events/factory/EngineFactory.groovy[tags=class, indent=0]
-
-include::{testsdir}/events/factory/EngineInitializer.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.events.factory.V8Engine,io.micronaut.docs.events.factory.EngineFactory,io.micronaut.docs.events.factory.EngineInitializer[tags="class",indent=0]
 
 <1> The `V8Engine` class defines a `rodLength` property
 <2> The `EngineFactory` initializes the value of `rodLength` and creates the instance
