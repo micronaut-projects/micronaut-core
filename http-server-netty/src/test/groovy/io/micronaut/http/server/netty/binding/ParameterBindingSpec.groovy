@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import io.micronaut.core.convert.format.Format
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpParameters
 import io.micronaut.http.HttpRequest
@@ -54,9 +55,9 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         httpMethod      | uri                                             | result                      | httpStatus
         // you can't populate post request data from query parameters without explicit @QueryValue
         HttpMethod.POST | '/parameter/save?max=30'                        | null                        | HttpStatus.BAD_REQUEST
-        HttpMethod.GET  | '/parameter/path/20/foo/10'                     | "Parameter Values: 20 10"    | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/path/20/bar/10'                     | "Parameter Values: 20 10"    | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/path/20/bar'                        | "Parameter Values: 20 "      | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/path/20/foo/10'                     | "Parameter Values: 20 10"   | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/path/20/bar/10'                     | "Parameter Values: 20 10"   | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/path/20/bar'                        | "Parameter Values: 20 "     | HttpStatus.OK
         HttpMethod.GET  | '/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
         HttpMethod.POST | '/parameter/save-again?max=30'                  | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/path/20'                            | "Parameter Value: 20"       | HttpStatus.OK
@@ -72,6 +73,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/set?values=10&values=20'            | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/optional-list?values=10&values=20'  | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional-date?date=1941-01-05'      | "Parameter Value: 1941"     | HttpStatus.OK
         HttpMethod.GET  | '/parameter?max=20'                             | "Parameter Value: 20"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/simple?max=20'                      | "Parameter Value: 20"       | HttpStatus.OK
 
@@ -165,6 +167,17 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
                 "Parameter Value: ${values.get()}"
             } else {
                 "Parameter Value: none"
+            }
+        }
+
+        @Get("/optional-date")
+        String optionalDate(@Format("yyyy-MM-dd") Optional<Date> date) {
+            if (date.isPresent()) {
+                Calendar c = new GregorianCalendar()
+                c.setTime(date.get())
+                "Parameter Value: ${c.get(Calendar.YEAR)}"
+            } else {
+                "Parameter Value: empty"
             }
         }
 
