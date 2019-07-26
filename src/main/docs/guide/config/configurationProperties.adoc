@@ -5,13 +5,7 @@ Micronaut will produce a reflection-free `@ConfigurationProperties` bean and wil
 
 An example of a configuration class can be seen below:
 
-.@ConfigurationProperties Example
-[source,groovy]
-----
-include::{testsdir}/config/properties/EngineConfig.groovy[tags=imports, indent=0]
-
-include::{testsdir}/config/properties/EngineConfig.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.config.properties.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
 
 <1> The `@ConfigurationProperties` annotation takes the configuration prefix
 <2> You can use `javax.validation` to validate the configuration
