@@ -84,7 +84,7 @@ class TtlHeartbeatSpec extends Specification implements MockConsulSpec {
         waitForService(consulServer, 'myService')
 
         DiscoveryClient discoveryClient = application.applicationContext.getBean(DiscoveryClient)
-        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 0.5 )
+        PollingConditions conditions = new PollingConditions(timeout: 60, delay: 0.5 )
 
         then:"The heart beat is received"
         conditions.eventually {
