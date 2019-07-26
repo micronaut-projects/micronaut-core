@@ -95,6 +95,9 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
         if (registration != null && !registration.getCheck().isHttp() && registration.getCheck().isEnabled()) {
 
             String checkId = "service:" + idGenerator.generateId(environment, instance);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Reporting status for Check ID [{}]: {}", checkId, status);
+            }
 
             if (status.equals(HealthStatus.UP)) {
                 // send a request to /agent/check/pass/:check_id
@@ -106,6 +109,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
                         }
                     } else {
                         // check if the service is still registered with Consul
+
                         Single.fromPublisher(consulClient.getServiceIds()).subscribe((serviceIds, throwable1) -> {
                             if (throwable1 == null) {
                                 String serviceId = idGenerator.generateId(environment, instance);

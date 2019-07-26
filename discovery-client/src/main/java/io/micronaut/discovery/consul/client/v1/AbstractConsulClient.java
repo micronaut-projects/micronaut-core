@@ -47,7 +47,7 @@ import java.util.Optional;
 @BootstrapContextCompatible
 public abstract class AbstractConsulClient implements ConsulClient {
 
-    static final String CONSUL_REGISTRATION_RETRY_COUNT = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retry-count:10}";
+    static final String CONSUL_REGISTRATION_RETRY_COUNT = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retry-count:3}";
     static final String CONSUL_REGISTRATION_RETRY_DELAY = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retry-delay:3s}";
     static final String EXPR_CONSUL_CONFIG_RETRY_COUNT = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retry-count:3}";
     static final String EXPR_CONSUL_CONFIG_RETRY_DELAY = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retry-delay:1s}";

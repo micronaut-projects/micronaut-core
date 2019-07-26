@@ -43,7 +43,7 @@ abstract class PublicAbstractMethodVisitor extends PublicMethodVisitor {
 
     @Override
     protected boolean isAcceptable(MethodNode node) {
-        if (!node.isAbstract()) {
+        if (!isAcceptableMethod(node)) {
             return false
         }
         if (current != null) {
@@ -54,5 +54,14 @@ abstract class PublicAbstractMethodVisitor extends PublicMethodVisitor {
             }
         }
         return super.isAcceptable(node)
+    }
+
+    /**
+     * Return whether the given executable element is acceptable. By default just checks if the method is abstract.
+     * @param executableElement The method
+     * @return True if it is
+     */
+    protected boolean isAcceptableMethod(MethodNode node) {
+        return node.isAbstract()
     }
 }
