@@ -526,8 +526,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             classElement.asType().accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(classElement, modelUtils, elementUtils) {
 
                 @Override
-                protected boolean isAcceptable(Element element) {
-                    return super.isAcceptable(element) || (element.getKind() == METHOD && annotationUtils.hasStereotype(element, AROUND_TYPE));
+                protected boolean isAcceptableMethod(ExecutableElement executableElement) {
+                    return super.isAcceptableMethod(executableElement) || annotationUtils.getAnnotationMetadata(executableElement).hasDeclaredStereotype(AROUND_TYPE);
                 }
 
                 @Override
