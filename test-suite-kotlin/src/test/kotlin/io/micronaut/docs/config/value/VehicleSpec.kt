@@ -1,13 +1,11 @@
 package io.micronaut.docs.config.value
 
+import io.kotlintest.shouldBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import org.codehaus.groovy.runtime.DefaultGroovyMethods
-import org.junit.Test
-
-import org.junit.Assert.assertEquals
 
 class VehicleSpec : StringSpec({
     "test start vehicle with configuration" {
@@ -21,7 +19,7 @@ class VehicleSpec : StringSpec({
         DefaultGroovyMethods.println(this, vehicle.start())
         // end::start[]
 
-        assertEquals("Starting V8 Engine", vehicle.start())
+        vehicle.start().shouldBe("Starting V8 Engine")
     }
 
     "test start vehicle without configuration" {
@@ -33,7 +31,7 @@ class VehicleSpec : StringSpec({
         DefaultGroovyMethods.println(this, vehicle.start())
         // end::start[]
 
-        assertEquals("Starting V6 Engine", vehicle.start())
+        vehicle.start().shouldBe("Starting V6 Engine")
     }
 
 })
