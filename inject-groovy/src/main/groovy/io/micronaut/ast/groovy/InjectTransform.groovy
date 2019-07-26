@@ -434,8 +434,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             PublicMethodVisitor publicMethodVisitor = new PublicAbstractMethodVisitor(source) {
 
                 @Override
-                protected boolean isAcceptable(MethodNode methodNode) {
-                    return super.isAcceptable(methodNode) || AstAnnotationUtils.hasStereotype(source, methodNode, AROUND_TYPE)
+                protected boolean isAcceptableMethod(MethodNode methodNode) {
+                    return super.isAcceptableMethod(methodNode) || AstAnnotationUtils.getAnnotationMetadata(source, methodNode).hasDeclaredStereotype(AROUND_TYPE)
                 }
 
                 @Override
