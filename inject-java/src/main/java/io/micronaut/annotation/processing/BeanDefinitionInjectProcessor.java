@@ -531,9 +531,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private void visitIntroductionAdviceInterface(TypeElement classElement, AnnotationMetadata typeAnnotationMetadata, AopProxyWriter aopProxyWriter) {
             String introductionTypeName = classElement.getQualifiedName().toString();
             classElement.asType().accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(classElement, modelUtils, elementUtils) {
+
+                @Override
+                protected boolean isAcceptableMethod(ExecutableElement executableElement) {
+                    return super.isAcceptableMethod(executableElement) || annotationUtils.getAnnotationMetadata(executableElement).hasDeclaredStereotype(AROUND_TYPE);
+                }
+
                 @Override
                 protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
                     ExecutableElement method = (ExecutableElement) element;
+
                     Map<String, Object> boundTypes = genericUtils.resolveBoundTypes(type);
                     ExecutableElementParamInfo params = populateParameterData(introductionTypeName, method, boundTypes);
                     Object owningType = modelUtils.resolveTypeReference(method.getEnclosingElement());
@@ -558,6 +565,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                 typeAnnotationMetadata
                         );
+                    }
+                    if (annotationUtils.hasStereotype(method, AROUND_TYPE)) {
+                        Object[] interceptorTypes = annotationMetadata
+                                .getAnnotationNamesByStereotype(AROUND_TYPE)
+                                .toArray();
+
+                        aopProxyWriter.visitInterceptorTypes(interceptorTypes);
                     }
 
                     aopProxyWriter.visitAroundMethod(
