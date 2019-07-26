@@ -434,6 +434,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             PublicMethodVisitor publicMethodVisitor = new PublicAbstractMethodVisitor(source) {
 
                 @Override
+                protected boolean isAcceptable(MethodNode methodNode) {
+                    return super.isAcceptable(methodNode) || AstAnnotationUtils.hasStereotype(source, methodNode, AROUND_TYPE)
+                }
+
+                @Override
                 void accept(ClassNode classNode, MethodNode methodNode) {
                     Map<String, Object> targetMethodParamsToType = [:]
                     Map<String, Object> targetGenericParams = [:]
@@ -468,6 +473,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                 typeAnnotationMetadata
                         )
+                    }
+
+                    if (AstAnnotationUtils.hasStereotype(source, methodNode, AROUND_TYPE)) {
+                        Object[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
+                        aopProxyWriter.visitInterceptorTypes(interceptorTypeReferences)
                     }
                     aopProxyWriter.visitAroundMethod(
                             AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
