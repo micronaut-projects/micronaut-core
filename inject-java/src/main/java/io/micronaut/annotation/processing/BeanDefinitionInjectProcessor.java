@@ -619,10 +619,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 return null;
             }
 
-            TypeElement declaringClassElement = modelUtils.classElementFor(method);
-            if (declaringClassElement == null || modelUtils.isObjectClass(declaringClassElement)) {
-                return null;
-            }
+
 
             Set<Modifier> modifiers = method.getModifiers();
             boolean hasInvalidModifiers = modelUtils.isAbstract(method) || modifiers.contains(Modifier.STATIC) || methodAnnotationMetadata.hasAnnotation(Internal.class) || modelUtils.isPrivate(method);
@@ -972,6 +969,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
          */
         void visitExecutableMethod(ExecutableElement method, AnnotationMetadata methodAnnotationMetadata) {
             TypeMirror returnType = method.getReturnType();
+
+            TypeElement declaringClass = modelUtils.classElementFor(method);
+            if (declaringClass == null || modelUtils.isObjectClass(declaringClass)) {
+                return;
+            }
+
+            boolean isOwningClass = declaringClass.getQualifiedName().equals(concreteClass.getQualifiedName());
+
+            if (isOwningClass && modelUtils.isAbstract(concreteClass) && !concreteClassMetadata.hasStereotype(INTRODUCTION_TYPE)) {
+                return;
+            }
+
+            if (!isOwningClass && modelUtils.overridingOrHidingMethod(method, concreteClass, true).isPresent()) {
+                return;
+            }
 
             Map<String, Object> returnTypeGenerics = new HashMap<>();
             genericUtils.resolveBoundGenerics((TypeElement) method.getEnclosingElement(),
@@ -1340,7 +1352,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
 
             boolean isParent = !declaringClass.getQualifiedName().equals(this.concreteClass.getQualifiedName());
-            ExecutableElement overridingMethod = modelUtils.overridingOrHidingMethod(method, this.concreteClass).orElse(method);
+            ExecutableElement overridingMethod = modelUtils.overridingOrHidingMethod(method, this.concreteClass, false).orElse(method);
             TypeElement overridingClass = modelUtils.classElementFor(overridingMethod);
             boolean overridden = isParent && overridingClass != null && !overridingClass.getQualifiedName().equals(declaringClass.getQualifiedName());
 
