@@ -30,6 +30,11 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
+
+    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
     
     testCompile dependencyVersion("jaeger")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
