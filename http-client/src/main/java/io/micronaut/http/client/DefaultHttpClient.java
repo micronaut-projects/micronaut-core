@@ -2273,7 +2273,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         public RequestKey(URI requestURI) {
             this.secure = "https".equalsIgnoreCase(requestURI.getScheme());
             this.host = requestURI.getHost();
-            this.port = requestURI.getPort() > -1 ? requestURI.getPort() : sslContext != null ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+            this.port = requestURI.getPort() > -1 ? requestURI.getPort() : this.secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
 
         }
 
