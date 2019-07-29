@@ -21,6 +21,16 @@ In previous versions of Micronaut manual validation had to be applied to reactiv
 
 It is no longer necessary to apply the ann:validation.Validated[] annotation to beans that accept `@Valid` arguments or use any `javax.validation` annotation.
 
+=== Micronaut Kubernetes 1.0 Release
+
+There is a new https://micronaut-projects.github.io/micronaut-kubernetes/1.0.0/guide/[Micronaut Kubernetes] module, with an improved support for running Micronaut applications in a Kubernetes cluster, including support for Kubernetes' ``ConfigMap``s, ``Secret``s and more.
+
+To get started, use the `kubernetes` feature:
+
+----
+mn create-app my-app --features kubernetes
+----
+
 === Micronaut Security 1.2 Update
 
 Support for OAuth 2.0 and OpenID clients has been added to the Micronaut security module through a new dependency: `micronaut-security-oauth2`. It is now very easy to add support for login through an OAuth providers. See the https://micronaut-projects.github.io/micronaut-security/latest/guide/#oauth[Oauth section] in the security documentation for more information.
