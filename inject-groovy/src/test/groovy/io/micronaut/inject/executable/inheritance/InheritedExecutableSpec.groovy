@@ -1,12 +1,12 @@
 package io.micronaut.inject.executable.inheritance
 
-import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
 
-class InheritedExecutableSpec extends AbstractTypeElementSpec {
+class InheritedExecutableSpec extends AbstractBeanDefinitionSpec {
 
     void "test extending an abstract class with an executable method"() {
-        given:
+        when:
         BeanDefinition definition = buildBeanDefinition("test.GenericController", """
 package test;
 
@@ -24,8 +24,8 @@ abstract class GenericController<T> {
 }
 
 """)
-        expect:
-        definition == null
+        then:
+        thrown(ClassNotFoundException)
     }
 
     void "test the same method isn't written twice"() {
@@ -96,7 +96,6 @@ package test;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 import javax.inject.Singleton;
-import java.io.Serializable;
 
 abstract class GenericController<T, ID extends Serializable> {
 

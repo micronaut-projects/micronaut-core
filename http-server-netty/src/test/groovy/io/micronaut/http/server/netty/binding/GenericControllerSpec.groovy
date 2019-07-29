@@ -71,6 +71,7 @@ class GenericControllerSpec extends AbstractMicronautSpec {
             new Status.StatusBuilder()
                     .withName("status - ${id.toString()}").build()
         }
+
     }
 
 }
