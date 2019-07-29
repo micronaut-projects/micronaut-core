@@ -18,7 +18,6 @@ package io.micronaut.inject.context
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Type
-import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 import spock.lang.Specification
@@ -48,13 +47,27 @@ class RegisterSingletonSpec extends Specification {
         when:
         def context = BeanContext.run()
 
-        def s1 = new DefaultDynamicService<String>()
-        context.registerSingleton(DynamicService, s1, Qualifiers.byType(String))
+        then:
+        !context.findBean(DynamicService, Qualifiers.byTypeArguments(String)).present
+
+        when:
+        context.registerSingleton(DynamicService, new DefaultDynamicService<String>(String), Qualifiers.byTypeArguments(String))
 
         then:
-        context.getBean(DynamicService, Qualifiers.byType(String))
-        context.getBean(DynamicService, Qualifiers.byTypeArguments(String))
+        context.findBean(DynamicService, Qualifiers.byTypeArguments(String)).present
+        context.findBean(DynamicService, Qualifiers.byTypeArguments(String)).get() instanceof DefaultDynamicService
+        context.findBean(DynamicService, Qualifiers.byTypeArguments(String)).get().type == String
 
+        and:
+        !context.findBean(DynamicService, Qualifiers.byTypeArguments(Long)).present
+
+        when:
+        context.registerSingleton(DynamicService, new DefaultDynamicService<Long>(Long), Qualifiers.byTypeArguments(Long))
+
+        then:
+        context.findBean(DynamicService, Qualifiers.byTypeArguments(Long)).present
+        context.findBean(DynamicService, Qualifiers.byTypeArguments(Long)).get() instanceof DefaultDynamicService
+        context.findBean(DynamicService, Qualifiers.byTypeArguments(Long)).get().type == Long
 
         cleanup:
         context.close()
@@ -63,5 +76,11 @@ class RegisterSingletonSpec extends Specification {
     static interface DynamicService<T> {}
 
     @Type(String)
-    static class DefaultDynamicService<T> implements DynamicService<T> {}
+    static class DefaultDynamicService<T> implements DynamicService<T> {
+        final Class<T> type
+
+        DefaultDynamicService(Class<T> type) {
+            this.type = type
+        }
+    }
 }
