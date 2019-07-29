@@ -869,13 +869,34 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 String methodName, boolean isPublic) {
             if (declaringClass != ClassHelper.OBJECT_TYPE) {
 
-                defineBeanDefinition(concreteClass)
+                boolean isOwningClass = declaringClass == concreteClass
+
+                if (isOwningClass && concreteClass.abstract && !annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
+                    return
+                }
 
                 Map<String, Map<String, ClassNode>> genericInfo = AstGenericUtils.buildAllGenericElementInfo(concreteClass, new GroovyVisitorContext(sourceUnit))
 
                 Map<String, ClassNode> declaringTypeGenericInfo = genericInfo.get(methodNode.declaringClass.name)
                 if (declaringTypeGenericInfo == null) {
                     declaringTypeGenericInfo = Collections.emptyMap()
+                }
+
+                List<Parameter> resolvedParameters = []
+
+                for (Parameter p: methodNode.parameters) {
+                    if (p.type.isGenericsPlaceHolder()) {
+                        String name = p.type.genericsTypes[0].name
+                        resolvedParameters.add(new Parameter(declaringTypeGenericInfo.get(name), p.name))
+                    } else {
+                        resolvedParameters.add(p)
+                    }
+                }
+
+                boolean isParent = declaringClass != concreteClass
+                MethodNode overriddenMethod = isParent ? concreteClass.getMethod(methodName, resolvedParameters as Parameter[]) : methodNode
+                if (!isOwningClass && overriddenMethod != null && overriddenMethod.declaringClass != declaringClass) {
+                    return
                 }
 
                 Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, declaringTypeGenericInfo)
@@ -892,6 +913,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         genericTypeMap,
                         declaringTypeGenericInfo
                 )
+
+                defineBeanDefinition(concreteClass)
 
                 boolean preprocess = methodAnnotationMetadata.booleanValue(Executable.class, "processOnStartup").orElse(false)
                 if (preprocess) {
