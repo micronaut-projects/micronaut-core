@@ -88,7 +88,11 @@ abstract class AbstractTypeElementSpec extends Specification {
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)
-        return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+        try {
+            return (BeanDefinition) classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
     }
 
     protected ApplicationContext buildContext(String className, String cls) {
