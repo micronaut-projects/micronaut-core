@@ -78,6 +78,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             ExecutionHandleLocator.class,
             "getProxyTargetMethod",
             Class.class,
+            Qualifier.class,
             String.class,
             Class[].class
         )
@@ -147,6 +148,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private GeneratorAdapter constructorGenerator;
     private int interceptorArgumentIndex;
     private int beanContextArgumentIndex = -1;
+    private int qualifierIndex;
     private Map<String, Object> constructorArgumentTypes;
     private Map<String, AnnotationMetadata> constructArgumentMetadata;
     private Map<String, Map<String, Object>> constructorGenericTypes;
@@ -368,6 +370,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.constructorNewArgumentTypes = new LinkedHashMap<>(argumentTypes);
         this.beanContextArgumentIndex = argumentTypes.size();
         constructorNewArgumentTypes.put("beanContext", BeanContext.class);
+        this.qualifierIndex = constructorNewArgumentTypes.size();
+        constructorNewArgumentTypes.put("qualifier", Qualifier.class);
         this.interceptorArgumentIndex = constructorNewArgumentTypes.size();
         constructorNewArgumentTypes.put("interceptors", Interceptor[].class);
 
@@ -590,6 +594,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             addDeclaredAnnotation(io.micronaut.context.annotation.Type.class.getName(), Collections.singletonMap(
                 "value", Arrays.stream(interceptorTypes).map(t -> new AnnotationClassValue(t.getClassName())).toArray()
             ));
+        }});
+        this.constructArgumentMetadata.put("qualifier", new DefaultAnnotationMetadata() {{
+            addDeclaredAnnotation("javax.annotation.Nullable", Collections.emptyMap());
         }});
         String constructorDescriptor = getConstructorDescriptor(constructorNewArgumentTypes.values());
         ClassWriter proxyClassWriter = this.classWriter;
@@ -828,6 +835,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     proxyConstructorGenerator.loadArg(beanContextArgumentIndex);
 
                     proxyConstructorGenerator.push(targetType);
+                    proxyConstructorGenerator.loadArg(qualifierIndex);
 
                     pushMethodNameAndTypesArguments(proxyConstructorGenerator, methodRef.name, methodRef.argumentTypes);
                     proxyConstructorGenerator.invokeInterface(
