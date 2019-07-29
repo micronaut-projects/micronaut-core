@@ -2098,7 +2098,13 @@ public class DefaultBeanContext implements BeanContext {
                     LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
                 Stream<BeanDefinition<T>> candidateStream = candidates.stream().filter(c -> !c.isAbstract());
-                Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidateStream);
+                Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidateStream).filter((bt) -> {
+                    if (bt instanceof NoInjectionBeanDefinition) {
+                        NoInjectionBeanDefinition noInjectionBeanDefinition = (NoInjectionBeanDefinition) bt;
+                        return qualifier.contains(noInjectionBeanDefinition.qualifier);
+                    }
+                    return true;
+                });
                 List<BeanDefinition<T>> beanDefinitionList = qualified.collect(Collectors.toList());
                 if (beanDefinitionList.isEmpty()) {
                     if (LOG.isDebugEnabled()) {
@@ -2205,12 +2211,12 @@ public class DefaultBeanContext implements BeanContext {
         synchronized (singletonObjects) {
             if (definition instanceof NoInjectionBeanDefinition) {
                 NoInjectionBeanDefinition<T> manuallyRegistered = (NoInjectionBeanDefinition) definition;
-                T bean = (T) singletonObjects.get(new BeanKey(beanType, manuallyRegistered.getQualifier()));
-                if (bean == null) {
+                BeanRegistration<T> reg = (BeanRegistration<T>) singletonObjects.get(new BeanKey(beanType, manuallyRegistered.getQualifier()));
+                if (reg == null) {
                     throw new IllegalStateException("Manually registered singleton no longer present in bean context");
                 }
-                registerSingletonBean(definition, beanType, bean, qualifier, true);
-                return bean;
+                registerSingletonBean(definition, beanType, reg.bean, qualifier, true);
+                return reg.bean;
             } else {
                 T createdBean = doCreateBean(resolutionContext, definition, qualifier, true, null);
                 registerSingletonBean(definition, beanType, createdBean, qualifier, true);
