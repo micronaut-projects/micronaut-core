@@ -223,7 +223,7 @@ public class RequiresCondition implements Condition {
                     if (hasNotEquals) {
                         return true;
                     } else {
-                        context.fail("Required property [" + property + "] not present");
+                        context.fail("Required property [" + property + "] with value [" + value + "] not present");
                         return false;
                     }
                 } else if (StringUtils.isNotEmpty(value)) {
