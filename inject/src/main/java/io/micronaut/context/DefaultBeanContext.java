@@ -2097,14 +2097,17 @@ public class DefaultBeanContext implements BeanContext {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
-                Stream<BeanDefinition<T>> candidateStream = candidates.stream().filter(c -> !c.isAbstract());
-                Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidateStream).filter((bt) -> {
-                    if (bt instanceof NoInjectionBeanDefinition) {
-                        NoInjectionBeanDefinition noInjectionBeanDefinition = (NoInjectionBeanDefinition) bt;
-                        return qualifier.contains(noInjectionBeanDefinition.qualifier);
+                Stream<BeanDefinition<T>> candidateStream = candidates.stream().filter(c -> {
+                    if (!c.isAbstract()) {
+                        if (c instanceof NoInjectionBeanDefinition) {
+                            NoInjectionBeanDefinition noInjectionBeanDefinition = (NoInjectionBeanDefinition) c;
+                            return qualifier.contains(noInjectionBeanDefinition.qualifier);
+                        }
+                        return true;
                     }
-                    return true;
+                    return false;
                 });
+                Stream<BeanDefinition<T>> qualified = qualifier.reduce(beanType, candidateStream);
                 List<BeanDefinition<T>> beanDefinitionList = qualified.collect(Collectors.toList());
                 if (beanDefinitionList.isEmpty()) {
                     if (LOG.isDebugEnabled()) {
