@@ -1303,13 +1303,26 @@ public class DefaultBeanContext implements BeanContext {
     /**
      * Find bean candidates for the given type.
      *
+     * @param <T>      The bean generic type
      * @param beanType The bean type
      * @param filter   A bean definition to filter out
+     * @return The candidates
+     */
+    protected @Nonnull <T> Collection<BeanDefinition<T>>  findBeanCandidates(@Nonnull Class<T> beanType, @Nullable BeanDefinition<?> filter) {
+        return findBeanCandidates(beanType, filter, true);
+    }
+
+    /**
+     * Find bean candidates for the given type.
+     *
      * @param <T>      The bean generic type
+     * @param beanType The bean type
+     * @param filter   A bean definition to filter out
+     * @param filterProxied Whether to filter out bean proxy targets
      * @return The candidates
      */
     @SuppressWarnings("unchecked")
-    protected @Nonnull <T> Collection<BeanDefinition<T>>  findBeanCandidates(@Nonnull Class<T> beanType, @Nullable BeanDefinition<?> filter) {
+    protected @Nonnull <T> Collection<BeanDefinition<T>>  findBeanCandidates(@Nonnull Class<T> beanType, @Nullable BeanDefinition<?> filter, boolean filterProxied) {
         ArgumentUtils.requireNonNull("beanType", beanType);
 
         if (LOG.isDebugEnabled()) {
@@ -1358,6 +1371,9 @@ public class DefaultBeanContext implements BeanContext {
                     .collect(Collectors.toSet());
 
             if (!candidates.isEmpty()) {
+                if (filterProxied) {
+                    filterProxiedTypes(candidates, true, false);
+                }
                 filterReplacedBeans(candidates);
             }
 
@@ -1796,7 +1812,7 @@ public class DefaultBeanContext implements BeanContext {
 
     private void loadContextScopeBean(BeanDefinition beanDefinition) {
         if (beanDefinition.isIterable()) {
-            Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null);
+            Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null, true);
             for (BeanDefinition beanCandidate : beanCandidates) {
                 DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, beanDefinition);
 
@@ -2087,7 +2103,7 @@ public class DefaultBeanContext implements BeanContext {
             boolean throwNonUnique,
             boolean includeProvided,
             boolean filterProxied) {
-        Collection<BeanDefinition<T>> candidates = new ArrayList<>(findBeanCandidates(beanType, null));
+        Collection<BeanDefinition<T>> candidates = new ArrayList<>(findBeanCandidates(beanType, null, filterProxied));
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
@@ -2407,7 +2423,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     private <T> Collection<BeanDefinition<T>> findBeanCandidatesInternal(Class<T> beanType) {
-        return (Collection) beanCandidateCache.computeIfAbsent(beanType, aClass -> (Collection) findBeanCandidates(beanType, null));
+        return (Collection) beanCandidateCache.computeIfAbsent(beanType, aClass -> (Collection) findBeanCandidates(beanType, null, true));
     }
 
     @SuppressWarnings("unchecked")
@@ -2575,7 +2591,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private <T> boolean isCandidatePresent(Class<T> beanType, Qualifier<T> qualifier) {
-        final Collection<BeanDefinition<T>> candidates = findBeanCandidates(beanType, null);
+        final Collection<BeanDefinition<T>> candidates = findBeanCandidates(beanType, null, true);
         if (!candidates.isEmpty()) {
             filterReplacedBeans(candidates);
             Stream<BeanDefinition<T>> stream = candidates.stream();
