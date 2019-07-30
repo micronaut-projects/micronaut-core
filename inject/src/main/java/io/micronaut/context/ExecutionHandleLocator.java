@@ -35,7 +35,7 @@ public interface ExecutionHandleLocator {
     /**
      * A empty no-op locator.
      */
-    ExecutionHandleLocator EMPTY = new ExecutionHandleLocator() {};
+    ExecutionHandleLocator EMPTY = new ExecutionHandleLocator() { };
 
     /**
      * Finds an optimized execution handle for invoking a bean method. The execution handle may or may not be
@@ -125,7 +125,7 @@ public interface ExecutionHandleLocator {
      */
     default <T, R> Optional<ExecutableMethod<T, R>> findProxyTargetMethod(Class<T> beanType, Qualifier<T> qualifier, String method, Class... arguments) {
         return Optional.empty();
-    };
+    }
 
     /**
      * Finds an optimized execution handle for invoking a bean method. The execution handle may or may not be
