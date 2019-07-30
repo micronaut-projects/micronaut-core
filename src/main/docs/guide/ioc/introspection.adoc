@@ -32,7 +32,7 @@ snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="usage", indent=0]
 
 ==== Use the `@Introspected` Annotation on a Configuration Class
 
-If the class you wish to introspect is already compiled and not under your control an alternative option is to define a configuration class or some sort that uses the `classes` member of the ann:core.annotation.Introspected[] annotation.
+If the class you wish to introspect is already compiled and not under your control an alternative option is to define a configuration class with the `classes` member of the ann:core.annotation.Introspected[] annotation set.
 
 snippet::io.micronaut.docs.ioc.beans.PersonConfiguration[tags="class"]
 
