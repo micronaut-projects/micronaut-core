@@ -381,35 +381,35 @@ public interface BeanDefinitionVisitor {
      * Visit a configuration builder method.
      *
      * @param prefix              The prefix used for the method
-     * @param configurationPrefix The prefix used to retrieve the configuration value
      * @param returnType          The return type
      * @param methodName          The method name
      * @param paramType           The method type
      * @param generics            The generic types of the method
+     * @param path                The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
             String prefix,
-            String configurationPrefix,
             Object returnType,
             String methodName,
             Object paramType,
-            Map<String, Object> generics);
+            Map<String, Object> generics,
+            String path);
 
     /**
      * Visit a configuration builder method that accepts a long and a TimeUnit.
      *
      * @param prefix              The prefix used for the method
-     * @param configurationPrefix The prefix used to retrieve the configuration value
      * @param returnType          The return type
      * @param methodName          The method name
+     * @param path                The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderDurationMethod(
             String prefix,
-            String configurationPrefix,
             Object returnType,
-            String methodName);
+            String methodName,
+            String path);
 
     /**
      * Finalize a configuration builder field.
