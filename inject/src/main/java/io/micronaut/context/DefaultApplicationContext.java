@@ -237,8 +237,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType, BeanDefinition<?> filter) {
-        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(beanType, filter);
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType, BeanDefinition<?> filter, boolean filterProxied) {
+        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(beanType, filter, filterProxied);
         if (!candidates.isEmpty()) {
 
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
@@ -274,7 +274,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                         continue;
                     }
 
-                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType, null);
+                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType, null, filterProxied);
                     if (!dependentCandidates.isEmpty()) {
                         for (BeanDefinition dependentCandidate : dependentCandidates) {
 
