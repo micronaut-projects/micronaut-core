@@ -24,6 +24,16 @@ dependencies {
     testCompile project(":management")
     testCompile project(":runtime")
     testCompile project(":inject")
+    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+
+    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+
     testCompile dependencyVersion("jcache")
     testCompile dependencyVersion("jaeger")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
