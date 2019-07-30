@@ -425,6 +425,7 @@ public class ModelUtils {
      *
      * @param overridden   the candidate overridden method
      * @param classElement the type element that may contain the overriding method, either directly or in a subclass
+     * @param strict       Whether to use strict checks for overriding and not include logic to handle method overloading 
      * @return the overriding method
      */
     Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement, boolean strict) {
