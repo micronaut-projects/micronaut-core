@@ -461,7 +461,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     if (i > -1) {
                         String propertyName = resolvedProperty.substring(0, i);
                         Map entries = resolveEntriesForKey(propertyName, true);
-                        processProperty(property.substring(i), val -> entries.put(propertyName, val), () -> entries.get(propertyName), value);
+                        if (entries != null) {
+                            processProperty(property.substring(i), val -> entries.put(propertyName, val), () -> entries.get(propertyName), value);
+                        }
                     } else {
                         Map entries = resolveEntriesForKey(resolvedProperty, true);
                         if (entries != null) {
