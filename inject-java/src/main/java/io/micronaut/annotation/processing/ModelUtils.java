@@ -427,12 +427,20 @@ public class ModelUtils {
      * @param classElement the type element that may contain the overriding method, either directly or in a subclass
      * @return the overriding method
      */
-    Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement) {
+    Optional<ExecutableElement> overridingOrHidingMethod(ExecutableElement overridden, TypeElement classElement, boolean strict) {
         List<ExecutableElement> methods = ElementFilter.methodsIn(elementUtils.getAllMembers(classElement));
         for (ExecutableElement method : methods) {
-            if (!method.equals(overridden) && method.getSimpleName().equals(overridden.getSimpleName())) {
-                return Optional.of(method);
+            if (strict) {
+                if (elementUtils.overrides(method, overridden, classElement)) {
+                    return Optional.of(method);
+                }
+            } else {
+                if (!method.equals(overridden) &&
+                        method.getSimpleName().equals(overridden.getSimpleName())) {
+                    return Optional.of(method);
+                }
             }
+
         }
         // might be looking for a package private & packages differ method in a superclass
         // that is not visible to the most concrete subclass, really!
@@ -440,7 +448,7 @@ public class ModelUtils {
         // check the superclass until we reach Object, then bail out with empty if necessary.
         TypeElement superClass = superClassFor(classElement);
         if (superClass != null && !isObjectClass(superClass)) {
-            return overridingOrHidingMethod(overridden, superClass);
+            return overridingOrHidingMethod(overridden, superClass, strict);
         }
         return Optional.empty();
     }
