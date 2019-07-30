@@ -197,8 +197,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
         if (executionHandleLocator != null) {
             return executionHandleLocator;
         } else {
-            return new ExecutionHandleLocator() {
-            };
+            return ExecutionHandleLocator.EMPTY;
         }
     }
 
