@@ -37,9 +37,11 @@ import java.util.stream.Collectors;
  *
  * @author graemerocher
  * @since 1.0
+ * @deprecated Use <a href="https://github.com/micronaut-projects/micronaut-kubernetes">Micronaut Kubernetes</a> instead.
  */
 @Singleton
 @Requires(env = Environment.KUBERNETES)
+@Deprecated
 public class KubernetesDiscoveryClient implements DiscoveryClient {
     private static final Logger LOG = LoggerFactory.getLogger(KubernetesDiscoveryClient.class);
 
