@@ -357,4 +357,42 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getAllProperties(StringConvention.CAMEL_CASE, MapFormat.MapTransformation.NESTED).get('testKey').get('conventionTest') == 'key'
     }
 
+    void "test inner properties"() {
+        given:
+            def values = new HashMap()
+            values.put('foo[0].bar[0]', 'foo0Bar0')
+            values.put('foo[0].bar[1]', 'foo0Bar1')
+            values.put('foo[0].bar[3]', 'foo0Bar2')
+            values.put('foo[1].bar[abx]', 'foo1Bar0')
+            values.put('foo[1].bar[xyz]', 'foo1Bar1')
+            values.put('custom[0][0][key][4]', 'ohh')
+            values.put('custom[0][0][key][5]', 'ehh')
+            values.put('custom[0][0][key2]', 'xyz')
+            values.put('micronaut.security.intercept-url-map[0].access[0]', '/some-path')
+
+            PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                    PropertySource.of("test", values)
+            )
+        when:
+            def foos = resolver.getProperty("foo", List).get()
+            def custom = resolver.getProperty("custom", List).get()
+            def micronaut = resolver.getProperty("micronaut", Map).get()
+        then:
+            foos.size() == 2
+            foos[0].bar.size() == 4
+            foos[0].bar[0] == 'foo0Bar0'
+            foos[0].bar[2] == null
+            foos[1].bar.size() == 2
+            foos[1].bar['abx'] == 'foo1Bar0'
+            foos[1].bar['xyz'] == 'foo1Bar1'
+            custom.size() == 1
+            custom[0].size() == 1
+            custom[0][0].size() == 2
+            custom[0][0]['key'].size() == 6
+            custom[0][0]['key'][4] == 'ohh'
+            custom[0][0]['key'][5] == 'ehh'
+            custom[0][0]['key2'] == 'xyz'
+            micronaut['security']['intercept-url-map'][0]['access'][0] == '/some-path'
+    }
+
 }
