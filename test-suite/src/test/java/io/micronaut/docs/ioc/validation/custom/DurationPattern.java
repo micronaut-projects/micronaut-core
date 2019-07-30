@@ -25,4 +25,4 @@ public @interface DurationPattern {
         DurationPattern[] value(); // <3>
     }
 }
-// end::imports[]
+// end::class[]

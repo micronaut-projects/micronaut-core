@@ -1,5 +1,6 @@
 package io.micronaut.docs.context.events.async
 
+// tag::imports[]
 import io.kotlintest.eventually
 import io.kotlintest.seconds
 import io.kotlintest.shouldBe
@@ -7,6 +8,7 @@ import io.kotlintest.specs.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.context.events.SampleEventEmitterBean
 import org.opentest4j.AssertionFailedError
+// end::imports[]
 
 // tag::class[]
 class SampleEventListenerSpec : AnnotationSpec() {
