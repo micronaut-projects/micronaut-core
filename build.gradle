@@ -470,6 +470,11 @@ ext {
                     modules : ['micronaut-rss', 'micronaut-itunespodcast']
 
             ],
+            'micronaut.kubernetes': [
+                    version:micronautKubernetesVersion,
+                    group:'io.micronaut.kubernetes',
+                    name:'micronaut-kubernetes-discovery-client'
+            ]
     ]
 
     dependencyVersion = { String name ->
