@@ -51,8 +51,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.*;
 import javax.validation.groups.Default;
-import javax.validation.metadata.BeanDescriptor;
-import javax.validation.metadata.ConstraintDescriptor;
+import javax.validation.metadata.*;
 import javax.validation.valueextraction.ValueExtractor;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
@@ -60,6 +59,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -295,9 +295,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
     @Override
     public BeanDescriptor getConstraintsForClass(Class<?> clazz) {
-        return new IntrospectedBeanDescriptor(
-                BeanIntrospection.getIntrospection(clazz)
-        );
+        return BeanIntrospector.SHARED.findIntrospection(clazz)
+                .map((Function<BeanIntrospection<?>, BeanDescriptor>) IntrospectedBeanDescriptor::new)
+                .orElseGet(() -> new EmptyDescriptor(clazz));
     }
 
     @Override
@@ -1824,6 +1824,87 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @Override
         public <U> U unwrap(Class<U> type) {
             throw new UnsupportedOperationException("Unwrapping is unsupported by this implementation");
+        }
+    }
+
+    /**
+     * An empty descriptor with no constraints.
+     */
+    private final class EmptyDescriptor implements BeanDescriptor, ElementDescriptor.ConstraintFinder {
+        private final Class<?> elementClass;
+
+        EmptyDescriptor(Class<?> elementClass) {
+            this.elementClass = elementClass;
+        }
+
+        @Override
+        public boolean isBeanConstrained() {
+            return false;
+        }
+
+        @Override
+        public PropertyDescriptor getConstraintsForProperty(String propertyName) {
+            return null;
+        }
+
+        @Override
+        public Set<PropertyDescriptor> getConstrainedProperties() {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public MethodDescriptor getConstraintsForMethod(String methodName, Class<?>... parameterTypes) {
+            return null;
+        }
+
+        @Override
+        public Set<MethodDescriptor> getConstrainedMethods(MethodType methodType, MethodType... methodTypes) {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public ConstructorDescriptor getConstraintsForConstructor(Class<?>... parameterTypes) {
+            return null;
+        }
+
+        @Override
+        public Set<ConstructorDescriptor> getConstrainedConstructors() {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public boolean hasConstraints() {
+            return false;
+        }
+
+        @Override
+        public Class<?> getElementClass() {
+            return elementClass;
+        }
+
+        @Override
+        public ConstraintFinder unorderedAndMatchingGroups(Class<?>... groups) {
+            return this;
+        }
+
+        @Override
+        public ConstraintFinder lookingAt(Scope scope) {
+            return this;
+        }
+
+        @Override
+        public ConstraintFinder declaredOn(ElementType... types) {
+            return this;
+        }
+
+        @Override
+        public Set<ConstraintDescriptor<?>> getConstraintDescriptors() {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public ConstraintFinder findConstraints() {
+            return this;
         }
     }
 }
