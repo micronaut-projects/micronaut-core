@@ -978,8 +978,12 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 try {
                     Object bean;
                     Qualifier qualifier = resolveQualifier(resolutionContext, argument, isInnerConfiguration(argumentType));
-                    //noinspection unchecked
-                    bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+                    if (Qualifier.class.isAssignableFrom(argumentType)) {
+                        bean = qualifier;
+                    } else {
+                        //noinspection unchecked
+                        bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+                    }
                     path.pop();
                     return bean;
                 } catch (NoSuchBeanException e) {
@@ -1753,7 +1757,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         .map(map -> (Qualifier) map.get(argument));
                 qualifier = optional.orElse(null);
                 if (qualifier == null && isIterable()) {
-                    if (argument.isAnnotationPresent(Parameter.class) || innerConfiguration) {
+                    if (argument.isAnnotationPresent(Parameter.class) || innerConfiguration || Qualifier.class == argument.getType()) {
                         qualifier = optional.orElseGet(() -> {
                             final Optional<String> n = resolutionContext.get(Named.class.getName(), String.class);
                             return n.map(Qualifiers::byName).orElse(null);
