@@ -22,6 +22,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
@@ -493,6 +494,20 @@ class HttpGetSpec extends Specification {
         client.completable().blockingGet() == null
         ex instanceof HttpClientResponseException
         ex.message.contains("completable error")
+    }
+
+    void "test setting query params on the request"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        MutableHttpRequest request = HttpRequest.GET("/get/multipleQueryParam?foo=x")
+        request.parameters.add('bar', 'y')
+        String body = client.toBlocking().retrieve(request)
+
+        then:
+        noExceptionThrown()
+        body == 'x-y'
     }
 
     @Controller("/get")
