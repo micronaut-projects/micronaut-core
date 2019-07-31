@@ -36,7 +36,7 @@ public class BookmarkController {
 
     // tag::listBooks[]
     @Get("/bookmarks/list{?paginationCommand*}")
-    public HttpStatus list(@Valid @Nullable PaginationCommand paginationCommand) {
+    public HttpStatus list(@Valid @Nullable @QueryValue PaginationCommand paginationCommand) {
         return HttpStatus.OK;
     }
     // end::listBooks[]
