@@ -1,8 +1,10 @@
 package io.micronaut.docs.context.events.application
 
+// tag::imports[]
 import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.context.events.SampleEventEmitterBean
 import spock.lang.Specification
+// end::imports[]
 
 // tag::class[]
 class SampleEventListenerSpec extends Specification {

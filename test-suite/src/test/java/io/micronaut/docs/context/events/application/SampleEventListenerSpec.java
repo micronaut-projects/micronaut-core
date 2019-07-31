@@ -1,10 +1,12 @@
 package io.micronaut.docs.context.events.application;
 
+// tag::imports[]
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.docs.context.events.SampleEventEmitterBean;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+// end::imports[]
 
 // tag::class[]
 public class SampleEventListenerSpec {

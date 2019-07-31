@@ -1,9 +1,11 @@
 package io.micronaut.docs.context.events.async
 
+// tag::imports[]
 import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.context.events.SampleEventEmitterBean
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
+// end::imports[]
 
 // tag::class[]
 class SampleEventListenerSpec extends Specification {
