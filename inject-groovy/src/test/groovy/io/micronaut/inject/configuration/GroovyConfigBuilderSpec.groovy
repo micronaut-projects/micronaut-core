@@ -55,7 +55,7 @@ final class TestProps {
 
         then:
         MultipleCompilationErrorsException ex = thrown()
-        ex.message.contains("ConfigurationBuilder applied to a private field must have a corresponding non-private getter method.")
+        ex.message.contains("ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.")
         ex.message.contains("@ConfigurationBuilder(prefixes = \"with\")")
     }
 

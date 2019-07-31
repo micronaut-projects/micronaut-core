@@ -51,8 +51,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.*;
 import javax.validation.groups.Default;
-import javax.validation.metadata.BeanDescriptor;
-import javax.validation.metadata.ConstraintDescriptor;
+import javax.validation.metadata.*;
 import javax.validation.valueextraction.ValueExtractor;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
@@ -60,6 +59,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -132,7 +132,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         final Collection<BeanProperty<Object, Object>> cascadeProperties =
                 ((BeanIntrospection<Object>) introspection).getIndexedProperties(Valid.class);
 
-        if (CollectionUtils.isNotEmpty(constrainedProperties) || CollectionUtils.isNotEmpty(cascadeProperties)) {
+        final List<Class<? extends Annotation>> pojoConstraints = introspection.getAnnotationTypesByStereotype(Constraint.class);
+
+        if (CollectionUtils.isNotEmpty(constrainedProperties)
+                || CollectionUtils.isNotEmpty(cascadeProperties)
+                || CollectionUtils.isNotEmpty(pojoConstraints)) {
+
             DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(object, groups);
             Set<ConstraintViolation<T>> overallViolations = new HashSet<>(5);
             return doValidate(
@@ -141,7 +146,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     constrainedProperties,
                     cascadeProperties,
                     context,
-                    overallViolations
+                    overallViolations,
+                    pojoConstraints
             );
         }
         return Collections.emptySet();
@@ -289,9 +295,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
     @Override
     public BeanDescriptor getConstraintsForClass(Class<?> clazz) {
-        return new IntrospectedBeanDescriptor(
-                BeanIntrospection.getIntrospection(clazz)
-        );
+        return BeanIntrospector.SHARED.findIntrospection(clazz)
+                .map((Function<BeanIntrospection<?>, BeanDescriptor>) IntrospectedBeanDescriptor::new)
+                .orElseGet(() -> new EmptyDescriptor(clazz));
     }
 
     @Override
@@ -530,12 +536,21 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             final Class<?> parameterType = argument.getType();
 
             final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+
+            final boolean hasValid = annotationMetadata.hasStereotype(Valid.class);
+            final boolean hasConstraint = annotationMetadata.hasStereotype(Constraint.class);
+
             final MutableArgumentValue<Object> argumentValue = (MutableArgumentValue<Object>) iterator.next();
+
+            if (!hasValid && !hasConstraint) {
+                continue;
+            }
+
             Object parameterValue = argumentValue.getValue();
 
             ValueExtractor<Object> valueExtractor = null;
             final boolean hasValue = parameterValue != null;
-            final boolean isValid = hasValue && annotationMetadata.hasStereotype(Valid.class);
+            final boolean isValid = hasValue && hasValid;
             final boolean isPublisher = hasValue && Publishers.isConvertibleToPublisher(parameterType);
             if (isPublisher) {
                 instrumentPublisherArgumentWithValidation(
@@ -843,6 +858,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             context.addParameterNode(parameterName, parameterIndex);
             final List<Class<? extends Annotation>> constraintTypes =
                     annotationMetadata.getAnnotationTypesByStereotype(Constraint.class);
+
+            // Constraints applied to the parameter
             for (Class<? extends Annotation> constraintType : constraintTypes) {
                 final ConstraintValidator constraintValidator = constraintValidatorRegistry
                         .findConstraintValidator(constraintType, parameterType).orElse(null);
@@ -864,8 +881,55 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     }
                 }
             }
+
+            // Constraints applied to the class used as a parameter
+            final BeanIntrospection<Object> introspection = getBeanIntrospection(parameterType);
+            if (introspection != null) {
+                final List<Class<? extends Annotation>> pojoConstraints = introspection.getAnnotationTypesByStereotype(Constraint.class);
+
+                for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
+                    validatePojoInternal(rootClass, object, argumentValues, context, overallViolations, parameterType, parameterValue, pojoConstraint);
+                }
+            }
         } finally {
             context.removeLast();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> void validatePojoInternal(@Nonnull Class<T> rootClass,
+                                          @Nullable T object,
+                                          @Nonnull Collection<MutableArgumentValue<?>> argumentValues,
+                                          @Nonnull DefaultConstraintValidatorContext context,
+                                          @Nonnull Set overallViolations,
+                                          @Nonnull Class<?> parameterType,
+                                          @Nonnull Object parameterValue,
+                                          Class<? extends Annotation> pojoConstraint) {
+        final ConstraintValidator constraintValidator = constraintValidatorRegistry
+                .findConstraintValidator(pojoConstraint, parameterType).orElse(null);
+
+        if (constraintValidator != null) {
+            if (!constraintValidator.isValid((T) parameterValue, null, context)) {
+                final String propertyValue = "";
+                BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
+                if (beanIntrospection == null) {
+                    throw new ValidationException("Passed object [" + parameterValue + "] cannot be introspected. Please annotate with @Introspected");
+                }
+                AnnotationMetadata beanAnnotationMetadata = beanIntrospection.getAnnotationMetadata();
+                AnnotationValue<? extends Annotation> annotationValue = beanAnnotationMetadata.getAnnotation(pojoConstraint);
+
+                final String messageTemplate = buildMessageTemplate(annotationValue, beanAnnotationMetadata);
+                final Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, beanAnnotationMetadata);
+                overallViolations.add(new DefaultConstraintViolation(
+                        object,
+                        rootClass,
+                        null,
+                        parameterValue,
+                        messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
+                        messageTemplate,
+                        new PathImpl(context.currentPath),
+                        argumentValues));
+            }
         }
     }
 
@@ -875,7 +939,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             Collection<? extends BeanProperty<Object, Object>> constrainedProperties,
             Collection<BeanProperty<Object, Object>> cascadeProperties,
             DefaultConstraintValidatorContext context,
-            Set overallViolations) {
+            Set overallViolations,
+            List<Class<? extends Annotation>> pojoConstraints) {
         @SuppressWarnings("unchecked")
         final Class<T> rootBeanClass = (Class<T>) rootBean.getClass();
         for (BeanProperty<Object, Object> constrainedProperty : constrainedProperties) {
@@ -891,6 +956,18 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     context,
                     overallViolations,
                     null);
+        }
+
+        for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
+            validatePojoInternal(
+                    rootBeanClass,
+                    rootBean,
+                    null,
+                    context,
+                    overallViolations,
+                    rootBeanClass,
+                    object,
+                    pojoConstraint);
         }
 
         // now handle cascading validation
@@ -1143,7 +1220,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     cascadeConstraints,
                     cascadeNestedProperties,
                     context,
-                    overallViolations
+                    overallViolations,
+                    Collections.emptyList()
             );
         }
     }
@@ -1746,6 +1824,87 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @Override
         public <U> U unwrap(Class<U> type) {
             throw new UnsupportedOperationException("Unwrapping is unsupported by this implementation");
+        }
+    }
+
+    /**
+     * An empty descriptor with no constraints.
+     */
+    private final class EmptyDescriptor implements BeanDescriptor, ElementDescriptor.ConstraintFinder {
+        private final Class<?> elementClass;
+
+        EmptyDescriptor(Class<?> elementClass) {
+            this.elementClass = elementClass;
+        }
+
+        @Override
+        public boolean isBeanConstrained() {
+            return false;
+        }
+
+        @Override
+        public PropertyDescriptor getConstraintsForProperty(String propertyName) {
+            return null;
+        }
+
+        @Override
+        public Set<PropertyDescriptor> getConstrainedProperties() {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public MethodDescriptor getConstraintsForMethod(String methodName, Class<?>... parameterTypes) {
+            return null;
+        }
+
+        @Override
+        public Set<MethodDescriptor> getConstrainedMethods(MethodType methodType, MethodType... methodTypes) {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public ConstructorDescriptor getConstraintsForConstructor(Class<?>... parameterTypes) {
+            return null;
+        }
+
+        @Override
+        public Set<ConstructorDescriptor> getConstrainedConstructors() {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public boolean hasConstraints() {
+            return false;
+        }
+
+        @Override
+        public Class<?> getElementClass() {
+            return elementClass;
+        }
+
+        @Override
+        public ConstraintFinder unorderedAndMatchingGroups(Class<?>... groups) {
+            return this;
+        }
+
+        @Override
+        public ConstraintFinder lookingAt(Scope scope) {
+            return this;
+        }
+
+        @Override
+        public ConstraintFinder declaredOn(ElementType... types) {
+            return this;
+        }
+
+        @Override
+        public Set<ConstraintDescriptor<?>> getConstraintDescriptors() {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public ConstraintFinder findConstraints() {
+            return this;
         }
     }
 }

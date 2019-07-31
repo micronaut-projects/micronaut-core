@@ -23,7 +23,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MemberElement;
-import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.annotation.Nonnull;
 import javax.lang.model.element.Element;
@@ -182,7 +181,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             if (e instanceof TypeElement) {
                 TypeElement typeElement = (TypeElement) e;
                 Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(visitorContext, genericsInfo);
-                if (JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
+                if (visitorContext.getModelUtils().resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
                     return new JavaEnumElement(
                             typeElement,
                             visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),

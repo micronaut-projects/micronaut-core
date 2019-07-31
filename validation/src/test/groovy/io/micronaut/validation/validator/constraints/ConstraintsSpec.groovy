@@ -152,18 +152,18 @@ class ConstraintsSpec extends AbstractTypeElementSpec {
         PositiveOrZero | -100 as byte                                  | false   | new AnnotationValue<>(constraint.getName())
         // Max
         Max            | 10                                            | false   | constraintMetadata(constraint, "@Max(5)")
-        Max            | 5                                             | false   | constraintMetadata(constraint, "@Max(5)")
+        Max            | 5                                             | true   | constraintMetadata(constraint, "@Max(5)")
         Max            | new BigInteger("10")                          | false   | constraintMetadata(constraint, "@Max(5)")
-        Max            | 5                                             | false   | constraintMetadata(constraint, "@Max(5)")
+        Max            | new BigDecimal("10")                          | false   | constraintMetadata(constraint, "@Max(5)")
         Max            | 0                                             | true    | constraintMetadata(constraint, "@Max(5)")
         Max            | null                                          | true    | constraintMetadata(constraint, "@Max(5)")
         // Min
         Min            | 10                                            | true    | constraintMetadata(constraint, "@Min(5)")
         Min            | 5                                             | true    | constraintMetadata(constraint, "@Min(5)")
         Min            | new BigInteger("10")                          | true    | constraintMetadata(constraint, "@Min(5)")
-        Min            | 5                                             | true    | constraintMetadata(constraint, "@Min(5)")
+        Min            | new BigDecimal("10")                          | true    | constraintMetadata(constraint, "@Min(5)")
         Min            | 0                                             | false   | constraintMetadata(constraint, "@Min(5)")
-        Min            | null                                          | true    | constraintMetadata(constraint, "@Max(5)")
+        Min            | null                                          | true    | constraintMetadata(constraint, "@Min(5)")
         // Size
         Size           | null                                          | true    | constraintMetadata(constraint, "@Size(min=2, max=5)")
         Size           | "test"                                        | true    | constraintMetadata(constraint, "@Size(min=2, max=5)")

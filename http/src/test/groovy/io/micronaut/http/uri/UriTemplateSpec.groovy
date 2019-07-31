@@ -180,6 +180,7 @@ class UriTemplateSpec extends Specification {
         '{+half}'             | [half: '50%']                                      | '50%25'
         '{base}index'         | [base: 'http://example.com/home/']                 | 'http%3A%2F%2Fexample.com%2Fhome%2Findex'
         '{+base}index'        | [base: 'http://example.com/home/']                 | 'http://example.com/home/index'
+        '{+base}{hello}'      | [base: 'http://example.com/home/', hello: "Hello World!"] | 'http://example.com/home/Hello%20World%21'
         'O{+empty}X'          | [empty: '']                                        | 'OX'
         'O{+undef}X'          | [:]                                                | 'OX'
         '{+path}/here'        | [path: "/foo/bar"]                                 | '/foo/bar/here'
@@ -267,7 +268,7 @@ class UriTemplateSpec extends Specification {
         '{&list*}'            | [list: ['red', 'green', 'blue']]                   | '&list=red&list=green&list=blue'
         '{&keys}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '&keys=semi,%3B,dot,.,comma,%2C'
         '{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '&semi=%3B&dot=.&comma=%2C'
-
+        '{?list*,locale,currency}' | [list: ['red', 'green', 'blue'], locale: null, currency: 'USD'] | '?list=red&list=green&list=blue&currency=USD'
     }
 
 
@@ -315,6 +316,8 @@ class UriTemplateSpec extends Specification {
         'http://example.com/{keys*}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com/semi=%3B,dot=.,comma=%2C'
         'http://example.com/{+var}'              | [var: 'value']                                     | 'http://example.com/value' // Section 3.2.3 - Level 2 - Reserved Expansion: {+var}
         'http://example.com/{+hello}'            | [hello: "Hello World!"]                            | 'http://example.com/Hello%20World!'
+        'http://example.com/{+hello}'            | [hello: "foo/bar"]                                 | 'http://example.com/foo/bar'
+        'http://example.com/{+hello}'            | [hello: ""]                                        | 'http://example.com/'
         'http://example.com/{+half}'             | [half: '50%']                                      | 'http://example.com/50%25'
         'http://example.com/{base}index'         | [base: 'http://example.com/home/']                 | 'http://example.com/http%3A%2F%2Fexample.com%2Fhome%2Findex'
         'http://example.com/{+base}index'        | [base: 'http://example.com/home/']                 | 'http://example.com/http://example.com/home/index'

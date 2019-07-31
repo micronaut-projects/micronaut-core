@@ -26,14 +26,19 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.exceptions.ReadTimeoutException
+import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Get
+import io.netty.channel.pool.AbstractChannelPoolMap
+import io.netty.channel.pool.FixedChannelPool
 import io.reactivex.Flowable
 import spock.lang.AutoCleanup
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Inject
+import java.lang.reflect.Field
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.atomic.AtomicInteger
@@ -260,6 +265,41 @@ class ReadTimeoutSpec extends Specification {
         clientContext.close()
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1796')
+    void "test read timeout setting with connection pool doesn't leak connections"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'my.port':embeddedServer.getPort(),
+                'micronaut.http.client.read-timeout':'1ms',
+                'micronaut.http.client.pool.enabled':true,
+                'micronaut.http.client.pool.max-connections':10
+        )
+
+        when:"Lots of read timeouts occur"
+        TimeoutClient client = clientContext.getBean(TimeoutClient)
+        (1..20).collect {
+            client.getFuture()
+        }.each {
+            try {
+                it.join()
+            } catch (Throwable e){ }
+        }
+
+        then:"Connections are not leaked"
+        getPool(clientContext.getBean(HttpClientIntroductionAdvice).clients.get("http://localhost:${embeddedServer.getPort()}".toString())).acquiredChannelCount() == 0
+
+        cleanup:
+        clientContext.close()
+    }
+
+    FixedChannelPool getPool(RxHttpClient client) {
+        AbstractChannelPoolMap poolMap = client.poolMap
+        Field mapField = AbstractChannelPoolMap.getDeclaredField("map")
+        mapField.setAccessible(true)
+        Map innerMap = mapField.get(poolMap)
+        return innerMap.values().first()
+    }
+
     void "test disable read timeout"() {
         given:
 
@@ -311,9 +351,19 @@ class ReadTimeoutSpec extends Specification {
         }
     }
 
+    @Client('http://localhost:${my.port}')
+    static interface TimeoutClient {
+
+        @Get("/")
+        CompletableFuture<String> getFuture()
+    }
+
     @Client("/timeout")
     static interface TestClient {
         @Get
         String get()
+
+        @Get("/")
+        CompletableFuture<String> getFuture()
     }
 }

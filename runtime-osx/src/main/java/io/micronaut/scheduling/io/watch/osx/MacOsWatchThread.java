@@ -24,9 +24,11 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.io.watch.DefaultWatchThread;
+import io.micronaut.scheduling.io.watch.FileWatchCondition;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 
 import javax.annotation.Nonnull;
+import javax.inject.Singleton;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
@@ -42,8 +44,9 @@ import java.nio.file.WatchService;
 @Replaces(DefaultWatchThread.class)
 @Parallel
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-@Requires(property = FileWatchConfiguration.PATHS)
+@Requires(condition = FileWatchCondition.class)
 @Requires(classes = {MacOSXListeningWatchService.class, Library.class})
+@Singleton
 public class MacOsWatchThread extends DefaultWatchThread {
     /**
      * Default constructor.

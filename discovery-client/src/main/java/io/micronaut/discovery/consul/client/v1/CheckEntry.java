@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nullable;
 import java.util.Locale;
 
 /**
@@ -43,7 +44,7 @@ public class CheckEntry implements Check {
      * @param id The id
      */
     @JsonCreator
-    protected CheckEntry(@JsonProperty("CheckID") String id) {
+    protected CheckEntry(@Nullable @JsonProperty("CheckID") String id) {
         this.id = id;
     }
 

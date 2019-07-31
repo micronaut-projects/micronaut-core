@@ -265,6 +265,16 @@ class ValidatorSpec extends Specification {
         descriptors.first().annotation.min() == 1
         descriptors.first().annotation.max() == 10
     }
+
+    void "test empty bean descriptor"() {
+        given:
+        BeanDescriptor beanDescriptor = validator.getConstraintsForClass(String)
+
+
+        expect:
+        !beanDescriptor.isBeanConstrained()
+        beanDescriptor.getConstrainedProperties().size() == 0
+    }
 }
 
 @Introspected

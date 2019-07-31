@@ -25,6 +25,7 @@ import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
@@ -62,10 +63,10 @@ abstract class AbstractTypeElementSpec extends Specification {
         return metadata
     }
 
-    AnnotationMetadata buildFieldAnnotationMetadata(String cls, String methodName, String fieldName) {
+    AnnotationMetadata buildMethodArgumentAnnotationMetadata(String cls, String methodName, String argumentName) {
         TypeElement element = buildTypeElement(cls)
         ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
-        VariableElement argument = method.parameters.find() { it.simpleName.toString() == fieldName }
+        VariableElement argument = method.parameters.find() { it.simpleName.toString() == argumentName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
         return metadata
@@ -87,7 +88,11 @@ abstract class AbstractTypeElementSpec extends Specification {
         String beanFullName = "${packageName}.${beanDefName}"
 
         ClassLoader classLoader = buildClassLoader(className, cls)
-        return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+        try {
+            return (BeanDefinition) classLoader.loadClass(beanFullName).newInstance()
+        } catch (ClassNotFoundException e) {
+            return null
+        }
     }
 
     protected ApplicationContext buildContext(String className, String cls) {
@@ -167,6 +172,20 @@ abstract class AbstractTypeElementSpec extends Specification {
 
         AnnotationMetadata metadata = (AnnotationMetadata) classLoader.loadClass(className).newInstance()
         return metadata
+    }
+
+    /**
+     * Build and return a {@link io.micronaut.core.beans.BeanIntrospection} for the given class name and class data.
+     *
+     * @return the introspection if it is correct
+     **/
+    protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
+        def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
     }
 
     @CompileStatic

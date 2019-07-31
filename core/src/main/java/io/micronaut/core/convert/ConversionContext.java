@@ -18,6 +18,7 @@ package io.micronaut.core.convert;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.TypeVariableResolver;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 
 import javax.annotation.Nullable;
@@ -152,6 +153,7 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
      * @return The conversion context
      */
     static <T> ArgumentConversionContext<T> of(Class<T> argument) {
+        ArgumentUtils.requireNonNull("argument", argument);
         return of(Argument.of(argument), null, null);
     }
 
@@ -177,6 +179,7 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
      * @return The conversion context
      */
     static <T> ArgumentConversionContext<T> of(Argument<T> argument, @Nullable Locale locale, @Nullable Charset charset) {
+        ArgumentUtils.requireNonNull("argument", argument);
         Charset finalCharset = charset != null ? charset : StandardCharsets.UTF_8;
         Locale finalLocale = locale != null ? locale : Locale.getDefault();
         return new DefaultArgumentConversionContext<>(argument, finalLocale, finalCharset);

@@ -22,6 +22,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
@@ -29,8 +30,11 @@ import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Completable
 import io.reactivex.Flowable
+import io.reactivex.Single
 import io.reactivex.functions.Consumer
+import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -442,6 +446,70 @@ class HttpGetSpec extends Specification {
         client.close()
     }
 
+    void "test empty list returns ok"() {
+        given:
+        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+
+        when:
+        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList"), Argument.listOf(Book)).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        response.status == HttpStatus.OK
+        response.body().isEmpty()
+    }
+
+    void "test single empty list returns ok"() {
+        given:
+        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+
+        when:
+        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList/single"), Argument.listOf(Book)).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        response.status == HttpStatus.OK
+        response.body().isEmpty()
+    }
+
+    void "test mono empty list returns ok"() {
+        given:
+        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+
+        when:
+        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList/mono"), Argument.listOf(Book)).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        response.status == HttpStatus.OK
+        response.body().isEmpty()
+    }
+
+    void "test completable returns 200"() {
+        when:
+        MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
+        def ex = client.completableError().blockingGet()
+
+        then:
+        client.completable().blockingGet() == null
+        ex instanceof HttpClientResponseException
+        ex.message.contains("completable error")
+    }
+
+    void "test setting query params on the request"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        MutableHttpRequest request = HttpRequest.GET("/get/multipleQueryParam?foo=x")
+        request.parameters.add('bar', 'y')
+        String body = client.toBlocking().retrieve(request)
+
+        then:
+        noExceptionThrown()
+        body == 'x-y'
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -458,6 +526,21 @@ class HttpGetSpec extends Specification {
         @Get("/pojoList")
         List<Book> pojoList() {
             return [ new Book(title: "The Stand") ]
+        }
+
+        @Get("/emptyList")
+        List<Book> emptyList() {
+            return []
+        }
+
+        @Get("/emptyList/single")
+        Single<List<Book>> emptyListSingle() {
+            return Single.just([])
+        }
+
+        @Get("/emptyList/mono")
+        Mono<List<Book>> emptyListMono() {
+            return Mono.just([])
         }
 
         @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
@@ -513,6 +596,16 @@ class HttpGetSpec extends Specification {
         @Get("/host")
         String hostHeader(@Header String host) {
             return host
+        }
+
+        @Get("/completable")
+        Completable completable(){
+            return Completable.complete()
+        }
+
+        @Get("/completable/error")
+        Completable completableError() {
+            return Completable.error(new RuntimeException("completable error"))
         }
     }
 
@@ -617,6 +710,11 @@ class HttpGetSpec extends Specification {
         @Get("/dateTimeQuery")
         String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate)
 
+        @Get("/completable")
+        Completable completable()
+
+        @Get("/completable/error")
+        Completable completableError()
     }
 
     @javax.inject.Singleton

@@ -40,10 +40,3 @@ include "test-utils"
 
 // benchmarks
 include "benchmarks"
-
-// configurations
-include "configurations:cassandra"
-include "configurations:hibernate-validator"
-include "configurations:jmx"
-include "configurations:picocli"
-

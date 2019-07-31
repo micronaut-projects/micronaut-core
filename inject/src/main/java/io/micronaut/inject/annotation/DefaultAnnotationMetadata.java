@@ -21,6 +21,7 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -157,6 +158,113 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return isPresent;
     }
 
+    @Override
+    public <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, Class<E> enumType) {
+        return enumValue(annotation, VALUE_MEMBER, enumType, null);
+    }
+
+    @Override
+    public <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+        return enumValue(annotation, member, enumType, null);
+    }
+
+    @Override
+    public <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, Class<E> enumType) {
+        return enumValue(annotation, VALUE_MEMBER, enumType);
+    }
+
+    @Override
+    public <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+        return enumValue(annotation, member, enumType, null);
+    }
+
+    /**
+     * Retrieve the class value and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param enumType The enum type
+     * @param valueMapper The value mapper
+     * @param <E> The enum type
+     * @return The class value
+     */
+    @Internal
+    <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+        final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            Object v = getRawSingleValue(repeatable.value().getName(), VALUE_MEMBER, valueMapper);
+            if (v instanceof AnnotationValue) {
+                return ((AnnotationValue<?>) v).enumValue(member, enumType, valueMapper);
+            }
+            return Optional.empty();
+        } else {
+            return enumValue(annotation.getName(), member, enumType, valueMapper);
+        }
+    }
+
+    /**
+     * Retrieve the class value and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param enumType The enum type
+     * @param valueMapper The value mapper
+     * @param <E> The enum type
+     * @return The class value
+     */
+    @Internal
+    <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+        Object rawValue = getRawSingleValue(annotation, member, valueMapper);
+        return enumValueOf(enumType, rawValue);
+    }
+
+    private <E extends Enum> Optional<E> enumValueOf(Class<E> enumType, Object rawValue) {
+        if (rawValue != null) {
+            if (enumType.isInstance(rawValue)) {
+                return Optional.of((E) rawValue);
+            } else {
+                try {
+                    return Optional.of((E) Enum.valueOf(enumType, rawValue.toString()));
+                } catch (Exception e) {
+                    return Optional.empty();
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public <T> Class<T>[] classValues(@Nonnull String annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        Object rawSingleValue = getRawValue(annotation, member);
+        //noinspection unchecked
+        Class<T>[] classes = (Class<T>[]) AnnotationValue.resolveClassValues(rawSingleValue);
+        if (classes != null) {
+            return classes;
+        }
+        //noinspection unchecked
+        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+    }
+
+    @Override
+    public <T> Class<T>[] classValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+        final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            Object v = getRawSingleValue(repeatable.value().getName(), member, null);
+            if (v instanceof AnnotationValue) {
+                Class<?>[] classes = ((AnnotationValue<?>) v).classValues(member);
+                return (Class<T>[]) classes;
+            }
+            return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        } else {
+            return classValues(annotation.getName(), member);
+        }
+    }
+
     @Nonnull
     @Override
     public Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
@@ -175,14 +283,14 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
         if (repeatable != null) {
-            Object v = getRawSingleValue(repeatable.value().getName(), VALUE_MEMBER, valueMapper);
+            Object v = getRawSingleValue(repeatable.value().getName(), member, valueMapper);
             if (v instanceof AnnotationValue) {
                 Optional o = ((AnnotationValue<?>) v).classValue(member, valueMapper);
                 return o;
             }
             return Optional.empty();
         } else {
-            return classValue(annotation.getName(), member);
+            return classValue(annotation.getName(), member, valueMapper);
         }
     }
 
@@ -1016,7 +1124,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    protected static boolean areAnnotationDefaultsRegistered(String annotation) {
+    public static boolean areAnnotationDefaultsRegistered(String annotation) {
         return AnnotationMetadataSupport.hasDefaultValues(annotation);
     }
 
@@ -1029,7 +1137,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    protected static void registerAnnotationDefaults(String annotation, Map<String, Object> defaultValues) {
+    public static void registerAnnotationDefaults(String annotation, Map<String, Object> defaultValues) {
         AnnotationMetadataSupport.registerDefaultValues(annotation, defaultValues);
     }
 
@@ -1042,7 +1150,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    protected static void registerAnnotationDefaults(AnnotationClassValue<?> annotation, Map<String, Object> defaultValues) {
+    public static void registerAnnotationDefaults(AnnotationClassValue<?> annotation, Map<String, Object> defaultValues) {
         AnnotationMetadataSupport.registerDefaultValues(annotation, defaultValues);
     }
 
@@ -1054,7 +1162,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    protected static void registerAnnotationType(AnnotationClassValue<?> annotation) {
+    public static void registerAnnotationType(AnnotationClassValue<?> annotation) {
         AnnotationMetadataSupport.registerAnnotationType(annotation);
     }
 
@@ -1398,6 +1506,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 int len = Array.getLength(rawValue);
                 if (len > 0) {
                     rawValue = Array.get(rawValue, 0);
+                }
+            } else if (rawValue instanceof Iterable) {
+                Iterator i = ((Iterable) rawValue).iterator();
+                if (i.hasNext()) {
+                    rawValue = i.next();
                 }
             }
         }

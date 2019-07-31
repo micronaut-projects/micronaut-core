@@ -20,6 +20,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
+import javax.annotation.Nullable;
+
 /**
  * @author graemerocher
  * @since 1.0
@@ -32,7 +34,7 @@ public class ServiceEntry extends AbstractServiceEntry {
      * @param id   The id
      */
     @JsonCreator
-    public ServiceEntry(@JsonProperty("Service") String name, @JsonProperty("ID") String id) {
+    public ServiceEntry(@Nullable @JsonProperty("Service") String name, @Nullable @JsonProperty("ID") String id) {
         super(name);
         setID(id);
     }

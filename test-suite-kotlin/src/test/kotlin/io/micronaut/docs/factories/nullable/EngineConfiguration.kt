@@ -4,6 +4,7 @@ import io.micronaut.context.annotation.EachProperty
 import io.micronaut.core.util.Toggleable
 import javax.validation.constraints.NotNull
 
+// tag::class[]
 @EachProperty("engines")
 class EngineConfiguration : Toggleable {
 
@@ -16,3 +17,4 @@ class EngineConfiguration : Toggleable {
         return enabled
     }
 }
+// end::class[]

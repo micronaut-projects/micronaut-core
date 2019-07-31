@@ -86,7 +86,7 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
 
         requiredArgumentValues = requiredArgumentValues != null ? new LinkedHashMap<>(requiredArgumentValues) : Collections.emptyMap();
         Argument<?>[] requiredArguments = getRequiredArguments();
-        Optional<Class> eachBeanType = definition.getValue(EachBean.class, Class.class);
+        Optional<Class> eachBeanType = definition.classValue(EachBean.class);
         for (Argument<?> requiredArgument : requiredArguments) {
             if (requiredArgument.getType() == BeanResolutionContext.class) {
                 requiredArgumentValues.put(requiredArgument.getName(), resolutionContext);

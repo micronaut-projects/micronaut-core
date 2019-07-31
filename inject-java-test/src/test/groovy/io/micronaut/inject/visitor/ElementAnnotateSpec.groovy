@@ -5,9 +5,13 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.aop.Introduction
 import io.micronaut.core.annotation.AnnotationValueBuilder
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PropertyElement
+import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 import javax.annotation.processing.SupportedAnnotationTypes
@@ -73,6 +77,32 @@ class TestListener {
         definition.findMethod("receive", String).get().hasAnnotation(Ann)
     }
 
+    void "test annotation bean introspection properties"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test {
+    private String name;
+    
+    public String getName() { 
+        return name;
+    }
+    
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+''')
+
+        expect:
+        introspection.getRequiredProperty("name", String).stringValue("foo.bar.Ann", 'foo')
+            .get() == 'bar'
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
@@ -87,16 +117,31 @@ class TestListener {
     static class MyTypeElementVisitorProcessor extends TypeElementVisitorProcessor {
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
-            return [new MyAnnotatingTypeElementVisitor()]
+            return [new MyAnnotatingTypeElementVisitor(), new IntrospectedTypeElementVisitor()]
         }
     }
 
     static class MyAnnotatingTypeElementVisitor implements TypeElementVisitor {
+
+        @Override
+        int getOrder() {
+            return 100
+        }
+
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
             if (!element.hasStereotype(Introduction)) {
                 element.annotate(Ann) { AnnotationValueBuilder builder ->
                     builder.member("foo", "bar")
+                }
+            }
+
+            if (element.hasStereotype(Introspected)) {
+                List<PropertyElement> props = element.getBeanProperties()
+                for (PropertyElement pe : props) {
+                    pe.annotate("foo.bar.Ann") { AnnotationValueBuilder builder ->
+                        builder.member("foo", "bar")
+                    }
                 }
             }
         }

@@ -23,16 +23,8 @@ import io.micronaut.core.util.CollectionUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.Parameterizable;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.TypeParameterElement;
-import javax.lang.model.type.ArrayType;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
-import javax.lang.model.type.TypeVariable;
-import javax.lang.model.type.WildcardType;
+import javax.lang.model.element.*;
+import javax.lang.model.type.*;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.lang.reflect.Array;
@@ -413,7 +405,68 @@ public class GenericUtils {
     }
 
     /**
+     * Resolve bound types for the given return type.
+     *
+     * @param declaringType The declaring type
+     * @param returnType The return type
+     * @param genericsInfo The declaring generics info
+     * @return The type bounds
+     */
+    protected Map<String, TypeMirror> resolveBoundGenerics(TypeElement declaringType, TypeMirror returnType, Map<String, Map<String, TypeMirror>> genericsInfo) {
+
+        if (returnType instanceof NoType) {
+            return Collections.emptyMap();
+        } else if (returnType instanceof DeclaredType) {
+            DeclaredType dt = (DeclaredType) returnType;
+            Element e = dt.asElement();
+            List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
+            if (e instanceof TypeElement) {
+                TypeElement typeElement = (TypeElement) e;
+                Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(declaringType, genericsInfo);
+                if (!modelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
+                    return alignNewGenericsInfo(
+                            typeElement.getTypeParameters(),
+                            typeArguments,
+                            boundGenerics);
+                }
+            }
+        } else if (returnType instanceof TypeVariable) {
+            TypeVariable tv = (TypeVariable) returnType;
+            TypeMirror upperBound = tv.getUpperBound();
+            Map<String, TypeMirror> boundGenerics = resolveBoundGenerics(declaringType, genericsInfo);
+
+            TypeMirror bound = boundGenerics.get(tv.toString());
+            if (bound != null) {
+                return Collections.singletonMap(tv.toString(), bound);
+            } else {
+
+                Map<String, TypeMirror> generics = resolveBoundGenerics(declaringType, upperBound, genericsInfo);
+                if (!generics.isEmpty()) {
+                    return generics;
+                } else {
+                    return resolveBoundGenerics(declaringType, tv.getLowerBound(), genericsInfo);
+                }
+            }
+        }
+
+        return Collections.emptyMap();
+    }
+
+    private Map<String, TypeMirror> resolveBoundGenerics(TypeElement typeElement, Map<String, Map<String, TypeMirror>> genericsInfo) {
+        String declaringTypeName = null;
+        if (typeElement != null) {
+            declaringTypeName = typeElement.getQualifiedName().toString();
+        }
+        Map<String, TypeMirror> boundGenerics = genericsInfo.get(declaringTypeName);
+        if (boundGenerics == null) {
+            boundGenerics = Collections.emptyMap();
+        }
+        return boundGenerics;
+    }
+
+    /**
      * Takes a type element and the bound generic information and re-aligns for the new type.
+     *
      * @param typeElement The type element
      * @param typeArguments The type arguments
      * @param genericsInfo The generic info
@@ -425,6 +478,28 @@ public class GenericUtils {
             Map<String, TypeMirror> genericsInfo) {
         String typeName = typeElement.getQualifiedName().toString();
         List<? extends TypeParameterElement> typeParameters = typeElement.getTypeParameters();
+        Map<String, TypeMirror> resolved = alignNewGenericsInfo(typeParameters, typeArguments, genericsInfo);
+        if (!resolved.isEmpty()) {
+            return Collections.singletonMap(
+                    typeName,
+                    resolved
+            );
+        }
+        return Collections.emptyMap();
+    }
+
+    /**
+     * Takes the bound generic information and re-aligns for the new type.
+     *
+     * @param typeParameters The type parameters
+     * @param typeArguments The type arguments
+     * @param genericsInfo The generic info
+     * @return The aligned generics
+     */
+    public Map<String, TypeMirror> alignNewGenericsInfo(
+            List<? extends TypeParameterElement> typeParameters,
+            List<? extends TypeMirror> typeArguments,
+            Map<String, TypeMirror> genericsInfo) {
         if (typeArguments.size() == typeParameters.size()) {
 
             Map<String, TypeMirror> resolved = new HashMap<>(typeArguments.size());
@@ -434,10 +509,7 @@ public class GenericUtils {
                 String variableName = typeParameter.getSimpleName().toString();
                 resolveVariableForMirror(genericsInfo, resolved, variableName, typeParameterMirror);
             }
-            return Collections.singletonMap(
-                    typeName,
-                    resolved
-            );
+            return resolved;
         }
         return Collections.emptyMap();
     }

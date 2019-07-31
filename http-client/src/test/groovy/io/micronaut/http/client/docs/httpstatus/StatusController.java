@@ -21,6 +21,9 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Status;
+import io.reactivex.Maybe;
+
+import java.util.concurrent.CompletableFuture;
 
 @Requires(property = "spec.name", value = "httpstatus")
 @Controller("/status")
@@ -42,6 +45,18 @@ public class StatusController {
     @Status(HttpStatus.CREATED)
     @Get(value = "/voidreturn")
     public void voidReturn() {
+    }
+
+    @Status(HttpStatus.CREATED)
+    @Get(value = "/completableVoid")
+    public CompletableFuture<Void> voidCompletableFuture() {
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Status(HttpStatus.CREATED)
+    @Get(value = "/maybeVoid")
+    public Maybe<Void> maybeVoid() {
+        return Maybe.empty();
     }
 
     @Status(HttpStatus.NOT_FOUND)

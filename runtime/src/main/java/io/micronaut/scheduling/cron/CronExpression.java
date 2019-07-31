@@ -130,7 +130,7 @@ import java.util.regex.Pattern;
  * the constraints of each field are met. Overlap of intervals are not allowed. That is: for
  * Day-of-week field &quot;FRI-MON&quot; is invalid,but &quot;FRI-SUN,MON&quot; is valid
  */
-public class CronExpression {
+public final class CronExpression {
 
     /**
      * Represents a field in the cron expression.
@@ -174,27 +174,18 @@ public class CronExpression {
     private final SimpleField monthField;
     private final DayOfMonthField dayOfMonthField;
 
-    /**
-     * Construct an object form a valid cron expression string.
-     *
-     * @param expr The cron expression.
-     */
-    CronExpression(final String expr) {
-        this(expr, true);
-    }
-
-    private CronExpression(final String expr, final boolean withSeconds) {
+    private CronExpression(final String expr) {
         if (expr == null) {
             throw new IllegalArgumentException("expr is null"); //$NON-NLS-1$
         }
 
         this.expr = expr;
 
-        final int expectedParts = withSeconds ? CRON_EXPRESSION_LENGTH_WITH_SEC : CRON_EXPRESSION_LENGTH_WITHOUT_SEC;
         final String[] parts = expr.split("\\s+"); //$NON-NLS-1$
-        if (parts.length != expectedParts) {
-            throw new IllegalArgumentException(String.format("Invalid cron expression [%s], expected %s field, got %s", expr, expectedParts, parts.length));
+        if (parts.length < CRON_EXPRESSION_LENGTH_WITHOUT_SEC || parts.length > CRON_EXPRESSION_LENGTH_WITH_SEC) {
+            throw new IllegalArgumentException(String.format("Invalid cron expression [%s], expected 5 or 6 fields, got %s", expr, parts.length));
         }
+        boolean withSeconds = parts.length == CRON_EXPRESSION_LENGTH_WITH_SEC;
 
         int ix = withSeconds ? 1 : 0;
         this.secondField = new SimpleField(CronFieldType.SECOND, withSeconds ? parts[0] : "0");
@@ -212,7 +203,7 @@ public class CronExpression {
      * @return The {@link CronExpression} instance
      */
     public static CronExpression create(final String expr) {
-        return new CronExpression(expr, true);
+        return new CronExpression(expr);
     }
 
     /**

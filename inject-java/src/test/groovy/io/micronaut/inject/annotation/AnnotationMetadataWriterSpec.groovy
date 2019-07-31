@@ -41,6 +41,28 @@ import java.lang.annotation.Retention
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
 
+    void "test javax nullable on field"() {
+        given:
+        AnnotationMetadata metadata = buildMethodAnnotationMetadata('''\
+package test;
+
+import javax.annotation.Nullable;
+
+class Test {
+    @Nullable
+    void testMethod() {}
+}
+''', 'testMethod')
+
+
+
+        expect:
+        metadata != null
+        metadata.declaredAnnotationNames.size() == 1
+        metadata.declaredStereotypes == null
+        metadata.annotationNames.size() == 1
+    }
+
     void "test write annotation metadata with primitive arrays"() {
         given:
         AnnotationMetadata toWrite = new DefaultAnnotationMetadata(
@@ -143,6 +165,7 @@ class Test {
         then:
         metadata != null
         metadata.getValue(Timed, "percentiles", double[].class).get() == [1.1d] as double[]
+        metadata.doubleValue(Timed,"percentiles").asDouble == 1.1d
         metadata.getValue("test.MyAnn", "doubleArray", double[].class).get() == [1.1d] as double[]
     }
 
@@ -166,6 +189,7 @@ class Test {
         metadata.hasAnnotation(MyStereotype)
         // the value of @Type should be the the one declared on the the @MyStereotype annotation not the one declared on @Recoverable
         metadata.getValue(Type.class, String.class).get() == StubIntroducer.class.getName()
+        metadata.stringValue(Type.class).get() == StubIntroducer.class.getName()
         // the stereotypes should include meta annotation stereotypes
         metadata.getAnnotationNamesByStereotype(Around.class).contains(Recoverable.class.getName())
     }
@@ -217,6 +241,7 @@ class Test {
 
         then:
         metadata != null
+        metadata.enumValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
         metadata.getValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
         metadata.getValue(Requires, "version").get() == "1.8"
     }
@@ -240,6 +265,10 @@ class Test {
         then:
         metadata != null
         metadata.synthesize(EnumAnn).value() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn, EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn, "value", EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn.name, EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
+        metadata.enumValue(EnumAnn.name, "value", EnumAnn.MyEnum).get() == EnumAnn.MyEnum.TWO
     }
 
     void "test read external constants"() {

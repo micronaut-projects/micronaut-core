@@ -4,6 +4,20 @@ import spock.lang.Specification
 
 class AnnotationValueSpec extends Specification {
 
+    void "test get properties"() {
+        given:
+        def av = AnnotationValue.builder("test.Foo")
+                        .member("props",
+                                AnnotationValue.builder("test.Prop").member("name", "foo.bar1").value("one").build(),
+                                AnnotationValue.builder("test.Prop").member("name", "foo.bar2").value("two").build()
+                        )
+
+                        .build()
+
+        expect:
+        av.getProperties("props") == ['foo.bar1':'one', 'foo.bar2':'two']
+    }
+
     void "test class value"() {
         given:
         def av = AnnotationValue.builder("test.Foo")
@@ -11,10 +25,22 @@ class AnnotationValueSpec extends Specification {
                        .build()
 
         expect:
+        av.classValues() == [AnnotationValueSpec] as Class[]
         av.classValue().get() == AnnotationValueSpec
         av.classValue("value").get() == AnnotationValueSpec
         av.classValue("value", Specification).get() == AnnotationValueSpec
         !av.classValue("value", URL).isPresent()
+    }
+
+    void "test class values"() {
+        given:
+        def av = AnnotationValue.builder("test.Foo")
+                .values(AnnotationValueSpec, Specification)
+                .build()
+
+        expect:
+        av.classValues().contains(AnnotationValueSpec)
+        av.classValues().contains(Specification)
     }
 
     void "test class value 2"() {
