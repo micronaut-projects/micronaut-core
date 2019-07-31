@@ -63,24 +63,25 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/named'                              | null                        | HttpStatus.BAD_REQUEST
         HttpMethod.GET  | '/parameter/overlap/30'                         | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/overlap/30?max=50'                  | "Parameter Value: 30"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"    | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional?max=20'                    | "Parameter Value: 20"       | HttpStatus.OK
 
-        HttpMethod.GET  | '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"     | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/optional?max=20'                    | "Parameter Value: 20"        | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]"  | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]"  | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/optional-list?values=10&values=20'  | "Parameter Value: [10, 20]"  | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/optional-date?date=1941-01-05'      | "Parameter Value: 1941"      | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/set?values=10,20'                   | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/set?values=10&values=20'            | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional-list?values=10&values=20'  | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional-date?date=1941-01-05'      | "Parameter Value: 1941"     | HttpStatus.OK
+        HttpMethod.GET  | '/parameter?max=20'                             | "Parameter Value: 20"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/simple?max=20'                      | "Parameter Value: 20"       | HttpStatus.OK
 
-        HttpMethod.GET  | '/parameter?max=20'                             | "Parameter Value: 20"        | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/simple?max=20'                      | "Parameter Value: 20"        | HttpStatus.OK
-
-        HttpMethod.GET  | '/parameter/optional'                           | "Parameter Value: 10"        | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/all'                                | "Parameter Value: 10"        | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/all?max=20'                         | "Parameter Value: 20"        | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional'                           | "Parameter Value: 10"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/all?max=20'                         | "Parameter Value: 20"       | HttpStatus.OK
 
         HttpMethod.GET  | '/parameter/exploded?title=The%20Stand'         | "Parameter Value: The Stand" | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
         HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"    | HttpStatus.OK
+        HttpMethod.POST | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
     }
 
     void "test exploded with no default constructor"() {
