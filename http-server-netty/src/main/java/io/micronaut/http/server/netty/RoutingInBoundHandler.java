@@ -97,6 +97,7 @@ import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.reactivex.BackpressureStrategy;
+import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.functions.LongConsumer;
 import io.reactivex.internal.operators.flowable.FlowableReplay;
@@ -308,6 +309,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             MediaType defaultResponseMediaType = errorRoute.getProduces().stream().findFirst().orElse(MediaType.APPLICATION_JSON_TYPE);
             try {
                 final MethodBasedRouteMatch<?, ?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
+                Class<?> javaReturnType = errorRoute.getReturnType().getType();
+                boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
+                boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
                 Flowable resultFlowable = Flowable.defer(() -> {
                       Object result = methodBasedRoute.execute();
                       MutableHttpResponse<?> response = errorResultToResponse(result);
@@ -318,7 +322,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                         methodBasedRoute.getDeclaringType(),
-                        methodBasedRoute.getReturnType().getType(),
+                        methodBasedRoute.getReturnType(),
+                        isReactiveReturnType,
                         methodBasedRoute.getAnnotationMetadata(),
                         requestReference,
                         resultFlowable);
@@ -364,7 +369,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                     Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                             handler.getClass(),
-                            HttpResponse.class,
+                            ReturnType.of(HttpResponse.class),
+                            false,
                             AnnotationMetadata.EMPTY_METADATA,
                             requestReference,
                             resultFlowable);
@@ -402,7 +408,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                         null,
-                        HttpResponse.class,
+                        ReturnType.of(HttpResponse.class),
+                        false,
                         AnnotationMetadata.EMPTY_METADATA,
                         requestReference,
                         resultFlowable);
@@ -972,7 +979,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     isReactiveReturnType && Publishers.isSingle(javaReturnType) ||
                             isResponsePublisher(genericReturnType, javaReturnType) ||
                                 isFuture ||
-                                    finalRoute.getAnnotationMetadata().getValue(Produces.class, "single", Boolean.class).orElse(false);
+                                    finalRoute.getAnnotationMetadata().booleanValue(Produces.class, "single").orElse(false);
 
             // build the result emitter. This result emitter emits the response from a controller action
             Flowable<?> resultEmitter = buildResultEmitter(
@@ -982,7 +989,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     isReactiveReturnType,
                     isSingle
             );
-
 
             // here we transform the result of the controller action into a MutableHttpResponse
             Flowable<MutableHttpResponse<?>> routePublisher = resultEmitter.map((message) -> {
@@ -1014,7 +1020,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         routeMatch = statusRoute.get();
                         httpRequest.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
 
-                        requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
+                        routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
 
                         if (routeMatch.isExecutable()) {
                             Object result;
@@ -1023,6 +1029,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 finalResponse = messageToResponse(routeMatch, result);
                             } catch (Throwable e) {
                                 throw new InternalServerException("Error executing status route [" + routeMatch + "]: " + e.getMessage(), e);
+                            }
+                        } else {
+                            if (LOG.isWarnEnabled()) {
+                                LOG.warn("Matched status route [" + routeMatch + "] not executed because one or more arguments could not be bound. Returning the original response.");
                             }
                         }
                     }
@@ -1034,7 +1044,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             routePublisher = buildRoutePublisher(
                     finalRoute.getDeclaringType(),
-                    javaReturnType,
+                    genericReturnType,
+                    isReactiveReturnType,
                     finalRoute.getAnnotationMetadata(),
                     requestReference,
                     routePublisher
@@ -1126,7 +1137,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private Flowable<MutableHttpResponse<?>> buildRoutePublisher(
             Class<?> declaringType,
-            Class<?> javaReturnType,
+            ReturnType<?> genericReturnType,
+            boolean isReactiveReturnType,
             AnnotationMetadata annotationMetadata,
             AtomicReference<HttpRequest<?>> requestReference,
             Flowable<MutableHttpResponse<?>> routePublisher) {
@@ -1135,8 +1147,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         routePublisher = routePublisher.switchIfEmpty(Flowable.create((emitter) -> {
             HttpRequest<?> httpRequest = requestReference.get();
             MutableHttpResponse<?> response;
-            if (javaReturnType != void.class) {
+            Class<?> javaReturnType = genericReturnType.getType();
+            boolean isVoid = javaReturnType == void.class ||
+                    Completable.class.isAssignableFrom(javaReturnType) ||
+                    (isReactiveReturnType && genericReturnType.getFirstTypeVariable()
+                            .filter(arg -> arg.getType() == Void.class).isPresent());
 
+            if (isVoid) {
+                // void return type with no response, nothing else to do
+                response = forStatus(annotationMetadata);
+            } else {
                 // handle re-mapping of errors
                 Optional<RouteMatch<Object>> statusRoute = Optional.empty();
                 // if declaringType is not null, this means its a locally marked method handler
@@ -1148,8 +1168,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
 
                 if (statusRoute.isPresent()) {
-                    RouteMatch<Object> newRoute = statusRoute.get();
-                    requestArgumentSatisfier.fulfillArgumentRequirements(newRoute, httpRequest, true);
+                    RouteMatch<?> newRoute = requestArgumentSatisfier.fulfillArgumentRequirements(statusRoute.get(), httpRequest, true);
 
                     if (newRoute.isExecutable()) {
                         try {
@@ -1161,16 +1180,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         }
 
                     } else {
+                        if (LOG.isWarnEnabled()) {
+                            LOG.warn("Matched status route [" + newRoute + "] not executed because one or more arguments could not be bound. Returning a default response.");
+                        }
                         response = newNotFoundError(httpRequest);
                     }
-                    response.setAttribute(HttpAttributes.ROUTE_MATCH, statusRoute);
+                    response.setAttribute(HttpAttributes.ROUTE_MATCH, newRoute);
                 } else {
                     response = newNotFoundError(httpRequest);
                 }
-            } else {
-                // void return type with no response, nothing else to do
-                response = forStatus(annotationMetadata);
             }
+
             try {
                 emitter.onNext(response);
                 emitter.onComplete();
@@ -1437,7 +1457,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         HttpStatus status = HttpStatus.OK;
 
         if (annotationMetadata.hasAnnotation(Status.class)) {
-            status = annotationMetadata.getValue(Status.class, HttpStatus.class).orElse(status);
+            status = annotationMetadata.stringValue(Status.class).map(HttpStatus::valueOf).orElse(status);
         }
 
         return HttpResponse.status(status);
@@ -1602,7 +1622,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private void logException(Throwable cause) {
         //handling connection reset by peer exceptions
-        if (cause instanceof IOException && IGNORABLE_ERROR_MESSAGE.matcher(cause.getMessage()).matches()) {
+        String message = cause.getMessage();
+        if (cause instanceof IOException && message != null && IGNORABLE_ERROR_MESSAGE.matcher(message).matches()) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
             }

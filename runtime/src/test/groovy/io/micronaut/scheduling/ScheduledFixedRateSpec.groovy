@@ -55,7 +55,8 @@ class ScheduledFixedRateSpec extends Specification {
         and:
         conditions.eventually {
             myTask.wasRun
-            myTask.cronEvents.get() == 2
+            myTask.cronEvents.get() >= 3
+            myTask.cronEventsNoSeconds.get() >= 0
             myTask.wasDelayedRun
             beanContext.getBean(MyJavaTask).wasRun
         }
@@ -77,7 +78,6 @@ class ScheduledFixedRateSpec extends Specification {
             myTask.initialDelayWasRun
             myTask.attempts.get() == 2
         }
-
     }
 
     @Singleton
@@ -88,6 +88,7 @@ class ScheduledFixedRateSpec extends Specification {
         boolean fixedDelayWasRun = false
         boolean configuredWasRun = false
         AtomicInteger cronEvents = new AtomicInteger(0)
+        AtomicInteger cronEventsNoSeconds = new AtomicInteger(0)
 
         @Scheduled(fixedRate = '10ms')
         void runSomething() {
@@ -97,6 +98,11 @@ class ScheduledFixedRateSpec extends Specification {
         @Scheduled(cron = '1/3 0/1 * 1/1 * ?')
         void runCron() {
             cronEvents.incrementAndGet()
+        }
+
+        @Scheduled(cron = '0/1 * 1/1 * ?')
+        void runCronNoSeconds() {
+            cronEventsNoSeconds.incrementAndGet()
         }
 
         @Scheduled(fixedRate = '${some.configuration}')

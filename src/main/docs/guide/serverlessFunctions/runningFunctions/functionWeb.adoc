@@ -52,7 +52,7 @@ dependency:micronaut-http-server-netty[scope="testCompile"]
 
 dependency:micronaut-function-web[scope="testCompile"]
 
-<1> In order to run the function as a web application, you will need an HTTP server, such as the `http-server-netty` dependency
+TIP: In order to run the function as a web application, you will need an HTTP server, such as the `http-server-netty` dependency
 
 Create a ann:function.client.FunctionClient[] interface as shown below:
 

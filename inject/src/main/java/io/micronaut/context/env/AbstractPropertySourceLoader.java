@@ -69,12 +69,11 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
         if (isEnabled()) {
             Set<String> extensions = getExtensions();
             for (String ext : extensions) {
-                String qualifiedName = fileName;
-                fileName += "." + ext;
-                Map<String, Object> finalMap = loadProperties(resourceLoader, qualifiedName, fileName);
+                String fileExt = fileName +  "." + ext;
+                Map<String, Object> finalMap = loadProperties(resourceLoader, fileName, fileExt);
 
                 if (!finalMap.isEmpty()) {
-                    MapPropertySource newPropertySource = new MapPropertySource(qualifiedName, finalMap) {
+                    MapPropertySource newPropertySource = new MapPropertySource(fileName, finalMap) {
                         @Override
                         public int getOrder() {
                             return order;

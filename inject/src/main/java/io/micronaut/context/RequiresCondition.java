@@ -223,7 +223,7 @@ public class RequiresCondition implements Condition {
                     if (hasNotEquals) {
                         return true;
                     } else {
-                        context.fail("Required property [" + property + "] not present");
+                        context.fail("Required property [" + property + "] with value [" + value + "] not present");
                         return false;
                     }
                 } else if (StringUtils.isNotEmpty(value)) {
@@ -545,7 +545,7 @@ public class RequiresCondition implements Condition {
 
             for (Class<?> type : missingBeans) {
                 // remove self by passing definition as filter
-                Collection<? extends BeanDefinition<?>> beanDefinitions = new ArrayList<>(beanContext.findBeanCandidates(type, bd));
+                Collection<? extends BeanDefinition<?>> beanDefinitions = new ArrayList<>(beanContext.findBeanCandidates(type, bd, true));
 
                 if (!beanDefinitions.isEmpty()) {
                     // remove abstract beans

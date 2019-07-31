@@ -26,7 +26,7 @@ class SessionProxySpec extends AbstractTypeElementSpec {
 
     void "test create session proxy"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$CurrentSessionDefinition' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$CurrentSession0Definition' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.introduction.*;
@@ -67,7 +67,7 @@ class AbstractBean {
 
     void "test create session factory proxy"() {
         when:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$SessionFactoryDefinition' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.$AbstractBean$SessionFactory0Definition' + BeanDefinitionVisitor.PROXY_SUFFIX, '''
 package test;
 
 import io.micronaut.aop.introduction.*;

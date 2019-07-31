@@ -16,6 +16,7 @@
 package io.micronaut.inject.qualifiers.primary
 
 import io.micronaut.context.BeanContext
+import io.micronaut.context.exceptions.NonUniqueBeanException
 import spock.lang.Specification
 /**
  * Created by graemerocher on 26/05/2017.
@@ -35,5 +36,16 @@ class PrimarySpec extends Specification {
         b.all.any() { it instanceof A1 }
         b.all.any() { it instanceof A2 }
         b.a instanceof A2
+    }
+
+    void "test duplicate @Primary bean throws exception"() {
+        given:
+        BeanContext context = BeanContext.run()
+
+        when:
+        C c = context.getBean(C)
+
+        then:
+        thrown(NonUniqueBeanException)
     }
 }

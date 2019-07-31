@@ -22,3 +22,46 @@ dependencyManagement {
 
 <1> Micronaut releases are available on jcenter
 <2> Micronaut snapshots are available on sonatype
+
+In the case of Maven, edit `pom.xml`:
+
+[source, xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+  ...
+
+  <properties>
+    <micronaut.version>1.0.2.BUILD-SNAPSHOT</micronaut.version> <!--1-->
+    ...
+  </properties>
+
+  <repositories>
+    <repository>
+      <id>jcenter.bintray.com</id>
+      <url>https://jcenter.bintray.com</url> <!--2-->
+    </repository>
+    <repository>
+      <id>sonatype-snapshots</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots/</url> <!--3-->
+    </repository>
+  </repositories>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.micronaut</groupId>
+        <artifactId>micronaut-bom</artifactId>
+        <version>${micronaut.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  ...
+</project>
+
+----
+<1> Set the snapshot version.
+<2> Micronaut releases are available on jcenter
+<3> Micronaut snapshots are available on sonatype

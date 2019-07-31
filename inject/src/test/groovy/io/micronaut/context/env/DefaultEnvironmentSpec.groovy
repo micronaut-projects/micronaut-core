@@ -368,6 +368,24 @@ class DefaultEnvironmentSpec extends Specification {
         ctx2.close()
     }
 
+    void "test add and remove property sources"() {
+        given:
+        Environment env = new DefaultEnvironment("test").start()
+        PropertySource propertySource = PropertySource.of("test", [foo: 'bar'])
+
+        when:
+        env.addPropertySource(propertySource)
+
+        then:
+        env.propertySources.contains(propertySource)
+
+        when:
+        env.removePropertySource(propertySource)
+
+        then:
+        !env.propertySources.contains(propertySource)
+    }
+
     private static Environment startEnv(String files) {
         new DefaultEnvironment("test") {
             protected String readPropertySourceListKeyFromEnvironment() {

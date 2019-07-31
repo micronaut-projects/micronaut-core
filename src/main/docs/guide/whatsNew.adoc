@@ -21,6 +21,16 @@ In previous versions of Micronaut manual validation had to be applied to reactiv
 
 It is no longer necessary to apply the ann:validation.Validated[] annotation to beans that accept `@Valid` arguments or use any `javax.validation` annotation.
 
+=== Micronaut Kubernetes 1.0 Release
+
+There is a new https://micronaut-projects.github.io/micronaut-kubernetes/1.0.0/guide/[Micronaut Kubernetes] module, with an improved support for running Micronaut applications in a Kubernetes cluster, including support for Kubernetes' ``ConfigMap``s, ``Secret``s and more.
+
+To get started, use the `kubernetes` feature:
+
+----
+mn create-app my-app --features kubernetes
+----
+
 === Micronaut Security 1.2 Update
 
 Support for OAuth 2.0 and OpenID clients has been added to the Micronaut security module through a new dependency: `micronaut-security-oauth2`. It is now very easy to add support for login through an OAuth providers. See the https://micronaut-projects.github.io/micronaut-security/latest/guide/#oauth[Oauth section] in the security documentation for more information.
@@ -29,8 +39,9 @@ Support for OAuth 2.0 and OpenID clients has been added to the Micronaut securit
 
 https://micronaut-projects.github.io/micronaut-micrometer/1.2.x/guide/[Micronaut Micrometer has been updated to 1.2] which includes the following new features:
 
+* Update to Micrometer 1.2.0
 * Support for GraalVM native images
-* Meter registry support for Datadog, Influx and Elastic
+* Meter registry support for AppOptics, Azure Monitor, Datadog, Dynatrace, Elastic, Ganglia, Humio, Influx, Jmx, Kairos, New Relic, SignalFX, Stackdriver and Wavefront
 
 Thanks to https://github.com/thiagolocatelli[Thiago Locatelli] for this contribution.
 
@@ -41,7 +52,27 @@ The https://micronaut-projects.github.io/micronaut-sql/1.2.x/guide/index.html[Mi
 * Improved Entity Scan support for JPA
 * Integration with Micronaut 1.2 Validator for JPA
 * GraalVM `native-image` metadata
+* Support for https://www.jooq.org[JOOQ]. Thanks to https://github.com/lightoze[Vladimir Kulev].
 
+=== Micronaut Kafka 1.2 Update
+
+The https://micronaut-projects.github.io/micronaut-kafka/1.2.x/guide/index.html[Micronaut Kafka] module has been updated with support for the following new features:
+
+* Support for Kafka 2.3.0
+* Improved Exception Handling
+* Support for GraalVM `native-image`
+
+=== Micronaut Rabbit 1.1.1 Update
+
+The https://micronaut-projects.github.io/micronaut-rabbitmq/1.1.x/guide/index.html[Micronaut RabbitMQ] module has been updated with support for GraalVM `native-image`.
+
+=== Micronaut Test 1.1 Update
+
+The https://micronaut-projects.github.io/micronaut-test/1.1.x/guide/index.html[Micronaut Test] module has been updated with support for the following new features:
+
+* Updated to JUnit 5.5
+* Support for Dependency Injection in Constructors and Methods for JUnit 5
+* Support for https://github.com/kotlintest/kotlintest[Kotlin Test]
 
 === Optional Beans Returned from Factories
 
@@ -58,6 +89,10 @@ Initial support for environment detection and cloud metadata for Oracle Cloud ha
 === @Client and Manual Service Discovery
 
 If a service is configured statically with `micronaut.http.services.*`, it was previously not possible to override the configuration with the ann:http.client.annotation.Client[] annotation. It is now possible to override the configuration, which will result in a new client being created for the given client class.
+
+=== Completable Support
+
+The RxJava2 reactive type `io.reactivex.Completable` is now supported as a return type for controller and client methods.
 
 === Client and Server Host Resolution
 
@@ -81,14 +116,29 @@ A new bean scope has been created to allow for beans that only exist in the scop
 
 In previous versions of Micronaut, the property sources for an active environment had no priority over any other active environment. It was non deterministic which environment's properties would override other environments. Now the last environment supplied has the highest priority. For example, if an application is started with `-Dmicronaut.environments=first,second`, `application-second.yml` will override properties in `application-first.yml`. This change affects all sources of properties, including distributed configuration sources.
 
-== RSS 2.0 and iTunes Podcast
+=== Environment Endpoint
 
-This version references the https://micronaut-projects.github.io/micronaut-rss/latest/guide/index.html[RSS configuration] which eases the generation of a RSS 2.0 feed or an iTunes Podcast feed in a Micronaut app.
+This version includes a new `/env` endpoint with information about the environment and its property sources See the <<environmentEndpoint, documentation>> for more information.
+
+== RSS 2.0 Module Included in BOM
+
+This version references the https://micronaut-projects.github.io/micronaut-rss/latest/guide/index.html[RSS configuration] which eases the generation of a RSS 2.0 feeds in a Micronaut app.
 
 === Dependency Upgrades
 
 - Groovy `2.5.4` -> `2.5.6`
-- Micronaut SQL `1.1.1` -> `1.2.0.M1`
-- Micronaut Micrometer `1.1.0` -> `1.2.0.RC1`
-- Micronaut Security `1.1.1` -> `1.2.0.M1`
+- Gradle `5.1.1` -> `Gradle 5.5` (for new applications)
+- Micronaut SQL `1.1.1` -> `1.2.0.RC1`
+- Micronaut Micrometer `1.1.0` -> `1.2.0.RC2`
+- Micrometer `1.1.5` -> `1.2.0`
+- Micronaut Security `1.1.1` -> `1.2.0.RC1`
 - Micronaut Views `1.1.3` -> `1.2.0.RC1`
+- Netty `4.1.30.Final` -> `4.1.37.Final`
+- Neo4j Driver `1.7.2` -> `1.7.5`
+- Mongo Driver `3.8.0` -> `3.10.1`
+- Mongo Reactive Streams `1.10.0` -> `1.11.0`
+- Open Tracing `0.33.10` -> `0.33.13`
+- Kafka `2.1.1` -> `2.3.0`
+- Snake YAML `1.23` -> `1.24`
+- Lettuce `5.1.3.RELEASE` -> `5.1.7.RELEASE`
+- JUnit `5.3.2` -> `5.5.0`

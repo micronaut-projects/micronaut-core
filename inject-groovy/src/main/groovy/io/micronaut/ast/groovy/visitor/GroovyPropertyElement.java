@@ -22,8 +22,6 @@ import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.control.SourceUnit;
 
-import javax.annotation.Nonnull;
-
 /**
  * Implementation of {@link PropertyElement} for Groovy.
  *
@@ -31,8 +29,7 @@ import javax.annotation.Nonnull;
  * @since 1.0
  */
 @Internal
-class GroovyPropertyElement extends AbstractGroovyElement implements PropertyElement {
-    private final ClassElement type;
+abstract class GroovyPropertyElement extends AbstractGroovyElement implements PropertyElement {
     private final String name;
     private final boolean readOnly;
     private final Object nativeType;
@@ -45,7 +42,6 @@ class GroovyPropertyElement extends AbstractGroovyElement implements PropertyEle
      * @param declaringElement The declaring element
      * @param annotatedNode    The annotated node
      * @param annotationMetadata the annotation metadata
-     * @param type the type
      * @param name the name
      * @param readOnly Whether it is read only
      * @param nativeType the native underlying type
@@ -55,22 +51,14 @@ class GroovyPropertyElement extends AbstractGroovyElement implements PropertyEle
             GroovyClassElement declaringElement,
             AnnotatedNode annotatedNode,
             AnnotationMetadata annotationMetadata,
-            ClassElement type,
             String name,
             boolean readOnly,
             Object nativeType) {
         super(sourceUnit, annotatedNode, annotationMetadata);
-        this.type = type;
         this.name = name;
         this.readOnly = readOnly;
         this.nativeType = nativeType;
         this.declaringElement = declaringElement;
-    }
-
-    @Nonnull
-    @Override
-    public ClassElement getType() {
-        return type;
     }
 
     @Override

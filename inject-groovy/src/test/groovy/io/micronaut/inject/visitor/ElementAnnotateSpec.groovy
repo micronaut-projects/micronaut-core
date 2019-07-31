@@ -4,9 +4,11 @@ import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.ast.groovy.TypeElementVisitorTransform
 import io.micronaut.core.annotation.AnnotationValueBuilder
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 class ElementAnnotateSpec extends AbstractBeanDefinitionSpec{
@@ -67,11 +69,70 @@ class TestListener {
         definition.findMethod("receive", String).get().hasAnnotation('foo.bar.Ann')
     }
 
+    void "test annotation bean introspection properties"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test {
+    private String name;
+    
+    public String getName() { 
+        return name;
+    }
+    
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+''')
+
+        expect:
+        introspection.getRequiredProperty("name", String).stringValue("foo.bar.Ann", 'foo')
+                .get() == 'bar'
+    }
+
+    void "test annotation groovy bean introspection properties"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Test {
+    String name
+}
+''')
+
+        expect:
+        introspection.getRequiredProperty("name", String).stringValue("foo.bar.Ann", 'foo')
+                .get() == 'bar'
+    }
+
     static class MyAnnotatingTypeElementVisitor implements TypeElementVisitor {
+
+        @Override
+        int getOrder() {
+            return 100
+        }
+
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
             element.annotate("foo.bar.Ann") { AnnotationValueBuilder builder ->
                 builder.member("foo", "bar")
+            }
+
+            if (element.hasStereotype(Introspected)) {
+                List<PropertyElement> props = element.getBeanProperties()
+                for (PropertyElement pe : props) {
+                    pe.annotate("foo.bar.Ann") { AnnotationValueBuilder builder ->
+                        builder.member("foo", "bar")
+                    }
+                }
             }
         }
 

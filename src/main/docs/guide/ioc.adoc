@@ -28,14 +28,17 @@ dependencies {
     annotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <2>
     compile "io.micronaut:micronaut-inject:{version}"
     ...
+    testAnnotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <3>
+    ...
 }
 
 ----
 
 <1> Apply the Annotation Processing plugin
 <2> Include the minimal dependencies required to perform dependency injection
+<3> This is necessary to create beans in the `test` directory
 
-NOTE: For the Groovy language you should include `micronaut-inject-groovy` in the `compileOnly` scope.
+NOTE: For the Groovy language you should include `micronaut-inject-groovy` in the `compileOnly` and `testCompileOnly` scopes.
 
 The entry point for IoC is then the api:context.ApplicationContext[] interface, which includes a `run` method. The following example demonstrates using it:
 

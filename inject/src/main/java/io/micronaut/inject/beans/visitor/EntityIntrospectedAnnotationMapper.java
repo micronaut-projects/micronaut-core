@@ -33,6 +33,7 @@ import java.util.List;
  * @author graemerocher
  * @since 1.1
  */
+// tag::class[]
 public class EntityIntrospectedAnnotationMapper implements NamedAnnotationMapper {
     @Nonnull
     @Override
@@ -41,12 +42,13 @@ public class EntityIntrospectedAnnotationMapper implements NamedAnnotationMapper
     }
 
     @Override
-    public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
+    public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) { // <1>
         final AnnotationValueBuilder<Introspected> builder = AnnotationValue.builder(Introspected.class)
                 // don't bother with transients properties
-                .member("excludedAnnotations", "javax.persistence.Transient");
+                .member("excludedAnnotations", "javax.persistence.Transient"); // <2>
         return Collections.singletonList(
                 builder.build()
         );
     }
 }
+// end::class[]

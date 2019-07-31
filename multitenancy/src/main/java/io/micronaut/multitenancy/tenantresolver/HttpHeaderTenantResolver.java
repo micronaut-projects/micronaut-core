@@ -16,9 +16,11 @@
 package io.micronaut.multitenancy.tenantresolver;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.multitenancy.exceptions.TenantNotFoundException;
+
 import javax.inject.Singleton;
 import java.io.Serializable;
 import java.util.Optional;
@@ -31,7 +33,7 @@ import java.util.Optional;
  */
 @Singleton
 @Requires(beans = HttpHeaderTenantResolverConfiguration.class)
-@Requires(property = HttpHeaderTenantResolverConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = HttpHeaderTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class HttpHeaderTenantResolver implements TenantResolver {
 
     /**

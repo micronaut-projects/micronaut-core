@@ -16,6 +16,7 @@
 package io.micronaut.multitenancy.tenantresolver;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
@@ -30,10 +31,10 @@ import java.util.Optional;
  * A tenant resolver that resolves the tenant from the authenticated principal.
  *
  * @author Sergio del Amo
- * @since 6.0
+ * @since 1.0.0
  */
 @Singleton
-@Requires(property = PrincipalTenantResolverConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = PrincipalTenantResolverConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class PrincipalTenantResolver implements TenantResolver {
 
     @Override

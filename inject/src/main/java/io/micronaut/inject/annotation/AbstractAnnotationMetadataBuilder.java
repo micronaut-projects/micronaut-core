@@ -83,6 +83,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
+    private boolean validating = true;
     private final Set<T> erroneousElements = new HashSet<>();
 
     /**
@@ -320,15 +321,24 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param resolvedValue The resolved value
      */
     protected void validateAnnotationValue(T originatingElement, String annotationName, T member, String memberName, Object resolvedValue) {
+        if (!validating) {
+            return;
+        }
+
         final AnnotatedElementValidator elementValidator = getElementValidator();
         if (elementValidator != null && !erroneousElements.contains(member)) {
             final boolean shouldValidate = !(annotationName.equals(AliasFor.class.getName())) &&
                                            (!(resolvedValue instanceof String) || !resolvedValue.toString().contains("${"));
             if (shouldValidate) {
+                AnnotationMetadata metadata;
+                try {
+                    validating = false;
+                    metadata = buildDeclared(member);
+                } finally {
+                    validating = true;
+                }
+
                 final Set<String> errors = elementValidator.validatedAnnotatedElement(new AnnotatedElement() {
-
-                    AnnotationMetadata metadata = buildDeclared(member);
-
                     @Nonnull
                     @Override
                     public String getName() {
@@ -660,7 +670,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private AnnotationMetadata lookupExisting(String declaringType, T element) {
-        return isMethodOrClassElement(element) ? MUTATED_ANNOTATION_METADATA.get(new MetadataKey(declaringType, element)) : null;
+        return MUTATED_ANNOTATION_METADATA.get(new MetadataKey(declaringType, element));
     }
 
     private void processAnnotationAlias(
@@ -872,7 +882,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private void processAnnotationStereotype(A annotationMirror, DefaultAnnotationMetadata annotationMetadata, boolean isDeclared) {
         T annotationType = getTypeForAnnotation(annotationMirror);
         String parentAnnotationName = getAnnotationTypeName(annotationMirror);
-        processAnnotationStereotypes(annotationMetadata, isDeclared, annotationType, parentAnnotationName);
+        if (!parentAnnotationName.endsWith(".Nullable")) {
+            processAnnotationStereotypes(annotationMetadata, isDeclared, annotationType, parentAnnotationName);
+        }
     }
 
     private void processAnnotationStereotypes(DefaultAnnotationMetadata annotationMetadata, boolean isDeclared, T annotationType, String annotationName) {

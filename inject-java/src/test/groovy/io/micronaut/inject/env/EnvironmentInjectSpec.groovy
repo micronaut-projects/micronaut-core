@@ -16,7 +16,11 @@
 package io.micronaut.inject.env
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.PropertySource
 import io.micronaut.context.env.Environment
+import io.micronaut.context.event.ApplicationEventPublisher
+import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 
 class EnvironmentInjectSpec extends Specification {
@@ -34,5 +38,17 @@ class EnvironmentInjectSpec extends Specification {
         a.environment.activeNames.contains(Environment.TEST)
         a.defaultEnvironment != null
         a.defaultEnvironment.activeNames.contains("foo")
+    }
+
+    void "test environment resolution in sub annotations"() {
+        ApplicationContext ctx = ApplicationContext.run(["from.config": "hello"])
+
+        when:
+        BeanDefinition beanDefinition = ctx.getBeanDefinition(B.class)
+        def props = beanDefinition.getAnnotation(PropertySource).getProperties("value")
+
+        then:
+        props == [x:'hello']
+
     }
 }

@@ -29,6 +29,8 @@ import java.nio.charset.StandardCharsets
 
 @Retry
 class BinaryWebSocketSpec extends Specification{
+
+    @Retry
     void "test binary websocket exchange"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.build('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)

@@ -24,6 +24,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.http.HttpMethod;
 
+import javax.annotation.Nullable;
 import java.net.URL;
 import java.time.Duration;
 import java.util.List;
@@ -51,7 +52,7 @@ public class HTTPCheck extends NewCheck {
      * @param url  The URL
      */
     @JsonCreator
-    public HTTPCheck(@JsonProperty("Name") String name, @JsonProperty("HTTP") URL url) {
+    public HTTPCheck(@Nullable @JsonProperty("Name") String name, @Nullable @JsonProperty("HTTP") URL url) {
         super(name);
         this.url = url;
     }

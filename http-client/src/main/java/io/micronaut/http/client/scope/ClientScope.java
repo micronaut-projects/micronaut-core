@@ -95,22 +95,25 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
         String value = annotation.stringValue().orElseThrow(() ->
                 new DependencyInjectionException(resolutionContext, argument, "No value specified for @Client")
         );
-        LoadBalancer loadBalancer = loadBalancerResolver.resolve(value)
-            .orElseThrow(() ->
-                new DependencyInjectionException(resolutionContext, argument, "Invalid service reference [" + value + "] specified to @Client")
-            );
 
         //noinspection unchecked
         return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey -> {
-            HttpClient existingBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(value)).orElse(null);
-            if (existingBean != null) {
-                return existingBean;
+            String path = annotation.get("path", String.class).orElse(null);
+            HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(value)).orElse(null);
+            Optional<Class<?>> configurationClass = annotation.classValue("configuration");
+
+            if (clientBean != null && path == null && !configurationClass.isPresent()) {
+                return clientBean;
             }
 
+            LoadBalancer loadBalancer = loadBalancerResolver.resolve(value)
+                    .orElseThrow(() ->
+                            new DependencyInjectionException(resolutionContext, argument, "Invalid service reference [" + value + "] specified to @Client")
+                    );
+
             String contextPath = null;
-            String annotationPath = annotation.get("path", String.class).orElse(null);
-            if (StringUtils.isNotEmpty(annotationPath)) {
-                contextPath = annotationPath;
+            if (StringUtils.isNotEmpty(path)) {
+                contextPath = path;
             } else if (StringUtils.isNotEmpty(value) && value.startsWith("/")) {
                 contextPath = value;
             } else {
@@ -118,18 +121,25 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
                     contextPath = ((FixedLoadBalancer) loadBalancer).getUrl().getPath();
                 }
             }
-            Class<?> configurationClass = annotation.get("configuration", Class.class).orElse(HttpClientConfiguration.class);
-            Object bean = beanContext.getBean(configurationClass);
 
-            if (!(bean instanceof HttpClientConfiguration)) {
+            HttpClientConfiguration configuration;
+            Optional<HttpClientConfiguration> clientSpecificConfig = beanContext.findBean(
+                    HttpClientConfiguration.class,
+                    Qualifiers.byName(value)
+            );
+            Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>) configurationClass.orElse(HttpClientConfiguration.class);
+            configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
+
+            if (!(configuration instanceof HttpClientConfiguration)) {
                 throw new IllegalStateException("Referenced HTTP client configuration class must be an instance of HttpClientConfiguration for injection point: " + segment);
             }
-            HttpClientConfiguration configuration = (HttpClientConfiguration) bean;
-            HttpClient httpClient = (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration, contextPath);
-            if (httpClient instanceof DefaultHttpClient) {
-                ((DefaultHttpClient) httpClient).setClientIdentifiers(value);
+
+            HttpClient client = (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration, contextPath);
+            if (client instanceof DefaultHttpClient) {
+                DefaultHttpClient defaultClient = (DefaultHttpClient) client;
+                defaultClient.setClientIdentifiers(value);
             }
-            return httpClient;
+            return client;
         });
     }
 

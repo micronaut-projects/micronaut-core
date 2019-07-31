@@ -19,6 +19,7 @@ import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.inject.BeanDefinitionReference
 import org.codehaus.groovy.ast.ASTNode
@@ -111,7 +112,19 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return metadata
     }
 
+    /**
+     * Build and return a {@link io.micronaut.core.beans.BeanIntrospection} for the given class name and class data.
+     *
+     * @return the introspection if it is correct
+     **/
+    protected BeanIntrospection buildBeanIntrospection(String className, String cls) {
+        def beanDefName= '$' + NameUtils.getSimpleName(className) + '$Introspection'
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
 
+        ClassLoader classLoader = buildClassLoader(cls)
+        return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
+    }
 
     protected ApplicationContext buildContext(String className, String cls) {
         InMemoryByteCodeGroovyClassLoader classLoader = buildClassLoader(cls)

@@ -72,7 +72,7 @@ class AnnotationProcessorListener implements BeanCreatedEventListener<Annotation
                                             if (LOG.isErrorEnabled()) {
                                                 LOG.error("Error processing bean method " + beanDefinition + "." + executableMethod + " with processor (" + processor + "): " + e.getMessage(), e);
                                             }
-                                            Boolean shutdownOnError = executableMethod.getAnnotationMetadata().getValue(Parallel.class, "shutdownOnError", Boolean.class).orElse(true);
+                                            Boolean shutdownOnError = executableMethod.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                                             if (shutdownOnError) {
                                                 beanContext.stop();
                                             }

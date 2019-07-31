@@ -57,7 +57,7 @@ public class SessionValueArgumentBinder implements AnnotatedRequestArgumentBinde
         }
 
         Argument<Object> argument = context.getArgument();
-        String name = context.getAnnotationMetadata().getValue(SessionValue.class, String.class).orElse(argument.getName());
+        String name = context.getAnnotationMetadata().stringValue(SessionValue.class).orElse(argument.getName());
         Optional<Session> existing = attrs.get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
         if (existing.isPresent()) {
             String finalName = name;

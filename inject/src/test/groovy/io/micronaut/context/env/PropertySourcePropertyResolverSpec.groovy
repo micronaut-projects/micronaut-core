@@ -17,6 +17,8 @@ package io.micronaut.context.env
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.core.convert.format.MapFormat
+import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyResolver
 import org.junit.Rule
@@ -334,5 +336,63 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
     }
 
+    void "test getProperties"() {
+        given:
+        def values = [
+                'foo.bar'          : 'two',
+                'my.property.one'  : 'one',
+                'my.property.two'  : '${foo.bar}',
+                'my.property.three': 'three',
+                'test-key.convention-test': 'key'
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values))
+
+        expect:
+        resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED).containsKey('my')
+        resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.FLAT).containsKey('my.property.one')
+        resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.FLAT).get('my.property.two') == 'two'
+        resolver.getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED).get('my').get('property').get('two') == 'two'
+        resolver.getAllProperties(StringConvention.CAMEL_CASE, MapFormat.MapTransformation.FLAT).get('testKey.conventionTest') == 'key'
+        resolver.getAllProperties(StringConvention.CAMEL_CASE, MapFormat.MapTransformation.NESTED).get('testKey').get('conventionTest') == 'key'
+    }
+
+    void "test inner properties"() {
+        given:
+            def values = new HashMap()
+            values.put('foo[0].bar[0]', 'foo0Bar0')
+            values.put('foo[0].bar[1]', 'foo0Bar1')
+            values.put('foo[0].bar[3]', 'foo0Bar2')
+            values.put('foo[1].bar[abx]', 'foo1Bar0')
+            values.put('foo[1].bar[xyz]', 'foo1Bar1')
+            values.put('custom[0][0][key][4]', 'ohh')
+            values.put('custom[0][0][key][5]', 'ehh')
+            values.put('custom[0][0][key2]', 'xyz')
+            values.put('micronaut.security.intercept-url-map[0].access[0]', '/some-path')
+
+            PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                    PropertySource.of("test", values)
+            )
+        when:
+            def foos = resolver.getProperty("foo", List).get()
+            def custom = resolver.getProperty("custom", List).get()
+            def micronaut = resolver.getProperty("micronaut", Map).get()
+        then:
+            foos.size() == 2
+            foos[0].bar.size() == 4
+            foos[0].bar[0] == 'foo0Bar0'
+            foos[0].bar[2] == null
+            foos[1].bar.size() == 2
+            foos[1].bar['abx'] == 'foo1Bar0'
+            foos[1].bar['xyz'] == 'foo1Bar1'
+            custom.size() == 1
+            custom[0].size() == 1
+            custom[0][0].size() == 2
+            custom[0][0]['key'].size() == 6
+            custom[0][0]['key'][4] == 'ohh'
+            custom[0][0]['key'][5] == 'ehh'
+            custom[0][0]['key2'] == 'xyz'
+            micronaut['security']['intercept-url-map'][0]['access'][0] == '/some-path'
+    }
 
 }

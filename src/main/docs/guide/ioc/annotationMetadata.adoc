@@ -61,17 +61,15 @@ If you do not have control over the annotation then another approach is to use a
 
 NOTE: Because `AnnotationMapper` implementations need to be on the annotation processor classpath they should generally be in a project that includes few external dependencies to avoid polluting the annotation processor classpath.
 
-As an example the the `AnnotationMapper` that maps the `javax.annotation.security.PermitAll` standard Java annotation to the internal Micronaut `Secured` annotation looks like the following:
+As an example the  `AnnotationMapper` that improves the introspection capabilities of JPA entities
 
 .PermitAllAnnotationMapper Mapper Example
 [source,java]
 ----
-include::security/src/main/java/io/micronaut/security/annotation/PermitAllAnnotationMapper.java[tag=clazz]
+include::inject/src/main/java/io/micronaut/inject/beans/visitor/EntityIntrospectedAnnotationMapper.java[indent=0, tag="class"]
 ----
 
-<1> The annotation type to be mapped is specified as a generic type argument.
-<2> The `map` method receives a api:io.micronaut.core.annotation.AnnotationValue[] with the values for the annotation.
-<3> One or more annotations can be returned, in this case `@Secured`.
-<4> Annotations values can be provided.
+<1> The `map` method receives a api:io.micronaut.core.annotation.AnnotationValue[] with the values for the annotation.
+<2> One or more annotations can be returned, in this case `@Transient`.
 
-NOTE: The example above implements the api:io.micronaut.inject.annotation.TypedAnnotationMapper[] interface which requires the annotation class itself to be on the annotation processor classpath. If that is undesirable (such as for projects that mix annotations with runtime code) then you should use api:io.micronaut.inject.annotation.NamedAnnotationMapper[] instead.
+NOTE: The example above implements the api:io.micronaut.inject.annotation.NamedAnnotationMapper[] interface which allows for annotations to be mixed with runtime code. If you want to operate against a concrete annotation type then you should use api:io.micronaut.inject.annotation.TypedAnnotationMapper[] instead, though note it requires the annotation class itself to be on the annotation processor classpath.

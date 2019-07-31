@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.binding
 
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.*
+import io.micronaut.core.convert.format.Format
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
@@ -52,21 +53,24 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         httpMethod      | uri                                             | result                      | httpStatus
         // you can't populate post request data from query parameters without explicit @QueryValue
         HttpMethod.POST | '/parameter/save?max=30'                        | null                        | HttpStatus.BAD_REQUEST
-        HttpMethod.GET  | '/parameter/path/20/foo/10'                     | "Parameter Values: 20 10"    | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/path/20/bar/10'                     | "Parameter Values: 20 10"    | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/path/20/bar'                        | "Parameter Values: 20 "      | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/path/20/foo/10'                     | "Parameter Values: 20 10"   | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/path/20/bar/10'                     | "Parameter Values: 20 10"   | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/path/20/bar'                        | "Parameter Values: 20 "     | HttpStatus.OK
         HttpMethod.GET  | '/parameter/named?maximum=20'                   | "Parameter Value: 20"       | HttpStatus.OK
-        HttpMethod.POST | '/parameter/save-again?max=30'                   | "Parameter Value: 30"       | HttpStatus.OK
+        HttpMethod.POST | '/parameter/save-again?max=30'                  | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/path/20'                            | "Parameter Value: 20"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/simple'                             | null                        | HttpStatus.BAD_REQUEST
         HttpMethod.GET  | '/parameter/named'                              | null                        | HttpStatus.BAD_REQUEST
         HttpMethod.GET  | '/parameter/overlap/30'                         | "Parameter Value: 30"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/overlap/30?max=50'                  | "Parameter Value: 30"       | HttpStatus.OK
+
         HttpMethod.GET  | '/parameter/map?values.max=20&values.offset=30' | "Parameter Value: 20 30"     | HttpStatus.OK
         HttpMethod.GET  | '/parameter/optional?max=20'                    | "Parameter Value: 20"        | HttpStatus.OK
         HttpMethod.GET  | '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]"  | HttpStatus.OK
         HttpMethod.GET  | '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]"  | HttpStatus.OK
         HttpMethod.GET  | '/parameter/optional-list?values=10&values=20'  | "Parameter Value: [10, 20]"  | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/optional-date?date=1941-01-05'      | "Parameter Value: 1941"      | HttpStatus.OK
+
         HttpMethod.GET  | '/parameter?max=20'                             | "Parameter Value: 20"        | HttpStatus.OK
         HttpMethod.GET  | '/parameter/simple?max=20'                      | "Parameter Value: 20"        | HttpStatus.OK
 
@@ -75,8 +79,8 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/all?max=20'                         | "Parameter Value: 20"        | HttpStatus.OK
 
         HttpMethod.GET  | '/parameter/exploded?title=The%20Stand'         | "Parameter Value: The Stand" | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"     | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"     | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"    | HttpStatus.OK
     }
 
     void "test exploded with no default constructor"() {
@@ -158,6 +162,12 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             "Parameter Value: ${values.inspect()}"
         }
 
+        @Get("/set")
+        String set(Set<Integer> values) {
+            assert values.every() { it instanceof Integer }
+            "Parameter Value: ${values.toList().sort().inspect()}"
+        }
+
         @Get("/optional-list")
         String optionalList(Optional<List<Integer>> values) {
             if (values.isPresent()) {
@@ -165,6 +175,17 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
                 "Parameter Value: ${values.get()}"
             } else {
                 "Parameter Value: none"
+            }
+        }
+
+        @Get("/optional-date")
+        String optionalDate(@Format("yyyy-MM-dd") Optional<Date> date) {
+            if (date.isPresent()) {
+                Calendar c = new GregorianCalendar()
+                c.setTime(date.get())
+                "Parameter Value: ${c.get(Calendar.YEAR)}"
+            } else {
+                "Parameter Value: empty"
             }
         }
 

@@ -978,8 +978,12 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 try {
                     Object bean;
                     Qualifier qualifier = resolveQualifier(resolutionContext, argument, isInnerConfiguration(argumentType));
-                    //noinspection unchecked
-                    bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+                    if (Qualifier.class.isAssignableFrom(argumentType)) {
+                        bean = qualifier;
+                    } else {
+                        //noinspection unchecked
+                        bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+                    }
                     path.pop();
                     return bean;
                 } catch (NoSuchBeanException e) {
@@ -1018,7 +1022,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 AnnotationMetadata argMetadata = argument.getAnnotationMetadata();
                 Optional<String> valAnn = argMetadata.stringValue(Value.class);
                 String prop = valAnn.orElseGet(() ->
-                        argMetadata.getValue(Property.class, "name", String.class)
+                        argMetadata.stringValue(Property.class, "name")
                                 .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."))
                 );
                 ArgumentConversionContext<?> conversionContext = ConversionContext.of(argument);
@@ -1565,9 +1569,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (valueAnnStr != null) {
             valString = valueAnnStr;
         } else {
-            valString = annotationMetadata.getValue(Property.class, "name", String.class)
+            valString = annotationMetadata.stringValue(Property.class, "name")
                     .orElseGet(() ->
-                            argument.getAnnotationMetadata().getValue(Property.class, "name", String.class)
+                            argument.getAnnotationMetadata().stringValue(Property.class, "name")
                                     .orElseThrow(() ->
                                             new DependencyInjectionException(
                                                     resolutionContext,
@@ -1591,7 +1595,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (valueAnn != null) {
             valString = valueAnn;
         } else {
-            valString = annotationMetadata.getValue(Property.class, "name", String.class)
+            valString = annotationMetadata.stringValue(Property.class, "name")
                     .orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Value resolution attempted but @Value annotation is missing"));
 
             valString = substituteWildCards(resolutionContext, valString);
@@ -1609,7 +1613,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private String getConfigurationPropertiesPath(BeanResolutionContext resolutionContext) {
         String valString = getAnnotationMetadata()
-                .getValue(ConfigurationReader.class, "prefix", String.class)
+                .stringValue(ConfigurationReader.class, "prefix")
                 .orElseThrow(() -> new IllegalStateException("Resolve property path called for non @ConfigurationProperties bean"));
         valString = substituteWildCards(
                 resolutionContext,
@@ -1632,7 +1636,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         String attr = "cliPrefix";
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         if (annotationMetadata.isPresent(ConfigurationProperties.class, attr)) {
-            return annotationMetadata.getValue(ConfigurationProperties.class, attr, String.class).map(val -> val + name).orElse(null);
+            return annotationMetadata.stringValue(ConfigurationProperties.class, attr).map(val -> val + name).orElse(null);
         }
         return null;
     }
@@ -1698,6 +1702,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
+            if (argument.isNullable()) {
+                path.pop();
+                return null;
+            }
             throw new DependencyInjectionException(resolutionContext, argument, e);
         }
     }
@@ -1705,14 +1713,18 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private <B> B resolveBeanWithGenericsForField(BeanResolutionContext resolutionContext, FieldInjectionPoint injectionPoint, BeanResolver<B> beanResolver) {
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushFieldResolve(this, injectionPoint);
-
+        Argument argument = injectionPoint.asArgument();
         try {
-            Optional<Class> genericType = injectionPoint.getType().isArray() ? Optional.of(injectionPoint.getType().getComponentType()) : injectionPoint.asArgument().getFirstTypeVariable().map(Argument::getType);
+            Optional<Class> genericType = injectionPoint.getType().isArray() ? Optional.of(injectionPoint.getType().getComponentType()) : argument.getFirstTypeVariable().map(Argument::getType);
             Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint.asArgument());
             @SuppressWarnings("unchecked") B bean = (B) beanResolver.resolveBean(genericType.orElse(injectionPoint.getType()), qualifier);
             path.pop();
             return bean;
         } catch (NoSuchBeanException e) {
+            if (argument.isNullable()) {
+                path.pop();
+                return null;
+            }
             throw new DependencyInjectionException(resolutionContext, injectionPoint, e);
         }
     }
@@ -1737,7 +1749,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
 
         if (qualifier == null) {
-            Class<?>[] byType = annotationMetadata.hasDeclaredAnnotation(Type.class) ? annotationMetadata.getValue(Type.class, Class[].class).orElse(null) : null;
+            Class<?>[] byType = annotationMetadata.hasDeclaredAnnotation(Type.class) ? annotationMetadata.classValues(Type.class) : null;
             if (byType != null) {
                 qualifier = Qualifiers.byType(byType);
             } else {
@@ -1745,7 +1757,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         .map(map -> (Qualifier) map.get(argument));
                 qualifier = optional.orElse(null);
                 if (qualifier == null && isIterable()) {
-                    if (argument.isAnnotationPresent(Parameter.class) || innerConfiguration) {
+                    if (argument.isAnnotationPresent(Parameter.class) || innerConfiguration || Qualifier.class == argument.getType()) {
                         qualifier = optional.orElseGet(() -> {
                             final Optional<String> n = resolutionContext.get(Named.class.getName(), String.class);
                             return n.map(Qualifiers::byName).orElse(null);

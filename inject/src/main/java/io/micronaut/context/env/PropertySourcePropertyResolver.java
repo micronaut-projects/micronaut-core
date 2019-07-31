@@ -38,6 +38,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -285,9 +287,23 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      * Returns a combined Map of all properties in the catalog.
      *
      * @return Map of all properties
+     * @deprecated Use {@link #getAllProperties(StringConvention, MapFormat.MapTransformation)} instead
      */
+    @Deprecated
     public Map<String, Object> getAllProperties() {
+        return getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED);
+    }
+
+    /**
+     * Returns a combined Map of all properties in the catalog.
+     *
+     * @param keyConvention The map key convention
+     * @param transformation The map format
+     * @return Map of all properties
+     */
+    public Map<String, Object> getAllProperties(StringConvention keyConvention, MapFormat.MapTransformation transformation) {
         Map<String, Object> map = new HashMap<>();
+        boolean isNested = transformation == MapFormat.MapTransformation.NESTED;
 
         Arrays
             .stream(catalog)
@@ -295,11 +311,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             .map(Map::entrySet)
             .flatMap(Collection::stream)
             .forEach((Map.Entry<String, Object> entry) -> {
-                String k = entry.getKey();
+                String k = keyConvention.format(entry.getKey());
                 Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
                 Map finalMap = map;
                 int index = k.indexOf('.');
-                if (index != -1) {
+                if (index != -1 && isNested) {
                     String[] keys = k.split("\\.");
                     for (int i = 0; i < keys.length - 1; i++) {
                         if (!finalMap.containsKey(keys[i])) {
@@ -329,7 +345,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         // special handling for maps for resolving sub keys
         Properties properties = new Properties();
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
-        StringConvention keyConvention = annotationMetadata.getValue(MapFormat.class, "keyFormat", StringConvention.class)
+        StringConvention keyConvention = annotationMetadata.enumValue(MapFormat.class, "keyFormat", StringConvention.class)
                                                            .orElse(StringConvention.RAW);
         String prefix = name + '.';
         entries.entrySet().stream()
@@ -355,8 +371,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
-        StringConvention keyConvention = annotationMetadata.getValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(StringConvention.RAW);
-        MapFormat.MapTransformation transformation = annotationMetadata.getValue(
+        StringConvention keyConvention = annotationMetadata.enumValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(StringConvention.RAW);
+        MapFormat.MapTransformation transformation = annotationMetadata.enumValue(
                 MapFormat.class,
                 "transformation",
                 MapFormat.MapTransformation.class)
@@ -441,37 +457,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
                 for (String resolvedProperty : resolvedProperties) {
-                    int i = resolvedProperty.indexOf('[');
-                    if (i > -1 && resolvedProperty.endsWith("]")) {
-                        String index = resolvedProperty.substring(i + 1, resolvedProperty.length() - 1);
-                        if (StringUtils.isNotEmpty(index)) {
-                            resolvedProperty = resolvedProperty.substring(0, i);
-                            Map entries = resolveEntriesForKey(resolvedProperty, true);
-                            Object v = entries.get(resolvedProperty);
-                            if (StringUtils.isDigits(index)) {
-                                Integer number = Integer.valueOf(index);
-                                List list;
-                                if (v instanceof List) {
-                                    list = (List) v;
-                                } else {
-                                    list = new ArrayList(10);
-                                    entries.put(resolvedProperty, list);
-                                }
-                                fill(list, number, null);
-                                list.set(number, value);
-                            } else {
-                                Map map;
-                                if (v instanceof Map) {
-                                    map = (Map) v;
-                                } else {
-                                    map = new LinkedHashMap(10);
-                                    entries.put(resolvedProperty, map);
-                                }
-                                map.put(index, value);
-                            }
+                    int i = property.indexOf('[');
+                    if (i > -1) {
+                        String propertyName = resolvedProperty.substring(0, i);
+                        Map entries = resolveEntriesForKey(propertyName, true);
+                        if (entries != null) {
+                            processProperty(property.substring(i), val -> entries.put(propertyName, val), () -> entries.get(propertyName), value);
                         }
                     } else {
-
                         Map entries = resolveEntriesForKey(resolvedProperty, true);
                         if (entries != null) {
                             entries.put(resolvedProperty, value);
@@ -479,6 +472,62 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     }
                 }
             }
+        }
+    }
+
+    private void processProperty(String property, Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
+        if (StringUtils.isEmpty(property)) {
+            containerSet.accept(actualValue);
+            return;
+        }
+        int i = property.indexOf('[');
+        int li = property.indexOf(']');
+        if (i == 0 && li > -1) {
+            String propertyIndex = property.substring(1, li);
+            String propertyRest = property.substring(li + 1);
+            Object container = containerGet.get();
+            if (StringUtils.isDigits(propertyIndex)) {
+                Integer number = Integer.valueOf(propertyIndex);
+                List list;
+                if (container instanceof List) {
+                    list = (List) container;
+                } else {
+                    list = new ArrayList(10);
+                    containerSet.accept(list);
+                }
+                fill(list, number, null);
+
+                processProperty(propertyRest, val -> list.set(number, val), () -> list.get(number), actualValue);
+            } else {
+                Map map;
+                if (container instanceof Map) {
+                    map = (Map) container;
+                } else {
+                    map = new LinkedHashMap(10);
+                    containerSet.accept(map);
+                }
+
+                processProperty(propertyRest, val -> map.put(propertyIndex, val), () -> map.get(propertyIndex), actualValue);
+            }
+        } else if (property.startsWith(".")) {
+            String propertyName;
+            String propertyRest;
+            if (i > -1) {
+                propertyName = property.substring(1, i);
+                propertyRest = property.substring(i);
+            } else {
+                propertyName = property.substring(1);
+                propertyRest = "";
+            }
+            Object v = containerGet.get();
+            Map map;
+            if (v instanceof Map) {
+                map = (Map) v;
+            } else {
+                map = new LinkedHashMap(10);
+                containerSet.accept(map);
+            }
+            processProperty(propertyRest, val -> map.put(propertyName, val), () -> map.get(propertyName), actualValue);
         }
     }
 

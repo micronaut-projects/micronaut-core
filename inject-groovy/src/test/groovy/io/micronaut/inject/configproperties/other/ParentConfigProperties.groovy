@@ -13,16 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.configproperties.other;
+package io.micronaut.inject.configproperties.other
 
-import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.inject.configuration.Engine;
 
 @ConfigurationProperties("parent")
 class ParentConfigProperties {
 
     private String name
-
     protected String nationality
+
+    @ConfigurationBuilder(configurationPrefix = "engine", prefixes = "with")
+    protected Engine.Builder builder = Engine.builder()
+
+    Engine.Builder getBuilder() {
+        return builder
+    }
 
     String getName() {
         return name

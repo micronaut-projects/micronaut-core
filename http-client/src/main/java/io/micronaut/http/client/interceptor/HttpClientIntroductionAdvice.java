@@ -62,6 +62,7 @@ import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.annotation.JacksonFeatures;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
@@ -183,7 +184,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             ReturnType returnType = context.getReturnType();
             Class<?> javaReturnType = returnType.getType();
 
-            UriMatchTemplate uriTemplate = UriMatchTemplate.of("");
+            UriMatchTemplate uriTemplate = UriMatchTemplate.of("/");
             if (!(uri.length() == 1 && uri.charAt(0) == '/')) {
                 uriTemplate = uriTemplate.nest(uri);
             }
@@ -458,7 +459,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                 } else {
 
-                    if (Void.class.isAssignableFrom(argumentType)) {
+                    if (Void.class.isAssignableFrom(argumentType) || Completable.class.isAssignableFrom(javaReturnType)) {
                         publisher = httpClient.exchange(
                                 request, null, errorType
                         );

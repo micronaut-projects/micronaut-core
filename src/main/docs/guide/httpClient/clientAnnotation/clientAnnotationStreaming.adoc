@@ -7,7 +7,7 @@ For example to write a client that streams data from the controller defined in t
 .HeadlineClient.java
 [source,java]
 ----
-include::{testsclient}/streaming/HeadlineClient.java[tags=import, indent=0]
+include::{testsclient}/streaming/HeadlineClient.java[tags=imports, indent=0]
 
 include::{testsclient}/streaming/HeadlineClient.java[tags=class, indent=0]
 }
