@@ -50,7 +50,7 @@ class UriTemplateSpec extends Specification {
         '{var}{?q}'    | '/{var2}'            | [var: 'foo', var2: 'bar', q: 'test']    | 'foo/bar?q=test'
         '{var}{?q}'    | '{var2}'             | [var: 'foo', var2: 'bar', q: 'test']    | 'foo/bar?q=test'
         '{var}{#hash}' | '{var2}'             | [var: 'foo', var2: 'bar', hash: 'test'] | 'foo/bar#test'
-
+        '/'            | '{?req*}'            | [req: [var: 'foo', var2: null]]         | '/?var=foo'
     }
 
     @Unroll
@@ -263,6 +263,7 @@ class UriTemplateSpec extends Specification {
         '{?hello}'            | [hello: "Hello World!"]                            | '?hello=Hello+World%21'
         '?fixed=yes{&x}'      | [x: 1024]                                          | '?fixed=yes&x=1024' // Section 3.2.9 - Level 3 - Form-style query continuation
         '{&x,y,empty}'        | [x: 1024, y: 768, empty: '']                       | '&x=1024&y=768&empty='
+        '{&x,y,empty}'        | [x: 1024, y: 768, empty: null]                     | '&x=1024&y=768'
         '{&var:3}'            | [var: 'value']                                     | '&var=val' // Section 3.2.9 - Level 4 - Form-style query continuation
         '{&list}'             | [list: ['red', 'green', 'blue']]                   | '&list=red,green,blue'
         '{&list*}'            | [list: ['red', 'green', 'blue']]                   | '&list=red&list=green&list=blue'
@@ -408,6 +409,7 @@ class UriTemplateSpec extends Specification {
         'http://example.com/{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com/&semi=%3B&dot=.&comma=%2C'
         'http://example.com/foo{?query,number}'  | [query: 'mycelium', number: 100]                   | 'http://example.com/foo?query=mycelium&number=100'
         'http://example.com/foo{?query,number}'  | [number: 100]                                      | 'http://example.com/foo?number=100'
+        'http://example.com/foo{?req*}'          | [req: [number: 100, name: null]]                   | 'http://example.com/foo?number=100'
     }
 
 
@@ -544,5 +546,6 @@ class UriTemplateSpec extends Specification {
         'http://example.com:8080/{&list*}'            | [list: ['red', 'green', 'blue']]                   | 'http://example.com:8080/&list=red&list=green&list=blue'
         'http://example.com:8080/{&keys}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com:8080/&keys=semi,%3B,dot,.,comma,%2C'
         'http://example.com:8080/{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com:8080/&semi=%3B&dot=.&comma=%2C'
+        'http://example.com:8080/{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: null]]     | 'http://example.com:8080/&semi=%3B&dot=.'
     }
 }
