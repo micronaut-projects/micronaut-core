@@ -105,7 +105,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      */
     public PropertySourcePropertyResolver addPropertySource(@Nullable PropertySource propertySource) {
         if (propertySource != null) {
-            propertySources.put(propertySource.getName(), propertySource);
             processPropertySource(propertySource, propertySource.getConvention());
         }
         return this;
