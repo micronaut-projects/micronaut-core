@@ -5,6 +5,7 @@ import io.micronaut.core.util.Toggleable;
 
 import javax.validation.constraints.NotNull;
 
+// tag::class[]
 @EachProperty("engines")
 public class EngineConfiguration implements Toggleable {
 
@@ -30,3 +31,4 @@ public class EngineConfiguration implements Toggleable {
     }
 
 }
+// end::class[]

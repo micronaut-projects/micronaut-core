@@ -1,9 +1,11 @@
 package io.micronaut.docs.context.events.application
 
+// tag::imports[]
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.AnnotationSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.docs.context.events.SampleEventEmitterBean
+// end::imports[]
 
 // tag::class[]
 class SampleEventListenerSpec : AnnotationSpec() {
