@@ -25,7 +25,6 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.StreamSupport;
 
 /**
  * <p>A Fast Implementation of URI Template specification. See https://tools.ietf.org/html/rfc6570 and
