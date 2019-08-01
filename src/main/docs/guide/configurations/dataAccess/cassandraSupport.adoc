@@ -7,30 +7,4 @@ $ mn create-app my-app --features cassandra
 ----
 ====
 
-To enable the Cassandra configuration, add the following dependency to your application:
-
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut.configuration:micronaut-cassandra"
-----
-
-Micronaut supports Cassandra configuration by using the https://docs.datastax.com/en/developer/java-driver/[Datastax Java Driver].
-Configuration values can be supplied a property source such as below. The property name is derived from the builder methods in
-https://docs.datastax.com/en/drivers/java/3.1/com/datastax/driver/core/Cluster.Builder.html[Cluster.Builder] (without the prefix).
-Micronaut will create a https://docs.datastax.com/en/drivers/java/3.1/com/datastax/driver/core/Cluster.html[Cluster] bean. This bean
-can be then injected into any other Micronaut bean.
-
-.Supply Single Configuration
-[source,groovy]
-----
-include::configurations/cassandra/src/test/groovy/io/micronaut/configuration/cassandra/CassandraConfigurationSpec.groovy[tags=single, indent=0]
-----
-
-Multiple Cluster instances can be configured as follows:
-
-.Supply Multiple Configuration
-[source,groovy]
-----
-include::configurations/cassandra/src/test/groovy/io/micronaut/configuration/cassandra/CassandraConfigurationSpec.groovy[tags=multiple, indent=0]
-----
+For more information see the https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micronaut Cassandra Module] documentation.
