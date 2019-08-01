@@ -1,5 +1,6 @@
 package io.micronaut.docs.context.events.async;
 
+// tag::imports[]
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.docs.context.events.SampleEventEmitterBean;
 import org.junit.Test;
@@ -8,6 +9,7 @@ import static org.junit.Assert.assertEquals;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.equalTo;
+// end::imports[]
 
 // tag::class[]
 public class SampleEventListenerSpec {

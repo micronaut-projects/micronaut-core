@@ -20,8 +20,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.annotation.Client;
 import io.reactivex.Flowable;
-// end::imports[]
 import reactor.core.publisher.Flux;
+// end::imports[]
 
 // tag::class[]
 @Client("/streaming")

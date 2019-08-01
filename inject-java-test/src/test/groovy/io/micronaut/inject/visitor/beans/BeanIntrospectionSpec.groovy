@@ -7,11 +7,13 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
+import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.TypeConverter
+import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
-import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import spock.lang.Issue
@@ -22,6 +24,7 @@ import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
 import javax.validation.constraints.Size
+import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
@@ -93,6 +96,134 @@ interface GroupThree {}
         expect:
         reference != null
         reference.load()
+    }
+
+    void "test multiple constructors with primary constructor marked as @Creator"() {
+        given:
+        ApplicationContext context = buildContext('test.Book', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Book {
+
+    private String title;
+    private String author;
+
+    public Book(String title, String author) {
+        this.title = title;
+        this.author = author;
+    }
+    
+    @io.micronaut.core.annotation.Creator
+    public Book(String title) {
+        this.title = title;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+    
+    void setTitle(String title) {
+        this.title = title;
+    }
+
+    String getAuthor() {
+        return author;
+    }
+
+    void setAuthor(String author) {
+        this.author = author;
+    }
+}
+''')
+        Class clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
+
+        expect:
+        reference != null
+
+        when:
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 1
+
+        when: "update introspectionMap"
+        BeanIntrospector introspector = BeanIntrospector.SHARED
+        Field introspectionMapField = introspector.getClass().getDeclaredField("introspectionMap")
+        introspectionMapField.setAccessible(true)
+        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>());
+        Map map = (Map) introspectionMapField.get(introspector)
+        map.put(reference.getName(), reference)
+
+        and:
+        def book = InstantiationUtils.tryInstantiate(introspection.getBeanType(), ["title": "The Stand"], ConversionContext.of(Argument.of(introspection.beanType)))
+        def prop = introspection.getRequiredProperty("title", String)
+
+        then:
+        prop.get(book.get()) == "The Stand"
+
+        cleanup:
+        introspectionMapField.set(introspector, null)
+        context?.close()
+    }
+
+    void "test default constructor "() {
+        given:
+        ApplicationContext context = buildContext('test.Book', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Book {
+
+    private String title;
+
+    public Book() {
+    }   
+
+    public String getTitle() {
+        return title;
+    }
+    
+    public void setTitle(String title) {
+        this.title = title;
+    }
+}
+''')
+        Class clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
+
+        expect:
+        reference != null
+
+        when:
+        BeanIntrospection introspection = reference.load()
+
+        then:
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 1
+
+        when: "update introspectionMap"
+        BeanIntrospector introspector = BeanIntrospector.SHARED
+        Field introspectionMapField = introspector.getClass().getDeclaredField("introspectionMap")
+        introspectionMapField.setAccessible(true)
+        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>());
+        Map map = (Map) introspectionMapField.get(introspector)
+        map.put(reference.getName(), reference)
+
+        and:
+        def book = InstantiationUtils.tryInstantiate(introspection.getBeanType(), ["title": "The Stand"], ConversionContext.of(Argument.of(introspection.beanType)))
+        def prop = introspection.getRequiredProperty("title", String)
+
+        then:
+        prop.get(book.get()) == null
+
+        cleanup:
+        introspectionMapField.set(introspector, null)
+        context?.close()
     }
 
     void "test multiple constructors with @JsonCreator"() {

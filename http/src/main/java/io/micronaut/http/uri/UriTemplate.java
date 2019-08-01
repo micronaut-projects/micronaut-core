@@ -21,16 +21,11 @@ import io.micronaut.core.util.StringUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.StreamSupport;
 
 /**
  * <p>A Fast Implementation of URI Template specification. See https://tools.ietf.org/html/rfc6570 and
@@ -988,9 +983,12 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
                         map.forEach((key, some) -> {
                             String ks = key.toString();
-                            Iterable<?> values = (some instanceof Iterable) ? (Iterable) some : Arrays.asList(some);
-                            values.forEach(value -> {
-                                String vs = value == null ? "" : value.toString();
+                            Iterable<?> values = (some instanceof Iterable) ? (Iterable) some : Collections.singletonList(some);
+                            for (Object value: values) {
+                                if (value == null) {
+                                    continue;
+                                }
+                                String vs = value.toString();
                                 String ek = encode ? encode(ks, isQuery) : escape(ks);
                                 String ev = encode ? encode(vs, isQuery) : escape(vs);
                                 if (modifierChar == EXPAND_MODIFIER) {
@@ -1000,7 +998,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                     joiner.add(ek);
                                     joiner.add(ev);
                                 }
-                            });
+                            }
                         });
                         result = joiner.toString();
                     } else {
