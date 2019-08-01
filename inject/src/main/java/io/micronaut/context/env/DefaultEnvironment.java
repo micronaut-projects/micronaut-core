@@ -544,6 +544,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return propertySources;
     }
 
+    /**
+     * Adds default property sources.
+     *
+     * @param propertySources The list of property sources
+     */
     protected void addDefaultPropertySources(List<PropertySource> propertySources) {
         if (!this.propertySources.containsKey(SystemPropertiesPropertySource.NAME)) {
             propertySources.add(new SystemPropertiesPropertySource());
