@@ -1,7 +1,9 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.http.MediaType;
-import io.micronaut.http.multipart.Part;
+import io.micronaut.http.multipart.CompletedPart;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.multipart.FileUpload;
 
 import java.io.IOException;
@@ -9,14 +11,12 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Optional;
 
-public class NettyMultipartFile implements Part, io.micronaut.http.multipart.FileUpload {
+public class NettyMultipartFile implements CompletedPart, io.micronaut.http.multipart.FileUpload {
 
     private final FileUpload fileUpload;
-    private final NettyPartData partData;
 
     public NettyMultipartFile(FileUpload fileUpload) {
         this.fileUpload = fileUpload;
-        this.partData = new NettyPartData(() -> Optional.of(MediaType.of((fileUpload.getContentType()))), fileUpload::getByteBuf);
     }
 
     @Override
@@ -46,21 +46,21 @@ public class NettyMultipartFile implements Part, io.micronaut.http.multipart.Fil
 
     @Override
     public InputStream getInputStream() throws IOException {
-        return partData.getInputStream();
+        return new ByteBufInputStream(fileUpload.getByteBuf(), false);
     }
 
     @Override
     public byte[] getBytes() throws IOException {
-        return partData.getBytes();
+        return ByteBufUtil.getBytes(fileUpload.getByteBuf());
     }
 
     @Override
     public ByteBuffer getByteBuffer() throws IOException {
-        return partData.getByteBuffer();
+        return fileUpload.getByteBuf().nioBuffer();
     }
 
     @Override
     public Optional<MediaType> getContentType() {
-        return partData.getContentType();
+        return Optional.of(MediaType.of((fileUpload.getContentType())));
     }
 }
