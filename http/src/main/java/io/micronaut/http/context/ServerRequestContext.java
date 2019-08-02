@@ -15,11 +15,14 @@
  */
 package io.micronaut.http.context;
 
-import io.micronaut.http.HttpRequest;
-
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+import io.micronaut.http.HttpRequest;
 
 /**
  * The holder for the current {@link HttpRequest} that is bound to instrumented threads.
@@ -35,6 +38,14 @@ public final class ServerRequestContext {
     private ServerRequestContext() {
     }
 
+    private static void set(@Nullable HttpRequest request) {
+        if (request == null) {
+            REQUEST.remove();
+        } else {
+            REQUEST.set(request);
+        }
+    }
+
     /**
      * Wrap the execution of the given runnable in request context processing.
      *
@@ -47,12 +58,12 @@ public final class ServerRequestContext {
         try {
             if (request != existing) {
                 isSet = true;
-                REQUEST.set(request);
+                set(request);
             }
             runnable.run();
         } finally {
             if (isSet) {
-                REQUEST.remove();
+                set(existing);
             }
         }
     }
@@ -82,12 +93,12 @@ public final class ServerRequestContext {
         try {
             if (request != existing) {
                 isSet = true;
-                REQUEST.set(request);
+                set(request);
             }
             return callable.get();
         } finally {
             if (isSet) {
-                REQUEST.remove();
+                set(existing);
             }
         }
     }
@@ -107,12 +118,12 @@ public final class ServerRequestContext {
         try {
             if (request != existing) {
                 isSet = true;
-                REQUEST.set(request);
+                set(request);
             }
             return callable.call();
         } finally {
             if (isSet) {
-                REQUEST.remove();
+                set(existing);
             }
         }
     }
