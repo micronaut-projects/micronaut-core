@@ -4,7 +4,7 @@ repositories {
 }
 
 dependencies {
-    compile "info.picocli:picocli:$picocliVersion"
+    compile "info.picocli:picocli-groovy:$picocliVersion"
     compile "org.apache.ant:ant:1.9.7"
     compile dependencyModuleVersion("groovy", "groovy-ant")
     compile dependencyModuleVersion("groovy", "groovy-json")

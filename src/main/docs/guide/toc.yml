@@ -176,8 +176,6 @@ commandLineApps:
   title: Standalone Command Line Applications
   picocli:
     title: Picocli Support
-    picocliGenerateProject: Generating a Project with the Micronaut CLI
-    picocliQuickStart: Picocli Quick Start
 configurations:
   title: Configurations
   dataAccess:
