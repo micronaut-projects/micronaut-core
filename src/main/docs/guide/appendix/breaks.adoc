@@ -8,6 +8,20 @@ The following changes could potentially be considered to be breaking changes, ho
 
 * The return of reactive types with a generic of `Void` has been changed from always returning a 404 status to returning a 200, or whatever status is defined in the `@Status` annotation. This includes `CompletionStage`, RxJava2, and Reactor types. The change was made to be consistent with the behavior of methods that return `void`.
 
+* Extending a `@ConfigurationProperties` class that contains a `@ConfigurationBuilder` only allowed the builder to be configured through the child's class prefix instead of the parent's. This was a bug because the behavior is different compared to any other property on the parent class. Previously the `parent.child.address` prefix would have been used to configure the `address` builder on the child class. With this change `parent.address` will be used.
++
+    @ConfigurationProperties("parent")
+    class Parent {
+        @ConfigurationBuilder(configurationPrefix = "address")
+        ...
+    }
+
+    @ConfigurationProperties("child")
+    class Child extends Parent {
+    }
++
+
+
 ==== 1.1.0
 
 The following changes could potentially be considered to be breaking changes, however the likelihood of any negative impact is low.

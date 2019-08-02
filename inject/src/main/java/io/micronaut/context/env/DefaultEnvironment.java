@@ -81,6 +81,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
 
     protected final ClassPathResourceLoader resourceLoader;
+    protected final List<PropertySource> refreshablePropertySources = new ArrayList<>();
 
     private EnvironmentsAndPackage environmentsAndPackage;
 
@@ -336,6 +337,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public Environment stop() {
         running.set(false);
         reading.set(false);
+        this.propertySources.values().removeAll(refreshablePropertySources);
         synchronized (catalog) {
             for (int i = 0; i < catalog.length; i++) {
                 catalog[i] = null;
@@ -457,12 +459,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param name The name to read property sources
      */
     protected void readPropertySources(String name) {
+        refreshablePropertySources.clear();
         List<PropertySource> propertySources = readPropertySourceList(name);
-        propertySources.addAll(this.propertySources.values());
+        addDefaultPropertySources(propertySources);
         propertySources.addAll(readPropertySourceListFromFiles(System.getProperty(Environment.PROPERTY_SOURCES_KEY)));
         propertySources.addAll(readPropertySourceListFromFiles(
             readPropertySourceListKeyFromEnvironment())
         );
+        refreshablePropertySources.addAll(propertySources);
+
+        propertySources.addAll(this.propertySources.values());
         OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
             if (LOG.isDebugEnabled()) {
@@ -535,6 +541,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 loadPropertySourceFromLoader(name, propertySourceLoader, propertySources);
             }
         }
+        return propertySources;
+    }
+
+    /**
+     * Adds default property sources.
+     *
+     * @param propertySources The list of property sources
+     */
+    protected void addDefaultPropertySources(List<PropertySource> propertySources) {
         if (!this.propertySources.containsKey(SystemPropertiesPropertySource.NAME)) {
             propertySources.add(new SystemPropertiesPropertySource());
         }
@@ -543,7 +558,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     configuration.getEnvironmentVariableIncludes(),
                     configuration.getEnvironmentVariableExcludes()));
         }
-        return propertySources;
     }
 
     /**

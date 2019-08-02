@@ -1130,13 +1130,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
-    public void visitConfigBuilderMethod(String prefix, String configurationPrefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics) {
-        proxyBeanDefinitionWriter.visitConfigBuilderMethod(prefix, configurationPrefix, returnType, methodName, paramType, generics);
+    public void visitConfigBuilderMethod(String prefix, Object returnType, String methodName, Object paramType, Map<String, Object> generics, String propertyPath) {
+        proxyBeanDefinitionWriter.visitConfigBuilderMethod(prefix, returnType, methodName, paramType, generics, propertyPath);
     }
 
     @Override
-    public void visitConfigBuilderDurationMethod(String prefix, String configurationPrefix, Object returnType, String methodName) {
-        proxyBeanDefinitionWriter.visitConfigBuilderDurationMethod(prefix, configurationPrefix, returnType, methodName);
+    public void visitConfigBuilderDurationMethod(String prefix, Object returnType, String methodName, String propertyPath) {
+        proxyBeanDefinitionWriter.visitConfigBuilderDurationMethod(prefix, returnType, methodName, propertyPath);
     }
 
     @Override
