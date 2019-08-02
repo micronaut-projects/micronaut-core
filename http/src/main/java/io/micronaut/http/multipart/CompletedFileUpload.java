@@ -25,5 +25,5 @@ package io.micronaut.http.multipart;
  * @author Zachary Klein
  * @since 1.0
  */
-public interface CompletedFileUpload extends FileUpload, Part {
+public interface CompletedFileUpload extends FileUpload, CompletedPart {
 }

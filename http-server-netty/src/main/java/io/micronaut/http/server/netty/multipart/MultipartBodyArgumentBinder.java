@@ -17,13 +17,17 @@ import io.netty.buffer.EmptyByteBuf;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Singleton;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
+@Singleton
 public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
@@ -57,11 +61,25 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                 return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument) context.getArgument()) {
 
                     Subscription s;
+                    AtomicLong partsRequested = new AtomicLong(0);
 
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {
                         this.s = subscription;
-                        subscriber.onSubscribe(subscription);
+                        subscriber.onSubscribe(new Subscription() {
+
+                            @Override
+                            public void request(long n) {
+                                if (partsRequested.getAndUpdate((prev) -> prev + n) == 0) {
+                                    s.request(1);
+                                }
+                            }
+
+                            @Override
+                            public void cancel() {
+                                subscription.cancel();
+                            }
+                        });
                     }
 
                     @Override
@@ -78,6 +96,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                         if (message instanceof HttpData) {
                             HttpData data = (HttpData) message;
                             if (data.isCompleted()) {
+                                partsRequested.decrementAndGet();
                                 if (data instanceof FileUpload) {
                                     subscriber.onNext(new NettyMultipartFile(((FileUpload) data)));
                                 } else if (data instanceof Attribute) {
@@ -86,8 +105,16 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                             }
                         }
 
+                        if (partsRequested.get() > 0) {
+                            s.request(1);
+                        }
+
+                        //If the user didn't release the data, we should
                         if (message instanceof ReferenceCounted) {
-                            ((ReferenceCounted) message).release();
+                            ReferenceCounted refCounted = (ReferenceCounted) message;
+                            if (refCounted.refCnt() > 0) {
+                                refCounted.release();
+                            }
                         }
                     }
 

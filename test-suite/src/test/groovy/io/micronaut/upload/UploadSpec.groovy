@@ -310,4 +310,8 @@ class UploadSpec extends AbstractMicronautSpec {
         response.code() == HttpStatus.OK.code
         result == 'data.json: 16'
     }
+
+    void "test receiving an entire multipart body"() {
+
+    }
 }
