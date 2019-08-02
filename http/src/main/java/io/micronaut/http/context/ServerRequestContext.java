@@ -52,7 +52,7 @@ public final class ServerRequestContext {
      * @param request  The request
      * @param runnable The runnable
      */
-    public static void with(HttpRequest request, Runnable runnable) {
+    public static void with(@Nullable HttpRequest request, @Nonnull Runnable runnable) {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {
@@ -75,7 +75,7 @@ public final class ServerRequestContext {
      * @param runnable The runnable
      * @return The newly instrumented runnable
      */
-    public static Runnable instrument(HttpRequest request, Runnable runnable) {
+    public static Runnable instrument(@Nullable HttpRequest request, @Nonnull Runnable runnable) {
         return () -> with(request, runnable);
     }
 
@@ -87,7 +87,7 @@ public final class ServerRequestContext {
      * @param <T>      The return type of the callable
      * @return The return value of the callable
      */
-    public static <T> T with(HttpRequest request, Supplier<T> callable) {
+    public static <T> T with(@Nullable HttpRequest request, @Nonnull Supplier<T> callable) {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {
@@ -112,7 +112,7 @@ public final class ServerRequestContext {
      * @return The return value of the callable
      * @throws Exception If the callable throws an exception
      */
-    public static <T> T with(HttpRequest request, Callable<T> callable) throws Exception {
+    public static <T> T with(@Nullable HttpRequest request, @Nonnull Callable<T> callable) throws Exception {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {
