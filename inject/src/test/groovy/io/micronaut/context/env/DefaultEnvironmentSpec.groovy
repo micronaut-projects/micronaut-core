@@ -386,6 +386,40 @@ class DefaultEnvironmentSpec extends Specification {
         !env.propertySources.contains(propertySource)
     }
 
+    void "test custom property source is not removed after refresh"() {
+        ApplicationContext context = ApplicationContext.build(['static': true]).start()
+
+        expect:
+        context.getRequiredProperty("static", Boolean.class)
+
+        when:
+        context.getEnvironment().refresh()
+
+        then:
+        context.getRequiredProperty("static", Boolean.class)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test custom property source is not removed after refresh 2"() {
+        def env = new DefaultEnvironment("test")
+        env.addPropertySource(new MapPropertySource('static', [static: true]))
+        env.start()
+
+        expect:
+        env.getRequiredProperty("static", Boolean.class)
+
+        when:
+        env.refresh()
+
+        then:
+        env.getRequiredProperty("static", Boolean.class)
+
+        cleanup:
+        env.close()
+    }
+
     private static Environment startEnv(String files) {
         new DefaultEnvironment("test") {
             protected String readPropertySourceListKeyFromEnvironment() {
