@@ -59,26 +59,14 @@ public class TracingRunnableInstrumenter implements Function<Runnable, Runnable>
 
     @Override
     public Optional<RunnableInstrumenter> newInstrumentation() {
-        Scope active = tracer.scopeManager().active();
-        Span activeSpan;
-        if (active != null) {
-            activeSpan = active.span();
-        } else {
-            activeSpan = tracer.activeSpan();
-        }
+        Span activeSpan = tracer.scopeManager().activeSpan();
         if (activeSpan != null) {
             return Optional.of(new RunnableInstrumenter() {
                 @Override
                 public Runnable instrument(Runnable command) {
                     return () -> {
-                        Scope scope;
-                        scope = tracer.scopeManager().activate(activeSpan, false);
-                        try {
+                        try (Scope ignored = tracer.scopeManager().activate(activeSpan)) {
                             command.run();
-                        } finally {
-                            if (scope != null) {
-                                scope.close();
-                            }
                         }
                     };
                 }

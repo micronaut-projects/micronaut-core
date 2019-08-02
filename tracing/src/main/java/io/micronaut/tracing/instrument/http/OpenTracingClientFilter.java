@@ -24,7 +24,6 @@ import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.tracing.brave.instrument.http.BraveTracingClientFilter;
 import io.micronaut.tracing.instrument.util.TracingPublisher;
-import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
@@ -59,8 +58,8 @@ public class OpenTracingClientFilter extends AbstractOpenTracingFilter implement
     @Override
     public Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
         Publisher<? extends HttpResponse<?>> requestPublisher = chain.proceed(request);
-        Scope activeSpan = tracer.scopeManager().active();
-        SpanContext activeContext = activeSpan != null ? activeSpan.span().context() : null;
+        Span activeSpan = tracer.scopeManager().activeSpan();
+        SpanContext activeContext = activeSpan != null ? activeSpan.context() : null;
         Tracer.SpanBuilder spanBuilder = newSpan(request, activeContext);
 
         return new TracingPublisher(

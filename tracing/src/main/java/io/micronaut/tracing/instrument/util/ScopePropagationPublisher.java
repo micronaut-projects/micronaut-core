@@ -53,32 +53,32 @@ public class ScopePropagationPublisher<T> implements Publisher<T> {
     public void subscribe(Subscriber<? super T> actual) {
         Span span = parentSpan;
         if (span != null) {
-            try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+            try (Scope ignored = tracer.scopeManager().activate(span)) {
                 publisher.subscribe(new Subscriber<T>() {
                     @Override
                     public void onSubscribe(Subscription s) {
-                        try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+                        try (Scope ignored = tracer.scopeManager().activate(span)) {
                             actual.onSubscribe(s);
                         }
                     }
 
                     @Override
                     public void onNext(T object) {
-                        try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+                        try (Scope ignored = tracer.scopeManager().activate(span)) {
                             actual.onNext(object);
                         }
                     }
 
                     @Override
                     public void onError(Throwable t) {
-                        try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+                        try (Scope ignored = tracer.scopeManager().activate(span)) {
                             actual.onError(t);
                         }
                     }
 
                     @Override
                     public void onComplete() {
-                        try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+                        try (Scope ignored = tracer.scopeManager().activate(span)) {
                             actual.onComplete();
                         }
                     }
