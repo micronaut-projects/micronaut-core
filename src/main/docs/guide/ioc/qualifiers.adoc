@@ -32,7 +32,7 @@ api:context.annotation.Primary[] is a qualifier that indicates that a bean is th
 
 Consider the following example:
 
-snippet::io.micronaut.docs.context.annotation.primary.ColorPicker[tags=clazz, indent=0]
+snippet::io.micronaut.docs.context.annotation.primary.ColorPicker[tags="clazz", indent=0]
 
 Given a common interface called `ColorPicker` that is implemented by multiple classes.
 
