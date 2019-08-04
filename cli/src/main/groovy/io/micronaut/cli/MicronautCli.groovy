@@ -206,7 +206,7 @@ class MicronautCli {
     }
 
     private int getBaseUsage() {
-        System.out.println "Usage: \n\t $APP_USAGE_MESSAGE \n\t $CLI_APP_USAGE_MESSAGE \\n\\t $FEDERATION_USAGE_MESSAGE \n\t $FUNCTION_USAGE_MESSAGE  \n\n"
+        System.out.println "Usage: \n\t $APP_USAGE_MESSAGE \n\t $CLI_APP_USAGE_MESSAGE \n\t $FEDERATION_USAGE_MESSAGE \n\t $FUNCTION_USAGE_MESSAGE  \n\n"
         this.execute "list-profiles"
         System.out.println "\nType 'mn help' or 'mn -h' for more information."
 
