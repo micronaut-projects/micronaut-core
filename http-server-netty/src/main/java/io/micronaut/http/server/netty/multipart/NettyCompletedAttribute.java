@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.multipart;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.multipart.PartData;
@@ -13,12 +14,19 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Optional;
 
-public class NettyMultipartAttribute implements CompletedPart {
+@Internal
+public class NettyCompletedAttribute implements CompletedPart {
 
     private final Attribute attribute;
+    private final boolean controlRelease;
 
-    public NettyMultipartAttribute(Attribute attribute) {
+    public NettyCompletedAttribute(Attribute attribute) {
+        this(attribute, true);
+    }
+
+    public NettyCompletedAttribute(Attribute attribute, boolean controlRelease) {
         this.attribute = attribute;
+        this.controlRelease = controlRelease;
     }
 
     @Override
@@ -28,17 +36,31 @@ public class NettyMultipartAttribute implements CompletedPart {
 
     @Override
     public InputStream getInputStream() throws IOException {
-        return new ByteBufInputStream(attribute.getByteBuf(), false);
+        return new ByteBufInputStream(attribute.getByteBuf(), controlRelease);
     }
 
     @Override
     public byte[] getBytes() throws IOException {
-        return ByteBufUtil.getBytes(attribute.getByteBuf());
+        ByteBuf byteBuf = attribute.getByteBuf();
+        try {
+            return ByteBufUtil.getBytes(byteBuf);
+        } finally {
+            if (controlRelease) {
+                byteBuf.release();
+            }
+        }
     }
 
     @Override
     public ByteBuffer getByteBuffer() throws IOException {
-        return attribute.getByteBuf().nioBuffer();
+        ByteBuf byteBuf = attribute.getByteBuf();
+        try {
+            return byteBuf.nioBuffer();
+        } finally {
+            if (controlRelease) {
+                byteBuf.release();
+            }
+        }
     }
 
     @Override

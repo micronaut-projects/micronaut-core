@@ -38,13 +38,24 @@ import java.util.Optional;
 public class NettyCompletedFileUpload implements CompletedFileUpload {
 
     private final FileUpload fileUpload;
+    private final boolean controlRelease;
 
     /**
      * @param fileUpload The file upload
      */
     public NettyCompletedFileUpload(FileUpload fileUpload) {
+        this(fileUpload, true);
+    }
+
+    /**
+     * @param fileUpload The file upload
+     */
+    public NettyCompletedFileUpload(FileUpload fileUpload, boolean controlRelease) {
         this.fileUpload = fileUpload;
-        fileUpload.retain();
+        this.controlRelease = controlRelease;
+        if (controlRelease) {
+            fileUpload.retain();
+        }
     }
 
     /**
@@ -58,7 +69,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
      */
     @Override
     public InputStream getInputStream() throws IOException {
-        return new ByteBufInputStream(fileUpload.getByteBuf(), true);
+        return new ByteBufInputStream(fileUpload.getByteBuf(), controlRelease);
     }
 
     /**
@@ -76,7 +87,9 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         try {
             return ByteBufUtil.getBytes(byteBuf);
         } finally {
-            byteBuf.release();
+            if (controlRelease) {
+                byteBuf.release();
+            }
         }
     }
 
@@ -95,7 +108,9 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         try {
             return byteBuf.nioBuffer();
         } finally {
-            byteBuf.release();
+            if (controlRelease) {
+                byteBuf.release();
+            }
         }
     }
 
