@@ -104,7 +104,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                                 if (data instanceof FileUpload) {
                                     subscriber.onNext(new NettyCompletedFileUpload((FileUpload) data, false));
                                 } else if (data instanceof Attribute) {
-                                    subscriber.onNext(new NettyCompletedAttribute((Attribute) data));
+                                    subscriber.onNext(new NettyCompletedAttribute((Attribute) data, false));
                                 }
                             }
                         }
