@@ -107,9 +107,13 @@ public class SpringCloudConfigurationClient implements ConfigurationClient {
                     .onErrorResumeNext(throwable -> {
                         if (throwable instanceof HttpClientResponseException) {
                             HttpClientResponseException httpClientResponseException = (HttpClientResponseException) throwable;
-                            if (httpClientResponseException.getStatus() == HttpStatus.NOT_FOUND && springCloudConfiguration.isFailFast()) {
-                                return Flowable.error(
+                            if (httpClientResponseException.getStatus() == HttpStatus.NOT_FOUND) {
+                                if (springCloudConfiguration.isFailFast()) {
+                                    return Flowable.error(
                                         new ConfigurationException("Could not locate PropertySource and the fail fast property is set", throwable));
+                                } else {
+                                    return Flowable.empty();
+                                }
                             }
                         }
                         return Flowable.error(new ConfigurationException("Error reading distributed configuration from Spring Cloud: " + throwable.getMessage(), throwable));
