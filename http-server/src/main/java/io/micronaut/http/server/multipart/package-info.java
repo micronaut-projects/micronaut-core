@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Classes related to multiple requests received by a server.
+ * Classes related to multipart requests received by a server.
  *
  * @author James Kleeh
- * @since 1.2.0
+ * @since 1.3.0
  */
 package io.micronaut.http.server.multipart;
