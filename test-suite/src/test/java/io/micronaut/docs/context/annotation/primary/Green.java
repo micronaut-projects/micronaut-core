@@ -1,9 +1,9 @@
 package io.micronaut.docs.context.annotation.primary;
 
-import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Requires;
 
 //tag::imports[]
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Primary;
 import javax.inject.Singleton;
 //end::imports[]
 
