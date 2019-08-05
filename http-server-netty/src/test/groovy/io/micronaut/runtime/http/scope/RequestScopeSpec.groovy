@@ -68,9 +68,6 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         conditions.eventually {
             RequestBean.BEANS_CREATED.first().dead
         }
-
-        cleanup:
-        embeddedServer.stop()
     }
 
     void "test request scope bean that injects the request"() {
