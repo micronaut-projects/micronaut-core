@@ -32,7 +32,7 @@ import java.util.Optional;
  * A Netty implementation of {@link CompletedFileUpload}.
  *
  * @author Zachary Klein
- * @since 1.0
+ * @since 1.0.0
  */
 @Internal
 public class NettyCompletedFileUpload implements CompletedFileUpload {
@@ -49,6 +49,7 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
 
     /**
      * @param fileUpload The file upload
+     * @param controlRelease If true, release after retrieving the data
      */
     public NettyCompletedFileUpload(FileUpload fileUpload, boolean controlRelease) {
         this.fileUpload = fileUpload;
