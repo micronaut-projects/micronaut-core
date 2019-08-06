@@ -64,6 +64,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final String beanFullClassName;
     private final String methodProxyShortName;
     private final boolean isInterface;
+    private final boolean isAbstract;
     private String outerClassName = null;
     private boolean isStatic = false;
     private final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
@@ -89,6 +90,41 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.internalName = getInternalName(methodClassName);
         this.methodType = getObjectType(methodClassName);
         this.isInterface = isInterface;
+        this.isAbstract = isInterface;
+    }
+
+
+    /**
+     * @param beanFullClassName    The bean full class name
+     * @param methodClassName      The method class name
+     * @param methodProxyShortName The method proxy short name
+     * @param isInterface          Whether is an interface
+     * @param isAbstract           Whether the method is abstract
+     * @param annotationMetadata   The annotation metadata
+     */
+    public ExecutableMethodWriter(
+            String beanFullClassName,
+            String methodClassName,
+            String methodProxyShortName,
+            boolean isInterface,
+            boolean isAbstract,
+            AnnotationMetadata annotationMetadata) {
+        super(methodClassName, annotationMetadata, true);
+        this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        this.beanFullClassName = beanFullClassName;
+        this.methodProxyShortName = methodProxyShortName;
+        this.className = methodClassName;
+        this.internalName = getInternalName(methodClassName);
+        this.methodType = getObjectType(methodClassName);
+        this.isInterface = isInterface;
+        this.isAbstract = isInterface || isAbstract;
+    }
+
+    /**
+     * @return Is the method abstract.
+     */
+    public boolean isAbstract() {
+        return isAbstract;
     }
 
     /**
