@@ -153,8 +153,13 @@ ext {
             ],
             'micronaut.graphql': [
                     version:micronautGraphQLVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.graphql',
                     name:'micronaut-graphql'
+            ],
+            'micronaut.graphql.gorm': [
+                    version:micronautGraphQLGormVersion,
+                    group:'io.micronaut.graphql',
+                    name:'micronaut-graphql-gorm'
             ],
             'micronaut.groovy': [
                     version:micronautGroovyVersion,
