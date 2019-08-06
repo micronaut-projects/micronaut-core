@@ -5,13 +5,7 @@ Micronaut will produce a reflection-free `@ConfigurationProperties` bean and wil
 
 An example of a configuration class can be seen below:
 
-.@ConfigurationProperties Example
-[source,groovy]
-----
-include::{testsdir}/config/properties/EngineConfig.groovy[tags=imports, indent=0]
-
-include::{testsdir}/config/properties/EngineConfig.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.config.properties.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
 
 <1> The `@ConfigurationProperties` annotation takes the configuration prefix
 <2> You can use `javax.validation` to validate the configuration
@@ -21,22 +15,14 @@ include::{testsdir}/config/properties/EngineConfig.groovy[tags=class, indent=0]
 
 Once you have prepared a type safe configuration it can simply be injected into your objects like any other bean:
 
-.@ConfigurationProperties Dependency Injection
-[source,groovy]
-----
-include::{testsdir}/config/properties/EngineImpl.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.config.properties.EngineImpl[tags="class",indent=0,title="@ConfigurationProperties Dependency Injection"]
 
 <1> Inject the `EngineConfig` bean
 <2> Use the configuration properties
 
 Configuration values can then be supplied from one of the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] instances. For example:
 
-.Supply Configuration
-[source,groovy]
-----
-include::{testsdir}/config/properties/VehicleSpec.groovy[tags=start, indent=0]
-----
+snippet::io.micronaut.docs.config.properties.VehicleSpec[tags="start",indent=0,title="Supply Configuration"]
 
 The above example prints: `"Ford Engine Starting V8 [rodLength=6.0]"`
 
@@ -210,28 +196,13 @@ For some use cases it may be desirable to accept a map of arbitrary configuratio
 
 For this purpose, the api:core.convert.format.MapFormat[] annotation allows you to bind a map to a single configuration property, and specify whether to accept a flat map of keys to values, or a nested map (where the values may be additional maps].
 
-.@MapFormat Example
-[source,groovy]
-----
-include::{testsdir}/config/mapFormat/EngineConfig.groovy[tags=imports, indent=0]
-
-include::{testsdir}/config/mapFormat/EngineConfig.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.config.mapFormat.EngineConfig[tags="imports,class",indent=0,title="@MapFormat Example"]
 <1> Note the `transformation` argument to the annotation; possible values are `MapTransformation.FLAT` (for flat maps) and `MapTransformation.NESTED` (for nested maps)
 
-.EngineImpl
-[source,groovy]
-----
-include::{testsdir}/config/mapFormat/EngineImpl.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.config.mapFormat.EngineImpl[tags="class",indent=0,title="EngineImpl"]
 
 Now a map of properties can be supplied to the `my.engine.sensors` configuration property.
 
-
-.Use Map Configuration
-[source,groovy]
-----
-include::{testsdir}/config/mapFormat/VehicleSpec.groovy[tags=start, indent=0]
-----
+snippet::io.micronaut.docs.config.mapFormat.VehicleSpec[tags="start",indent=0,title="Use Map Configuration"]
 
 The above example prints: `"Engine Starting V8 [sensors=2]"`
