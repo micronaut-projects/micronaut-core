@@ -69,6 +69,7 @@ Micronaut still allows specifying the latter in configuration, but normalizes th
 
 |`myApp.myStuff` | `my-app.my-stuff` | Properties, YAML etc.
 
+|`my-app.myStuff` | `my-app.my-stuff` | Properties, YAML etc.
 |`myApp.my-stuff` | `my-app.my-stuff` | Properties, YAML etc.
 
 |`MYAPP_MYSTUFF` | `myapp.mystuff`, `myapp-mystuff` | Environment Variable
