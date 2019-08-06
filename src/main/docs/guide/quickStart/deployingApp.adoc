@@ -1,4 +1,4 @@
-To deploy a Micronaut application you create a runnable JAR file by running `./gradlew assemble` or `./mvnw package`.
+To deploy a Micronaut application you create a runnable JAR file by running `./gradlew assembleShadowDist` or `./mvnw package`.
 
 The constructed JAR file can then be executed with `java -jar`. For example:
 
