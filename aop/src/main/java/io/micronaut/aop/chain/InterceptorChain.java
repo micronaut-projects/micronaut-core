@@ -83,7 +83,11 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         boolean isIntroduction = target instanceof Introduced;
         if (isIntroduction) {
             this.interceptors[this.interceptors.length - 1] = context -> {
-                throw new UnimplementedAdviceException(method);
+                try {
+                    return method.invoke(target, getParameterValues());
+                } catch (AbstractMethodError e) {
+                    throw new UnimplementedAdviceException(method);
+                }
             };
         } else {
             this.interceptors[this.interceptors.length - 1] = context -> method.invoke(target, getParameterValues());

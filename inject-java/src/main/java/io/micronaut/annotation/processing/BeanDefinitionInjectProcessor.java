@@ -575,18 +575,36 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         aopProxyWriter.visitInterceptorTypes(interceptorTypes);
                     }
 
-                    aopProxyWriter.visitAroundMethod(
-                            owningType,
-                            modelUtils.resolveTypeReference(returnTypeMirror),
-                            resolvedReturnType,
-                            returnTypeGenerics,
-                            methodName,
-                            methodParameters,
-                            genericParameters,
-                            methodQualifier,
-                            methodGenericTypes,
-                            annotationMetadata
-                    );
+                    if (modelUtils.isAbstract(method)) {
+                        aopProxyWriter.visitIntroductionMethod(
+                                owningType,
+                                modelUtils.resolveTypeReference(returnTypeMirror),
+                                resolvedReturnType,
+                                returnTypeGenerics,
+                                methodName,
+                                methodParameters,
+                                genericParameters,
+                                methodQualifier,
+                                methodGenericTypes,
+                                annotationMetadata
+                        );
+                    } else {
+                        // only apply around advise to non-abstract methods of introduction advise
+                        aopProxyWriter.visitAroundMethod(
+                                owningType,
+                                modelUtils.resolveTypeReference(returnTypeMirror),
+                                resolvedReturnType,
+                                returnTypeGenerics,
+                                methodName,
+                                methodParameters,
+                                genericParameters,
+                                methodQualifier,
+                                methodGenericTypes,
+                                annotationMetadata
+                        );
+                    }
+
+
                 }
             }, aopProxyWriter);
         }

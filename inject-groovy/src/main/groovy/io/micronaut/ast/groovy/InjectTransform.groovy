@@ -483,18 +483,35 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Object[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                         aopProxyWriter.visitInterceptorTypes(interceptorTypeReferences)
                     }
-                    aopProxyWriter.visitAroundMethod(
-                            AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                            resolveReturnType(classNode, methodNode, boundTypes),
-                            resolvedReturnType,
-                            resolvedGenericTypes,
-                            methodNode.name,
-                            targetMethodParamsToType,
-                            targetGenericParams,
-                            targetAnnotationMetadata,
-                            targetMethodGenericTypeMap,
-                            annotationMetadata
-                    )
+
+                    if (methodNode.isAbstract()) {
+                        aopProxyWriter.visitIntroductionMethod(
+                                AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                resolveReturnType(classNode, methodNode, boundTypes),
+                                resolvedReturnType,
+                                resolvedGenericTypes,
+                                methodNode.name,
+                                targetMethodParamsToType,
+                                targetGenericParams,
+                                targetAnnotationMetadata,
+                                targetMethodGenericTypeMap,
+                                annotationMetadata
+                        )
+                    } else {
+                        aopProxyWriter.visitAroundMethod(
+                                AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                resolveReturnType(classNode, methodNode, boundTypes),
+                                resolvedReturnType,
+                                resolvedGenericTypes,
+                                methodNode.name,
+                                targetMethodParamsToType,
+                                targetGenericParams,
+                                targetAnnotationMetadata,
+                                targetMethodGenericTypeMap,
+                                annotationMetadata
+                        )
+                    }
+
                 }
 
 
