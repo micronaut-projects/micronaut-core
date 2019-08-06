@@ -349,4 +349,12 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         return HttpRequestFactory.INSTANCE.create(httpMethod, uri);
     }
+
+    /**
+     *
+     * @return The name of the method (same as {@link HttpMethod} value for standard http methods).
+     */
+    default String getHttpMethodName() {
+        return getMethod().name();
+    }
 }
