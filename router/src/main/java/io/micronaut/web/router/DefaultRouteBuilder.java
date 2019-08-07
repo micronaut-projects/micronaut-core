@@ -815,11 +815,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public long getComplexityScore() {
-            return uriMatchTemplate.getVariableSegmentCount() - uriMatchTemplate.getRawSegmentCount();
-        }
-
-        @Override
         public UriRoute consumes(MediaType... mediaTypes) {
             return (UriRoute) super.consumes(mediaTypes);
         }

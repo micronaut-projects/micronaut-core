@@ -68,6 +68,7 @@ import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -125,6 +126,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -477,23 +479,42 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             uriRoutes = acceptRoutes;
         }
 
+        //find the routes with the least amount of variables
         if (uriRoutes.size() > 1) {
-            long score = Long.MAX_VALUE;
+            long segments = Long.MAX_VALUE;
             List<UriRouteMatch<Object, Object>> closestMatches = new ArrayList<>(uriRoutes.size());
 
             for (UriRouteMatch<Object, Object> match: uriRoutes) {
-                long routeScore = match.getRoute().getComplexityScore();
-                if (routeScore < score) {
+                List<UriTemplate.PathSegment> pathSegments = match.getRoute().getUriMatchTemplate().getSegments();
+                long matchedSegements = pathSegments.stream().filter(UriTemplate.PathSegment::isVariable).count();
+                if (matchedSegements < segments) {
                     closestMatches.clear();
-                    score = routeScore;
+                    segments = matchedSegements;
                 }
-                if (routeScore == score) {
+                if (matchedSegements == segments) {
                     closestMatches.add(match);
                 }
             }
             uriRoutes = closestMatches;
         }
 
+        if (uriRoutes.size() > 1) {
+            long segments = 0L;
+            List<UriRouteMatch<Object, Object>> closestMatches = new ArrayList<>(uriRoutes.size());
+
+            for (UriRouteMatch<Object, Object> match: uriRoutes) {
+                List<UriTemplate.PathSegment> pathSegments = match.getRoute().getUriMatchTemplate().getSegments();
+                long matchedSegements = pathSegments.stream().filter(segment -> !segment.isVariable()).count();
+                if (matchedSegements > segments) {
+                    closestMatches.clear();
+                    segments = matchedSegements;
+                }
+                if (matchedSegements == segments) {
+                    closestMatches.add(match);
+                }
+            }
+            uriRoutes = closestMatches;
+        }
 
         if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(requestPath, uriRoutes);
@@ -594,6 +615,31 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
             handleRouteMatch(route, nettyHttpRequest, ctx);
         }
+    }
+
+    private List<UriRouteMatch<Object, Object>> reduceMatchesByComplexity(List<UriRouteMatch<Object, Object>> uriRoutes, boolean variable) {
+        long segments = Long.MAX_VALUE;
+        List<UriRouteMatch<Object, Object>> closestMatches = new ArrayList<>(uriRoutes.size());
+
+        for (UriRouteMatch<Object, Object> match: uriRoutes) {
+            List<UriTemplate.PathSegment> pathSegments = match.getRoute().getUriMatchTemplate().getSegments();
+            long matchedSegements = pathSegments.stream().filter(segment -> variable == segment.isVariable()).count();
+            if (variable) {
+                if (matchedSegements < segments) {
+                    closestMatches.clear();
+                    segments = matchedSegements;
+                }
+            } else {
+                if (matchedSegements > segments) {
+                    closestMatches.clear();
+                    segments = matchedSegements;
+                }
+            }
+            if (matchedSegements == segments) {
+                closestMatches.add(match);
+            }
+        }
+        return closestMatches;
     }
 
     private void handleStatusError(

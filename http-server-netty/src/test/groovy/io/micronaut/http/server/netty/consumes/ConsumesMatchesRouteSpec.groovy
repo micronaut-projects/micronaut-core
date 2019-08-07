@@ -63,6 +63,15 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         body == "all"
     }
 
+    void "test accept matching has priority over route complexity"() {
+        when:
+        String body = rxClient.retrieve(HttpRequest.POST("/test-accept/foo", [x: 1]).contentType(APPLICATION_JSON_TYPE)).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        body == "json"
+    }
+
     @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
     @Controller("/test-consumes")
     static class MyController  {
@@ -78,6 +87,22 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         }
 
         @Post(consumes = ALL)
+        HttpResponse postc(@Body String body) {
+            HttpResponse.ok("all")
+        }
+    }
+
+    @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
+    @Controller("/test-accept")
+    static class MyOtherController  {
+
+        //If the content type is json, this method should be chosen even for /foo
+        @Post(uri = "/{name}", consumes = APPLICATION_JSON)
+        HttpResponse posta(@Body String body) {
+            HttpResponse.ok("json")
+        }
+
+        @Post(uri = "/foo", consumes = ALL)
         HttpResponse postc(@Body String body) {
             HttpResponse.ok("all")
         }
