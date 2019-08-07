@@ -149,6 +149,14 @@ public class UriTemplate implements Comparable<UriTemplate> {
         this.segments.addAll(segments);
     }
 
+    public long getRawSegmentCount() {
+        return segments.stream().filter(segment -> !segment.getVariable().isPresent()).count();
+    }
+
+    public long getVariableSegmentCount() {
+        return segments.stream().filter(segment -> segment.getVariable().isPresent()).count();
+    }
+
     /**
      * Nests another URI template with this template.
      *

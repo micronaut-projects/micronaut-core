@@ -85,4 +85,15 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
 
     @Override
     UriRoute body(String argument);
+
+    /**
+     * A relative score on how complex the URI route is.
+     * A route with more variable segments is more complex. A
+     * route with more raw segments is less complex.
+     *
+     * @return The route complexity
+     */
+    default long getComplexityScore() {
+        return Long.MAX_VALUE;
+    }
 }

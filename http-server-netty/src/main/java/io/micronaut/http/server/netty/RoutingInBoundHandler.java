@@ -29,7 +29,6 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.StreamUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -461,9 +460,40 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         List<UriRouteMatch<Object, Object>> uriRoutes = router
             .find(request)
             .filter((match) -> match.test(request))
-            .collect(StreamUtils.minAll(
-                Comparator.comparingInt((match) -> match.getVariableValues().size()),
-                Collectors.toList()));
+            .collect(Collectors.toList());
+
+        if (!uriRoutes.isEmpty() && HttpMethod.permitsRequestBody(httpMethod)) {
+
+            List<UriRouteMatch<Object, Object>> acceptRoutes = uriRoutes.stream()
+                    .filter(match -> match.explicitAccept(request.getContentType().orElse(MediaType.ALL_TYPE)))
+                    .collect(Collectors.toList());
+
+            if (acceptRoutes.isEmpty()) {
+                acceptRoutes = uriRoutes.stream()
+                        .filter(match -> match.accept(request.getContentType().orElse(null)))
+                        .collect(Collectors.toList());
+            }
+
+            uriRoutes = acceptRoutes;
+        }
+
+        if (uriRoutes.size() > 1) {
+            long score = Long.MAX_VALUE;
+            List<UriRouteMatch<Object, Object>> closestMatches = new ArrayList<>(uriRoutes.size());
+
+            for (UriRouteMatch<Object, Object> match: uriRoutes) {
+                long routeScore = match.getRoute().getComplexityScore();
+                if (routeScore < score) {
+                    closestMatches.clear();
+                    score = routeScore;
+                }
+                if (routeScore == score) {
+                    closestMatches.add(match);
+                }
+            }
+            uriRoutes = closestMatches;
+        }
+
 
         if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(requestPath, uriRoutes);

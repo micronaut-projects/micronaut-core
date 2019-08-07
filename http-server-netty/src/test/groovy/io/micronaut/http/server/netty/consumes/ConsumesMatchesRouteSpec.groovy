@@ -41,6 +41,26 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         then:
         noExceptionThrown()
         body == "graphql"
+
+        when:
+        URL url1 = embeddedServer.getURL()
+        URL url = new URL(url1.getProtocol(), url1.getHost(), url1.getPort(), url1.getFile() + "/test-consumes", null)
+        URLConnection connection = url.openConnection()
+        connection.setRequestMethod("POST")
+        connection.setRequestProperty('Content-Type', null)
+        connection.doOutput = true
+
+        def writer = new OutputStreamWriter(connection.outputStream)
+        writer.write("abc")
+        writer.flush()
+        writer.close()
+        connection.connect()
+
+        body = connection.content.text
+
+        then:
+        noExceptionThrown()
+        body == "all"
     }
 
     @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
@@ -55,6 +75,11 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         @Post(consumes = APPLICATION_GRAPHQL)
         HttpResponse postb(@Body String body) {
             HttpResponse.ok("graphql")
+        }
+
+        @Post(consumes = ALL)
+        HttpResponse postc(@Body String body) {
+            HttpResponse.ok("all")
         }
     }
 }
