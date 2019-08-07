@@ -620,31 +620,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
     }
 
-    private List<UriRouteMatch<Object, Object>> reduceMatchesByComplexity(List<UriRouteMatch<Object, Object>> uriRoutes, boolean variable) {
-        long segments = Long.MAX_VALUE;
-        List<UriRouteMatch<Object, Object>> closestMatches = new ArrayList<>(uriRoutes.size());
-
-        for (UriRouteMatch<Object, Object> match: uriRoutes) {
-            List<UriTemplate.PathSegment> pathSegments = match.getRoute().getUriMatchTemplate().getSegments();
-            long matchedSegements = pathSegments.stream().filter(segment -> variable == segment.isVariable()).count();
-            if (variable) {
-                if (matchedSegements < segments) {
-                    closestMatches.clear();
-                    segments = matchedSegements;
-                }
-            } else {
-                if (matchedSegements > segments) {
-                    closestMatches.clear();
-                    segments = matchedSegements;
-                }
-            }
-            if (matchedSegements == segments) {
-                closestMatches.add(match);
-            }
-        }
-        return closestMatches;
-    }
-
     private void handleStatusError(
             ChannelHandlerContext ctx,
             HttpRequest<?> request,
