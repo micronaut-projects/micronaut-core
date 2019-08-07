@@ -126,7 +126,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -466,17 +465,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         if (!uriRoutes.isEmpty() && HttpMethod.permitsRequestBody(httpMethod)) {
 
-            List<UriRouteMatch<Object, Object>> acceptRoutes = uriRoutes.stream()
-                    .filter(match -> match.explicitAccept(request.getContentType().orElse(MediaType.ALL_TYPE)))
-                    .collect(Collectors.toList());
+            List<UriRouteMatch<Object, Object>> explicitAcceptRoutes = new ArrayList<>(uriRoutes.size());
+            List<UriRouteMatch<Object, Object>> acceptRoutes = new ArrayList<>(uriRoutes.size());
 
-            if (acceptRoutes.isEmpty()) {
-                acceptRoutes = uriRoutes.stream()
-                        .filter(match -> match.accept(request.getContentType().orElse(null)))
-                        .collect(Collectors.toList());
+            Optional<MediaType> contentType = request.getContentType();
+
+            for (UriRouteMatch<Object, Object> match: uriRoutes) {
+                if (match.explicitAccept(contentType.orElse(MediaType.ALL_TYPE))) {
+                    explicitAcceptRoutes.add(match);
+                }
+                if (explicitAcceptRoutes.isEmpty() && match.accept(contentType.orElse(null))) {
+                    acceptRoutes.add(match);
+                }
             }
 
-            uriRoutes = acceptRoutes;
+            uriRoutes = explicitAcceptRoutes.isEmpty() ? acceptRoutes : explicitAcceptRoutes;
         }
 
         //find the routes with the least amount of variables
