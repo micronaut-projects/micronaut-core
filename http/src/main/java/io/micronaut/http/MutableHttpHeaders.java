@@ -193,7 +193,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      * @param methods The methods to specify in the Allowed HTTP header
      * @return This HTTP headers
      */
-    default MutableHttpHeaders allow(Collection<HttpMethod> methods) {
+    default MutableHttpHeaders allow(Collection<? extends CharSequence> methods) {
         String value = methods.stream().distinct().collect(Collectors.joining(","));
         return add(ALLOW, value);
     }

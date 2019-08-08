@@ -174,7 +174,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @param <T>     The response type
      * @return The response
      */
-    static <T> MutableHttpResponse<T> notAllowed(Set<HttpMethod> allowed) {
+    static <T> MutableHttpResponse<T> notAllowed(Set<? extends CharSequence> allowed) {
         return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.METHOD_NOT_ALLOWED)
             .headers((headers) -> headers.allow(allowed));
     }

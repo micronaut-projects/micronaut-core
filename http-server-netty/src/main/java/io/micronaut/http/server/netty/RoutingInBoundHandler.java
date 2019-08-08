@@ -509,9 +509,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
 
             // if there is no route present try to locate a route that matches a different HTTP method
-            Set<io.micronaut.http.HttpMethod> existingRouteMethods = router
+            Set<String> existingRouteMethods = router
                     .findAny(request.getUri().toString())
-                    .map(UriRouteMatch::getHttpMethod)
+                    .map(UriRouteMatch::getRoute)
+                    .map(UriRoute::getHttpMethodName)
                     .collect(Collectors.toSet());
 
             if (!existingRouteMethods.isEmpty()) {
@@ -524,7 +525,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         request,
                         nettyHttpRequest,
                         HttpResponse.notAllowed(existingRouteMethods),
-                        "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRouteMethods);
+                        "Method [" + request.getHttpMethodName() + "] not allowed. " +
+                                "Allowed methods: " + existingRouteMethods);
                 return;
             }
 
