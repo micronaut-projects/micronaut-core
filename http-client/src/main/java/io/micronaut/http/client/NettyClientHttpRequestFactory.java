@@ -74,6 +74,11 @@ public class NettyClientHttpRequestFactory implements HttpRequestFactory {
         return new NettyClientHttpRequest<>(httpMethod, uri);
     }
 
+    @Override
+    public <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri, String httpMethodName) {
+        return new NettyClientHttpRequest<>(httpMethod, uri, httpMethodName);
+    }
+
     @SuppressWarnings("unchecked")
     private <T> MutableHttpRequest<T> buildRequest(String uri, T body, HttpMethod method) {
         if (uri.indexOf('{') > -1 && body != null) {
