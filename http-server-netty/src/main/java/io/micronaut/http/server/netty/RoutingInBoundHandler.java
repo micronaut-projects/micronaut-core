@@ -68,6 +68,7 @@ import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -488,8 +489,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             List<UriRouteMatch<Object, Object>> closestMatches = new ArrayList<>(uriRoutes.size());
 
             for (UriRouteMatch<Object, Object> match: uriRoutes) {
-                List<UriTemplate.PathSegment> pathSegments = match.getRoute().getUriMatchTemplate().getSegments();
-                long matchedSegements = pathSegments.stream().filter(UriTemplate.PathSegment::isVariable).count();
+                UriMatchTemplate template = match.getRoute().getUriMatchTemplate();
+                long matchedSegements = template.getVariableSegmentCount();
                 if (matchedSegements < segments) {
                     closestMatches.clear();
                     segments = matchedSegements;
@@ -506,8 +507,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             List<UriRouteMatch<Object, Object>> closestMatches = new ArrayList<>(uriRoutes.size());
 
             for (UriRouteMatch<Object, Object> match: uriRoutes) {
-                List<UriTemplate.PathSegment> pathSegments = match.getRoute().getUriMatchTemplate().getSegments();
-                long matchedSegements = pathSegments.stream().filter(segment -> !segment.isVariable()).count();
+                UriMatchTemplate template = match.getRoute().getUriMatchTemplate();
+                long matchedSegements = template.getRawSegmentCount();
                 if (matchedSegements > segments) {
                     closestMatches.clear();
                     segments = matchedSegements;

@@ -150,10 +150,17 @@ public class UriTemplate implements Comparable<UriTemplate> {
     }
 
     /**
-     * @return An unmodifiable list of the route uri segments
+     * @return The number of segments that are variable
      */
-    public List<PathSegment> getSegments() {
-        return Collections.unmodifiableList(segments);
+    public long getVariableSegmentCount() {
+        return segments.stream().filter(PathSegment::isVariable).count();
+    }
+
+    /**
+     * @return The number of segments that are raw
+     */
+    public long getRawSegmentCount() {
+        return segments.stream().filter(segment -> !segment.isVariable()).count();
     }
 
     /**
@@ -485,7 +492,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     /**
      * Represents an expandable path segment.
      */
-    public interface PathSegment extends CharSequence {
+    protected interface PathSegment extends CharSequence {
 
         /**
          * @return Whether this segment is part of the query string
