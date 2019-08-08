@@ -24,6 +24,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Put
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -72,6 +73,22 @@ class ClientIntroductionAdviceSpec extends Specification {
 
         cleanup:
         server.close()
+        ctx.close()
+    }
+
+    void "test non body params have preference for uri templates"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        ApplicationContext ctx = server.applicationContext
+
+        when:
+        LocalOfferClient client = ctx.getBean(LocalOfferClient)
+
+        then:
+        client.putTest("abc", new MyObject(code: "def")) == "abc"
+
+        cleanup:
+        ctx.close()
     }
 
     @Controller('/aop')
@@ -101,6 +118,11 @@ class ClientIntroductionAdviceSpec extends Specification {
         String post(@Body String data, @Header String foo)  {
             return data + ' header=' + foo
         }
+
+        @Put("/{code}")
+        String code(String code) {
+            code
+        }
     }
 
 
@@ -128,6 +150,16 @@ class ClientIntroductionAdviceSpec extends Specification {
         String post(@Body String data, @Header String foo)
     }
 
+    @Client("/offers")
+    static interface LocalOfferClient {
+
+        @Put("/{code}")
+        String putTest(String code, @Body MyObject myObject)
+    }
+
+    class MyObject {
+        String code
+    }
     class TestServiceInstanceList implements ServiceInstanceList {
 
         private final URI uri
