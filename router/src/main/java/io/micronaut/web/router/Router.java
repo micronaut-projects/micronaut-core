@@ -56,6 +56,19 @@ public interface Router {
     <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, CharSequence uri);
 
     /**
+     * Find method, that should be used for non-standard http methods. For standards it should act
+     * the same as {@link #find(HttpMethod, URI)}
+     * @param request The request, that can have overridden {@link HttpRequest#getHttpMethodName()}
+     * @param uri The URI route match.
+     * @param <T> The target type.
+     * @param <R> The type of what
+     * @return A {@link Stream} of possible {@link Route} instances.
+     */
+    default <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest request, CharSequence uri) {
+        return find(HttpMethod.valueOf(request.getHttpMethodName()), uri);
+    }
+
+    /**
      * Returns all UriRoutes.
      *
      * @return A {@link Stream} of all registered {@link UriRoute} instances.
@@ -227,7 +240,7 @@ public interface Router {
      * @return A {@link Stream} of possible {@link Route} instances.
      */
     default <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
-        return find(request.getMethod(), request.getPath());
+        return find(request, request.getPath());
     }
 
 }
