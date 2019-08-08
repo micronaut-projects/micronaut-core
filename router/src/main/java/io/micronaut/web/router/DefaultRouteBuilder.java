@@ -395,18 +395,40 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * @return an {@link UriRoute}
      */
     protected UriRoute buildRoute(HttpMethod httpMethod, String uri, MethodExecutionHandle<?, Object> executableHandle) {
-        DefaultUriRoute route;
+        return buildRoute(httpMethod.name(), httpMethod, uri, executableHandle);
+    }
+
+    private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, MethodExecutionHandle<?, Object> executableHandle) {
+        UriRoute route;
         if (currentParentRoute != null) {
             route = new DefaultUriRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri), executableHandle);
-            currentParentRoute.nestedRoutes.add(route);
+            currentParentRoute.nestedRoutes.add((DefaultUriRoute) route);
         } else {
             route = new DefaultUriRoute(httpMethod, uri, executableHandle);
         }
+
+        if (!httpMethodName.equals(httpMethod.name())) {
+            route = new CustomMethodRoute(httpMethodName, route);
+        }
+
         this.uriRoutes.add(route);
         return route;
     }
 
     private UriRoute buildBeanRoute(HttpMethod httpMethod, String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return buildBeanRoute(httpMethod.name(), httpMethod, uri, beanDefinition,  method);
+    }
+
+    /**
+     * A special case that is required for non standard http methods.
+     * @param httpMethodName The name of method. For standard http methods matches {@link HttpMethod#name()}
+     * @param httpMethod The http method. Is {@link HttpMethod#CUSTOM} for non standard http methods.
+     * @param uri The uri.
+     * @param beanDefinition The definition of the bean.
+     * @param method The method description
+     * @return The uri route corresponding to the method.
+     */
+    protected UriRoute buildBeanRoute(String httpMethodName, HttpMethod httpMethod, String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         io.micronaut.context.Qualifier<?> qualifier = beanDefinition.getAnnotationTypeByStereotype(Qualifier.class).map(aClass -> Qualifiers.byAnnotation(beanDefinition, aClass)).orElse(null);
         if (qualifier == null && beanDefinition.isIterable() && beanDefinition instanceof NameResolver) {
             qualifier = ((NameResolver) beanDefinition).resolveName()
@@ -414,7 +436,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
         MethodExecutionHandle<?, Object> executionHandle = executionHandleLocator.findExecutionHandle(beanDefinition.getBeanType(), qualifier, method.getMethodName(), method.getArgumentTypes())
                 .orElseThrow(() -> new RoutingException("No such route: " + beanDefinition.getBeanType().getName() + "." + method));
-        return buildRoute(httpMethod, uri, executionHandle);
+        return buildRoute(httpMethodName, httpMethod, uri, executionHandle);
     }
 
     /**
