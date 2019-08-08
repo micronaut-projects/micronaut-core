@@ -194,13 +194,14 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         for (PropertyNode propertyNode : propertyNodes) {
             if (propertyNode.isPublic() && !propertyNode.isStatic()) {
                 groovyProps.add(propertyNode.getName());
+                boolean readOnly = propertyNode.getField().isFinal();
                 GroovyPropertyElement groovyPropertyElement = new GroovyPropertyElement(
                         sourceUnit,
                         this,
                         propertyNode.getField(),
                         AstAnnotationUtils.getAnnotationMetadata(sourceUnit, propertyNode.getField()),
                         propertyNode.getName(),
-                        false,
+                        readOnly,
                         propertyNode
                 ) {
                     @Nonnull
