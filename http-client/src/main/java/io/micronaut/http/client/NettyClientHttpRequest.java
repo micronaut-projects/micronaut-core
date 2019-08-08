@@ -45,7 +45,9 @@ import org.reactivestreams.Publisher;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Default implementation of {@link MutableHttpRequest} for the {@link HttpClient}.
@@ -57,6 +59,7 @@ import java.util.Optional;
 @Internal
 class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
+    private static final Map<String, io.netty.handler.codec.http.HttpMethod> METHOD_MAP = new ConcurrentHashMap<>();
     private final NettyHttpHeaders headers = new NettyHttpHeaders();
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
     private final HttpMethod httpMethod;
@@ -202,11 +205,26 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
      */
     HttpRequest getFullRequest(ByteBuf content) {
         String uriStr = resolveUriPath();
-        io.netty.handler.codec.http.HttpMethod method = io.netty.handler.codec.http.HttpMethod.valueOf(httpMethodName);
+        io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
         DefaultFullHttpRequest req = content != null ? new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, content) :
             new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
         req.headers().setAll(headers.getNettyHeaders());
         return req;
+    }
+
+    /**
+     * This method guarantees that for each name you get at most one instance, so that multiple calls
+     * would not cause GC problems. However, due to the bug in JDK 8, it had to be implemented in a weird way.
+     * @param httpMethodName The name of the method
+     * @return The instance of HttpMethod
+     * @see @link https://bugs.openjdk.java.net/browse/JDK-8161372
+     */
+    private static io.netty.handler.codec.http.HttpMethod getMethod(String httpMethodName) {
+        if (!METHOD_MAP.containsKey(httpMethodName)) {
+            return METHOD_MAP.computeIfAbsent(httpMethodName, io.netty.handler.codec.http.HttpMethod::valueOf);
+        }
+
+        return METHOD_MAP.get(httpMethodName);
     }
 
     /**
@@ -215,7 +233,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
      */
     HttpRequest getStreamedRequest(Publisher<HttpContent> publisher) {
         String uriStr = resolveUriPath();
-        io.netty.handler.codec.http.HttpMethod method = io.netty.handler.codec.http.HttpMethod.valueOf(httpMethodName);
+        io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
         HttpRequest req = publisher != null ? new DefaultStreamedHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, publisher) :
             new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
         req.headers().setAll(headers.getNettyHeaders());
