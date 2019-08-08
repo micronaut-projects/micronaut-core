@@ -1,4 +1,4 @@
-eYou can inject configuration values into beans with Micronaut using the ann:io.micronaut.context.annotation.Value[] annotation.
+You can inject configuration values into beans with Micronaut using the ann:io.micronaut.context.annotation.Value[] annotation.
 
 === Using the `@Value` Annotation
 
