@@ -484,7 +484,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             // if there is no route present try to locate a route that matches a different content type
             Set<MediaType> existingRouteConsumes = router
-                    .find(httpMethod, requestPath)
+                    .find(request)
                     .map(UriRouteMatch::getRoute)
                     .flatMap(r -> r.getConsumes().stream())
                     .collect(Collectors.toSet());
@@ -494,7 +494,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (contentType != null) {
                     if (!existingRouteConsumes.contains(contentType)) {
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(), httpMethod, contentType);
+                            LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(),
+                                    request.getHttpMethodName(), contentType);
                         }
 
                         handleStatusError(
@@ -517,7 +518,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             if (!existingRouteMethods.isEmpty()) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Method not allowed for URI {} and method {}", request.getUri(), httpMethod);
+                    LOG.debug("Method not allowed for URI {} and method {}", request.getUri(), request.getHttpMethodName());
                 }
 
                 handleStatusError(
@@ -550,9 +551,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         if (LOG.isDebugEnabled()) {
             if (route instanceof MethodBasedRouteMatch) {
-                LOG.debug("Matched route {} - {} to controller {}", httpMethod, requestPath, route.getDeclaringType());
+                LOG.debug("Matched route {} - {} to controller {}", request.getHttpMethodName(), requestPath, route.getDeclaringType());
             } else {
-                LOG.debug("Matched route {} - {}", httpMethod, requestPath);
+                LOG.debug("Matched route {} - {}", request.getHttpMethodName(), requestPath);
             }
         }
         // all ok proceed to try and execute the route

@@ -70,6 +70,11 @@ public class FilteredRouter implements Router {
     }
 
     @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest request, CharSequence uri) {
+        return router.find(request, uri);
+    }
+
+    @Override
     public Stream<UriRoute> uriRoutes() {
         return router.uriRoutes();
     }
