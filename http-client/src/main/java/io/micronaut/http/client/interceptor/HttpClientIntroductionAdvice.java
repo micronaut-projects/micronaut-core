@@ -179,7 +179,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
 
-            HttpMethod httpMethod = HttpMethod.valueOf(annotationType.getSimpleName().toUpperCase());
+            HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase());
+            String httpMethodName = context.getValue(CustomHttpMethod.class, "method", String.class).orElse(httpMethod.name());
 
             ReturnType returnType = context.getReturnType();
             Class<?> javaReturnType = returnType.getType();
@@ -348,7 +349,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             uri = uriTemplate.expand(paramMap);
             uriVariables.forEach(queryParams::remove);
 
-            request = HttpRequest.create(httpMethod, appendQuery(uri, queryParams));
+            request = HttpRequest.create(httpMethod, appendQuery(uri, queryParams), httpMethodName);
             if (body != null) {
                 request.body(body);
 
