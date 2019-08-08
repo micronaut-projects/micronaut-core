@@ -88,11 +88,20 @@ public class DefaultRouter implements Router {
     @SuppressWarnings("unchecked")
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, CharSequence uri) {
-        List<UriRoute> routes = routesByMethod.getOrDefault(httpMethod.name(), Collections.emptyList());
+        return find(httpMethod.name(), uri);
+    }
+
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest request, CharSequence uri) {
+        return find(request.getHttpMethodName(), uri);
+    }
+
+    private <T, R> Stream<UriRouteMatch<T, R>> find(String httpMethodName, CharSequence uri) {
+        List<UriRoute> routes = routesByMethod.getOrDefault(httpMethodName, Collections.emptyList());
         return routes.stream()
-            .map((route -> route.match(uri.toString())))
-            .filter(Optional::isPresent)
-            .map(Optional::get);
+                .map((route -> route.match(uri.toString())))
+                .filter(Optional::isPresent)
+                .map(Optional::get);
     }
 
     @Override
