@@ -22,9 +22,9 @@ class EachPropertyTest : AnnotationSpec() {
                 "test",
                 mapOf(
                         "test.datasource.one.url" to "jdbc:mysql://localhost/one",
-                        "test.datasource.two.url" to "jdbc:mysql://localhost/two")
-        )
-        )
+                        "test.datasource.two.url" to "jdbc:mysql://localhost/two"
+                )
+        ))
         // end::config[]
 
         // tag::beans[]

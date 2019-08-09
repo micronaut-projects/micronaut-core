@@ -2,9 +2,9 @@ package io.micronaut.docs.config.env;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.junit.Test;
-import io.micronaut.core.util.CollectionUtils;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -20,8 +20,9 @@ public class EachPropertyTest {
         ApplicationContext applicationContext = ApplicationContext.run(PropertySource.of(
                 "test",
                 CollectionUtils.mapOf(
-                "test.datasource.one.url", "jdbc:mysql://localhost/one",
-                "test.datasource.two.url", "jdbc:mysql://localhost/two")
+                        "test.datasource.one.url", "jdbc:mysql://localhost/one",
+                        "test.datasource.two.url", "jdbc:mysql://localhost/two")
+
         ));
         // end::config[]
 
