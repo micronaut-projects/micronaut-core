@@ -1,11 +1,6 @@
 The link:{api}/io/micronaut/context/annotation/EachProperty.html[@EachProperty] is a great way to drive dynamic configuration, but typically you want to inject that configuration into another bean that depends on it. Injecting a single instance with a hard coded qualifier is not a great solution, hence `@EachProperty` is typically used in combination with link:{api}/io/micronaut/context/annotation/EachBean.html[@EachBean]:
 
-.Using @EachBean
-[source,java]
-----
-include::{testsjava}/env/DataSourceFactory.java[tags=eachBean, indent=0]
-}
-----
+snippet::io.micronaut.docs.config.env.DataSourceFactory[tags="eachBean", indent=0, title="Using @EachBean"]
 
 <1> The above example defines a bean link:{api}/io/micronaut/context/annotation/Factory.html[Factory] that will create instances of `javax.sql.DataSource`.
 <2> The link:{api}/io/micronaut/context/annotation/EachBean.html[@EachBean] annotation is used to indicate that a new `DataSource` bean should be created for each `DataSourceConfiguration` defined in the previous section.
@@ -15,12 +10,7 @@ Note that `@EachBean` requires that the parent bean has a `@Named` qualifier, si
 
 In other words, to retrieve the `DataSource` created by `test.datasource.one` you can do:
 
-.Using a Qualifier
-[source,java]
-----
-DataSource firstDataSource = applicationContext.getBean(
-        DataSource.class,
-        Qualifiers.byName("one")
-);
-----
+snippet::io.micronaut.docs.config.env.EachBeanTest[tags="beans", indent=0, title="Using a Qualifier"]
 
+<1> We demonstrate here that there are indeed two data sources. How can we get one in particular?
+<2> By using `Qualifiers.byName("one")`, we can select which of the two beans we'd like to reference.
