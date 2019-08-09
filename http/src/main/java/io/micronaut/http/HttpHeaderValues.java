@@ -26,12 +26,12 @@ public interface HttpHeaderValues {
     /**
      * {@code "Bearer "}.
      */
-    String AUTHORIZATION_PREFIX_BEARER = "Bearer";
+    String AUTHORIZATION_PREFIX_BEARER = "Bearer ";
 
     /**
      * {@code "Basic "}.
      */
-    String AUTHORIZATION_PREFIX_BASIC = "Basic";
+    String AUTHORIZATION_PREFIX_BASIC = "Basic ";
 
     /**
      * @see <a href="https://tools.ietf.org/html/rfc7234#section-5.2.1.1">Rfc 7234 section-5.2.1.1</a>, <a href="https://tools.ietf.org/html/rfc7234#section-5.2.2.8">Rfc 7234 section-5.2.2.8</a>.
