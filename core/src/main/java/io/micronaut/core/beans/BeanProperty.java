@@ -130,9 +130,9 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      */
     default void set(@Nonnull B bean, @Nullable T value) {
         if (isReadOnly()) {
-            throw new UnsupportedOperationException("Cannot write read-only property");
+            throw new UnsupportedOperationException("Cannot write read-only property: " + getName());
         } else {
-            throw new UnsupportedOperationException("Write method unimplemented");
+            throw new UnsupportedOperationException("Write method unimplemented for property: " + getName());
         }
     }
 

@@ -35,6 +35,7 @@ import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 import io.micronaut.inject.writer.GeneratedFile
 
 import javax.inject.Named
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Function
@@ -482,18 +483,35 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Object[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                         aopProxyWriter.visitInterceptorTypes(interceptorTypeReferences)
                     }
-                    aopProxyWriter.visitAroundMethod(
-                            AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                            resolveReturnType(classNode, methodNode, boundTypes),
-                            resolvedReturnType,
-                            resolvedGenericTypes,
-                            methodNode.name,
-                            targetMethodParamsToType,
-                            targetGenericParams,
-                            targetAnnotationMetadata,
-                            targetMethodGenericTypeMap,
-                            annotationMetadata
-                    )
+
+                    if (methodNode.isAbstract()) {
+                        aopProxyWriter.visitIntroductionMethod(
+                                AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                resolveReturnType(classNode, methodNode, boundTypes),
+                                resolvedReturnType,
+                                resolvedGenericTypes,
+                                methodNode.name,
+                                targetMethodParamsToType,
+                                targetGenericParams,
+                                targetAnnotationMetadata,
+                                targetMethodGenericTypeMap,
+                                annotationMetadata
+                        )
+                    } else {
+                        aopProxyWriter.visitAroundMethod(
+                                AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                resolveReturnType(classNode, methodNode, boundTypes),
+                                resolvedReturnType,
+                                resolvedGenericTypes,
+                                methodNode.name,
+                                targetMethodParamsToType,
+                                targetGenericParams,
+                                targetAnnotationMetadata,
+                                targetMethodGenericTypeMap,
+                                annotationMetadata
+                        )
+                    }
+
                 }
 
 
@@ -812,7 +830,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     methodAnnotationMetadata,
                                     configurationMetadataBuilder)
                             try {
-                                visitConfigurationBuilder(methodAnnotationMetadata, parameter.type, getBeanWriter())
+                                visitConfigurationBuilder(declaringClass, methodAnnotationMetadata, parameter.type, getBeanWriter())
                             } finally {
                                 getBeanWriter().visitConfigBuilderEnd()
                             }
@@ -1124,7 +1142,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 getBeanWriter().visitConfigBuilderField(fieldType, fieldName, fieldAnnotationMetadata, configurationMetadataBuilder)
                             }
                             try {
-                                visitConfigurationBuilder(fieldAnnotationMetadata, fieldNode.type, getBeanWriter())
+                                visitConfigurationBuilder(declaringClass, fieldAnnotationMetadata, fieldNode.type, getBeanWriter())
                             } finally {
                                 getBeanWriter().visitConfigBuilderEnd()
                             }
@@ -1257,7 +1275,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 fieldAnnotationMetadata,
                                 configurationMetadataBuilder)
                         try {
-                            visitConfigurationBuilder(fieldAnnotationMetadata, fieldNode.type, getBeanWriter())
+                            visitConfigurationBuilder(declaringClass, fieldAnnotationMetadata, fieldNode.type, getBeanWriter())
                         } finally {
                             getBeanWriter().visitConfigBuilderEnd()
                         }
@@ -1716,10 +1734,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             return nonPrivateConstructors
         }
 
-        private void visitConfigurationBuilder(AnnotationMetadata annotationMetadata, ClassNode classNode, BeanDefinitionVisitor writer) {
+        private void visitConfigurationBuilder(ClassNode declaringClass,
+                                               AnnotationMetadata annotationMetadata,
+                                               ClassNode classNode,
+                                               BeanDefinitionVisitor writer) {
             Boolean allowZeroArgs = annotationMetadata.getValue(ConfigurationBuilder.class, "allowZeroArgs", Boolean.class).orElse(false)
             List<String> prefixes = Arrays.asList(annotationMetadata.getValue(ConfigurationBuilder.class, "prefixes", String[].class).orElse(["set"] as String[]))
-            String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, String.class).orElse("")
+            String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, String.class)
+                    .map({ value -> value + "."}).orElse("")
             Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet())
             Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet())
 
@@ -1744,13 +1766,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Parameter paramType = params.size() == 1 ? params[0] : null
                         Object expectedType = paramType != null ? AstGenericUtils.resolveTypeReference(paramType.type) : null
 
+                        PropertyMetadata metadata = configurationMetadataBuilder.visitProperty(
+                                concreteClass,
+                                declaringClass,
+                                expectedType?.toString(),
+                                configurationPrefix + propertyName,
+                                null,
+                                null
+                        )
+
                         writer.visitConfigBuilderMethod(
                                 prefix,
-                                configurationPrefix,
                                 AstGenericUtils.resolveTypeReference(returnType),
                                 name,
                                 expectedType,
-                                paramType != null ? resolveGenericTypes(paramType) : null
+                                paramType != null ? resolveGenericTypes(paramType) : null,
+                                metadata.path
                         )
 
                     } else if (paramCount == 2) {
@@ -1758,12 +1789,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Parameter first = params[0]
                         Parameter second = params[1]
 
+                        PropertyMetadata metadata = configurationMetadataBuilder.visitProperty(
+                                concreteClass,
+                                declaringClass,
+                                Duration.class.name,
+                                configurationPrefix + propertyName,
+                                null,
+                                null
+                        )
+
                         if (second.type.name == TimeUnit.class.name && first.type.name == "long") {
                             writer.visitConfigBuilderDurationMethod(
                                     prefix,
-                                    configurationPrefix,
                                     AstGenericUtils.resolveTypeReference(returnType),
-                                    name
+                                    name,
+                                    metadata.path
                             )
                         }
                     }

@@ -23,7 +23,7 @@ fi
 
 if [[ $EXIT_STATUS -eq 0 ]]; then
     echo "Publishing archives for branch $TRAVIS_BRANCH"
-    if [[ -n $TRAVIS_TAG ]] || [[ $TRAVIS_BRANCH =~ ^master$ && $TRAVIS_PULL_REQUEST == 'false' ]]; then
+    if [[ -n $TRAVIS_TAG ]] || [[ $TRAVIS_BRANCH =~ ^1.2.x$ && $TRAVIS_PULL_REQUEST == 'false' ]]; then
 
       echo "Publishing archives"
       ./gradlew --stop
@@ -40,7 +40,7 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
       cd gh-pages
 
       # If this is the master branch then update the snapshot
-      if [[ $TRAVIS_BRANCH =~ ^master$ ]]; then
+      if [[ $TRAVIS_BRANCH =~ ^1.2.x$ ]]; then
          mkdir -p snapshot
          cp -r ../build/docs/. ./snapshot/
           git add snapshot/*
@@ -48,9 +48,9 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
 
       # If there is a tag present then this becomes the latest
       if [[ -n $TRAVIS_TAG ]]; then
-#         mkdir -p latest
-#         cp -r ../build/docs/. ./latest/
-#         git add latest/*
+          mkdir -p latest
+          cp -r ../build/docs/. ./latest/
+          git add latest/*
 
           version="$TRAVIS_TAG"
           version=${version:1}

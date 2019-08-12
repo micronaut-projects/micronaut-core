@@ -41,7 +41,7 @@ class VisibilityIssuesSpec extends AbstractBeanDefinitionSpec {
         def context = ApplicationContext.run(
                 'parent.name': 'Sally',
                 'parent.child.age': 22,
-                'parent.child.engine.manufacturer': 'Chevy')
+                'parent.engine.manufacturer': 'Chevy')
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
 
         then:

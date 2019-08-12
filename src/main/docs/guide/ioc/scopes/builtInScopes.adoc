@@ -9,13 +9,13 @@
 |link:{api}/io/micronaut/context/annotation/Prototype.html[@Prototype]
 |Prototype scope indicates that a new instance of the bean is created each time it is injected
 |link:{api}/io/micronaut/context/annotation/Infrastructure.html[@Infrastructure]
-|Infrastructure is a `@Context` scope stereotype that indicates the bean cannot be replaced
+|Infrastructure scope represents a bean that cannot be overridden or replaced using ann:context.annotation.Replaces[] because it is critical to the functioning of the system.
 |link:{api}/io/micronaut/runtime/context/scope/ThreadLocal.html[@ThreadLocal]
 |`@ThreadLocal` scope is a custom scope that associates a bean per thread via a ThreadLocal
 |link:{api}/io/micronaut/runtime/context/scope/Refreshable.html[@Refreshable]
 |`@Refreshable` scope is a custom scope that allows a bean's state to be refreshed via the `/refresh` endpoint.
 |link:{api}/io/micronaut/runtime/http/scope/RequestScope.html[@RequestScope]
-|`@RequestScope` scope is a custom scope that indicates a new instance of the bean is created for each HTTP request
+|`@RequestScope` scope is a custom scope that indicates a new instance of the bean is created and associated with each HTTP request
 |===
 
 NOTE: The link:{api}/io/micronaut/context/annotation/Prototype.html[@Prototype] annotation is a synonym for link:{api}/io/micronaut/context/annotation/Bean.html[@Bean] because the default scope is prototype.

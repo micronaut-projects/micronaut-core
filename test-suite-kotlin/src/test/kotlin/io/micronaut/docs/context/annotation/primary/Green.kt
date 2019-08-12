@@ -17,4 +17,4 @@ class Green: ColorPicker {
         return "green"
     }
 }
-//end:clazz[]
+//end::clazz[]

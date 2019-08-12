@@ -69,6 +69,7 @@ import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -574,18 +575,36 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         aopProxyWriter.visitInterceptorTypes(interceptorTypes);
                     }
 
-                    aopProxyWriter.visitAroundMethod(
-                            owningType,
-                            modelUtils.resolveTypeReference(returnTypeMirror),
-                            resolvedReturnType,
-                            returnTypeGenerics,
-                            methodName,
-                            methodParameters,
-                            genericParameters,
-                            methodQualifier,
-                            methodGenericTypes,
-                            annotationMetadata
-                    );
+                    if (modelUtils.isAbstract(method)) {
+                        aopProxyWriter.visitIntroductionMethod(
+                                owningType,
+                                modelUtils.resolveTypeReference(returnTypeMirror),
+                                resolvedReturnType,
+                                returnTypeGenerics,
+                                methodName,
+                                methodParameters,
+                                genericParameters,
+                                methodQualifier,
+                                methodGenericTypes,
+                                annotationMetadata
+                        );
+                    } else {
+                        // only apply around advise to non-abstract methods of introduction advise
+                        aopProxyWriter.visitAroundMethod(
+                                owningType,
+                                modelUtils.resolveTypeReference(returnTypeMirror),
+                                resolvedReturnType,
+                                returnTypeGenerics,
+                                methodName,
+                                methodParameters,
+                                genericParameters,
+                                methodQualifier,
+                                methodGenericTypes,
+                                annotationMetadata
+                        );
+                    }
+
+
                 }
             }, aopProxyWriter);
         }
@@ -686,7 +705,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             methodAnnotationMetadata,
                             metadataBuilder);
                     try {
-                        visitConfigurationBuilder(method, valueType, writer);
+                        visitConfigurationBuilder(declaringClass, method, valueType, writer);
                     } finally {
                         writer.visitConfigBuilderEnd();
                     }
@@ -1602,7 +1621,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                     }
                     try {
-                        visitConfigurationBuilder(field, fieldTypeMirror, writer);
+                        visitConfigurationBuilder(declaringClass, field, fieldTypeMirror, writer);
                     } finally {
                         writer.visitConfigBuilderEnd();
                     }
@@ -1692,11 +1711,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     !(modifiers.contains(Modifier.PUBLIC));
         }
 
-        private void visitConfigurationBuilder(Element builderElement, TypeMirror builderType, BeanDefinitionVisitor writer) {
+        private void visitConfigurationBuilder(TypeElement declaringClass, Element builderElement, TypeMirror builderType, BeanDefinitionVisitor writer) {
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(builderElement);
             Boolean allowZeroArgs = annotationMetadata.getValue(ConfigurationBuilder.class, "allowZeroArgs", Boolean.class).orElse(false);
             List<String> prefixes = Arrays.asList(annotationMetadata.getValue(ConfigurationBuilder.class, "prefixes", String[].class).orElse(new String[]{"set"}));
-            String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, String.class).orElse("");
+            String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, String.class)
+                    .map(v -> v + ".").orElse("");
             Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet());
             Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet());
 
@@ -1720,13 +1740,22 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         VariableElement paramType = paramCount == 1 ? params.get(0) : null;
                         Object expectedType = paramType != null ? modelUtils.resolveTypeReference(paramType.asType()) : null;
 
+                        PropertyMetadata metadata = metadataBuilder.visitProperty(
+                                concreteClass,
+                                declaringClass,
+                                expectedType != null ? expectedType.toString() : null,
+                                configurationPrefix + propertyName,
+                                null,
+                                null
+                        );
+
                         writer.visitConfigBuilderMethod(
                                 prefix,
-                                configurationPrefix,
                                 modelUtils.resolveTypeReference(method.getReturnType()),
                                 methodName,
                                 expectedType,
-                                paramType != null ? genericUtils.resolveGenericTypes(paramType.asType(), Collections.emptyMap()) : null
+                                paramType != null ? genericUtils.resolveGenericTypes(paramType.asType(), Collections.emptyMap()) : null,
+                                metadata.getPath()
                         );
                     } else if (paramCount == 2) {
                         // check the params are a long and a TimeUnit
@@ -1735,11 +1764,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         TypeMirror tu = elementUtils.getTypeElement(TimeUnit.class.getName()).asType();
                         TypeMirror typeMirror = first.asType();
                         if (typeMirror.toString().equals("long") && typeUtils.isAssignable(second.asType(), tu)) {
+
+                            PropertyMetadata metadata = metadataBuilder.visitProperty(
+                                    concreteClass,
+                                    declaringClass,
+                                    Duration.class.getName(),
+                                    configurationPrefix + propertyName,
+                                    null,
+                                    null
+                            );
+
                             writer.visitConfigBuilderDurationMethod(
                                     prefix,
-                                    configurationPrefix,
                                     modelUtils.resolveTypeReference(method.getReturnType()),
-                                    methodName
+                                    methodName,
+                                    metadata.getPath()
                             );
                         }
                     }

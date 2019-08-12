@@ -1,32 +1,3 @@
 https://github.com/remkop/picocli[Picocli] is a command line parser that supports usage help with ANSI colors, autocomplete and nested subcommands. It has an annotations API to create command line applications with almost no code, and a programmatic API for dynamic uses like creating Domain Specific Languages.
 
-From the project Readme page:
-
-[quote]
-____
-How it works: annotate your class and picocli initializes it from the command line arguments,
-converting the input to strongly typed data. Supports git-like http://picocli.info/#_subcommands[subcommands]
-(and nested http://picocli.info/#_nested_sub_subcommands[sub-subcommands]),
-any option prefix style, POSIX-style http://picocli.info/#_short_options[grouped short options],
-http://picocli.info/#_interactive_password_options[password options],
-custom http://picocli.info/#_custom_type_converters[type converters] and more.
-Parser http://picocli.info/#_tracing[tracing] facilitates troubleshooting.
-
-It distinguishes between link:http://picocli.info/#_options[named options] and
-http://picocli.info/#_positional_parameters[positional parameters] and allows both to be
-http://picocli.info/#_strongly_typed_everything[strongly typed].
-http://picocli.info/#_multiple_values[Multi-valued fields] can specify
-an exact number of parameters or a http://picocli.info/#_arity[range] (e.g., `0..*`, `1..2`).
-Supports http://picocli.info/#_maps[Map options] like `-Dkey1=val1 -Dkey2=val2`, where both key and value can be strongly typed.
-
-It generates polished and easily tailored http://picocli.info/#_usage_help[usage help]
-and  http://picocli.info/#_version_help[version help],
-using http://picocli.info/#_ansi_colors_and_styles[ANSI colors] where possible.
-Picocli-based command line applications can have http://picocli.info/autocomplete.html[TAB autocompletion],
-interactively showing users what options and subcommands are available.
-Picocli can generate completion scripts for bash and zsh, and offers an API to easily create a https://github.com/jline/jline2[JLine] `Completer` for your application.
-____
-
-Micronaut features dedicated support for defining picocli `Command` instances. Micronaut applications built with picocli can be deployed with or without the presence of an HTTP server.
-
-Combining picocli with Micronaut makes it easy to provide a rich, well-documented command line interface for your Microservices.
+See the https://micronaut-projects.github.io/micronaut-picocli/latest/guide/[documentation for the Picocli integration] for more information.

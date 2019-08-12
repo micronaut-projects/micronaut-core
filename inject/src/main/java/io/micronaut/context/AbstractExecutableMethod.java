@@ -45,6 +45,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
     private final ReturnType returnType;
     private final Argument<?> genericReturnType;
+    private final int hashCode;
     private Environment environment;
     private AnnotationMetadata methodAnnotationMetadata;
 
@@ -62,7 +63,9 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         super(declaringType, methodName, arguments);
         this.genericReturnType = genericReturnType;
         this.returnType = new ReturnTypeImpl();
-
+        int result = Objects.hash(declaringType, methodName);
+        result = 31 * result + Arrays.hashCode(argTypes);
+        this.hashCode = result;
     }
 
     /**
@@ -107,9 +110,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(declaringType, methodName);
-        result = 31 * result + Arrays.hashCode(argTypes);
-        return result;
+        return hashCode;
     }
 
     @Override

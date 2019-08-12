@@ -4,13 +4,7 @@ You can inject configuration values into beans with Micronaut using the ann:io.m
 
 Consider the following example:
 
-.@Value Example
-[source,groovy]
-----
-include::{testsdir}/config/value/EngineImpl.groovy[tags=imports, indent=0]
-
-include::{testsdir}/config/value/EngineImpl.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.config.value.EngineImpl[tags="imports,class",indent=0,title="@Value Example"]
 
 <1> The `@Value` annotation accepts a string that can have embedded placeholder values (the default value can be provided by specifying a value after the colon `:` character).
 <2> The injected value can then be used within code.
