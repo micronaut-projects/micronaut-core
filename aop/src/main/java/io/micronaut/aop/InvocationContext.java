@@ -17,6 +17,7 @@ package io.micronaut.aop;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.attr.MutableAttributeHolder;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentValue;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.MutableArgumentValue;
@@ -41,6 +42,10 @@ import java.util.Map;
 public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMetadataDelegate, MutableAttributeHolder {
 
     /**
+     * Returns the current parameters as a map of mutable argument values. This method allows mutation of the argument values
+     * and is generally more expensive than using {@link #getParameterValues()} and {@link #getArguments()} directly, hence
+     * should be used with care.
+     *
      * @return The bound {@link ArgumentValue} instances
      */
     Map<String, MutableArgumentValue<?>> getParameters();
@@ -89,18 +94,18 @@ public interface InvocationContext<T, R> extends Executable<T, R>, AnnotationMet
     }
 
     /**
-     * Returns the current state of the parameters as an array by parameter index. Note that mutations to the array have no effect.
-     * If you wish to mutate the parameters use {@link #getParameters()} and the {@link MutableArgumentValue} interface instead
+     * Returns the current state of the parameters as a map keyed by parameter name.
      *
-     * @return The bound {@link ArgumentValue} instances
+     * @return A map of parameter names to values
      */
     default Map<String, Object> getParameterValueMap() {
-        Map<String, MutableArgumentValue<?>> parameters = getParameters();
-        Map<String, Object> valueMap = new LinkedHashMap<>(parameters.size());
-        for (Map.Entry<String, MutableArgumentValue<?>> entry : parameters.entrySet()) {
-            MutableArgumentValue<?> value = entry.getValue();
-            String key = entry.getKey();
-            valueMap.put(key, value.getValue());
+        Argument[] arguments = getArguments();
+        Object[] parameterValues = getParameterValues();
+        Map<String, Object> valueMap = new LinkedHashMap<>(arguments.length);
+        for (int i = 0; i < parameterValues.length; i++) {
+            Object parameterValue = parameterValues[i];
+            Argument arg = arguments[i];
+            valueMap.put(arg.getName(), parameterValue);
         }
         return valueMap;
     }

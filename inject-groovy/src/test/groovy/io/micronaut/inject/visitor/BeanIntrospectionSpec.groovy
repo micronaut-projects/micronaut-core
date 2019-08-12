@@ -432,4 +432,35 @@ class ParentBean {
 
     }
 
+
+    void "test final property"() {
+        given:
+        ClassLoader classLoader = buildClassLoader('''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+    
+    final String name
+}
+
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+        BeanIntrospection introspection = reference.load()
+        def test = classLoader.loadClass('test.Test').newInstance()
+
+        then:
+        introspection.getRequiredProperty("name", String).isReadOnly()
+
+        when:
+        introspection.getRequiredProperty("name", String).set(test, "test")
+
+        then:
+        thrown(UnsupportedOperationException)
+    }
 }
