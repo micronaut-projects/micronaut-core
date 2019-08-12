@@ -29,7 +29,7 @@ public class EngineConfig {
 
     @Min(1L)
     private int cylinders;
-    @MapFormat(transformation = MapFormat.MapTransformation.FLAT)
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT) //<1>
     private Map<Integer, String> sensors;
 }
 // end::class[]
