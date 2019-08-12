@@ -36,7 +36,7 @@ import java.lang.reflect.Method;
  * @since 1.0
  */
 @Internal
-public class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements MethodInvocationContext<T, R> {
+public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements MethodInvocationContext<T, R> {
 
     /**
      * Constructor.

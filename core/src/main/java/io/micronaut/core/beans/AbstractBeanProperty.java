@@ -124,7 +124,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
             throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + introspection.getBeanType());
         }
         if (isReadOnly()) {
-            throw new UnsupportedOperationException("Cannot write a read-only property");
+            throw new UnsupportedOperationException("Cannot write a read-only property: " + getName());
         }
         if (value != null && !ReflectionUtils.getWrapperType(getType()).isInstance(value)) {
             throw new IllegalArgumentException("Specified value [" + value + "] is not of the correct type: " + getType());
