@@ -128,19 +128,16 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                                 } else if (data instanceof Attribute) {
                                     subscriber.onNext(new NettyCompletedAttribute((Attribute) data, false));
                                 }
+
+                                //If the user didn't release the data, we should
+                                if (data.refCnt() > 0) {
+                                    data.release();
+                                }
                             }
                         }
 
                         if (partsRequested.get() > 0) {
                             s.request(1);
-                        }
-
-                        //If the user didn't release the data, we should
-                        if (message instanceof ReferenceCounted) {
-                            ReferenceCounted refCounted = (ReferenceCounted) message;
-                            if (refCounted.refCnt() > 0) {
-                                refCounted.release();
-                            }
                         }
                     }
 

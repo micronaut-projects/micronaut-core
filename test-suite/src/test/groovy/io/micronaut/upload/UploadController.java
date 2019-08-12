@@ -343,7 +343,7 @@ public class UploadController {
 
                 @Override
                 public void onComplete() {
-                    emitter.onSuccess(String.join("", datas));
+                    emitter.onSuccess(String.join("|", datas));
                 }
             });
         });
