@@ -91,6 +91,22 @@ class ClientIntroductionAdviceSpec extends Specification {
         ctx.close()
     }
 
+    void "test basic auth"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        ApplicationContext ctx = ApplicationContext.run(['server-port': server.getPort()])
+
+        when:
+        BasicAuthClient client = ctx.getBean(BasicAuthClient)
+
+        then:
+        client.get() == 'Basic Y29uZmlnOnNlY3JldA=='
+
+        cleanup:
+        server.close()
+        ctx.close()
+    }
+
     @Controller('/aop')
     static class AopController implements MyApi {
         @Override
@@ -125,6 +141,17 @@ class ClientIntroductionAdviceSpec extends Specification {
         }
     }
 
+    /**
+     * Also used by {@link BasicAuthSpec}
+     */
+    @Controller("/basic-auth")
+    static class BasicAuthController {
+
+        @Get
+        String index(@Header String authorization) {
+            authorization
+        }
+    }
 
     static interface MyApi {
         @Get(produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
@@ -155,6 +182,13 @@ class ClientIntroductionAdviceSpec extends Specification {
 
         @Put("/{code}")
         String putTest(String code, @Body MyObject myObject)
+    }
+
+    @Client('http://config:secret@localhost:${server-port}/basic-auth')
+    static interface BasicAuthClient {
+
+        @Get
+        String get()
     }
 
     class MyObject {
