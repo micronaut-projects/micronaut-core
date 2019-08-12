@@ -2,6 +2,7 @@ package io.micronaut.docs.config.properties
 
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties
+import java.util.*
 
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
@@ -19,7 +20,7 @@ class EngineConfig {
 
     @ConfigurationProperties("crank-shaft")
     class CrankShaft { // <4>
-        var rodLength: Double? = null // <5>
+        var rodLength: Optional<Double> = Optional.empty() // <5>
     }
 }
 // end::class[]
