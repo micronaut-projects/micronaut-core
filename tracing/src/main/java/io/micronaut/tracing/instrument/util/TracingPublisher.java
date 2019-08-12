@@ -111,12 +111,12 @@ public class TracingPublisher<T> implements Publisher<T> {
             finishOnClose = false;
         }
         if (span != null) {
-            try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+            try (Scope ignored = tracer.scopeManager().activate(span)) {
                 publisher.subscribe(new Subscriber<T>() {
                     boolean finished = false;
                     @Override
                     public void onSubscribe(Subscription s) {
-                        try (Scope ignored = tracer.scopeManager().activate(span, false)) {
+                        try (Scope ignored = tracer.scopeManager().activate(span)) {
                             TracingPublisher.this.doOnSubscribe(span);
                             actual.onSubscribe(s);
                         }
@@ -124,7 +124,9 @@ public class TracingPublisher<T> implements Publisher<T> {
 
                     @Override
                     public void onNext(T object) {
-                        try (Scope ignored = tracer.scopeManager().activate(span, isSingle && finishOnClose)) {
+                        boolean closedAfterNext = isSingle && finishOnClose;
+                        Scope ignored = tracer.scopeManager().activate(span);
+                        try {
                             if (object instanceof MutableHttpResponse) {
                                 MutableHttpResponse response = (MutableHttpResponse) object;
                                 Optional<?> body = response.getBody();
@@ -145,25 +147,43 @@ public class TracingPublisher<T> implements Publisher<T> {
                                 finished = true;
                                 TracingPublisher.this.doOnFinish(span);
                             }
+                        } finally {
+                            if (closedAfterNext) {
+                                span.finish();
+                                ignored.close();
+                            }
                         }
                     }
 
                     @Override
                     public void onError(Throwable t) {
-                        try (Scope ignored = tracer.scopeManager().activate(span, finishOnClose)) {
+                        Scope ignored = tracer.scopeManager().activate(span);
+                        try {
                             TracingPublisher.this.onError(t, span);
                             actual.onError(t);
                             finished = true;
+                        } finally {
+                            if (finishOnClose) {
+                                span.finish();
+                                ignored.close();
+                            }
                         }
                     }
 
                     @Override
                     public void onComplete() {
                         if (!finished) {
-                            try (Scope ignored = tracer.scopeManager().activate(span, finishOnClose)) {
+                            Scope ignored = tracer.scopeManager().activate(span);
+                            try {
                                 actual.onComplete();
                                 TracingPublisher.this.doOnFinish(span);
+                            } finally {
+                                if (finishOnClose) {
+                                    span.finish();
+                                    ignored.close();
+                                }
                             }
+
                         } else {
                             actual.onComplete();
                         }

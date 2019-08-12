@@ -63,7 +63,7 @@ NOTE: Because `AnnotationMapper` implementations need to be on the annotation pr
 
 As an example the  `AnnotationMapper` that improves the introspection capabilities of JPA entities
 
-.PermitAllAnnotationMapper Mapper Example
+.EntityIntrospectedAnnotationMapper Mapper Example
 [source,java]
 ----
 include::inject/src/main/java/io/micronaut/inject/beans/visitor/EntityIntrospectedAnnotationMapper.java[indent=0, tag="class"]

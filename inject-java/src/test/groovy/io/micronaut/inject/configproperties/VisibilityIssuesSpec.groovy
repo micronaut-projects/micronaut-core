@@ -49,7 +49,7 @@ class VisibilityIssuesSpec extends AbstractTypeElementSpec {
         def context = ApplicationContext.run(
                 'parent.child.age': 22,
                 'parent.name': 'Sally',
-                'parent.child.engine.manufacturer': 'Chevy')
+                'parent.engine.manufacturer': 'Chevy')
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
 
         then:

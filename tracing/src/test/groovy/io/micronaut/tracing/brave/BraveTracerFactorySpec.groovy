@@ -21,6 +21,7 @@ import brave.http.HttpServerHandler
 import brave.http.HttpTracing
 import io.micronaut.context.ApplicationContext
 import io.micronaut.tracing.brave.sender.HttpClientSender
+import io.opentracing.Span
 import io.opentracing.Tracer
 import io.opentracing.noop.NoopTracer
 import spock.lang.Specification
@@ -95,7 +96,10 @@ class BraveTracerFactorySpec extends Specification {
 
         when:
         Tracer tracer = context.getBean(Tracer)
-        def scope = tracer.buildSpan("test").startActive(true)
+        def span = tracer.buildSpan("test").start()
+        def scope = tracer.activateSpan(span)
+
+        span.finish()
         scope.close()
 
         then:

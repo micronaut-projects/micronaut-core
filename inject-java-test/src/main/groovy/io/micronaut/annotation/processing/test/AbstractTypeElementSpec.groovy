@@ -22,10 +22,13 @@ import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AnnotationUtils
 import io.micronaut.annotation.processing.GenericUtils
 import io.micronaut.annotation.processing.ModelUtils
+import io.micronaut.annotation.processing.visitor.JavaClassElement
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
@@ -33,6 +36,7 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
+import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import spock.lang.Specification
 
@@ -52,6 +56,40 @@ import javax.tools.JavaFileObject
  * @since 1.0
  */
 abstract class AbstractTypeElementSpec extends Specification {
+
+    /**
+     * Builds a class element for the given source code.
+     * @param cls The source
+     * @return The class element
+     */
+    ClassElement buildClassElement(String cls) {
+        TypeElement typeElement = buildTypeElement(cls)
+        def env = JavacProcessingEnvironment.instance(new Context())
+        def elements = JavacElements.instance(new Context())
+        ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
+        GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
+        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, genericUtils, env.filer) {
+        }
+        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement)
+
+        return new JavaClassElement(
+                typeElement,
+                annotationMetadata,
+                new JavaVisitorContext(
+                      env,
+                      env.messager,
+                      elements,
+                      annotationUtils,
+                        env.typeUtils,
+                        modelUtils,
+                        genericUtils,
+                        env.filer,
+                        new MutableConvertibleValuesMap<Object>()
+                )
+        ) {
+
+        }
+    }
 
     /**
      * @param cls The class string

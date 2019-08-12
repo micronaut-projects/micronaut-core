@@ -122,7 +122,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final Method GET_VALUE_FOR_FIELD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getValueForField", BeanResolutionContext.class, BeanContext.class, int.class);
 
-    private static final Method GET_VALUE_FOR_PATH = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getValueForPath", BeanResolutionContext.class, BeanContext.class, Argument.class, String[].class);
+    private static final Method GET_VALUE_FOR_PATH = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "getValueForPath", BeanResolutionContext.class, BeanContext.class, Argument.class, String.class);
 
     private static final Method CONTAINS_VALUE_FOR_FIELD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "containsValueForField", BeanResolutionContext.class, BeanContext.class, int.class);
 
@@ -868,7 +868,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitConfigBuilderField(Object type, String field, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
+    public void visitConfigBuilderField(
+            Object type,
+            String field,
+            AnnotationMetadata annotationMetadata,
+            ConfigurationMetadataBuilder metadataBuilder) {
         String factoryMethod = annotationMetadata
                 .getValue(
                         ConfigurationBuilder.class,
@@ -899,7 +903,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitConfigBuilderMethod(Object type, String methodName, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
+    public void visitConfigBuilderMethod(
+            Object type,
+            String methodName,
+            AnnotationMetadata annotationMetadata,
+            ConfigurationMetadataBuilder metadataBuilder) {
 
         String factoryMethod = annotationMetadata
                 .getValue(
@@ -931,35 +939,39 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
-    public void visitConfigBuilderDurationMethod(String prefix, String configurationPrefix, Object returnType, String methodName) {
+    public void visitConfigBuilderDurationMethod(
+            String prefix,
+            Object returnType,
+            String methodName,
+            String path) {
         visitConfigBuilderMethodInternal(
                 prefix,
-                configurationPrefix,
                 returnType,
                 methodName,
                 Duration.class,
                 Collections.emptyMap(),
-                true
+                true,
+                path
         );
     }
 
     @Override
     public void visitConfigBuilderMethod(
             String prefix,
-            String configurationPrefix,
             Object returnType,
             String methodName,
             Object paramType,
-            Map<String, Object> generics) {
+            Map<String, Object> generics,
+            String path) {
 
         visitConfigBuilderMethodInternal(
                 prefix,
-                configurationPrefix,
                 returnType,
                 methodName,
                 paramType,
                 generics,
-                false
+                false,
+                path
         );
     }
 
@@ -1034,38 +1046,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitConfigBuilderMethodInternal(
             String prefix,
-            String configurationPrefix,
             Object returnType,
             String methodName,
             Object paramType,
             Map<String, Object> generics,
-            boolean isDurationWithTimeUnit) {
+            boolean isDurationWithTimeUnit,
+            String propertyPath) {
 
         if (currentConfigBuilderState != null) {
             Type builderType = currentConfigBuilderState.getType();
             String builderName = currentConfigBuilderState.getName();
             boolean isResolveBuilderViaMethodCall = currentConfigBuilderState.isMethod();
-            ConfigurationMetadataBuilder<?> metadataBuilder = currentConfigBuilderState.getMetadataBuilder();
             GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
 
             String propertyName = NameUtils.hyphenate(NameUtils.decapitalize(methodName.substring(prefix.length())), true);
-            // at some point we may want to support nested builders, hence the arrays and property path resolution
-            String[] propertyPath;
-            if (StringUtils.isNotEmpty(configurationPrefix)) {
-                propertyPath = new String[]{configurationPrefix, propertyName};
-            } else {
-                propertyPath = new String[]{propertyName};
-            }
-            boolean zeroArgs = paramType == null;
-            Type paramTypeRef = !zeroArgs ? getTypeReference(paramType) : null;
 
-            // visit the property metadata
-            metadataBuilder.visitProperty(
-                    paramTypeRef != null ? paramTypeRef.getClassName() : boolean.class.getName(),
-                    String.join(".", propertyPath),
-                    null,
-                    null
-            );
+            boolean zeroArgs = paramType == null;
 
             // Optional optional = AbstractBeanDefinition.getValueForPath(...)
             pushGetValueForPathCall(injectMethodVisitor, paramType, propertyName, propertyPath, zeroArgs, generics);
@@ -1172,7 +1168,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         ));
     }
 
-    private void pushGetValueForPathCall(GeneratorAdapter injectMethodVisitor, Object propertyType, String propertyName, String[] propertyPath, boolean zeroArgs, Map<String, Object> generics) {
+    private void pushGetValueForPathCall(GeneratorAdapter injectMethodVisitor, Object propertyType, String propertyName, String propertyPath, boolean zeroArgs, Map<String, Object> generics) {
         injectMethodVisitor.loadThis();
         injectMethodVisitor.loadArg(0); // the resolution context
         injectMethodVisitor.loadArg(1); // the bean context
@@ -1191,12 +1187,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             );
         }
 
-        int propertyPathLength = propertyPath.length;
-        pushNewArray(injectMethodVisitor, String.class, propertyPathLength);
-
-        for (int i = 0; i < propertyPathLength; i++) {
-            pushStoreStringInArray(injectMethodVisitor, i, propertyPathLength, propertyPath[i]);
-        }
+        injectMethodVisitor.push(propertyPath);
         // Optional optional = AbstractBeanDefinition.getValueForPath(...)
         injectMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(GET_VALUE_FOR_PATH));
         injectMethodVisitor.visitVarInsn(ASTORE, optionalInstanceIndex);

@@ -159,8 +159,8 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
                 }
             } else {
                 if (CompletionStage.class.isAssignableFrom(javaReturnType)) {
-                    try (Scope scope = builder.startActive(false)) {
-                        Span span = scope.span();
+                    Span span = builder.start();
+                    try (Scope ignored = tracer.scopeManager().activate(span)) {
                         populateTags(context, hystrixCommand, span);
                         try {
                             CompletionStage<?> completionStage = (CompletionStage) context.proceed();
@@ -175,21 +175,23 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
                             }
                             return null;
                         } catch (RuntimeException e) {
-                            logError(scope.span(), e);
+                            logError(span, e);
                             throw e;
                         }
 
                     }
                 } else {
 
-                    try (Scope scope = builder.startActive(true)) {
-                        Span span = scope.span();
+                    Span span = builder.start();
+                    try (Scope scope = tracer.scopeManager().activate(span)) {
                         populateTags(context, hystrixCommand, span);
                         try {
                             return context.proceed();
                         } catch (RuntimeException e) {
-                            logError(scope.span(), e);
+                            logError(span, e);
                             throw e;
+                        } finally {
+                            span.finish();
                         }
                     }
                 }

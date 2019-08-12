@@ -1730,9 +1730,7 @@ public class DefaultBeanContext implements BeanContext {
                             if (type != null) {
                                 final Optional qualified = Qualifiers.<T>byName(qualifier)
                                         .qualify(type, Stream.of(definition));
-                                if (qualified.isPresent()) {
-                                    return true;
-                                }
+                                return qualified.isPresent();
                             }
                         }
                     }
@@ -1788,10 +1786,12 @@ public class DefaultBeanContext implements BeanContext {
             }
             if (defaultImpl.filter(impl -> impl == bt).isPresent()) {
                 return (clazz) -> clazz.isAssignableFrom(bt);
+            } else {
+                return (clazz) -> clazz == bt;
             }
         }
 
-        return (clazz) -> clazz == bt;
+        return (clazz) -> clazz != Object.class && clazz.isAssignableFrom(bt);
     }
 
     private <T> void doInject(BeanResolutionContext resolutionContext, T instance, BeanDefinition definition) {

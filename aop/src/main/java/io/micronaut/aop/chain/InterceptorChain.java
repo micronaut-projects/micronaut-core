@@ -23,6 +23,7 @@ import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
@@ -32,6 +33,7 @@ import io.micronaut.inject.ExecutableMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -55,9 +57,11 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     protected final Interceptor<B, R>[] interceptors;
     protected final B target;
     protected final ExecutableMethod<B, R> executionHandle;
-    protected final MutableConvertibleValues attributes = MutableConvertibleValues.of(new ConcurrentHashMap<>());
-    protected final Map<String, MutableArgumentValue<?>> parameters = new LinkedHashMap<>();
+    protected final Object[] originalParameters;
+    protected MutableConvertibleValues<Object> attributes;
+    protected Map<String, MutableArgumentValue<?>> parameters;
 
+    private final int interceptorCount;
     private int index = 0;
 
 
@@ -77,23 +81,15 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
             LOG.trace("Intercepted method [{}] invocation on target: {}", method, target);
         }
         this.target = target;
+        this.originalParameters = originalParameters;
         this.executionHandle = method;
-        this.interceptors = new Interceptor[interceptors.length + 1];
-        System.arraycopy(interceptors, 0, this.interceptors, 0, interceptors.length);
-        boolean isIntroduction = target instanceof Introduced;
-        if (isIntroduction) {
-            this.interceptors[this.interceptors.length - 1] = context -> {
-                throw new UnimplementedAdviceException(method);
-            };
-        } else {
-            this.interceptors[this.interceptors.length - 1] = context -> method.invoke(target, getParameterValues());
-        }
-        Argument[] arguments = method.getArguments();
-        for (int i = 0; i < arguments.length; i++) {
-            Argument argument = method.getArguments()[i];
-            Object value = originalParameters[i];
-            parameters.put(argument.getName(), MutableArgumentValue.create(argument, value));
-        }
+        this.interceptors = interceptors;
+        this.interceptorCount = interceptors.length;
+    }
+
+    @Override
+    public Object[] getParameterValues() {
+        return originalParameters;
     }
 
     @Override
@@ -103,6 +99,16 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
 
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes == null) {
+            synchronized (this) { // double check
+                attributes = this.attributes;
+                if (attributes == null) {
+                    attributes = MutableConvertibleValues.of(new ConcurrentHashMap<>(5));
+                    this.attributes = attributes;
+                }
+            }
+        }
         return attributes;
     }
 
@@ -113,6 +119,74 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
 
     @Override
     public Map<String, MutableArgumentValue<?>> getParameters() {
+        Map<String, MutableArgumentValue<?>>  parameters = this.parameters;
+        if (parameters == null) {
+            synchronized (this) { // double check
+                parameters = this.parameters;
+                if (parameters == null) {
+                    Argument[] arguments = executionHandle.getArguments();
+                    parameters = new LinkedHashMap<>(arguments.length);
+                    for (int i = 0; i < arguments.length; i++) {
+                        Argument argument = executionHandle.getArguments()[i];
+                        int finalIndex = i;
+                        parameters.put(argument.getName(), new MutableArgumentValue<Object>() {
+                            @Override
+                            public AnnotationMetadata getAnnotationMetadata() {
+                                return argument.getAnnotationMetadata();
+                            }
+
+                            @Override
+                            public Optional<Argument<?>> getFirstTypeVariable() {
+                                return argument.getFirstTypeVariable();
+                            }
+
+                            @Override
+                            public Argument[] getTypeParameters() {
+                                return argument.getTypeParameters();
+                            }
+
+                            @Override
+                            public Map<String, Argument<?>> getTypeVariables() {
+                                return argument.getTypeVariables();
+                            }
+
+                            @Nonnull
+                            @Override
+                            public String getName() {
+                                return argument.getName();
+                            }
+
+                            @Nonnull
+                            @Override
+                            public Class<Object> getType() {
+                                return argument.getType();
+                            }
+
+                            @Override
+                            public boolean equalsType(Argument<?> other) {
+                                return argument.equalsType(other);
+                            }
+
+                            @Override
+                            public int typeHashCode() {
+                                return argument.typeHashCode();
+                            }
+
+                            @Override
+                            public Object getValue() {
+                                return originalParameters[finalIndex];
+                            }
+
+                            @Override
+                            public void setValue(Object value) {
+                                originalParameters[finalIndex] = value;
+                            }
+                        });
+                    }
+                    this.parameters = parameters;
+                }
+            }
+        }
         return parameters;
     }
 
@@ -129,21 +203,20 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     @Override
     public R proceed() throws RuntimeException {
         Interceptor<B, R> interceptor;
-        int len = this.interceptors.length;
-        if (len == 0) {
-            throw new IllegalStateException("At least one interceptor is required when calling proceed on the interceptor chain!");
-        }
-        int size = len - 1;
-        if (index == size) {
-            interceptor = this.interceptors[size];
+        if (interceptorCount == 0 || index == interceptorCount) {
+            try {
+                return executionHandle.invoke(target, getParameterValues());
+            } catch (AbstractMethodError e) {
+                throw new UnimplementedAdviceException(executionHandle);
+            }
         } else {
             interceptor = this.interceptors[index++];
-        }
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("Proceeded to next interceptor [{}] in chain for method invocation: {}", interceptor, executionHandle);
-        }
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Proceeded to next interceptor [{}] in chain for method invocation: {}", interceptor, executionHandle);
+            }
 
-        return interceptor.intercept(this);
+            return interceptor.intercept(this);
+        }
     }
 
     @Override
@@ -167,7 +240,9 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
      * @param interceptors The array of interceptors
      * @return The filtered array of interceptors
      */
+    @SuppressWarnings("WeakerAccess")
     @Internal
+    @UsedByGeneratedCode
     public static Interceptor[] resolveAroundInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
         return resolveInterceptorsInternal(method, Around.class, interceptors);
@@ -183,6 +258,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
      * @return The filtered array of interceptors
      */
     @Internal
+    @UsedByGeneratedCode
     public static Interceptor[] resolveIntroductionInterceptors(BeanContext beanContext, ExecutableMethod<?, ?> method, Interceptor... interceptors) {
         instrumentAnnotationMetadata(beanContext, method);
         Interceptor[] aroundInterceptors = resolveAroundInterceptors(beanContext, method, interceptors);

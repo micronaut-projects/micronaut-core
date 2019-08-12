@@ -47,7 +47,7 @@ public class TracingRunnable implements Runnable {
     public void run() {
         Scope scope = null;
         if (span != null) {
-            scope = tracer.scopeManager().activate(span, false);
+            scope = tracer.scopeManager().activate(span);
         }
         try {
             runnable.run();
@@ -59,11 +59,6 @@ public class TracingRunnable implements Runnable {
     }
 
     private Span getSpan(Tracer tracer) {
-        Scope active = tracer.scopeManager().active();
-        if (active != null) {
-            return active.span();
-        } else {
-            return tracer.activeSpan();
-        }
+        return tracer.scopeManager().activeSpan();
     }
 }

@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
+import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
 class BasicAuthSpec extends Specification {
@@ -29,5 +31,20 @@ class BasicAuthSpec extends Specification {
         then:
         request.headers.get('Authorization')
         request.headers.get('Authorization') == "Basic ${'sherlock:password'.bytes.encodeBase64().toString()}"
+    }
+
+    void "test user in absolute URL"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        ApplicationContext ctx = server.getApplicationContext()
+
+        when:
+        String resp = ctx.createBean(RxHttpClient, new URL("http://sherlock:password@localhost:${server.port}")).retrieve("/basic-auth").blockingFirst()
+
+        then:
+        resp == "Basic ${'sherlock:password'.bytes.encodeBase64().toString()}"
+
+        cleanup:
+        ctx.close()
     }
 }
