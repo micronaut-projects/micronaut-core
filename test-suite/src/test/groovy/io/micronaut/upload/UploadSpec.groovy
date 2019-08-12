@@ -311,7 +311,4 @@ class UploadSpec extends AbstractMicronautSpec {
         result == 'data.json: 16'
     }
 
-    void "test receiving an entire multipart body"() {
-
-    }
 }
