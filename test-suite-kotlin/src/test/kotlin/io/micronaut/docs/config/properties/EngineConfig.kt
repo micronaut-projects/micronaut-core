@@ -9,18 +9,18 @@ import javax.validation.constraints.NotBlank
 // end::imports[]
 
 // tag::class[]
-@ConfigurationProperties("my.engine")
+@ConfigurationProperties("my.engine") // <1>
 class EngineConfig {
 
-    @NotBlank
-    var manufacturer = "Ford"
+    @NotBlank // <2>
+    var manufacturer = "Ford" // <3>
     @Min(1L)
     var cylinders: Int = 0
     var crankShaft = CrankShaft()
 
     @ConfigurationProperties("crank-shaft")
-    class CrankShaft {
-        var rodLength: Optional<Double> = Optional.empty()
+    class CrankShaft { // <4>
+        var rodLength: Optional<Double> = Optional.empty() // <5>
     }
 }
 // end::class[]

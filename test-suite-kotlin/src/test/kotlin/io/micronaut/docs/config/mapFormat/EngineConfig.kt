@@ -13,7 +13,7 @@ class EngineConfig {
 
     @Min(1L)
     var cylinders: Int = 0
-    @MapFormat(transformation = MapFormat.MapTransformation.FLAT)
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT) //<1>
     var sensors: Map<Int, String>? = null
 }
 // end::class[]
