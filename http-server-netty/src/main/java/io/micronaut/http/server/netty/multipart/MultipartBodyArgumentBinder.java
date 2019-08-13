@@ -23,9 +23,9 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.*;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.buffer.ByteBufHolder;
@@ -33,7 +33,6 @@ import io.netty.buffer.EmptyByteBuf;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,13 +42,13 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * A {@link io.micronaut.http.annotation.Body} argument binder for a {@link Publisher<CompletedPart>} argument.
+ * A {@link io.micronaut.http.annotation.Body} argument binder for a {@link MultipartBody} argument.
  *
  * @author James Kleeh
  * @since 1.3.0
  */
 @Singleton
-public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<Publisher> {
+public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     
@@ -68,12 +67,17 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
     }
 
     @Override
-    public Argument<Publisher> argumentType() {
-        return Argument.of(Publisher.class, CompletedPart.class);
+    public boolean supportsSuperTypes() {
+        return false;
     }
 
     @Override
-    public BindingResult<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest<?> source) {
+    public Argument<MultipartBody> argumentType() {
+        return Argument.of(MultipartBody.class);
+    }
+
+    @Override
+    public BindingResult<MultipartBody> bind(ArgumentConversionContext<MultipartBody> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
