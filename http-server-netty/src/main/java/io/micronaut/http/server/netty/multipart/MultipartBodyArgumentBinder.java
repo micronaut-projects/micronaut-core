@@ -26,7 +26,6 @@ import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.*;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.buffer.ByteBufHolder;
@@ -44,7 +43,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * A {@link io.micronaut.http.annotation.Body} argument binder for a {@link MultipartBody} argument.
+ * A {@link io.micronaut.http.annotation.Body} argument binder for a {@link Publisher<CompletedPart>} argument.
  *
  * @author James Kleeh
  * @since 1.3.0
