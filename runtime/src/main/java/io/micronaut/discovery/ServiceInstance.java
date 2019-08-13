@@ -15,7 +15,6 @@
  */
 package io.micronaut.discovery;
 
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
