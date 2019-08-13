@@ -69,13 +69,15 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
             }
-            route = HEAD(resolveUri(bean, uri,
-                    method,
-                    uriNamingStrategy),
-                    bean,
-                    method).produces(produces);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Created Route: {}", route);
+            if (method.booleanValue(Get.class, "headRoute").orElse(true)) {
+                route = HEAD(resolveUri(bean, uri,
+                        method,
+                        uriNamingStrategy),
+                        bean,
+                        method).produces(produces);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route: {}", route);
+                }
             }
         });
 

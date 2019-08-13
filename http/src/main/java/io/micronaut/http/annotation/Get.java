@@ -85,4 +85,8 @@ public @interface Get {
     @AliasFor(annotation = SingleResult.class, member = "value")
     boolean single() default false;
 
+    /**
+     * @return True if a HEAD route should also be registered for the same method
+     */
+    boolean headRoute() default true;
 }

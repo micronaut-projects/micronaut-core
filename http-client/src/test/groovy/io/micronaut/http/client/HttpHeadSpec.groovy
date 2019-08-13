@@ -329,7 +329,6 @@ class HttpHeadSpec extends Specification {
         client.stop()
     }
 
-
     void "test that Optional.empty() should return 404"() {
         given:
         HttpClient client = HttpClient.create(embeddedServer.getURL())
@@ -347,7 +346,6 @@ class HttpHeadSpec extends Specification {
         e.status == HttpStatus.NOT_FOUND
 
         cleanup:
-        client.stop()
         client.close()
     }
 
@@ -365,7 +363,6 @@ class HttpHeadSpec extends Specification {
         ex.message == "Empty body"
 
         cleanup:
-        client.stop()
         client.close()
     }
 
@@ -418,7 +415,28 @@ class HttpHeadSpec extends Specification {
         ex.message == "Empty body"
 
         cleanup:
-        client.stop()
+        client.close()
+    }
+
+    void "test a disabled head route"() {
+        given:
+        MyGetClient myGetClient = embeddedServer.applicationContext.getBean(MyGetClient)
+
+        when:
+        myGetClient.noHead()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.message == "Method Not Allowed"
+
+        when:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+        String body = client.toBlocking().retrieve(HttpRequest.GET("/head/no-head"), String)
+
+        then:
+        body == "success"
+
+        cleanup:
         client.close()
     }
 
@@ -494,6 +512,11 @@ class HttpHeadSpec extends Specification {
         String hostHeader(@Header String host) {
             return host
         }
+
+        @Get(uri = "/no-head", produces = MediaType.TEXT_PLAIN, headRoute = false)
+        String noHead() {
+            return "success"
+        }
     }
 
     static class Book {
@@ -539,6 +562,8 @@ class HttpHeadSpec extends Specification {
         @Head("/dateTimeQuery")
         String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate)
 
+        @Head("/no-head")
+        String noHead()
     }
 
     @javax.inject.Singleton
