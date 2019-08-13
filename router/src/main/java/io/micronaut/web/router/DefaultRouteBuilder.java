@@ -401,14 +401,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, MethodExecutionHandle<?, Object> executableHandle) {
         UriRoute route;
         if (currentParentRoute != null) {
-            route = new DefaultUriRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri), executableHandle);
+            route = new DefaultUriRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri), executableHandle, httpMethodName);
             currentParentRoute.nestedRoutes.add((DefaultUriRoute) route);
         } else {
-            route = new DefaultUriRoute(httpMethod, uri, executableHandle);
-        }
-
-        if (!httpMethodName.equals(httpMethod.name())) {
-            route = new CustomMethodRoute(httpMethodName, route);
+            route = new DefaultUriRoute(httpMethod, uri, executableHandle, httpMethodName);
         }
 
         this.uriRoutes.add(route);
@@ -780,7 +776,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * The default route impl.
      */
     class DefaultUriRoute extends AbstractRoute implements UriRoute {
-
+        final String httpMethodName;
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
@@ -791,7 +787,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          */
         DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod);
+            this(httpMethod, uriTemplate, targetMethod, httpMethod.name());
+        }
+
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link CharSequence}
+         * @param targetMethod The target method execution handle
+         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         */
+        DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MethodExecutionHandle targetMethod, String httpMethodName) {
+            this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod, httpMethodName);
         }
 
         /**
@@ -801,7 +807,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          */
         DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod) {
-            this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod);
+            this(httpMethod, uriTemplate, mediaType, targetMethod, httpMethod.name());
+        }
+
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link CharSequence}
+         * @param mediaType The Media type
+         * @param targetMethod The target method execution handle
+         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         */
+        DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod, String httpMethodName) {
+            this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod, httpMethodName);
         }
 
         /**
@@ -810,7 +827,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          */
         DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), targetMethod);
+            this(httpMethod, uriTemplate, targetMethod, httpMethod.name());
+        }
+
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
+         * @param targetMethod The target method execution handle
+         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         */
+        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MethodExecutionHandle targetMethod, String httpMethodName) {
+            this(httpMethod, uriTemplate, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), targetMethod, httpMethodName);
         }
 
         /**
@@ -820,14 +847,31 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          */
         DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, List<MediaType> mediaTypes, MethodExecutionHandle targetMethod) {
+            this(httpMethod, uriTemplate, mediaTypes, targetMethod, httpMethod.name());
+        }
+
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
+         * @param mediaTypes The media types
+         * @param targetMethod The target method execution handle
+         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         */
+        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, List<MediaType> mediaTypes, MethodExecutionHandle targetMethod, String httpMethodName) {
             super(targetMethod, ConversionService.SHARED, mediaTypes);
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
+            this.httpMethodName = httpMethodName;
+        }
+
+        @Override
+        public String getHttpMethodName() {
+            return httpMethodName;
         }
 
         @Override
         public String toString() {
-            StringBuilder builder = new StringBuilder(httpMethod);
+            StringBuilder builder = new StringBuilder(getHttpMethodName());
             return builder.append(' ')
                 .append(uriMatchTemplate)
                 .append(" -> ")

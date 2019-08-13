@@ -85,7 +85,7 @@ public class RxJavaRouteDataCollector implements RouteDataCollector<Map<String, 
         return new StringBuilder("{[")
             .append(route.getUriMatchTemplate())
             .append("],method=[")
-            .append(route.getHttpMethod().name())
+            .append(route.getHttpMethodName())
             .append("],produces=[")
             .append(produces)
             .append("]}")

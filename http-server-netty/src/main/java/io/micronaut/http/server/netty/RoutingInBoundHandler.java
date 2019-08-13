@@ -525,7 +525,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         ctx,
                         request,
                         nettyHttpRequest,
-                        HttpResponse.notAllowed(existingRouteMethods),
+                        HttpResponse.notAllowedGeneric(existingRouteMethods),
                         "Method [" + request.getHttpMethodName() + "] not allowed. " +
                                 "Allowed methods: " + existingRouteMethods);
                 return;
