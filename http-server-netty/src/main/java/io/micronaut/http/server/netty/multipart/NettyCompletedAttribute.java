@@ -37,7 +37,7 @@ import java.util.Optional;
  * @since 1.3.0
  */
 @Internal
-public class NettyCompletedAttribute implements CompletedPart {
+class NettyCompletedAttribute implements CompletedPart {
 
     private final Attribute attribute;
     private final boolean controlRelease;
@@ -53,7 +53,7 @@ public class NettyCompletedAttribute implements CompletedPart {
      * @param attribute The netty attribute
      * @param controlRelease If true, release after retrieving the attribute data
      */
-    public NettyCompletedAttribute(Attribute attribute, boolean controlRelease) {
+    NettyCompletedAttribute(Attribute attribute, boolean controlRelease) {
         this.attribute = attribute;
         this.controlRelease = controlRelease;
     }
