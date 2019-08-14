@@ -93,7 +93,7 @@ public class UploadController {
     // end::bytesUpload[]
 
     // tag::wholeBodyUpload[]
-    @Post(value = "/bytes", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
+    @Post(value = "/whole-body", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
     public Single<String> uploadBytes(@Body MultipartBody body) { // <2>
         return Single.create(emitter -> {
             body.subscribe(new Subscriber<CompletedPart>() {
