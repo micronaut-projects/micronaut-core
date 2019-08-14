@@ -369,6 +369,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
             values.put('custom[0][0][key][5]', 'ehh')
             values.put('custom[0][0][key2]', 'xyz')
             values.put('micronaut.security.intercept-url-map[0].access[0]', '/some-path')
+            values.put('micronaut.security.interceptUrlMap[0].access[1]', '/some-path-x')
 
             PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                     PropertySource.of("test", values)
@@ -393,6 +394,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
             custom[0][0]['key'][5] == 'ehh'
             custom[0][0]['key2'] == 'xyz'
             micronaut['security']['intercept-url-map'][0]['access'][0] == '/some-path'
+            micronaut['security']['intercept-url-map'][0]['access'][1] == '/some-path-x'
     }
 
 }
