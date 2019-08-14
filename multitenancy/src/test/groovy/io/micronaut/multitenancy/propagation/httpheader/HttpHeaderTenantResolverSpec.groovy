@@ -29,7 +29,6 @@ import io.micronaut.multitenancy.tenantresolver.TenantResolver
 import io.micronaut.multitenancy.writer.HttpHeaderTenantWriter
 import io.micronaut.multitenancy.writer.TenantWriter
 import io.micronaut.runtime.server.EmbeddedServer
-import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
