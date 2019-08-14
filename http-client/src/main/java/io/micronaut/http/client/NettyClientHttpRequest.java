@@ -15,6 +15,11 @@
  */
 package io.micronaut.http.client;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.util.Optional;
+
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -42,13 +47,6 @@ import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import org.reactivestreams.Publisher;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.Charset;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-
 /**
  * Default implementation of {@link MutableHttpRequest} for the {@link HttpClient}.
  *
@@ -59,7 +57,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
-    private static final Map<String, io.netty.handler.codec.http.HttpMethod> METHOD_MAP = new ConcurrentHashMap<>();
     private final NettyHttpHeaders headers = new NettyHttpHeaders();
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
     private final HttpMethod httpMethod;
@@ -212,19 +209,8 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
         return req;
     }
 
-    /**
-     * This method guarantees that for each name you get at most one instance, so that multiple calls
-     * would not cause GC problems. However, due to the bug in JDK 8, it had to be implemented in a weird way.
-     * @param httpMethodName The name of the method
-     * @return The instance of HttpMethod
-     * @see @link https://bugs.openjdk.java.net/browse/JDK-8161372
-     */
     private static io.netty.handler.codec.http.HttpMethod getMethod(String httpMethodName) {
-        if (!METHOD_MAP.containsKey(httpMethodName)) {
-            return METHOD_MAP.computeIfAbsent(httpMethodName, io.netty.handler.codec.http.HttpMethod::valueOf);
-        }
-
-        return METHOD_MAP.get(httpMethodName);
+        return io.netty.handler.codec.http.HttpMethod.valueOf(httpMethodName);
     }
 
     /**
