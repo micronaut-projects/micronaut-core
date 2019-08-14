@@ -258,7 +258,6 @@ public class DefaultRouter implements Router {
 
     private UriRoute[] finalizeRoutes(List<UriRoute> routes) {
         Collections.sort(routes);
-        Collections.reverse(routes);
         return routes.toArray(new UriRoute[0]);
     }
 

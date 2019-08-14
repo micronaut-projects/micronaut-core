@@ -240,24 +240,33 @@ public class UriTemplate implements Comparable<UriTemplate> {
             return 0;
         }
 
-        List<PathSegment> thisSegments = this.segments;
-        List<PathSegment> thatSegments = o.segments;
+        Integer thisVariableCount = 0;
+        Integer thatVariableCount = 0;
+        Integer thisRawCount = 0;
+        Integer thatRawCount = 0;
 
-        boolean e1 = thisSegments.isEmpty();
-        boolean e2 = thatSegments.isEmpty();
-        if (e1 && e2) {
-            return 0;
-        } else if (e1 && !e2) {
-            return -1;
-        } else if (!e1 && e2) {
-            return 1;
-        } else {
-            return Integer.compare(
-                    thisSegments.get(0).toString().length(),
-                    thatSegments.get(0).toString().length()
-            );
+        for (PathSegment segment: this.segments) {
+            if (segment.isVariable()) {
+                thisVariableCount++;
+            } else {
+                thisRawCount++;
+            }
         }
 
+        for (PathSegment segment: o.segments) {
+            if (segment.isVariable()) {
+                thatVariableCount++;
+            } else {
+                thatRawCount++;
+            }
+        }
+
+        int variableCompare = thisVariableCount.compareTo(thatVariableCount);
+        if (variableCompare == 0) {
+            return thatRawCount.compareTo(thisRawCount);
+        } else {
+            return variableCompare;
+        }
     }
 
     /**

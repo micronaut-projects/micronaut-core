@@ -68,6 +68,7 @@ import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -483,35 +484,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         //find the routes with the least amount of variables
         if (uriRoutes.size() > 1) {
-            long segments = Long.MAX_VALUE;
+            long variableCount = 0;
+            long rawCount = 0;
+
             List<UriRouteMatch<Object, Object>> closestMatches = new ArrayList<>(uriRoutes.size());
 
-            for (UriRouteMatch<Object, Object> match: uriRoutes) {
-                long matchedSegements = match.getRoute().getUriMatchTemplate().getVariableSegmentCount();
-                if (matchedSegements < segments) {
-                    closestMatches.clear();
-                    segments = matchedSegements;
+            for (int i = 0; i < uriRoutes.size(); i++) {
+                UriRouteMatch<Object, Object> match = uriRoutes.get(i);
+                UriMatchTemplate template = match.getRoute().getUriMatchTemplate();
+                long variable = template.getVariableSegmentCount();
+                long raw = template.getRawSegmentCount();
+                if (i == 0) {
+                    variableCount = variable;
+                    rawCount = raw;
                 }
-                if (matchedSegements == segments) {
-                    closestMatches.add(match);
+                if (variable > variableCount || raw < rawCount) {
+                    break;
                 }
-            }
-            uriRoutes = closestMatches;
-        }
-
-        if (uriRoutes.size() > 1) {
-            long segments = 0L;
-            List<UriRouteMatch<Object, Object>> closestMatches = new ArrayList<>(uriRoutes.size());
-
-            for (UriRouteMatch<Object, Object> match: uriRoutes) {
-                long matchedSegements = match.getRoute().getUriMatchTemplate().getRawSegmentCount();
-                if (matchedSegements > segments) {
-                    closestMatches.clear();
-                    segments = matchedSegements;
-                }
-                if (matchedSegements == segments) {
-                    closestMatches.add(match);
-                }
+                closestMatches.add(match);
             }
             uriRoutes = closestMatches;
         }
