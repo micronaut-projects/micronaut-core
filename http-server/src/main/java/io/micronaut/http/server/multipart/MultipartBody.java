@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.multipart;
+package io.micronaut.http.server.multipart;
+
+import io.micronaut.http.multipart.CompletedPart;
+import org.reactivestreams.Publisher;
 
 /**
- * Represents a completed part of a multipart request.
- * <p>
- * When used as an argument to an {@link io.micronaut.http.annotation.Controller} instance method, the route
- * is not executed until the part has been fully received. Provides access to metadata about the file as
- * well as the contents.
+ * Represents the body of a multipart request that emits each
+ * part after it is received in its entirety.
  *
- * @author Zachary Klein
- * @since 1.0.0
+ * @author James Kleeh
+ * @since 1.3.0
  */
-public interface CompletedFileUpload extends FileUpload, CompletedPart {
+public interface MultipartBody extends Publisher<CompletedPart> {
+
 }

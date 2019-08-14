@@ -398,6 +398,55 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         response.body() == val
     }
 
+    void "test whole multipart body"() {
+        given:
+        def data = '{"title":"Test"}'
+        def data2 = '{"title":"Test2"}'
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .addPart("data", "data2.json", MediaType.APPLICATION_JSON_TYPE, data2.bytes)
+                .addPart("title", "bar")
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-multipart-body", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.getBody().get() == '{"title":"Test"}|{"title":"Test2"}|bar'
+    }
+
+    void "test whole multipart body with large parts"() {
+        when: "a large document with partial data is uploaded"
+        def val = 'xxxx' * 20000
+        def data = '{"title":"Big ' + val + '"}'
+        def data2 = '{"title":"Big2 ' + val + '"}'
+        def requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE,data.bytes)
+                .addPart("data", "data2.json", MediaType.APPLICATION_JSON_TYPE,data2.bytes)
+                .addPart("title", "bar")
+                .build()
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-multipart-body", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
+                String
+        ))
+        def response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body().contains('"title":"Big xx')
+        response.body().contains('"title":"Big2 xx')
+        response.body().contains('bar')
+    }
+
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.http.client.read-timeout': 300]
     }
