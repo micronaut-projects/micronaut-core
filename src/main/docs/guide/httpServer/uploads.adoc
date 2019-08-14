@@ -91,3 +91,23 @@ HttpResponse upload(Publisher<CompletedFileUpload> files)
 HttpResponse upload(Publisher<MyObject> files)
 HttpResponse upload(Publisher<Publisher<PartData>> files)
 ----
+
+== Whole Body Binding
+
+For the cases where the names of the parts of the request cannot be known ahead of time, or the entire body should be read, a special type can be used to indicate the entire body is desired.
+
+If a route has an argument of type api:io.micronaut.http.server.multipart.MultipartBody[] (not to be confused with the class for the client) annotated with ann:http.annotation.Body[], then each part of the request will be emitted through the argument. A api:io.micronaut.http.server.multipart.MultipartBody[] is a publisher of api:io.micronaut.http.multipart.CompletedPart[] instances.
+
+For example:
+
+[source,java]
+----
+include::{testsuite}/server/upload/UploadController.java[tags=imports, indent=0]
+include::{testsuite}/server/upload/UploadController.java[tags=wholeBodyImports, indent=0]
+
+include::{testsuite}/server/upload/UploadController.java[tags=class, indent=0]
+
+include::{testsuite}/server/upload/UploadController.java[tags=wholeBodyUpload, indent=4]
+
+}
+----
