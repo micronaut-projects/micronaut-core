@@ -31,6 +31,13 @@ import io.micronaut.http.multipart.CompletedFileUpload;
 import java.io.IOException;
 import java.nio.file.*;
 // end::completedImports[]
+
+// tag::wholeBodyImports[]
+import io.micronaut.http.multipart.CompletedPart;
+import io.micronaut.http.server.multipart.MultipartBody;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+// end::wholeBodyImports[]
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -85,4 +92,38 @@ public class UploadController {
     }
     // end::bytesUpload[]
 
+    // tag::wholeBodyUpload[]
+    @Post(value = "/bytes", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
+    public Single<String> uploadBytes(@Body MultipartBody body) { // <2>
+        return Single.create(emitter -> {
+            body.subscribe(new Subscriber<CompletedPart>() {
+                private Subscription s;
+
+                @Override
+                public void onSubscribe(Subscription s) {
+                    this.s = s;
+                    s.request(1);
+                }
+
+                @Override
+                public void onNext(CompletedPart completedPart) {
+                    String partName = completedPart.getName();
+                    if (completedPart instanceof CompletedFileUpload) {
+                        String originalFileName = ((CompletedFileUpload) completedPart).getFilename();
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+
+                }
+
+                @Override
+                public void onComplete() {
+                    emitter.onSuccess("Uploaded");
+                }
+            });
+        });
+    }
+    // end::wholeBodyUpload[]
 }
