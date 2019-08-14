@@ -79,20 +79,20 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/all?max=20'                         | "Parameter Value: 20"       | HttpStatus.OK
 
-        HttpMethod.GET  | '/parameter/exploded?title=The%20Stand'         | "Parameter Value: The Stand" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/exploded?title=The%20Stand&age=20'  | "Parameter Value: The Stand 20" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"    | HttpStatus.OK
         HttpMethod.POST | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
     }
 
-    void "test exploded with no default constructor"() {
-        when:
-        Flowable<HttpResponse<String>> exchange = rxClient.exchange(HttpRequest.GET("/parameter/exploded?title=The%20Stand"), String)
-        HttpResponse<String> response = exchange.onErrorReturn({ t -> t.response }).blockingFirst()
+    void "test list to single error"() {
+        given:
+        def req = HttpRequest.GET('/parameter/exploded?title=The%20Stand&age=20&age=30')
+        def exchange = rxClient.exchange(req, String)
+        def response = exchange.onErrorReturn({ t -> t.response }).blockingFirst()
 
-        then:
-        response.status() == HttpStatus.OK
-        response.getBody().isPresent()
-        response.getBody().get() == "Parameter Value: The Stand"
+        expect:
+        response.status() == HttpStatus.BAD_REQUEST
+        response.body().contains('Failed to convert argument [age]')
     }
 
     @Controller(value = "/parameter", produces = MediaType.TEXT_PLAIN)
@@ -197,7 +197,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
         @Get("/exploded{?book*}")
         String exploded(Book book) {
-            "Parameter Value: $book.title"
+            "Parameter Value: $book.title $book.age"
         }
 
         @Get('/queryName/{name}')
@@ -215,8 +215,10 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
             private String title
             private String author
+            private int age
 
-            Book(String title, @Nullable String author) {
+            Book(String title, Integer age, @Nullable String author) {
+                this.age = age
                 this.title = title
                 this.author = author
             }
@@ -224,6 +226,11 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             String getTitle() {
                 return title
             }
+
+            int getAge() {
+                return age
+            }
+
         }
     }
 }
