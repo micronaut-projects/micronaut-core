@@ -849,8 +849,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (value instanceof CharSequence) {
             return new String[] { value.toString() };
         } else if (value instanceof String[]) {
-            String[] strs = (String[]) value;
-            return resolveStringArray(strs, valueMapper);
+            return (String[]) value;
         } else if (value != null) {
             if (value.getClass().isArray()) {
                 int len = Array.getLength(value);
