@@ -102,6 +102,8 @@ The following table illustrates common return types usable with ann:http.client.
 |`Book show()`
 |===
 
-Generally, any reactive type that can be converted to the rs:Publisher[] interface is supported as a return type including (but not limited to) the reactive types defined by RxJava 1.x, RxJava 2.x and Reactor 3.x.
+Generally, any reactive type that can be converted to the rs:Publisher[] interface is supported as a return type including (but not limited to) the reactive types defined by RxJava 1.x, RxJava 2.x and Reactor 3.x. 
+
+You can combine many of these return types together. For example, if you wanted a reactive interface that provided access to the HTTP response headers as well as a body that was already converted to a Book, you could return `Flowable<HttpResponse<Book>>`.
 
 Returning jdk:java.util.concurrent.CompletableFuture[] instances is also supported. Note that returning any other type _will result in a blocking request_ and is not recommended other than for testing.
