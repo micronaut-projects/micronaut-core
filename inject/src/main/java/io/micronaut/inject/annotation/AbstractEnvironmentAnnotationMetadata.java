@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -32,6 +33,7 @@ import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Variation of {@link AnnotationMetadata} that is environment specific.
@@ -188,7 +190,29 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     @Nonnull
     @Override
     public String[] stringValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
-        Function<Object, Object> valueMapper = getEnvironmentValueMapper();
+        PropertyPlaceholderResolver resolver = getEnvironment().getPlaceholderResolver();
+        Function<Object, Object> valueMapper = (val) -> {
+            String[] values;
+            if (val instanceof CharSequence) {
+                values = new String[] { val.toString() };
+            } else if (val instanceof String[]) {
+                values = (String[]) val;
+            } else {
+                return null;
+            }
+            return Arrays.stream(values)
+                    .flatMap(value -> {
+                        try {
+                            return Arrays.stream(resolver.resolveRequiredPlaceholder(value, String[].class));
+                        } catch (ConfigurationException e) {
+                            if (value.contains(resolver.getPrefix())) {
+                                value = resolver.resolveRequiredPlaceholders(value);
+                            }
+                            return Stream.of(value);
+                        }
+                    })
+                    .toArray(String[]::new);
+        };
         return annotationMetadata.stringValues(annotation, member, valueMapper);
     }
 

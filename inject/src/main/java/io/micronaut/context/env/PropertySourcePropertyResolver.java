@@ -456,12 +456,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
                 for (String resolvedProperty : resolvedProperties) {
-                    int i = property.indexOf('[');
+                    int i = resolvedProperty.indexOf('[');
                     if (i > -1) {
                         String propertyName = resolvedProperty.substring(0, i);
                         Map entries = resolveEntriesForKey(propertyName, true);
                         if (entries != null) {
-                            processProperty(property.substring(i), val -> entries.put(propertyName, val), () -> entries.get(propertyName), value);
+                            processProperty(resolvedProperty.substring(i), val -> entries.put(propertyName, val), () -> entries.get(propertyName), value);
                         }
                     } else {
                         Map entries = resolveEntriesForKey(resolvedProperty, true);
