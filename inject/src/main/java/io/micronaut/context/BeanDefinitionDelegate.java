@@ -51,36 +51,11 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         this.definition = definition;
     }
 
-    @Override
-    public boolean isAbstract() {
-        return definition.isAbstract();
-    }
-
-    @Override
-    public boolean isProxy() {
-        return definition.isProxy();
-    }
-
     /**
      * @return The bean definition type
      */
     BeanDefinition<T> getDelegate() {
         return definition;
-    }
-
-    @Override
-    public Optional<Class<? extends Annotation>> getScope() {
-        return definition.getScope();
-    }
-
-    @Override
-    public boolean isSingleton() {
-        return definition.isSingleton();
-    }
-
-    @Override
-    public boolean isProvided() {
-        return definition.isProvided();
     }
 
     @Override
@@ -91,76 +66,6 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     @Override
     public boolean isPrimary() {
         return definition.isPrimary() || get(PRIMARY_ATTRIBUTE, Boolean.class).orElse(false);
-    }
-
-    @Override
-    public Class<T> getBeanType() {
-        return definition.getBeanType();
-    }
-
-    @Override
-    public Optional<Class<?>> getDeclaringType() {
-        return definition.getDeclaringType();
-    }
-
-    @Override
-    public ConstructorInjectionPoint<T> getConstructor() {
-        return definition.getConstructor();
-    }
-
-    @Override
-    public Collection<Class> getRequiredComponents() {
-        return definition.getRequiredComponents();
-    }
-
-    @Override
-    public Collection<MethodInjectionPoint> getInjectedMethods() {
-        return definition.getInjectedMethods();
-    }
-
-    @Override
-    public Collection<FieldInjectionPoint> getInjectedFields() {
-        return definition.getInjectedFields();
-    }
-
-    @Override
-    public Collection<MethodInjectionPoint> getPostConstructMethods() {
-        return definition.getPostConstructMethods();
-    }
-
-    @Override
-    public Collection<MethodInjectionPoint> getPreDestroyMethods() {
-        return definition.getPreDestroyMethods();
-    }
-
-    @Override
-    public String getName() {
-        return definition.getName();
-    }
-
-    @Override
-    public <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class[] argumentTypes) {
-        return definition.findMethod(name, argumentTypes);
-    }
-
-    @Override
-    public <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name) {
-        return definition.findPossibleMethods(name);
-    }
-
-    @Override
-    public T inject(BeanContext context, T bean) {
-        return definition.inject(context, bean);
-    }
-
-    @Override
-    public T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
-        return definition.inject(resolutionContext, context, bean);
-    }
-
-    @Override
-    public Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
-        return definition.getExecutableMethods();
     }
 
     @Override
