@@ -734,9 +734,13 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
             List list = new ArrayList();
             for (Object o : object) {
-                Optional<?> converted = convert(o, targetComponentType, newContext);
-                if (converted.isPresent()) {
-                    list.add(converted.get());
+                if (o != null) {
+                    Optional<?> converted = convert(o, targetComponentType, newContext);
+                    if (converted.isPresent()) {
+                        list.add(converted.get());
+                    }
+                } else {
+                    list.add(null);
                 }
             }
             return CollectionUtils.convertCollection((Class) targetType, list);
