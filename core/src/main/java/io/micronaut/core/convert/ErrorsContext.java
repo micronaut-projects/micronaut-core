@@ -43,6 +43,15 @@ public interface ErrorsContext extends Iterable<ConversionError> {
      * @param exception The exception
      */
     default void reject(Object value, Exception exception) {
+
+    }
+
+    /**
+     * Reject the version with the given error.
+     *
+     * @param conversionError THe conversion error
+     */
+    default void reject(ConversionError conversionError) {
         // no-op - in some cases conversion errors can simply be ignored
     }
 

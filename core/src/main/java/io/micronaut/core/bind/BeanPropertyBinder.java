@@ -46,6 +46,25 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
     <T2> T2 bind(Class<T2> type, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException;
 
     /**
+     * Bind a new instance of the given type from the given source.
+     *
+     * @param type   The type
+     * @param source The source
+     * @param <T2>   The generic type
+     * @return The bound instance
+     * @throws ConversionErrorException if the object cannot be bound
+     */
+    @SuppressWarnings("unchecked")
+    default <T2> T2 bind(Class<T2> type, ArgumentConversionContext<T2> context, Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
+        try {
+           return bind(type, source);
+        } catch (ConversionErrorException e) {
+            context.reject(e.getConversionError());
+            return null;
+        }
+    }
+
+    /**
      * Bind an existing instance of the given type from the given source.
      *
      * @param object  The bean

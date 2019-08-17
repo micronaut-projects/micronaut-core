@@ -14,7 +14,7 @@ class IntrospectedBeanPropertyBinderSpec extends Specification {
     @Unroll
     void "test bind map properties to object"() {
         given:
-        IntrospectedBeanPropertyBinder binder = new IntrospectedBeanPropertyBinder()
+        IntrospectedBeanPropertyBinder binder = new IntrospectedBeanPropertyBinder(null)
         def result = binder.bind(type, map)
 
         expect:
@@ -37,7 +37,7 @@ class IntrospectedBeanPropertyBinderSpec extends Specification {
 
     void "test constructor arguments"() {
         given:
-        IntrospectedBeanPropertyBinder binder = new IntrospectedBeanPropertyBinder()
+        IntrospectedBeanPropertyBinder binder = new IntrospectedBeanPropertyBinder(null)
         Map<String, Object> map = [
                 'publishers[1].name': 'Pub 1',
                 'publishers[0].name': 'Pub 0',
@@ -73,7 +73,65 @@ class IntrospectedBeanPropertyBinderSpec extends Specification {
         args.strings[2] == 'String 2'
         args.strings[1] == 'String 1'
         args.strings[0] == null
-        //args.integers.get()[0] == 0
+        args.publisherMap.pub1.name == 'Pub Map 1'
+        args.publisherMap.pub2.name == 'Pub Map 2'
+        args.integer == 2
+        args.author.name == 'John'
+        args.author.age == 53
+        args.author.publisher.name == 'Author Publisher'
+        args.books[0].authors[0].name == 'John'
+        args.books[0].authors[0].age == 53
+        args.books[0].authors[0].publisher.name == 'John Publisher'
+        args.books[0].authors[1].name == 'Sally'
+        args.books[0].authors[1].age == 45
+        args.books[0].authors[1].publisher.name == 'Sally Publisher'
+        args.books[0].title == 'Book 0 Title'
+        args.books[0].url == new URL('https://micronaut.io')
+        args.books[1].authors[0].name == 'Susan'
+        args.books[1].authors[0].age == 19
+        args.books[1].authors[0].publisher.name == 'Susan Publisher'
+        args.books[1].authorsByInitials.sk.name == 'Stephen King'
+    }
+
+    void "test constructor arguments with nested map"() {
+        given:
+        IntrospectedBeanPropertyBinder binder = new IntrospectedBeanPropertyBinder(null)
+        Map<String, Object> map = [
+                publishers: [
+                        [name: 'Pub 0'],
+                        [name: 'Pub 1'],
+                ],
+                strings: ['String 0', 'String 1'],
+                integers: [0],
+                publisherMap: [pub1: [name: 'Pub Map 1'], pub2: [name: 'Pub Map 2']],
+                integer: '2',
+                author: [name: 'John', age: '53', publisher: [name: 'Author Publisher']],
+                books: [
+                        [
+                                title: 'Book 0 Title',
+                                url: 'https://micronaut.io',
+                                authors: [
+                                        [name: 'John', age: '53', publisher: [name: 'John Publisher']],
+                                        [name: 'Sally', age: '45', publisher: [name: 'Sally Publisher']]
+                                ]
+                        ],
+                        [
+                                authors: [
+                                        [name: 'Susan', age: '19', publisher: [name: 'Susan Publisher']]
+                                ],
+                                authorsByInitials: [sk: [name: 'Stephen King']]
+                        ]
+                ]
+        ]
+
+        when:
+        ConstructorArgs args = binder.bind(ConstructorArgs, map)
+
+        then:
+        args.publishers[1].name == 'Pub 1'
+        args.publishers[0].name == 'Pub 0'
+        args.strings[1] == 'String 1'
+        args.strings[0] == 'String 0'
         args.publisherMap.pub1.name == 'Pub Map 1'
         args.publisherMap.pub2.name == 'Pub Map 2'
         args.integer == 2
@@ -127,7 +185,6 @@ class IntrospectedBeanPropertyBinderSpec extends Specification {
 
         final List<Publisher> publishers
         final Set<String> strings
-        //final Optional<List<Integer>> integers
         final Map<String, Publisher> publisherMap
         final int integer
         final Author author
@@ -135,7 +192,6 @@ class IntrospectedBeanPropertyBinderSpec extends Specification {
 
         ConstructorArgs(List<Publisher> publishers,
                         Set<String> strings,
-                        //Optional<List<Integer>> integers,
                         Author author,
                         Map<String, Publisher> publisherMap,
                         Integer integer,
@@ -144,7 +200,6 @@ class IntrospectedBeanPropertyBinderSpec extends Specification {
             this.author = author
             this.integer = integer
             this.publisherMap = publisherMap
-            //this.integers = integers
             this.strings = strings
             this.publishers = publishers
         }

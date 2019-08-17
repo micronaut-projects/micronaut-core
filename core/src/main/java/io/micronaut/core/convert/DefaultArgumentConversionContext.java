@@ -97,6 +97,11 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     }
 
     @Override
+    public void reject(ConversionError conversionError) {
+        conversionErrors.add(conversionError);
+    }
+
+    @Override
     public Optional<ConversionError> getLastError() {
         if (!conversionErrors.isEmpty()) {
             return Optional.of(conversionErrors.get(conversionErrors.size() - 1));
