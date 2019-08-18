@@ -89,7 +89,7 @@ If you wish to inject a specific property name then you may be better off using 
 String url;
 ----
 
-The above will instead inject the value of the `my.url` property resolved from application configuration. You can also use this feature to resolve sub maps. For example, consider the following configuration:
+The above will instead inject the value of the `my.url` property resolved from application configuration. Note that the configuration values for `@Property` must exist and no default value can be defined. You can also use this feature to resolve sub maps. For example, consider the following configuration:
 
 .Example `application.yml` configuration
 [source,yaml]
