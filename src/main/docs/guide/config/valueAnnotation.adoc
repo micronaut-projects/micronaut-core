@@ -88,6 +88,15 @@ If you wish to inject a specific property name then you may be better off using 
 @Property(name = "my.url")
 String url;
 ----
+[source,kotlin]
+----
+@Singleton
+class HelloService(
+    @Property(name = "my.url") var url: String
+) {
+   ...
+}
+----
 
 The above will instead inject the value of the `my.url` property resolved from application configuration. You can also use this feature to resolve sub maps. For example, consider the following configuration:
 
