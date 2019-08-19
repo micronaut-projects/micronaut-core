@@ -49,6 +49,7 @@ public interface BeanPropertyBinder extends ArgumentBinder<Object, Map<CharSeque
      * Bind a new instance of the given type from the given source.
      *
      * @param type   The type
+     * @param context The conversion context
      * @param source The source
      * @param <T2>   The generic type
      * @return The bound instance

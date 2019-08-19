@@ -50,6 +50,8 @@ public class IntrospectedBeanPropertyBinder implements BeanPropertyBinder {
 
     /**
      * Default Constructor. Uses the shared conversion service.
+     *
+     * @param fallbackBinder The binder to use for non introspected beans
      */
     public IntrospectedBeanPropertyBinder(@Nullable BeanPropertyBinder fallbackBinder) {
         this(ConversionService.SHARED, fallbackBinder);
@@ -57,6 +59,7 @@ public class IntrospectedBeanPropertyBinder implements BeanPropertyBinder {
 
     /**
      * @param conversionService The conversion service
+     * @param fallbackBinder The binder to use for non introspected beans
      */
     public IntrospectedBeanPropertyBinder(ConversionService<?> conversionService, @Nullable BeanPropertyBinder fallbackBinder) {
         this.conversionService = conversionService;
