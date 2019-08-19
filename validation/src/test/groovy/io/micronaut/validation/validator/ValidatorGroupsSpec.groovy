@@ -12,7 +12,9 @@ import spock.lang.Shared
 
 import javax.annotation.processing.SupportedAnnotationTypes
 import javax.validation.constraints.NotBlank
+import javax.validation.constraints.NotEmpty
 import javax.validation.constraints.Size
+import javax.validation.groups.Default
 
 class ValidatorGroupsSpec extends AbstractTypeElementSpec {
 
@@ -38,6 +40,38 @@ class ValidatorGroupsSpec extends AbstractTypeElementSpec {
 
         then:
         violations.size() == 2
+    }
+
+    void "test validate with default group"() {
+        def address = new AddressTwo(street: "", city: "", zipCode: "")
+
+        when:
+        def violations = validator.validate(address)
+        List properties = violations*.propertyPath*.toString()
+
+        then:
+        violations.size() == 2
+        properties.contains("zipCode")
+        properties.contains("city")
+
+        when:
+        violations = validator.validate(address, GroupOne)
+        properties = violations*.propertyPath*.toString()
+
+        then:
+        violations.size() == 2
+        properties.contains("zipCode")
+        properties.contains("street")
+
+        when:
+        violations = validator.validate(address, GroupOne, Default)
+        properties = violations*.propertyPath*.toString()
+
+        then:
+        violations.size() == 3
+        properties.contains("zipCode")
+        properties.contains("street")
+        properties.contains("city")
     }
 
     void "test build introspection"() {
@@ -99,3 +133,16 @@ class Address {
 interface GroupOne {}
 interface GroupTwo {}
 interface GroupThree {}
+
+@Introspected
+class AddressTwo {
+
+    @NotEmpty(groups = GroupOne.class)
+    String street
+
+    @NotEmpty
+    String city
+
+    @NotEmpty(groups = [GroupOne.class, Default.class])
+    String zipCode
+}
