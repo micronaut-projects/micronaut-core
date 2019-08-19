@@ -58,8 +58,8 @@ public class TransactionInterceptor extends TransactionAspectSupport implements 
 
     @Override
     public final Object intercept(MethodInvocationContext<Object, Object> context) {
-        if (context.hasAnnotation(Transactional.class)) {
-            String transactionManagerName = context.stringValue(Transactional.class).orElse(null);
+        if (context.hasStereotype(Transactional.class)) {
+            String transactionManagerName = context.findAnnotation(Transactional.class).flatMap(AnnotationValue::stringValue).orElse(null);
             if (StringUtils.isEmpty(transactionManagerName)) {
                 transactionManagerName = null;
             }
