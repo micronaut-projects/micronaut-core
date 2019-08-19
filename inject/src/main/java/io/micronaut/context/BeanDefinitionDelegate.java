@@ -28,9 +28,7 @@ import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-import java.lang.annotation.Annotation;
 import java.util.*;
-import java.util.stream.Stream;
 
 /**
  * A delegate bean definition.
