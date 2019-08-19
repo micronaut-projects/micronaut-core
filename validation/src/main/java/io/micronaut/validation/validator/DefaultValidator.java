@@ -141,6 +141,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(object, groups);
             Set<ConstraintViolation<T>> overallViolations = new HashSet<>(5);
             return doValidate(
+                    introspection,
                     object,
                     object,
                     constrainedProperties,
@@ -888,7 +889,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 final List<Class<? extends Annotation>> pojoConstraints = introspection.getAnnotationTypesByStereotype(Constraint.class);
 
                 for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
-                    validatePojoInternal(rootClass, object, argumentValues, context, overallViolations, parameterType, parameterValue, pojoConstraint);
+                    validatePojoInternal(rootClass, object, argumentValues, context, overallViolations, parameterType, parameterValue, pojoConstraint, introspection.getAnnotation(pojoConstraint));
                 }
             }
         } finally {
@@ -904,12 +905,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                           @Nonnull Set overallViolations,
                                           @Nonnull Class<?> parameterType,
                                           @Nonnull Object parameterValue,
-                                          Class<? extends Annotation> pojoConstraint) {
+                                          Class<? extends Annotation> pojoConstraint,
+                                          AnnotationValue constraintAnnotation) {
         final ConstraintValidator constraintValidator = constraintValidatorRegistry
                 .findConstraintValidator(pojoConstraint, parameterType).orElse(null);
 
         if (constraintValidator != null) {
-            if (!constraintValidator.isValid((T) parameterValue, null, context)) {
+            if (!constraintValidator.isValid((T) parameterValue, constraintAnnotation, context)) {
                 final String propertyValue = "";
                 BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
                 if (beanIntrospection == null) {
@@ -934,6 +936,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     }
 
     private <T> Set<ConstraintViolation<T>> doValidate(
+            BeanIntrospection<T> introspection,
             @Nonnull T rootBean,
             @Nonnull Object object,
             Collection<? extends BeanProperty<Object, Object>> constrainedProperties,
@@ -967,7 +970,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     overallViolations,
                     rootBeanClass,
                     object,
-                    pojoConstraint);
+                    pojoConstraint,
+                    introspection.getAnnotation(pojoConstraint));
         }
 
         // now handle cascading validation
@@ -1215,6 +1219,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
         if (CollectionUtils.isNotEmpty(cascadeConstraints) || CollectionUtils.isNotEmpty(cascadeNestedProperties)) {
             doValidate(
+                    beanIntrospection,
                     rootBean,
                     bean,
                     cascadeConstraints,
