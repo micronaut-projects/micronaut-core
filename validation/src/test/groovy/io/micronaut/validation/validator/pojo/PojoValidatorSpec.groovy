@@ -68,6 +68,8 @@ class NameAndLastNameValidatorFactory {
     @Singleton
     ConstraintValidator<NameAndLastNameValidator, Search> nameAndLastNameValidator() {
         return { value, annotationMetadata, context ->
+            Objects.requireNonNull(annotationMetadata)
+            Objects.requireNonNull(context)
             value != null && (value.getName() != null || value.getLastName() != null)
         }
     }
