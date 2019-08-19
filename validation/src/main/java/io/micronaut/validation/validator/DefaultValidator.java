@@ -141,6 +141,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(object, groups);
             Set<ConstraintViolation<T>> overallViolations = new HashSet<>(5);
             return doValidate(
+                    introspection,
                     object,
                     object,
                     constrainedProperties,
@@ -888,7 +889,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 final List<Class<? extends Annotation>> pojoConstraints = introspection.getAnnotationTypesByStereotype(Constraint.class);
 
                 for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
-                    validatePojoInternal(rootClass, object, argumentValues, context, overallViolations, parameterType, parameterValue, pojoConstraint);
+                    validatePojoInternal(rootClass, object, argumentValues, context, overallViolations, parameterType, parameterValue, pojoConstraint, introspection.getAnnotation(pojoConstraint));
                 }
             }
         } finally {
@@ -904,12 +905,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                           @Nonnull Set overallViolations,
                                           @Nonnull Class<?> parameterType,
                                           @Nonnull Object parameterValue,
-                                          Class<? extends Annotation> pojoConstraint) {
+                                          Class<? extends Annotation> pojoConstraint,
+                                          AnnotationValue constraintAnnotation) {
         final ConstraintValidator constraintValidator = constraintValidatorRegistry
                 .findConstraintValidator(pojoConstraint, parameterType).orElse(null);
 
         if (constraintValidator != null) {
-            if (!constraintValidator.isValid((T) parameterValue, null, context)) {
+            if (!constraintValidator.isValid((T) parameterValue, constraintAnnotation, context)) {
                 final String propertyValue = "";
                 BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
                 if (beanIntrospection == null) {
@@ -934,6 +936,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     }
 
     private <T> Set<ConstraintViolation<T>> doValidate(
+            BeanIntrospection<T> introspection,
             @Nonnull T rootBean,
             @Nonnull Object object,
             Collection<? extends BeanProperty<Object, Object>> constrainedProperties,
@@ -967,7 +970,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     overallViolations,
                     rootBeanClass,
                     object,
-                    pojoConstraint);
+                    pojoConstraint,
+                    introspection.getAnnotation(pojoConstraint));
         }
 
         // now handle cascading validation
@@ -1215,6 +1219,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
         if (CollectionUtils.isNotEmpty(cascadeConstraints) || CollectionUtils.isNotEmpty(cascadeNestedProperties)) {
             doValidate(
+                    beanIntrospection,
                     rootBean,
                     bean,
                     cascadeConstraints,
@@ -1312,30 +1317,17 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             Class propertyType,
             @Nullable Object propertyValue,
             Class<? extends Annotation> constraintType) {
-        Map<Class<?>, List<? extends AnnotationValue<? extends Annotation>>> constraintsByGroup;
         final AnnotationMetadata annotationMetadata = constrainedProperty
                 .getAnnotationMetadata();
         final List<? extends AnnotationValue<? extends Annotation>> annotationValues = annotationMetadata
                 .getAnnotationValuesByType(constraintType);
-        if (context.groups == DEFAULT_GROUPS) {
-            constraintsByGroup = Collections.singletonMap(
-                    Default.class,
-                    annotationValues
-            );
-        } else {
-            constraintsByGroup = new LinkedHashMap<>(context.groups.size());
-            for (Class<?> group : context.groups) {
-                for (AnnotationValue<? extends Annotation> annotationValue : annotationValues) {
-                    final List<Class> constraintGroups = annotationValue.get("groups", Class[].class).map(Arrays::asList).orElse(DEFAULT_GROUPS);
-                    if (constraintGroups == DEFAULT_GROUPS) {
-                        final List<AnnotationValue<? extends Annotation>> values =
-                                (List<AnnotationValue<? extends Annotation>>) constraintsByGroup.computeIfAbsent(Default.class, (g -> new ArrayList<>(3)));
-                        values.add(annotationValue);
-                    } else if (constraintGroups.contains(group)) {
-                        final List<AnnotationValue<? extends Annotation>> values =
-                                (List<AnnotationValue<? extends Annotation>>) constraintsByGroup.computeIfAbsent(group, (g -> new ArrayList<>(3)));
-                        values.add(annotationValue);
-                    }
+
+        Set<AnnotationValue<? extends Annotation>> constraints = new HashSet<>(3);
+        for (Class<?> group : context.groups) {
+            for (AnnotationValue<? extends Annotation> annotationValue : annotationValues) {
+                final List<Class> constraintGroups = annotationValue.get("groups", Class[].class).map(Arrays::asList).orElse(DEFAULT_GROUPS);
+                if (constraintGroups.contains(group)) {
+                    constraints.add(annotationValue);
                 }
             }
         }
@@ -1344,28 +1336,25 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         final ConstraintValidator<? extends Annotation, Object> validator = constraintValidatorRegistry
                 .findConstraintValidator(constraintType, targetType).orElse(null);
         if (validator != null) {
-            for (Map.Entry<Class<?>, List<? extends AnnotationValue<? extends Annotation>>> entry : constraintsByGroup.entrySet()) {
-                final List<? extends AnnotationValue<? extends Annotation>> groupValues = entry.getValue();
-                for (AnnotationValue annotationValue : groupValues) {
-                    //noinspection unchecked
-                    if (!validator.isValid(propertyValue, annotationValue, context)) {
+            for (AnnotationValue annotationValue : constraints) {
+                //noinspection unchecked
+                if (!validator.isValid(propertyValue, annotationValue, context)) {
 
-                        final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
-                        Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, annotationMetadata);
-                        //noinspection unchecked
-                        overallViolations.add(
-                                new DefaultConstraintViolation(
-                                        rootBean,
-                                        rootBeanClass,
-                                        object,
-                                        propertyValue,
-                                        messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
-                                        messageTemplate,
-                                        new PathImpl(context.currentPath),
-                                        null
-                                )
-                        );
-                    }
+                    final String messageTemplate = buildMessageTemplate(annotationValue, annotationMetadata);
+                    Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue, annotationMetadata);
+                    //noinspection unchecked
+                    overallViolations.add(
+                            new DefaultConstraintViolation(
+                                    rootBean,
+                                    rootBeanClass,
+                                    object,
+                                    propertyValue,
+                                    messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
+                                    messageTemplate,
+                                    new PathImpl(context.currentPath),
+                                    null
+                            )
+                    );
                 }
             }
         }
