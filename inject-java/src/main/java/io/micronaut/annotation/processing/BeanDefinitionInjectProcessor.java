@@ -320,8 +320,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             this.isConfigurationPropertiesType = isConfigurationProperties(concreteClass);
             this.isAopProxyType = concreteClassMetadata.hasStereotype(AROUND_TYPE) && !modelUtils.isAbstract(concreteClass);
             this.aopSettings = isAopProxyType ? concreteClassMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.empty();
+            ExecutableElement constructor = modelUtils.concreteConstructorFor(concreteClass, annotationUtils);
+            this.constructorParameterInfo = populateParameterData(null, constructor, Collections.emptyMap());
             this.isExecutableType = isAopProxyType || concreteClassMetadata.hasStereotype(Executable.class);
-            this.isDeclaredBean = isExecutableType || isConfigurationPropertiesType || isFactoryType || concreteClassMetadata.hasStereotype(Scope.class) || concreteClassMetadata.hasStereotype(DefaultScope.class);
+            this.isDeclaredBean = isExecutableType || isConfigurationPropertiesType || isFactoryType || concreteClassMetadata.hasStereotype(Scope.class) || concreteClassMetadata.hasStereotype(DefaultScope.class) || constructorParameterInfo.getAnnotationMetadata().hasStereotype(Inject.class);
         }
 
         /**
@@ -398,8 +400,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         qualifiedName.equals(classElementQualifiedName)) {
 
                     if (qualifiedName.equals(classElementQualifiedName)) {
-                        ExecutableElement constructor = modelUtils.concreteConstructorFor(classElement, annotationUtils);
-                        this.constructorParameterInfo = populateParameterData(null, constructor, Collections.emptyMap());
                         final boolean isBean = isAopProxyType ||
                                 isConfigurationPropertiesType ||
                                 typeAnnotationMetadata.hasStereotype(ANNOTATION_STEREOTYPES) ||
