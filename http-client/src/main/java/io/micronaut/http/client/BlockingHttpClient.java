@@ -22,6 +22,8 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 
+import java.io.Closeable;
+
 /**
  * A blocking HTTP client interface that features a subset of the operations provided by {@link HttpClient} and
  * is designed primarily for testing purposes.
@@ -30,7 +32,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
  * @since 1.0
  */
 @Blocking
-public interface BlockingHttpClient {
+public interface BlockingHttpClient extends Closeable {
 
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
