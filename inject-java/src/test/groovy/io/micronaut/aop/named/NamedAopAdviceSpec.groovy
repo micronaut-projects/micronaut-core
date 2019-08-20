@@ -47,4 +47,20 @@ class NamedAopAdviceSpec extends Specification {
         cleanup:
         context.close()
     }
+
+    void "test manually named beans with AOP advice"() {
+        given:
+        def context = ApplicationContext.run()
+
+        expect:
+        context.getBean(OtherInterface, Qualifiers.byName("first")).doStuff() == 'first'
+        context.getBean(OtherInterface, Qualifiers.byName("second")).doStuff() == 'second'
+        context.getBeansOfType(OtherInterface).size() == 2
+        context.getBeansOfType(OtherInterface).every({ it instanceof Intercepted })
+        context.getBean(OtherBean).first.doStuff() == "first"
+        context.getBean(OtherBean).second.doStuff() == "second"
+
+        cleanup:
+        context.close()
+    }
 }
