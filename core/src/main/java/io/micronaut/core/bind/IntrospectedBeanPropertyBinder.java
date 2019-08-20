@@ -71,7 +71,7 @@ public class IntrospectedBeanPropertyBinder implements BeanPropertyBinder {
     public <T2> T2 bind(Class<T2> type, Set<? extends Map.Entry<? extends CharSequence, Object>> source) throws ConversionErrorException {
         ArgumentConversionContext<T2> typeConversionContext = ConversionContext.of(type);
 
-        T2 instance = bind(type, typeConversionContext, source);
+        T2 instance = bindType(type, typeConversionContext, source);
 
         if (typeConversionContext.getLastError().isPresent()) {
             throw new ConversionErrorException(typeConversionContext.getArgument(), typeConversionContext.getLastError().get());
@@ -81,7 +81,7 @@ public class IntrospectedBeanPropertyBinder implements BeanPropertyBinder {
     }
 
     @Override
-    public <T2> T2 bind(Class<T2> type, ArgumentConversionContext<T2> context, Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
+    public <T2> T2 bindType(Class<T2> type, ArgumentConversionContext<T2> context, Set<? extends Map.Entry<? extends CharSequence, Object>> source) {
         T2 instance;
         try {
             BeanIntrospection<T2> introspection = beanIntrospector.getIntrospection(type);

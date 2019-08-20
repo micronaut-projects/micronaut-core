@@ -1,11 +1,8 @@
-package io.micronaut.bind
+package io.micronaut.core.bind
 
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
-import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.bind.IntrospectedBeanPropertyBinder
-import io.micronaut.core.type.Argument
 import spock.lang.Specification
 import spock.lang.Unroll
 

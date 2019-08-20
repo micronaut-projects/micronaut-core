@@ -52,6 +52,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         where:
         httpMethod      | uri                                             | result                      | httpStatus
         // you can't populate post request data from query parameters without explicit @QueryValue
+        HttpMethod.GET  | '/parameter/exploded?title=The%20Stand&age=20'  | "Parameter Value: The Stand 20" | HttpStatus.OK
         HttpMethod.POST | '/parameter/save?max=30'                        | null                        | HttpStatus.BAD_REQUEST
         HttpMethod.GET  | '/parameter/path/20/foo/10'                     | "Parameter Values: 20 10"   | HttpStatus.OK
         HttpMethod.GET  | '/parameter/path/20/bar/10'                     | "Parameter Values: 20 10"   | HttpStatus.OK
@@ -79,7 +80,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/all?max=20'                         | "Parameter Value: 20"       | HttpStatus.OK
 
-        HttpMethod.GET  | '/parameter/exploded?title=The%20Stand&age=20'  | "Parameter Value: The Stand 20" | HttpStatus.OK
+
         HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"    | HttpStatus.OK
         HttpMethod.POST | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
     }

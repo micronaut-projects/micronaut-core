@@ -15,11 +15,16 @@
  */
 package io.micronaut.jackson.bind;
 
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.bind.BeanPropertyBinder;
+import io.micronaut.core.bind.IntrospectedBeanPropertyBinder;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
+import io.micronaut.core.type.Argument;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -59,26 +64,32 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
 
     @Override
     public Optional<Object> convert(Map map, Class<Object> targetType, ConversionContext context) {
-        final BiFunction<Object, Map<?, ?>, Object> propertiesBinderFunction = (object, properties) -> {
-            Map bindMap = new LinkedHashMap(properties.size());
-            for (Map.Entry entry : properties.entrySet()) {
-                Object key = entry.getKey();
-                bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
-            }
-            return beanPropertyBinder.get().bind(object, bindMap);
-        };
 
-        Optional<Object> instance = InstantiationUtils.tryInstantiate(targetType, map, context)
-                    .map(object -> propertiesBinderFunction.apply(object, map));
-
-        if (instance.isPresent()) {
-            return instance;
-        } else if (targetType.isInstance(map)) {
+        if (targetType.isInstance(map)) {
             return Optional.of(map);
-        } else {
-            return InstantiationUtils
-                    .tryInstantiate(targetType)
-                    .map(object -> propertiesBinderFunction.apply(object, map));
         }
+        Optional<BeanIntrospection<Object>> introspection = BeanIntrospector.SHARED.findIntrospection(targetType);
+
+        if (introspection.isPresent()) {
+            IntrospectedBeanPropertyBinder introspectedBinder = new IntrospectedBeanPropertyBinder(beanPropertyBinder.get());
+            ArgumentConversionContext<Object> argumentContext;
+            if (context instanceof ArgumentConversionContext) {
+                argumentContext = (ArgumentConversionContext) context;
+            } else {
+                argumentContext = context.with(Argument.of(targetType));
+            }
+            return Optional.of(introspectedBinder.bind(targetType, map.entrySet()));
+        }
+
+        return InstantiationUtils
+                .tryInstantiate(targetType)
+                .map(object -> {
+                    Map bindMap = new LinkedHashMap(map.size());
+                    for (Map.Entry entry : ((Map<?,?>) map).entrySet()) {
+                        Object key = entry.getKey();
+                        bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
+                    }
+                    return beanPropertyBinder.get().bind(object, bindMap);
+                });
     }
 }

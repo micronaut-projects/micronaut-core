@@ -30,11 +30,15 @@ class JacksonBeanPropertyBinderSpec extends Specification {
     @Unroll
     void "test bind map properties to object"() {
         given:
-        JacksonBeanPropertyBinder binder = ApplicationContext.run().getBean(JacksonBeanPropertyBinder)
+        def ctx = ApplicationContext.run()
+        JacksonBeanPropertyBinder binder = ctx.getBean(JacksonBeanPropertyBinder)
         def result = binder.bind(type.newInstance(), map)
 
         expect:
         result == expected
+
+        cleanup:
+        ctx.close()
 
         where:
         type   | map                                                                                            | expected
