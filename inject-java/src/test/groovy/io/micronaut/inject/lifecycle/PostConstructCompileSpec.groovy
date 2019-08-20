@@ -25,4 +25,51 @@ class Test {
         then:
         definition == null
     }
+
+    void "test visit constructor @Inject"() {
+        when:
+        def definition = buildBeanDefinition('test.Test', '''
+package test;
+
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
+
+class Test {
+
+    @Inject
+    Test() {
+    
+
+    }
+}
+''')
+
+        then:
+        definition != null
+        definition.postConstructMethods.empty
+
+    }
+
+    void "test visit constructor @Inject and @PostConstruct"() {
+        when:
+        def definition = buildBeanDefinition('test.Test', '''
+package test;
+
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
+
+class Test {
+
+    @Inject
+    Test() {  }
+    
+    @PostConstruct
+    void init() {   }
+}
+''')
+
+        then:
+        definition != null
+        definition.postConstructMethods.size() == 1
+    }
 }
