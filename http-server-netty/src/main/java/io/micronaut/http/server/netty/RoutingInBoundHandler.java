@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
