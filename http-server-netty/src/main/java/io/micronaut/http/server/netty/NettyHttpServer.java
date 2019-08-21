@@ -252,7 +252,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
                     final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
                     final RoutingInBoundHandler routingHandler = new RoutingInBoundHandler(
-                        beanLocator,
+                        applicationContext,
                         router,
                         mediaTypeCodecRegistry,
                         customizableResponseTypeHandlerRegistry,
