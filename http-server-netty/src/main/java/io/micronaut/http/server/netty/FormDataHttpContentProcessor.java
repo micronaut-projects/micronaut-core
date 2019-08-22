@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
@@ -25,9 +26,11 @@ import io.netty.handler.codec.http.multipart.*;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -44,6 +47,8 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     private final HttpPostRequestDecoder decoder;
     private final boolean enabled;
     private AtomicLong extraMessages = new AtomicLong(0);
+    private final ConcurrentHashMap<Integer, Long> partLengths = new ConcurrentHashMap<>();
+    protected final long partMaxSize;
 
     /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
@@ -65,6 +70,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
         this.decoder = new HttpPostRequestDecoder(factory, nettyHttpRequest.getNativeRequest(), characterEncoding);
         this.enabled = nettyHttpRequest.getContentType().map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false) ||
             multipart.isEnabled();
+        this.partMaxSize = multipart.getMaxFileSize();
     }
 
     @Override
@@ -133,6 +139,18 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
             } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
                 // ok, ignore
+            } catch (HttpPostRequestDecoder.ErrorDataDecoderException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
+                    String partName = decoder.currentPartialHttpData().getName();
+                    try {
+                        onError(new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]"));
+                    } finally {
+                        parentSubscription.cancel();
+                    }
+                } else {
+                    onError(e);
+                }
             } catch (Throwable e) {
                 onError(e);
             } finally {
