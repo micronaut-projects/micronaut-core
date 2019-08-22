@@ -18,6 +18,7 @@ package io.micronaut
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.handler.codec.http.multipart.DiskFileUpload
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -39,9 +40,12 @@ abstract class AbstractMicronautSpec extends Specification {
 
 
     Map<String, Object> getConfiguration() {
-        ['micronaut.server.multipart.location':uploadDir.absolutePath]
+        ['micronaut.server.multipart.location': uploadDir.absolutePath]
     }
 
+    def setupSpec() {
+        uploadDir.mkdir()
+    }
 
     def cleanupSpec()  {
         uploadDir.delete()
