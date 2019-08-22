@@ -8,6 +8,7 @@ import io.micronaut.context.env.PropertySource
 import org.codehaus.groovy.runtime.DefaultGroovyMethods
 
 class VehicleSpec : StringSpec({
+
     "test start vehicle with configuration" {
         // tag::start[]
         val applicationContext = DefaultApplicationContext("test")

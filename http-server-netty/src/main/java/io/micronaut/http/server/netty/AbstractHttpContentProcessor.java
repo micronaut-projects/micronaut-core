@@ -41,6 +41,7 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     protected final AtomicLong receivedLength = new AtomicLong();
     protected final HttpServerConfiguration configuration;
 
+
     /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
      * @param configuration    The {@link HttpServerConfiguration}
@@ -69,19 +70,20 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     protected final void doOnNext(ByteBufHolder message) {
         long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
 
-        if ((advertisedLength != -1 && receivedLength > advertisedLength) || (receivedLength > requestMaxSize)) {
-            fireExceedsLength(receivedLength, advertisedLength == -1 ? requestMaxSize : advertisedLength);
+        if (advertisedLength > requestMaxSize) {
+            fireExceedsLength(advertisedLength, requestMaxSize);
+        } else if (receivedLength > requestMaxSize) {
+            fireExceedsLength(receivedLength, requestMaxSize);
         } else {
-            long serverMax = configuration.getMultipart().getMaxFileSize();
-            if (receivedLength > serverMax) {
-                fireExceedsLength(receivedLength, serverMax);
-            } else {
-                onData(message);
-            }
+            onData(message);
         }
     }
 
-    private void fireExceedsLength(long receivedLength, long expected) {
+    /**
+     * @param receivedLength The length of the content received
+     * @param expected The expected length of the content
+     */
+    protected void fireExceedsLength(long receivedLength, long expected) {
         try {
             onError(new ContentLengthExceededException(expected, receivedLength));
         } finally {

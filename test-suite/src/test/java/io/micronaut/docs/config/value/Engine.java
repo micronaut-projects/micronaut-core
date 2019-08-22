@@ -1,7 +1,7 @@
 package io.micronaut.docs.config.value;
 
 public interface Engine {
-    public abstract int getCylinders();
+    int getCylinders();
 
-    public abstract String start();
+    String start();
 }

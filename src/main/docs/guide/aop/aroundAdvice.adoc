@@ -4,13 +4,7 @@ The most common type of advice you may want to apply is "Around" advice, which e
 
 The first step to defining Around advice is to implement a link:{api}/io/micronaut/aop/MethodInterceptor.html[MethodInterceptor]. For example the following interceptor disallows parameters with `null` values:
 
-.MethodInterceptor Example
-[source,java]
-----
-include::{testsjava}/aop/around/NotNullInterceptor.java[tags=imports, indent=0]
-
-include::{testsjava}/aop/around/NotNullInterceptor.java[tags=interceptor, indent=0]
-----
+snippet::io.micronaut.docs.aop.around.NotNullInterceptor[tags="imports,interceptor", indent=0, title="MethodInterceptor Example"]
 
 <1> An interceptor implements the link:{api}/io/micronaut/aop/MethodInterceptor.html[MethodInterceptor] interface
 <2> The passed link:{api}/io/micronaut/aop/MethodInvocationContext.html[MethodInvocationContext] is used to find the first parameter that is `null`
@@ -21,14 +15,7 @@ NOTE: Micronaut AOP interceptors use no reflection which improves performance an
 
 To put the new `MethodInterceptor` to work the next step is to define an annotation that will trigger the `MethodInterceptor`:
 
-
-.Around Advice Annotation Example
-[source,java]
-----
-include::{testsjava}/aop/around/NotNull.java[tags=imports, indent=0]
-
-include::{testsjava}/aop/around/NotNull.java[tags=annotation, indent=0]
-----
+snippet::io.micronaut.docs.aop.around.NotNull[tags="imports,annotation", indent=0, title="Around Advice Annotation Example"]
 
 <1> The retention policy of the annotation should be `RUNTIME`
 <2> Generally you want to be able to apply advice at the class or method level so the target types are `TYPE` and `METHOD`
@@ -37,19 +24,11 @@ include::{testsjava}/aop/around/NotNull.java[tags=annotation, indent=0]
 
 With the interceptor and annotation implemented you can then simply apply the annotation to the target classes:
 
-.Around Advice Usage Example
-[source,java]
-----
-include::{testsjava}/aop/around/NotNullExample.java[tags=example, indent=0]
-----
+snippet::io.micronaut.docs.aop.around.NotNullExample[tags="example", indent=0, title="Around Advice Usage Example"]
 
 Whenever the type `NotNullExample` is injected into any class, a compile time generated proxy will instead be injected that decorates the appropriate method calls with the `@NotNull` advice defined earlier. You can verify that the advice works by writing a test. The following test uses a JUnit `ExpectedException` rule to verify the appropriate exception is thrown when an argument is `null`:
 
-.Around Advice Test
-[source,java]
-----
-include::{testsjava}/aop/around/AroundTest.java[tags=test, indent=0]
-----
+snippet::io.micronaut.docs.aop.around.AroundSpec[tags="test", indent=0, title="Around Advice Test"]
 
 NOTE: Since Micronaut injection is done at compile time, generally the advice should be packaged in a dependent JAR file that is on the classpath when the above test is compiled and should not be in the same codebase since you don't want the test to be compiled before the advice itself is compiled.
 
@@ -72,37 +51,13 @@ The semantics of AOP advice when applied to <<factories,Bean Factories>> differs
 
 Consider the following two examples:
 
-.AOP Advice at the type level of a `@Factory`
-[source,java]
-----
-@Cacheable("my-cache")
-@Factory
-class MyFactory {
-
-    @Prototype
-    MyBean myBean() {
-        return new MyBean();
-    }
-}
-----
+snippet::io.micronaut.docs.aop.advice.type.MyFactory[tags="class", indent=0, title="AOP Advice at the type level of a `@Factory`"]
 
 The above example will cache creation of `MyBean` bean, according to the semantics defined by the ann:cache.annotation.Cacheable[] cache configuration.
 
 Now consider this example:
 
-.AOP Advice at the method level of a `@Factory`
-[source,java]
-----
-@Factory
-class MyFactory {
-
-    @Prototype
-    @Cacheable("my-cache")
-    MyBean myBean() {
-        return new MyBean();
-    }
-}
-----
+snippet::io.micronaut.docs.aop.advice.method.MyFactory[tags="class", indent=0, title="AOP Advice at the method level of a `@Factory`"]
 
 The above example will cache all of the public methods of the `MyBean` bean, but not the bean creation.
 
