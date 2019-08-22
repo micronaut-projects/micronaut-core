@@ -471,6 +471,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             if (applicationContext.isRunning()) {
                 applicationContext.stop();
             }
+            serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
         } catch (Throwable e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);

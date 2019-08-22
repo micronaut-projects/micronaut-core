@@ -63,6 +63,11 @@ class MultipartFileUploadSpec extends Specification {
 
     static final File uploadDir = File.createTempDir()
 
+    void setupSpec() {
+        uploadDir.mkdir()
+        assert uploadDir.exists() && uploadDir.canWrite()
+    }
+
     void cleanup() {
         uploadDir.listFiles()*.delete()
     }
@@ -210,7 +215,6 @@ class MultipartFileUploadSpec extends Specification {
 
     }
 
-
     void "test upload InputStream without ContentType"() {
         given:
         File file = new File(uploadDir, "walkingthehimalayas.txt")
@@ -239,7 +243,6 @@ class MultipartFileUploadSpec extends Specification {
         newFile.text == file.text
 
     }
-
 
     @Controller('/multipart')
     static class MultipartController {
