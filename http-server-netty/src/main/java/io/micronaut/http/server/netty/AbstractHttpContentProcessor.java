@@ -16,13 +16,17 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.core.async.processor.SingleSubscriberProcessor;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.handler.codec.http.multipart.HttpData;
 import org.reactivestreams.Subscriber;
 
+import java.util.IdentityHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -40,6 +44,7 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     protected final long requestMaxSize;
     protected final AtomicLong receivedLength = new AtomicLong();
     protected final HttpServerConfiguration configuration;
+
 
     /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
@@ -69,19 +74,16 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     protected final void doOnNext(ByteBufHolder message) {
         long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
 
-        if ((advertisedLength != -1 && receivedLength > advertisedLength) || (receivedLength > requestMaxSize)) {
-            fireExceedsLength(receivedLength, advertisedLength == -1 ? requestMaxSize : advertisedLength);
+        if (advertisedLength > requestMaxSize) {
+            fireExceedsLength(advertisedLength, requestMaxSize);
+        } else if (receivedLength > requestMaxSize) {
+            fireExceedsLength(receivedLength, requestMaxSize);
         } else {
-            long serverMax = configuration.getMultipart().getMaxFileSize();
-            if (receivedLength > serverMax) {
-                fireExceedsLength(receivedLength, serverMax);
-            } else {
-                onData(message);
-            }
+            onData(message);
         }
     }
 
-    private void fireExceedsLength(long receivedLength, long expected) {
+    protected void fireExceedsLength(long receivedLength, long expected) {
         try {
             onError(new ContentLengthExceededException(expected, receivedLength));
         } finally {
