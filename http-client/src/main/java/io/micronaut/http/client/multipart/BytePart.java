@@ -16,11 +16,9 @@
 package io.micronaut.http.client.multipart;
 
 import io.micronaut.http.MediaType;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.multipart.FileUpload;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 /**
