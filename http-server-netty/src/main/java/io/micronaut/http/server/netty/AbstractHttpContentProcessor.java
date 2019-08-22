@@ -16,17 +16,13 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.core.async.processor.SingleSubscriberProcessor;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.handler.codec.http.multipart.HttpData;
 import org.reactivestreams.Subscriber;
 
-import java.util.IdentityHashMap;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -83,6 +79,10 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
         }
     }
 
+    /**
+     * @param receivedLength The length of the content received
+     * @param expected The expected length of the content
+     */
     protected void fireExceedsLength(long receivedLength, long expected) {
         try {
             onError(new ContentLengthExceededException(expected, receivedLength));

@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -47,8 +46,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     private final HttpPostRequestDecoder decoder;
     private final boolean enabled;
     private AtomicLong extraMessages = new AtomicLong(0);
-    private final ConcurrentHashMap<Integer, Long> partLengths = new ConcurrentHashMap<>();
-    protected final long partMaxSize;
+    private final long partMaxSize;
 
     /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
