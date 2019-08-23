@@ -8,13 +8,7 @@ The way you implement Introduction advice is very similar to how you implement A
 
 You start off by defining an annotation that will power the introduction advice. As an example, say you want to implement advice that will return a stubbed value for every method in an interface (a common requirement in testing frameworks). Consider the following `@Stub` annotation:
 
-.Introduction Advice Annotation Example
-[source,java]
-----
-include::{testsjava}/aop/introduction/Stub.java[tags=imports, indent=0]
-
-include::{testsjava}/aop/introduction/Stub.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.aop.introduction.Stub[tags="imports,class", indent=0, title="Introduction Advice Annotation Example"]
 
 <1> The introduction advice is annotated with api:aop.Introduction[]
 <2> The api:context.annotation.Type[] annotation is used to refer to the implementor of the advise. In this case `StubIntroduction`
@@ -24,13 +18,7 @@ The `StubIntroduction` class referred to in the previous example must then imple
 
 The following is an example implementation:
 
-.StubIntroduction.java
-[source,java]
-----
-include::{testsjava}/aop/introduction/StubIntroduction.java[tags=imports, indent=0]
-
-include::{testsjava}/aop/introduction/StubIntroduction.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.aop.introduction.StubIntroduction[tags="imports,class", indent=0, title="StubIntroduction"]
 
 <1> The class is annotated with `@Singleton` and implements the api:aop.MethodInterceptor[] interface
 <2> The value of the `@Stub` annotation is read from the context and an attempt made to convert the value to the return type
@@ -38,22 +26,13 @@ include::{testsjava}/aop/introduction/StubIntroduction.java[tags=class, indent=0
 
 To now use this introduction advice in an application you simply annotate your abstract classes or interfaces with `@Stub`:
 
-
-.StubExample.java
-[source,java]
-----
-include::{testsjava}/aop/introduction/StubExample.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.aop.introduction.StubIntroduction[tags="class", indent=0, title="StubExample"]
 
 All abstract methods will delegate to the `StubIntroduction` class to be implemented.
 
 The following test demonstrates the behaviour or `StubIntroduction`:
 
-.Testing Introduction Advice
-[source,java]
-----
-include::{testsjava}/aop/introduction/IntroductionTest.java[tags=test, indent=0]
-----
+snippet::io.micronaut.docs.aop.introduction.IntroductionTest[tags="test", indent=0, title="Testing Introduction Advice"]
 
 Note that if the introduction advice cannot implement the method the `proceed` method of the api:aop.MethodInvocationContext[] should be called. This gives the opportunity for other introduction advice interceptors to implement the method, otherwise a `UnsupportedOperationException` will be thrown if no advice can implement the method.
 
