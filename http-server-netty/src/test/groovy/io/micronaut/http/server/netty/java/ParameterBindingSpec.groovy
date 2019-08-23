@@ -62,8 +62,8 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         }
 
         expect:
-        body == result
         status == httpStatus
+        body == result
 
         where:
         uri                                                              | result                      | httpStatus

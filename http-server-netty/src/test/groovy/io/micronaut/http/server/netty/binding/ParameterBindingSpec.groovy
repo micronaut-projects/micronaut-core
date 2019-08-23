@@ -46,8 +46,8 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         }
 
         expect:
-        body == result
         status == httpStatus
+        body == result
 
         where:
         httpMethod      | uri                                             | result                      | httpStatus
@@ -93,7 +93,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
         expect:
         response.status() == HttpStatus.BAD_REQUEST
-        response.body().contains('Failed to convert argument [age]')
+        response.body().contains('Failed to convert argument [book]')
     }
 
     @Controller(value = "/parameter", produces = MediaType.TEXT_PLAIN)

@@ -30,11 +30,7 @@ import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
 
 import javax.inject.Singleton;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * A class containing methods to aid in satisfying arguments of a {@link io.micronaut.web.router.Route}.
@@ -144,6 +140,8 @@ public class RequestArgumentSatisfier {
                         }
                         return result;
                     };
+                } else if (!bindingResult.getConversionErrors().isEmpty()) {
+                    value = (UnresolvedArgument) () -> bindingResult;
                 }
             }
         }

@@ -105,6 +105,16 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
             }
 
             @Override
+            public void reject(Object value, Exception exception) {
+                thisContext.reject(value, exception);
+            }
+
+            @Override
+            public void reject(ConversionError conversionError) {
+                thisContext.reject(conversionError);
+            }
+
+            @Override
             public Iterator<ConversionError> iterator() {
                 return thisContext.iterator();
             }

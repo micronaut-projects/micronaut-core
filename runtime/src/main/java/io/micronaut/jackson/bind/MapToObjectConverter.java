@@ -78,7 +78,7 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
             } else {
                 argumentContext = context.with(Argument.of(targetType));
             }
-            return Optional.of(introspectedBinder.bind(targetType, map.entrySet()));
+            return Optional.ofNullable(introspectedBinder.bindType(targetType, argumentContext, map.entrySet()));
         }
 
         return InstantiationUtils

@@ -707,7 +707,6 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             Object value = null;
             while (i.hasNext()) {
                 if (count > 0) {
-                    context.reject(object, new ConversionErrorException(Argument.of(targetType), new IllegalArgumentException("Cannot convert an iterable with more than 1 value to a non collection object")));
                     return Optional.empty();
                 }
                 count++;
