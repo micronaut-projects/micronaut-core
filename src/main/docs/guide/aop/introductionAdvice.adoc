@@ -32,7 +32,7 @@ All abstract methods will delegate to the `StubIntroduction` class to be impleme
 
 The following test demonstrates the behaviour or `StubIntroduction`:
 
-snippet::io.micronaut.docs.aop.introduction.IntroductionTest[tags="test", indent=0, title="Testing Introduction Advice"]
+snippet::io.micronaut.docs.aop.introduction.IntroductionSpec[tags="test", indent=0, title="Testing Introduction Advice"]
 
 Note that if the introduction advice cannot implement the method the `proceed` method of the api:aop.MethodInvocationContext[] should be called. This gives the opportunity for other introduction advice interceptors to implement the method, otherwise a `UnsupportedOperationException` will be thrown if no advice can implement the method.
 
