@@ -252,7 +252,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
                     final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
                     final RoutingInBoundHandler routingHandler = new RoutingInBoundHandler(
-                        beanLocator,
+                        applicationContext,
                         router,
                         mediaTypeCodecRegistry,
                         customizableResponseTypeHandlerRegistry,
@@ -471,6 +471,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             if (applicationContext.isRunning()) {
                 applicationContext.stop();
             }
+            serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
         } catch (Throwable e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);

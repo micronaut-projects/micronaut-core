@@ -18,6 +18,8 @@ package io.micronaut.docs.http.server.exception
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -45,5 +47,16 @@ class ExceptionHandlerSpec extends Specification {
         noExceptionThrown()
         stock != null
         stock == 0
+    }
+
+    void "test error route with @Status"() {
+        when:
+        HttpRequest request = HttpRequest.GET('/books/null-pointer')
+        HttpResponse<String> stock = client.toBlocking().exchange(request, String)
+
+        then:
+        noExceptionThrown()
+        stock.getBody(String).get() == "NPE"
+        stock.status() == HttpStatus.MULTI_STATUS
     }
 }

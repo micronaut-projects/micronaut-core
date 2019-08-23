@@ -15,8 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.context.BeanLocator;
-import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -109,6 +108,7 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -148,14 +148,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final ExecutorSelector executorSelector;
     private final StaticResourceResolver staticResourceResolver;
     private final ExecutorService ioExecutor;
-    private final BeanLocator beanLocator;
+    private final BeanContext beanContext;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
 
     /**
-     * @param beanLocator                             The bean locator
+     * @param beanContext                             The bean locator
      * @param router                                  The router
      * @param mediaTypeCodecRegistry                  The media type codec registry
      * @param customizableResponseTypeHandlerRegistry The customizable response type handler registry
@@ -166,7 +166,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * @param ioExecutor                              The IO executor
      */
     RoutingInBoundHandler(
-        BeanLocator beanLocator,
+        BeanContext beanContext,
         Router router,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
@@ -178,7 +178,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
-        this.beanLocator = beanLocator;
+        this.beanContext = beanContext;
         this.staticResourceResolver = staticResourceResolver;
         this.ioExecutor = ioExecutor;
         this.executorSelector = executorSelector;
@@ -198,21 +198,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             try {
                 request.release();
             } finally {
-                if (beanLocator instanceof ApplicationEventPublisher) {
-                    ctx.executor().execute(() -> {
-                        try {
-                            ((ApplicationEventPublisher) beanLocator).publishEvent(
-                                    new HttpRequestTerminatedEvent(
-                                            request
-                                    )
-                            );
-                        } catch (Exception e) {
-                            if (LOG.isErrorEnabled()) {
-                                LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
-                            }
+                ctx.executor().execute(() -> {
+                    try {
+                        beanContext.publishEvent(
+                                new HttpRequestTerminatedEvent(
+                                        request
+                                )
+                        );
+                    } catch (Exception e) {
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
                         }
-                    });
-                }
+                    }
+                });
             }
         }
     }
@@ -314,7 +312,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
                 Flowable resultFlowable = Flowable.defer(() -> {
                       Object result = methodBasedRoute.execute();
-                      MutableHttpResponse<?> response = errorResultToResponse(result);
+                      MutableHttpResponse<?> response = errorResultToResponse(result, methodBasedRoute);
                       response.setAttribute(HttpAttributes.ROUTE_MATCH, methodBasedRoute);
                       return Flowable.just(response);
                 });
@@ -353,7 +351,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
         } else {
 
-            Optional<ExceptionHandler> exceptionHandler = beanLocator
+            Optional<ExceptionHandler> exceptionHandler = beanContext
                     .findBean(ExceptionHandler.class, Qualifiers.byTypeArgumentsClosest(cause.getClass(), Object.class));
 
             if (exceptionHandler.isPresent()) {
@@ -362,7 +360,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 try {
                     Flowable resultFlowable = Flowable.defer(() -> {
                         Object result = handler.handle(nettyHttpRequest, cause);
-                        MutableHttpResponse<?> response = errorResultToResponse(result);
+                        MutableHttpResponse<?> response = errorResultToResponse(result, null);
                         return Flowable.just(response);
                     });
 
@@ -651,16 +649,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 .link(Link.SELF, Link.of(uri));
     }
 
-    private MutableHttpResponse errorResultToResponse(Object result) {
+    private MutableHttpResponse errorResultToResponse(Object result, @Nullable RouteMatch routeMatch) {
         MutableHttpResponse<?> response;
-        if (result == null) {
-            response = io.micronaut.http.HttpResponse.serverError();
-        } else if (result instanceof io.micronaut.http.HttpResponse) {
-            response = (MutableHttpResponse) result;
+        if (result instanceof HttpResponse) {
+            response = ConversionService.SHARED.convert(result, NettyMutableHttpResponse.class)
+                    .orElseThrow(() -> new InternalServerException("Emitted response is not mutable"));
         } else {
-            response = io.micronaut.http.HttpResponse.serverError()
-                .body(result);
-            MediaType.fromType(result.getClass()).ifPresent(response::contentType);
+            if (result instanceof HttpStatus) {
+                response = HttpResponse.status((HttpStatus) result);
+            } else {
+                if (routeMatch != null) {
+                    response = forStatus(routeMatch.getAnnotationMetadata(), HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+                } else {
+                    response = HttpResponse.serverError().body(result);
+                }
+            }
         }
         return response;
     }
@@ -686,7 +689,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Optional<MediaType> contentType = request.getContentType();
             HttpContentProcessor<?> processor = contentType
                 .flatMap(type ->
-                    beanLocator.findBean(HttpContentSubscriberFactory.class,
+                    beanContext.findBean(HttpContentSubscriberFactory.class,
                         new ConsumesMediaTypeQualifier<>(type))
                 ).map(factory ->
                     factory.build(request)
@@ -1454,13 +1457,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private MutableHttpResponse<Object> forStatus(AnnotationMetadata annotationMetadata) {
-        HttpStatus status = HttpStatus.OK;
+        return forStatus(annotationMetadata, HttpStatus.OK);
+    }
 
-        if (annotationMetadata.hasAnnotation(Status.class)) {
-            status = annotationMetadata.stringValue(Status.class).map(HttpStatus::valueOf).orElse(status);
-        }
-
-        return HttpResponse.status(status);
+    private MutableHttpResponse<Object> forStatus(AnnotationMetadata annotationMetadata, HttpStatus defaultStatus) {
+        return HttpResponse.status(
+                annotationMetadata.stringValue(Status.class)
+                        .map(HttpStatus::valueOf)
+                        .orElse(defaultStatus));
     }
 
     private boolean isResponsePublisher(ReturnType<?> genericReturnType, Class<?> javaReturnType) {
