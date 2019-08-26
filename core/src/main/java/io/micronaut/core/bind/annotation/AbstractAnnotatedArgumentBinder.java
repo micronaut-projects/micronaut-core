@@ -122,7 +122,6 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
         if (result.isPresent() && context.getArgument().getType() == Optional.class) {
             return () -> (Optional<T>) result.get();
         }
-        if (context.getLastError().isPresent())
         return () -> result;
     }
 }

@@ -103,7 +103,7 @@ public class IntrospectedBeanPropertyBinder implements BeanPropertyBinder {
             }
 
             if (context.getLastError().isPresent()) {
-                return null;
+                throw new ConversionErrorException(context.getArgument(), context.getLastError().get());
             }
 
             if (constructorArguments.length > 0) {
@@ -113,6 +113,10 @@ public class IntrospectedBeanPropertyBinder implements BeanPropertyBinder {
             }
 
             bind(instance, context, bindMap.entrySet());
+
+            if (context.getLastError().isPresent()) {
+                throw new ConversionErrorException(context.getArgument(), context.getLastError().get());
+            }
 
             return instance;
         } catch (IntrospectionException e) {
@@ -299,8 +303,9 @@ public class IntrospectedBeanPropertyBinder implements BeanPropertyBinder {
                 }
                 consumer.accept(converted.orElse(null));
             } else {
-                if (value instanceof List) {
-                    List list = (List) value;
+                if (value instanceof Collection) {
+                    List list = new ArrayList<>((Collection<?>) value);
+                    value = list;
                     boolean isArray = argument.getType().isArray();
                     Optional<Argument<?>> typeVariable;
                     if (isArray) {
