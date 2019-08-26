@@ -32,4 +32,11 @@ public interface HttpCompressionStrategy {
      * @return True if the response should be compressed
      */
     boolean shouldCompress(HttpResponse response);
+
+    /**
+     * @return The compression level (0-9)
+     */
+    default int getCompressionLevel() {
+        return 6;
+    }
 }
