@@ -26,7 +26,7 @@ class SmartHttpContentCompressorSpec extends Specification {
             headers.add(HttpHeaderNames.CONTENT_LENGTH, length)
         }
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, headers)
-        new SmartHttpContentCompressor(new DefaultHttpCompressionStrategy(1024)).shouldSkip(response) == expected
+        new SmartHttpContentCompressor(new DefaultHttpCompressionStrategy(1024, 6)).shouldSkip(response) == expected
 
         where:
         type           | length | expected
