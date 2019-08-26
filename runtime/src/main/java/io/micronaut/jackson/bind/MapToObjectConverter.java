@@ -32,7 +32,6 @@ import javax.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.BiFunction;
 
 /**
  * A class that uses the {@link BeanPropertyBinder} to bind maps to {@link Object} instances.
@@ -85,7 +84,7 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
                 .tryInstantiate(targetType)
                 .map(object -> {
                     Map bindMap = new LinkedHashMap(map.size());
-                    for (Map.Entry entry : ((Map<?,?>) map).entrySet()) {
+                    for (Map.Entry entry : ((Map<?, ?>) map).entrySet()) {
                         Object key = entry.getKey();
                         bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
                     }
