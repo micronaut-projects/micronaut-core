@@ -17,7 +17,6 @@ package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
 import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
