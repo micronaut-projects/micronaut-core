@@ -102,7 +102,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
     private LogLevel logLevel;
     private int compressionThreshold = DEFAULT_COMPRESSIONTHRESHOLD;
-    private int compressionLevel = DEFAULT_COMPRESSIONTHRESHOLD;
+    private int compressionLevel = DEFAULT_COMPRESSIONLEVEL;
     private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
 
     /**
