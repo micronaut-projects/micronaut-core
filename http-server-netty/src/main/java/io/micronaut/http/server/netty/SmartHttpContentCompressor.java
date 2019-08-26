@@ -42,6 +42,7 @@ public class SmartHttpContentCompressor extends HttpContentCompressor {
      * @param httpCompressionStrategy The compression strategy
      */
     SmartHttpContentCompressor(HttpCompressionStrategy httpCompressionStrategy) {
+        super(httpCompressionStrategy.getCompressionLevel());
         this.httpCompressionStrategy = httpCompressionStrategy;
     }
 

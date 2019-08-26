@@ -206,7 +206,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 String headerName = headerAnnotation.stringValue("name").orElse(null);
                 String headerValue = headerAnnotation.stringValue().orElse(null);
                 if (StringUtils.isNotEmpty(headerName) && StringUtils.isNotEmpty(headerValue)) {
-                    headers.put(headerName, headerValue);
+                    headers.putIfAbsent(headerName, headerValue);
                 }
             }
 
