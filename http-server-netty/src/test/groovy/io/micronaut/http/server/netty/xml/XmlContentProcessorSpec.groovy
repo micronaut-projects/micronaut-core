@@ -59,6 +59,20 @@ class XmlContentProcessorSpec extends Specification {
         books[1].title == "Second Book"
     }
 
+    void "test streaming books with self closed elements"() {
+        RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+
+        when:
+        List<Book> books = client.jsonStream(
+                HttpRequest.POST("/xml/stream", '<books><book title="First Book"/><book title="Second Book"/></books>')
+                        .contentType(MediaType.TEXT_XML_TYPE), Book.class).toList().blockingGet()
+
+        then:
+        books.size() == 2
+        books[0].title == "First Book"
+        books[1].title == "Second Book"
+    }
+
     void "test sending a blocking author"() {
         RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
@@ -70,7 +84,6 @@ class XmlContentProcessorSpec extends Specification {
         then:
         author.books.size() == 1
         author.books[0].title == "First Book"
-        author.name == "Joe"
     }
 
     void "test sending a blocking author with 2 books"() {
@@ -86,6 +99,18 @@ class XmlContentProcessorSpec extends Specification {
         author.books[0].title == "First Book"
         author.books[1].title == "Second Book"
         author.name == "Joe"
+    }
+
+    void "test mapping xml field to controller argument"() {
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        String name = client.toBlocking().retrieve(
+                HttpRequest.POST("/xml/stream/author/name", '<author name="Joe"><books><book><title>First Book</title></book></books></author>')
+                        .contentType(MediaType.TEXT_XML_TYPE))
+
+        then:
+        name == 'Joe'
     }
 
     @Controller(value = "/xml/stream", consumes = MediaType.TEXT_XML)
@@ -106,6 +131,11 @@ class XmlContentProcessorSpec extends Specification {
         @Post("/author")
         Author author(@Body Author author) {
             return author
+        }
+
+        @Post("/author/name")
+        String author(String name) {
+            return name
         }
 
     }

@@ -21,11 +21,13 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.reflect.GenericTypeUtils;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
@@ -169,7 +171,75 @@ public class ObjectMapperFactory {
             if (propertyNamingStrategy != null) {
                 objectMapper.setPropertyNamingStrategy(propertyNamingStrategy);
             }
-            
+
+            jacksonConfiguration.getSerializationSettings().forEach(objectMapper::configure);
+            jacksonConfiguration.getDeserializationSettings().forEach(objectMapper::configure);
+            jacksonConfiguration.getMapperSettings().forEach(objectMapper::configure);
+            jacksonConfiguration.getParserSettings().forEach(objectMapper::configure);
+            jacksonConfiguration.getGeneratorSettings().forEach(objectMapper::configure);
+        }
+        return objectMapper;
+    }
+
+    /**
+     * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
+     *
+     * @param jacksonConfiguration The configuration
+     * @return The {@link ObjectMapper}
+     */
+    @Singleton
+    @BootstrapContextCompatible
+    @Named("xml")
+    @Requires(classes = XmlMapper.class)
+    public ObjectMapper xmlMapper(@Nullable JacksonConfiguration jacksonConfiguration) {
+
+        XmlMapper objectMapper = new XmlMapper();
+
+        final boolean hasConfiguration = jacksonConfiguration != null;
+        if (!hasConfiguration || jacksonConfiguration.isModuleScan()) {
+            objectMapper.findAndRegisterModules();
+        }
+        objectMapper.registerModules(jacksonModules);
+
+        for (BeanSerializerModifier beanSerializerModifier : beanSerializerModifiers) {
+            objectMapper.setSerializerFactory(
+                    objectMapper.getSerializerFactory().withSerializerModifier(
+                            beanSerializerModifier
+                    ));
+        }
+
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
+        objectMapper.configure(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS, true);
+
+        if (hasConfiguration) {
+
+            ObjectMapper.DefaultTyping defaultTyping = jacksonConfiguration.getDefaultTyping();
+            if (defaultTyping != null) {
+                objectMapper.enableDefaultTyping(defaultTyping);
+            }
+
+            JsonInclude.Include include = jacksonConfiguration.getSerializationInclusion();
+            if (include != null) {
+                objectMapper.setSerializationInclusion(include);
+            }
+            String dateFormat = jacksonConfiguration.getDateFormat();
+            if (dateFormat != null) {
+                objectMapper.setDateFormat(new SimpleDateFormat(dateFormat));
+            }
+            Locale locale = jacksonConfiguration.getLocale();
+            if (locale != null) {
+                objectMapper.setLocale(locale);
+            }
+            TimeZone timeZone = jacksonConfiguration.getTimeZone();
+            if (timeZone != null) {
+                objectMapper.setTimeZone(timeZone);
+            }
+            PropertyNamingStrategy propertyNamingStrategy = jacksonConfiguration.getPropertyNamingStrategy();
+            if (propertyNamingStrategy != null) {
+                objectMapper.setPropertyNamingStrategy(propertyNamingStrategy);
+            }
+
             jacksonConfiguration.getSerializationSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getDeserializationSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getMapperSettings().forEach(objectMapper::configure);

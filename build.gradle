@@ -94,6 +94,11 @@ ext {
                     name   : 'jackson-datatype-jdk8',
                     modules: ['jackson-datatype-jsr310']
             ],
+            'jackson.dataformat'       : [
+                    version: jacksonVersion,
+                    group  : 'com.fasterxml.jackson.dataformat',
+                    name   : 'jackson-dataformat-xml',
+            ],
             jaeger                     : [
                     version: jaegerVersion,
                     group  : 'io.jaegertracing',
@@ -699,7 +704,7 @@ subprojects { Project subproject ->
         relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
         relocate "org.objectweb.asm", "io.micronaut.asm"
     }
-    
+
     shadowJar.enabled = false
 
     def isDocumented = subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')

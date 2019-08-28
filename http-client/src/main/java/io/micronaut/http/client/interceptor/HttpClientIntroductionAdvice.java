@@ -59,9 +59,9 @@ import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.annotation.JacksonFeatures;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
+import io.micronaut.jackson.codec.XmlMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
@@ -225,7 +225,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         configuration.getParameters()
                                 .forEach(parameter -> queryParams.put(parameter, version));
                     });
-          
+
             Map<String, Object> attributes = new LinkedHashMap<>(ATTRIBUTES_INITIAL_CAPACITY);
 
             List<AnnotationValue<RequestAttribute>> attributeAnnotations = context.getAnnotationValuesByType(RequestAttribute.class);
@@ -646,11 +646,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         return clients.computeIfAbsent(clientKey, integer -> {
             HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(NameUtils.hyphenate(clientId))).orElse(null);
-            AnnotationValue<JacksonFeatures> jacksonFeatures = context.findAnnotation(JacksonFeatures.class).orElse(null);
+            AnnotationValue<JacksonFeatures> jacksonFeaturesAnn = context.findAnnotation(JacksonFeatures.class).orElse(null);
             Optional<Class<?>> configurationClass = clientAnn.classValue("configuration");
 
             if (null != clientBean) {
-                if (path == null && jacksonFeatures == null && !configurationClass.isPresent()) {
+                if (path == null && jacksonFeaturesAnn == null && !configurationClass.isPresent()) {
                     return clientBean;
                 }
             }
@@ -688,54 +688,60 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
                 defaultClient.setClientIdentifiers(clientId);
 
-                if (jacksonFeatures != null) {
-                    Optional<MediaTypeCodec> existingCodec = defaultClient.getMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE);
-                    ObjectMapper objectMapper = null;
-                    if (existingCodec.isPresent()) {
-                        MediaTypeCodec existing = existingCodec.get();
-                        if (existing instanceof JsonMediaTypeCodec) {
-                            objectMapper = ((JsonMediaTypeCodec) existing).getObjectMapper().copy();
-                        }
-                    }
-                    if (objectMapper == null) {
-                        objectMapper = new ObjectMapperFactory().objectMapper(null, null);
-                    }
+                if (jacksonFeaturesAnn != null) {
+                    io.micronaut.jackson.codec.JacksonFeatures jacksonFeatures = new io.micronaut.jackson.codec.JacksonFeatures();
 
-                    SerializationFeature[] enabledSerializationFeatures = jacksonFeatures.get("enabledSerializationFeatures", SerializationFeature[].class).orElse(null);
+
+                    SerializationFeature[] enabledSerializationFeatures = jacksonFeaturesAnn.get("enabledSerializationFeatures", SerializationFeature[].class).orElse(null);
                     if (enabledSerializationFeatures != null) {
                         for (SerializationFeature serializationFeature : enabledSerializationFeatures) {
-                            objectMapper.configure(serializationFeature, true);
+                            jacksonFeatures.addFeature(serializationFeature, true);
                         }
                     }
 
-                    DeserializationFeature[] enabledDeserializationFeatures = jacksonFeatures.get("enabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
+                    DeserializationFeature[] enabledDeserializationFeatures = jacksonFeaturesAnn.get("enabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
 
                     if (enabledDeserializationFeatures != null) {
-                        for (DeserializationFeature serializationFeature : enabledDeserializationFeatures) {
-                            objectMapper.configure(serializationFeature, true);
+                        for (DeserializationFeature deserializationFeature : enabledDeserializationFeatures) {
+                            jacksonFeatures.addFeature(deserializationFeature, true);
                         }
                     }
 
-                    SerializationFeature[] disabledSerializationFeatures = jacksonFeatures.get("disabledSerializationFeatures", SerializationFeature[].class).orElse(null);
+                    SerializationFeature[] disabledSerializationFeatures = jacksonFeaturesAnn.get("disabledSerializationFeatures", SerializationFeature[].class).orElse(null);
                     if (disabledSerializationFeatures != null) {
                         for (SerializationFeature serializationFeature : disabledSerializationFeatures) {
-                            objectMapper.configure(serializationFeature, false);
+                            jacksonFeatures.addFeature(serializationFeature, false);
                         }
                     }
 
-                    DeserializationFeature[] disabledDeserializationFeatures = jacksonFeatures.get("disabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
+                    DeserializationFeature[] disabledDeserializationFeatures = jacksonFeaturesAnn.get("disabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
 
                     if (disabledDeserializationFeatures != null) {
                         for (DeserializationFeature feature : disabledDeserializationFeatures) {
-                            objectMapper.configure(feature, false);
+                            jacksonFeatures.addFeature(feature, false);
                         }
                     }
 
-                    defaultClient.setMediaTypeCodecRegistry(
-                            MediaTypeCodecRegistry.of(
-                                    new JsonMediaTypeCodec(objectMapper,
-                                            beanContext.getBean(ApplicationConfiguration.class),
-                                            beanContext.findBean(CodecConfiguration.class, Qualifiers.byName(JsonMediaTypeCodec.CONFIGURATION_QUALIFIER)).orElse(null))));
+                    List<MediaTypeCodec> codecs = new ArrayList<>(2);
+                    codecs.add(new JsonMediaTypeCodec(
+                            jacksonFeatures,
+                            beanContext.getBean(ObjectMapper.class),
+                            beanContext.getBean(ApplicationConfiguration.class),
+                            beanContext.findBean(CodecConfiguration.class,
+                                                 Qualifiers.byName(JsonMediaTypeCodec.CONFIGURATION_QUALIFIER)).orElse(null))
+                    );
+
+                    if (beanContext.containsBean(XmlMediaTypeCodec.class)) {
+                        codecs.add(new XmlMediaTypeCodec(
+                                jacksonFeatures,
+                                beanContext.getBean(ObjectMapper.class),
+                                beanContext.getBean(ApplicationConfiguration.class),
+                                beanContext.findBean(CodecConfiguration.class,
+                                                     Qualifiers.byName(XmlMediaTypeCodec.CONFIGURATION_QUALIFIER)).orElse(null))
+                        );
+                    }
+
+                    defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(codecs));
                 }
             }
             return client;
