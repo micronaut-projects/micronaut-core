@@ -19,11 +19,7 @@ import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.function.FunctionBean
 import io.micronaut.function.LocalFunctionRegistry
-import io.micronaut.http.HttpHeaders
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
+import io.micronaut.http.*
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
@@ -112,7 +108,25 @@ class WebFunctionSpec extends Specification {
 
         then:
         response.code() == HttpStatus.OK.code
-        StringConsumer.LAST_VALUE == "The Stand"
+        StringConsumer.LAST_VALUE == '{"title":"The Stand"}'
+
+        cleanup:
+        embeddedServer.stop()
+    }
+
+    void "test string consumer with XML"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+        def data = '{"title":"The Stand"}'
+
+        when:
+        HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST('/consumer/string', data)
+                                                                        .contentType(MediaType.APPLICATION_XML_TYPE))
+
+        then:
+        response.code() == HttpStatus.OK.code
+        StringConsumer.LAST_VALUE == '{"title":"The Stand"}'
 
         cleanup:
         embeddedServer.stop()
@@ -213,6 +227,7 @@ class WebFunctionSpec extends Specification {
             LAST_VALUE = title
         }
     }
+
 
     @FunctionBean("consumer/pojo")
     static class PojoConsumer implements Consumer<Book> {

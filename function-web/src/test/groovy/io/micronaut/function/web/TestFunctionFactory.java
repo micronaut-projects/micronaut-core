@@ -72,6 +72,12 @@ public class TestFunctionFactory {
         return (str) -> str;
     }
 
+    @FunctionBean("java/function/json")
+    @Consumes(MediaType.APPLICATION_JSON)
+    Function<String, String> roundJson() {
+        return (hi) -> hi;
+    }
+
     static class Name {
         private String name;
 

@@ -125,4 +125,20 @@ class JavaLambdaFunctionSpec extends Specification {
         cleanup:
         embeddedServer.stop()
     }
+
+    void "test func json"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.POST('/java/function/json', '{"hi": "there"}').contentType(MediaType.APPLICATION_JSON), String)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == '{"hi": "there"}'
+
+        cleanup:
+        embeddedServer.stop()
+    }
 }
