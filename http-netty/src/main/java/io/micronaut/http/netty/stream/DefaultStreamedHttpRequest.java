@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.stream;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.netty.reactive.HotObservable;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpMethod;
@@ -63,4 +64,10 @@ public class DefaultStreamedHttpRequest extends DefaultHttpRequest implements St
         stream.subscribe(subscriber);
     }
 
+    @Override
+    public void closeIfNoSubscriber() {
+        if (stream instanceof HotObservable) {
+            ((HotObservable<HttpContent>) stream).closeIfNoSubscriber();
+        }
+    }
 }
