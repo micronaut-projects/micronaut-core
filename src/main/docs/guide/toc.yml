@@ -102,6 +102,7 @@ httpServer:
     threadPools: Configuring Server Thread Pools
     cors: Configuring CORS
     https: Securing the Server with HTTPS
+    dualProtocol: Enabling HTTP and HTTPS
   views:
     title: Server Side View Rendering
   openapi: OpenAPI / Swagger Support
