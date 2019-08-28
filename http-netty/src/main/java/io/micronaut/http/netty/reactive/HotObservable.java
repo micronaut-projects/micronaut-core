@@ -13,22 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.netty.stream;
+package io.micronaut.http.netty.reactive;
 
-import io.netty.handler.codec.http.HttpRequest;
+import org.reactivestreams.Publisher;
 
 /**
- * Combines {@link HttpRequest} and {@link StreamedHttpMessage} into one
- * message. So it represents an http request with a stream of
- * {@link io.netty.handler.codec.http.HttpContent} messages that can be subscribed to.
+ * A contract for a publisher that buffers data to allow for
+ * the release of that data if there will not be a subscriber.
  *
- * @author jroper
- * @author Graeme Rocher
+ * @param <T> The type of data being published
+ * @author James Kleeh
+ * @since 1.2.1
  */
-public interface StreamedHttpRequest extends HttpRequest, StreamedHttpMessage {
+public interface HotObservable<T> extends Publisher<T> {
 
     /**
-     * Releases the stream if there is no subscriber.
+     * Releases buffered data if there is no subscriber.
      */
-    default void closeIfNoSubscriber() { }
+    void closeIfNoSubscriber();
 }

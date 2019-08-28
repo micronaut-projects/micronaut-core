@@ -24,7 +24,6 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.TypeParameterMatcher;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -63,7 +62,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.0
  */
 @Internal
-public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publisher<T> {
+public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObservable<T> {
     private static final Logger LOG = LoggerFactory.getLogger(HandlerPublisher.class);
     /**
      * Used for buffering a completion signal.
@@ -527,6 +526,14 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                 break;
             default:
                 // no-op
+        }
+    }
+
+    @Override
+    public void closeIfNoSubscriber() {
+        if (subscriber == null) {
+            state = DONE;
+            cleanup();
         }
     }
 

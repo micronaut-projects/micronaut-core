@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.stream;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.netty.reactive.HotObservable;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import org.reactivestreams.Publisher;
@@ -45,5 +46,12 @@ final class DelegateStreamedHttpRequest extends DelegateHttpRequest implements S
     @Override
     public void subscribe(Subscriber<? super HttpContent> subscriber) {
         stream.subscribe(subscriber);
+    }
+
+    @Override
+    public void closeIfNoSubscriber() {
+        if (stream instanceof HotObservable) {
+            ((HotObservable<HttpContent>) stream).closeIfNoSubscriber();
+        }
     }
 }
