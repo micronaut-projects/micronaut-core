@@ -280,6 +280,11 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             return false
         }
 
+        if (cmd.features.any { SupportedLanguage.isValidValue(it) }) {
+            MicronautConsole.instance.error("Language features cannot be used with the --features flag. Use --lang instead")
+            return false
+        }
+
         List<Feature> features = evaluateFeatures(profileInstance, cmd.features, cmd.lang).toList()
 
         if (profileInstance) {
@@ -495,6 +500,8 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             testFramework = "junit"
         else if (features.contains("spek"))
             testFramework = "spek"
+        else if (features.contains("kotlintest"))
+            testFramework = "kotlintest"
 
         testFramework
     }

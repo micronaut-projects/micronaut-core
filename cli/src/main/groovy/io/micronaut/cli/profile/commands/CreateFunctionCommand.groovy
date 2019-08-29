@@ -114,13 +114,13 @@ class CreateFunctionCommand extends AbstractCreateCommand {
         switch (lang) {
             case SupportedLanguage.java:   return SupportedTestFramework.junit
             case SupportedLanguage.groovy: return SupportedTestFramework.spock
-            case SupportedLanguage.kotlin: return SupportedTestFramework.spek
+            case SupportedLanguage.kotlin: return SupportedTestFramework.kotlintest
             default:                       return SupportedTestFramework.junit
         }
     }
 
     protected void checkInvalidSelections(ExecutionContext executionContext, String langFeature, String testFeature) {
-        if (langFeature.contains("kotlin") && !testFeature.contains("spek")) {
+        if (langFeature.contains("kotlin") && !testFeature.contains("kotlintest")) {
             executionContext.console.warn("Kotlin project may not support your chosen test framework")
         }
     }

@@ -126,7 +126,7 @@ function _picocli_mn_createapp() {
   LANG_OPTION_ARGS="java groovy kotlin" # SupportedLanguage values
   BUILDTOOL_OPTION_ARGS="gradle maven" # SupportedBuildTool values
   PROFILE_OPTION_ARGS="base cli federation function function-aws kafka profile service base cli federation function function-aws kafka profile service" # --profile values
-  FEATURE_OPTION_ARGS="annotation-api cassandra config-consul discovery-consul discovery-eureka groovy hibernate-gorm hibernate-jpa http-client http-server java jdbc-dbcp jdbc-hikari jdbc-tomcat jrebel junit kafka kafka-streams kotlin management micrometer micrometer-atlas micrometer-graphite micrometer-prometheus micrometer-statsd mongo-gorm mongo-reactive neo4j-bolt neo4j-gorm netflix-archius netflix-hystrix netflix-ribbon picocli postgres-reactive rabbitmq redis-lettuce security-jwt security-session spek spock springloaded tracing-jaeger tracing-zipkin" # --features values
+  FEATURE_OPTION_ARGS="annotation-api cassandra config-consul discovery-consul discovery-eureka groovy hibernate-gorm hibernate-jpa http-client http-server java jdbc-dbcp jdbc-hikari jdbc-tomcat jrebel junit kafka kafka-streams kotlin kotlintest management micrometer micrometer-atlas micrometer-graphite micrometer-prometheus micrometer-statsd mongo-gorm mongo-reactive neo4j-bolt neo4j-gorm netflix-archius netflix-hystrix netflix-ribbon picocli postgres-reactive rabbitmq redis-lettuce security-jwt security-session spek spock springloaded tracing-jaeger tracing-zipkin" # --features values
 
   case ${CURR_WORD} in
     -l|--lang)
@@ -179,10 +179,10 @@ function _picocli_mn_createcliapp() {
   FLAG_OPTS="-i --inplace -n --plain-output -x --stacktrace -v --verbose -h --help -V --version"
   ARG_OPTS="-l --lang -t --test -b --build -p --profile -f --features"
   LANG_OPTION_ARGS="java groovy kotlin" # SupportedLanguage values
-  TEST_OPTION_ARGS="junit spock spek" # SupportedTestFramework values
+  TEST_OPTION_ARGS="junit spock spek kotlintest" # SupportedTestFramework values
   BUILDTOOL_OPTION_ARGS="gradle maven" # SupportedBuildTool values
   PROFILE_OPTION_ARGS="base cli federation function function-aws kafka profile service base cli federation function function-aws kafka profile service" # --profile values
-  FEATURE_OPTION_ARGS="annotation-api cassandra config-consul discovery-consul discovery-eureka groovy hibernate-gorm hibernate-jpa http-client http-server java jdbc-dbcp jdbc-hikari jdbc-tomcat jrebel junit kafka kafka-streams kotlin management micrometer micrometer-atlas micrometer-graphite micrometer-prometheus micrometer-statsd mongo-gorm mongo-reactive neo4j-bolt neo4j-gorm netflix-archius netflix-hystrix netflix-ribbon picocli postgres-reactive rabbitmq redis-lettuce security-jwt security-session spek spock springloaded tracing-jaeger tracing-zipkin" # --features values
+  FEATURE_OPTION_ARGS="annotation-api cassandra config-consul discovery-consul discovery-eureka groovy hibernate-gorm hibernate-jpa http-client http-server java jdbc-dbcp jdbc-hikari jdbc-tomcat jrebel junit kafka kafka-streams kotlin kotlintest management micrometer micrometer-atlas micrometer-graphite micrometer-prometheus micrometer-statsd mongo-gorm mongo-reactive neo4j-bolt neo4j-gorm netflix-archius netflix-hystrix netflix-ribbon picocli postgres-reactive rabbitmq redis-lettuce security-jwt security-session spek spock springloaded tracing-jaeger tracing-zipkin" # --features values
 
   case ${CURR_WORD} in
     -l|--lang)
@@ -244,7 +244,7 @@ function _picocli_mn_createfederation() {
   ARG_OPTS="-s --services -b --build -p --profile -f --features"
   BUILDTOOL_OPTION_ARGS="gradle maven" # SupportedBuildTool values
   PROFILE_OPTION_ARGS="base cli federation function function-aws kafka profile service base cli federation function function-aws kafka profile service" # --profile values
-  FEATURE_OPTION_ARGS="annotation-api cassandra config-consul discovery-consul discovery-eureka groovy hibernate-gorm hibernate-jpa http-client http-server java jdbc-dbcp jdbc-hikari jdbc-tomcat jrebel junit kafka kafka-streams kotlin management micrometer micrometer-atlas micrometer-graphite micrometer-prometheus micrometer-statsd mongo-gorm mongo-reactive neo4j-bolt neo4j-gorm netflix-archius netflix-hystrix netflix-ribbon picocli postgres-reactive rabbitmq redis-lettuce security-jwt security-session spek spock springloaded tracing-jaeger tracing-zipkin" # --features values
+  FEATURE_OPTION_ARGS="annotation-api cassandra config-consul discovery-consul discovery-eureka groovy hibernate-gorm hibernate-jpa http-client http-server java jdbc-dbcp jdbc-hikari jdbc-tomcat jrebel junit kafka kafka-streams kotlin kotlintest management micrometer micrometer-atlas micrometer-graphite micrometer-prometheus micrometer-statsd mongo-gorm mongo-reactive neo4j-bolt neo4j-gorm netflix-archius netflix-hystrix netflix-ribbon picocli postgres-reactive rabbitmq redis-lettuce security-jwt security-session spek spock springloaded tracing-jaeger tracing-zipkin" # --features values
 
   case ${CURR_WORD} in
     -b|--build)
@@ -289,10 +289,10 @@ function _picocli_mn_createfunction() {
   FLAG_OPTS="-i --inplace -n --plain-output -x --stacktrace -v --verbose -h --help -V --version"
   ARG_OPTS="-r --provider -l --lang -t --test -b --build -p --profile -f --features"
   LANG_OPTION_ARGS="java groovy kotlin" # SupportedLanguage values
-  TEST_OPTION_ARGS="junit spock spek" # SupportedTestFramework values
+  TEST_OPTION_ARGS="junit spock spek kotlintest" # SupportedTestFramework values
   BUILDTOOL_OPTION_ARGS="gradle maven" # SupportedBuildTool values
   PROFILE_OPTION_ARGS="base cli federation function function-aws kafka profile service base cli federation function function-aws kafka profile service" # --profile values
-  FEATURE_OPTION_ARGS="annotation-api cassandra config-consul discovery-consul discovery-eureka groovy hibernate-gorm hibernate-jpa http-client http-server java jdbc-dbcp jdbc-hikari jdbc-tomcat jrebel junit kafka kafka-streams kotlin management micrometer micrometer-atlas micrometer-graphite micrometer-prometheus micrometer-statsd mongo-gorm mongo-reactive neo4j-bolt neo4j-gorm netflix-archius netflix-hystrix netflix-ribbon picocli postgres-reactive rabbitmq redis-lettuce security-jwt security-session spek spock springloaded tracing-jaeger tracing-zipkin" # --features values
+  FEATURE_OPTION_ARGS="annotation-api cassandra config-consul discovery-consul discovery-eureka groovy hibernate-gorm hibernate-jpa http-client http-server java jdbc-dbcp jdbc-hikari jdbc-tomcat jrebel junit kafka kafka-streams kotlin kotlintest management micrometer micrometer-atlas micrometer-graphite micrometer-prometheus micrometer-statsd mongo-gorm mongo-reactive neo4j-bolt neo4j-gorm netflix-archius netflix-hystrix netflix-ribbon picocli postgres-reactive rabbitmq redis-lettuce security-jwt security-session spek spock springloaded tracing-jaeger tracing-zipkin" # --features values
 
   case ${CURR_WORD} in
     -l|--lang)
