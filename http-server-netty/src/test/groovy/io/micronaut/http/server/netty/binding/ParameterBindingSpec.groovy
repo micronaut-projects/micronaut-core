@@ -23,7 +23,6 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.reactivex.Flowable
 import spock.lang.Unroll
 
 import javax.annotation.Nullable
@@ -82,6 +81,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/exploded?title=The%20Stand&age=20'  | "Parameter Value: The Stand 20" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"    | HttpStatus.OK
         HttpMethod.POST | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/arrayStyle?param[]=a&param[]=b&param[]=c' | "Parameter Value: [a, b, c]"    | HttpStatus.OK
     }
 
     void "test list to single error"() {
@@ -209,6 +209,12 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         String queryPost(@QueryValue String name) {
             "Parameter Value: $name"
         }
+
+        @Get('/arrayStyle{?param[]*}')
+        String arrayStyle(@QueryValue("param[]") List<String> params) {
+            "Parameter Value: $params"
+        }
+
 
         @Introspected
         static class Book {
