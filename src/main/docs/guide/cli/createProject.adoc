@@ -12,6 +12,7 @@ In addition, there are specialty commands for creating a "federation" of multipl
 |Creates a basic Micronaut application, using the `service` profile by default.
 a|
 * `-p`, `--profile`
+* `-l`, `--lang`
 * `-f`, `--features`
 * `-b`, `--build`
 * `-i`, `--inplace`
@@ -36,7 +37,7 @@ a|
 ----
 mn create-cli-app my-project --features
  http-client,jdbc-hikari --build maven
- --lang kotlin --test spek
+ --lang kotlin --test kotlintest
 ----
 
 
@@ -157,25 +158,25 @@ NOTE: The values in `micronaut-cli.yml` are used by the CLI for code generation 
 
 ==== Groovy
 
-To create an app with Groovy & Spock support, supply the appropriate features via the `feature` flag:
+To create an app with Groovy support (which comes with Spock by default), supply the appropriate language via the `lang` flag:
 
 [source,bash]
 ----
-$ mn create-app my-groovy-app --features groovy,spock
+$ mn create-app my-groovy-app --lang groovy
 ----
 
 This will include the Groovy & Spock dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
 
 ==== Kotlin
 
-To create an app with Kotlin & Spek support, supply the appropriate features via the `feature` flag:
+To create an app with Kotlin support (which comes with Kotlintest by default), supply the appropriate language via the `lang` flag:
 
 [source,bash]
 ----
-$ mn create-app my-kotlin-app --features kotlin,spek
+$ mn create-app my-kotlin-app --lang kotlin
 ----
 
-This will include the Kotlin & Spek dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
+This will include the Kotlin & Kotlintest dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
 
 
 === Build Tool
@@ -279,14 +280,14 @@ This will include the Groovy & Spock dependencies in your project, and write the
 
 ==== Kotlin
 
-To create an app with Kotlin & Spek support, supply the appropriate features via the `lang` and `test` flags:
+To create an app with Kotlin & KotlinTest support, supply the appropriate features via the `lang` and `test` flags:
 
 [source,bash]
 ----
-$ mn create-cli-app my-kotlin-app --lang=kotlin --test=spek
+$ mn create-cli-app my-kotlin-app --lang=kotlin --test=kotlintest
 ----
 
-This will include the Kotlin & Spek dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
+This will include the Kotlin & KotlinTest dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
 
 
 === Build Tool
@@ -350,7 +351,7 @@ or
 
 Setting the language using the `lang` flag will generate a `*Function` file in the appropriate language. For Java/Kotlin, this will generate a class annotated with ann:function.FunctionBean[]. For Groovy, a Groovy function script will be generated. See <<writingFunctions, Writing Functions>> for more details on how to write and test Micronaut functions.
 
-Depending on language choice, an appropriate test will also be generated. By default, a Java function will include a JUnit test, a Groovy function will include a Spock test, and a Kotlin function will include a Spek test. However, you can override the chosen test framework with the `test` flag.
+Depending on language choice, an appropriate test will also be generated. By default, a Java function will include a JUnit test, a Groovy function will include a Spock test, and a Kotlin function will include a KotlinTest test. However, you can override the chosen test framework with the `test` flag.
 
 [source,bash]
 ----
