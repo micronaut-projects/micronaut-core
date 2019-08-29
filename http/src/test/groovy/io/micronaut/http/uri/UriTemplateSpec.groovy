@@ -270,6 +270,7 @@ class UriTemplateSpec extends Specification {
         '{&keys}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '&keys=semi,%3B,dot,.,comma,%2C'
         '{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '&semi=%3B&dot=.&comma=%2C'
         '{?list*,locale,currency}' | [list: ['red', 'green', 'blue'], locale: null, currency: 'USD'] | '?list=red&list=green&list=blue&currency=USD'
+        '{?param[]*}'         | ['param[]': ['a', 'b', 'c']]                       | '?param[]=a&param[]=b&param[]=c'
     }
 
 

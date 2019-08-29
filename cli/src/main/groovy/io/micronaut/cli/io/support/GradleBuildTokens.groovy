@@ -107,6 +107,7 @@ class GradleBuildTokens extends BuildTokens {
         List<GradleDependency> gradleDependencies = []
         final String enforcedPlatform = ' platform("io.micronaut:micronaut-bom:$micronautVersion")'
         gradleDependencies.add(new GradleDependency("implementation", enforcedPlatform))
+        gradleDependencies.add(new GradleDependency("testImplementation", enforcedPlatform))
         if (sourceLanguage == "groovy") {
             gradleDependencies.add(new GradleDependency("compileOnly", enforcedPlatform))
             gradleDependencies.add(new GradleDependency("testCompileOnly", enforcedPlatform))
