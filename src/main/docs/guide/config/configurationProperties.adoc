@@ -149,7 +149,7 @@ The ann:io.micronaut.core.convert.format.Format[] annotation can be used on any 
 .Using `@Format` for Dates
 [source,java]
 ----
-public void setMyDate(@Format("yy-mm-dd") LocalDate date) {
+public void setMyDate(@Format("yyyy-MM-dd") LocalDate date) {
     this.myDate = date;
 }
 ----
