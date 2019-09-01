@@ -58,7 +58,9 @@ Then install SDKman, which is the quickest way to set up a development environme
 Once you have SDKman installed, point SDKman to your local development version of Micronaut.
 
 ```
-sdk install micronaut dev /path/to/checkout
+cd /path/to/checkout/cli/build/distributions/
+unzip micronaut-*.zip
+sdk install micronaut dev /path/to/checkout/cli/build/distributions/<unziped directory name>
 sdk use micronaut dev
 ```
 
