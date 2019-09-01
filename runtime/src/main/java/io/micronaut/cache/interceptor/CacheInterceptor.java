@@ -38,6 +38,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import io.reactivex.Maybe;
+import io.reactivex.Single;
 import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -501,46 +503,52 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
         CacheKeyGenerator keyGenerator = resolveKeyGenerator(cacheOperation.defaultKeyGenerator, cacheable);
         Object[] params = resolveParams(context, cacheable.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY));
         Object key = keyGenerator.generateKey(context, params);
+        Argument<?> firstTypeVariable = returnTypeObject.getFirstTypeVariable().orElse(Argument.of(Object.class));
 
-        final Flowable<?> originalFlowable = Publishers.convertPublisher(context.proceed(), Flowable.class);
-        return Flowable.create(emitter -> {
-            Argument<?> firstTypeVariable = returnTypeObject.getFirstTypeVariable().orElse(Argument.of(Object.class));
-            asyncCache.get(key, firstTypeVariable).whenComplete((BiConsumer<Optional<?>, Throwable>) (o, throwable) -> {
-                if (throwable == null && o.isPresent()) {
-                    // cache hit, return to original subscriber
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Value found in cache [" + asyncCache.getName() + "] for invocation: " + context);
-                    }
-                    emitter.onNext(o.get());
-                    emitter.onComplete();
-                } else {
-                    if (throwable != null) {
-                        if (errorHandler.handleLoadError(asyncCache, key, asRuntimeException(throwable))) {
-                            emitter.onError(throwable);
-                        } else {
-                            emitter.onComplete();
-                        }
-                    } else {
-                        emitter.onComplete();
-                    }
-                }
+        Maybe<Object> maybe = Maybe.create(emitter -> {
+            asyncCache.get(key, firstTypeVariable).whenComplete((opt, throwable) -> {
+               if (throwable != null) {
+                   if (errorHandler.handleLoadError(asyncCache, key, asRuntimeException(throwable))) {
+                       emitter.onError(throwable);
+                   } else {
+                       emitter.onComplete();
+                   }
+                   emitter.onError(throwable);
+               } else if (opt.isPresent()) {
+                   if (LOG.isDebugEnabled()) {
+                       LOG.debug("Value found in cache [" + asyncCache.getName() + "] for invocation: " + context);
+                   }
+                   emitter.onSuccess(opt.get());
+               } else {
+                   emitter.onComplete();
+               }
             });
-        }, BackpressureStrategy.BUFFER).switchIfEmpty(originalFlowable.flatMap((Function<Object, Publisher<?>>) o ->
-                Flowable.create(emitter -> asyncCache.put(key, o).whenComplete((aBoolean, throwable1) -> {
-                    if (throwable1 == null) {
-                        emitter.onNext(o);
-                        emitter.onComplete();
-                    } else {
-                        if (errorHandler.handleLoadError(asyncCache, key, asRuntimeException(throwable1))) {
+        });
 
-                            emitter.onError(throwable1);
-                        } else {
-                            emitter.onNext(o);
-                            emitter.onComplete();
+        return maybe.isEmpty().flatMapPublisher(empty -> {
+            if (empty) {
+               return Publishers.convertPublisher(
+                       context.proceed(), Flowable.class)
+                       .flatMap(o -> {
+                           return Single.create(emitter -> {
+                               asyncCache.put(key, o).whenComplete((aBoolean, throwable1) -> {
+                                   if (throwable1 == null) {
+                                       emitter.onSuccess(o);
+                                   } else {
+                                       if (errorHandler.handleLoadError(asyncCache, key, asRuntimeException(throwable1))) {
 
-                        }
-                    }
-                }), BackpressureStrategy.ERROR)));
+                                           emitter.onError(throwable1);
+                                       } else {
+                                           emitter.onSuccess(o);
+                                       }
+                                   }
+                               });
+                           }).toFlowable();
+                       });
+            } else {
+                return maybe.toFlowable();
+            }
+        });
     }
 
     private CompletableFuture<Object> processFuturePutOperations(MethodInvocationContext<Object, Object> context, CacheOperation cacheOperation, CompletableFuture<Object> returnFuture) {

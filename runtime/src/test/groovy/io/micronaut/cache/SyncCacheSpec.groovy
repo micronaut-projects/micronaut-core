@@ -33,6 +33,7 @@ import spock.util.concurrent.PollingConditions
 import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * @author Graeme Rocher
@@ -70,7 +71,6 @@ class SyncCacheSpec extends Specification {
         counterService.stageValue("test").toCompletableFuture().get() == 1
         counterService.singleValue("test").blockingGet() == 1
         counterService.getValue("test") == 1
-        counterService.getValue("test") == 1
 
         when:
         result = counterService.incrementNoCache("test")
@@ -80,20 +80,21 @@ class SyncCacheSpec extends Specification {
         counterService.flowableValue("test").blockingFirst() == 1
         counterService.futureValue("test").get() == 1
         counterService.stageValue("test").toCompletableFuture().get() == 1
+        counterService.singleValue("test").blockingGet() == 1
         counterService.getValue("test") == 1
 
         when:
         counterService.reset("test")
+
         then:
         counterService.getValue("test") == 0
 
         when:
         counterService.reset("test")
+
         then:
         counterService.futureValue("test").get() == 0
         counterService.stageValue("test").toCompletableFuture().get() == 0
-
-
 
         when:
         counterService.set("test", 3)
@@ -144,8 +145,44 @@ class SyncCacheSpec extends Specification {
         then:
         counterService.getValue("test") == 1
         counterService.getValue2("test") == 1
+    }
 
+    void "test publisher cache methods are not called for hits"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'micronaut.caches.counter.initialCapacity':10,
+                'micronaut.caches.counter.testMode':true,
+                'micronaut.caches.counter.maximumSize':20,
+        )
 
+        PublisherService publisherService = applicationContext.getBean(PublisherService)
+
+        expect:
+        publisherService.callCount.get() == 0
+
+        when:
+        publisherService.flowableValue("abc").blockingFirst()
+
+        then:
+        publisherService.callCount.get() == 1
+
+        when:
+        publisherService.flowableValue("abc").blockingFirst()
+
+        then:
+        publisherService.callCount.get() == 1
+
+        when:
+        publisherService.singleValue("abcd").blockingGet()
+
+        then:
+        publisherService.callCount.get() == 2
+
+        when:
+        publisherService.singleValue("abcd").blockingGet()
+
+        then:
+        publisherService.callCount.get() == 2
     }
 
     void "test configure sync cache"() {
@@ -206,6 +243,27 @@ class SyncCacheSpec extends Specification {
 
         cleanup:
         applicationContext.stop()
+    }
+
+    @Singleton
+    @CacheConfig('counter')
+    static class PublisherService {
+
+        AtomicInteger callCount = new AtomicInteger()
+
+        @Cacheable
+        @SingleResult
+        Flowable<Integer> flowableValue(String name) {
+            callCount.incrementAndGet()
+            return Flowable.just(0)
+        }
+
+        @Cacheable
+        Single<Integer> singleValue(String name) {
+            callCount.incrementAndGet()
+            return Single.just(0)
+        }
+
     }
 
     @Singleton
