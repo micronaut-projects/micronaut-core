@@ -68,9 +68,14 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         conditions.eventually {
             RequestBean.BEANS_CREATED.first().dead
         }
+    }
 
-        cleanup:
-        embeddedServer.stop()
+    void "test request scope bean that injects the request"() {
+        when:
+        String result = rxClient.retrieve(HttpRequest.GET("/test-request-aware"), String).blockingFirst()
+
+        then:
+        result == "OK"
     }
 
     @RequestScope
@@ -98,6 +103,17 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         }
     }
 
+    @RequestScope
+    static class RequestAwareBean implements RequestAware {
+
+        HttpRequest<?> request
+
+        @Override
+        void setRequest(HttpRequest<?> request) {
+            this.request = request
+        }
+    }
+
     @Singleton
     static class MessageService {
 
@@ -122,9 +138,20 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         @Inject
         MessageService messageService
 
+        @Inject
+        RequestAwareBean requestAwareBean
+
         @Get("/test-request-scope")
         String test() {
             return messageService.message
+        }
+
+        @Get("/test-request-aware")
+        String testAware(HttpRequest request) {
+            if (requestAwareBean.request == request) {
+                return "OK"
+            }
+            throw new IllegalStateException("Request does not match")
         }
     }
 }
