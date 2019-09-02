@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.binding
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.io.socket.SocketUtils
@@ -31,6 +32,7 @@ import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.exceptions.ServerStartupException
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Retry
@@ -195,6 +197,55 @@ class NettyHttpServerSpec extends Specification {
         client.stop()
         applicationContext.stop()
     }
+
+    void "test run Micronaut server when enabling both http and https"() {
+        when:
+        int httpPort = SocketUtils.findAvailableTcpPort()
+        PropertySource propertySource = PropertySource.of(
+                'micronaut.server.port':httpPort,
+                'micronaut.ssl.enabled': true,
+                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.dualProtocol':true
+        )
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
+
+        def secureUrl = embeddedServer.getURL()
+        RxHttpClient httpsClient = embeddedServer.applicationContext.createBean(RxHttpClient, secureUrl)
+        RxHttpClient httpClient = embeddedServer.applicationContext.createBean(RxHttpClient, new URL("http://localhost:$httpPort"))
+        HttpResponse httpsResponse = httpsClient.exchange('/person/Fred', String).blockingFirst()
+        HttpResponse httpResponse = httpClient.exchange('/person/Fred', String).blockingFirst()
+
+        then:
+        httpsResponse.body() == "Person Named Fred"
+        httpResponse.body() == "Person Named Fred"
+
+        cleanup:
+        httpsClient.stop()
+        embeddedServer.applicationContext.stop()
+    }
+
+    void "test dual protocol is using https by default when grabbing values from server"() {
+        def securePort = SocketUtils.findAvailableTcpPort()
+        def unsecurePort = SocketUtils.findAvailableTcpPort()
+        when:
+        PropertySource propertySource = PropertySource.of(
+                'micronaut.server.port': unsecurePort,
+                'micronaut.ssl.port': securePort,
+                'micronaut.ssl.enabled': true,
+                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.dualProtocol':true
+        )
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
+
+        then:
+        embeddedServer.getPort() == securePort
+        embeddedServer.getScheme() == "https"
+        embeddedServer.getURL().toString() == "https://localhost:$securePort"
+
+        cleanup:
+        embeddedServer.applicationContext.stop()
+    }
+
 
     @Controller("/person")
     static class PersonController {
