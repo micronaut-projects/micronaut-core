@@ -19,10 +19,11 @@ import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.type.MutableArgumentValue;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.tracing.annotation.ContinueSpan;
@@ -127,7 +128,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
         } else {
             // must be new
             String operationName = newSpan.stringValue().orElse(null);
-            Optional<String> hystrixCommand = context.getValue(HYSTRIX_ANNOTATION, String.class);
+            Optional<String> hystrixCommand = context.stringValue(HYSTRIX_ANNOTATION);
             if (StringUtils.isEmpty(operationName)) {
                 // try hystrix command name
                 operationName = hystrixCommand.orElse(context.getMethodName());
@@ -204,10 +205,10 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
         span.setTag(CLASS_TAG, context.getDeclaringType().getSimpleName());
         span.setTag(METHOD_TAG, context.getMethodName());
         hystrixCommand.ifPresent(s -> span.setTag(TAG_HYSTRIX_COMMAND, s));
-        context.getValue(HYSTRIX_ANNOTATION, "group", String.class).ifPresent(s ->
+        context.stringValue(HYSTRIX_ANNOTATION, "group").ifPresent(s ->
                 span.setTag(TAG_HYSTRIX_GROUP, s)
         );
-        context.getValue(HYSTRIX_ANNOTATION, "threadPool", String.class).ifPresent(s ->
+        context.stringValue(HYSTRIX_ANNOTATION, "threadPool").ifPresent(s ->
                 span.setTag(TAG_HYSTRIX_THREAD_POOL, s)
         );
         tagArguments(span, context);
@@ -221,7 +222,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
      * @param e    The error
      */
     public static void logError(Span span, Throwable e) {
-        HashMap<String, Object> fields = new HashMap<>();
+        HashMap<String, Object> fields = new HashMap<>(2);
         fields.put(Fields.ERROR_OBJECT, e);
         String message = e.getMessage();
         if (message != null) {
@@ -231,12 +232,17 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     private void tagArguments(Span span, MethodInvocationContext<Object, Object> context) {
-        for (MutableArgumentValue<?> argumentValue : context.getParameters().values()) {
-            AnnotationValue<SpanTag> spanTag = argumentValue.getAnnotation(SpanTag.class);
-            Object v = argumentValue.getValue();
-            if (spanTag != null && v != null) {
-                String tagName = spanTag.stringValue().orElse(argumentValue.getName());
-                span.setTag(tagName, v.toString());
+        Argument[] arguments = context.getArguments();
+        Object[] parameterValues = context.getParameterValues();
+        for (int i = 0; i < arguments.length; i++) {
+            Argument argument = arguments[i];
+            AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+            if (annotationMetadata.hasAnnotation(SpanTag.class)) {
+                Object v = parameterValues[i];
+                if (v != null) {
+                    String tagName = annotationMetadata.stringValue(SpanTag.class).orElse(argument.getName());
+                    span.setTag(tagName, v.toString());
+                }
             }
         }
     }
