@@ -54,8 +54,12 @@ import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
+import io.netty.channel.epoll.Epoll;
+import io.netty.channel.epoll.EpollChannelOption;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
+import io.netty.channel.kqueue.KQueue;
+import io.netty.channel.kqueue.KQueueChannelOption;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
@@ -71,20 +75,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.Immutable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.net.*;
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Implements the bootstrap and configuration logic for the Netty implementation of {@link EmbeddedServer}.
@@ -262,8 +267,14 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             parentGroup = createParentEventLoopGroup();
             ServerBootstrap serverBootstrap = createServerBootstrap();
 
-            processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
-            processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
+            if (serverConfiguration.isUseNativeTransport()) {
+                LOG.debug("Native transport is enabled");
+                applyNativeOptions(serverBootstrap);
+            } else {
+                LOG.debug("Native transport is NOT enabled");
+                processBaseOptions(serverConfiguration.getOptions(), serverBootstrap::option);
+                processBaseOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
+            }
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
                 .channel(eventLoopGroupFactory.serverSocketChannelClass())
                 .childHandler(new ChannelInitializer() {
@@ -542,23 +553,133 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
     }
 
-    private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
-        for (ChannelOption channelOption : options.keySet()) {
-            String name = channelOption.name();
-            Object value = options.get(channelOption);
-            Optional<Field> declaredField = ReflectionUtils.findDeclaredField(ChannelOption.class, name);
-            declaredField.ifPresent((field) -> {
-                Optional<Class> typeArg = GenericTypeUtils.resolveGenericTypeArgument(field);
-                typeArg.ifPresent((arg) -> {
-                    Optional converted = environment.convert(value, arg);
-                    converted.ifPresent((convertedValue) ->
-                        biConsumer.accept(channelOption, convertedValue)
-                    );
-                });
+    private Map<NettyChannelOption, Object> annotateOptions(Map<ChannelOption, Object> baseOptions,
+                                                            Function<ChannelOption, NettyChannelOption> optionFn) {
+        return baseOptions.entrySet().stream()
+          .collect(Collectors.toMap(
+            (entrySet) -> optionFn.apply(entrySet.getKey()),
+            Map.Entry::getValue,
+            (left, right) -> right,  // no merging
+            () -> new HashMap<>(baseOptions.size())));
+    }
 
-            });
-            if (!declaredField.isPresent()) {
-                biConsumer.accept(channelOption, value);
+    private void mergeNativeOptions(Map<ChannelOption, Object> nativeOptions,
+                                    Map<NettyChannelOption, Object> materialized,
+                                    Function<ChannelOption, NettyChannelOption> optionFn) {
+        Map<NettyChannelOption, Object> wrappedOptions = this.annotateOptions(nativeOptions, optionFn);
+        materialized.putAll(wrappedOptions);
+    }
+
+    private void applyNativeOptions(ServerBootstrap serverBootstrap) {
+        Map<ChannelOption, Object> baseOptions = serverConfiguration.getOptions();
+        Map<ChannelOption, Object> baseChildOptions = serverConfiguration.getChildOptions();
+
+        // wrap base options before adding native ones
+        Map<NettyChannelOption, Object> materializedOptions = this.annotateOptions(
+          baseOptions, NettyChannelOption::forBaseOption);
+        Map<NettyChannelOption, Object> materializedChildOptions = this.annotateOptions(
+          baseChildOptions, NettyChannelOption::forBaseOption);
+
+        if (Epoll.isAvailable()) {
+            LOG.debug("Netty: epoll support is available.");
+            NettyHttpServerConfiguration.EpollOptions epollOptions = serverConfiguration.getEpoll();
+            if (epollOptions != null) {
+                // apply options
+                this.mergeNativeOptions(
+                  epollOptions.getOptions(),
+                  materializedOptions,
+                  NettyChannelOption::forEpollOption);
+
+                this.mergeNativeOptions(
+                  epollOptions.getChildOptions(),
+                  materializedChildOptions,
+                  NettyChannelOption::forEpollOption);
+            }
+
+        } else if (KQueue.isAvailable()) {
+            LOG.debug("Netty: kqueue support is available.");
+            NettyHttpServerConfiguration.KQueueOptions kqueueOptions = serverConfiguration.getKqueue();
+            if (kqueueOptions != null) {
+                this.mergeNativeOptions(
+                  kqueueOptions.getOptions(),
+                  materializedOptions,
+                  NettyChannelOption::forEpollOption);
+
+                this.mergeNativeOptions(
+                  kqueueOptions.getChildOptions(),
+                  materializedChildOptions,
+                  NettyChannelOption::forEpollOption);
+            }
+
+        } else {
+            LOG.debug("Netty: Neither kqueue or epoll were available.");
+        }
+
+        processOptions(materializedOptions, serverBootstrap::option);
+        processOptions(materializedChildOptions, serverBootstrap::childOption);
+    }
+
+    private void processBaseOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
+        Map<NettyChannelOption, Object> baseOptions = new HashMap<>(options.size());
+        for (Map.Entry<ChannelOption, Object> optionEntry : options.entrySet()) {
+            baseOptions.put(NettyChannelOption.forBaseOption(optionEntry.getKey()), optionEntry.getValue());
+        }
+        processOptions(baseOptions, biConsumer);
+    }
+
+    private void processOptions(Map<NettyChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
+        if (options.isEmpty()) {
+            LOG.debug("No socket options to add");
+            return;
+        }
+
+        HashSet<String> optionSet = new HashSet<>(options.size());
+        for (NettyChannelOption channelOption : options.keySet()) {
+            final ChannelOption baseOption = channelOption.option;
+            if (!optionSet.contains(baseOption.name())) {
+                optionSet.add(baseOption.name());
+                final Object value = options.get(channelOption);
+                final String name = baseOption.name();
+                final Class optionTarget;
+                LOG.debug("Setting socket option {} of type {}", name, channelOption.type);
+
+                try {
+                    switch (channelOption.type) {
+                        case BASE:
+                            optionTarget = ChannelOption.class;
+                            break;
+                        case EPOLL:
+                            optionTarget = EpollChannelOption.class;
+                            break;
+                        case KQUEUE:
+                            optionTarget = KQueueChannelOption.class;
+                            break;
+                        default:
+                            throw new IllegalArgumentException(
+                              "Unrecognized Netty channel option type: " + channelOption.type.name());
+                    }
+
+                    Optional<Field> declaredField = ReflectionUtils.findDeclaredField(optionTarget, name);
+                    declaredField.ifPresent((field) -> {
+                        Optional<Class> typeArg = GenericTypeUtils.resolveGenericTypeArgument(field);
+                        typeArg.ifPresent((arg) -> {
+                            Optional converted = environment.convert(value, arg);
+                            converted.ifPresent((convertedValue) ->
+                              biConsumer.accept(baseOption, convertedValue)
+                            );
+                        });
+
+                    });
+                    if (!declaredField.isPresent()) {
+                        LOG.debug("Failed to locate option field '{}'", name);
+                        biConsumer.accept(baseOption, value);
+                    }
+
+                } catch (NoClassDefFoundError err) {
+                    LOG.warn("NoClassDefFound when resolving transport options. Please make sure you have installed " +
+                      "the relevant Netty package for your OS. See " +
+                      "https://docs.micronaut.io/snapshot/guide/index.html#serverConfiguration for more info.");
+                }
             }
         }
     }
@@ -579,10 +700,59 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     }
 
     /**
+     * Retrieve the WebSocket session repository.
      *
      * @return {@link io.micronaut.http.server.netty.NettyHttpServer} which implements {@link WebSocketSessionRepository}
      */
     public WebSocketSessionRepository getWebSocketSessionRepository() {
         return this;
+    }
+
+    /**
+     * Enumerates Netty option types by transport layer implementation.
+     */
+    private enum NettyChannelOptionType {
+        /** Base options applicable to all socket types. */
+        BASE,
+
+        /** epoll socket options for use on Linux. */
+        EPOLL,
+
+        /** kqueue socket options for use on macOS/some Unix variants. */
+        KQUEUE
+    }
+
+    /**
+     * Wrapper class that implements option specification for each transport layer type.
+     */
+    @Immutable
+    private static final class NettyChannelOption {
+        private final NettyChannelOptionType type;
+        private final ChannelOption option;
+
+        private NettyChannelOption(NettyChannelOptionType type, ChannelOption option) {
+            this.type = type;
+            this.option = option;
+        }
+
+        static NettyChannelOption forBaseOption(ChannelOption option) {
+            return new NettyChannelOption(NettyChannelOptionType.BASE, option);
+        }
+
+        static NettyChannelOption forEpollOption(ChannelOption option) {
+            return new NettyChannelOption(NettyChannelOptionType.EPOLL, option);
+        }
+
+        static NettyChannelOption forKQueueOption(ChannelOption option) {
+            return new NettyChannelOption(NettyChannelOptionType.KQUEUE, option);
+        }
+
+        NettyChannelOptionType getType() {
+            return type;
+        }
+
+        ChannelOption getOption() {
+            return option;
+        }
     }
 }

@@ -67,6 +67,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public static final boolean DEFAULT_CHUNKSUPPORTED = true;
 
     /**
+     * The default keepalive value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_KEEPALIVE = false;
+
+    /**
      * The default validate headers value.
      */
     @SuppressWarnings("WeakerAccess")
@@ -77,6 +83,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_INITIALBUFFERSIZE = 128;
+
+    /**
+     * Whether to enable `TCP_QUICKACK` by default.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_QUICKACK = false;
 
     /**
      * The default compression threshold.
@@ -94,10 +106,13 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private Map<ChannelOption, Object> options = Collections.emptyMap();
     private Worker worker;
     private Parent parent;
+    private EpollOptions epoll;
+    private KQueueOptions kqueue;
     private int maxInitialLineLength = DEFAULT_MAXINITIALLINELENGTH;
     private int maxHeaderSize = DEFAULT_MAXHEADERSIZE;
     private int maxChunkSize = DEFAULT_MAXCHUNKSIZE;
     private boolean chunkedSupported = DEFAULT_CHUNKSUPPORTED;
+    private boolean keepaliveEnabled = DEFAULT_KEEPALIVE;
     private boolean validateHeaders = DEFAULT_VALIDATEHEADERS;
     private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
     private LogLevel logLevel;
@@ -162,6 +177,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public boolean isChunkedSupported() {
         return chunkedSupported;
+    }
+
+    /**
+     * Whether to enable keepalive on the socket.
+     *
+     * @return Whether keepalive is enabled.
+     */
+    public boolean isKeepaliveEnabled() {
+        return keepaliveEnabled;
     }
 
     /**
@@ -240,6 +264,22 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * @return Configuration specific to epoll-based sockets.
+     * @see io.netty.channel.epoll.EpollChannelOption
+     */
+    public EpollOptions getEpoll() {
+        return epoll;
+    }
+
+    /**
+     * @return Configuration specific to kqueue-based sockets.
+     * @see io.netty.channel.kqueue.KQueueChannelOption
+     */
+    public KQueueOptions getKqueue() {
+        return kqueue;
+    }
+
+    /**
      * Sets the Netty child worker options.
      *
      * @param childOptions The options
@@ -273,6 +313,22 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Sets the epoll-specific options.
+     * @param epollOptions Epoll options
+     */
+    public void setEpoll(EpollOptions epollOptions) {
+        this.epoll = epollOptions;
+    }
+
+    /**
+     * Sets the kqueue-specific options.
+     * @param kqueueOptions KQueue options
+     */
+    public void setKqueue(KQueueOptions kqueueOptions) {
+        this.kqueue = kqueueOptions;
+    }
+
+    /**
      * Sets the maximum initial line length for the HTTP request. Default value ({@value #DEFAULT_MAXINITIALLINELENGTH}).
      * @param maxInitialLineLength The max length
      */
@@ -302,6 +358,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setChunkedSupported(boolean chunkedSupported) {
         this.chunkedSupported = chunkedSupported;
+    }
+
+    /**
+     * Sets whether keepalive should be enabled on the socket. Default value {@value #DEFAULT_KEEPALIVE}).
+     * @param keepaliveEnabled True if it should be enabled
+     */
+    public void setKeepaliveEnabled(boolean keepaliveEnabled) {
+        this.keepaliveEnabled = keepaliveEnabled;
     }
 
     /**
@@ -365,6 +429,96 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @ConfigurationProperties("parent")
     public static class Parent extends EventLoopConfig {
+    }
+
+    /**
+     * Configuration for epoll-based sockets.
+     */
+    @ConfigurationProperties("epoll")
+    public static class EpollOptions extends NativeTransportConfig {
+        private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
+
+        /**
+         * @return Options to set for epoll sockets, applied to children.
+         * @see io.netty.channel.epoll.EpollChannelOption
+         */
+        public Map<ChannelOption, Object> getChildOptions() {
+            return childOptions;
+        }
+
+        /**
+         * Sets the Netty e-poll child worker options.
+         *
+         * @param epollChildOptions The epoll options to set.
+         */
+        public void setChildOptions(Map<ChannelOption, Object> epollChildOptions) {
+            this.childOptions = epollChildOptions;
+        }
+    }
+
+    /**
+     * Configuration for KQueue-based sockets.
+     */
+    @ConfigurationProperties("kqueue")
+    public static class KQueueOptions extends NativeTransportConfig {
+        private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
+
+        /**
+         * Set the Netty kqueue child worker options.
+         *
+         * @param kqueueChildOptions The kqueue options to set.
+         */
+        public void setChildOptions(Map<ChannelOption, Object> kqueueChildOptions) {
+            this.childOptions = kqueueChildOptions;
+        }
+
+        /**
+         * @return Options to set for kqueue sockets.
+         * @see io.netty.channel.kqueue.KQueueChannelOption
+         */
+        public Map<ChannelOption, Object> getChildOptions() {
+            return childOptions;
+        }
+    }
+
+    /**
+     * Abstract class for configuring native transport settings.
+     */
+    public abstract static class NativeTransportConfig {
+        private Boolean quickack = DEFAULT_QUICKACK;
+        private Map<ChannelOption, Object> options = Collections.emptyMap();
+
+        /**
+         * @return Status of `TCP_QUICKACK` for epoll.
+         */
+        public Boolean getQuickack() {
+            return quickack;
+        }
+
+        /**
+         * Sets the flag to use `TCP_QUICKACK` for epoll.
+         *
+         * @param quickack Whether to apply `TCP_QUICKACK`.
+         */
+        public void setQuickack(Boolean quickack) {
+            this.quickack = quickack;
+        }
+
+        /**
+         * @return Options to set for a native socket.
+         */
+        public Map<ChannelOption, Object> getOptions() {
+            return options;
+        }
+
+        /**
+         * Sets the Netty native socket options.
+         *
+         * @param epollOptions The options to set.
+         */
+        public void setOptions(Map<ChannelOption, Object> epollOptions) {
+            this.options = epollOptions;
+        }
     }
 
     /**
