@@ -96,6 +96,12 @@ public class HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_LOG_HANDLED_EXCEPTIONS = false;
 
+    /**
+     * The default value for enabling dual protocol (http/https).
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_DUAL_PROTOCOL = false;
+
     private Integer port;
     private String host;
     private Integer readTimeout;
@@ -111,6 +117,7 @@ public class HttpServerConfiguration {
     private HostResolutionConfiguration hostResolution;
     private String clientAddressHeader;
     private String contextPath;
+    private boolean dualProtocol = DEFAULT_DUAL_PROTOCOL;
 
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
@@ -256,6 +263,13 @@ public class HttpServerConfiguration {
     }
 
     /**
+     * @return if dual protocol has been enabled or not
+     */
+    public boolean isDualProtocol() {
+        return dualProtocol;
+    }
+
+    /**
      * @param defaultCharset The default charset to use
      */
     public void setDefaultCharset(Charset defaultCharset) {
@@ -394,6 +408,13 @@ public class HttpServerConfiguration {
      */
     public void setContextPath(String contextPath) {
         this.contextPath = contextPath;
+    }
+
+    /**
+     * @param dualProtocol the dual protocol (http/https) configuration
+     */
+    public void setDualProtocol(boolean dualProtocol) {
+        this.dualProtocol = dualProtocol;
     }
 
     /**
