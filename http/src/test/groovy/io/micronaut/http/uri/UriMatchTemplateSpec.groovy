@@ -35,13 +35,13 @@ class UriMatchTemplateSpec extends Specification {
 
         where:
         left           | right          | result
-        "/book"        | "/{name}"      | 1
+        "/book"        | "/{name}"      | -1
         "/"            | "/"            | 0
-        "/"            | "/book"        | -1
-        "/book/foo"    | "/book"        | 1
+        "/"            | "/book"        | 0
+        "/book/foo"    | "/book"        | 0
         "/book/{name}" | "/book"        | 1
         "/book/{name}" | "/book/{test}" | 0
-        "/book/{name}" | "/book/test"   | -1
+        "/book/{name}" | "/book/test"   | 1
 
     }
 

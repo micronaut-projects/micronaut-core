@@ -41,6 +41,35 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         then:
         noExceptionThrown()
         body == "graphql"
+
+        when:
+        URL url1 = embeddedServer.getURL()
+        URL url = new URL(url1.getProtocol(), url1.getHost(), url1.getPort(), url1.getFile() + "/test-consumes", null)
+        URLConnection connection = url.openConnection()
+        connection.setRequestMethod("POST")
+        connection.setRequestProperty('Content-Type', null)
+        connection.doOutput = true
+
+        def writer = new OutputStreamWriter(connection.outputStream)
+        writer.write("abc")
+        writer.flush()
+        writer.close()
+        connection.connect()
+
+        body = connection.content.text
+
+        then:
+        noExceptionThrown()
+        body == "all"
+    }
+
+    void "test accept matching has priority over route complexity"() {
+        when:
+        String body = rxClient.retrieve(HttpRequest.POST("/test-accept/foo", [x: 1]).contentType(APPLICATION_JSON_TYPE)).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        body == "json"
     }
 
     @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
@@ -55,6 +84,27 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         @Post(consumes = APPLICATION_GRAPHQL)
         HttpResponse postb(@Body String body) {
             HttpResponse.ok("graphql")
+        }
+
+        @Post(consumes = ALL)
+        HttpResponse postc(@Body String body) {
+            HttpResponse.ok("all")
+        }
+    }
+
+    @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
+    @Controller("/test-accept")
+    static class MyOtherController  {
+
+        //If the content type is json, this method should be chosen even for /foo
+        @Post(uri = "/{name}", consumes = APPLICATION_JSON)
+        HttpResponse posta(@Body String body) {
+            HttpResponse.ok("json")
+        }
+
+        @Post(uri = "/foo", consumes = ALL)
+        HttpResponse postc(@Body String body) {
+            HttpResponse.ok("all")
         }
     }
 }
