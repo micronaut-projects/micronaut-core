@@ -28,7 +28,6 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.StreamUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -398,10 +397,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             } else {
                 logException(cause);
 
-                Flowable resultFlowable = Flowable.defer(() -> {
-                    return Flowable.just(HttpResponse.serverError()
-                            .body(new JsonError("Internal Server Error: " + cause.getMessage())));
-                });
+                Flowable resultFlowable = Flowable.defer(() ->
+                        Flowable.just(HttpResponse.serverError().body(new JsonError("Internal Server Error: " + cause.getMessage())))
+                );
 
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
@@ -456,12 +454,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
         Optional<UriRouteMatch<Object, Object>> routeMatch = Optional.empty();
 
-        List<UriRouteMatch<Object, Object>> uriRoutes = router
-            .find(request)
-            .filter((match) -> match.test(request))
-            .collect(StreamUtils.minAll(
-                Comparator.comparingInt((match) -> match.getVariableValues().size()),
-                Collectors.toList()));
+        List<UriRouteMatch<Object, Object>> uriRoutes = router.findAllClosest(request);
 
         if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(requestPath, uriRoutes);
@@ -522,7 +515,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         request,
                         nettyHttpRequest,
                         HttpResponse.notAllowed(existingRouteMethods),
-                        "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRouteMethods);
+                        "Method [" + httpMethod + "] not allowed for URI [" + request.getUri() + "]. Allowed methods: " + existingRouteMethods);
                 return;
             }
 

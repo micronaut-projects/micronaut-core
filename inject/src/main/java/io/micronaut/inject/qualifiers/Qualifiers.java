@@ -116,9 +116,9 @@ public class Qualifiers {
                 return byType(aClass.get());
             }
         } else if (Named.class.getName().equals(type)) {
-            Optional<String> value = metadata.getValue(type, String.class);
-            if (value.isPresent()) {
-                return byName(value.get());
+            String n = metadata.stringValue(type).orElse(null);
+            if (n != null) {
+                return byName(n);
             }
         }
         return new AnnotationMetadataQualifier<>(metadata, type);

@@ -297,7 +297,12 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public boolean accept(MediaType contentType) {
-        return acceptedMediaTypes.isEmpty() || contentType == null || acceptedMediaTypes.contains(MediaType.ALL_TYPE) || acceptedMediaTypes.contains(contentType);
+        return acceptedMediaTypes.isEmpty() || contentType == null || acceptedMediaTypes.contains(MediaType.ALL_TYPE) || explicitAccept(contentType);
+    }
+
+    @Override
+    public boolean explicitAccept(MediaType contentType) {
+        return acceptedMediaTypes.contains(contentType);
     }
 
     @Override
