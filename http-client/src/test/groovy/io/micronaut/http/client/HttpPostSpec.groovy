@@ -68,7 +68,7 @@ class HttpPostSpec extends Specification {
 
         then:
         def e = thrown(HttpClientException)
-        e.message == "Method [PATCH] not allowed. Allowed methods: [POST]"
+        e.message == "Method [PATCH] not allowed for URI [/post/simple]. Allowed methods: [POST]"
     }
 
     void "test simple post request with JSON"() {
