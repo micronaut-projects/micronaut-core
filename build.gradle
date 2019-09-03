@@ -31,7 +31,6 @@ apply plugin: "io.sdkman.vendors"
 apply plugin: 'org.aim42.htmlSanityCheck'
 
 repositories {
-    mavenLocal()
     maven { url "https://repo.grails.org/grails/core" }
     //maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
 }
@@ -578,7 +577,6 @@ subprojects { Project subproject ->
 
 
     repositories {
-        mavenLocal()
         maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
         maven { url "https://repo.grails.org/grails/core" }
     }

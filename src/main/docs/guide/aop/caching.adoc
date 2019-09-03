@@ -1,2 +1,6 @@
+Similar to Spring and Grails, Micronaut provides a set of caching annotations within the
+https://micronaut-projects.github.io/micronaut-cache/latest/api/io/micronaut/cache/package-summary.html[`io.micronaut.cache`]
+package.
+
 Check the https://micronaut-projects.github.io/micronaut-cache/latest/guide/index.html[Micronaut Cache] project for more
 information.
