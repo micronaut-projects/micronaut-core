@@ -13,29 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.consumes;
+package io.micronaut.docs.consumes
 
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Post;
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Consumes
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Post
 
 @Requires(property = "spec.name", value = "consumesspec")
 //tag::clazz[]
 @Controller("/test")
-public class TestController {
+class TestController {
 
     @Consumes([MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON]) // <1>
     @Post("/multiple-consumes")
-    public HttpResponse multipleConsumes() {
-        return HttpResponse.ok();
+    HttpResponse multipleConsumes() {
+        HttpResponse.ok()
     }
 
     @Post // <2>
-    public HttpResponse index() {
-        return HttpResponse.ok();
+    HttpResponse index() {
+        HttpResponse.ok()
     }
 }
 //end::clazz[]
