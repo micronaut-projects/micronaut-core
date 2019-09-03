@@ -18,10 +18,12 @@ package io.micronaut.discovery;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
+import io.micronaut.http.HttpHeaders;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -185,6 +187,18 @@ public interface ServiceInstance {
             @Override
             public URI getURI() {
                 return uri;
+            }
+
+            @Override
+            public ConvertibleValues<String> getMetadata() {
+                String userInfo = uri.getUserInfo();
+                if (userInfo == null) {
+                    return ServiceInstance.super.getMetadata();
+                } else {
+                    Map<String, String> metadata = new HashMap<>(1);
+                    metadata.put(HttpHeaders.AUTHORIZATION_INFO, userInfo);
+                    return ConvertibleValues.of(metadata);
+                }
             }
         };
     }

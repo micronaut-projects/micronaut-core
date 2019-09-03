@@ -18,6 +18,8 @@ package io.micronaut.http.bind.binders;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Body;
 
@@ -50,30 +52,52 @@ public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
-        Optional<?> body = source.getBody();
-        if (!body.isPresent()) {
-            //noinspection unchecked
-            return BindingResult.EMPTY;
-        } else {
-            Object o = body.get();
-            Optional<T> converted = conversionService.convert(o, context);
-            final Optional<ConversionError> lastError = context.getLastError();
-            //noinspection OptionalIsPresent
-            if (lastError.isPresent()) {
-                return new BindingResult<T>() {
-                    @Override
-                    public Optional<T> getValue() {
-                        return Optional.empty();
-                    }
+        Optional<String> bodyComponent = context.getAnnotationMetadata().stringValue(Body.class);
+        if (bodyComponent.isPresent()) {
+            Optional<ConvertibleValues> body = source.getBody(ConvertibleValues.class);
+            if (body.isPresent()) {
+                ConvertibleValues values = body.get();
+                String component = bodyComponent.get();
+                if (!values.contains(component)) {
+                    component = NameUtils.hyphenate(component);
+                }
 
-                    @Override
-                    public List<ConversionError> getConversionErrors() {
-                        return Collections.singletonList(lastError.get());
-                    }
-                };
+                Optional<T> value = values.get(component, context);
+                return newResult(value.orElse(null), context);
             } else {
-                return () -> converted;
+                //noinspection unchecked
+                return BindingResult.EMPTY;
             }
+        } else {
+            Optional<?> body = source.getBody();
+            if (!body.isPresent()) {
+
+                return BindingResult.EMPTY;
+            } else {
+                Object o = body.get();
+                Optional<T> converted = conversionService.convert(o, context);
+                return newResult(converted.orElse(null), context);
+            }
+        }
+    }
+
+    private BindingResult<T> newResult(T converted, ArgumentConversionContext<T> context) {
+        final Optional<ConversionError> lastError = context.getLastError();
+        //noinspection OptionalIsPresent
+        if (lastError.isPresent()) {
+            return new BindingResult<T>() {
+                @Override
+                public Optional<T> getValue() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public List<ConversionError> getConversionErrors() {
+                    return Collections.singletonList(lastError.get());
+                }
+            };
+        } else {
+            return () -> Optional.ofNullable(converted);
         }
     }
 }

@@ -26,4 +26,9 @@ import io.netty.handler.codec.http.HttpRequest;
  * @author Graeme Rocher
  */
 public interface StreamedHttpRequest extends HttpRequest, StreamedHttpMessage {
+
+    /**
+     * Releases the stream if there is no subscriber.
+     */
+    default void closeIfNoSubscriber() { }
 }

@@ -461,20 +461,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             if (ArrayUtils.isNotEmpty(types)) {
                 this.producesMediaTypes = Arrays.asList(types);
             }
-            this.conditions.add(req -> {
-                if (!permitsRequestBody()) {
-                    return true;
-                }
-                List<MediaType> consumes = this.acceptedMediaTypes;
-                if (consumes != null && !consumes.isEmpty()) {
-                    if (consumes.contains(MediaType.ALL_TYPE)) {
-                        return true;
-                    }
-                    return req.getContentType().map(consumes::contains).orElse(true);
-                } else {
-                    return true;
-                }
-            });
         }
 
         @Override

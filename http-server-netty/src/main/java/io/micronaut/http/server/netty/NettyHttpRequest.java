@@ -29,6 +29,7 @@ import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.cookies.NettyCookies;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.web.router.RouteMatch;
@@ -260,6 +261,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         for (Map.Entry<String, Object> attribute : attributes) {
             Object value = attribute.getValue();
             releaseIfNecessary(value);
+        }
+        if (nettyRequest instanceof StreamedHttpRequest) {
+            ((StreamedHttpRequest) nettyRequest).closeIfNoSubscriber();
         }
     }
 

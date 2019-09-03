@@ -62,6 +62,17 @@ class PojoBodyParameterSpec extends Specification {
         HttpClientResponseException e = thrown()
         e.response.status() == HttpStatus.BAD_REQUEST
     }
+
+    void "test only sub properties are bound"() {
+        HttpRequest req = HttpRequest.POST("/search/sub", '{"name":"X","search":{"lastName":"Jones"}}')
+
+        when:
+        Search search = client.toBlocking().retrieve(req, Search)
+
+        then:
+        search.name == null
+        search.lastName == "Jones"
+    }
 }
 
 
@@ -72,6 +83,11 @@ class SearchController {
     @Post("/")
     HttpResponse search(@Nullable @Header("X-Temp") String temp, @Body @NotNull @Valid Search search) {
         return HttpResponse.ok()
+    }
+
+    @Post("/sub")
+    HttpResponse search(@Body("search") Search search) {
+        return HttpResponse.ok(search)
     }
 
     @Error(exception = ConstraintViolationException.class)

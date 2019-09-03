@@ -24,12 +24,12 @@ package io.micronaut.http;
 public interface HttpHeaderValues {
 
     /**
-     * {@code "Bearer "}.
+     * {@code "Bearer"}.
      */
     String AUTHORIZATION_PREFIX_BEARER = "Bearer";
 
     /**
-     * {@code "Basic "}.
+     * {@code "Basic"}.
      */
     String AUTHORIZATION_PREFIX_BASIC = "Basic";
 

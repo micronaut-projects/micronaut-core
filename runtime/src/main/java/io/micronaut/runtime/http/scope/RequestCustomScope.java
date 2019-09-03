@@ -88,6 +88,9 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
                 bean = (T) scopedBeanMap.get(identifier);
                 if (bean == null) {
                     bean = provider.get();
+                    if (bean instanceof RequestAware) {
+                        ((RequestAware) bean).setRequest(httpRequest);
+                    }
                     scopedBeanMap.put(identifier, bean);
                 }
             }

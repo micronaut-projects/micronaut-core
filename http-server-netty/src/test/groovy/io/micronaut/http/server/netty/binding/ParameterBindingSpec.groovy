@@ -23,7 +23,6 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.reactivex.Flowable
 import spock.lang.Unroll
 
 import javax.annotation.Nullable
@@ -79,20 +78,21 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/all'                                | "Parameter Value: 10"       | HttpStatus.OK
         HttpMethod.GET  | '/parameter/all?max=20'                         | "Parameter Value: 20"       | HttpStatus.OK
 
-        HttpMethod.GET  | '/parameter/exploded?title=The%20Stand'         | "Parameter Value: The Stand" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/exploded?title=The%20Stand&age=20'  | "Parameter Value: The Stand 20" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"    | HttpStatus.OK
         HttpMethod.POST | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/arrayStyle?param[]=a&param[]=b&param[]=c' | "Parameter Value: [a, b, c]"    | HttpStatus.OK
     }
 
-    void "test exploded with no default constructor"() {
-        when:
-        Flowable<HttpResponse<String>> exchange = rxClient.exchange(HttpRequest.GET("/parameter/exploded?title=The%20Stand"), String)
-        HttpResponse<String> response = exchange.onErrorReturn({ t -> t.response }).blockingFirst()
+    void "test list to single error"() {
+        given:
+        def req = HttpRequest.GET('/parameter/exploded?title=The%20Stand&age=20&age=30')
+        def exchange = rxClient.exchange(req, String)
+        def response = exchange.onErrorReturn({ t -> t.response }).blockingFirst()
 
-        then:
-        response.status() == HttpStatus.OK
-        response.getBody().isPresent()
-        response.getBody().get() == "Parameter Value: The Stand"
+        expect:
+        response.status() == HttpStatus.BAD_REQUEST
+        response.body().contains('Failed to convert argument [age]')
     }
 
     @Controller(value = "/parameter", produces = MediaType.TEXT_PLAIN)
@@ -197,7 +197,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
 
         @Get("/exploded{?book*}")
         String exploded(Book book) {
-            "Parameter Value: $book.title"
+            "Parameter Value: $book.title $book.age"
         }
 
         @Get('/queryName/{name}')
@@ -210,13 +210,21 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             "Parameter Value: $name"
         }
 
+        @Get('/arrayStyle{?param[]*}')
+        String arrayStyle(@QueryValue("param[]") List<String> params) {
+            "Parameter Value: $params"
+        }
+
+
         @Introspected
         static class Book {
 
             private String title
             private String author
+            private int age
 
-            Book(String title, @Nullable String author) {
+            Book(String title, Integer age, @Nullable String author) {
+                this.age = age
                 this.title = title
                 this.author = author
             }
@@ -224,6 +232,11 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             String getTitle() {
                 return title
             }
+
+            int getAge() {
+                return age
+            }
+
         }
     }
 }

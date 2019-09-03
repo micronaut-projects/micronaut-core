@@ -1,0 +1,15 @@
+Micronaut supports binding both HTTP and HTTPS out of the box. To enable
+dual protocol support, modify your configuration. For example with `application.yml`:
+
+.Dual Protocol Configuration Example
+[source,yaml]
+----
+micronaut:
+    ssl:
+        enabled: true
+        buildSelfSigned: true # <1>
+    server:
+        dualProtocol : true #<2>
+----
+<1> You will need to configure ssl for https to work. In this example we are just using self signed but see <<https, Securing the Server with HTTPS>> for other configurations
+<2> To enable http & https is an opt-in feature, setting the dualProtocol flag enables that, by default Micronaut will only enable one or the other

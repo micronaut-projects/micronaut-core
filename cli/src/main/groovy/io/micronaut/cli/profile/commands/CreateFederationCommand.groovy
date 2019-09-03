@@ -78,7 +78,7 @@ class CreateFederationCommand extends AbstractCreateAppCommand {
                         build: this.build.toString(),
                         console: executionContext.console,
                         lang: resolveLang(),
-                        skeletonExclude: ["gradle*", "gradle/", ".mvn/", "mvnw*"]
+                        skeletonExclude: ["gradlew*", "gradle/", ".mvn/", "mvnw*"]
                 )
                 super.handle(cmd)
             }

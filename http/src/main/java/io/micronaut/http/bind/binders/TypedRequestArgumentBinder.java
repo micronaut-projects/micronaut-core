@@ -26,4 +26,14 @@ import io.micronaut.http.HttpRequest;
  * @since 1.0
  */
 public interface TypedRequestArgumentBinder<T> extends RequestArgumentBinder<T>, TypeArgumentBinder<T, HttpRequest<?>> {
+
+    /**
+     * Determines whether arguments that are an interface that {@link T}
+     * implements are candidates for binding.
+     *
+     * @return True if super interfaces are binding candidates
+     */
+    default boolean supportsSuperTypes() {
+        return true;
+    }
 }

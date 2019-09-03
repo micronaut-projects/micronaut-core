@@ -24,9 +24,11 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRoute;
 import io.micronaut.web.router.UriRouteMatch;
 
+import javax.annotation.Nonnull;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -67,6 +69,14 @@ public class FilteredRouter implements Router {
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, CharSequence uri) {
         return router.find(httpMethod, uri);
+    }
+
+    @Nonnull
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(@Nonnull HttpRequest<?> request) {
+        List<UriRouteMatch<T, R>> closestMatches = router.findAllClosest(request);
+        return closestMatches.stream().filter(routeFilter.filter(request))
+                    .collect(Collectors.toList());
     }
 
     @Override

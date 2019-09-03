@@ -20,13 +20,16 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.http.uri.UriMatchTemplate;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -107,6 +110,56 @@ public class DefaultRouter implements Router {
     @Override
     public Stream<UriRoute> uriRoutes() {
         return routesByMethod.values().stream().flatMap(List::stream);
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
+        List<UriRouteMatch<T, R>> uriRoutes = this.<T, R>find(request).collect(Collectors.toList());
+        boolean hasMultipleMatches = uriRoutes.size() > 1;
+        if (hasMultipleMatches && HttpMethod.permitsRequestBody(request.getMethod())) {
+
+            List<UriRouteMatch<T, R>> explicitAcceptRoutes = new ArrayList<>(uriRoutes.size());
+            List<UriRouteMatch<T, R>> acceptRoutes = new ArrayList<>(uriRoutes.size());
+
+            Optional<MediaType> contentType = request.getContentType();
+
+            for (UriRouteMatch<T, R> match: uriRoutes) {
+                if (match.explicitAccept(contentType.orElse(MediaType.ALL_TYPE))) {
+                    explicitAcceptRoutes.add(match);
+                }
+                if (explicitAcceptRoutes.isEmpty() && match.accept(contentType.orElse(null))) {
+                    acceptRoutes.add(match);
+                }
+            }
+
+            uriRoutes = explicitAcceptRoutes.isEmpty() ? acceptRoutes : explicitAcceptRoutes;
+            hasMultipleMatches = uriRoutes.size() > 1;
+        }
+
+
+        if (hasMultipleMatches) {
+            long variableCount = 0;
+            long rawCount = 0;
+
+            List<UriRouteMatch<T, R>> closestMatches = new ArrayList<>(uriRoutes.size());
+
+            for (int i = 0; i < uriRoutes.size(); i++) {
+                UriRouteMatch<T, R> match = uriRoutes.get(i);
+                UriMatchTemplate template = match.getRoute().getUriMatchTemplate();
+                long variable = template.getVariableSegmentCount();
+                long raw = template.getRawSegmentCount();
+                if (i == 0) {
+                    variableCount = variable;
+                    rawCount = raw;
+                }
+                if (variable > variableCount || raw < rawCount) {
+                    break;
+                }
+                closestMatches.add(match);
+            }
+            uriRoutes = closestMatches;
+        }
+        return uriRoutes;
     }
 
     @Override
@@ -200,7 +253,6 @@ public class DefaultRouter implements Router {
 
     private UriRoute[] finalizeRoutes(List<UriRoute> routes) {
         Collections.sort(routes);
-        Collections.reverse(routes);
         return routes.toArray(new UriRoute[0]);
     }
 

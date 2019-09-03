@@ -21,5 +21,6 @@ import groovy.transform.CompileStatic
 enum SupportedTestFramework {
     junit,
     spock,
-    spek
+    spek,
+    kotlintest
 }

@@ -17,6 +17,7 @@ package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
 import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
@@ -667,8 +668,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return CollectionUtils.convertCollection((Class) targetType, list);
         });
 
-        // Optional handling
-        addConverter(Object.class, Optional.class, (object, targetType, context) -> {
+        TypeConverter<Object, Optional> objectToOptionalConverter = (object, targetType, context) -> {
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
             Argument<?> componentType = typeVariable.orElse(Argument.OBJECT_ARGUMENT);
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
@@ -679,7 +679,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 return Optional.of(converted);
             }
             return Optional.of(Optional.empty());
-        });
+        };
+
+        // Optional handling
+        addConverter(Object.class, Optional.class, objectToOptionalConverter);
 
         addConverter(Object.class, OptionalInt.class, (object, targetType, context) -> {
             Optional<Integer> converted = convert(object, Integer.class, context);
@@ -693,6 +696,25 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // Iterable -> String
         addConverter(Iterable.class, String.class, (object, targetType, context) -> Optional.of(CollectionUtils.toString(object)));
+
+        // Iterable -> Object
+        addConverter(Iterable.class, Object.class, (object, targetType, context) -> {
+            if (Optional.class.isAssignableFrom(targetType)) {
+                return objectToOptionalConverter.convert(object, (Class) targetType, context);
+            }
+            Iterator<?> i = object.iterator();
+            int count = 0;
+            Object value = null;
+            while (i.hasNext()) {
+                if (count > 0) {
+                    context.reject(object, new ConversionErrorException(Argument.of(targetType), new IllegalArgumentException("Cannot convert an iterable with more than 1 value to a non collection object")));
+                    return Optional.empty();
+                }
+                count++;
+                value = i.next();
+            }
+            return convert(value, targetType, context);
+        });
 
         // Iterable -> Iterable (inner type conversion)
         addConverter(Iterable.class, Iterable.class, (object, targetType, context) -> {

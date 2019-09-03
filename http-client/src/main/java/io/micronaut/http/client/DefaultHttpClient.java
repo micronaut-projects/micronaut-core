@@ -118,6 +118,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Named;
 import java.io.Closeable;
+import java.io.IOException;
 import java.net.*;
 import java.net.Proxy.Type;
 import java.nio.charset.Charset;
@@ -501,6 +502,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     @Override
     public BlockingHttpClient toBlocking() {
         return new BlockingHttpClient() {
+
+            @Override
+            public void close() throws IOException {
+                DefaultHttpClient.this.close();
+            }
 
             @Override
             public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {

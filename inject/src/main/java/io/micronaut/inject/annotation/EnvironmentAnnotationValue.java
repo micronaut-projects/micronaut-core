@@ -16,10 +16,14 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.PropertyPlaceholderResolver;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
+import java.util.stream.Stream;
 
 /**
  * Adapts an {@link AnnotationValue} to the environment.
@@ -42,11 +46,26 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
                 environment,
                 target.getValues()
         ), environment != null ? o -> {
+            PropertyPlaceholderResolver resolver = environment.getPlaceholderResolver();
             if (o instanceof String) {
                 String v = (String) o;
                 if (v.contains("${")) {
-                    return environment.getPlaceholderResolver().resolveRequiredPlaceholders(v);
+                    return resolver.resolveRequiredPlaceholders(v);
                 }
+            } else if (o instanceof String[]) {
+                String[] values = (String[]) o;
+                return Arrays.stream(values)
+                        .flatMap(value -> {
+                            try {
+                                return Arrays.stream(resolver.resolveRequiredPlaceholder(value, String[].class));
+                            } catch (ConfigurationException e) {
+                                if (value.contains(resolver.getPrefix())) {
+                                    value = resolver.resolveRequiredPlaceholders(value);
+                                }
+                                return Stream.of(value);
+                            }
+                        })
+                        .toArray(String[]::new);
             }
             return o;
         } : null);

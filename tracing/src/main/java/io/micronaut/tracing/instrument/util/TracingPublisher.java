@@ -38,6 +38,7 @@ import static io.micronaut.tracing.interceptor.TraceInterceptor.logError;
  * @author graemerocher
  * @since 1.0
  */
+@SuppressWarnings("PublisherImplementation")
 public class TracingPublisher<T> implements Publisher<T> {
 
     private final Publisher<T> publisher;
@@ -112,6 +113,7 @@ public class TracingPublisher<T> implements Publisher<T> {
         }
         if (span != null) {
             try (Scope ignored = tracer.scopeManager().activate(span)) {
+                //noinspection SubscriberImplementation
                 publisher.subscribe(new Subscriber<T>() {
                     boolean finished = false;
                     @Override
@@ -124,9 +126,8 @@ public class TracingPublisher<T> implements Publisher<T> {
 
                     @Override
                     public void onNext(T object) {
-                        boolean closedAfterNext = isSingle && finishOnClose;
-                        Scope ignored = tracer.scopeManager().activate(span);
-                        try {
+                        boolean finishAfterNext = isSingle && finishOnClose;
+                        try (Scope ignored = tracer.scopeManager().activate(span)) {
                             if (object instanceof MutableHttpResponse) {
                                 MutableHttpResponse response = (MutableHttpResponse) object;
                                 Optional<?> body = response.getBody();
@@ -148,24 +149,21 @@ public class TracingPublisher<T> implements Publisher<T> {
                                 TracingPublisher.this.doOnFinish(span);
                             }
                         } finally {
-                            if (closedAfterNext) {
+                            if (finishAfterNext) {
                                 span.finish();
-                                ignored.close();
                             }
                         }
                     }
 
                     @Override
                     public void onError(Throwable t) {
-                        Scope ignored = tracer.scopeManager().activate(span);
-                        try {
+                        try (Scope ignored = tracer.scopeManager().activate(span)) {
                             TracingPublisher.this.onError(t, span);
                             actual.onError(t);
                             finished = true;
                         } finally {
                             if (finishOnClose) {
                                 span.finish();
-                                ignored.close();
                             }
                         }
                     }
@@ -173,14 +171,12 @@ public class TracingPublisher<T> implements Publisher<T> {
                     @Override
                     public void onComplete() {
                         if (!finished) {
-                            Scope ignored = tracer.scopeManager().activate(span);
-                            try {
+                            try (Scope ignored = tracer.scopeManager().activate(span)) {
                                 actual.onComplete();
                                 TracingPublisher.this.doOnFinish(span);
                             } finally {
                                 if (finishOnClose) {
                                     span.finish();
-                                    ignored.close();
                                 }
                             }
 
@@ -201,7 +197,6 @@ public class TracingPublisher<T> implements Publisher<T> {
      * @param object The object
      * @param span The span
      */
-    @SuppressWarnings("WeakerAccess")
     protected void doOnNext(@Nonnull T object, @Nonnull Span span) {
         // no-op
     }
@@ -211,7 +206,6 @@ public class TracingPublisher<T> implements Publisher<T> {
      *
      * @param span The span
      */
-    @SuppressWarnings("WeakerAccess")
     protected void doOnSubscribe(@Nonnull Span span) {
         // no-op
     }
@@ -233,7 +227,6 @@ public class TracingPublisher<T> implements Publisher<T> {
      * @param throwable The error
      * @param span The span
      */
-    @SuppressWarnings("WeakerAccess")
     protected void doOnError(@Nonnull Throwable throwable, @Nonnull Span span) {
         // no-op
     }

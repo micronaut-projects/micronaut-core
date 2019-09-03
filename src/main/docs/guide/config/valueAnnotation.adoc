@@ -4,13 +4,7 @@ You can inject configuration values into beans with Micronaut using the ann:io.m
 
 Consider the following example:
 
-.@Value Example
-[source,groovy]
-----
-include::{testsdir}/config/value/EngineImpl.groovy[tags=imports, indent=0]
-
-include::{testsdir}/config/value/EngineImpl.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.config.value.EngineImpl[tags="imports,class",indent=0,title="@Value Example"]
 
 <1> The `@Value` annotation accepts a string that can have embedded placeholder values (the default value can be provided by specifying a value after the colon `:` character).
 <2> The injected value can then be used within code.
@@ -88,14 +82,17 @@ In the above case the value `my.url` will be injected and set to the `url` field
 
 If you wish to inject a specific property name then you may be better off using ann:io.micronaut.context.annotation.Property[]:
 
-.Using `@Property`
-[source,java]
-----
-@Property(name = "my.url")
-String url;
-----
+snippet::io.micronaut.docs.config.property.Engine[tags="imports,class",indent=0, title="Using @Property"]
 
-The above will instead inject the value of the `my.url` property resolved from application configuration. You can also use this feature to resolve sub maps. For example, consider the following configuration:
+<1> The `my.engine.cylinders` property will be resolved from configuration and injected directly into the field.
+<2> Fields subjected to injection should never be private otherwise expensive reflection must be used
+<3> The `@Property` annotation is used to inject through the setter
+
+NOTE: Because it is not possible to define a default value with `@Property`, if the value doesn't exist or cannot be converted to the required type, the bean instantiation will fail.
+
+The above will instead inject the value of the `my.url` property resolved from application configuration. If the property can not be found in configuration, an exception will be thrown. As with other types of injection, the injection point can also be annotated with `@Nullable` to make the injection optional.
+
+You can also use this feature to resolve sub maps. For example, consider the following configuration:
 
 .Example `application.yml` configuration
 [source,yaml]
