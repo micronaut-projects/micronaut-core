@@ -68,7 +68,6 @@ import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
-import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -400,10 +399,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             } else {
                 logException(cause);
 
-                Flowable resultFlowable = Flowable.defer(() -> {
-                    return Flowable.just(HttpResponse.serverError()
-                            .body(new JsonError("Internal Server Error: " + cause.getMessage())));
-                });
+                Flowable resultFlowable = Flowable.defer(() ->
+                        Flowable.just(HttpResponse.serverError().body(new JsonError("Internal Server Error: " + cause.getMessage())))
+                );
 
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
@@ -458,53 +456,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
         Optional<UriRouteMatch<Object, Object>> routeMatch = Optional.empty();
 
-        List<UriRouteMatch<Object, Object>> uriRoutes = router
-            .find(request)
-            .filter((match) -> match.test(request))
-            .collect(Collectors.toList());
-
-        if (!uriRoutes.isEmpty() && HttpMethod.permitsRequestBody(httpMethod)) {
-
-            List<UriRouteMatch<Object, Object>> explicitAcceptRoutes = new ArrayList<>(uriRoutes.size());
-            List<UriRouteMatch<Object, Object>> acceptRoutes = new ArrayList<>(uriRoutes.size());
-
-            Optional<MediaType> contentType = request.getContentType();
-
-            for (UriRouteMatch<Object, Object> match: uriRoutes) {
-                if (match.explicitAccept(contentType.orElse(MediaType.ALL_TYPE))) {
-                    explicitAcceptRoutes.add(match);
-                }
-                if (explicitAcceptRoutes.isEmpty() && match.accept(contentType.orElse(null))) {
-                    acceptRoutes.add(match);
-                }
-            }
-
-            uriRoutes = explicitAcceptRoutes.isEmpty() ? acceptRoutes : explicitAcceptRoutes;
-        }
-
-        //find the routes with the least amount of variables
-        if (uriRoutes.size() > 1) {
-            long variableCount = 0;
-            long rawCount = 0;
-
-            List<UriRouteMatch<Object, Object>> closestMatches = new ArrayList<>(uriRoutes.size());
-
-            for (int i = 0; i < uriRoutes.size(); i++) {
-                UriRouteMatch<Object, Object> match = uriRoutes.get(i);
-                UriMatchTemplate template = match.getRoute().getUriMatchTemplate();
-                long variable = template.getVariableSegmentCount();
-                long raw = template.getRawSegmentCount();
-                if (i == 0) {
-                    variableCount = variable;
-                    rawCount = raw;
-                }
-                if (variable > variableCount || raw < rawCount) {
-                    break;
-                }
-                closestMatches.add(match);
-            }
-            uriRoutes = closestMatches;
-        }
+        List<UriRouteMatch<Object, Object>> uriRoutes = router.findAllClosest(request);
 
         if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(requestPath, uriRoutes);
@@ -565,7 +517,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         request,
                         nettyHttpRequest,
                         HttpResponse.notAllowed(existingRouteMethods),
-                        "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRouteMethods);
+                        "Method [" + httpMethod + "] not allowed for URI [" + request.getUri() + "]. Allowed methods: " + existingRouteMethods);
                 return;
             }
 
