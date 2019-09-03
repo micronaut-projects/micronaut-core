@@ -340,6 +340,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 int httpPort = getPortOrDefault(getHttpPort(serverConfiguration));
                 bindServerToHost(serverBootstrap, host.orElse(null), httpPort, new AtomicInteger(0));
             }
+            fireStartupEvents();
             running.set(true);
         }
 
@@ -444,13 +445,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             } else {
                 serverBootstrap.bind(port).sync();
             }
-
-            applicationContext.publishEvent(new ServerStartupEvent(this));
-            applicationName.ifPresent(id -> {
-                this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-                applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
-            });
-
         } catch (Throwable e) {
             final boolean isBindError = e instanceof BindException;
             if (LOG.isErrorEnabled()) {
@@ -470,6 +464,15 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 throw new ServerStartupException("Unable to start Micronaut server on port: " + port, e);
             }
         }
+    }
+
+    private void fireStartupEvents() {
+        Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
+        applicationContext.publishEvent(new ServerStartupEvent(this));
+        applicationName.ifPresent(id -> {
+            this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+            applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
+        });
     }
 
     private void logShutdownErrorIfNecessary(Future<?> future) {

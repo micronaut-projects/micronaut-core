@@ -20,6 +20,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.HttpFilter;
 
+import javax.annotation.Nonnull;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
@@ -42,7 +43,7 @@ public interface Router {
      * @param <R> The return type
      * @return A stream of route matches
      */
-    <T, R> Stream<UriRouteMatch<T, R>> findAny(CharSequence uri);
+    @Nonnull <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri);
 
     /**
      * Finds all of the possible routes for the given HTTP method and URI.
@@ -53,14 +54,25 @@ public interface Router {
      * @param <R>        The type
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, CharSequence uri);
+    @Nonnull <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri);
+
+    /**
+     * Finds the closest match for the given request.
+     *
+     * @param request The request
+     * @param <T> The target type
+     * @param <R>        The type
+     * @return A {@link List} of possible {@link Route} instances.
+     * @since 1.2.1
+     */
+    @Nonnull <T, R> List<UriRouteMatch<T, R>> findAllClosest(@Nonnull HttpRequest<?> request);
 
     /**
      * Returns all UriRoutes.
      *
      * @return A {@link Stream} of all registered {@link UriRoute} instances.
      */
-    Stream<UriRoute> uriRoutes();
+    @Nonnull Stream<UriRoute> uriRoutes();
 
     /**
      * Finds the first possible route for the given HTTP method and URI.
@@ -71,7 +83,7 @@ public interface Router {
      * @param <R>        The URI route match
      * @return The route match
      */
-    <T, R> Optional<UriRouteMatch<T, R>> route(HttpMethod httpMethod, CharSequence uri);
+    <T, R> Optional<UriRouteMatch<T, R>> route(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri);
 
     /**
      * Found a {@link RouteMatch} for the given {@link io.micronaut.http.HttpStatus} code.
@@ -80,7 +92,7 @@ public interface Router {
      * @param <R>    The matched route
      * @return The {@link RouteMatch}
      */
-    <R> Optional<RouteMatch<R>> route(HttpStatus status);
+    <R> Optional<RouteMatch<R>> route(@Nonnull HttpStatus status);
 
     /**
      * Found a {@link RouteMatch} for the given {@link io.micronaut.http.HttpStatus} code.
@@ -90,7 +102,7 @@ public interface Router {
      * @param <R>    The matched route
      * @return The {@link RouteMatch}
      */
-    <R> Optional<RouteMatch<R>> route(Class originatingClass, HttpStatus status);
+    <R> Optional<RouteMatch<R>> route(@Nonnull Class originatingClass, @Nonnull HttpStatus status);
 
     /**
      * Match a route to an error.
@@ -99,7 +111,7 @@ public interface Router {
      * @param <R>   The matched route
      * @return The {@link RouteMatch}
      */
-    <R> Optional<RouteMatch<R>> route(Throwable error);
+    <R> Optional<RouteMatch<R>> route(@Nonnull Throwable error);
 
     /**
      * Match a route to an error.
@@ -109,7 +121,7 @@ public interface Router {
      * @param <R>              The matched route
      * @return The {@link RouteMatch}
      */
-    <R> Optional<RouteMatch<R>> route(Class originatingClass, Throwable error);
+    <R> Optional<RouteMatch<R>> route(@Nonnull Class originatingClass, @Nonnull Throwable error);
 
     /**
      * Build a filtered {@link org.reactivestreams.Publisher} for an action.
@@ -117,8 +129,8 @@ public interface Router {
      * @param request The request
      * @return A new filtered publisher
      */
-    List<HttpFilter> findFilters(
-        HttpRequest<?> request
+    @Nonnull List<HttpFilter> findFilters(
+            @Nonnull HttpRequest<?> request
     );
 
     /**
@@ -129,7 +141,7 @@ public interface Router {
      * @param <R> The return type
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    default <T, R> Optional<UriRouteMatch<T, R>> GET(CharSequence uri) {
+    default <T, R> Optional<UriRouteMatch<T, R>> GET(@Nonnull CharSequence uri) {
         return route(HttpMethod.GET, uri);
     }
 
@@ -141,7 +153,7 @@ public interface Router {
      * @param <R> The return type
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    default <T, R> Optional<UriRouteMatch<T, R>> POST(CharSequence uri) {
+    default <T, R> Optional<UriRouteMatch<T, R>> POST(@Nonnull CharSequence uri) {
         return route(HttpMethod.POST, uri);
     }
 
@@ -153,7 +165,7 @@ public interface Router {
      * @param <R> The URI route match
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    default <T, R> Optional<UriRouteMatch<T, R>> PUT(CharSequence uri) {
+    default <T, R> Optional<UriRouteMatch<T, R>> PUT(@Nonnull CharSequence uri) {
         return route(HttpMethod.PUT, uri);
     }
 
@@ -165,7 +177,7 @@ public interface Router {
      * @param <R> The return type
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    default <T, R> Optional<UriRouteMatch<T, R>> PATCH(CharSequence uri) {
+    default <T, R> Optional<UriRouteMatch<T, R>> PATCH(@Nonnull CharSequence uri) {
         return route(HttpMethod.PATCH, uri);
     }
 
@@ -177,7 +189,7 @@ public interface Router {
      * @param <R> The return type
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    default <T, R> Optional<UriRouteMatch<T, R>> DELETE(CharSequence uri) {
+    default <T, R> Optional<UriRouteMatch<T, R>> DELETE(@Nonnull CharSequence uri) {
         return route(HttpMethod.DELETE, uri);
     }
 
@@ -189,7 +201,7 @@ public interface Router {
      * @param <R> The return type
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    default <T, R> Optional<UriRouteMatch<T, R>> OPTIONS(CharSequence uri) {
+    default <T, R> Optional<UriRouteMatch<T, R>> OPTIONS(@Nonnull CharSequence uri) {
         return route(HttpMethod.OPTIONS, uri);
     }
 
@@ -201,7 +213,7 @@ public interface Router {
      * @param <R> The return type
      * @return An {@link Optional} of {@link RouteMatch}
      */
-    default <T, R> Optional<UriRouteMatch<T, R>> HEAD(CharSequence uri) {
+    default <T, R> Optional<UriRouteMatch<T, R>> HEAD(@Nonnull CharSequence uri) {
         return route(HttpMethod.HEAD, uri);
     }
 
@@ -214,7 +226,7 @@ public interface Router {
      * @param <R>        The URI route match
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    default <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, URI uri) {
+    default @Nonnull <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull URI uri) {
         return find(httpMethod, uri.toString());
     }
 
@@ -226,7 +238,7 @@ public interface Router {
      * @param <R>     The URI route match
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    default <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
+    default @Nonnull <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpRequest<?> request) {
         return find(request.getMethod(), request.getPath());
     }
 

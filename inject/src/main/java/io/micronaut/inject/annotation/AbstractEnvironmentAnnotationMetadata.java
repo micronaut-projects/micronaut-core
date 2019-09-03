@@ -190,30 +190,36 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     @Nonnull
     @Override
     public String[] stringValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
-        PropertyPlaceholderResolver resolver = getEnvironment().getPlaceholderResolver();
-        Function<Object, Object> valueMapper = (val) -> {
-            String[] values;
-            if (val instanceof CharSequence) {
-                values = new String[] { val.toString() };
-            } else if (val instanceof String[]) {
-                values = (String[]) val;
-            } else {
-                return null;
-            }
-            return Arrays.stream(values)
-                    .flatMap(value -> {
-                        try {
-                            return Arrays.stream(resolver.resolveRequiredPlaceholder(value, String[].class));
-                        } catch (ConfigurationException e) {
-                            if (value.contains(resolver.getPrefix())) {
-                                value = resolver.resolveRequiredPlaceholders(value);
+        Environment environment = getEnvironment();
+        if (environment != null) {
+
+            PropertyPlaceholderResolver resolver = environment.getPlaceholderResolver();
+            Function<Object, Object> valueMapper = (val) -> {
+                String[] values;
+                if (val instanceof CharSequence) {
+                    values = new String[] { val.toString() };
+                } else if (val instanceof String[]) {
+                    values = (String[]) val;
+                } else {
+                    return null;
+                }
+                return Arrays.stream(values)
+                        .flatMap(value -> {
+                            try {
+                                return Arrays.stream(resolver.resolveRequiredPlaceholder(value, String[].class));
+                            } catch (ConfigurationException e) {
+                                if (value.contains(resolver.getPrefix())) {
+                                    value = resolver.resolveRequiredPlaceholders(value);
+                                }
+                                return Stream.of(value);
                             }
-                            return Stream.of(value);
-                        }
-                    })
-                    .toArray(String[]::new);
-        };
-        return annotationMetadata.stringValues(annotation, member, valueMapper);
+                        })
+                        .toArray(String[]::new);
+            };
+            return annotationMetadata.stringValues(annotation, member, valueMapper);
+        } else {
+            return annotationMetadata.stringValues(annotation, member, null);
+        }
     }
 
     @Nonnull

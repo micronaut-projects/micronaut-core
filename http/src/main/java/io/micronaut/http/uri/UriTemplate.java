@@ -150,6 +150,20 @@ public class UriTemplate implements Comparable<UriTemplate> {
     }
 
     /**
+     * @return The number of segments that are variable
+     */
+    public long getVariableSegmentCount() {
+        return segments.stream().filter(PathSegment::isVariable).count();
+    }
+
+    /**
+     * @return The number of segments that are raw
+     */
+    public long getRawSegmentCount() {
+        return segments.stream().filter(segment -> !segment.isVariable()).count();
+    }
+
+    /**
      * Nests another URI template with this template.
      *
      * @param uriTemplate The URI template. If it does not begin with forward slash it will automatically be appended with forward slash
@@ -226,24 +240,33 @@ public class UriTemplate implements Comparable<UriTemplate> {
             return 0;
         }
 
-        List<PathSegment> thisSegments = this.segments;
-        List<PathSegment> thatSegments = o.segments;
+        Integer thisVariableCount = 0;
+        Integer thatVariableCount = 0;
+        Integer thisRawCount = 0;
+        Integer thatRawCount = 0;
 
-        boolean e1 = thisSegments.isEmpty();
-        boolean e2 = thatSegments.isEmpty();
-        if (e1 && e2) {
-            return 0;
-        } else if (e1 && !e2) {
-            return -1;
-        } else if (!e1 && e2) {
-            return 1;
-        } else {
-            return Integer.compare(
-                    thisSegments.get(0).toString().length(),
-                    thatSegments.get(0).toString().length()
-            );
+        for (PathSegment segment: this.segments) {
+            if (segment.isVariable()) {
+                thisVariableCount++;
+            } else {
+                thisRawCount++;
+            }
         }
 
+        for (PathSegment segment: o.segments) {
+            if (segment.isVariable()) {
+                thatVariableCount++;
+            } else {
+                thatRawCount++;
+            }
+        }
+
+        int variableCompare = thisVariableCount.compareTo(thatVariableCount);
+        if (variableCompare == 0) {
+            return thatRawCount.compareTo(thisRawCount);
+        } else {
+            return variableCompare;
+        }
     }
 
     /**
@@ -479,6 +502,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * Represents an expandable path segment.
      */
     protected interface PathSegment extends CharSequence {
+
         /**
          * @return Whether this segment is part of the query string
          */
@@ -493,6 +517,13 @@ public class UriTemplate implements Comparable<UriTemplate> {
          */
         default Optional<String> getVariable() {
             return Optional.empty();
+        }
+
+        /**
+         * @return True if this is a variable segment
+         */
+        default boolean isVariable() {
+            return getVariable().isPresent();
         }
 
         /**
