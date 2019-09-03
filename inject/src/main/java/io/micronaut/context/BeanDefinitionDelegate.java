@@ -43,7 +43,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     static final String PRIMARY_ATTRIBUTE = Primary.class.getName();
 
     protected final BeanDefinition<T> definition;
-    protected final Map<String, Object> attributes = new HashMap<>();
+    protected final Map<String, Object> attributes = new HashMap<>(2);
 
     private BeanDefinitionDelegate(BeanDefinition<T> definition) {
         this.definition = definition;
@@ -54,6 +54,11 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      */
     BeanDefinition<T> getDelegate() {
         return definition;
+    }
+
+    @Override
+    public boolean isProxy() {
+        return definition.isProxy();
     }
 
     @Override
@@ -70,14 +75,14 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
         LinkedHashMap<String, Object> oldAttributes = null;
         if (!attributes.isEmpty()) {
-            oldAttributes = new LinkedHashMap<>(attributes.size());
-            for (Map.Entry<String, Object> entry: attributes.entrySet()) {
-                String key = entry.getKey();
-                if (resolutionContext.containsKey(key)) {
-                    oldAttributes.put(key, resolutionContext.get(key));
+            LinkedHashMap<String, Object> oldAttrs = new LinkedHashMap<>(attributes.size());
+            attributes.forEach((key, value) -> {
+                Object previous = resolutionContext.setAttribute(key, value);
+                if (previous != null) {
+                    oldAttrs.put(key, previous);
                 }
-                resolutionContext.put(key, entry.getValue());
-            }
+            });
+            oldAttributes = oldAttrs;
         }
 
         try {
@@ -86,7 +91,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                 Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
                 Object named = attributes.get(Named.class.getName());
                 if (named != null) {
-                    Map<String, Object> fulfilled = new LinkedHashMap<>();
+                    Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
                     for (Argument argument : requiredArguments) {
                         Class argumentType = argument.getType();
                         Optional result = ConversionService.SHARED.convert(named, argumentType);
@@ -111,10 +116,10 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
             }
         } finally {
             for (String key : attributes.keySet()) {
-                resolutionContext.remove(key);
+                resolutionContext.removeAttribute(key);
             }
             if (oldAttributes != null) {
-                resolutionContext.putAll(oldAttributes);
+                oldAttributes.forEach(resolutionContext::setAttribute);
             }
         }
     }

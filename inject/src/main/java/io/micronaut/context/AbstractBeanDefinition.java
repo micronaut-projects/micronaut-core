@@ -89,6 +89,7 @@ import java.util.stream.Stream;
 @Internal
 public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional implements BeanDefinition<T>, EnvironmentConfigurable {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractBeanDefinition.class);
+    private static final String NAMED_ATTRIBUTE = Named.class.getName();
 
     @SuppressWarnings("WeakerAccess")
     protected final List<MethodInjectionPoint> methodInjectionPoints = new ArrayList<>(3);
@@ -433,7 +434,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     protected final Object getProxiedBean(BeanContext beanContext) {
         DefaultBeanContext defaultBeanContext = (DefaultBeanContext) beanContext;
         Optional<String> qualifier = getAnnotationMetadata().getAnnotationNameByStereotype(javax.inject.Qualifier.class);
-        return defaultBeanContext.getProxyTargetBean(getBeanType(), (Qualifier<T>) qualifier.map(q -> Qualifiers.byAnnotation(getAnnotationMetadata(), q)).orElse(null));
+        return defaultBeanContext.getProxyTargetBean(
+                getBeanType(),
+                (Qualifier<T>) qualifier.map(q -> Qualifiers.byAnnotation(getAnnotationMetadata(), q)).orElse(null)
+        );
     }
 
     /**
@@ -1766,36 +1770,40 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         return resolveQualifier(resolutionContext, argument, false);
     }
 
-    private Qualifier resolveQualifier(BeanResolutionContext resolutionContext, Argument argument, boolean innerConfiguration) {
-        Qualifier qualifier = null;
+    private Qualifier resolveQualifier(
+            BeanResolutionContext resolutionContext,
+            Argument argument,
+            boolean innerConfiguration) {
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        Optional<Class<? extends Annotation>> qualifierType = annotationMetadata.getAnnotationTypeByStereotype(javax.inject.Qualifier.class);
-        if (qualifierType.isPresent()) {
-            qualifier = Qualifiers.byAnnotation(
+        boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
+        Class<? extends Annotation> qualifierType = hasMetadata ? annotationMetadata.getAnnotationTypeByStereotype(javax.inject.Qualifier.class).orElse(null) : null;
+        if (qualifierType != null) {
+            return Qualifiers.byAnnotation(
                     annotationMetadata,
-                    qualifierType.get()
+                    qualifierType
             );
-        }
-
-        if (qualifier == null) {
-            Class<?>[] byType = annotationMetadata.hasDeclaredAnnotation(Type.class) ? annotationMetadata.classValues(Type.class) : null;
+        } else {
+            Class<?>[] byType = hasMetadata ? annotationMetadata.hasDeclaredAnnotation(Type.class) ? annotationMetadata.classValues(Type.class) : null : null;
             if (byType != null) {
-                qualifier = Qualifiers.byType(byType);
+                return Qualifiers.byType(byType);
             } else {
-                Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
-                        .map(map -> (Qualifier) map.get(argument));
-                qualifier = optional.orElse(null);
-                if (qualifier == null && isIterable()) {
-                    if (argument.isAnnotationPresent(Parameter.class) || innerConfiguration || Qualifier.class == argument.getType()) {
-                        qualifier = optional.orElseGet(() -> {
-                            final Optional<String> n = resolutionContext.get(Named.class.getName(), String.class);
-                            return n.map(Qualifiers::byName).orElse(null);
-                        });
+                Qualifier qualifier = null;
+                boolean isIterable = isIterable();
+                if (isIterable) {
+                    Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
+                            .map(map -> (Qualifier) map.get(argument));
+                    qualifier = optional.orElse(null);
+                }
+                if (qualifier == null) {
+                    if ((hasMetadata && argument.isAnnotationPresent(Parameter.class)) || innerConfiguration || Qualifier.class == argument.getType()) {
+                        final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, String.class);
+                        qualifier = n.map(Qualifiers::byName).orElse(null);
                     }
                 }
+                return qualifier;
             }
         }
-        return qualifier;
+
     }
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")

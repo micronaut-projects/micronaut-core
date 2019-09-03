@@ -25,7 +25,6 @@ import io.micronaut.inject.MethodInjectionPoint;
 
 import javax.annotation.Nullable;
 import java.util.Deque;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -35,7 +34,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public interface BeanResolutionContext extends Map<String, Object>, ValueResolver<CharSequence> {
+public interface BeanResolutionContext extends ValueResolver<CharSequence> {
 
     /**
      * @return The context
@@ -51,6 +50,26 @@ public interface BeanResolutionContext extends Map<String, Object>, ValueResolve
      * @return The path that this resolution has taken so far
      */
     Path getPath();
+
+    /**
+     * Store a value within the context.
+     * @param key The key
+     * @param value The value
+     * @return The previous value or null
+     */
+    Object setAttribute(CharSequence key, Object value);
+
+    /**
+     * @param key The key
+     * @return The attribute value
+     */
+    Object getAttribute(CharSequence key);
+
+    /**
+     * Remove the attribute for the given key.
+     * @param key the key
+     */
+    void removeAttribute(CharSequence key);
 
     /**
      * Adds a bean that is created as part of the resolution. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
