@@ -17,7 +17,6 @@ package io.micronaut.scheduling;
 
 import io.micronaut.scheduling.exceptions.TaskExecutionException;
 
-import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutionException;
@@ -25,7 +24,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Supplier;
 
 /**
  * Wraps a {@link Runnable} and re-schedules the tasks.
@@ -39,7 +37,7 @@ class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
 
     private final Callable<V> task;
     private final TaskScheduler taskScheduler;
-    private final Supplier<Duration> nextTime;
+    private final NextFireTime nextTime;
     private ScheduledFuture<?> currentFuture;
     private AtomicBoolean cancelled = new AtomicBoolean(false);
 
@@ -48,7 +46,7 @@ class ReschedulingTask<V> implements ScheduledFuture<V>, Runnable, Callable<V> {
      * @param taskScheduler To schedule the task for next time
      * @param nextTime      The next time
      */
-    ReschedulingTask(Callable<V> task, TaskScheduler taskScheduler, Supplier<Duration> nextTime) {
+    ReschedulingTask(Callable<V> task, TaskScheduler taskScheduler, NextFireTime nextTime) {
         this.task = task;
         this.taskScheduler = taskScheduler;
         this.nextTime = nextTime;
