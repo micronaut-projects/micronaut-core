@@ -479,6 +479,11 @@ ext {
                     version:micronautKubernetesVersion,
                     group:'io.micronaut.kubernetes',
                     name:'micronaut-kubernetes-discovery-client'
+            ],
+            'micronaut.cache': [
+                    version:micronautCacheVersion,
+                    group:'io.micronaut.cache',
+                    name:'micronaut-cache-core'
             ]
     ]
 
