@@ -826,6 +826,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             proxyConstructorGenerator.loadArg(beanContextArgumentIndex);
             proxyConstructorGenerator.putField(proxyType, FIELD_BEAN_LOCATOR, TYPE_BEAN_LOCATOR);
 
+            proxyConstructorGenerator.loadThis();
+            proxyConstructorGenerator.loadArg(qualifierIndex);
+            proxyConstructorGenerator.putField(proxyType, FIELD_BEAN_QUALIFIER, Type.getType(Qualifier.class));
 
             Method resolveTargetMethodDesc = writeResolveTargetMethod(proxyClassWriter, targetType);
 
