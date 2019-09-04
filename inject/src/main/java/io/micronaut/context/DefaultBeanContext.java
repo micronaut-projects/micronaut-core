@@ -2465,7 +2465,7 @@ public class DefaultBeanContext implements BeanContext {
                 return existing;
             }
 
-            HashSet<T> beansOfTypeList = new HashSet<>();
+            HashSet<T> beansOfTypeList;
             boolean allCandidatesAreSingleton = false;
             Collection<T> beans;
             Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(beanType);
@@ -2481,6 +2481,7 @@ public class DefaultBeanContext implements BeanContext {
                 List<BeanDefinition<T>> reduced = qualifier.reduce(beanType, candidateStream)
                         .collect(Collectors.toList());
                 if (!reduced.isEmpty()) {
+                    beansOfTypeList = new HashSet<>(reduced.size());
                     for (BeanDefinition<T> definition : reduced) {
                         if (definition.isSingleton()) {
                             allCandidatesAreSingleton = true;
@@ -2494,7 +2495,7 @@ public class DefaultBeanContext implements BeanContext {
                         LOG.debug("Found no matching beans of type [{}] for qualifier: {} ", beanType.getName(), qualifier);
                     }
                     allCandidatesAreSingleton = true;
-                    beans = beansOfTypeList;
+                    beans = Collections.emptySet();
                 }
             } else if (hasCandidates) {
                 boolean hasNonSingletonCandidate = false;
@@ -2503,6 +2504,7 @@ public class DefaultBeanContext implements BeanContext {
                 candidateStream = applyBeanResolutionFilters(resolutionContext, candidateStream);
 
                 List<BeanDefinition<T>> candidateList = candidateStream.collect(Collectors.toList());
+                beansOfTypeList = new HashSet<>(candidateCount);
                 for (BeanDefinition<T> candidate : candidateList) {
                     if (!hasNonSingletonCandidate && !candidate.isSingleton()) {
                         hasNonSingletonCandidate = true;
@@ -2518,13 +2520,15 @@ public class DefaultBeanContext implements BeanContext {
                     LOG.debug("Found no possible candidate beans of type [{}] for qualifier: {} ", beanType.getName(), qualifier);
                 }
                 allCandidatesAreSingleton = true;
-                beans = beansOfTypeList;
+                beans = Collections.emptySet();
             }
 
-            if (Ordered.class.isAssignableFrom(beanType)) {
-                beans = beans.stream().sorted(OrderUtil.COMPARATOR).collect(StreamUtils.toImmutableCollection());
-            } else {
-                beans = Collections.unmodifiableCollection(beans);
+            if (beans != Collections.EMPTY_SET) {
+                if (Ordered.class.isAssignableFrom(beanType)) {
+                    beans = beans.stream().sorted(OrderUtil.COMPARATOR).collect(StreamUtils.toImmutableCollection());
+                } else {
+                    beans = Collections.unmodifiableCollection(beans);
+                }
             }
 
             if (allCandidatesAreSingleton) {
