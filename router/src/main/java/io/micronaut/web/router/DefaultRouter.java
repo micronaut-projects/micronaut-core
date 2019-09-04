@@ -24,6 +24,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
 
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;
@@ -54,16 +55,6 @@ public class DefaultRouter implements Router {
      */
     @Inject
     public DefaultRouter(Collection<RouteBuilder> builders) {
-        List<UriRoute> getRoutes = new ArrayList<>();
-        List<UriRoute> putRoutes = new ArrayList<>();
-        List<UriRoute> postRoutes = new ArrayList<>();
-        List<UriRoute> patchRoutes = new ArrayList<>();
-        List<UriRoute> deleteRoutes = new ArrayList<>();
-        List<UriRoute> optionsRoutes = new ArrayList<>();
-        List<UriRoute> headRoutes = new ArrayList<>();
-        List<UriRoute> connectRoutes = new ArrayList<>();
-        List<UriRoute> traceRoutes = new ArrayList<>();
-
         for (RouteBuilder builder : builders) {
             List<UriRoute> constructedRoutes = builder.getUriRoutes();
             for (UriRoute route : constructedRoutes) {
@@ -105,6 +96,20 @@ public class DefaultRouter implements Router {
                 .map((route -> route.match(uri.toString())))
                 .filter(Optional::isPresent)
                 .map(Optional::get);
+    }
+
+    @Nonnull
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull URI uri) {
+        return find(httpMethod.name(), uri.toString());
+    }
+
+    @Nonnull
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpRequest<?> request) {
+        boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
+        return this.<T, R>find(request, request.getPath())
+                .filter((match) -> match.test(request) && (!permitsBody || match.accept(request.getContentType().orElse(null))));
     }
 
     @Override
