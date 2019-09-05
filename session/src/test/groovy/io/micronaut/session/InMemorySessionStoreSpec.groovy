@@ -89,7 +89,7 @@ class InMemorySessionStoreSpec extends Specification {
         session.put("foo", "bar")
         sessionStore.save(session)
         String id = session.id
-        PollingConditions conditions = new PollingConditions(initialDelay: 2)
+        PollingConditions conditions = new PollingConditions(timeout: 2, initialDelay: 2)
 
         then:
         conditions.eventually {
