@@ -20,6 +20,7 @@ import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.session.event.AbstractSessionEvent
 import io.micronaut.session.event.SessionCreatedEvent
 import io.micronaut.session.event.SessionDeletedEvent
+import io.micronaut.session.event.SessionExpiredEvent
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -70,14 +71,31 @@ class InMemorySessionStoreSpec extends Specification {
         listener.events.clear()
         sessionStore.deleteSession(session.id)
 
-
         then:
         conditions.eventually {
             assert listener.events.size() == 1
             assert listener.events[0] instanceof SessionDeletedEvent
             assert !sessionStore.findSession(session.id).get().isPresent()
         }
+    }
 
+    void "test session expiry"() {
+        when:
+        //expire in 1 second
+        ApplicationContext applicationContext = ApplicationContext.run(['micronaut.session.max-inactive-interval': 'PT1S'])
+        SessionStore sessionStore = applicationContext.getBean(SessionStore)
+        TestListener listener = applicationContext.getBean(TestListener)
+        Session session = sessionStore.newSession()
+        session.put("foo", "bar")
+        sessionStore.save(session)
+        String id = session.id
+        PollingConditions conditions = new PollingConditions(initialDelay: 2)
+
+        then:
+        conditions.eventually {
+            !sessionStore.findSession(id).get().isPresent()
+            listener.events.any { it instanceof SessionExpiredEvent }
+        }
     }
 
     @Singleton
