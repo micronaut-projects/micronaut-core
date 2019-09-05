@@ -94,6 +94,7 @@ public class DefaultBeanContext implements BeanContext {
     private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String NAMED_MEMBER = "named";
+    private static final String NAMED_ATTRIBUTE = Named.class.getName();
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
@@ -464,7 +465,7 @@ public class DefaultBeanContext implements BeanContext {
                 NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(singleton.getClass(), qualifier);
                 if (qualifier instanceof Named) {
                     final BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(dynamicRegistration);
-                    delegate.put(Named.class.getName(), ((Named) qualifier).getName());
+                    delegate.put(NAMED_ATTRIBUTE, ((Named) qualifier).getName());
                     beanDefinition = delegate;
                 } else {
                     beanDefinition = dynamicRegistration;
@@ -1529,7 +1530,8 @@ public class DefaultBeanContext implements BeanContext {
                     }
                     Map<String, Object> convertedValues = new LinkedHashMap<>(argumentValues);
                     for (Argument<?> requiredArgument : requiredArguments) {
-                        Object val = argumentValues.get(requiredArgument.getName());
+                        String argumentName = requiredArgument.getName();
+                        Object val = argumentValues.get(argumentName);
                         if (val == null && !requiredArgument.isDeclaredNullable()) {
                             throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "].");
                         }
@@ -1540,7 +1542,7 @@ public class DefaultBeanContext implements BeanContext {
                                     new BeanInstantiationException(finalResolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
                             );
                         }
-                        convertedValues.put(requiredArgument.getName(), convertedValue);
+                        convertedValues.put(argumentName, convertedValue);
                     }
 
                     bean = parametrizedBeanFactory.build(
@@ -1550,7 +1552,17 @@ public class DefaultBeanContext implements BeanContext {
                             convertedValues
                     );
                 } else {
-                    bean = beanFactory.build(resolutionContext, this, beanDefinition);
+                    boolean propagateQualifier = beanDefinition.isProxy() && declaredQualifier instanceof Named;
+                    if (propagateQualifier) {
+                        resolutionContext.setAttribute(NAMED_ATTRIBUTE, ((Named) declaredQualifier).getName());
+                    }
+                    try {
+                        bean = beanFactory.build(resolutionContext, this, beanDefinition);
+                    } finally {
+                        if (propagateQualifier) {
+                            resolutionContext.removeAttribute(NAMED_ATTRIBUTE);
+                        }
+                    }
 
                     if (bean == null) {
                         if (!(beanDefinition.isIterable() || beanDefinition.getAnnotationMetadata().hasAnnotation(Factory.class))) {
@@ -2353,7 +2365,7 @@ public class DefaultBeanContext implements BeanContext {
     private <T> Qualifier<T> resolveDynamicQualifier(BeanDefinition<T> beanDefinition) {
         Qualifier<T> qualifier = null;
         if (beanDefinition instanceof BeanDefinitionDelegate) {
-            String name = ((BeanDefinitionDelegate<?>) beanDefinition).get(Named.class.getName(), String.class, null);
+            String name = ((BeanDefinitionDelegate<?>) beanDefinition).get(NAMED_ATTRIBUTE, String.class, null);
             if (name != null) {
                 qualifier = Qualifiers.byName(name);
             }
