@@ -16,6 +16,9 @@ import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
+//import org.objectweb.asm.ClassReader
+//import org.objectweb.asm.util.ASMifier
+//import org.objectweb.asm.util.TraceClassVisitor
 import spock.lang.Issue
 
 import javax.annotation.processing.SupportedAnnotationTypes
@@ -27,6 +30,36 @@ import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2083')
+    void "test class references in constructor arguments"() {
+        given:
+//        TraceClassVisitor traceClassVisitor =
+//                new TraceClassVisitor(null, new ASMifier(), new PrintWriter(System.out));
+//        new ClassReader('io.micronaut.inject.visitor.beans.TestConstructorIntrospection')
+//                .accept(traceClassVisitor, ClassReader.EXPAND_FRAMES)
+
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.BooleanSerializer;
+
+@io.micronaut.core.annotation.Introspected
+class Test {
+    private String test;
+    Test(@JsonSerialize(using=BooleanSerializer.class) String test) {
+        this.test = test;
+    }
+    public String getTest() {
+        return test;
+    } 
+}
+
+
+''')
+        expect:
+        introspection != null
+    }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1645")
     void "test recusive generics 2"() {

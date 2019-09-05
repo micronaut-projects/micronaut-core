@@ -530,6 +530,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
             ), ACC_STATIC | ACC_SYNTHETIC, methodName, desc);
 
+            loadTypeGenerator.visitCode();
             Label tryStart = new Label();
             Label tryEnd = new Label();
             Label exceptionHandler = new Label();
@@ -553,6 +554,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             loadTypeGenerator.visitLabel(tryEnd);
             loadTypeGenerator.returnValue();
             loadTypeGenerator.visitLabel(exceptionHandler);
+            loadTypeGenerator.visitFrame(Opcodes.F_NEW, 0, new Object[] {}, 1, new Object[] {"java/lang/Throwable"});
             // Try load the class
 
             // fallback to return a class value that is just a string
