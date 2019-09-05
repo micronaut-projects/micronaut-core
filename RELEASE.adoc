@@ -11,4 +11,6 @@
 9. Verify the release worked 
 ** Run `sdk install micronaut XXX` and perform smoke tests or creating an application etc.
 ** Check the documentation published to docs.micronaut.io/XXX
-10. Announce the Release
+10. Change the version in `gradle.properties` back to a snapshot of next release
+11. Push the code `git push` 
+12. Announce the Release
