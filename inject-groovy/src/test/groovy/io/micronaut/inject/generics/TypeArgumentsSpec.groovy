@@ -46,6 +46,5 @@ interface ChainE<A, B, C, D> {
         definition.getTypeArguments("test.ChainE")[1].type == Number
         definition.getTypeArguments("test.ChainE")[2].type == String
         definition.getTypeArguments("test.ChainE")[3].type == Byte
-
     }
 }
