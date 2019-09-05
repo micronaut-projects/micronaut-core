@@ -47,9 +47,7 @@ import java.lang.annotation.Target;
 public @interface Controller {
 
     /**
-     * <p>This attribute returns the base URI of the controller. If not specified the URI will be
-     * formulated from the controller class name without the "Controller" suffix (ie. {@code MessageController becomes}
-     * {@code /message}).</p>
+     * <p>This attribute returns the base URI of the controller</p>
      * <p>
      * <p>A value of {@code /} can be used to map a controller
      * to the root URI.</p>
