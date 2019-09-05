@@ -147,8 +147,7 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
             private long newExpiry(InMemorySession value) {
                 Instant current = Instant.now();
                 value.setLastAccessedTime(current);
-                long newExpiry = current.plus(value.getMaxInactiveInterval()).toEpochMilli();
-                return TimeUnit.MILLISECONDS.toNanos(newExpiry);
+                return value.getMaxInactiveInterval().toNanos();
             }
         };
     }
