@@ -406,7 +406,7 @@ class AstGenericUtils {
             if (redirectType.isPlaceholder()) {
                 String name = redirectType.getName()
                 if (!map.containsKey(name)) {
-                    if (parameterized.length >= i) {
+                    if (i >= parameterized.length) {
                         continue
                     }
                     GenericsType value = parameterized[i]
