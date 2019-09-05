@@ -2,7 +2,7 @@
 
 1. Ensure there are no snapshot dependencies 
 2. Set the version to a release version in `gradle.properties`
-3. Commit the release `git commit -a -m "Release Micronaut XXX"
+3. Commit the release `git commit -a -m "Release Micronaut XXX"`
 4. Tag the release `git tag vXXX` (Don't forget the `v` prefix!)
 5. Push the tag `git push --tags` and waiting for Travis to complete the tagged release https://travis-ci.org/micronaut-projects/micronaut-core/
 6. Login to the Bintray repo at https://bintray.com/micronaut/core-releases-local and click the button to publish the staged release.
