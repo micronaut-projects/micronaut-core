@@ -9,4 +9,11 @@ dependencies {
     testCompile dependencyVersion("validation")
     testCompile "javax.persistence:javax.persistence-api:2.2"
     testCompile project(":runtime")
+
+//    testCompile "org.ow2.asm:asm-tree:$asmVersion"
+//    testCompile "org.ow2.asm:asm-util:$asmVersion"
+//    testCompile "org.ow2.asm:asm:$asmVersion"
+//    testCompile "org.ow2.asm:asm-commons:$asmVersion"
+//    testCompile "org.ow2.asm:asm-tree:$asmVersion"
+
 }
