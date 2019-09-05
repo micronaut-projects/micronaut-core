@@ -1,6 +1,6 @@
 plugins {
-    id "org.jetbrains.kotlin.jvm" version "1.3.20"
-    id "org.jetbrains.kotlin.kapt" version "1.3.20"
+    id "org.jetbrains.kotlin.jvm" version "1.3.50"
+    id "org.jetbrains.kotlin.kapt" version "1.3.50"
 }
 
 ext {
@@ -8,15 +8,15 @@ ext {
 }
 
 dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.3.20"
-    compile "org.jetbrains.kotlin:kotlin-reflect:1.3.20"
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
+    compile "org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion"
     compile "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.1.1"
     compile "org.jetbrains.kotlinx:kotlinx-coroutines-rx2:1.1.1"
     compile project(':http-server-netty')
     compile project(':http-client')
     compile project(':runtime')
-    testCompile "org.jetbrains.kotlin:kotlin-test-junit:1.3.20"
-    testCompile "org.jetbrains.kotlin:kotlin-test:1.3.20"
+    testCompile "org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion"
+    testCompile "org.jetbrains.kotlin:kotlin-test:$kotlinVersion"
 
     testCompile project(":validation")
     testCompile project(":inject")
