@@ -77,6 +77,9 @@ class InMemorySessionStoreSpec extends Specification {
             assert listener.events[0] instanceof SessionDeletedEvent
             assert !sessionStore.findSession(session.id).get().isPresent()
         }
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test session expiry"() {
@@ -89,13 +92,16 @@ class InMemorySessionStoreSpec extends Specification {
         session.put("foo", "bar")
         sessionStore.save(session)
         String id = session.id
-        PollingConditions conditions = new PollingConditions(timeout: 2, initialDelay: 2)
+        PollingConditions conditions = new PollingConditions(timeout: 5, initialDelay: 2)
 
         then:
         conditions.eventually {
             !sessionStore.findSession(id).get().isPresent()
             listener.events.any { it instanceof SessionExpiredEvent }
         }
+
+        cleanup:
+        applicationContext.close()
     }
 
     @Singleton
