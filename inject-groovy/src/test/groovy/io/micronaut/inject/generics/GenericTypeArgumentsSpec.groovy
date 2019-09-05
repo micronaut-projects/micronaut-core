@@ -190,4 +190,28 @@ class StatusController extends GenericController<String> {
         methods[0].getArguments()[0].type == String
         methods[0].getReturnType().getFirstTypeVariable().get().type == String
     }
+
+    void "test replacing an impl with an interface"() {
+        BeanDefinition definition = buildBeanDefinition('test.FactoryReplace$TestService0', '''
+package test
+
+import io.micronaut.context.annotation.*
+import io.micronaut.inject.generics.missing.*
+import io.micronaut.aop.interceptors.Mutating
+
+@Factory
+class FactoryReplace {
+
+    @Replaces(TestServiceImpl)
+    @Mutating("name")
+    @Bean
+    TestService testService() {
+        new TestServiceImpl()
+    }
+}
+''')
+
+        expect:
+        definition != null
+    }
 }

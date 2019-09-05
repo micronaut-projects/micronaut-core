@@ -406,6 +406,9 @@ class AstGenericUtils {
             if (redirectType.isPlaceholder()) {
                 String name = redirectType.getName()
                 if (!map.containsKey(name)) {
+                    if (parameterized.length >= i) {
+                        continue
+                    }
                     GenericsType value = parameterized[i]
                     ClassNode cn = value.type
                     Object typeRef = resolveTypeReference(cn)
