@@ -28,8 +28,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * This annotation is designed for non-standard http methods, that you
  * can provide by specifying the required {@link #method()} property.
+ * 
  * @author spirit-1984
- * @since 1.2.1
+ * @since 1.3.0
  */
 @Documented
 @Retention(RUNTIME)

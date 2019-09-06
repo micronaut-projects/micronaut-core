@@ -79,7 +79,7 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
         Span span = initialSpan;
         Optional<Object> routeTemplate = request.getAttribute(HttpAttributes.URI_TEMPLATE);
         routeTemplate.ifPresent(o ->
-                span.name(request.getHttpMethodName() + " " + o.toString())
+                span.name(request.getMethodName() + " " + o.toString())
         );
         request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
         try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
@@ -148,13 +148,13 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
 
     private void configureSpan(Span span) {
         span.kind(Span.Kind.SERVER);
-        span.tag(AbstractOpenTracingFilter.TAG_METHOD, request.getHttpMethodName());
+        span.tag(AbstractOpenTracingFilter.TAG_METHOD, request.getMethodName());
         span.tag(AbstractOpenTracingFilter.TAG_PATH, request.getPath());
     }
 
     private void configureAttributes(HttpResponse<?> response) {
         Optional<Object> routeTemplate = request.getAttribute(HttpAttributes.URI_TEMPLATE);
         routeTemplate.ifPresent(o -> response.setAttribute(HttpAttributes.URI_TEMPLATE, o));
-        response.setAttribute(HttpAttributes.METHOD_NAME, request.getHttpMethodName());
+        response.setAttribute(HttpAttributes.METHOD_NAME, request.getMethodName());
     }
 }

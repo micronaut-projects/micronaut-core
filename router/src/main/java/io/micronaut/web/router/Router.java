@@ -70,14 +70,14 @@ public interface Router {
     /**
      * Find method, that should be used for non-standard http methods. For standards it should act
      * the same as {@link #find(HttpMethod, URI)}
-     * @param request The request, that can have overridden {@link HttpRequest#getHttpMethodName()}
+     * @param request The request, that can have overridden {@link HttpRequest#getMethodName()}
      * @param uri The URI route match.
      * @param <T> The target type.
      * @param <R> The type of what
      * @return A {@link Stream} of possible {@link Route} instances.
      */
     default <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest request, CharSequence uri) {
-        return find(HttpMethod.valueOf(request.getHttpMethodName()), uri);
+        return find(HttpMethod.valueOf(request.getMethodName()), uri);
     }
 
     /**

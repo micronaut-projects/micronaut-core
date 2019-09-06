@@ -87,7 +87,7 @@ public class DefaultRouter implements Router {
 
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest request, CharSequence uri) {
-        return find(request.getHttpMethodName(), uri);
+        return find(request.getMethodName(), uri);
     }
 
     private <T, R> Stream<UriRouteMatch<T, R>> find(String httpMethodName, CharSequence uri) {

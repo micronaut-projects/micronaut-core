@@ -182,7 +182,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     }
 
     @Override
-    public String getHttpMethodName() {
+    public String getMethodName() {
         return httpMethodName;
     }
 }

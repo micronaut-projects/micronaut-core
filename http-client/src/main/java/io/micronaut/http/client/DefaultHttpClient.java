@@ -841,7 +841,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     ByteBuf byteBuf = message.content();
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
-                                byteBuf.readableBytes(), request.getHttpMethodName(), request.getUri());
+                                byteBuf.readableBytes(), request.getMethodName(), request.getUri());
                         traceBody("Response", byteBuf);
                     }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
@@ -887,7 +887,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             ByteBuf chunk = content.content();
                             if (log.isTraceEnabled()) {
                                 log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
-                                        chunk.readableBytes(), request.getHttpMethodName(), request.getUri());
+                                        chunk.readableBytes(), request.getMethodName(), request.getUri());
                                 traceBody("Chunk", chunk);
                             }
                             try {
@@ -1757,7 +1757,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     HttpHeaders headers = fullResponse.headers();
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Response Received for Request: {} {}",
-                                request.getHttpMethodName(), request.getUri());
+                                request.getMethodName(), request.getUri());
                         log.trace("Status Code: {}", status);
                         traceHeaders(headers);
                         traceBody("Response", fullResponse.content());
@@ -1917,7 +1917,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         }
                         if (log.isTraceEnabled()) {
                             log.trace("HTTP Client exception ({}) occurred for request : {} {}",
-                                    message, request.getHttpMethodName(), request.getUri());
+                                    message, request.getMethodName(), request.getUri());
                         }
 
                         if (cause instanceof TooLongFrameException) {
