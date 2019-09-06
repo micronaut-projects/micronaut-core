@@ -20,7 +20,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAmount;
+import java.time.Duration;
 
 /**
  * An interface representing a Cookie. See https://tools.ietf.org/html/rfc6265.
@@ -156,12 +156,12 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     }
 
     /**
-     * Sets the max age of the cookie in seconds.
+     * Sets the max age of the cookie.
      *
      * @param maxAge The max age
      * @return This cookie
      */
-    default @Nonnull Cookie maxAge(@Nonnull TemporalAmount maxAge) {
+    default @Nonnull Cookie maxAge(@Nonnull Duration maxAge) {
         ArgumentUtils.requireNonNull("maxAge", maxAge);
         return maxAge(maxAge.get(ChronoUnit.SECONDS));
     }

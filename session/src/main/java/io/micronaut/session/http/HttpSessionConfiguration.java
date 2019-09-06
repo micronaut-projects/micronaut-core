@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.session.SessionConfiguration;
 
-import java.time.temporal.TemporalAmount;
+import java.time.Duration;
 import java.util.Optional;
 
 /**
@@ -57,7 +57,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
 
     private boolean rememberMe = DEFAULT_REMEMBERME;
     private boolean base64Encode = DEFAULT_BASE64ENCODE;
-    private TemporalAmount cookieMaxAge;
+    private Duration cookieMaxAge;
     private String cookiePath = DEFAULT_COOKIEPATH;
     private String domainName;
     private String cookieName = DEFAULT_COOKIENAME;
@@ -154,14 +154,15 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @return The max age to use for the cookie
      */
-    public Optional<TemporalAmount> getCookieMaxAge() {
+    public Optional<Duration> getCookieMaxAge() {
         return Optional.ofNullable(cookieMaxAge);
     }
 
     /**
-     * @param cookieMaxAge Set the max age to use for the cookie
+     * Sets the maximum age of the cookie.
+     * @param cookieMaxAge The maximum age of the cookie
      */
-    public void setCookieMaxAge(TemporalAmount cookieMaxAge) {
+    public void setCookieMaxAge(Duration cookieMaxAge) {
         this.cookieMaxAge = cookieMaxAge;
     }
 
