@@ -103,7 +103,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public String toString() {
-        return getMethod() + " " + getUri();
+        return getHttpMethodName() + " " + getUri();
     }
 
     /**

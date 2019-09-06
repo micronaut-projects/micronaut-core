@@ -22,6 +22,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Error;
@@ -91,6 +92,23 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                 bean,
                 method);
             route = route.consumes(consumes).produces(produces);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Created Route: {}", route);
+            }
+        });
+
+        httpMethodsHandlers.put(CustomHttpMethod.class, (BeanDefinition bean, ExecutableMethod method) -> {
+            String uri = method.stringValue(HttpMethodMapping.class).orElse(UriMapping.DEFAULT_URI);
+            MediaType[] consumes = resolveConsumes(method);
+            MediaType[] produces = resolveProduces(method);
+            String methodName = method.stringValue(CustomHttpMethod.class, "method").get();
+            Route route = buildBeanRoute(methodName, HttpMethod.CUSTOM, resolveUri(bean, uri,
+                    method,
+                    uriNamingStrategy),
+                    bean,
+                    method);
+            route = route.consumes(consumes).produces(produces);
+
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
             }

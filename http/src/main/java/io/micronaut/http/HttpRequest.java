@@ -346,7 +346,30 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri) {
         Objects.requireNonNull(httpMethod, "Argument [httpMethod] is required");
+        return create(httpMethod, uri, httpMethod.name());
+    }
+
+    /**
+     * Create a new {@link MutableHttpRequest} for the given method and URI.
+     *
+     * @param httpMethod The method
+     * @param uri        The URI
+     * @param <T>        The Http request type
+     * @param httpMethodName Method name - for standard http methods is equal to {@link HttpMethod#name()}
+     * @return The request
+     */
+    static <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri, String httpMethodName) {
+        Objects.requireNonNull(httpMethod, "Argument [httpMethod] is required");
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        return HttpRequestFactory.INSTANCE.create(httpMethod, uri);
+        Objects.requireNonNull(httpMethodName, "Argument [httpMethodName] is required");
+        return HttpRequestFactory.INSTANCE.create(httpMethod, uri, httpMethodName);
+    }
+
+    /**
+     *
+     * @return The name of the method (same as {@link HttpMethod} value for standard http methods).
+     */
+    default String getHttpMethodName() {
+        return getMethod().name();
     }
 }

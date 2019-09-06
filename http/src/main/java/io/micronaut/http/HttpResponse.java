@@ -175,8 +175,19 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> notAllowed(Set<HttpMethod> allowed) {
+        return notAllowedGeneric(allowed);
+    }
+
+    /**
+     * Return an {@link io.micronaut.http.HttpStatus#METHOD_NOT_ALLOWED} response with an empty body.
+     *
+     * @param allowed Allowed Http Methods
+     * @param <T>     The response type
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> notAllowedGeneric(Set<? extends CharSequence> allowed) {
         return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.METHOD_NOT_ALLOWED)
-            .headers((headers) -> headers.allow(allowed));
+                .headers((headers) -> headers.allowGeneric(allowed));
     }
 
     /**

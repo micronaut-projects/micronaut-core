@@ -66,7 +66,8 @@ public enum HttpMethod implements CharSequence {
     /**
      * See https://tools.ietf.org/html/rfc5789.
      */
-    PATCH;
+    PATCH,
+    CUSTOM;
 
     @Override
     public int length() {
@@ -100,8 +101,23 @@ public enum HttpMethod implements CharSequence {
      * @return True if it does
      */
     public static boolean permitsRequestBody(HttpMethod method) {
-        return requiresRequestBody(method)
-            || method.equals(OPTIONS)
-            || method.equals(DELETE);
+        return method != null && (requiresRequestBody(method)
+                || method.equals(OPTIONS)
+                || method.equals(DELETE)
+                || method.equals(CUSTOM)
+        );
+    }
+
+    /**
+     *
+     * @param httpMethodName Name of the http method (may be nonstandard)
+     * @return the value of enum (CUSTOM by default).
+     */
+    public static HttpMethod parse(String httpMethodName) {
+        try {
+            return HttpMethod.valueOf(httpMethodName.toUpperCase());
+        } catch (Exception e) {
+            return CUSTOM;
+        }
     }
 }
