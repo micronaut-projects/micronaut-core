@@ -76,7 +76,7 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
 
     @Override
     public boolean isEmpty() {
-        return size() > 0;
+        return size() == 0;
     }
 
     @Override
