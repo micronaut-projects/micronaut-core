@@ -230,7 +230,6 @@ class HttpGetSpec extends Specification {
 
         cleanup:
         client.stop()
-
     }
 
     void "test simple retrieve request with POJO"() {
@@ -510,6 +509,16 @@ class HttpGetSpec extends Specification {
         body == 'x-y'
     }
 
+    void "test overriding the URL"() {
+        def client = embeddedServer.applicationContext.getBean(OverrideUrlClient)
+
+        when:
+        String val = client.overrideUrl(embeddedServer.getURL().toString())
+
+        then:
+        val == "success"
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -715,6 +724,14 @@ class HttpGetSpec extends Specification {
 
         @Get("/completable/error")
         Completable completableError()
+    }
+
+    @Client("http://not.used")
+    static interface OverrideUrlClient {
+
+        @Get("{+url}/get/simple")
+        String overrideUrl(String url);
+
     }
 
     @javax.inject.Singleton

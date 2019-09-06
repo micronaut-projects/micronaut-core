@@ -31,7 +31,6 @@ import javax.inject.Singleton;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Default implementation that stores sessions in-memory.
@@ -147,8 +146,7 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
             private long newExpiry(InMemorySession value) {
                 Instant current = Instant.now();
                 value.setLastAccessedTime(current);
-                long newExpiry = current.plus(value.getMaxInactiveInterval()).toEpochMilli();
-                return TimeUnit.MILLISECONDS.toNanos(newExpiry);
+                return value.getMaxInactiveInterval().toNanos();
             }
         };
     }
