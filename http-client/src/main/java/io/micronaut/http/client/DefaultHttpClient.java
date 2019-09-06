@@ -1290,7 +1290,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         if (parentRequest != null) {
             filterList.add(new ClientServerContextFilter(parentRequest));
         }
-        String requestPath = requestURI.getPath();
+        String requestPath = StringUtils.prependUri("/", requestURI.getPath());
         io.micronaut.http.HttpMethod method = request.getMethod();
         for (HttpClientFilter filter : filters) {
             if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {

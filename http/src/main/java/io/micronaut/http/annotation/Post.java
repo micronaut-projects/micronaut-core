@@ -38,14 +38,14 @@ import java.lang.annotation.Target;
 public @interface Post {
 
     /**
-     * @return The URI of the POST route if not specified inferred from the method name and arguments
+     * @return The URI of the POST route
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
     @AliasFor(annotation = UriMapping.class, member = "value")
     String value() default UriMapping.DEFAULT_URI;
 
     /**
-     * @return The URI of the POST route if not specified inferred from the method name and arguments
+     * @return The URI of the POST route
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
     @AliasFor(annotation = UriMapping.class, member = "value")

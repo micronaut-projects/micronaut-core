@@ -259,6 +259,9 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             if (ArrayUtils.isNotEmpty(constructorArguments)) {
                 writeConstructorArguments();
             }
+            for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
+                generatorAdapter.visitMaxs(3, 1);
+            }
 
             introspectionStream.write(introspectionWriter.toByteArray());
         }
@@ -278,8 +281,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 args,
                 annotationMetadataMap,
                 toTypeArguments(constructorArguments),
-                loadTypeMethods
-                );
+                loadTypeMethods);
 
         getConstructorArguments.returnValue();
         getConstructorArguments.visitMaxs(1, 1);
@@ -296,7 +298,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 "instantiateInternal",
                 desc);
 
-        @SuppressWarnings("ConstantConditions") Collection<Type> argumentTypes = Arrays.stream(constructorArguments).map(pe ->
+        Collection<Type> argumentTypes = Arrays.stream(constructorArguments).map(pe ->
             getTypeForElement(pe.getType())
         ).collect(Collectors.toList());
 
@@ -380,10 +382,6 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         getBeanType.endMethod();
 
         writeGetAnnotationMetadataMethod(classWriter);
-
-        for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
-            generatorAdapter.visitMaxs(3, 1);
-        }
 
         return classWriter;
     }
