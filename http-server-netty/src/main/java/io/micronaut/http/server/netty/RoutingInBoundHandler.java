@@ -15,6 +15,34 @@
  */
 package io.micronaut.http.server.netty;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import javax.annotation.Nullable;
+
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -52,7 +80,6 @@ import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
@@ -72,7 +99,12 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.micronaut.scheduling.executor.ExecutorSelector;
-import io.micronaut.web.router.*;
+import io.micronaut.web.router.BasicObjectRouteMatch;
+import io.micronaut.web.router.MethodBasedRouteMatch;
+import io.micronaut.web.router.RouteMatch;
+import io.micronaut.web.router.Router;
+import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
@@ -88,7 +120,16 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.DefaultLastHttpContent;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
@@ -106,28 +147,6 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nullable;
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Internal implementation of the {@link io.netty.channel.ChannelInboundHandler} for Micronaut.
@@ -475,7 +494,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             // if there is no route present try to locate a route that matches a different content type
             Set<MediaType> existingRouteConsumes = router
-                    .find(httpMethod, requestPath)
+                    .find(request, requestPath)
                     .map(UriRouteMatch::getRoute)
                     .flatMap(r -> r.getConsumes().stream())
                     .collect(Collectors.toSet());
@@ -485,7 +504,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (contentType != null) {
                     if (!existingRouteConsumes.contains(contentType)) {
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(), httpMethod, contentType);
+                            LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(),
+                                    request.getHttpMethodName(), contentType);
                         }
 
                         handleStatusError(
@@ -500,22 +520,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
 
             // if there is no route present try to locate a route that matches a different HTTP method
-            Set<io.micronaut.http.HttpMethod> existingRouteMethods = router
+            Set<String> existingRouteMethods = router
                     .findAny(request.getUri().toString())
-                    .map(UriRouteMatch::getHttpMethod)
+                    .map(UriRouteMatch::getRoute)
+                    .map(UriRoute::getHttpMethodName)
                     .collect(Collectors.toSet());
 
             if (!existingRouteMethods.isEmpty()) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Method not allowed for URI {} and method {}", request.getUri(), httpMethod);
+                    LOG.debug("Method not allowed for URI {} and method {}", request.getUri(), request.getHttpMethodName());
                 }
 
                 handleStatusError(
                         ctx,
                         request,
                         nettyHttpRequest,
-                        HttpResponse.notAllowed(existingRouteMethods),
-                        "Method [" + httpMethod + "] not allowed for URI [" + request.getUri() + "]. Allowed methods: " + existingRouteMethods);
+                        HttpResponse.notAllowedGeneric(existingRouteMethods),
+                        "Method [" + request.getHttpMethodName() + "] not allowed for URI [" + request.getUri() + "]. Allowed methods: " + existingRouteMethods);
                 return;
             }
 
@@ -539,9 +560,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         if (LOG.isDebugEnabled()) {
             if (route instanceof MethodBasedRouteMatch) {
-                LOG.debug("Matched route {} - {} to controller {}", httpMethod, requestPath, route.getDeclaringType());
+                LOG.debug("Matched route {} - {} to controller {}", request.getHttpMethodName(), requestPath, route.getDeclaringType());
             } else {
-                LOG.debug("Matched route {} - {}", httpMethod, requestPath);
+                LOG.debug("Matched route {} - {}", request.getHttpMethodName(), requestPath);
             }
         }
         // all ok proceed to try and execute the route
