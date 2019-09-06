@@ -20,7 +20,7 @@ The task above will execute every 5 minutes.
 
 === Scheduling with a Fixed Delay
 
-To schedule a task so that is runs 5 minutes after the termination of the previous task use the `fixedDelay` member. For example:
+To schedule a task so that it runs 5 minutes after the termination of the previous task use the `fixedDelay` member. For example:
 
 .Fixed Delay Example
 [source,java]
@@ -38,11 +38,11 @@ To schedule a https://en.wikipedia.org/wiki/Cron[Cron] task use the `cron` membe
 include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=cron, indent=0]
 ----
 
-The above example will run the task every Monday morning at 10:15AM.
+The above example will run the task every Monday morning at 10:15AM for the time zone of the server.
 
 === Scheduling with only an Initial Delay
 
-To schedule a task so that is runs a single time after the server starts, use the `initialDelay` member:
+To schedule a task so that it runs a single time after the server starts, use the `initialDelay` member:
 
 .Initial Delay Example
 [source,java]
@@ -96,4 +96,4 @@ include::{includedir}configurationProperties/io.micronaut.scheduling.executor.Us
 
 By default Micronaut includes a api:io.micronaut.scheduling.DefaultTaskExceptionHandler[] bean that implements the api:io.micronaut.scheduling.TaskExceptionHandler[] and simply logs the exception if an error occurs invoking a scheduled task.
 
-If you have custom requirements you can replace this bean with a custom implementation (for example if you wish to send an email or shutdown context to fail fast). To do so simply write your own api:io.micronaut.scheduling.TaskExceptionHandler[] and annotated it with `@Replaces(DefaultTaskExceptionHandler.class)`.
+If you have custom requirements you can replace this bean with a custom implementation (for example if you wish to send an email or shutdown context to fail fast). To do so simply write your own api:io.micronaut.scheduling.TaskExceptionHandler[] and annotate it with `@Replaces(DefaultTaskExceptionHandler.class)`.
