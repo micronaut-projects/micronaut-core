@@ -67,6 +67,10 @@ public enum HttpMethod implements CharSequence {
      * See https://tools.ietf.org/html/rfc5789.
      */
     PATCH,
+
+    /**
+     * A custom non-standard HTTP method.
+     */
     CUSTOM;
 
     @Override

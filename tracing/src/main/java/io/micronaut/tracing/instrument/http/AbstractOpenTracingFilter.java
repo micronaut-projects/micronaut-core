@@ -95,7 +95,7 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
      */
     protected String resolveSpanName(HttpRequest<?> request) {
         Optional<String> route = request.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
-        return route.map(s -> request.getHttpMethodName() + " " + s).orElse(request.getHttpMethodName() + " " + request.getPath());
+        return route.map(s -> request.getMethodName() + " " + s).orElse(request.getMethodName() + " " + request.getPath());
     }
 
     /**
@@ -111,7 +111,7 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
                 spanName
         ).asChildOf(spanContext);
 
-        spanBuilder.withTag(TAG_METHOD, request.getHttpMethodName());
+        spanBuilder.withTag(TAG_METHOD, request.getMethodName());
         String path = request.getPath();
         spanBuilder.withTag(TAG_PATH, path);
         return spanBuilder;

@@ -57,6 +57,14 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     @Nonnull URI getUri();
 
     /**
+     *
+     * @return The name of the method (same as {@link HttpMethod} value for standard http methods).
+     */
+    default @Nonnull String getMethodName() {
+        return getMethod().name();
+    }
+
+    /**
      * The user principal stored within the request.
      *
      * @return The principal
@@ -363,13 +371,5 @@ public interface HttpRequest<B> extends HttpMessage<B> {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(httpMethodName, "Argument [httpMethodName] is required");
         return HttpRequestFactory.INSTANCE.create(httpMethod, uri, httpMethodName);
-    }
-
-    /**
-     *
-     * @return The name of the method (same as {@link HttpMethod} value for standard http methods).
-     */
-    default String getHttpMethodName() {
-        return getMethod().name();
     }
 }
