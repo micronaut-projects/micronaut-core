@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.time.temporal.TemporalAmount;
+import java.time.Duration;
 import java.util.Optional;
 
 /**
@@ -72,7 +72,7 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
 
     private Boolean cookieHttpOnly = DEFAULT_HTTPONLY;
     private Boolean cookieSecure = DEFAULT_SECURE;
-    private TemporalAmount cookieMaxAge;
+    private Duration cookieMaxAge;
     private boolean enabled = DEFAULT_ENABLED;
 
     @Override
@@ -152,7 +152,7 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
      * @return The max age to use for the cookie
      */
     @Override
-    public Optional<TemporalAmount> getCookieMaxAge() {
+    public Optional<Duration> getCookieMaxAge() {
         return Optional.ofNullable(cookieMaxAge);
     }
 
@@ -192,7 +192,7 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
      * Sets the maximum age of the cookie.
      * @param cookieMaxAge The maximum age of the cookie
      */
-    public void setCookieMaxAge(TemporalAmount cookieMaxAge) {
+    public void setCookieMaxAge(Duration cookieMaxAge) {
         this.cookieMaxAge = cookieMaxAge;
     }
 }
