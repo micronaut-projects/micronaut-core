@@ -16,6 +16,7 @@
 package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
@@ -94,6 +95,16 @@ class QueryParametersSpec extends Specification {
     void "test client mappping URL parameters appended through a POJO with a list (served through #flavour)"() {
         expect:
         client.searchExplodedPojo(flavour, new SearchParamsAsList(term: ["Tool", "Agnes Obel"])).albums.size() == 4
+
+        where:
+        flavour << [ "pojo", "list", "map" ]
+    }
+
+    @Unroll
+    void "test client mappping URL parameters appended through an introspected POJO with a list"() {
+        expect:
+        client.searchExplodedIntrospectedPojo(flavour, new IntrospectedSearchParamsAsList(term: ["Tool", "Agnes Obel"])).albums.size() == 4
+
         where:
         flavour << [ "pojo", "list", "map" ]
     }
@@ -136,12 +147,18 @@ class QueryParametersSpec extends Specification {
         List<String> term // POJO parameters can bind request params to list fields
     }
 
+    @Introspected
+    static class IntrospectedSearchParamsAsList {
+        List<String> term // POJO parameters can bind request params to list fields
+    }
+
     static class SearchParams {
         String term // Now, POJO parameters can bind request params to simple fields, too.
     }
 
     @Controller('/itunes')
     static class ItunesController {
+
         Map<String, List<String>> artists = [
                 Riverside:["Out of Myself", "Second Life Syndrome"],
                 Tool:["Undertow"],
@@ -222,6 +239,9 @@ class QueryParametersSpec extends Specification {
 
         @Get("/search-exploded/{flavour}{?params*}")
         SearchResult searchExplodedPojo(String flavour, SearchParamsAsList params)
+
+        @Get("/search-exploded/{flavour}{?params*}")
+        SearchResult searchExplodedIntrospectedPojo(String flavour, IntrospectedSearchParamsAsList params)
 
         @Get("/search-default")
         SearchResult searchDefault(@QueryValue(defaultValue = "Tool") String term)
