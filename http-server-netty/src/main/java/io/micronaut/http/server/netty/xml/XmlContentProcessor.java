@@ -80,6 +80,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
 
 
     /**
+     * @param xmlMapper        Jackson mapper for xml
      * @param nettyHttpRequest The {@link NettyHttpRequest}
      * @param configuration    The {@link HttpServerConfiguration}
      */
