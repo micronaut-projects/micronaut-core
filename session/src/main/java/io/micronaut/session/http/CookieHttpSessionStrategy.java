@@ -91,26 +91,28 @@ public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
                          MutableHttpResponse<?> response,
                          Session session) {
         Cookie cookie;
+        HttpSessionConfiguration configuration = getConfiguration();
         if (session.isExpired()) {
-            cookie = Cookie.of(getConfiguration().getCookieName(), "")
+            cookie = Cookie.of(configuration.getCookieName(), "")
                 .maxAge(0);
         } else {
             String cookieValue = cookieHttpSessionIdGenerator.cookieValueFromSession(session);
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("path {}, cookie value {}", request.getPath(), cookieValue);
             }
-            cookie = Cookie.of(getConfiguration().getCookieName(), cookieValue);
-            if (getConfiguration().isRememberMe()) {
+            cookie = Cookie.of(configuration.getCookieName(), cookieValue);
+            if (configuration.isRememberMe()) {
                 cookie.maxAge(Integer.MAX_VALUE);
             } else {
-                getConfiguration().getCookieMaxAge().ifPresent(cookie::maxAge);
+                configuration.getCookieMaxAge().ifPresent(cookie::maxAge);
             }
         }
 
-        cookie.httpOnly(true).secure(request.isSecure());
+        boolean secure = request.isSecure() || configuration.isCookieSecure();
+        cookie.httpOnly(true).secure(secure);
 
-        getConfiguration().getCookiePath().ifPresent(cookie::path);
-        getConfiguration().getDomainName().ifPresent(cookie::domain);
+        configuration.getCookiePath().ifPresent(cookie::path);
+        configuration.getDomainName().ifPresent(cookie::domain);
 
         response.cookie(cookie);
     }

@@ -50,6 +50,12 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     public static final boolean DEFAULT_REMEMBERME = false;
 
     /**
+     * The default cookie secure value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_COOKIESECURE = false;
+
+    /**
      * The default base64 encode value.
      */
     @SuppressWarnings("WeakerAccess")
@@ -58,6 +64,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     private boolean rememberMe = DEFAULT_REMEMBERME;
     private boolean base64Encode = DEFAULT_BASE64ENCODE;
     private Duration cookieMaxAge;
+    private boolean cookieSecure = DEFAULT_COOKIESECURE;
     private String cookiePath = DEFAULT_COOKIEPATH;
     private String domainName;
     private String cookieName = DEFAULT_COOKIENAME;
@@ -179,5 +186,20 @@ public class HttpSessionConfiguration extends SessionConfiguration {
      */
     public void setRememberMe(boolean rememberMe) {
         this.rememberMe = rememberMe;
+    }
+
+    /**
+     * @return Is cookie secure
+     */
+    public boolean isCookieSecure() {
+        return cookieSecure;
+    }
+
+    /**
+     * Sets the secure value of a cookie. Default value ({@value #DEFAULT_COOKIESECURE}).
+     * @param cookieSecure Whether or not a cookie is secure.
+     */
+    public void setCookieSecure(boolean cookieSecure) {
+        this.cookieSecure = cookieSecure;
     }
 }
