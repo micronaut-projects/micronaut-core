@@ -108,7 +108,7 @@ class WebFunctionSpec extends Specification {
 
         then:
         response.code() == HttpStatus.OK.code
-        StringConsumer.LAST_VALUE == '{"title":"The Stand"}'
+        StringConsumer.LAST_VALUE == "The Stand"
 
         cleanup:
         embeddedServer.stop()
