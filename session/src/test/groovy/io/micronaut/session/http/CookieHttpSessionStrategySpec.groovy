@@ -55,13 +55,12 @@ class CookieHttpSessionStrategySpec extends Specification {
     }
 
     void "test encode default cookie config"() {
-
         given:
         def configuration = new HttpSessionConfiguration()
         if (domain) configuration.domainName = domain
         if (path) configuration.cookiePath = path
         if (prefix) configuration.prefix = prefix
-        if (configSecure) configuration.cookieSecure = configSecure
+        configuration.cookieSecure = configSecure
         CookieHttpSessionStrategy strategy = new CookieHttpSessionStrategy(configuration)
 
         def request = Mock(HttpRequest)
@@ -87,8 +86,9 @@ class CookieHttpSessionStrategySpec extends Specification {
         "1234" | null   | "/foo" | null          | encode(id)          | false   | false  | false        | "SESSION=$encoded; Path=/foo; HTTPOnly"
         "1234" | null   | null   | "example.com" | encode(id)          | false   | false  | false        | "SESSION=$encoded; Path=/; Domain=example.com; HTTPOnly"
         "1234" | null   | null   | null          | encode(id)          | true    | false  | false        | ~/SESSION=; Max-Age=0; Expires=.*; Path=\/; HTTPOnly/
-        "1234" | null   | null   | null          | encode(id)          | false   | true   | false        | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | false   | true   | false        | "SESSION=$encoded; Path=/; HTTPOnly"
         "1234" | null   | null   | null          | encode(id)          | false   | true   | true         | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | false   | true   | null         | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
 
     }
 

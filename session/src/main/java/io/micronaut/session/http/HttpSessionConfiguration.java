@@ -17,6 +17,8 @@ package io.micronaut.session.http;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.cookie.CookieConfiguration;
 import io.micronaut.session.SessionConfiguration;
 
 import java.time.Duration;
@@ -29,7 +31,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @ConfigurationProperties("http")
-public class HttpSessionConfiguration extends SessionConfiguration {
+public class HttpSessionConfiguration extends SessionConfiguration implements CookieConfiguration {
 
     /**
      * Default Cookie Path.
@@ -50,12 +52,6 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     public static final boolean DEFAULT_REMEMBERME = false;
 
     /**
-     * The default cookie secure value.
-     */
-    @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_COOKIESECURE = false;
-
-    /**
      * The default base64 encode value.
      */
     @SuppressWarnings("WeakerAccess")
@@ -64,7 +60,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     private boolean rememberMe = DEFAULT_REMEMBERME;
     private boolean base64Encode = DEFAULT_BASE64ENCODE;
     private Duration cookieMaxAge;
-    private boolean cookieSecure = DEFAULT_COOKIESECURE;
+    private Boolean cookieSecure;
     private String cookiePath = DEFAULT_COOKIEPATH;
     private String domainName;
     private String cookieName = DEFAULT_COOKIENAME;
@@ -137,6 +133,11 @@ public class HttpSessionConfiguration extends SessionConfiguration {
         return Optional.ofNullable(cookiePath);
     }
 
+    @Override
+    public Optional<Boolean> isCookieHttpOnly() {
+        return Optional.empty();
+    }
+
     /**
      * @param cookiePath Set the cookie path to use. Default value ({@value #DEFAULT_COOKIEPATH}).
      */
@@ -151,10 +152,19 @@ public class HttpSessionConfiguration extends SessionConfiguration {
         return Optional.ofNullable(domainName);
     }
 
+    @Override
+    public Optional<String> getCookieDomain() {
+        return Optional.ofNullable(domainName);
+    }
+
     /**
      * @param domainName Set the domain name to use for the cookie
      */
     public void setDomainName(String domainName) {
+        this.domainName = domainName;
+    }
+
+    public void setCookieDomain(String cookieDomain) {
         this.domainName = domainName;
     }
 
@@ -191,15 +201,16 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @return Is cookie secure
      */
-    public boolean isCookieSecure() {
-        return cookieSecure;
+    public Optional<Boolean> isCookieSecure() {
+        return Optional.ofNullable(cookieSecure);
     }
 
     /**
-     * Sets the secure value of a cookie. Default value ({@value #DEFAULT_COOKIESECURE}).
-     * @param cookieSecure Whether or not a cookie is secure.
+     * Sets the secure status of the cookie. Delegates to {@link HttpRequest#isSecure()} if not set.
+     *
+     * @param cookieSecure Whether or not the cookie is secure.
      */
-    public void setCookieSecure(boolean cookieSecure) {
+    public void setCookieSecure(Boolean cookieSecure) {
         this.cookieSecure = cookieSecure;
     }
 }
