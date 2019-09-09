@@ -17,7 +17,6 @@ package io.micronaut.session.http;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.cookie.CookieConfiguration;
 import io.micronaut.session.SessionConfiguration;
 
@@ -164,6 +163,9 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
         this.domainName = domainName;
     }
 
+    /**
+     * @param cookieDomain Set the domain name to use for the cookie
+     */
     public void setCookieDomain(String cookieDomain) {
         this.domainName = domainName;
     }
@@ -206,7 +208,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
     }
 
     /**
-     * Sets the secure status of the cookie. Delegates to {@link HttpRequest#isSecure()} if not set.
+     * Sets the secure status of the cookie. Delegates to {@link io.micronaut.http.HttpRequest#isSecure()} if not set.
      *
      * @param cookieSecure Whether or not the cookie is secure.
      */
