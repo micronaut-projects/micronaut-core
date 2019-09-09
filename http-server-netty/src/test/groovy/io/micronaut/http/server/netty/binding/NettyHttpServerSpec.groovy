@@ -26,6 +26,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Put
 import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.exceptions.ServerStartupException
 import io.micronaut.runtime.Micronaut
@@ -277,6 +278,51 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         embeddedServer.applicationContext.stop()
+    }
+
+    void "make sure all ports shut down"() {
+        when:
+        int httpPort = SocketUtils.findAvailableTcpPort()
+        PropertySource propertySource = PropertySource.of(
+                'micronaut.server.port': httpPort,
+                'micronaut.ssl.port': SocketUtils.findAvailableTcpPort(),
+                'micronaut.ssl.enabled': true,
+                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.dualProtocol':true
+        )
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource)
+
+        def secureUrl = embeddedServer.getURL()
+        RxHttpClient httpsClient = embeddedServer.applicationContext.createBean(RxHttpClient, secureUrl)
+        RxHttpClient httpClient = embeddedServer.applicationContext.createBean(RxHttpClient, new URL("http://localhost:$httpPort"))
+        HttpResponse httpsResponse = httpsClient.exchange('/person/Fred', String).blockingFirst()
+        HttpResponse httpResponse = httpClient.exchange('/person/Fred', String).blockingFirst()
+
+        assert httpsResponse.body() == "Person Named Fred"
+        assert httpResponse.body() == "Person Named Fred"
+
+        then:
+        embeddedServer.stop()
+
+        try {
+            httpsClient.exchange('/person/Fred', String).blockingFirst()
+            assert "secure" == "running"
+        }catch(HttpClientException e){}
+
+        try {
+            httpClient.exchange('/person/Fred', String).blockingFirst()
+            assert "unsecure" == "running"
+        }catch(HttpClientException e){}
+
+//        discount double check
+        EmbeddedServer embeddedServer2 = ApplicationContext.run(EmbeddedServer, propertySource)
+        embeddedServer2.getURL() == embeddedServer.getURL()
+
+        cleanup:
+        httpClient.stop()
+        httpsClient.stop()
+        embeddedServer.applicationContext.stop()
+        embeddedServer2.applicationContext.stop()
     }
 
     @Singleton
