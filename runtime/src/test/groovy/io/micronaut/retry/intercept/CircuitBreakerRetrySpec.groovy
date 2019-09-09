@@ -18,6 +18,7 @@ package io.micronaut.retry.intercept
 import io.micronaut.context.ApplicationContext
 import io.micronaut.retry.CircuitState
 import io.micronaut.retry.annotation.CircuitBreaker
+import io.reactivex.Single
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -170,6 +171,22 @@ class CircuitBreakerRetrySpec extends Specification {
         context.stop()
     }
 
+    void "test circuit breaker with a single"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCount().onErrorReturnItem(1).blockingGet() //to trigger the state
+        counterService.getCount()
+
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        context.stop()
+    }
+
     @Singleton
     static class CounterService {
         int countIncludes = 0
@@ -200,6 +217,11 @@ class CircuitBreakerRetrySpec extends Specification {
                 }
             }
             return countExcludes
+        }
+
+        @CircuitBreaker(attempts = '1', delay = '0ms')
+        Single<Integer> getCount() {
+            Single.error(new IllegalStateException("Bad count"))
         }
     }
 
