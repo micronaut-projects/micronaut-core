@@ -7,7 +7,7 @@ dependencies {
     compileOnly project(":graal")
     compileOnly dependencyVersion("jcache")
     compile dependencyVersion("validation")
-    compile dependencyVersion("jackson")
+    compile dependencyVersion("jackson.databind")
     compile dependencyVersion("rxjava2")
 
     compile([
