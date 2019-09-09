@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -148,17 +149,14 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
 
     /**
      * @param id The route id
-     * @return {@link EndpointDefaultConfiguration#path} + resolved Uri based on UriNamingStrategy
+     * @return {@link EndpointDefaultConfiguration#getPath()} + resolved Uri based on UriNamingStrategy
      */
     String resolveUriByRouteId(String id) {
-        String uri = uriNamingStrategy.resolveUri(id);
-        if (endpointDefaultConfiguration.getPath().equals("/") && uri.charAt(0) == '/') {
-            return uri;
+        String path = StringUtils.prependUri(endpointDefaultConfiguration.getPath(), id);
+        if (path.charAt(0) == '/') {
+            path = path.substring(1);
         }
-        StringBuilder sb = new StringBuilder();
-        sb.append(endpointDefaultConfiguration.getPath());
-        sb.append(uri);
-        return sb.toString();
+        return uriNamingStrategy.resolveUri(path);
     }
 
     /**
