@@ -15,32 +15,6 @@
  */
 package io.micronaut.http.server.netty;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -146,6 +120,32 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Internal implementation of the {@link io.netty.channel.ChannelInboundHandler} for Micronaut.
@@ -695,18 +695,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         io.netty.handler.codec.http.HttpRequest nativeRequest = request.getNativeRequest();
         if (!route.isExecutable() && io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && nativeRequest instanceof StreamedHttpRequest) {
             Optional<MediaType> contentType = request.getContentType();
-            Optional<Class<?>> bodyType = route.getBodyArgument().map(Argument::getType);
-            boolean isFunctionalBean = route.getAnnotation("io.micronaut.function.FunctionBean") != null;
-
-            HttpContentProcessor<?> processor;
-            if (isFunctionalBean && bodyType.isPresent() && String.class.isAssignableFrom(bodyType.get())) {
-                processor = new DefaultHttpContentProcessor(request, serverConfiguration);
-            } else {
-                processor = contentType
-                        .flatMap(type -> beanLocator.findBean(HttpContentSubscriberFactory.class, new ConsumesMediaTypeQualifier<>(type)))
-                        .map(factory -> factory.build(request))
-                        .orElse(new DefaultHttpContentProcessor(request, serverConfiguration));
-            }
+            HttpContentProcessor<?> processor = contentType
+                .flatMap(type ->
+                    beanLocator.findBean(HttpContentSubscriberFactory.class,
+                        new ConsumesMediaTypeQualifier<>(type))
+                ).map(factory ->
+                    factory.build(request)
+                ).orElse(new DefaultHttpContentProcessor(request, serverConfiguration));
 
             processor.subscribe(buildSubscriber(request, context, route));
         } else {
