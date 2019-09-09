@@ -75,8 +75,12 @@ ext {
             jackson                    : [
                     version: jacksonVersion,
                     group  : 'com.fasterxml.jackson.core',
-                    name   : 'jackson-databind',
                     modules: ['jackson-core', 'jackson-annotations']
+            ],
+            'jackson.databind'         : [
+                    version: jacksonDatabindVersion,
+                    group  : 'com.fasterxml.jackson.core',
+                    name   : 'jackson-databind',
             ],
             'jackson.modules'          : [
                     version: jacksonVersion,
