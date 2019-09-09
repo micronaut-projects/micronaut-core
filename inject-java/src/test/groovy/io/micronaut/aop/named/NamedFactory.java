@@ -32,4 +32,9 @@ public class NamedFactory {
     OtherInterface second() {
         return () -> "second";
     }
+
+    @EachProperty("other.interfaces")
+    OtherInterface third(Config config, @Parameter String name) {
+        return () -> name;
+    }
 }

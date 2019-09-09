@@ -1795,7 +1795,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     qualifier = optional.orElse(null);
                 }
                 if (qualifier == null) {
-                    if ((hasMetadata && argument.isAnnotationPresent(Parameter.class)) || innerConfiguration || Qualifier.class == argument.getType()) {
+                    if ((hasMetadata && argument.isAnnotationPresent(Parameter.class)) ||
+                            (innerConfiguration && isIterable) ||
+                            Qualifier.class == argument.getType()) {
                         final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, String.class);
                         qualifier = n.map(Qualifiers::byName).orElse(null);
                     }
