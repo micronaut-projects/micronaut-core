@@ -10,45 +10,30 @@ NOTE: Remember that the scope of the bean has an impact on behaviour. a `@Single
 
 To schedule a task at a fixed rate, use the `fixedRate` member. For example:
 
-.Fixed Rate Example
-[source,java]
-----
-include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=fixedRate, indent=0]
-----
+snippet::io.micronaut.docs.aop.scheduled.ScheduledExample[tags="fixedRate", indent=0, title="Fixed Rate Example"]
 
 The task above will execute every 5 minutes.
 
 === Scheduling with a Fixed Delay
 
-To schedule a task so that is runs 5 minutes after the termination of the previous task use the `fixedDelay` member. For example:
+To schedule a task so that it runs 5 minutes after the termination of the previous task use the `fixedDelay` member. For example:
 
 .Fixed Delay Example
-[source,java]
-----
-include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=fixedDelay, indent=0]
-----
+snippet::io.micronaut.docs.aop.scheduled.ScheduledExample[tags="fixedDelay", indent=0, title="Fixed Delay Example"]
 
 === Scheduling a Cron Task
 
 To schedule a https://en.wikipedia.org/wiki/Cron[Cron] task use the `cron` member:
 
-.Cron Example
-[source,java]
-----
-include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=cron, indent=0]
-----
+snippet::io.micronaut.docs.aop.scheduled.ScheduledExample[tags="cron", indent=0, title="Cron Example"]
 
-The above example will run the task every Monday morning at 10:15AM.
+The above example will run the task every Monday morning at 10:15AM for the time zone of the server.
 
 === Scheduling with only an Initial Delay
 
-To schedule a task so that is runs a single time after the server starts, use the `initialDelay` member:
+To schedule a task so that it runs a single time after the server starts, use the `initialDelay` member:
 
-.Initial Delay Example
-[source,java]
-----
-include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=initialDelay, indent=0]
-----
+snippet::io.micronaut.docs.aop.scheduled.ScheduledExample[tags="initialDelay", indent=0, title="Initial Delay Example"]
 
 The above example will only run a single time 1 minute after the server starts.
 
@@ -56,20 +41,13 @@ The above example will only run a single time 1 minute after the server starts.
 
 If you wish to programmatically schedule tasks, then you can use the api:scheduling.TaskScheduler[] bean which can be injected as follows:
 
-[source,java]
-----
-@Inject @Named(TaskExecutors.SCHEDULED) TaskScheduler taskScheduler;
-----
+snippet::io.micronaut.docs.aop.scheduled.TaskSchedulerInjectExample[tags="inject", indent=0]
 
 == Configuring Scheduled Tasks with Annotation Metadata
 
 If you wish to make your application's tasks configurable then you can use annotation metadata and property placeholder configuration to do so. For example:
 
-.Allowing Tasks to be Configured
-[source,java]
-----
-include::{testsuite}/aop/scheduled/ScheduledExample.java[tags=configured, indent=0]
-----
+snippet::io.micronaut.docs.aop.scheduled.ScheduledExample[tags="configured", indent=0, title="Allow tasks to be configured"]
 
 The above example allows the task execution frequency to be configured with the property `my.task.rate` and the initial delay to be configured with the property `my.task.delay`.
 
@@ -96,4 +74,4 @@ include::{includedir}configurationProperties/io.micronaut.scheduling.executor.Us
 
 By default Micronaut includes a api:io.micronaut.scheduling.DefaultTaskExceptionHandler[] bean that implements the api:io.micronaut.scheduling.TaskExceptionHandler[] and simply logs the exception if an error occurs invoking a scheduled task.
 
-If you have custom requirements you can replace this bean with a custom implementation (for example if you wish to send an email or shutdown context to fail fast). To do so simply write your own api:io.micronaut.scheduling.TaskExceptionHandler[] and annotated it with `@Replaces(DefaultTaskExceptionHandler.class)`.
+If you have custom requirements you can replace this bean with a custom implementation (for example if you wish to send an email or shutdown context to fail fast). To do so simply write your own api:io.micronaut.scheduling.TaskExceptionHandler[] and annotate it with `@Replaces(DefaultTaskExceptionHandler.class)`.
