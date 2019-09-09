@@ -20,8 +20,6 @@ import com.fasterxml.aalto.AsyncXMLInputFactory;
 import com.fasterxml.aalto.AsyncXMLStreamReader;
 import com.fasterxml.aalto.async.AsyncByteArrayScanner;
 import com.fasterxml.aalto.stax.InputFactoryImpl;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.SingleThreadedBufferingSubscriber;
 import io.micronaut.core.async.subscriber.TypedSubscriber;
@@ -29,6 +27,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.AbstractBufferingHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.jackson.convert.XmlStreamToObjectConverter.ByteArrayXmlStreamReader;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufUtil;
@@ -38,7 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.xml.stream.XMLStreamException;
-import java.io.IOException;
+import javax.xml.stream.XMLStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
@@ -66,7 +65,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
 
     private static final Logger LOG = LoggerFactory.getLogger(XmlContentProcessor.class);
 
-    private final XmlMapper xmlMapper;
+    private final InputFactoryImpl xmlStreamFactory = new InputFactoryImpl();
     private List<byte[]> xmlChunkedInput = new ArrayList<>();
     private int streamElementStartIndex = 0;
     private LinkedList<Map.Entry<Integer, Integer>> elementRanges = new LinkedList<>();
@@ -80,13 +79,11 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
 
 
     /**
-     * @param xmlMapper        Jackson mapper for xml
      * @param nettyHttpRequest The {@link NettyHttpRequest}
      * @param configuration    The {@link HttpServerConfiguration}
      */
-    public XmlContentProcessor(XmlMapper xmlMapper, NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
+    public XmlContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         super(nettyHttpRequest, configuration);
-        this.xmlMapper = xmlMapper;
     }
 
     @Override
@@ -197,7 +194,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
                 String newCurrentElement = parser.getLocalName();
                 if (newCurrentElement.equals(currentElement) && streamArray && parser.getDepth() == 2) {
                     currentDownstreamSubscriber().ifPresent(
-                            subscriber -> subscriber.onNext(poolLastElement()));
+                            subscriber -> subscriber.onNext(poolLastElementStream()));
                 }
 
                 if (streamArray && parser.getDepth() == 2) {
@@ -217,9 +214,9 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
             } else if (event == END_DOCUMENT) {
                 currentDownstreamSubscriber().ifPresent(subscriber -> {
                     if (streamElementCounter.get() <= 1) {
-                        subscriber.onNext(parseXml(flatInput()));
+                        subscriber.onNext(createXmlStream(flatInput()));
                     } else {
-                        subscriber.onNext(poolLastElement());
+                        subscriber.onNext(poolLastElementStream());
                     }
                 });
                 break;
@@ -229,20 +226,19 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
         }
     }
 
-    private JsonNode parseXml(byte[] bytes) {
+    private XMLStreamReader createXmlStream(byte[] bytes) {
         try {
-            return xmlMapper.readTree(bytes);
-        } catch (IOException e) {
-            throw new RuntimeException(e.getMessage(), e.getCause());
+            return new ByteArrayXmlStreamReader(xmlStreamFactory.createAsyncFor(bytes), bytes);
+        } catch (XMLStreamException e) {
+           throw new RuntimeException(e);
         }
-
     }
 
-    private JsonNode poolLastElement() {
+    private XMLStreamReader poolLastElementStream() {
         Map.Entry<Integer, Integer> elementInputRange = elementRanges.peekLast();
         byte[] flattenInput = flatInput();
 
-        return parseXml(Arrays.copyOfRange(
+        return createXmlStream(Arrays.copyOfRange(
                 flattenInput,
                 elementInputRange.getKey() - bytesCleaned.get(),
                 elementInputRange.getValue() - bytesCleaned.get())

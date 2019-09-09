@@ -84,6 +84,7 @@ class XmlContentProcessorSpec extends Specification {
         then:
         author.books.size() == 1
         author.books[0].title == "First Book"
+        author.name == "Joe"
     }
 
     void "test sending a blocking author with 2 books"() {
@@ -101,7 +102,7 @@ class XmlContentProcessorSpec extends Specification {
         author.name == "Joe"
     }
 
-    void "test mapping xml field to controller argument"() {
+    void "test mapping xml simple field to controller argument"() {
         RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -111,6 +112,34 @@ class XmlContentProcessorSpec extends Specification {
 
         then:
         name == 'Joe'
+    }
+
+    void "test mapping xml list to controller argument"() {
+        RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        List<Book> books = client.jsonStream(
+                HttpRequest.POST("/xml/stream/author/books", '<author name="Joe"><books><book><title>First Book</title></book><book><title>Second Book</title></book></books></author>')
+                        .contentType(MediaType.TEXT_XML_TYPE)).toList().blockingGet();
+
+        then:
+        books.size() == 2
+        books[0].title == "First Book"
+        books[1].title == "Second Book"
+    }
+
+    void "test mapping xml set to controller argument"() {
+        RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        List<Book> books = client.jsonStream(
+                HttpRequest.POST("/xml/stream/author/bookSet", '<author name="Joe"><books><book><title>First Book</title></book><book><title>Second Book</title></book></books></author>')
+                        .contentType(MediaType.TEXT_XML_TYPE)).toList().blockingGet();
+
+        then:
+        books.size() == 2
+        books[0].title == "First Book"
+        books[1].title == "Second Book"
     }
 
     @Controller(value = "/xml/stream", consumes = MediaType.TEXT_XML)
@@ -138,6 +167,15 @@ class XmlContentProcessorSpec extends Specification {
             return name
         }
 
+        @Post("/author/books")
+        Flowable<Book> bookList(List<Book> books) {
+            return Flowable.fromIterable(books)
+        }
+
+        @Post("/author/bookSet")
+        Flowable<Book> bookList(Set<Book> books) {
+            return Flowable.fromIterable(books)
+        }
     }
 
     static class Book {
@@ -148,6 +186,4 @@ class XmlContentProcessorSpec extends Specification {
         String name
         List<Book> books
     }
-
-
 }
