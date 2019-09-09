@@ -108,8 +108,7 @@ public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
             }
         }
 
-        boolean secure = request.isSecure() || configuration.isCookieSecure();
-        cookie.httpOnly(true).secure(secure);
+        cookie.httpOnly(true).secure(configuration.isCookieSecure().orElse(request.isSecure()));
 
         configuration.getCookiePath().ifPresent(cookie::path);
         configuration.getDomainName().ifPresent(cookie::domain);
