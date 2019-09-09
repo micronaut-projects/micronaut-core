@@ -15,8 +15,6 @@
  */
 package io.micronaut.http.server.netty.xml;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.server.netty.HttpContentProcessor;
@@ -24,7 +22,6 @@ import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 
-import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
@@ -37,20 +34,16 @@ import javax.inject.Singleton;
 public class XmlHttpContentSubscriberFactory implements HttpContentSubscriberFactory {
 
     private final NettyHttpServerConfiguration configuration;
-    private XmlMapper xmlMapper;
 
     /**
      * @param configuration The {@link NettyHttpServerConfiguration}
-     * @param objectMapper  Jackson mapper for xml
      */
-    public XmlHttpContentSubscriberFactory(NettyHttpServerConfiguration configuration,
-                                           @Named("xml") ObjectMapper objectMapper) {
+    public XmlHttpContentSubscriberFactory(NettyHttpServerConfiguration configuration) {
         this.configuration = configuration;
-        this.xmlMapper = (XmlMapper) objectMapper;
     }
 
     @Override
     public HttpContentProcessor build(NettyHttpRequest request) {
-        return new XmlContentProcessor(xmlMapper, request, configuration);
+        return new XmlContentProcessor(request, configuration);
     }
 }
