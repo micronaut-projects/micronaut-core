@@ -9,8 +9,11 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Ignore
 import spock.lang.Specification
 
+//ignored because I couldn't reproduce the behavior in #2088
+@Ignore
 class ConnectionCloseSpec extends Specification {
 
     void "test the connection header in the response"() {
