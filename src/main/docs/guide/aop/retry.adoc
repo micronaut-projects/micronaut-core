@@ -8,13 +8,7 @@ The simplest form of retry is just to add the `@Retryable` annotation to any typ
 
 For example:
 
-.Simply Retry Example
-[source,java]
-----
-include::{testsuite}/aop/retry/BookService.java[tags=simple, indent=0]
-    ...
-}
-----
+snippet::io.micronaut.docs.aop.retry.BookService[tags="simple", indent=0, title="Simple Retry Example"]
 
 With the above example if the `listBooks()` method throws an exception it will be retried until the maximum number of attempts is reached.
 
@@ -24,23 +18,11 @@ Note also that the `@Retryable` annotation can be applied on interfaces and the 
 
 To customize retry behaviour you can set the `attempts` and `delay` members, For example to configure 5 attempts with a 2 second delay:
 
-.Setting Retry Attempts
-[source,java]
-----
-include::{testsuite}/aop/retry/BookService.java[tags=attempts, indent=0]
-    ...
-}
-----
+snippet::io.micronaut.docs.aop.retry.BookService[tags="attempts", indent=0, title="Setting Retry Attempts"]
 
 Notice how both `attempts` and `delay` are defined as strings. This is to support configurability through annotation metadata. For example you can allow the retry policy to be configured using property placeholder resolution:
 
-.Setting Retry via Configuration
-[source,java]
-----
-include::{testsuite}/aop/retry/BookService.java[tags=config, indent=0]
-    ...
-}
-----
+snippet::io.micronaut.docs.aop.retry.BookService[tags="config", indent=0, title="Setting Retry via Configuration"]
 
 With the above in place if `book.retry.attempts` is specified in configuration it wil be bound the value of the `attempts` member of the `@Retryable` annotation via annotation metadata.
 
@@ -48,14 +30,7 @@ With the above in place if `book.retry.attempts` is specified in configuration i
 
 `@Retryable` advice can also be applied to methods that return reactive types, such as an RxJava `Flowable`. For example:
 
-
-.Applying Retry Policy to Reactive Types
-[source,java]
-----
-include::{testsuite}/aop/retry/BookService.java[tags=reactive, indent=0]
-    ...
-}
-----
+snippet::io.micronaut.docs.aop.retry.BookService[tags="reactive", indent=0, title="Applying Retry Policy to Reactive Types"]
 
 In this case `@Retryable` advice will apply the retry policy to the reactive type.
 
@@ -67,13 +42,7 @@ The https://en.wikipedia.org/wiki/Circuit_breaker_design_pattern[Circuit Breaker
 
 The api:retry.annotation.CircuitBreaker[] annotation is a variation of the `@Retryable` annotation that supports a `reset` member that indicates how long the circuit should remain open before it is reset (the default is 20 seconds).
 
-.Applying CircuitBreaker Advice
-[source,java]
-----
-include::{testsuite}/aop/retry/BookService.java[tags=circuit, indent=0]
-    ...
-}
-----
+snippet::io.micronaut.docs.aop.retry.BookService[tags="circuit", indent=0, title="Applying CircuitBreaker Advice"]
 
 The above example will retry to `findBooks` method 3 times and then open the circuit for 30 seconds, rethrowing the original exception and preventing potential downstream traffic such as HTTP requests and I/O operations flooding the system.
 

@@ -13,4 +13,4 @@ Or full JSR 380 compliance with the `micronaut-hibernate-validator` dependency:
 
 dependency::micronaut-hibernate-validator[]
 
-See the section on <<beanValidation, Bean Validation>> for more informatino on how to apply validation rules to your bean classes.
+See the section on <<beanValidation, Bean Validation>> for more information on how to apply validation rules to your bean classes.
