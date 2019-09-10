@@ -26,6 +26,6 @@ public final class ReadTimeoutException extends HttpClientException {
     public static final ReadTimeoutException TIMEOUT_EXCEPTION = new ReadTimeoutException();
 
     private ReadTimeoutException() {
-        super("Read Timeout");
+        super("Read Timeout", null, true);
     }
 }
