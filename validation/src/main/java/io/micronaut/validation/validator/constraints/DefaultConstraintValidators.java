@@ -268,7 +268,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     @Inject
     protected DefaultConstraintValidators(@Nullable BeanContext beanContext) {
         this.beanContext = beanContext;
-        BeanWrapper<DefaultConstraintValidators> wrapper = BeanWrapper.findWrapper(this).orElse(null);
+        BeanWrapper<DefaultConstraintValidators> wrapper = BeanWrapper.findWrapper(DefaultConstraintValidators.class, this).orElse(null);
         if (wrapper != null) {
 
             final Collection<BeanProperty<DefaultConstraintValidators, Object>> beanProperties = wrapper.getBeanProperties();

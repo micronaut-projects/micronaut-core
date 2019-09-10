@@ -234,6 +234,23 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @return The wrapper
      * @throws io.micronaut.core.beans.exceptions.IntrospectionException If the wrapper cannot be created
      */
+    @SuppressWarnings("unchecked")
+    static @Nonnull <T2>  Optional<BeanWrapper<T2>> findWrapper(Class<T2> type, @Nonnull T2 bean) {
+        ArgumentUtils.requireNonNull("type", type);
+        ArgumentUtils.requireNonNull("bean", bean);
+        return BeanIntrospector.SHARED.findIntrospection(type).map(i ->
+                new DefaultBeanWrapper(bean, i)
+        );
+    }
+
+    /**
+     * Obtain a bean wrapper for the given bean.
+     * @param type the type
+     * @param bean The bean
+     * @param <T2> The bean type
+     * @return The wrapper
+     * @throws io.micronaut.core.beans.exceptions.IntrospectionException If the wrapper cannot be created
+     */
     static @Nonnull <T2>  BeanWrapper<T2> getWrapper(Class<T2> type, @Nonnull T2 bean) {
         ArgumentUtils.requireNonNull("type", type);
         ArgumentUtils.requireNonNull("bean", bean);
