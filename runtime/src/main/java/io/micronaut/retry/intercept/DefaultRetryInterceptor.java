@@ -34,6 +34,7 @@ import io.micronaut.scheduling.executor.ExecutorType;
 import io.micronaut.scheduling.executor.UserExecutorConfiguration;
 import io.reactivex.Flowable;
 import io.reactivex.functions.Function;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,14 +120,19 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             retryState = (MutableRetryState) retryStateBuilder.build();
         }
 
-        retryState.open();
-
         MutableConvertibleValues<Object> attrs = context.getAttributes();
         attrs.put(RetryState.class.getName(), retry);
 
         ReturnType<Object> returnType = context.getReturnType();
         Class<Object> javaReturnType = returnType.getType();
         if (CompletionStage.class.isAssignableFrom(javaReturnType)) {
+            try {
+                retryState.open();
+            } catch (RuntimeException e) {
+                CompletableFuture newFuture = new CompletableFuture();
+                newFuture.completeExceptionally(e);
+                return newFuture;
+            }
             Object result = context.proceed();
             if (result == null) {
                 return result;
@@ -137,6 +143,13 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             }
         } else if (Publishers.isConvertibleToPublisher(javaReturnType)) {
             ConversionService<?> conversionService = ConversionService.SHARED;
+            try {
+                retryState.open();
+            } catch (RuntimeException e) {
+                Publisher result = Publishers.just(e);
+                return conversionService.convert(result, returnType.asArgument())
+                        .orElseThrow(() -> new IllegalStateException("Unconvertible Reactive type: " + result));
+            }
             Object result = context.proceed();
             if (result == null) {
                 return result;
@@ -145,9 +158,8 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                     .convert(result, Flowable.class)
                     .orElseThrow(() -> new IllegalStateException("Unconvertible Reactive type: " + result));
                 Flowable retryObservable = observable.onErrorResumeNext(retryFlowable(context, retryState, observable))
-                    .map(o -> {
+                    .doOnNext(o -> {
                         retryState.close(null);
-                        return o;
                     });
 
                 return conversionService
@@ -156,6 +168,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
             }
 
         } else {
+            retryState.open();
             while (true) {
                 try {
                     Object result = context.proceed(this);

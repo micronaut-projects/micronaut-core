@@ -39,4 +39,16 @@ public class HttpClientException extends HttpException {
     public HttpClientException(String message, Throwable cause) {
         super(message, cause);
     }
+
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     * @param shared Shared instance
+     */
+    public HttpClientException(String message, Throwable cause, boolean shared) {
+        super(message, cause, false, true);
+        if (!shared) {
+            throw new IllegalArgumentException("shared must be true");
+        }
+    }
 }

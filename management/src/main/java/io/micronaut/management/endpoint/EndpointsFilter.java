@@ -34,8 +34,6 @@ import org.reactivestreams.Publisher;
 import java.util.Map;
 import java.util.Optional;
 
-import static io.micronaut.management.endpoint.EndpointDefaultConfiguration.PATH;
-
 /**
  * Returns 401 for {@link io.micronaut.management.endpoint.annotation.Endpoint} requests which have sensitive true. Disabled if micronaut.security is enabled.
  *
@@ -43,7 +41,7 @@ import static io.micronaut.management.endpoint.EndpointDefaultConfiguration.PATH
  * @since 1.0
  */
 @Requires(property = "micronaut.security.enabled", notEquals = StringUtils.TRUE)
-@Filter("${" + PATH + ":/}**")
+@Filter("/**")
 public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
     private final Map<ExecutableMethod, Boolean> endpointMethods;
@@ -68,10 +66,8 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
         Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatchAtRequest(request);
         if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch) {
             ExecutableMethod method = ((MethodBasedRouteMatch) routeMatch.get()).getExecutableMethod();
-            if (endpointMethods.containsKey(method)) {
-                if (endpointMethods.get(method)) {
-                    return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
-                }
+            if (endpointMethods.getOrDefault(method, false)) {
+                return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
             }
         }
         return chain.proceed(request);
