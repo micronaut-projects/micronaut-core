@@ -34,8 +34,6 @@ import org.reactivestreams.Publisher;
 import java.util.Map;
 import java.util.Optional;
 
-import static io.micronaut.management.endpoint.EndpointDefaultConfiguration.PATH;
-
 /**
  * Returns 401 for {@link io.micronaut.management.endpoint.annotation.Endpoint} requests which have sensitive true. Disabled if micronaut.security is enabled.
  *

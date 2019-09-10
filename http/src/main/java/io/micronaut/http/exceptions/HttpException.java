@@ -44,6 +44,12 @@ public abstract class HttpException extends RuntimeException {
         super(message, cause);
     }
 
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     * @param enableSuppression Enable suppression
+     * @param writableStackTrace Writable stacktrace
+     */
     protected HttpException(String message, Throwable cause,
                                boolean enableSuppression,
                                boolean writableStackTrace) {
