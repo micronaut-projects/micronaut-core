@@ -157,6 +157,13 @@ public class UriTemplate implements Comparable<UriTemplate> {
     }
 
     /**
+     * @return The number of path segments that are variable
+     */
+    public long getPathVariableSegmentCount() {
+        return segments.stream().filter(PathSegment::isVariable).filter(s -> !s.isQuerySegment()).count();
+    }
+
+    /**
      * @return The number of segments that are raw
      */
     public long getRawSegmentCount() {
@@ -247,7 +254,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
         for (PathSegment segment: this.segments) {
             if (segment.isVariable()) {
-                thisVariableCount++;
+                if (!segment.isQuerySegment()){
+                    thisVariableCount++;
+                }
             } else {
                 thisRawCount++;
             }
@@ -255,7 +264,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
         for (PathSegment segment: o.segments) {
             if (segment.isVariable()) {
-                thatVariableCount++;
+                if (!segment.isQuerySegment()) {
+                    thatVariableCount++;
+                }
             } else {
                 thatRawCount++;
             }

@@ -7,6 +7,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 
+import javax.annotation.Nullable
+
 class RouteComplexitySpec extends AbstractMicronautSpec {
 
     void "test route complexity"() {
@@ -30,6 +32,13 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
         then:
         noExceptionThrown()
         body == "ab/c/d"
+
+        when:
+        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/list")).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        body == "list"
     }
 
     @Requires(property = "spec.name", value = "RouteComplexitySpec")
@@ -54,6 +63,11 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
         @Get("/other{/a}/{b}{/c}/d")
         HttpResponse threeVariablesTwoRaw() {
             HttpResponse.ok("two variables")
+        }
+
+        @Get("/list{?full}")
+        String getFull(@Nullable Boolean full) {
+            return "list"
         }
     }
 }
