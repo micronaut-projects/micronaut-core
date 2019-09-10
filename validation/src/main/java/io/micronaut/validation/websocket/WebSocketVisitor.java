@@ -26,13 +26,17 @@ import io.micronaut.websocket.annotation.*;
 
 import java.util.*;
 
+import javax.annotation.processing.SupportedOptions;
+
 /**
  * A {@link io.micronaut.inject.visitor.TypeElementVisitor} that validates WebSocket implementations at compile time.
  *
  * @author graemerocher
  * @since 1.0
  */
+@SupportedOptions(WebSocketVisitor.MICRONAUT_WEBSOCKET_VALIDATION)
 public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, WebSocketMapping> {
+    public static final String MICRONAUT_WEBSOCKET_VALIDATION = "micronaut.websocket.validation";
 
     private static final String WEB_SOCKET_COMPONENT = "io.micronaut.websocket.annotation.WebSocketComponent";
     private static final String WEB_SOCKET_SESSION = "io.micronaut.websocket.WebSocketSession";
@@ -97,7 +101,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
 
     @Override
     public void start(VisitorContext visitorContext) {
-        String prop = System.getProperty("micronaut.websocket.validation");
+        String prop = System.getProperty(MICRONAUT_WEBSOCKET_VALIDATION);
         skipValidation = prop != null && prop.equals("false");
     }
 

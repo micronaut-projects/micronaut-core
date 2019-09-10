@@ -32,6 +32,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import javax.annotation.processing.SupportedOptions;
+
 /**
  * Visits methods annotated with {@link HttpMethodMapping} and validates the
  * parameters are consistent with the URI.
@@ -39,7 +41,9 @@ import java.util.List;
  * @author James Kleeh
  * @since 1.0
  */
+@SupportedOptions(RouteValidationVisitor.MICRONAUT_ROUTE_VALIDATION)
 public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMethodMapping> {
+    public static final String MICRONAUT_ROUTE_VALIDATION = "micronaut.route.validation";
 
     private List<RouteValidationRule> rules = new ArrayList<>();
     private boolean skipValidation = false;
@@ -83,7 +87,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
 
     @Override
     public void start(VisitorContext visitorContext) {
-        String prop = System.getProperty("micronaut.route.validation");
+        String prop = System.getProperty(MICRONAUT_ROUTE_VALIDATION);
         skipValidation = prop != null && prop.equals("false");
         rules.add(new MissingParameterRule());
         rules.add(new NullableParameterRule());

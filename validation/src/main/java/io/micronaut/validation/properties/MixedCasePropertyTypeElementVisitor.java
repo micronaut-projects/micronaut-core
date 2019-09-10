@@ -35,13 +35,17 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import javax.annotation.processing.SupportedOptions;
+
 /**
  * Visitor to check that only kebab-case values are used as values in annotations.
  *
  * @author Iván López
  * @since 1.1.0
  */
+@SupportedOptions(MixedCasePropertyTypeElementVisitor.MICRONAUT_CONFIGURATION_VALIDATION)
 public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<Object, Object> {
+    public static final String MICRONAUT_CONFIGURATION_VALIDATION = "micronaut.configuration.validation";
 
     private boolean skipValidation = false;
     private final DefaultPropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(new PropertySourcePropertyResolver(), new DefaultConversionService());
@@ -70,7 +74,7 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
 
     @Override
     public void start(VisitorContext visitorContext) {
-        String prop = System.getProperty("micronaut.configuration.validation");
+        String prop = System.getProperty(MICRONAUT_CONFIGURATION_VALIDATION);
         skipValidation = prop != null && prop.equals("false");
     }
 

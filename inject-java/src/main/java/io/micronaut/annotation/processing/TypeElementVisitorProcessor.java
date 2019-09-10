@@ -28,8 +28,10 @@ import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.Nonnull;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -53,6 +55,25 @@ import static javax.lang.model.element.ElementKind.FIELD;
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
 
     private boolean executed = false;
+    private Collection<TypeElementVisitor> typeElementVisitors;
+
+    @Override
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+        typeElementVisitors = findTypeElementVisitors();
+    }
+
+    @Override
+    public Set<String> getSupportedOptions() {
+        Set<String> supportedOptions = new HashSet<>(super.getSupportedOptions());
+        for (TypeElementVisitor visitor: typeElementVisitors) {
+          SupportedOptions so = visitor.getClass().getAnnotation(SupportedOptions.class);
+          if  (so != null) {
+             Arrays.stream(so.value()).forEach(supportedOptions::add);
+          }
+        }
+        return supportedOptions;
+    }
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -60,9 +81,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         if (executed) {
             return false;
         }
+        // set supported options as system properties
+        processingEnv.getOptions().forEach((k, v) -> System.setProperty(k, v == null ? "" : v));
 
-
-        Collection<TypeElementVisitor> typeElementVisitors = findTypeElementVisitors();
         List<LoadedVisitor> loadedVisitors = new ArrayList<>(typeElementVisitors.size());
         for (TypeElementVisitor visitor : typeElementVisitors) {
             try {
