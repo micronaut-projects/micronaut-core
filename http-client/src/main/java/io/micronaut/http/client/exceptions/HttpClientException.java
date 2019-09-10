@@ -43,6 +43,7 @@ public class HttpClientException extends HttpException {
     /**
      * @param message The message
      * @param cause   The throwable
+     * @param shared Shared instance
      */
     public HttpClientException(String message, Throwable cause, boolean shared) {
         super(message, cause, false, true);
