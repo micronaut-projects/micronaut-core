@@ -24,6 +24,7 @@ enum SupportedLanguage {
     kotlin("kt")
 
     final String extension
+
     private SupportedLanguage(String extension) {
         this.extension = extension
     }

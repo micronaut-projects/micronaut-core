@@ -16,10 +16,15 @@
 package io.micronaut.management.endpoint
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Read
+import io.micronaut.management.endpoint.annotation.Selector
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -27,28 +32,21 @@ import spock.lang.Specification
 
 class EndpointsBasePathSpec extends Specification {
 
-    @AutoCleanup
-    @Shared
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-            [
-                    'spec.name': getClass().simpleName,
-                    'endpoints.all.path': '/admin',
-                    'endpoints.all.enabled': true
-            ], Environment.TEST)
-
-    @AutoCleanup
-    @Shared
-    RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
-
     def "due to the change of endpoints base path to /admin, Health endpoint is available at /admin/health"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'endpoints.all.path': '/admin',
+                'endpoints.all.enabled': true
+        ])
+        HttpClient rxClient = server.applicationContext.createBean(HttpClient.class, server.getURL())
+
         when:
         rxClient.toBlocking().retrieve('/admin/health')
 
         then:
         noExceptionThrown()
-    }
 
-    def "due to the change of endpoints base path to /admin, Health endpoint is not available at /health"() {
         when:
         rxClient.toBlocking().retrieve('/health')
 
@@ -60,5 +58,98 @@ class EndpointsBasePathSpec extends Specification {
 
         then:
         response.status == HttpStatus.NOT_FOUND
+
+        cleanup:
+        rxClient.close()
+        server.close()
+    }
+
+    void "test routes with a server context path"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'micronaut.server.context-path': '/myapp',
+                'endpoints.all.path': '/endpoints'
+        ])
+        HttpClient client = server.applicationContext.createBean(HttpClient.class, server.getURL())
+
+        when:
+        client.toBlocking().retrieve('/myapp/endpoints/my-endpoint/hello', String)
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.UNAUTHORIZED
+
+        cleanup:
+        client.close()
+        server.close()
+    }
+
+    void "test routes with a server context path and all path without leading slash"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'micronaut.server.context-path': '/myapp',
+                'endpoints.all.path': 'endpoints'
+        ])
+        HttpClient client = server.applicationContext.createBean(HttpClient.class, server.getURL())
+
+        when:
+        client.toBlocking().retrieve('/myapp/endpoints/my-endpoint/hello', String)
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.UNAUTHORIZED
+
+        cleanup:
+        client.close()
+        server.close()
+    }
+
+    void "test routes with a server context path and context path without leading slash"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'micronaut.server.context-path': 'myapp',
+                'endpoints.all.path': 'endpoints'
+        ])
+        HttpClient client = server.applicationContext.createBean(HttpClient.class, server.getURL())
+
+        when:
+        client.toBlocking().retrieve('/myapp/endpoints/my-endpoint/hello', String)
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.UNAUTHORIZED
+
+        cleanup:
+        client.close()
+        server.close()
+    }
+
+    void "test routes with a server context path no all path"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'micronaut.server.context-path': '/myapp',
+        ])
+        HttpClient client = server.applicationContext.createBean(HttpClient.class, server.getURL())
+
+        when:
+        client.toBlocking().retrieve('/myapp/my-endpoint/hello', String)
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.UNAUTHORIZED
+
+        cleanup:
+        client.close()
+        server.close()
+    }
+
+    @Endpoint(id = "myEndpoint")
+    @Requires(property = "spec.name", value = "EndpointsBasePathSpec")
+    static class MyEndpoint {
+
+        @Read
+        String name(@Selector String name) {
+            name
+        }
     }
 }
