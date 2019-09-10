@@ -138,6 +138,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private EventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
     private EventLoopGroupFactory eventLoopGroupFactory;
+    private boolean randomPort;
 
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
@@ -185,6 +186,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.router = router;
         this.ioExecutor = ioExecutor;
         this.specifiedPort = getHttpPort(serverConfiguration);
+        this.randomPort = specifiedPort == -1;
 
         int port = specifiedPort;
         if (serverSslBuilder.isPresent()) {
@@ -427,7 +429,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     @SuppressWarnings("MagicNumber")
     private void bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, int port, AtomicInteger attempts) {
-        boolean isRandomPort = specifiedPort == -1;
         Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         if (applicationName.isPresent()) {
             if (LOG.isDebugEnabled()) {
@@ -456,7 +457,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
             int attemptCount = attempts.getAndIncrement();
 
-            if (isRandomPort && attemptCount < 3) {
+            if (randomPort && attemptCount < 3) {
                 port = SocketUtils.findAvailableTcpPort();
                 bindServerToHost(serverBootstrap, host, port, attempts);
             } else {
