@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery.consul.client.v1;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.discovery.consul.ConsulConfiguration;
@@ -35,6 +36,7 @@ import java.util.Optional;
  */
 @Filter(patterns = "/v1/**", serviceId = ConsulClient.SERVICE_ID)
 @Requires(beans = ConsulConfiguration.class)
+@BootstrapContextCompatible
 public class ConsulAslTokenFilter implements HttpClientFilter, Toggleable {
 
     /**
