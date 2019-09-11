@@ -279,6 +279,24 @@ class NettyHttpServerSpec extends Specification {
         embeddedServer.applicationContext.stop()
     }
 
+    void "start server many time"(){
+        when:
+        def servers =  []
+        [1..50].each{
+            servers << ApplicationContext.run(EmbeddedServer)
+        }
+
+        then:
+        servers.each{
+            assert ((EmbeddedServer)it).isRunning()
+        }
+
+        cleanup:
+        servers.each{
+            it.stop()
+        }
+    }
+
     @Singleton
     static class EventCounter {
         AtomicInteger count = new AtomicInteger(0)
