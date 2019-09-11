@@ -279,11 +279,12 @@ class NettyHttpServerSpec extends Specification {
         embeddedServer.applicationContext.stop()
     }
 
-    void "start server many time"(){
+    void "start server many times"(){
         when:
         def servers =  []
-        [1..50].each{
-            servers << ApplicationContext.run(EmbeddedServer)
+        (1..50).each{
+            def run = Micronaut.run()
+            servers << run.getBean(EmbeddedServer)
         }
 
         then:
