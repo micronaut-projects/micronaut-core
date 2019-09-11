@@ -254,7 +254,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
         for (PathSegment segment: this.segments) {
             if (segment.isVariable()) {
-                if (!segment.isQuerySegment()){
+                if (!segment.isQuerySegment()) {
                     thisVariableCount++;
                 }
             } else {

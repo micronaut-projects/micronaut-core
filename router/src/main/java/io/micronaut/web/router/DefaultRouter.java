@@ -23,7 +23,6 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.http.uri.UriTemplate;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
