@@ -334,7 +334,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
             Optional<String> host = serverConfiguration.getHost();
 
-            bindServerToHost(serverBootstrap, host.orElse(null), serverPort, new AtomicInteger(0));
+            serverPort = bindServerToHost(serverBootstrap, host.orElse(null), serverPort, new AtomicInteger(0));
             if (serverConfiguration.isDualProtocol()) {
                 // By default we will bind ssl first and then bind http after.
                 int httpPort = getPortOrDefault(getHttpPort(serverConfiguration));
@@ -426,7 +426,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     }
 
     @SuppressWarnings("MagicNumber")
-    private void bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, int port, AtomicInteger attempts) {
+    private int bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, int port, AtomicInteger attempts) {
         boolean isRandomPort = specifiedPort == -1;
         Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         if (applicationName.isPresent()) {
@@ -445,6 +445,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             } else {
                 serverBootstrap.bind(port).sync();
             }
+            return port;
         } catch (Throwable e) {
             final boolean isBindError = e instanceof BindException;
             if (LOG.isErrorEnabled()) {
@@ -458,7 +459,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
             if (isRandomPort && attemptCount < 3) {
                 port = SocketUtils.findAvailableTcpPort();
-                bindServerToHost(serverBootstrap, host, port, attempts);
+                return bindServerToHost(serverBootstrap, host, port, attempts);
             } else {
                 stopInternal();
                 throw new ServerStartupException("Unable to start Micronaut server on port: " + port, e);
