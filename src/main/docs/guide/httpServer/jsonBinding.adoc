@@ -62,6 +62,8 @@ In other words, as a rule reactive types should be used when you plan to do furt
 
 TIP: The output produced by Jackson can be customized in a variety of manners, from defining Jackson modules to using https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations[Jackson's annotations]
 
+TIP: The deserialization done by Jackson can also be customized, e.g. via the `@JsonFormat` annotation to https://www.baeldung.com/jackson-serialize-dates#jsonformat[format dates] in individual ways.
+
 == Jackson Configuration
 
 The Jackson ObjectMapper can be configured through normal configuration with the api:io.micronaut.jackson.JacksonConfiguration[] class.
