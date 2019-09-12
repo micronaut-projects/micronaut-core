@@ -29,6 +29,9 @@ import java.util.OptionalInt;
 @ConfigurationProperties(SessionSettings.PREFIX)
 public class SessionConfiguration {
 
+    /**
+     * @deprecated Use {@link #DEFAULT_MAXINACTIVEINTERVAL_MINUTES} instead.
+     */
     @Deprecated
     public static final int DEFAULT_MAXINACTIVEINTERVAL_SECONDS = 30;
 
