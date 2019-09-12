@@ -63,7 +63,7 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
      */
     @Override
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
-        Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatchAtRequest(request);
+        Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatch(request);
         if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch) {
             ExecutableMethod method = ((MethodBasedRouteMatch) routeMatch.get()).getExecutableMethod();
             if (endpointMethods.getOrDefault(method, false)) {
