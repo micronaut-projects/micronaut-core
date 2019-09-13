@@ -27,7 +27,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.AbstractBufferingHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.jackson.convert.XmlStreamToObjectConverter.ByteArrayXmlStreamReader;
+import io.micronaut.jackson.convert.ByteArrayXmlStreamReader;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufUtil;
@@ -230,7 +230,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
         try {
             return new ByteArrayXmlStreamReader(xmlStreamFactory.createAsyncFor(bytes), bytes);
         } catch (XMLStreamException e) {
-           throw new RuntimeException(e);
+            throw new RuntimeException(e);
         }
     }
 
