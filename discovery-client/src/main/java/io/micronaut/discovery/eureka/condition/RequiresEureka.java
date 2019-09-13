@@ -33,6 +33,6 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.PACKAGE, ElementType.TYPE})
-@Requires(property = EurekaConfiguration.PREFIX)
+@Requires(condition = RequiresEurekaCondition.class)
 public @interface RequiresEureka {
 }

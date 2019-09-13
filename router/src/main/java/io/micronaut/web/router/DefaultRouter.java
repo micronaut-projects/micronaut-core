@@ -141,7 +141,9 @@ public class DefaultRouter implements Router {
             hasMultipleMatches = uriRoutes.size() > 1;
         }
 
-
+        /**
+         * Any changes to the logic below may also need changes to {@link io.micronaut.http.uri.UriTemplate#compareTo(UriTemplate)} 
+         */
         if (hasMultipleMatches) {
             long variableCount = 0;
             long rawCount = 0;
@@ -151,7 +153,7 @@ public class DefaultRouter implements Router {
             for (int i = 0; i < uriRoutes.size(); i++) {
                 UriRouteMatch<T, R> match = uriRoutes.get(i);
                 UriMatchTemplate template = match.getRoute().getUriMatchTemplate();
-                long variable = template.getVariableSegmentCount();
+                long variable = template.getPathVariableSegmentCount();
                 long raw = template.getRawSegmentCount();
                 if (i == 0) {
                     variableCount = variable;
