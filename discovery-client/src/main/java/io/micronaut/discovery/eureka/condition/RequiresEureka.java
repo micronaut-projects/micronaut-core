@@ -16,7 +16,6 @@
 package io.micronaut.discovery.eureka.condition;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.discovery.eureka.EurekaConfiguration;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
