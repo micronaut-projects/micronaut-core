@@ -27,7 +27,6 @@ import io.micronaut.discovery.eureka.client.v2.DataCenterInfo;
 import io.micronaut.discovery.eureka.client.v2.EurekaClient;
 import io.micronaut.discovery.eureka.client.v2.InstanceInfo;
 import io.micronaut.discovery.eureka.client.v2.LeaseInfo;
-import io.micronaut.discovery.eureka.condition.RequiresEureka;
 import io.micronaut.discovery.registration.RegistrationConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
