@@ -28,6 +28,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.SimpleElementVisitor8;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Set;
 
 /**
@@ -46,6 +47,11 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
     @Override
     public final synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
+    }
+
+    @Override
+    public Set<String> getSupportedOptions() {
+        return Collections.singleton("org.gradle.annotation.processing.aggregating");
     }
 
     @Override
