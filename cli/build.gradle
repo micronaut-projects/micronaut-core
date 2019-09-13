@@ -18,8 +18,9 @@ dependencies {
     runtime dependencyModuleVersion("slf4j", "slf4j-simple")
     runtime "org.codehaus.plexus:plexus-component-api:1.0-alpha-33"
 
-    testCompile "net.sf.expectit:expectit-core:0.9.0"
-    testCompile "com.github.jnr:jnr-posix:3.0.6"
+
+    testImplementation "net.sf.expectit:expectit-core:0.9.0"
+    testImplementation "com.github.jnr:jnr-posix:3.0.6"
 }
 
 File outDir = new File(project.buildDir, 'bin')

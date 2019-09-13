@@ -3,5 +3,5 @@ dependencies {
     compileOnly project(":inject-java")
     compile project(":http")
 
-    testCompile project(":inject-java")
+    testImplementation project(":inject-java")
 }

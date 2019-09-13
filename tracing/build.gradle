@@ -22,19 +22,19 @@ dependencies {
     compileOnly dependencyVersion("rxjava1.interop")
 
 
-    testCompile dependencyModuleVersion('micronaut.netflix', 'micronaut-netflix-hystrix'), {
+    testImplementation dependencyModuleVersion('micronaut.netflix', 'micronaut-netflix-hystrix'), {
         exclude group:"io.micronaut", module:'micronaut-runtime'
         exclude group:"io.micronaut.configuration", module:'micronaut-netflix-archaius'
     }
-    testCompile project(":inject-groovy")
-    testCompile project(":discovery-client")
-    testCompile project(":inject-java")
-    testCompile project(":http-server-netty")
+    testImplementation project(":inject-groovy")
+    testImplementation project(":discovery-client")
+    testImplementation project(":inject-java")
+    testImplementation project(":http-server-netty")
 
-    testCompile dependencyVersion("reactor")
-    testCompile dependencyVersion("zipkin.reporter")
-    testCompile dependencyVersion("brave.instrumentation")
-    testCompile dependencyVersion("brave.opentracing")
+    testImplementation dependencyVersion("reactor")
+    testImplementation dependencyVersion("zipkin.reporter")
+    testImplementation dependencyVersion("brave.instrumentation")
+    testImplementation dependencyVersion("brave.opentracing")
 
 }
 

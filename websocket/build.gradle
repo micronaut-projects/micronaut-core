@@ -6,5 +6,5 @@ dependencies {
     compile dependencyVersion("rxjava2")
     compileOnly project(":inject-java")
 
-    testCompile project(":inject-groovy")
+    testImplementation project(":inject-groovy")
 }

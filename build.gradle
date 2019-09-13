@@ -716,21 +716,21 @@ subprojects { Project subproject ->
             compileOnly "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion"
         }
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-        testCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-        testCompile dependencyVersion("groovy")
+        testImplementation "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+        testImplementation dependencyVersion("groovy")
         testCompile(dependencyVersion("spock")) {
             exclude module: 'groovy-all'
         }
-        testCompile "cglib:cglib-nodep:3.3.0"
-        testCompile "org.objenesis:objenesis:1.4"
+        testImplementation "cglib:cglib-nodep:3.3.0"
+        testImplementation "org.objenesis:objenesis:1.4"
 
         testRuntime "ch.qos.logback:logback-classic:1.2.3"
-        testCompile "org.codehaus.groovy:groovy-test:$groovyVersion"
+        testImplementation "org.codehaus.groovy:groovy-test:$groovyVersion"
         compileOnly "org.ow2.asm:asm:$asmVersion"
         compileOnly "org.ow2.asm:asm-commons:$asmVersion"
 
-        testCompile "org.ow2.asm:asm:$asmVersion"
-        testCompile "org.ow2.asm:asm-commons:$asmVersion"
+        testImplementation "org.ow2.asm:asm:$asmVersion"
+        testImplementation "org.ow2.asm:asm-commons:$asmVersion"
     }
 
     task moveConfigProps() {

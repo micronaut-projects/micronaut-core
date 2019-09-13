@@ -37,15 +37,15 @@ dependencies {
     compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
     compileOnly project(":inject-java")
 
-    testCompile 'org.jsr107.ri:cache-ri-impl:1.1.0'
-    testCompile dependencyVersion("jcache")
-    testCompile dependencyVersion("rxjava1.interop")
-    testCompile dependencyVersion("reactor")
-    testCompile project(":inject-java")
-    testCompile project(":inject-java-test")
-    testCompile project(":inject-groovy")
-    testCompile dependencyModuleVersion("gorm", "grails-datastore-gorm")
-    testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    testImplementation 'org.jsr107.ri:cache-ri-impl:1.1.0'
+    testImplementation dependencyVersion("jcache")
+    testImplementation dependencyVersion("rxjava1.interop")
+    testImplementation dependencyVersion("reactor")
+    testImplementation project(":inject-java")
+    testImplementation project(":inject-java-test")
+    testImplementation project(":inject-groovy")
+    testImplementation dependencyModuleVersion("gorm", "grails-datastore-gorm")
+    testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
 }
 
 //compileJava.options.fork = true
