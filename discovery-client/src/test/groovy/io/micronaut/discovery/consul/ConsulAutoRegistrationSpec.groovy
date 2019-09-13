@@ -24,6 +24,7 @@ import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration
 import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.discovery.eureka.EurekaConfiguration
+import io.micronaut.discovery.eureka.client.v2.EurekaClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.testcontainers.containers.GenericContainer
@@ -204,11 +205,8 @@ class ConsulAutoRegistrationSpec extends Specification {
 
         and: "those beans doesn't exist"
         !embeddedServer.applicationContext.containsBean(Route53AutoRegistrationConfiguration)
-        !embeddedServer.applicationContext.containsBean(EurekaConfiguration.EurekaRegistrationConfiguration)
-
+        !embeddedServer.applicationContext.containsBean(EurekaClient)
         !embeddedServer.applicationContext.containsBean(Route53DiscoveryConfiguration)
-        !embeddedServer.applicationContext.containsBean(EurekaConfiguration.EurekaDiscoveryConfiguration)
-
         !embeddedServer.applicationContext.containsBean(AWSServiceDiscoveryClientResolver)
 
         cleanup:
