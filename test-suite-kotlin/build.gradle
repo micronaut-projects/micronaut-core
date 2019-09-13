@@ -15,31 +15,31 @@ dependencies {
     compile project(':http-server-netty')
     compile project(':http-client')
     compile project(':runtime')
-    testCompile "org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion"
-    testCompile "org.jetbrains.kotlin:kotlin-test:$kotlinVersion"
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion"
+    testImplementation "org.jetbrains.kotlin:kotlin-test:$kotlinVersion"
 
-    testCompile project(":validation")
-    testCompile project(":management")
-    testCompile project(":inject")
-    testCompile dependencyVersion("jcache")
-    testCompile project(':validation')
-    testCompileOnly project(':inject-java')
+    testImplementation project(":validation")
+    testImplementation project(":management")
+    testImplementation project(":inject")
+    testImplementation dependencyVersion("jcache")
+    testImplementation project(':validation')
+    testImplementationOnly project(':inject-java')
     kaptTest project(':inject-java')
     kaptTest project(':validation')
-    testCompile project(":http-client")
-    testCompile project(":session")
-    testCompile dependencyVersion("reactor")
-    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
+    testImplementation project(":http-client")
+    testImplementation project(":session")
+    testImplementation dependencyVersion("reactor")
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-kotlintest"), {
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-kotlintest"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-    testCompile project(":function-client")
-    testCompile project(":function-web")
-    testCompile 'io.kotlintest:kotlintest-runner-junit5:3.3.0'
+    testImplementation project(":function-client")
+    testImplementation project(":function-web")
+    testImplementation 'io.kotlintest:kotlintest-runner-junit5:3.3.0'
     testRuntime "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
     testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }

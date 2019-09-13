@@ -6,14 +6,14 @@ dependencies {
         exclude module:'groovy-all'
     }
     compile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    testCompile dependencyVersion("validation")
-    testCompile "javax.persistence:javax.persistence-api:2.2"
-    testCompile project(":runtime")
+    testImplementation dependencyVersion("validation")
+    testImplementation "javax.persistence:javax.persistence-api:2.2"
+    testImplementation project(":runtime")
 
-//    testCompile "org.ow2.asm:asm-tree:$asmVersion"
-//    testCompile "org.ow2.asm:asm-util:$asmVersion"
-//    testCompile "org.ow2.asm:asm:$asmVersion"
-//    testCompile "org.ow2.asm:asm-commons:$asmVersion"
-//    testCompile "org.ow2.asm:asm-tree:$asmVersion"
+//    testImplementation "org.ow2.asm:asm-tree:$asmVersion"
+//    testImplementation "org.ow2.asm:asm-util:$asmVersion"
+//    testImplementation "org.ow2.asm:asm:$asmVersion"
+//    testImplementation "org.ow2.asm:asm-commons:$asmVersion"
+//    testImplementation "org.ow2.asm:asm-tree:$asmVersion"
 
 }

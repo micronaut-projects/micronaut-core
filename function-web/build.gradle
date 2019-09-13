@@ -4,8 +4,8 @@ dependencies {
     compile project(":router")
     compile project(":http-server")
 
-    testCompile project(":http-client")
-    testCompile project(":inject-groovy")
-    testCompile project(":inject-java")
-    testCompile project(":http-server-netty")
+    testImplementation project(":http-client")
+    testImplementation project(":inject-groovy")
+    testImplementation project(":inject-java")
+    testImplementation project(":http-server-netty")
 }

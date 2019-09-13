@@ -8,13 +8,13 @@ dependencies {
     compileOnly dependencyVersion("reactor")
     compile project(":websocket")
 
-    testCompile project(":inject-groovy")
-    testCompile project(":validation")
-    testCompile project(":inject-java")
-    testCompile dependencyVersion("rxjava2")
-    testCompile dependencyVersion("reactor")
-    testCompile project(":http-server-netty")
-    testCompile "com.github.tomakehurst:wiremock-jre8:2.25.0"
+    testImplementation project(":inject-groovy")
+    testImplementation project(":validation")
+    testImplementation project(":inject-java")
+    testImplementation dependencyVersion("rxjava2")
+    testImplementation dependencyVersion("reactor")
+    testImplementation project(":http-server-netty")
+    testImplementation "com.github.tomakehurst:wiremock-jre8:2.25.0"
 }
 
 //tasks.withType(Test) {

@@ -3,6 +3,6 @@ dependencies {
     compile project(":inject")
     compile project(":http")
     compileOnly project(":inject-java")
-    testCompile project(":inject-groovy")
-    testCompile project(":inject-java")
+    testImplementation project(":inject-groovy")
+    testImplementation project(":inject-java")
 }

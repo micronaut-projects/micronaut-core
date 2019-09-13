@@ -5,21 +5,21 @@ dependencies {
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compileOnly dependencyVersion("validation")
 
-    testCompile 'com.github.spotbugs:spotbugs-annotations:3.1.12'
-    testCompile project(":aop")
-    testCompile project(":runtime")
-    testCompile dependencyVersion("rxjava2")
-    testCompile "org.hibernate:hibernate-core:5.3.6.Final"
+    testImplementation 'com.github.spotbugs:spotbugs-annotations:3.1.12'
+    testImplementation project(":aop")
+    testImplementation project(":runtime")
+    testImplementation dependencyVersion("rxjava2")
+    testImplementation "org.hibernate:hibernate-core:5.3.6.Final"
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
-    testCompile "junit:junit:4.7"
-    testCompile "com.google.testing.compile:compile-testing:0.12"
-    testCompile 'org.mongodb:mongo-java-driver:3.7.1'
-    testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
-    testCompile dependencyModuleVersion("groovy", "groovy-json")
-    testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    testImplementation "junit:junit:4.7"
+    testImplementation "com.google.testing.compile:compile-testing:0.12"
+    testImplementation 'org.mongodb:mongo-java-driver:3.7.1'
+    testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
+    testImplementation dependencyModuleVersion("groovy", "groovy-json")
+    testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     testRuntime 'org.glassfish:javax.el:3.0.1-b08'
-    testCompile dependencyVersion("micrometer")
-    testCompile project(":validation")
+    testImplementation dependencyVersion("micrometer")
+    testImplementation project(":validation")
 }
 
 
