@@ -18,13 +18,18 @@ package io.micronaut.http.server.netty.errors
 import groovy.json.JsonSlurper
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Produces
 import io.micronaut.http.hateoas.JsonError
+import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Get
 import io.reactivex.Single
+
+import javax.inject.Singleton
 
 /**
  * Tests for different kinds of errors and the expected responses
@@ -98,6 +103,19 @@ class ErrorSpec extends AbstractMicronautSpec {
         json._links.self.href == '/errors/server-error'
     }
 
+    void "test content type for error handler"() {
+        given:
+        def response = rxClient.exchange(
+                HttpRequest.GET('/errors/handler-content-type-error')
+
+        ).onErrorReturn({ t -> t.response; return t.response } ).blockingFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.TEXT_HTML
+        response.getBody(String).get() == '<div>Error</div>'
+    }
+
     @Controller('/errors')
     static class ErrorController {
 
@@ -112,5 +130,24 @@ class ErrorSpec extends AbstractMicronautSpec {
                 emitter.onError(new IOException())
             })
         }
+
+        @Get("/handler-content-type-error")
+        String handlerContentTypeError() {
+            throw new ContentTypeExceptionHandlerException()
+        }
     }
+
+
+    @Produces(value = MediaType.TEXT_HTML)
+    @Singleton
+    static class ContentTypeExceptionHandler implements ExceptionHandler<ContentTypeExceptionHandlerException, HttpResponse<String>> {
+
+        @Override
+        HttpResponse<String> handle(HttpRequest r, ContentTypeExceptionHandlerException exception) {
+            HttpResponse.serverError("<div>Error</div>")
+        }
+    }
+
+    static class ContentTypeExceptionHandlerException extends RuntimeException {}
+
 }
