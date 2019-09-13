@@ -122,6 +122,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     }
 
     @Override
+    public Set<String> getSupportedOptions() {
+        return Collections.singleton("org.gradle.annotation.processing.aggregating");
+    }
+
+    @Override
     public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         processingOver = roundEnv.processingOver();
             
