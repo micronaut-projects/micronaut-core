@@ -11,19 +11,19 @@ dependencies {
     }
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 
-    testCompile project(":http-server-netty")
-    testCompile dependencyVersion("micronaut.function-aws"), {
+    testImplementation project(":http-server-netty")
+    testImplementation dependencyVersion("micronaut.function-aws"), {
         exclude module:"micronaut-function"
     }
-    testCompile project(":function-web")
-    testCompile dependencyModuleVersion("micronaut.groovy","micronaut-function-groovy"), {
+    testImplementation project(":function-web")
+    testImplementation dependencyModuleVersion("micronaut.groovy","micronaut-function-groovy"), {
         exclude module:'micronaut-function'
         exclude module:'micronaut-runtime-groovy'
     }
-    testCompile dependencyModuleVersion("micronaut.groovy","micronaut-runtime-groovy"), {
+    testImplementation dependencyModuleVersion("micronaut.groovy","micronaut-runtime-groovy"), {
         exclude module:'micronaut-inject'
     }
-    testCompile project(":inject-groovy")
-    testCompile project(":inject-java")
-    testCompile group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
+    testImplementation project(":inject-groovy")
+    testImplementation project(":inject-java")
+    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }

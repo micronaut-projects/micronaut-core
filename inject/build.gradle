@@ -10,11 +10,11 @@ dependencies {
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
     compileOnly dependencyVersion("validation")
 
-    testCompile dependencyVersion("validation")
-    testCompile project(":inject-groovy")
+    testImplementation dependencyVersion("validation")
+    testImplementation project(":inject-groovy")
     //system-rules has a transitive on junit-dep:[4.9,), so hard setting the version instead
-    testCompile("com.github.stefanbirkner:system-rules:$systemRulesVersion") {
+    testImplementation("com.github.stefanbirkner:system-rules:$systemRulesVersion") {
         exclude group: "junit", module: "junit-dep"
     }
-    testCompile "junit:junit-dep:4.9"
+    testImplementation "junit:junit-dep:4.9"
 }
