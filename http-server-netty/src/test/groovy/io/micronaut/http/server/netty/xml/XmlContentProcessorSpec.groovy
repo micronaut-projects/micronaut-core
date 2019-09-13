@@ -14,6 +14,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.util.stream.Collectors
+
 class XmlContentProcessorSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [:])
@@ -132,14 +134,19 @@ class XmlContentProcessorSpec extends Specification {
         RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
-        List<Book> books = client.jsonStream(
+        Set<String> books = client.jsonStream(
                 HttpRequest.POST("/xml/stream/author/bookSet", '<author name="Joe"><books><book><title>First Book</title></book><book><title>Second Book</title></book></books></author>')
-                        .contentType(MediaType.TEXT_XML_TYPE)).toList().blockingGet();
+                        .contentType(MediaType.TEXT_XML_TYPE))
+                .toList()
+                .blockingGet()
+                .stream()
+                .map{book -> book.title}
+                .collect(Collectors.toSet())
 
         then:
         books.size() == 2
-        books[0].title == "First Book"
-        books[1].title == "Second Book"
+        books.contains "First Book"
+        books.contains "Second Book"
     }
 
     @Controller(value = "/xml/stream", consumes = MediaType.TEXT_XML)
@@ -178,7 +185,7 @@ class XmlContentProcessorSpec extends Specification {
         }
     }
 
-    static class Book {
+    public static class Book {
         String title
     }
 

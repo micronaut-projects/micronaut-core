@@ -118,7 +118,7 @@ class WebFunctionSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
         RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
-        def data = '{"title":"The Stand"}'
+        def data = '<book><title>The Stand</title></book>'
 
         when:
         HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST('/consumer/string', data)
@@ -126,7 +126,7 @@ class WebFunctionSpec extends Specification {
 
         then:
         response.code() == HttpStatus.OK.code
-        StringConsumer.LAST_VALUE == '{"title":"The Stand"}'
+        StringConsumer.LAST_VALUE == '<book><title>The Stand</title></book>'
 
         cleanup:
         embeddedServer.stop()
