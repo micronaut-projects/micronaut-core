@@ -159,6 +159,7 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
     asciidoc = true
     resourcesDir = project.file(docResourcesDir)
     properties = [
+            'sectanchors': true,
             'safe':'UNSAFE',
             'source-highlighter':'highlightjs',
             'version': project.version,
