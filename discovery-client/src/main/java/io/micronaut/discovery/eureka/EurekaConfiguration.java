@@ -27,7 +27,6 @@ import io.micronaut.discovery.eureka.client.v2.DataCenterInfo;
 import io.micronaut.discovery.eureka.client.v2.EurekaClient;
 import io.micronaut.discovery.eureka.client.v2.InstanceInfo;
 import io.micronaut.discovery.eureka.client.v2.LeaseInfo;
-import io.micronaut.discovery.eureka.condition.RequiresEureka;
 import io.micronaut.discovery.registration.RegistrationConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -44,7 +43,6 @@ import java.net.UnknownHostException;
  * @since 1.0
  */
 @ConfigurationProperties(EurekaConfiguration.PREFIX)
-@RequiresEureka
 public class EurekaConfiguration extends DiscoveryClientConfiguration {
 
     /**
@@ -143,7 +141,6 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
     /**
      * The default connection pool configuration.
      */
-    @RequiresEureka
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
     public static class EurekaConnectionPoolConfiguration extends ConnectionPoolConfiguration {
     }
@@ -152,7 +149,6 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
      * Configuration properties for Eureka client discovery.
      */
     @ConfigurationProperties(DiscoveryConfiguration.PREFIX)
-    @RequiresEureka
     public static class EurekaDiscoveryConfiguration extends DiscoveryConfiguration {
 
         private boolean useSecurePort;
@@ -179,7 +175,6 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
      */
     @ConfigurationProperties(RegistrationConfiguration.PREFIX)
     @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
-    @RequiresEureka
     public static class EurekaRegistrationConfiguration extends RegistrationConfiguration {
 
         /**
@@ -230,7 +225,7 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
          * @param applicationConfiguration The application configuration
          * @param ipAddress                The IP address
          * @param dataCenterInfo           The data center info
-         * @deprecated Use {@link #EurekaConfiguration(EurekaConnectionPoolConfiguration, ApplicationConfiguration, EurekaRegistrationConfiguration)} instead
+         * @deprecated Use {@link #EurekaRegistrationConfiguration(EmbeddedServer, ApplicationConfiguration, DataCenterInfo, String, String, Integer, String, String, Boolean)} instead
          */
         @Deprecated
         public EurekaRegistrationConfiguration(
