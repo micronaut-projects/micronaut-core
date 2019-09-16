@@ -225,7 +225,7 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
          * @param applicationConfiguration The application configuration
          * @param ipAddress                The IP address
          * @param dataCenterInfo           The data center info
-         * @deprecated Use {@link #EurekaConfiguration(EurekaConnectionPoolConfiguration, ApplicationConfiguration, EurekaRegistrationConfiguration)} instead
+         * @deprecated Use {@link #EurekaRegistrationConfiguration(EmbeddedServer, ApplicationConfiguration, DataCenterInfo, String, String, Integer, String, String, Boolean)} instead
          */
         @Deprecated
         public EurekaRegistrationConfiguration(
