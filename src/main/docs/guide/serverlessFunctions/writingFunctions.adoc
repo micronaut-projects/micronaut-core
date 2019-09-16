@@ -16,7 +16,7 @@ When creating a function with the `create-function` command Micronaut will setup
 ----
 $ mn create-function hello-world
 $ ./gradlew assemble
-$ echo '{"name":"hello"}' | java -jar build/libs/hello-world-0.1.jar
+$ echo '{"name":"hello"}' | java -jar build/libs/hello-world-0.1-all.jar
 ----
 
 Result in the following output being printed to standard out:
