@@ -21,6 +21,7 @@ import io.micronaut.http.cookie.CookieConfiguration;
 import io.micronaut.session.SessionConfiguration;
 
 import java.time.Duration;
+import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
 /**
@@ -173,7 +174,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
     /**
      * @return The max age to use for the cookie
      */
-    public Optional<Duration> getCookieMaxAge() {
+    public Optional<TemporalAmount> getCookieMaxAge() {
         return Optional.ofNullable(cookieMaxAge);
     }
 
