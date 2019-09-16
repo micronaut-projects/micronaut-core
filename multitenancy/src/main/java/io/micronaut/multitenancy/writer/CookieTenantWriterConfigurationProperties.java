@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.time.Duration;
+import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
 /**
@@ -152,7 +153,7 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
      * @return The max age to use for the cookie
      */
     @Override
-    public Optional<Duration> getCookieMaxAge() {
+    public Optional<TemporalAmount> getCookieMaxAge() {
         return Optional.ofNullable(cookieMaxAge);
     }
 

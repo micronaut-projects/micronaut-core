@@ -1,9 +1,8 @@
 package io.micronaut.docs.config.mapFormat
 
+// tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties
 import javax.validation.constraints.Min
-
-// end::imports[]
 import io.micronaut.core.convert.format.MapFormat
 // end::imports[]
 

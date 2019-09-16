@@ -55,6 +55,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     private boolean executed = false;
 
     @Override
+    public Set<String> getSupportedOptions() {
+        return Collections.singleton("org.gradle.annotation.processing.aggregating");
+    }
+
+    @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         //Only run on the first pass
         if (executed) {
