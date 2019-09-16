@@ -21,6 +21,7 @@ import io.micronaut.http.cookie.Cookie;
 
 import javax.inject.Singleton;
 import java.io.Serializable;
+import java.time.temporal.ChronoUnit;
 
 /**
  *  Writes the tenantId to in a cookie.
@@ -57,7 +58,7 @@ public class CookieTenantWriter implements TenantWriter {
             );
             cookie.configure(cookieTenantWriterConfiguration, request.isSecure());
             if (cookieTenantWriterConfiguration.getCookieMaxAge().isPresent()) {
-                cookie.maxAge(cookieTenantWriterConfiguration.getCookieMaxAge().get());
+                cookie.maxAge(cookieTenantWriterConfiguration.getCookieMaxAge().get().get(ChronoUnit.SECONDS));
             } else {
                 cookie.maxAge(Integer.MAX_VALUE);
             }
