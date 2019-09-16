@@ -16,7 +16,6 @@
 package io.micronaut.http.cookie;
 
 import javax.annotation.Nonnull;
-import java.time.Duration;
 import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
