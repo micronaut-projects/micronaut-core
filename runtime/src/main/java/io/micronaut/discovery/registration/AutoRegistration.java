@@ -38,9 +38,8 @@ import java.util.regex.Pattern;
 public abstract class AutoRegistration implements ApplicationEventListener<AbstractServiceInstanceEvent> {
 
     protected static final Logger LOG = LoggerFactory.getLogger(AutoRegistration.class);
-    protected final AtomicBoolean registered = new AtomicBoolean(false);
     private static final Pattern APPLICATION_NAME_PATTERN = Pattern.compile("^[a-zA-Z][\\w\\d-]*[a-zA-Z\\d]$");
-
+    protected final AtomicBoolean registered = new AtomicBoolean(false);
     private final RegistrationConfiguration registrationConfiguration;
 
     /**
