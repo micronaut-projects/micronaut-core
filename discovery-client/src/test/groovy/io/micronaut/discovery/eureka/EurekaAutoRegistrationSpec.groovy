@@ -95,10 +95,7 @@ class EurekaAutoRegistrationSpec extends Specification{
             )
         }
 
-
-
         cleanup: "The application is stopped"
         application?.stop()
-
     }
 }
