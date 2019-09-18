@@ -10,9 +10,11 @@ import io.netty.util.concurrent.Promise;
 public class ConnectTTLChannelPool implements ChannelPool {
 
     private final ChannelPool delegatePool;
+    private final AttributeKey RELEASE_CHANNEL;
 
-    public ConnectTTLChannelPool(ChannelPool delegatePool) {
+    public ConnectTTLChannelPool(ChannelPool delegatePool,AttributeKey RELEASE_CHANNEL) {
         this.delegatePool = delegatePool;
+        this.RELEASE_CHANNEL = RELEASE_CHANNEL;
     }
 
     @Override
@@ -34,12 +36,11 @@ public class ConnectTTLChannelPool implements ChannelPool {
     public Future<Void> release(Channel channel, Promise<Void> promise) {
 
         doInEventLoop(channel.eventLoop(), () -> {
-            boolean shouldCloseOnRelease = Boolean.TRUE.equals(channel.attr(AttributeKey.valueOf("realse_channel")).get());
+            boolean shouldCloseOnRelease = Boolean.TRUE.equals(channel.attr(RELEASE_CHANNEL).get());
 
             if (shouldCloseOnRelease && channel.isOpen() && !channel.eventLoop().isShuttingDown()) {
                 channel.close();
             }
-
             delegatePool.release(channel, promise);
         });
         return promise;

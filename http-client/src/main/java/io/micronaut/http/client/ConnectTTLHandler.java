@@ -18,14 +18,16 @@ import java.util.concurrent.TimeUnit;
 public class ConnectTTLHandler extends ChannelDuplexHandler {
     private static final Logger log = LoggerFactory.getLogger(ConnectTTLHandler.class);
     private final Long connectionTtlMillis;
+    private final AttributeKey RELEASE_CHANNEL;
 
     private ScheduledFuture<?> channelKiller;
 
-    public ConnectTTLHandler(Long connectionTtlMillis) {
+    public ConnectTTLHandler(Long connectionTtlMillis,AttributeKey RELEASE_CHANNEL) {
         if(connectionTtlMillis <=0){
             throw new IllegalArgumentException("connectTTL must be positive");
         }
         this.connectionTtlMillis = connectionTtlMillis;
+        this.RELEASE_CHANNEL = RELEASE_CHANNEL;
     }
 
     @Override
@@ -68,14 +70,10 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
 
     private void closeChannel(ChannelHandlerContext ctx) {
         assert ctx.channel().eventLoop().inEventLoop();
-        log.info("Channel details"+ctx.channel().id().toString());
-        System.out.println("Channel details"+ctx.channel().id().toString());
         if (ctx.channel().isOpen()) {
             log.info( "Connection (" + ctx.channel().id() + ") will be closed during its next release, because it " +
                     "has reached its maximum time to live of " + connectionTtlMillis + " milliseconds.");
-            System.out.println("Connection (" + ctx.channel().id() + ") will be closed during its next release, because it " +
-                    "has reached its maximum time to live of " + connectionTtlMillis + " milliseconds.");
-            ctx.channel().attr(AttributeKey.newInstance("realse_channel")).set(true);
+            ctx.channel().attr(RELEASE_CHANNEL).set(true);
         }
 
         channelKiller = null;
