@@ -93,12 +93,12 @@ task cliZip(type: Zip, dependsOn: ['fatJar']) {
     }
 }
 
-publishing {
-    publications {
-        maven(MavenPublication) {
-            artifact cliZip {
-                classifier "dist"
-            }
-        }
-    }
-}
+//publishing {
+//    publications {
+//        maven(MavenPublication) {
+//            artifact cliZip {
+//                classifier "dist"
+//            }
+//        }
+//    }
+//}

@@ -1,83 +1,84 @@
-publishing {
-    publications {
-        maven(MavenPublication) {
-            pom.withXml {
-                def xml = asNode()
-
-                def profiles = new Properties()
-                profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
-
-                boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
-                
-                xml.children().last() + {
-                    def mkp = delegate
-
-                    mkp.properties {
-                        for(dep in dependencyVersions) {
-                            def v = dep.value.version
-                            if(!v.toString().endsWith("-SNAPSHOT") || micronautSnapshot) {
-                                mkp."${dep.key}.version"(v)
-                            }
-                        }
-                    }
-
-                    mkp.dependencyManagement {
-                        mkp.dependencies {
-
-                            for (profile in profiles) {
-                                mkp.dependency {
-                                    mkp.groupId 'io.micronaut.profiles'
-                                    mkp.artifactId profile.key
-                                    def version = profile.value
-                                    if (!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
-                                        throw new RuntimeException("Cannot have a snapshot dependency on a profile [$profile.key] for a release!")
-                                    }
-                                    mkp.version(version)
-                                }
-                            }
-
-                            for (Project p : rootProject.subprojects) {
-                                if (!p.subprojects.empty) continue
-                                if (p.name == "bom") continue
-                                if (p.hasProperty("bomExclude") && p.property("bomExclude") == true) continue
-                                
-                                mkp.dependency {
-                                    mkp.groupId p.group
-                                    mkp.artifactId "micronaut-$p.name"
-                                    mkp.version p.version
-                                }
-                            }
-
-                            for (dep in dependencyVersions) {
-                                def info = dep.value
-                                // don't include snapshots
-                                if(info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
-                                    continue
-                                }
-
-                                def versionExpr = "\${${dep.key}.version}"
-
-                                if (info.name) {
-                                    mkp.dependency {
-                                        mkp.groupId info.group
-                                        mkp.artifactId info.name
-                                        mkp.version versionExpr
-                                    }
-                                }
-                                if(info.modules) {
-                                   for(m in info.modules) {
-                                       mkp.dependency {
-                                           mkp.groupId info.group
-                                           mkp.artifactId m
-                                           mkp.version versionExpr
-                                       }
-                                   }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+//publishing {
+//    publications {
+//        maven(MavenPublication) {
+//            pom.withXml {
+//                def xml = asNode()
+//
+//                def profiles = new Properties()
+//                profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
+//
+//                boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
+//
+//                xml.children().last() + {
+//                    def mkp = delegate
+//
+//                    mkp.packaging "pom"
+//                    mkp.properties {
+//                        for(dep in dependencyVersions) {
+//                            def v = dep.value.version
+//                            if(!v.toString().endsWith("-SNAPSHOT") || micronautSnapshot) {
+//                                mkp."${dep.key}.version"(v)
+//                            }
+//                        }
+//                    }
+//
+//                    mkp.dependencyManagement {
+//                        mkp.dependencies {
+//
+//                            for (profile in profiles) {
+//                                mkp.dependency {
+//                                    mkp.groupId 'io.micronaut.profiles'
+//                                    mkp.artifactId profile.key
+//                                    def version = profile.value
+//                                    if (!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
+//                                        throw new RuntimeException("Cannot have a snapshot dependency on a profile [$profile.key] for a release!")
+//                                    }
+//                                    mkp.version(version)
+//                                }
+//                            }
+//
+//                            for (Project p : rootProject.subprojects) {
+//                                if (!p.subprojects.empty) continue
+//                                if (p.name == "bom") continue
+//                                if (p.hasProperty("bomExclude") && p.property("bomExclude") == true) continue
+//
+//                                mkp.dependency {
+//                                    mkp.groupId p.group
+//                                    mkp.artifactId "micronaut-$p.name"
+//                                    mkp.version p.version
+//                                }
+//                            }
+//
+//                            for (dep in dependencyVersions) {
+//                                def info = dep.value
+//                                // don't include snapshots
+//                                if(info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
+//                                    continue
+//                                }
+//
+//                                def versionExpr = "\${${dep.key}.version}"
+//
+//                                if (info.name) {
+//                                    mkp.dependency {
+//                                        mkp.groupId info.group
+//                                        mkp.artifactId info.name
+//                                        mkp.version versionExpr
+//                                    }
+//                                }
+//                                if(info.modules) {
+//                                   for(m in info.modules) {
+//                                       mkp.dependency {
+//                                           mkp.groupId info.group
+//                                           mkp.artifactId m
+//                                           mkp.version versionExpr
+//                                       }
+//                                   }
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
