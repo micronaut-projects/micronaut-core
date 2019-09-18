@@ -42,6 +42,7 @@ dependencies {
     testImplementation dependencyVersion("rxjava1.interop")
     testImplementation dependencyVersion("reactor")
     testImplementation project(":inject-java")
+    testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-groovy")
     testImplementation dependencyModuleVersion("gorm", "grails-datastore-gorm")

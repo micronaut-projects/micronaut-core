@@ -9,6 +9,7 @@ dependencies {
 
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
+    testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject-java-test")
     testImplementation project(":http-client")
     testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.2'
@@ -18,8 +19,8 @@ dependencies {
     testImplementation dependencyModuleVersion("groovy", "groovy-templates")
     testImplementation dependencyVersion("rxjava2")
     testImplementation dependencyVersion("reactor")
-    testCompile(dependencyModuleVersion("netty", "netty-transport-native-epoll") + ":linux-x86_64")
-    testCompile(dependencyModuleVersion("netty", "netty-transport-native-kqueue") + ":osx-x86_64")
+    testImplementation(dependencyModuleVersion("netty", "netty-transport-native-epoll") + ":linux-x86_64")
+    testImplementation(dependencyModuleVersion("netty", "netty-transport-native-kqueue") + ":osx-x86_64")
 }
 
 tasks.withType(Test) {

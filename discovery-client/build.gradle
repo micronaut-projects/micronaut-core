@@ -37,6 +37,10 @@ dependencies {
     testImplementation project(":inject-groovy")
     testImplementation "com.amazonaws:aws-java-sdk-ec2:1.11.297"
     testImplementation dependencyVersion("reactor")
-    testRuntime dependencyVersion("snakeyaml")
+    testAnnotationProcessor project(":management")
+    testAnnotationProcessor project(":http-server-netty")
+    testAnnotationProcessor project(":inject-java")
+    testAnnotationProcessor project(":inject-groovy")
 
+    testRuntime dependencyVersion("snakeyaml")
 }

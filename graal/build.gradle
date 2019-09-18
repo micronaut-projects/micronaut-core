@@ -7,4 +7,6 @@ dependencies {
     testImplementation project(":inject-java")
     testImplementation project(":http")
     testImplementation project(":inject-java-test")
+
+    testAnnotationProcessor project(":inject-java")
 }
