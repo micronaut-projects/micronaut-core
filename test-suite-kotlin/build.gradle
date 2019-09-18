@@ -18,14 +18,19 @@ dependencies {
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion"
     testImplementation "org.jetbrains.kotlin:kotlin-test:$kotlinVersion"
 
+    // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junit5Version")
+
     testImplementation project(":validation")
     testImplementation project(":management")
     testImplementation project(":inject")
     testImplementation dependencyVersion("jcache")
     testImplementation project(':validation')
-    testImplementationOnly project(':inject-java')
-    kaptTest project(':inject-java')
-    kaptTest project(':validation')
+    testCompileOnly project(':inject-java')
+    testAnnotationProcessor project(':inject-java')
+    testCompileOnly project(':inject-java')
+    testCompileOnly project(':validation')
+    testAnnotationProcessor project(':validation')
     testImplementation project(":http-client")
     testImplementation project(":session")
     testImplementation dependencyVersion("reactor")
