@@ -1,9 +1,9 @@
 dependencies {
     compileOnly project(":inject-java")
 
-    compile project(":runtime")
-    compile project(":http")
-    compile project(":http-server")
+    api project(":runtime")
+    api project(":http")
+    api project(":http-server")
     compileOnly project(":session")
 
     testImplementation project(":http-client")

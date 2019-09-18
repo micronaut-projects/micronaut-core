@@ -4,17 +4,17 @@ repositories {
 }
 
 dependencies {
-    compile "info.picocli:picocli-groovy:$picocliVersion"
-    compile "org.apache.ant:ant:1.9.7"
-    compile dependencyModuleVersion("groovy", "groovy-ant")
-    compile dependencyModuleVersion("groovy", "groovy-json")
-    compile dependencyModuleVersion("groovy", "groovy-jmx")
-    compile dependencyModuleVersion("groovy", "groovy-xml")
-    compile dependencyModuleVersion("groovy", "groovy-templates")
-    compile "org.fusesource.jansi:jansi:1.14"
-    compile "jline:jline:2.12"
-    compile "org.springframework.boot:spring-boot-cli:1.5.10.RELEASE"
-    compile dependencyVersion("snakeyaml")
+    api "info.picocli:picocli-groovy:$picocliVersion"
+    api "org.apache.ant:ant:1.9.7"
+    api dependencyModuleVersion("groovy", "groovy-ant")
+    api dependencyModuleVersion("groovy", "groovy-json")
+    api dependencyModuleVersion("groovy", "groovy-jmx")
+    api dependencyModuleVersion("groovy", "groovy-xml")
+    api dependencyModuleVersion("groovy", "groovy-templates")
+    api "org.fusesource.jansi:jansi:1.14"
+    api "jline:jline:2.12"
+    api "org.springframework.boot:spring-boot-cli:1.5.10.RELEASE"
+    api dependencyVersion("snakeyaml")
     runtime dependencyModuleVersion("slf4j", "slf4j-simple")
     runtime "org.codehaus.plexus:plexus-component-api:1.0-alpha-33"
 

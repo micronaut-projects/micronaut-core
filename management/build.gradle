@@ -1,6 +1,6 @@
 dependencies {
-    compile project(":router")
-    compile project(":runtime")
+    api project(":router")
+    api project(":runtime")
     compileOnly project(":inject-java")
     compileOnly project(":graal")
 

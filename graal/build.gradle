@@ -1,7 +1,9 @@
 dependencies {
     compileOnly project(":inject-java")
-    compile project(":inject")
-    compile dependencyVersion("jackson.databind")
+    annotationProcessor project(":inject-java")
+    api project(":inject")
+    api dependencyVersion("jackson.databind")
+
     testImplementation project(":inject-java")
     testImplementation project(":http")
     testImplementation project(":inject-java-test")

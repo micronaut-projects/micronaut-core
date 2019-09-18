@@ -1,7 +1,7 @@
 dependencies {
-    compile project(":inject")
-    compile project(":aop")
-    compile dependencyVersion("groovy")
+    api project(":inject")
+    api project(":aop")
+    api dependencyVersion("groovy")
 
     testImplementation "junit:junit:4.7"
 //    testImplementation 'javax.validation:validation-api:1.1.0.Final'
