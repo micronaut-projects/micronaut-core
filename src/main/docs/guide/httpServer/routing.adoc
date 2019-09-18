@@ -25,13 +25,7 @@ If you have a requirement to build paths to include in your responses you can us
 
 URI variables can be referenced via method arguments. For example:
 
-.URI Variables Example
-[source,java]
-----
-include::{testsuite}/server/routes/IssuesController.java[tags=imports, indent=0]
-
-include::{testsuite}/server/routes/IssuesController.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.server.routes.IssuesController[tags="imports,class", indent=0, title="URI Variables Example"]
 
 <1> The `@Controller` annotation is specified without an argument resulting in a base URI of `/issues`
 <2> The link:{api}/io/micronaut/http/annotation/Get.html[Get] annotation is used to map the method to an HTTP link:{api}/io/micronaut/http/HttpMethod.html#GET[GET] with a URI variable embedded in the URI called `number`
