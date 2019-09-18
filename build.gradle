@@ -728,9 +728,13 @@ subprojects { Project subproject ->
         testImplementation "org.codehaus.groovy:groovy-test:$groovyVersion"
         compileOnly "org.ow2.asm:asm:$asmVersion"
         compileOnly "org.ow2.asm:asm-commons:$asmVersion"
+        annotationProcessor "org.ow2.asm:asm:$asmVersion"
+        annotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
 
         testImplementation "org.ow2.asm:asm:$asmVersion"
         testImplementation "org.ow2.asm:asm-commons:$asmVersion"
+        testAnnotationProcessor "org.ow2.asm:asm:$asmVersion"
+        testAnnotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
     }
 
     task moveConfigProps() {
