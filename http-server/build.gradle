@@ -1,8 +1,8 @@
 
 dependencies {
-    compile project(":websocket")
-    compile project(":runtime")
-    compile project(":router")
+    api project(":websocket")
+    api project(":runtime")
+    api project(":router")
     compileOnly project(":inject-java")
 }
 

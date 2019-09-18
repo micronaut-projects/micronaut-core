@@ -1,12 +1,13 @@
 dependencies {
     compileOnly project(":inject-java")
-    compile dependencyVersion("rxjava2")
-    compile project(":http-netty")
-    compile project(":runtime")
-    compile dependencyModuleVersion("netty", "netty-handler-proxy")
+    annotationProcessor project(":inject-java")
+    api dependencyVersion("rxjava2")
+    api project(":http-netty")
+    api project(":runtime")
+    api dependencyModuleVersion("netty", "netty-handler-proxy")
 
     compileOnly dependencyVersion("reactor")
-    compile project(":websocket")
+    api project(":websocket")
 
     testImplementation project(":inject-groovy")
     testImplementation project(":validation")

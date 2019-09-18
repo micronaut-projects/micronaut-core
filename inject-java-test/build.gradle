@@ -1,11 +1,12 @@
 dependencies {
-    compile project(":inject-java")
-    compile "com.google.testing.compile:compile-testing:0.18"
-    compile dependencyVersion("groovy")
-    compile(dependencyVersion("spock")) {
+    api project(":inject-java")
+    api "com.google.testing.compile:compile-testing:0.18"
+    api dependencyVersion("groovy")
+    api(dependencyVersion("spock")) {
         exclude module:'groovy-all'
     }
-    compile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+
     testImplementation dependencyVersion("validation")
     testImplementation "javax.persistence:javax.persistence-api:2.2"
     testImplementation project(":runtime")

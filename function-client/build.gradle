@@ -1,11 +1,12 @@
 dependencies {
-    compile project(":function")
-    compile project(":http-client")
-    compile dependencyVersion("micronaut.aws"), {
+    api project(":function")
+    api project(":http-client")
+    api dependencyVersion("micronaut.aws"), {
         exclude module:'micronaut-http-client'
         exclude module:'micronaut-inject'
     }
-    compileOnly project(":inject-java")
+    api project(":inject-java")
+    annotationProcessor project(":inject-java")
     compileOnly dependencyVersion("micronaut.function.aws"), {
         exclude module:"micronaut-function"
     }
