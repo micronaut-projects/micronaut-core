@@ -4,5 +4,5 @@ dependencies {
     compileOnly dependencyModuleVersion("spring", "spring-jdbc")
     compileOnly dependencyModuleVersion("spring", "spring-tx")
 
-    compile project(":inject")
+    api project(":inject")
 }

@@ -1,7 +1,7 @@
 shadowJar.enabled = true
 dependencies {
-    compile project(":runtime")
-    compile project(":http")
+    api project(":runtime")
+    api project(":http")
     
     compileOnly project(":inject-java")
     compileOnly project(":http-server")

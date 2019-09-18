@@ -1,14 +1,14 @@
 shadowJar.enabled = true
 dependencies {
     for(proj in ['inject', 'http', 'aop']) {
-        compile project(":$proj")
+        api project(":$proj")
     }
     compileOnly "com.oracle.substratevm:svm:$graalVersion"
     compileOnly project(":graal")
     compileOnly dependencyVersion("jcache")
-    compile dependencyVersion("validation")
-    compile dependencyVersion("jackson.databind")
-    compile dependencyVersion("rxjava2")
+    api dependencyVersion("validation")
+    api dependencyVersion("jackson.databind")
+    api dependencyVersion("rxjava2")
 
     compile([
         dependencyVersion('jackson.datatype'),
@@ -35,7 +35,7 @@ dependencies {
     compileOnly dependencyVersion("reactor")
     compileOnly dependencyVersion("rxjava1.interop")
     compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-    compileOnly project(":inject-java")
+    annotationProcessor project(":inject-java")
 
     testImplementation 'org.jsr107.ri:cache-ri-impl:1.1.0'
     testImplementation dependencyVersion("jcache")

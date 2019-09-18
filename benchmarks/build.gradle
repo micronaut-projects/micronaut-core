@@ -7,11 +7,10 @@ dependencies {
     annotationProcessor project(":validation")
     compileOnly project(":inject-java")
     compileOnly project(":validation")
-    compile project(":inject")
-    compile project(":inject-java-test")
-    compile project(":validation")
-    compile project(":runtime")
-
+    api project(":inject")
+    api project(":inject-java-test")
+    api project(":validation")
+    api project(":runtime")
 
     jmh 'org.openjdk.jmh:jmh-core:1.22'
     jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.21'

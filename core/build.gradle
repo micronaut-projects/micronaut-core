@@ -4,9 +4,9 @@ shadowJar {
 }
 
 dependencies {
-    compile dependencyVersion("slf4j")
-    compile dependencyVersion("reactive.streams")
-    compile dependencyVersion("jsr305")
+    api dependencyVersion("slf4j")
+    api dependencyVersion("reactive.streams")
+    api dependencyVersion("jsr305")
     
     compileOnly "org.ow2.asm:asm-tree:$asmVersion"
     shadowCompile "org.ow2.asm:asm:$asmVersion"

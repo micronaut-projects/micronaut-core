@@ -613,7 +613,7 @@ subprojects { Project subproject ->
         // apply plugin:"org.grails.grails-web"
     } else {
         apply plugin: "groovy"
-        apply plugin: "java"
+        apply plugin: "java-library"
 
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
@@ -708,7 +708,7 @@ subprojects { Project subproject ->
         documentation "org.codehaus.groovy:groovy-templates:$groovyVersion"
         documentation "org.codehaus.groovy:groovy-dateutil:$groovyVersion"
         if (subproject.name != "bom") {
-            compile dependencyVersion("slf4j")
+            api dependencyVersion("slf4j")
         }
 
 

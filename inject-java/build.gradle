@@ -1,6 +1,6 @@
 dependencies {
-    compile project(":inject")
-    compile project(":aop")
+    api project(":inject")
+    api project(":aop")
 
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compileOnly dependencyVersion("validation")

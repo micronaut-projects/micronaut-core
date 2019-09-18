@@ -1,4 +1,4 @@
 dependencies {
-    compile project(":inject")
+    api project(":inject")
 }
 shadowJar.enabled = true
