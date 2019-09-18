@@ -9,4 +9,7 @@ dependencies {
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
     testImplementation project(":http-server-netty")
+
+    testAnnotationProcessor project(":inject-java")
+    testAnnotationProcessor project(":inject-groovy")
 }

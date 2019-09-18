@@ -5,4 +5,5 @@ dependencies {
     api project(":http")
 
     testImplementation project(":inject-java")
+    testAnnotationProcessor project(":inject-java")
 }

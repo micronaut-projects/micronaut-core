@@ -5,6 +5,7 @@ dependencies {
     api project(":graal")
 
     testImplementation project(":inject-groovy")
+    testAnnotationProcessor project(":inject-groovy")
 }
 
 //compileJava.options.fork = true
