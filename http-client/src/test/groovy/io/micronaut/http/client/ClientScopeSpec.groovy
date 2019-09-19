@@ -16,13 +16,16 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Get
+import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Retry
 import spock.lang.Shared
@@ -43,9 +46,12 @@ class ClientScopeSpec extends Specification {
     @Shared
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run(
+            'spec.name': 'ClientScopeSpec',
             'from.config': '/',
             'micronaut.server.port':port,
-            'micronaut.http.services.my-service.url': "http://localhost:$port"
+            'micronaut.http.services.my-service.url': "http://localhost:$port",
+            'micronaut.http.services.my-service-declared.url': "http://my-service-declared:$port",
+            'micronaut.http.services.my-service-declared.path': "/my-declarative-client-path"
     )
 
     @Shared
@@ -95,6 +101,24 @@ class ClientScopeSpec extends Specification {
         expect:
         myService.getPath() == 'success'
         myServiceField.getPath() == 'success'
+    }
+
+    void "test injection after declarative client"() {
+        given:
+        MyDeclarativeService client = context.getBean(MyDeclarativeService)
+
+        when:
+        client.name()
+
+        then:
+        thrown(HttpClientException)
+
+        when:
+        MyJavaService myJavaService = context.getBean(MyJavaService)
+
+        then:
+        Flowable.fromPublisher(((DefaultHttpClient) myJavaService.client)
+                .resolveRequestURI(HttpRequest.GET("/foo"))).blockingFirst().toString() == "http://localhost:${port}/foo"
     }
 
     @Controller('/scope')
@@ -171,5 +195,13 @@ class ClientScopeSpec extends Specification {
                     HttpRequest.GET('/scope'), String
             )
         }
+    }
+
+    @Requires(property = 'spec.name', value = "ClientScopeSpec")
+    @Client(id = 'my-service-declared')
+    static interface MyDeclarativeService {
+
+        @Get
+        String name()
     }
 }
