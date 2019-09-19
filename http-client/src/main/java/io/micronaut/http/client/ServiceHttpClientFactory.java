@@ -16,10 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Parameter;
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.*;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
@@ -85,6 +82,7 @@ public class ServiceHttpClientFactory {
      */
     @EachBean(ServiceHttpClientConfiguration.class)
     @Requires(condition = ServiceHttpClientCondition.class)
+    @Secondary
     DefaultHttpClient serviceHttpClient(
             @Parameter ServiceHttpClientConfiguration configuration,
             @Parameter StaticServiceInstanceList instanceList) {
