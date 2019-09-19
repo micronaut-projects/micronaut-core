@@ -6,6 +6,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.channel.Channel
 import io.netty.channel.pool.AbstractChannelPoolMap
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -23,23 +24,30 @@ class ConnectionTTLSpec extends Specification {
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
 
-    void "Should close the connections accoridng to connect-ttl"() {
+    def "should close connection according to connect-ttl"() {
         setup:
         ApplicationContext clientContext = ApplicationContext.run(
           'my.port':embeddedServer.getPort(),
-          'micronaut.http.client.connect-ttl':'100ms',
+          'micronaut.http.client.connect-ttl':'1000ms',
           'micronaut.http.client.pool.enabled':true
         )
         DefaultHttpClient httpClient = clientContext.createBean(DefaultHttpClient, embeddedServer.getURL())
 
 
-        when:"make bunch of requests"
-        (1..50).collect{httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockingFirst()}
+        when:"make first request"
+        httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockingFirst()
+        Channel ch = getQueuedChannels(httpClient).first
 
+        then:"ensure that connection is open as connect-ttl is not reached"
+        getQueuedChannels(httpClient).size() == 1
+        ch.isOpen()
 
-        then:"ensure that all connections are closed"
+        when:"make another request in which connect-ttl will exceed"
+        httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockingFirst()
+
+        then:"ensure no connections in queue"
         getQueuedChannels(httpClient).size() == 0
-       // clientContext.getBean(ChannelHandlerContext.class)
+
 
         cleanup:
         httpClient.close()
@@ -60,8 +68,13 @@ class ConnectionTTLSpec extends Specification {
     static class GetController {
 
         @Get(value = "/", produces = MediaType.TEXT_PLAIN)
-        String index() {
-            Thread.sleep(99)
+        String get() {
+            return "success"
+        }
+
+        @Get(value = "/slow", produces = MediaType.TEXT_PLAIN)
+        String getSlow() {
+            sleep 1100
             return "success"
         }
     }
