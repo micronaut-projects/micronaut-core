@@ -17,6 +17,7 @@ package io.micronaut.inject.env;
 
 import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.io.ResourceLoader;
 
 import javax.inject.Inject;
 
@@ -26,4 +27,7 @@ public class A {
 
     @Inject
     DefaultEnvironment defaultEnvironment;
+
+    @Inject
+    ResourceLoader resourceLoader;
 }
