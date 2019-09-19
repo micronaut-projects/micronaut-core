@@ -32,15 +32,6 @@ The following example implements the previous `MessageController` example using 
 
 snippet::io.micronaut.docs.server.request.MessageController[tags="imports,class", indent=0, title="Request and Response Example"]
 
-//
-//.Request and Response Example
-//[source,java]
-//----
-//include::{testsuite}/server/request/MessageController.java[tags=imports, indent=0]
-//
-//include::{testsuite}/server/request/MessageController.java[tags=class, indent=0]
-//----
-
 <1> The factory methods of the api:http.HttpResponse[] are statically imported
 <2> The method is mapped to the URI `/hello` and accepts a api:io.micronaut.http.HttpRequest[]
 <3> The api:http.HttpRequest[] is used to obtain the value of a query parameter called `name`.
