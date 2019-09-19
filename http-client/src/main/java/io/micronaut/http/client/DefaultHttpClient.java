@@ -270,7 +270,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
                         final Long acquireTimeoutMillis = connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L);
-                        return new FixedChannelPool(
+                        FixedChannelPool channelPool =  new FixedChannelPool(
                                 newBootstrap,
                                 channelPoolHandler,
                                 ChannelHealthChecker.ACTIVE,
@@ -280,6 +280,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                 connectionPoolConfiguration.getMaxPendingAcquires()
 
                         );
+
+                        return wrapWithConnectChannelPool(channelPool);
                     }
                 };
             } else {
@@ -290,7 +292,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         newBootstrap.remoteAddress(key.getRemoteAddress());
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
                         SimpleChannelPool channelPool = new SimpleChannelPool(newBootstrap,channelPoolHandler);
-                        return  new ConnectTTLChannelPool(channelPool,RELEASE_CHANNEL);
+                        return wrapWithConnectChannelPool(channelPool);
                     }
                 };
             }
@@ -2428,6 +2430,17 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
         CurrentEvent(CompositeByteBuf data) {
             this.data = data;
+        }
+    }
+
+    private ChannelPool wrapWithConnectChannelPool(ChannelPool channelPool){
+
+        if(connectionTimeAliveMillis != null){
+            return new ConnectTTLChannelPool(channelPool,RELEASE_CHANNEL);
+        }
+        else
+        {
+            return channelPool;
         }
     }
 }

@@ -10,10 +10,7 @@ import io.netty.channel.pool.AbstractChannelPoolMap
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-import io.micronaut.http.client.annotation.Client
-import javax.inject.Inject
 import java.lang.reflect.Field
-import java.util.concurrent.CompletableFuture
 
 class ConnectionTTLSpec extends Specification {
 
@@ -42,6 +39,7 @@ class ConnectionTTLSpec extends Specification {
 
         then:"ensure that all connections are closed"
         getQueuedChannels(httpClient).size() == 0
+       // clientContext.getBean(ChannelHandlerContext.class)
 
         cleanup:
         httpClient.close()
@@ -56,23 +54,16 @@ class ConnectionTTLSpec extends Specification {
         Map innerMap = mapField.get(poolMap)
         return innerMap.values().first().delegatePool.deque
     }
+
+
     @Controller('/connectTTL')
     static class GetController {
-        @Inject
-        ConnectTTLClient ConnectTTLClient
 
         @Get(value = "/", produces = MediaType.TEXT_PLAIN)
         String index() {
             Thread.sleep(99)
             return "success"
         }
-    }
-
-    @Client('/connectTTL')
-    static interface ConnectTTLClient {
-
-        @Get("/get")
-        CompletableFuture<String> getFuture()
     }
 
 }
