@@ -2,11 +2,6 @@ A Micronaut's controller action consumes `application/json` by default. Nonethel
 
 snippet::io.micronaut.docs.server.consumes.TestController[tags="clazz", indent=0]
 
-//[source,java]
-//----
-//include::{testshttpservernetty}/consumes/TestController.groovy[tags=clazz, indent=0]
-//----
-
 <1> `@Consumes` annotation takes a `String[]` of supported media types for an incoming request.
 <2> By default, a controller's action consumes request with `Content-Type` of type `application/json`.
 
