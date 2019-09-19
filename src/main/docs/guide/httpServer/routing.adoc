@@ -147,15 +147,6 @@ To start off with you should subclass link:{api}/io/micronaut/web/router/Default
 
 snippet::io.micronaut.docs.server.routes.MyRoutes[tags="imports,class", indent=0, title="URI Variables Example"]
 
-
-//.RouteBuilder Example
-//[source,java]n
-//----
-//include::{testsuite}/server/routes/MyRoutes.java[tags=imports, indent=0]
-//
-//include::{testsuite}/server/routes/MyRoutes.java[tags=class, indent=0]
-//----
-
 <1> Route definitions should subclass link:{api}/io/micronaut/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder]
 <2> Use `@Inject` to inject a method with the controllers you want to route to
 <3> Use methods such as link:{api}/io/micronaut/web/router/RouteBuilder.html#GET-java.lang.String-java.lang.Class-java.lang.String-java.lang.Class...-[GET] to route to controller methods
