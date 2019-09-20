@@ -35,6 +35,10 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
     private final Long connectionTtlMillis;
     private ScheduledFuture<?> channelKiller;
 
+    /**
+     * Construct ConnectTTLHandler for given arguments
+     * @param connectionTtlMillis
+     */
     public ConnectTTLHandler(Long connectionTtlMillis) {
         if (connectionTtlMillis <= 0) {
             throw new IllegalArgumentException("connectTTL must be positive");
@@ -42,17 +46,30 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
         this.connectionTtlMillis = connectionTtlMillis;
     }
 
+    /**
+     * Will schedule a task when the handler added
+     * @param ctx
+     * @throws Exception
+     */
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         super.handlerAdded(ctx);
         channelKiller = ctx.channel().eventLoop().schedule(() -> closeChannel(ctx), connectionTtlMillis, TimeUnit.MILLISECONDS);
     }
 
+    /**
+     * Will cancel the scheduled tasks when handler removed
+     * @param ctx
+     */
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) {
         channelKiller.cancel(false);
     }
 
+    /**
+     * Will set RELEASE_CHANNEL as true for the channel attribute when connect-ttl is reached
+     * @param ctx
+     */
     private void closeChannel(ChannelHandlerContext ctx) {
         if (ctx.channel().isOpen()) {
             ctx.channel().attr(RELEASE_CHANNEL).set(true);

@@ -57,6 +57,35 @@ class ConnectionTTLSpec extends Specification {
         clientContext.close()
     }
 
+  def "shouldn't close connection if connect-ttl is not passed"() {
+    setup:
+    ApplicationContext clientContext = ApplicationContext.run(
+      'my.port':embeddedServer.getPort(),
+      'micronaut.http.client.pool.enabled':true
+    )
+    DefaultHttpClient httpClient = clientContext.createBean(DefaultHttpClient, embeddedServer.getURL())
+
+
+    when:"make first request"
+    httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockingFirst()
+    Channel ch = getQueuedChannels(httpClient).first
+
+    then:"ensure that connection is open as connect-ttl is not reached"
+    ch.isOpen()
+
+    when:"make another request "
+    httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockingFirst()
+
+    then:"ensure channel is closed"
+    new PollingConditions().eventually {
+      ch.isOpen()
+    }
+
+    cleanup:
+    httpClient.close()
+    clientContext.close()
+  }
+
 
     Deque getQueuedChannels(RxHttpClient client) {
         AbstractChannelPoolMap poolMap = client.poolMap
