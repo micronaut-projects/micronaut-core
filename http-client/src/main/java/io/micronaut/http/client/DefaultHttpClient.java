@@ -2128,7 +2128,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     }
                 });
 
-                if (connectionTimeAliveMillis!=null) {
+                if (connectionTimeAliveMillis != null) {
                     ch.pipeline().addLast(HANDLER_CONNECT_TTL, new ConnectTTLHandler(connectionTimeAliveMillis));
                 }
             }

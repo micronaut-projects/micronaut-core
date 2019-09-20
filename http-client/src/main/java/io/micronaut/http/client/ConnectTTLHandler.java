@@ -36,8 +36,8 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
     private ScheduledFuture<?> channelKiller;
 
     /**
-     * Construct ConnectTTLHandler for given arguments
-     * @param connectionTtlMillis
+     * Construct ConnectTTLHandler for given arguments.
+     * @param connectionTtlMillis The configured connect-ttl
      */
     public ConnectTTLHandler(Long connectionTtlMillis) {
         if (connectionTtlMillis <= 0) {
@@ -47,8 +47,8 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
     }
 
     /**
-     * Will schedule a task when the handler added
-     * @param ctx
+     * Will schedule a task when the handler added.
+     * @param ctx The context to use
      * @throws Exception
      */
     @Override
@@ -58,8 +58,8 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
     }
 
     /**
-     * Will cancel the scheduled tasks when handler removed
-     * @param ctx
+     * Will cancel the scheduled tasks when handler removed.
+     * @param ctx The context to use
      */
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) {
@@ -67,8 +67,8 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
     }
 
     /**
-     * Will set RELEASE_CHANNEL as true for the channel attribute when connect-ttl is reached
-     * @param ctx
+     * Will set RELEASE_CHANNEL as true for the channel attribute when connect-ttl is reached.
+     * @param ctx The context to use
      */
     private void closeChannel(ChannelHandlerContext ctx) {
         if (ctx.channel().isOpen()) {
