@@ -238,7 +238,10 @@ public abstract class HttpClientConfiguration {
         return Optional.ofNullable(connectTimeout);
     }
 
-    public Optional<Duration> getConnectTtl(){ return Optional.ofNullable(connectTtl); }
+    /**
+     * @return The default connectTtl.
+     */
+    public Optional<Duration> getConnectTtl() { return Optional.ofNullable(connectTtl); }
 
     /**
      * The amount of time to wait for shutdown.
@@ -285,7 +288,12 @@ public abstract class HttpClientConfiguration {
         this.connectTimeout = connectTimeout;
     }
 
-    public void setConnectTtl(@Nullable Duration connectTtl){ this.connectTtl = connectTtl;}
+    /**
+     * Sets the connect timeout.
+     *
+     * @param connectTtl The connect timeout
+     */
+    public void setConnectTtl(@Nullable Duration connectTtl){ this.connectTtl = connectTtl; }
 
     /**
      * @return The number of threads the client should use for requests

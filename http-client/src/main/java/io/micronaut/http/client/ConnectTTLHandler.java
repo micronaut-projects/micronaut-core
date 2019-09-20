@@ -1,11 +1,24 @@
+/*
+ * Copyright 2017-2019 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.client;
 
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.ScheduledFuture;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
 
@@ -16,14 +29,14 @@ import java.util.concurrent.TimeUnit;
  * released to the underlying connection pool.
  */
 public class ConnectTTLHandler extends ChannelDuplexHandler {
-    private static final Logger log = LoggerFactory.getLogger(ConnectTTLHandler.class);
-    private final Long connectionTtlMillis;
+
     public static final AttributeKey<Boolean> RELEASE_CHANNEL = AttributeKey.newInstance("release_channel");
 
+    private final Long connectionTtlMillis;
     private ScheduledFuture<?> channelKiller;
 
     public ConnectTTLHandler(Long connectionTtlMillis) {
-        if(connectionTtlMillis <=0){
+        if (connectionTtlMillis <= 0) {
             throw new IllegalArgumentException("connectTTL must be positive");
         }
         this.connectionTtlMillis = connectionTtlMillis;
@@ -32,7 +45,7 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         super.handlerAdded(ctx);
-        channelKiller = ctx.channel().eventLoop().schedule(()->closeChannel(ctx), connectionTtlMillis, TimeUnit.MILLISECONDS);
+        channelKiller = ctx.channel().eventLoop().schedule(() -> closeChannel(ctx), connectionTtlMillis, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -40,11 +53,8 @@ public class ConnectTTLHandler extends ChannelDuplexHandler {
         channelKiller.cancel(false);
     }
 
-
     private void closeChannel(ChannelHandlerContext ctx) {
         if (ctx.channel().isOpen()) {
-            log.trace( "Connection (" + ctx.channel().id() + ") will be closed during its next release, because it " +
-                    "has reached its maximum time to live of " + connectionTtlMillis + " milliseconds.");
             ctx.channel().attr(RELEASE_CHANNEL).set(true);
         }
     }

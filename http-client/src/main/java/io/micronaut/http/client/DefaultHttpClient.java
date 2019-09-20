@@ -98,7 +98,6 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
-import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -254,7 +253,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.readTimeoutMillis = readTimeout.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
 
         Optional<Duration> connectTtl = configuration.getConnectTtl();
-        this.connectionTimeAliveMillis = connectTtl.map(duration -> !duration.isNegative()? duration.toMillis() : null).orElse(null);
+        this.connectionTimeAliveMillis = connectTtl.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
 
         HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration = configuration.getConnectionPoolConfiguration();
         if (connectionPoolConfiguration.isEnabled()) {
@@ -269,7 +268,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
                         final Long acquireTimeoutMillis = connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L);
-                        FixedChannelPool channelPool =  new FixedChannelPool(
+                        return new FixedChannelPool(
                                 newBootstrap,
                                 channelPoolHandler,
                                 ChannelHealthChecker.ACTIVE,
@@ -279,8 +278,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                 connectionPoolConfiguration.getMaxPendingAcquires()
 
                         );
-
-                        return channelPool;
                     }
                 };
             } else {
@@ -290,8 +287,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         Bootstrap newBootstrap = bootstrap.clone(group);
                         newBootstrap.remoteAddress(key.getRemoteAddress());
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
-                        SimpleChannelPool channelPool = new SimpleChannelPool(newBootstrap,channelPoolHandler);
-                        return channelPool;
+                        return new SimpleChannelPool(
+                                newBootstrap,
+                                channelPoolHandler
+                        );
                     }
                 };
             }
@@ -2129,14 +2128,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     }
                 });
 
-                if(connectionTimeAliveMillis!=null){
+                if (connectionTimeAliveMillis!=null) {
                     ch.pipeline().addLast(HANDLER_CONNECT_TTL, new ConnectTTLHandler(connectionTimeAliveMillis));
                 }
             }
 
             @Override
             public void channelReleased(Channel ch) {
-                if(connectionTimeAliveMillis!=null){
+                if (connectionTimeAliveMillis != null) {
                     boolean shouldCloseOnRelease = Boolean.TRUE.equals(ch.attr(ConnectTTLHandler.RELEASE_CHANNEL).get());
 
                     if (shouldCloseOnRelease && ch.isOpen() && !ch.eventLoop().isShuttingDown()) {
