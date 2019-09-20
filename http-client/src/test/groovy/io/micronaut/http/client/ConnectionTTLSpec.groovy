@@ -11,6 +11,8 @@ import io.netty.channel.pool.AbstractChannelPoolMap
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
+
 import java.lang.reflect.Field
 
 class ConnectionTTLSpec extends Specification {
@@ -45,10 +47,11 @@ class ConnectionTTLSpec extends Specification {
         when:"make another request in which connect-ttl will exceed"
         httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockingFirst()
 
-        then:"ensure no connections in queue"
-        getQueuedChannels(httpClient).size() == 0
-
-
+        then:"ensure channel is closed"
+        new PollingConditions().eventually {
+            !ch.isOpen()
+        }
+        
         cleanup:
         httpClient.close()
         clientContext.close()
@@ -60,7 +63,7 @@ class ConnectionTTLSpec extends Specification {
         Field mapField = AbstractChannelPoolMap.getDeclaredField("map")
         mapField.setAccessible(true)
         Map innerMap = mapField.get(poolMap)
-        return innerMap.values().first().delegatePool.deque
+        return innerMap.values().first().deque
     }
 
 

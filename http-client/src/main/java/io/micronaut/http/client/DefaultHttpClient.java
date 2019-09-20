@@ -167,7 +167,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
     private static final String HANDLER_HTTP_CLIENT_INIT = "handler-http-client-init";
-    private static final AttributeKey RELEASE_CHANNEL = AttributeKey.newInstance("realse_channel");
 
     protected final Bootstrap bootstrap;
     protected EventLoopGroup group;
@@ -281,7 +280,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                         );
 
-                        return wrapWithConnectChannelPool(channelPool);
+                        return channelPool;
                     }
                 };
             } else {
@@ -292,7 +291,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         newBootstrap.remoteAddress(key.getRemoteAddress());
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
                         SimpleChannelPool channelPool = new SimpleChannelPool(newBootstrap,channelPoolHandler);
-                        return wrapWithConnectChannelPool(channelPool);
+                        return channelPool;
                     }
                 };
             }
@@ -2131,12 +2130,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 });
 
                 if(connectionTimeAliveMillis!=null){
-                    ch.pipeline().addLast(HANDLER_CONNECT_TTL,new ConnectTTLHandler(connectionTimeAliveMillis,RELEASE_CHANNEL));
+                    ch.pipeline().addLast(HANDLER_CONNECT_TTL, new ConnectTTLHandler(connectionTimeAliveMillis));
                 }
             }
 
             @Override
             public void channelReleased(Channel ch) {
+                if(connectionTimeAliveMillis!=null){
+                    boolean shouldCloseOnRelease = Boolean.TRUE.equals(ch.attr(ConnectTTLHandler.RELEASE_CHANNEL).get());
+
+                    if (shouldCloseOnRelease && ch.isOpen() && !ch.eventLoop().isShuttingDown()) {
+                        ch.close();
+                    }
+                }
+
                 if (readTimeoutMillis != null) {
                     ChannelPipeline pipeline = ch.pipeline();
                     if (pipeline.context(HANDLER_READ_TIMEOUT) != null) {
@@ -2430,17 +2437,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
         CurrentEvent(CompositeByteBuf data) {
             this.data = data;
-        }
-    }
-
-    private ChannelPool wrapWithConnectChannelPool(ChannelPool channelPool){
-
-        if(connectionTimeAliveMillis != null){
-            return new ConnectTTLChannelPool(channelPool,RELEASE_CHANNEL);
-        }
-        else
-        {
-            return channelPool;
         }
     }
 }

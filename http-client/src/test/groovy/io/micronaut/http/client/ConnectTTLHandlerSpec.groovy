@@ -2,15 +2,11 @@ package io.micronaut.http.client
 
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
-import io.netty.util.AttributeKey
-import spock.lang.Shared
 import spock.lang.Specification
 
 
 class ConnectTTLHandlerSpec extends Specification{
 
-  @Shared
-  AttributeKey key = AttributeKey.newInstance("RELEASE_CHANNEL")
 
   def "RELEASE_CHANNEL should be true for those channels who's connect-ttl is reached"(){
 
@@ -19,13 +15,13 @@ class ConnectTTLHandlerSpec extends Specification{
     ChannelHandlerContext context = Mock()
 
     when:
-    new ConnectTTLHandler(1,key).handlerAdded(context)
+    new ConnectTTLHandler(1).handlerAdded(context)
     channel.runAllPendingTasks()
 
     then:
     _ * context.channel() >> channel
 
-    channel.attr(key)
+    channel.attr(ConnectTTLHandler.RELEASE_CHANNEL)
 
   }
 

@@ -18,64 +18,34 @@ import java.util.concurrent.TimeUnit;
 public class ConnectTTLHandler extends ChannelDuplexHandler {
     private static final Logger log = LoggerFactory.getLogger(ConnectTTLHandler.class);
     private final Long connectionTtlMillis;
-    private final AttributeKey RELEASE_CHANNEL;
+    public static final AttributeKey<Boolean> RELEASE_CHANNEL = AttributeKey.newInstance("release_channel");
 
     private ScheduledFuture<?> channelKiller;
 
-    public ConnectTTLHandler(Long connectionTtlMillis,AttributeKey RELEASE_CHANNEL) {
+    public ConnectTTLHandler(Long connectionTtlMillis) {
         if(connectionTtlMillis <=0){
             throw new IllegalArgumentException("connectTTL must be positive");
         }
         this.connectionTtlMillis = connectionTtlMillis;
-        this.RELEASE_CHANNEL = RELEASE_CHANNEL;
     }
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-        initialize(ctx);
         super.handlerAdded(ctx);
-    }
-
-    @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        initialize(ctx);
-        super.channelActive(ctx);
-    }
-
-    @Override
-    public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
-        initialize(ctx);
-        super.channelRegistered(ctx);
-    }
-
-    private void initialize(ChannelHandlerContext ctx) {
-
-        if (channelKiller == null) {
-            channelKiller = ctx.channel().eventLoop().schedule(()->closeChannel(ctx), connectionTtlMillis, TimeUnit.MILLISECONDS);
-        }
+        channelKiller = ctx.channel().eventLoop().schedule(()->closeChannel(ctx), connectionTtlMillis, TimeUnit.MILLISECONDS);
     }
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) {
-        destroy();
-    }
-
-    private void destroy() {
-        if (channelKiller != null) {
-            channelKiller.cancel(false);
-            channelKiller = null;
-        }
+        channelKiller.cancel(false);
     }
 
 
     private void closeChannel(ChannelHandlerContext ctx) {
-        assert ctx.channel().eventLoop().inEventLoop();
         if (ctx.channel().isOpen()) {
-            log.info( "Connection (" + ctx.channel().id() + ") will be closed during its next release, because it " +
+            log.trace( "Connection (" + ctx.channel().id() + ") will be closed during its next release, because it " +
                     "has reached its maximum time to live of " + connectionTtlMillis + " milliseconds.");
             ctx.channel().attr(RELEASE_CHANNEL).set(true);
         }
-
-        channelKiller = null;
     }
 }
