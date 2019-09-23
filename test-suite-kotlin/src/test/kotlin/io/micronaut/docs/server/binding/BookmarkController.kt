@@ -20,7 +20,7 @@ class BookmarkController {
 
     // tag::listBooks[]
     @Get("/bookmarks/list{?paginationCommand*}")
-    fun list(@Valid paginationCommand: PaginationCommand?): HttpStatus {
+    open fun list(@Valid paginationCommand: PaginationCommand?): HttpStatus {
         return HttpStatus.OK
     }
     // end::listBooks[]
