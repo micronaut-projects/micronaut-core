@@ -505,6 +505,23 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
 
     /**
+     * looks up a bean introspection for the given object by instance's class or defined class.
+     *
+     * @param object The object, never null
+     * @param definedClass The defined class of the object, never null
+     * @return The introspection or null
+     */
+    @SuppressWarnings({"WeakerAccess", "unchecked"})
+    protected @Nullable BeanIntrospection<Object> getBeanIntrospection(@Nonnull Object object, @Nonnull Class<?> definedClass) {
+        //noinspection ConstantConditions
+        if (object == null) {
+            return null;
+        }
+        return BeanIntrospector.SHARED.findIntrospection((Class<Object>) object.getClass())
+                .orElseGet(() -> BeanIntrospector.SHARED.findIntrospection((Class<Object>) definedClass).orElse(null));
+    }
+
+    /**
      * looks up a bean introspection for the given object.
      *
      * @param object The object, never null
@@ -690,7 +707,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                 }
                             });
                         } else {
-                            final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterType);
+                            final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue, parameterType);
                             if (beanIntrospection != null) {
                                 try {
                                     context.addParameterNode(argument.getName(), i);
