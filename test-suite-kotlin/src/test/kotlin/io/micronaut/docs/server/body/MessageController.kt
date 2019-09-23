@@ -28,7 +28,7 @@ class MessageController {
 
     // tag::echo[]
     @Post(value = "/echo", consumes = [MediaType.TEXT_PLAIN]) // <1>
-    internal fun echo(@Size(max = 1024) @Body text: String): String { // <2>
+    open fun echo(@Size(max = 1024) @Body text: String): String { // <2>
         return text // <3>
     }
     // end::echo[]

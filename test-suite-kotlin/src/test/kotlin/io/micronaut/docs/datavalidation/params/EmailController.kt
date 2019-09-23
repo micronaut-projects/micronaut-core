@@ -16,10 +16,10 @@ import java.util.Collections
 //tag::clazz[]
 @Validated // <1>
 @Controller("/email")
-class EmailController {
+open class EmailController {
 
     @Get("/send")
-    fun send(@NotBlank recipient: String, // <2>
+    open fun send(@NotBlank recipient: String, // <2>
              @NotBlank subject: String): HttpResponse<*> { // <2>
         return HttpResponse.ok(Collections.singletonMap("msg", "OK"))
     }

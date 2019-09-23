@@ -13,6 +13,7 @@ import io.reactivex.Single
 import java.util.LinkedHashMap
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
+import java.util.function.Consumer
 
 /**
  * @author Graeme Rocher
@@ -22,7 +23,7 @@ import java.util.concurrent.CompletableFuture
 @Controller("/people")
 class PersonController {
 
-    internal var inMemoryDatastore: MutableMap<String, Person> = LinkedHashMap()
+    internal var inMemoryDatastore: MutableMap<String?, Person> = LinkedHashMap()
     // end::class[]
 
     @Get
