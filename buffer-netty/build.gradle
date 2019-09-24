@@ -3,4 +3,5 @@ dependencies {
     api dependencyModuleVersion("netty", "netty-buffer")
 
     compileOnly project(":inject-java")
+    annotationProcessor project(":inject-java")
 }

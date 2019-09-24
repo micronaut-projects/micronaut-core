@@ -5,6 +5,7 @@ dependencies {
     api project(":http")
     api project(":websocket")
     compileOnly project(":inject-java")
+    annotationProcessor project(":inject-java")
     api dependencyVersion("netty")
     api dependencyVersion("rxjava2")
     api dependencyModuleVersion("netty", "netty-handler")

@@ -11,7 +11,9 @@ dependencies {
 
     testImplementation project(":inject-groovy")
     testImplementation project(":validation")
+    testAnnotationProcessor project(":validation")
     testImplementation project(":inject-java")
+    testAnnotationProcessor project(":inject-java")
     testImplementation dependencyVersion("rxjava2")
     testImplementation dependencyVersion("reactor")
     testImplementation project(":http-server-netty")

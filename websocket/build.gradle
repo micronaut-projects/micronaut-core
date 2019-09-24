@@ -5,6 +5,7 @@ dependencies {
 
     api dependencyVersion("rxjava2")
     compileOnly project(":inject-java")
+    annotationProcessor project(":inject-java")
 
     testImplementation project(":inject-groovy")
 }
