@@ -28,7 +28,6 @@ dependencies {
     testImplementation project(':validation')
     testCompileOnly project(':inject-java')
     testAnnotationProcessor project(':inject-java')
-    testCompileOnly project(':inject-java')
     testCompileOnly project(':validation')
     testAnnotationProcessor project(':validation')
     testImplementation project(":http-client")

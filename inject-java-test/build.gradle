@@ -1,5 +1,6 @@
 dependencies {
     api project(":inject-java")
+    annotationProcessor project(":inject-java")
     api "com.google.testing.compile:compile-testing:0.12"
     api dependencyVersion("groovy")
     api(dependencyVersion("spock")) {

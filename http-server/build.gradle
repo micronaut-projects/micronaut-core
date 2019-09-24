@@ -4,6 +4,7 @@ dependencies {
     api project(":runtime")
     api project(":router")
     compileOnly project(":inject-java")
+    annotationProcessor project(":inject-java")
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
