@@ -33,7 +33,6 @@ import io.netty.handler.codec.http.HttpVersion;
 import org.apache.groovy.util.Maps;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Test;
 import org.mockito.Mockito;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -113,7 +112,6 @@ public class XmlDeserializationBenchmark {
     @Benchmark
     @BenchmarkMode(Mode.SampleTime)
     @OutputTimeUnit(TimeUnit.MILLISECONDS)
-    @Test
     public List<IntrospectedBook> xmlIntrospectedDeserialization() throws InterruptedException {
         String xmlRequestContent = "<book>\n" +
                 "    <author>\n" +
