@@ -626,17 +626,19 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @throws ConfigurationException If unable to find the appropriate property soruce loader for the given file
      */
     private void readPropertySourceFromLoader(String fileName, String filePath, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) throws ConfigurationException {
-        ResourceResolver resourceResolver = new ResourceResolver();
-        Optional<ResourceLoader> resourceLoader = resourceResolver.getSupportingLoader(filePath);
-        ResourceLoader loader = resourceLoader.orElse(FileSystemResourceLoader.defaultLoader());
-        try {
-            Optional<InputStream> inputStream = loader.getResourceAsStream(filePath);
-            if (inputStream.isPresent()) {
-                Map<String, Object> properties = propertySourceLoader.read(fileName, inputStream.get());
-                propertySources.add(PropertySource.of(properties));
+        if (!this.propertySources.containsKey(filePath)) {
+            ResourceResolver resourceResolver = new ResourceResolver();
+            Optional<ResourceLoader> resourceLoader = resourceResolver.getSupportingLoader(filePath);
+            ResourceLoader loader = resourceLoader.orElse(FileSystemResourceLoader.defaultLoader());
+            try {
+                Optional<InputStream> inputStream = loader.getResourceAsStream(filePath);
+                if (inputStream.isPresent()) {
+                    Map<String, Object> properties = propertySourceLoader.read(fileName, inputStream.get());
+                    propertySources.add(PropertySource.of(filePath, properties));
+                }
+            } catch (IOException e) {
+                throw new ConfigurationException("Unsupported properties file: " + fileName);
             }
-        } catch (IOException e) {
-            throw new ConfigurationException("Unsupported properties file: " + fileName);
         }
     }
 
