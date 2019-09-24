@@ -38,6 +38,7 @@ class EnvironmentInjectSpec extends Specification {
         a.environment.activeNames.contains(Environment.TEST)
         a.defaultEnvironment != null
         a.defaultEnvironment.activeNames.contains("foo")
+        a.resourceLoader != null
     }
 
     void "test environment resolution in sub annotations"() {

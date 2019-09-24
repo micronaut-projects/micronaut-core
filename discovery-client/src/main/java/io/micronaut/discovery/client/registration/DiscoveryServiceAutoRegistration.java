@@ -81,6 +81,7 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
 
             @Override
             public void onComplete() {
+                registered.set(true);
             }
         });
     }
@@ -125,6 +126,8 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error occurred de-registering service [" + applicationName + "] with " + discoveryService + ": " + t.getMessage(), t);
                 }
+            } finally {
+                registered.set(false);
             }
         } else {
             deregisterPublisher.subscribe(new Subscriber<HttpStatus>() {
@@ -145,11 +148,12 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error occurred de-registering service [" + applicationName + "] with " + discoveryService + ": " + t.getMessage(), t);
                     }
+                    registered.set(false);
                 }
 
                 @Override
                 public void onComplete() {
-
+                    registered.set(false);
                 }
             });
         }

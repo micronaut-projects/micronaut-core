@@ -2269,7 +2269,7 @@ public class DefaultBeanContext implements BeanContext {
         synchronized (singletonObjects) {
             if (definition instanceof NoInjectionBeanDefinition) {
                 NoInjectionBeanDefinition<T> manuallyRegistered = (NoInjectionBeanDefinition) definition;
-                BeanRegistration<T> reg = (BeanRegistration<T>) singletonObjects.get(new BeanKey(beanType, manuallyRegistered.getQualifier()));
+                BeanRegistration<T> reg = (BeanRegistration<T>) singletonObjects.get(new BeanKey(manuallyRegistered.getBeanType(), manuallyRegistered.getQualifier()));
                 if (reg == null) {
                     throw new IllegalStateException("Manually registered singleton no longer present in bean context");
                 }

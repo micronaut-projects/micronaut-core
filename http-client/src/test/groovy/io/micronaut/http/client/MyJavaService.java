@@ -23,8 +23,7 @@ import javax.inject.Singleton;
 @Singleton
 public class MyJavaService {
 
-    @Inject
-    @Client("/")
+    @Inject @Client("/")
     HttpClient client;
 
     @Inject @Client("/")

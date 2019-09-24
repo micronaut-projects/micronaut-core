@@ -516,7 +516,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                             }
                             Optional<Map<String, Object>> properties = readPropertiesFromLoader(fileName, filePath, propertySourceLoader.get());
                             if (properties.isPresent()) {
-                                propertySources.add(PropertySource.of(Environment.DEFAULT_NAME, properties.get(), order));
+                                propertySources.add(PropertySource.of(filePath, properties.get(), order));
                             }
                             order++;
                         } else {
