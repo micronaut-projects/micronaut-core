@@ -116,7 +116,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
             byte[] bytes = ByteBufUtil.getBytes(content);
             xmlChunkedInput.add(bytes);
             if (bytes.length == 0) {
-                if (!streamArray || feeder.needMoreInput()) {
+                if (feeder.needMoreInput()) {
                     if (LOG.isTraceEnabled()) {
                         LOG.trace("More input required to parse XML. Demanding more.");
                     }
@@ -124,11 +124,11 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
                 }
                 return;
             }
-            if (feeder.needMoreInput() && streamArray) {
+            if (feeder.needMoreInput()) {
                 parser.getInputFeeder().feedInput(bytes, 0, bytes.length);
                 processXml();
             }
-            if (!streamArray || feeder.needMoreInput()) {
+            if (feeder.needMoreInput()) {
                 if (LOG.isTraceEnabled()) {
                     LOG.trace("More input required to parse XML. Demanding more.");
                 }
@@ -176,15 +176,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
             doOnError(new XMLStreamException("Unexpected end-of-input"));
         } else {
             try {
-                if (!streamArray) {
-                    currentDownstreamSubscriber().ifPresent(subscriber -> {
-                        subscriber.onNext(createXmlStream(flatInput()));
-                    });
-                }
-                else {
-                    processXml();
-                }
-
+                processXml();
                 parser.close();
                 super.doOnComplete();
             } catch (XMLStreamException e) {
