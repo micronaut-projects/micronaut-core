@@ -4,6 +4,6 @@ dependencies {
     annotationProcessor project(":inject-java")
     api project(":http")
 
-    testImplementation project(":inject-java")
+    testCompileOnly project(":inject-java")
     testAnnotationProcessor project(":inject-java")
 }

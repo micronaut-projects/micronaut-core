@@ -25,6 +25,7 @@ dependencies {
         exclude module:'micronaut-inject'
     }
     testImplementation project(":inject-groovy")
-    testImplementation project(":inject-java")
+    testCompileOnly project(":inject-java")
+    testAnnotationProcessor project(":inject-java")
     testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }
