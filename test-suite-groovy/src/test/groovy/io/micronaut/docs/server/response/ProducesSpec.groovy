@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.produces
+package io.micronaut.docs.server.response
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
