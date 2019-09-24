@@ -140,9 +140,9 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Prototype
-@Primary
 @Internal
 @BootstrapContextCompatible
+@Primary
 public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStreamingHttpClient, RxSseClient, Closeable, AutoCloseable {
 
     protected static final String HANDLER_AGGREGATOR = "http-aggregator";
