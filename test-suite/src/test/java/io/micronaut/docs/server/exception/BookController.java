@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.server.exception;
+package io.micronaut.docs.server.exception;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.MediaType;
