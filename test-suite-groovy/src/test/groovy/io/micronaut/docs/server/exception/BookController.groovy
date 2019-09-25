@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.server.exception;
+package io.micronaut.docs.server.exception;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.MediaType;
@@ -9,11 +9,11 @@ import io.micronaut.http.annotation.Produces;
 @Requires(property = "spec.name", value = "ExceptionHandlerSpec")
 //tag::clazz[]
 @Controller("/books")
-public class BookController {
+class BookController {
     @Produces(MediaType.TEXT_PLAIN)
     @Get("/stock/{isbn}")
     Integer stock(String isbn) {
-        throw new OutOfStockException();
+        throw new OutOfStockException()
     }
 }
 //end::clazz[]

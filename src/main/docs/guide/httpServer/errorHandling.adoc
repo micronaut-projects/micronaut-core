@@ -48,23 +48,16 @@ Additionally you can implement a api:http.server.exceptions.ExceptionHandler[]; 
 
 Imagine your e-commerce app throws an `OutOfStockException` when a book is out of stock:
 
-[source,java]
-----
-include::{testshttpservernetty}/http/server/exception/OutOfStockException.java[tags=clazz, indent=0]
-----
+snippet::io.micronaut.docs.server.exception.OutOfStockException[tags="clazz", indent=0]
 
-[source,java]
-----
-include::{testshttpservernetty}/http/server/exception/BookController.java[tags=clazz, indent=0]
-----
+Along with `BookController`:
+
+snippet::io.micronaut.docs.server.exception.BookController[tags="clazz", indent=0]
 
 If you don't handle the exception the server returns a 500 (Internal Server Error) status code.
 
 If you want to respond 200 OK with 0 (stock level) as the response body when the `OutOfStockException` is thrown, you could register a `ExceptionHandler`:
 
-[source,java]
-----
-include::{testshttpservernetty}/http/server/exception/OutOfStockExceptionHandler.java[tags=clazz, indent=0]
-----
+snippet::io.micronaut.docs.server.exception.OutOfStockExceptionHandler[tags="clazz", indent=0]
 
 IMPORTANT: An `@Error` annotation capturing an exception has precedence over an implementation of `ExceptionHandler` capturing the same exception.
