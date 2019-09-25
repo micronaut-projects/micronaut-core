@@ -16,10 +16,9 @@
  *
  */
 
-package io.micronaut.core;
+package io.micronaut.deserialization.xml;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.server.netty.HttpContentProcessor;
@@ -53,6 +52,7 @@ import org.reactivestreams.Subscription;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -62,6 +62,7 @@ public class XmlDeserializationBenchmark {
     private EmbeddedServer embeddedServer;
     private XmlHttpContentSubscriberFactory xmlContentProcessorFactory;
     private ConversionService conversionService;
+    private Random random = new Random();
 
     @Setup
     @Before
@@ -78,24 +79,10 @@ public class XmlDeserializationBenchmark {
     }
 
     @Benchmark
-    @BenchmarkMode(Mode.SampleTime)
+    @BenchmarkMode({Mode.SampleTime, Mode.Throughput})
     @OutputTimeUnit(TimeUnit.MILLISECONDS)
     public List<Book> xmlDeserialization() throws InterruptedException {
-        String xmlRequestContent = "<book>\n" +
-                "    <author>\n" +
-                "        <name>Author</name>\n" +
-                "    </author>\n" +
-                "    <bookName>bookName</bookName>\n" +
-                "    <field1>field1</field1>\n" +
-                "    <field2>field2</field2>\n" +
-                "    <field3>field3</field3>\n" +
-                "    <field4>field4</field4>\n" +
-                "    <field5>field5</field5>\n" +
-                "    <field6>field6</field6>\n" +
-                "    <field7>field7</field7>\n" +
-                "    <field8>field8</field8>\n" +
-                "</book>";
-
+        String xmlRequestContent = getXml();
 
         SimplePublisher<HttpContent> publisher = new SimplePublisher<>(xmlRequestContent);
         NettyHttpRequest nettyHttpRequest = createNettyRequest(publisher, xmlRequestContent);
@@ -110,23 +97,10 @@ public class XmlDeserializationBenchmark {
     }
 
     @Benchmark
-    @BenchmarkMode(Mode.SampleTime)
+    @BenchmarkMode({Mode.SampleTime, Mode.Throughput})
     @OutputTimeUnit(TimeUnit.MILLISECONDS)
     public List<IntrospectedBook> xmlIntrospectedDeserialization() throws InterruptedException {
-        String xmlRequestContent = "<book>\n" +
-                "    <author>\n" +
-                "        <name>Author</name>\n" +
-                "    </author>\n" +
-                "    <bookName>bookName</bookName>\n" +
-                "    <field1>field1</field1>\n" +
-                "    <field2>field2</field2>\n" +
-                "    <field3>field3</field3>\n" +
-                "    <field4>field4</field4>\n" +
-                "    <field5>field5</field5>\n" +
-                "    <field6>field6</field6>\n" +
-                "    <field7>field7</field7>\n" +
-                "    <field8>field8</field8>\n" +
-                "</book>";
+        String xmlRequestContent = getXml();
 
 
         SimplePublisher<HttpContent> publisher = new SimplePublisher<>(xmlRequestContent);
@@ -139,6 +113,23 @@ public class XmlDeserializationBenchmark {
         downstreamSubscriber.latch.await(5, TimeUnit.SECONDS);
 
         return downstreamSubscriber.receivedItems;
+    }
+
+    private String getXml() {
+        return "<book>\n" +
+                "    <author>\n" +
+                "        <name>Author" + random.nextInt() + "</name>\n" +
+                "    </author>\n" +
+                "    <bookName>bookName</bookName>\n" +
+                "    <field1>field1</field1>\n" +
+                "    <field2>field2</field2>\n" +
+                "    <field3>field3</field3>\n" +
+                "    <field4>field4</field4>\n" +
+                "    <field5>field5</field5>\n" +
+                "    <field6>field6</field6>\n" +
+                "    <field7>field7</field7>\n" +
+                "    <field8>field8</field8>\n" +
+                "</book>";
     }
 
     private NettyHttpRequest createNettyRequest(Publisher<HttpContent> publisher, String content) {
@@ -329,113 +320,6 @@ public class XmlDeserializationBenchmark {
     }
 
     static class Author {
-        String name;
-
-        public String getName() {
-            return this.name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-    }
-
-    @Introspected
-    public static class IntrospectedBook {
-        IntrospectedAuthor author;
-        String bookName;
-        String field1;
-        String field2;
-        String field3;
-        String field4;
-        String field5;
-        String field6;
-        String field7;
-        String field8;
-
-        public IntrospectedAuthor getAuthor() {
-            return this.author;
-        }
-
-        public void setAuthor(IntrospectedAuthor author) {
-            this.author = author;
-        }
-
-        public String getBookName() {
-            return this.bookName;
-        }
-
-        public void setBookName(String bookName) {
-            this.bookName = bookName;
-        }
-
-        public String getField1() {
-            return this.field1;
-        }
-
-        public void setField1(String field1) {
-            this.field1 = field1;
-        }
-
-        public String getField2() {
-            return this.field2;
-        }
-
-        public void setField2(String field2) {
-            this.field2 = field2;
-        }
-
-        public String getField3() {
-            return this.field3;
-        }
-
-        public void setField3(String field3) {
-            this.field3 = field3;
-        }
-
-        public String getField4() {
-            return this.field4;
-        }
-
-        public void setField4(String field4) {
-            this.field4 = field4;
-        }
-
-        public String getField5() {
-            return this.field5;
-        }
-
-        public void setField5(String field5) {
-            this.field5 = field5;
-        }
-
-        public String getField6() {
-            return this.field6;
-        }
-
-        public void setField6(String field6) {
-            this.field6 = field6;
-        }
-
-        public String getField7() {
-            return this.field7;
-        }
-
-        public void setField7(String field7) {
-            this.field7 = field7;
-        }
-
-        public String getField8() {
-            return this.field8;
-        }
-
-        public void setField8(String field8) {
-            this.field8 = field8;
-        }
-    }
-
-    @Introspected
-    public static class IntrospectedAuthor {
         String name;
 
         public String getName() {
