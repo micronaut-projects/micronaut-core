@@ -15,6 +15,7 @@ dependencies {
     compileOnly project(":inject-java")
     compile project(":inject")
 
+    testCompileOnly project(":test-suite-helper")
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
     testCompile project(":validation")
@@ -52,6 +53,8 @@ dependencies {
     testRuntime dependencyVersion("h2")
     testRuntime "org.junit.vintage:junit-vintage-engine:$junit5Version"
     testRuntime "ch.qos.logback:logback-classic:1.2.3"
+
+    //testAnnotationProcessor project(":test-suite-helper")
 }
 
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
