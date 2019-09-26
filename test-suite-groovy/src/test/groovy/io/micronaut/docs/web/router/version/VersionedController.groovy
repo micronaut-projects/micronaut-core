@@ -1,8 +1,10 @@
-package io.micronaut.web.router.version;
+package io.micronaut.docs.web.router.version
 
 // tag::imports[]
-import io.micronaut.core.version.annotation.Version;
-import io.micronaut.http.annotation.*;
+
+import io.micronaut.core.version.annotation.Version
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 // end::imports[]
 
 
@@ -13,25 +15,25 @@ class VersionedController {
     @Version("1") // <1>
     @Get("/hello")
     String helloV1() {
-        return "helloV1";
+        "helloV1"
     }
 
     @Version("2") // <2>
     @Get("/hello")
     String helloV2() {
-        return "helloV2";
+        "helloV2"
     }
 // end::clazz[]
 
     @Version("2")
     @Get("/hello")
     String duplicatedHelloV2() {
-        return "duplicatedHelloV2";
+        "duplicatedHelloV2"
     }
 
     @Get("/hello")
     String hello() {
-        return "hello";
+        "hello"
     }
 
 }
