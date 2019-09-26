@@ -51,10 +51,7 @@ Often, you want to respond 404 (Not Found) when you don't find an item in your p
 
 See the following example:
 
-[source,java]
-----
-include::{testshttpservernetty}/respondingnotfound/BooksController.java[tags=clazz]
-----
+snippet::io.micronaut.docs.respondingnotfound.BooksController[tags="clazz", indent=0]
 
 <1> Returning `null` triggers a 404 (Not Found) response.
 <2> Returning an empty `Maybe` triggers a 404 (Not Found) response.
