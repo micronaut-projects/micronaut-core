@@ -5,7 +5,7 @@ import io.micronaut.core.annotation.Introspected
 import javax.validation.constraints.NotBlank
 
 @Introspected
-class Email {
+open class Email {
 
     @NotBlank // <1>
     lateinit

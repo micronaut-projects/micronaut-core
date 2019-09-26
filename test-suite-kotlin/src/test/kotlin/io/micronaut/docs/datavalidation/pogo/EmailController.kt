@@ -17,10 +17,10 @@ import java.util.Collections
 //tag::clazz[]
 @Validated // <1>
 @Controller("/email")
-class EmailController {
+open class EmailController {
 
     @Post("/send")
-    fun send(@Body @Valid email: Email): HttpResponse<*> { // <2>
+    open fun send(@Body @Valid email: Email): HttpResponse<*> { // <2>
         return HttpResponse.ok(Collections.singletonMap("msg", "OK"))
     }
 }

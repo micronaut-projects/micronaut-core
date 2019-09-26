@@ -12,7 +12,7 @@ import javax.inject.Singleton
 //tag::clazz[]
 @Produces
 @Singleton
-@Requires(classes = [OutOfStockException::class, ExceptionHandler<*, *>::class])
+//@Requires(classes = [OutOfStockException::class, ExceptionHandler<*, *>::class])
 class OutOfStockExceptionHandler : ExceptionHandler<OutOfStockException, HttpResponse<*>> {
 
     override fun handle(request: HttpRequest<*>, exception: OutOfStockException): HttpResponse<*> {
