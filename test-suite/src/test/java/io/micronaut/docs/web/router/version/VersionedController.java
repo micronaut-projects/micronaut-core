@@ -1,8 +1,10 @@
-package io.micronaut.web.router.version;
+package io.micronaut.docs.web.router.version;
 
 // tag::imports[]
+
 import io.micronaut.core.version.annotation.Version;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
 // end::imports[]
 
 
