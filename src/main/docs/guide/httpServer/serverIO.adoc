@@ -39,13 +39,7 @@ TIP: See the section on configuring <<threadPools, Server Thread Pools>> for det
 
 The following example demonstrates how to use this API with Groovy's `SimpleTemplateEngine` to write a server side template:
 
-.Performing Blocking I/O
-[source,java]
-----
-include::{testshttpservernetty}/writable/TemplateController.java[tags=imports, indent=0]
-
-include::{testshttpservernetty}/writable/TemplateController.java[tags=clazz, indent=0]
-----
+snippet::io.micronaut.docs.writable.TemplateController[tags="imports,clazz", indent=0, title="Performing Blocking I/O"]
 
 <1> The controller creates a simple template
 <2> The controller method returns a api:core.io.Writable[]
