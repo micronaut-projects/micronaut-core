@@ -184,8 +184,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitions.forEach(className -> {
                 if (processed.add(className)) {
                     final TypeElement refreshedClassElement = elementUtils.getTypeElement(className);
-                    final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(refreshedClassElement);
                     try {
+                        final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(refreshedClassElement);
                         refreshedClassElement.accept(visitor, className);
                         visitor.getBeanDefinitionWriters().forEach((name, writer) -> {
                             String beanDefinitionName = writer.getBeanDefinitionName();
