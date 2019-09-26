@@ -19,7 +19,9 @@
 package io.micronaut.deserialization.xml;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.core.async.subscriber.TypedSubscriber;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -29,9 +31,11 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpVersion;
+import io.reactivex.Flowable;
 import org.apache.groovy.util.Maps;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Test;
 import org.mockito.Mockito;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -49,6 +53,9 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -85,7 +92,7 @@ public class XmlDeserializationBenchmark {
         String xmlRequestContent = getXml();
 
         SimplePublisher<HttpContent> publisher = new SimplePublisher<>(xmlRequestContent);
-        NettyHttpRequest nettyHttpRequest = createNettyRequest(publisher, xmlRequestContent);
+        NettyHttpRequest nettyHttpRequest = createNettyRequest(publisher, xmlRequestContent.getBytes().length);
         HttpContentProcessor processor = xmlContentProcessorFactory.build(nettyHttpRequest);
 
         DownstreamSubscriber<Book> downstreamSubscriber = new DownstreamSubscriber<>(conversionService, Book.class);
@@ -104,10 +111,68 @@ public class XmlDeserializationBenchmark {
 
 
         SimplePublisher<HttpContent> publisher = new SimplePublisher<>(xmlRequestContent);
-        NettyHttpRequest nettyHttpRequest = createNettyRequest(publisher, xmlRequestContent);
+        NettyHttpRequest nettyHttpRequest = createNettyRequest(publisher, xmlRequestContent.getBytes().length);
         HttpContentProcessor processor = xmlContentProcessorFactory.build(nettyHttpRequest);
 
         DownstreamSubscriber<IntrospectedBook> downstreamSubscriber = new DownstreamSubscriber<>(conversionService, IntrospectedBook.class);
+        processor.subscribe(downstreamSubscriber);
+
+        downstreamSubscriber.latch.await(5, TimeUnit.SECONDS);
+
+        return downstreamSubscriber.receivedItems;
+    }
+
+    @Benchmark
+    @BenchmarkMode({Mode.SampleTime, Mode.Throughput})
+    @OutputTimeUnit(TimeUnit.MILLISECONDS)
+    @Test
+    public List streamingXmlDeserialization() throws InterruptedException {
+
+        List<String> xmlParts = new ArrayList<>(12);
+        xmlParts.add("<books>");
+        for (int i = 0; i < 10; i++) {
+            xmlParts.add(getXml());
+        }
+        xmlParts.add("</books>");
+
+        int contentLength = xmlParts.stream().map(String::getBytes).mapToInt(Array::getLength).sum();
+
+        SimplePublisher<HttpContent> publisher = new SimplePublisher<>(xmlParts);
+        NettyHttpRequest nettyHttpRequest = createNettyRequest(publisher, contentLength);
+        HttpContentProcessor processor = xmlContentProcessorFactory.build(nettyHttpRequest);
+
+        DownstreamTypedSubscriber downstreamSubscriber = new DownstreamTypedSubscriber<>(
+                conversionService, Book.class, Argument.of(Flowable.class, Object.class)
+        );
+        processor.subscribe(downstreamSubscriber);
+
+        downstreamSubscriber.latch.await(5, TimeUnit.SECONDS);
+
+        return downstreamSubscriber.receivedItems;
+    }
+
+    @Benchmark
+    @BenchmarkMode({Mode.SampleTime, Mode.Throughput})
+    @OutputTimeUnit(TimeUnit.MILLISECONDS)
+    @Test
+    public List streamingXmlIntrospectedDeserialization() throws InterruptedException {
+
+        List<String> xmlParts = new ArrayList<>(12);
+        xmlParts.add("<books>");
+        for (int i = 0; i < 10; i++) {
+            xmlParts.add(getXml());
+        }
+        xmlParts.add("</books>");
+
+        int contentLength = xmlParts.stream().map(String::getBytes).mapToInt(Array::getLength).sum();
+
+        SimplePublisher<HttpContent> publisher = new SimplePublisher<>(xmlParts);
+        NettyHttpRequest nettyHttpRequest = createNettyRequest(publisher, contentLength);
+        HttpContentProcessor processor = xmlContentProcessorFactory.build(nettyHttpRequest);
+
+        DownstreamTypedSubscriber downstreamSubscriber = new DownstreamTypedSubscriber<>(
+                conversionService, IntrospectedBook.class, Argument.of(Flowable.class, Object.class)
+        );
         processor.subscribe(downstreamSubscriber);
 
         downstreamSubscriber.latch.await(5, TimeUnit.SECONDS);
@@ -132,7 +197,7 @@ public class XmlDeserializationBenchmark {
                 "</book>";
     }
 
-    private NettyHttpRequest createNettyRequest(Publisher<HttpContent> publisher, String content) {
+    private NettyHttpRequest createNettyRequest(Publisher<HttpContent> publisher, int contentLength) {
         DefaultStreamedHttpRequest streamedHttpRequest = new DefaultStreamedHttpRequest(
                 HttpVersion.HTTP_1_1,
                 io.netty.handler.codec.http.HttpMethod.POST,
@@ -141,7 +206,7 @@ public class XmlDeserializationBenchmark {
         );
 
         NettyHttpRequest nettyHttpRequest = Mockito.mock(NettyHttpRequest.class);
-        Mockito.when(nettyHttpRequest.getContentLength()).thenReturn((long)content.getBytes().length);
+        Mockito.when(nettyHttpRequest.getContentLength()).thenReturn((long)contentLength);
         Mockito.when(nettyHttpRequest.getNativeRequest()).thenReturn(streamedHttpRequest);
 
         return nettyHttpRequest;
@@ -151,7 +216,7 @@ public class XmlDeserializationBenchmark {
         Options opt = new OptionsBuilder()
                 .include(".*" + XmlDeserializationBenchmark.class.getSimpleName() + ".*")
                 .warmupIterations(1)
-                .measurementIterations(5)
+                .measurementIterations(4)
                 .shouldFailOnError(true)
                 .forks(1)
                 .threads(1)
@@ -159,6 +224,40 @@ public class XmlDeserializationBenchmark {
                 .build();
 
         new Runner(opt).run();
+    }
+
+    static class DownstreamTypedSubscriber<R, T> extends  TypedSubscriber<T> {
+
+        private final CountDownLatch latch = new CountDownLatch(1);
+        private final List<R> receivedItems = new LinkedList<>();
+        private final ConversionService conversionService;
+        private final Class<R> type;
+
+        public DownstreamTypedSubscriber(ConversionService conversionService, Class<R> type, Argument<T> argument) {
+            super(argument);
+            this.type = type;
+            this.conversionService = conversionService;
+        }
+
+        @Override
+        protected void doOnSubscribe(Subscription subscription) {
+            subscription.request(1);
+        }
+
+        @Override
+        protected void doOnNext(Object message) {
+            receivedItems.add((R)conversionService.convert(message, type).get());
+        }
+
+        @Override
+        protected void doOnError(Throwable t) {
+            latch.countDown();
+        }
+
+        @Override
+        protected void doOnComplete() {
+            latch.countDown();
+        }
     }
 
     static class DownstreamSubscriber<T> implements Subscriber {
@@ -201,6 +300,10 @@ public class XmlDeserializationBenchmark {
 
         SimplePublisher(String message) {
             this.queue.add(message);
+        }
+
+        SimplePublisher(Collection<String> messages) {
+            this.queue.addAll(messages);
         }
 
         @Override
