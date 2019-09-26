@@ -24,17 +24,17 @@ class TemplateController {
         template = initTemplate() // <1>
     }
 
-    @Get(value = "/welcome", produces = [MediaType.TEXT_PLAIN])
-    internal fun render(): Writable { // <2>
-        return { writer ->
-            template.make( // <3>
-                    CollectionUtils.mapOf(
-                            "firstName", "Fred",
-                            "lastName", "Flintstone"
-                    )
-            ).writeTo(writer)
-        }
-    }
+//    @Get(value = "/welcome", produces = [MediaType.TEXT_PLAIN])
+//    internal fun render(): Writable { // <2>
+//        return { writer ->
+//            template.make( // <3>
+//                    CollectionUtils.mapOf(
+//                            "firstName", "Fred",
+//                            "lastName", "Flintstone"
+//                    )
+//            ).writeTo(writer)
+//        }
+//    }
 
     private fun initTemplate(): Template {
         val template: Template
