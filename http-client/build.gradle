@@ -4,7 +4,6 @@ dependencies {
     compile project(":http-netty")
     compile project(":runtime")
     compile dependencyModuleVersion("netty", "netty-handler-proxy")
-    compile dependencyModuleVersion("netty", "netty-resolver-dns")
 
     compileOnly dependencyVersion("reactor")
     compile project(":websocket")
