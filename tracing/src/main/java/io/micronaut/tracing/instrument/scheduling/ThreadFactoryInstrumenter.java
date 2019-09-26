@@ -18,6 +18,7 @@ package io.micronaut.tracing.instrument.scheduling;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.tracing.instrument.util.TracingRunnable;
 import io.opentracing.Tracer;
 
@@ -32,6 +33,9 @@ import java.util.concurrent.ThreadFactory;
  */
 @Singleton
 @Requires(beans = Tracer.class)
+@Requires(property = ExecutorServiceInstrumenter.PROPERTY_INSTRUMENT_THREADS,
+          value = StringUtils.TRUE,
+          defaultValue = StringUtils.FALSE)
 public class ThreadFactoryInstrumenter implements BeanCreatedEventListener<ThreadFactory> {
     private final Tracer tracer;
 

@@ -260,7 +260,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         Bootstrap newBootstrap = bootstrap.clone(group);
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
-
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
                         final Long acquireTimeoutMillis = connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L);
                         return new FixedChannelPool(
@@ -281,6 +280,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     protected ChannelPool newPool(RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
                         newBootstrap.remoteAddress(key.getRemoteAddress());
+
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
                         return new SimpleChannelPool(
                                 newBootstrap,
@@ -2303,7 +2303,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         }
 
         public InetSocketAddress getRemoteAddress() {
-            return new InetSocketAddress(host, port);
+            return InetSocketAddress.createUnresolved(host, port);
         }
 
         public boolean isSecure() {
