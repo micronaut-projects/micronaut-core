@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
 import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 import io.opentracing.Scope;
+import io.opentracing.ScopeManager;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
 
@@ -59,13 +60,19 @@ public class TracingRunnableInstrumenter implements Function<Runnable, Runnable>
 
     @Override
     public Optional<RunnableInstrumenter> newInstrumentation() {
-        Span activeSpan = tracer.scopeManager().activeSpan();
+        final ScopeManager scopeManager = tracer.scopeManager();
+        Span activeSpan = scopeManager.activeSpan();
         if (activeSpan != null) {
             return Optional.of(new RunnableInstrumenter() {
                 @Override
                 public Runnable instrument(Runnable command) {
                     return () -> {
-                        try (Scope ignored = tracer.scopeManager().activate(activeSpan)) {
+                        final Span currentSpan = scopeManager.activeSpan();
+                        if (currentSpan != activeSpan) {
+                            try (Scope ignored = scopeManager.activate(activeSpan)) {
+                                command.run();
+                            }
+                        } else {
                             command.run();
                         }
                     };
