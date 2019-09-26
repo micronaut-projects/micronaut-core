@@ -16,7 +16,7 @@ Once your build is configured you have a few ways to generate introspection data
 
 ==== Use the `@Introspected` Annotation
 
-The ann:core.annotation.Introspected[] annotation can be used on any class which you want to make available for introspecton, simply annotate the class with ann:core.annotation.Introspected[]:
+The ann:core.annotation.Introspected[] annotation can be used on any class which you want to make available for introspection, simply annotate the class with ann:core.annotation.Introspected[]:
 
 snippet::io.micronaut.docs.ioc.beans.Person[tags="imports,class"]
 
