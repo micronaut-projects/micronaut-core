@@ -19,33 +19,30 @@ import javax.tools.StandardLocation;
 @SupportedAnnotationTypes("*")
 @SupportedSourceVersion(RELEASE_8)
 public class TestGeneratingAnnotationProcessor extends AbstractProcessor {
-    
+
     private boolean executed = false;
-    
+
     @Override
     public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
         if (executed) {
             return false;
         }
-        
+
         try {
             final String output = determineOutputPath();
             final File outputDir = new File(output);
-    
+
             switch (outputDir.getName()) {
                 case "main":
                 case "classes":
-                    return false;
+                    break;
                 case "test":
                 case "test-classes":
                     final JavaFileObject issue = processingEnv
                         .getFiler()
                         .createSourceFile("io.micronaut.test.generated.Example");
                     try (final Writer w = issue.openWriter()) {
-                        w.write(
-                            "package io.micronaut.test.generated;\n\n"
-                        );
-                        w.write("public interface Example {}");
+                        w.write("package io.micronaut.test.generated;\n\npublic interface Example {}");
                     }
                     break;
                 default:
@@ -54,7 +51,7 @@ public class TestGeneratingAnnotationProcessor extends AbstractProcessor {
         } catch (final IOException e) {
             throw new IllegalStateException(e);
         }
-        
+
         executed = true;
         return false;
     }
@@ -70,5 +67,5 @@ public class TestGeneratingAnnotationProcessor extends AbstractProcessor {
             resource.delete();
         }
     }
-    
+
 }

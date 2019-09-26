@@ -11,11 +11,9 @@ public class VerifyDefinitionInjectionSpec {
     public void test() {
         BeanContext beanContext = BeanContext.run();
 
-        // tag::test[]
         MainBean mainBean = beanContext.getBean(MainBean.class);
 
         assertTrue(mainBean.check());
-        // end::test[]
 
         beanContext.stop();
     }

@@ -20,9 +20,9 @@ public final class PublisherIntroduction implements MethodInterceptor<GenericPub
 
         } else if (isToStringMethod(method)) {
             return toString();
-            
+
         } else {
-            return context.getArguments()[0].getType().getSimpleName();
+            return context.getParameterValues()[0].getClass().getSimpleName();
         }
     }
 
