@@ -100,7 +100,7 @@ import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.resolver.dns.DefaultDnsServerAddressStreamProvider;
-import io.netty.resolver.dns.RoundRobinDnsAddressResolverGroup;
+import io.netty.resolver.dns.DnsAddressResolverGroup;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -262,7 +262,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     protected ChannelPool newPool(RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
                         newBootstrap
-                                .resolver(new RoundRobinDnsAddressResolverGroup(NioDatagramChannel.class, DefaultDnsServerAddressStreamProvider.INSTANCE))
+                                .resolver(new DnsAddressResolverGroup(NioDatagramChannel.class, DefaultDnsServerAddressStreamProvider.INSTANCE))
                                 .remoteAddress(key.getRemoteAddress());
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
@@ -285,7 +285,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     protected ChannelPool newPool(RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
                         newBootstrap
-                                .resolver(new RoundRobinDnsAddressResolverGroup(NioDatagramChannel.class, DefaultDnsServerAddressStreamProvider.INSTANCE))
+                                .resolver(new DnsAddressResolverGroup(NioDatagramChannel.class, DefaultDnsServerAddressStreamProvider.INSTANCE))
                                 .remoteAddress(key.getRemoteAddress());
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
