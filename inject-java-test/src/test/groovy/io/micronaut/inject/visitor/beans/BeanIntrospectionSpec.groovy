@@ -31,6 +31,35 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2059')
+    void "test annotation metadata doesn't cause stackoverflow"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+public class Test {
+    int num;
+    String str;
+
+    public <T extends Enum<T>> Test(int num, String str, Class<T> enumClass) {
+        this(num, str + enumClass.getName());
+    }
+    
+    @Creator
+    public <T extends Enum<T>> Test(int num, String str) {
+        this.num = num;
+        this.str = str;
+    }
+}
+
+
+''')
+        expect:
+        introspection != null
+    }
+
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2083')
     void "test class references in constructor arguments"() {
         given:
