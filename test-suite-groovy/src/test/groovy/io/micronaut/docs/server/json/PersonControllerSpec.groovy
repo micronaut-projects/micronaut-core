@@ -23,6 +23,7 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
@@ -32,6 +33,7 @@ import spock.lang.Stepwise
  * @since 1.0
  */
 @Stepwise
+@Ignore
 class PersonControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
