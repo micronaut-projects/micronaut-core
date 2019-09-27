@@ -33,7 +33,6 @@ import spock.lang.Stepwise
  * @since 1.0
  */
 @Stepwise
-@Ignore
 class PersonControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =

@@ -25,13 +25,13 @@ class PersonController {
 
     @Get
     Collection<Person> index() {
-        return inMemoryDatastore.values();
+        inMemoryDatastore.values()
     }
 
     @Get("/{name}")
     Maybe<Person> get(String name) {
         if (inMemoryDatastore.containsKey(name)) {
-            Maybe.just(inMemoryDatastore.get(name))
+            return Maybe.just(inMemoryDatastore.get(name))
         }
         Maybe.empty()
     }
@@ -51,7 +51,7 @@ class PersonController {
     // tag::args[]
     HttpResponse<Person> save(String firstName, String lastName, Optional<Integer> age) {
         Person p = new Person(firstName, lastName)
-        age.ifPresent(p.&setAge)
+        age.ifPresent({ Integer i -> p.setAge(i) })
         inMemoryDatastore.put(p.getFirstName(), p)
         HttpResponse.created(p)
     }
@@ -75,9 +75,9 @@ class PersonController {
 
     // tag::localError[]
     @Error
-    HttpResponse<JsonError> jsonError(HttpRequest request, JsonParseException jsonParseException) { // <1>
+    public HttpResponse<JsonError> jsonError(HttpRequest request, JsonParseException jsonParseException) { // <1>
         JsonError error = new JsonError("Invalid JSON: " + jsonParseException.getMessage()) // <2>
-                .link(Link.SELF, Link.of(request.getUri()));
+                .link(Link.SELF, Link.of(request.getUri()))
 
         HttpResponse.<JsonError>status(HttpStatus.BAD_REQUEST, "Fix Your JSON")
                 .body(error) // <3>
