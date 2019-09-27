@@ -92,7 +92,7 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
     @Override
     protected void pulsate(ServiceInstance instance, HealthStatus status) {
         ConsulConfiguration.ConsulRegistrationConfiguration registration = consulConfiguration.getRegistration();
-        if (registration != null && !registration.getCheck().isHttp() && registration.getCheck().isEnabled()) {
+        if (registration != null && !registration.getCheck().isHttp() && registration.getCheck().isEnabled() && registered.get()) {
 
             String checkId = "service:" + idGenerator.generateId(environment, instance);
             if (LOG.isDebugEnabled()) {

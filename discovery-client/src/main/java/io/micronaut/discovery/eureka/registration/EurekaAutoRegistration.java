@@ -83,7 +83,7 @@ public class EurekaAutoRegistration extends DiscoveryServiceAutoRegistration {
     @Override
     protected void pulsate(ServiceInstance instance, HealthStatus status) {
         EurekaConfiguration.EurekaRegistrationConfiguration registration = eurekaConfiguration.getRegistration();
-        if (heartbeatConfiguration.isEnabled() && registration != null) {
+        if (heartbeatConfiguration.isEnabled() && registration != null && registered.get()) {
             InstanceInfo instanceInfo = registration.getInstanceInfo();
             if (status.equals(HealthStatus.UP)) {
                 Single<HttpStatus> heartbeatPublisher = Single.fromPublisher(eurekaClient.heartbeat(instanceInfo.getApp(), instanceInfo.getId()));

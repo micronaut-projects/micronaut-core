@@ -11,4 +11,4 @@ include::{testsclient}/httpclientexceptionbody/BindHttpClientExceptionBodySpec.g
 ----
 
 <1> Success Type
-<1> Error Type
+<2> Error Type

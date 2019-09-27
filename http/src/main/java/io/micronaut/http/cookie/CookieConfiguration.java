@@ -16,7 +16,7 @@
 package io.micronaut.http.cookie;
 
 import javax.annotation.Nonnull;
-import java.time.Duration;
+import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
 /**
@@ -62,5 +62,5 @@ public interface CookieConfiguration {
     /**
      * @return The max age to use for the cookie
      */
-    Optional<Duration> getCookieMaxAge();
+    Optional<TemporalAmount> getCookieMaxAge();
 }
