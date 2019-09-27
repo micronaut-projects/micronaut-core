@@ -1,0 +1,15 @@
+shadowJar.enabled = true
+
+dependencies {
+    compile dependencyVersion('jackson.dataformat')
+    
+    compileOnly project(":http")
+    compileOnly project(":inject")
+    compileOnly project(":http-server-netty")
+    compileOnly project(":inject-java")
+
+    testCompile project(":inject-groovy")
+    testCompile project(":http-client")
+    testCompile project(":runtime")
+    testCompile project(":http-server-netty")
+}
