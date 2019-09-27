@@ -437,15 +437,31 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     @NotNull
     protected Map<String, Object> toTypeArguments(@NotNull Map<String, ClassElement> typeArguments) {
+        Set<String> visitedTypes = new HashSet<>(5);
+
+        return toTypeArguments(typeArguments, visitedTypes);
+    }
+
+    @NotNull
+    private Map<String, Object> toTypeArguments(@NotNull Map<String, ClassElement> typeArguments, Set<String> visitedTypes) {
         final LinkedHashMap<String, Object> map = new LinkedHashMap<>(typeArguments.size());
         for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
             final ClassElement ce = entry.getValue();
-            final Map<String, ClassElement> subArgs = ce.getTypeArguments();
-            if (CollectionUtils.isNotEmpty(subArgs)) {
-                map.put(entry.getKey(), toTypeArguments(subArgs));
-            } else {
-                final Type typeReference = getTypeForElement(ce);
-                map.put(entry.getKey(), typeReference);
+            String className = ce.getName();
+            if (!visitedTypes.contains(className)) {
+                visitedTypes.add(className);
+                final Map<String, ClassElement> subArgs = ce.getTypeArguments();
+                if (CollectionUtils.isNotEmpty(subArgs)) {
+                    Map<String, Object> m = toTypeArguments(subArgs, visitedTypes);
+                    if (CollectionUtils.isNotEmpty(m)) {
+                        map.put(entry.getKey(), m);
+                    } else {
+                        map.put(entry.getKey(), Collections.singletonMap(entry.getKey(), className));
+                    }
+                } else {
+                    final Type typeReference = getTypeForElement(ce);
+                    map.put(entry.getKey(), typeReference);
+                }
             }
         }
 
@@ -463,9 +479,6 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         final LinkedHashMap<String, Map<String, Object>> map = new LinkedHashMap<>(parameters.length);
         for (ParameterElement ce : parameters) {
             final ClassElement type = ce.getType();
-            if (type == null) {
-                continue;
-            }
             final Map<String, ClassElement> subArgs = type.getTypeArguments();
             if (CollectionUtils.isNotEmpty(subArgs)) {
                 map.put(ce.getName(), toTypeArguments(subArgs));

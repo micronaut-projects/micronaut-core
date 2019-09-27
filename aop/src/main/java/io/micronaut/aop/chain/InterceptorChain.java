@@ -52,7 +52,7 @@ import java.util.stream.Collectors;
  */
 @Internal
 public class InterceptorChain<B, R> implements InvocationContext<B, R> {
-    private static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
+    protected static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
 
     protected final Interceptor<B, R>[] interceptors;
     protected final B target;
@@ -60,10 +60,8 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     protected final Object[] originalParameters;
     protected MutableConvertibleValues<Object> attributes;
     protected Map<String, MutableArgumentValue<?>> parameters;
-
-    private final int interceptorCount;
-    private int index = 0;
-
+    protected final int interceptorCount;
+    protected int index = 0;
 
     /**
      * Constructor.

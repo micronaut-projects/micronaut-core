@@ -1011,7 +1011,8 @@ public class DefaultBeanContext implements BeanContext {
         // first traverse component definition classes and load candidates
         Collection candidates;
         if (!beanDefinitionsClasses.isEmpty()) {
-            Stream<BeanDefinitionReference> reduced = qualifier.reduce(Object.class, beanDefinitionsClasses.stream());
+            Stream<BeanDefinitionReference> presentStream = beanDefinitionsClasses.stream().filter(BeanDefinitionReference::isPresent);
+            Stream<BeanDefinitionReference> reduced = qualifier.reduce(Object.class, presentStream);
             Stream<BeanDefinition> candidateStream = qualifier.reduce(Object.class,
                     reduced
                             .map(ref -> ref.load(this))
@@ -1040,6 +1041,7 @@ public class DefaultBeanContext implements BeanContext {
         if (!beanDefinitionsClasses.isEmpty()) {
             List collection = beanDefinitionsClasses
                     .stream()
+                    .filter(BeanDefinitionReference::isPresent)
                     .map(ref -> ref.load(this))
                     .filter(candidate -> candidate.isEnabled(this))
                     .collect(Collectors.toList());
@@ -1054,7 +1056,7 @@ public class DefaultBeanContext implements BeanContext {
     public @Nonnull
     Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences() {
         if (!beanDefinitionsClasses.isEmpty()) {
-            final List refs = beanDefinitionsClasses.stream().filter(ref -> ref.isEnabled(this))
+            final List refs = beanDefinitionsClasses.stream().filter(ref -> ref.isPresent() && ref.isEnabled(this))
                     .collect(Collectors.toList());
 
             return (Collection<BeanDefinitionReference<?>>) Collections.unmodifiableList(refs);
@@ -1717,7 +1719,7 @@ public class DefaultBeanContext implements BeanContext {
     protected void processParallelBeans() {
         new Thread(() -> {
             final List<BeanDefinitionReference> parallelBeans = beanDefinitionsClasses.stream()
-                    .filter(bd -> bd.getAnnotationMetadata().hasDeclaredStereotype(Parallel.class) && bd.isEnabled(this))
+                    .filter(bd -> bd.isPresent() && bd.getAnnotationMetadata().hasDeclaredStereotype(Parallel.class) && bd.isEnabled(this))
                     .collect(Collectors.toList());
 
 
