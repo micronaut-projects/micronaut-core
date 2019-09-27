@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
@@ -51,6 +52,8 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
     protected static final org.objectweb.asm.commons.Method METHOD_INVOKE_INTERNAL = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethod.class, "invokeInternal", Object.class, Object[].class));
+    protected static final org.objectweb.asm.commons.Method METHOD_IS_ABSTRACT = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(ExecutableMethod.class, "isAbstract"));
     protected static final Method METHOD_GET_TARGET = Method.getMethod("java.lang.reflect.Method resolveTargetMethod()");
     private  static final Type TYPE_REFLECTION_UTILS = Type.getType(ReflectionUtils.class);
     private static final org.objectweb.asm.commons.Method METHOD_GET_REQUIRED_METHOD = org.objectweb.asm.commons.Method.getMethod(
@@ -278,6 +281,23 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         }
         constructorWriter.visitInsn(RETURN);
         constructorWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
+
+        // add isAbstract method
+        GeneratorAdapter isAbstractMethod = new GeneratorAdapter(classWriter.visitMethod(
+                ACC_PUBLIC | ACC_FINAL,
+                METHOD_IS_ABSTRACT.getName(),
+                METHOD_IS_ABSTRACT.getDescriptor(),
+                null,
+                null),
+                ACC_PUBLIC,
+                METHOD_IS_ABSTRACT.getName(),
+                METHOD_IS_ABSTRACT.getDescriptor()
+        );
+
+        isAbstractMethod.push(isAbstract());
+        isAbstractMethod.returnValue();
+        isAbstractMethod.visitMaxs(1, 1);
+        isAbstractMethod.endMethod();
 
         // invoke the methods with the passed arguments
         String invokeDescriptor = METHOD_INVOKE_INTERNAL.getDescriptor();
