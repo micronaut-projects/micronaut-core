@@ -21,6 +21,7 @@ import io.micronaut.http.client.sse.RxSseClient
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -29,6 +30,7 @@ import spock.util.concurrent.PollingConditions
  * @author Graeme Rocher
  * @since 1.0
  */
+@Ignore
 class HeadlineControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
