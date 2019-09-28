@@ -188,3 +188,16 @@ An optional variable is one that will allow the route to match a URI even if the
  The URI template contains a variable that is missing from the method arguments.
 
 NOTE: To disable route compile time validation, set the system property `-Dmicronaut.route.validation=false`. For Java and Kotlin users using Gradle, the same effect can be achieved by removing the `validation` dependency from the `annotationProcessor`/`kapt` scope.
+
+== Routing non-standard HTTP methods
+
+In most cases developer has to deal only with standard http methods, such as GET, POST and etc. However, there are cases when one has to provide additional methods like REPORT or LOCK (see  https://tools.ietf.org/html/rfc4918[RFC-4918 Webdav] as one of many examples). In that case you can use @CustomHttpMethod annotation.
+ 
+.RoutingExample
+[source,java]
+----
+@CustomHttpMethod(method = "LOCK", value = "/{name}")
+String lock(String name)
+----
+
+You can use this annotation in controllers, as well as declarative clients, if you need to access an application that works with extension of HTTP.
