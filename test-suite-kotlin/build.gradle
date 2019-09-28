@@ -15,6 +15,7 @@ dependencies {
     api project(':http-server-netty')
     api project(':http-client')
     api project(':runtime')
+
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion"
     testImplementation "org.jetbrains.kotlin:kotlin-test:$kotlinVersion"
 
@@ -23,13 +24,10 @@ dependencies {
 
     testImplementation project(":validation")
     testImplementation project(":management")
+    testImplementation project(':inject-java')
     testImplementation project(":inject")
     testImplementation dependencyVersion("jcache")
     testImplementation project(':validation')
-    testCompileOnly project(':inject-java')
-    testAnnotationProcessor project(':inject-java')
-    testCompileOnly project(':validation')
-    testAnnotationProcessor project(':validation')
     testImplementation project(":http-client")
     testImplementation project(":session")
     testImplementation dependencyVersion("reactor")
@@ -44,6 +42,9 @@ dependencies {
     testImplementation project(":function-client")
     testImplementation project(":function-web")
     testImplementation 'io.kotlintest:kotlintest-runner-junit5:3.4.2'
+
+    kaptTest project(':inject-java')
+    kaptTest project(':validation')
     testRuntime "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
     testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }
