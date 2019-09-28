@@ -25,7 +25,6 @@ dependencies {
     testImplementation project(":validation")
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
-    testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject-java-test")
     testImplementation project(":tracing")
     testImplementation project(":management")
@@ -54,6 +53,9 @@ dependencies {
     testImplementation "org.testcontainers:spock:1.10.1"
     // end::testcontainers-dependencies[]
     testImplementation 'org.awaitility:awaitility:3.1.6'
+
+    testAnnotationProcessor project(":inject-java")
+    testAnnotationProcessor project(":test-suite")
 
     testRuntime dependencyVersion("tomcatJdbc")
     testRuntime dependencyVersion("h2")
