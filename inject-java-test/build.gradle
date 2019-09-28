@@ -8,14 +8,8 @@ dependencies {
     }
     api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
 
+    testAnnotationProcessor project(":inject-java")
     testImplementation dependencyVersion("validation")
     testImplementation "javax.persistence:javax.persistence-api:2.2"
     testImplementation project(":runtime")
-
-//    testImplementation "org.ow2.asm:asm-tree:$asmVersion"
-//    testImplementation "org.ow2.asm:asm-util:$asmVersion"
-//    testImplementation "org.ow2.asm:asm:$asmVersion"
-//    testImplementation "org.ow2.asm:asm-commons:$asmVersion"
-//    testImplementation "org.ow2.asm:asm-tree:$asmVersion"
-
 }
