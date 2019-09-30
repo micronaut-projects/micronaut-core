@@ -23,7 +23,7 @@ class ShoppingController {
     // tag::view[]
     @Get("/cart")
     @SessionValue(ATTR_CART) // <1>
-    internal fun viewCart(@SessionValue cart: Cart?): Cart { // <2>
+    open internal fun viewCart(@SessionValue cart: Cart?): Cart { // <2>
         var cart = cart
         if (cart == null) {
             cart = Cart()
@@ -34,7 +34,7 @@ class ShoppingController {
 
     // tag::add[]
     @Post("/cart/{name}")
-    internal fun addItem(session: Session, @NotBlank name: String): Cart { // <2>
+    open internal fun addItem(session: Session, @NotBlank name: String): Cart { // <2>
         val cart = session.get(ATTR_CART, Cart::class.java).orElseGet({
             // <3>
             val newCart = Cart()
@@ -48,7 +48,7 @@ class ShoppingController {
 
     // tag::clear[]
     @Post("/cart/clear")
-    internal fun clearCart(session: Session?) {
+    open internal fun clearCart(session: Session?) {
         if (session != null) {
             session!!.remove(ATTR_CART)
         }
