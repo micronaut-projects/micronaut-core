@@ -18,13 +18,12 @@
 
 package io.micronaunt.xml.client
 
+import com.fasterxml.jackson.databind.DeserializationFeature
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Consumes
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Produces
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.jackson.annotation.JacksonFeatures
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Single
 import spock.lang.AutoCleanup
@@ -50,20 +49,51 @@ class XmlRequestResponseSpec extends Specification {
         model.blockingGet().value == 'test'
     }
 
+    def 'verify client can send xml content'() {
+        when:
+        def requestModel = new XmlModel()
+        requestModel.value = 'test'
+        Single<XmlModel> model = xmlClient.sendXmlContent(requestModel)
+        then:
+        model.blockingGet().value == 'test'
+    }
+
+    def 'verify invalid xml content send'() {
+        when:
+        xmlClient.sendRawXmlContent("<xmlModel><value></></xmlModel>").blockingGet()
+        then:
+        def exception = thrown(Exception)
+        exception.message.contains "Unexpected end tag: expected </value>"
+    }
+
     @Client('/media/xml/')
     @Consumes(MediaType.APPLICATION_XML)
+    @Produces(MediaType.APPLICATION_XML)
+    @JacksonFeatures(enabledDeserializationFeatures = DeserializationFeature.UNWRAP_ROOT_VALUE)
     static interface XmlClient {
         @Get
         Single<XmlModel> getXmlContent();
+
+        @Post
+        Single<XmlModel> sendXmlContent(@Body XmlModel xmlModel);
+
+        @Post
+        Single<XmlModel> sendRawXmlContent(@Body String xml);
     }
 
     @Controller('/media/xml/')
+    @Consumes(MediaType.APPLICATION_XML)
     @Produces(MediaType.APPLICATION_XML)
     static class XmlController {
 
         @Get
         Single<String> getXmlContent() {
             return Single.just('<XmlModel><value>test</value></XmlModel>')
+        }
+
+        @Post
+        Single<XmlModel> getXmlContent(@Body XmlModel xmlModel) {
+            return Single.just(xmlModel)
         }
     }
 

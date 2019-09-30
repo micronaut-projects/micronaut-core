@@ -85,7 +85,7 @@ public class XmlStreamConvertibleValues<V> implements ConvertibleValues<V> {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         try {
-            FromXmlParser parser = xmlMapper.getFactory().createParser(stream);
+            FromXmlParser parser = xmlMapper.getFactory().createParser(stream.copy());
             FieldRenamerJsonParser fieldParser = new FieldRenamerJsonParser(
                     name.toString(), ParsedValueHolder.VALUE_FIELD_NAME, parser
             );

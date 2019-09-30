@@ -230,7 +230,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
 
     private XMLStreamReader createXmlStream(byte[] bytes) {
         try {
-            return new ByteArrayXmlStreamReader(xmlStreamFactory.createAsyncFor(bytes), bytes);
+            return new ByteArrayXmlStreamReader(xmlStreamFactory.createAsyncFor(bytes), bytes, () -> createXmlStream(bytes));
         } catch (XMLStreamException e) {
             throw new RuntimeException(e);
         }

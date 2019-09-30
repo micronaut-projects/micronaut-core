@@ -18,6 +18,7 @@
 
 package io.micronaunt.xml.client.server
 
+
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
@@ -148,7 +149,7 @@ class XmlContentProcessorSpec extends Specification {
         books[1].title == "Second Book"
     }
 
-    void "test mapping xml set to controller argument"() {
+    void "test binding xml set to controller argument"() {
         RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -165,6 +166,19 @@ class XmlContentProcessorSpec extends Specification {
         books.size() == 2
         books.contains "First Book"
         books.contains "Second Book"
+    }
+
+    void "test binding two fields to controller arguments"() {
+        RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        Author author = client.toBlocking().retrieve(
+                HttpRequest.POST("/xml/stream/author/argumentBinding/2", '<author name="Joe"><books><book><title>First Book</title></book><book><title>Second Book</title></book></books></author>')
+                        .contentType(MediaType.TEXT_XML_TYPE), Author)
+
+        then:
+        author.name == "Joe"
+        author.books.size() == 2
     }
 
     @Controller(value = "/xml/stream", consumes = MediaType.TEXT_XML)
@@ -184,6 +198,14 @@ class XmlContentProcessorSpec extends Specification {
 
         @Post("/author")
         Author author(@Body Author author) {
+            return author
+        }
+
+        @Post("/author/argumentBinding/2")
+        Author author(String name, List<Book> books) {
+            def author = new Author()
+            author.name = name
+            author.books = books
             return author
         }
 
@@ -210,5 +232,6 @@ class XmlContentProcessorSpec extends Specification {
     static class Author {
         String name
         List<Book> books
+
     }
 }

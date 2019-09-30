@@ -104,7 +104,7 @@ public abstract class AbstractJacksonMediaTypeCodec implements MediaTypeCodec {
                 return objectMapper.readValue(inputStream, type.getType());
             }
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage());
+            throw new CodecException("Error decoding XML stream for type [" + type.getName() + "]: " + e.getMessage());
         }
     }
 
@@ -121,7 +121,7 @@ public abstract class AbstractJacksonMediaTypeCodec implements MediaTypeCodec {
         try {
             return objectMapper.treeToValue(node, type.getType());
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
+            throw new CodecException("Error decoding XML stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
     }
 
@@ -152,7 +152,7 @@ public abstract class AbstractJacksonMediaTypeCodec implements MediaTypeCodec {
                 return objectMapper.readValue(data, type.getType());
             }
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
+            throw new CodecException("Error decoding XML stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
     }
 
@@ -161,7 +161,7 @@ public abstract class AbstractJacksonMediaTypeCodec implements MediaTypeCodec {
         try {
             objectMapper.writeValue(outputStream, object);
         } catch (IOException e) {
-            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
+            throw new CodecException("Error encoding object [" + object + "] to XML: " + e.getMessage(), e);
         }
     }
 
@@ -174,7 +174,7 @@ public abstract class AbstractJacksonMediaTypeCodec implements MediaTypeCodec {
                 return objectMapper.writeValueAsBytes(object);
             }
         } catch (JsonProcessingException e) {
-            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
+            throw new CodecException("Error encoding object [" + object + "] to XML: " + e.getMessage(), e);
         }
     }
 

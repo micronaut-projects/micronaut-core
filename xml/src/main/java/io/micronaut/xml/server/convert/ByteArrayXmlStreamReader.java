@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 
 import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.util.StreamReaderDelegate;
+import java.util.function.Supplier;
 
 /**
  * Stream reader that pairs xml stream with underlying byte array.
@@ -30,14 +31,16 @@ import javax.xml.stream.util.StreamReaderDelegate;
 @Internal
 public final class ByteArrayXmlStreamReader extends StreamReaderDelegate {
     private byte[] bytes;
+    private Supplier<XMLStreamReader> cloneAction;
 
     /**
      * @param reader stream reader we will delegate to
      * @param bytes  byte array that was fed to the given xml stream
      */
-    public ByteArrayXmlStreamReader(XMLStreamReader reader, byte[] bytes) {
+    public ByteArrayXmlStreamReader(XMLStreamReader reader, byte[] bytes, Supplier<XMLStreamReader> cloneAction) {
         super(reader);
         this.bytes = bytes;
+        this.cloneAction = cloneAction;
     }
 
     /**
@@ -45,5 +48,9 @@ public final class ByteArrayXmlStreamReader extends StreamReaderDelegate {
      */
     byte[] getBytes() {
         return this.bytes;
+    }
+
+    public XMLStreamReader copy() {
+        return cloneAction.get();
     }
 }
