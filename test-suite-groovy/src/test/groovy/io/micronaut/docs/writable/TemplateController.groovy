@@ -25,7 +25,7 @@ class TemplateController {
 
     @Get(value = "/welcome", produces = MediaType.TEXT_PLAIN)
     Writable render() { // <2>
-        return { writer ->
+        { writer ->
             template.make( // <3>
                     CollectionUtils.mapOf(
                             "firstName", "Fred",
@@ -39,8 +39,8 @@ class TemplateController {
         Template template
         try {
             template = templateEngine.createTemplate(
-                    "Dear $firstName $lastName. Nice to meet you."
-            );
+                    'Dear $firstName $lastName. Nice to meet you.'
+            )
         } catch (Exception e) {
             throw new HttpServerException("Cannot create template")
         }
