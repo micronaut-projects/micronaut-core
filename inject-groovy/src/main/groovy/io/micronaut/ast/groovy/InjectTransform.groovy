@@ -882,7 +882,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 } else if (isPublic) {
                     def sourceUnit = sourceUnit
-                    final boolean isConstrained =
+                    final boolean isConstrained = isDeclaredBean &&
                             methodNode.getParameters()
                                     .any { Parameter p ->
                                 AstAnnotationUtils.hasStereotype(sourceUnit, p, InjectTransform.ANN_CONSTRAINT) ||
