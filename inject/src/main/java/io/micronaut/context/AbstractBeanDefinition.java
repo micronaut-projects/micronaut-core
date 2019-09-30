@@ -623,6 +623,15 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @UsedByGeneratedCode
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
+        boolean addInCreationHandling = singleton && !postConstructMethods.isEmpty();
+        DefaultBeanContext.BeanKey key = null;
+        if (addInCreationHandling) {
+            // ensure registration as an inflight bean if a post construct is present
+            // this is to ensure that if the post construct method does anything funky to
+            // cause recreation of this bean then we don't have a circular problem
+            key = new DefaultBeanContext.BeanKey(this, resolutionContext.getCurrentQualifier());
+            defaultContext.singlesInCreation.put(key, bean);
+        }
         Collection<BeanRegistration<BeanInitializedEventListener>> beanInitializedEventListeners = ((DefaultBeanContext) context).beanInitializedEventListeners;
         if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
             for (BeanRegistration<BeanInitializedEventListener> registration : beanInitializedEventListeners) {
@@ -647,7 +656,16 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (bean instanceof LifeCycle) {
             bean = ((LifeCycle) bean).start();
         }
-        return bean;
+        try {
+            return bean;
+        } finally {
+            if (addInCreationHandling) {
+                // ensure registration as an inflight bean if a post construct is present
+                // this is to ensure that if the post construct method does anything funky to
+                // cause recreation of this bean then we don't have a circular problem
+                defaultContext.singlesInCreation.remove(key);
+            }
+        }
     }
 
     /**

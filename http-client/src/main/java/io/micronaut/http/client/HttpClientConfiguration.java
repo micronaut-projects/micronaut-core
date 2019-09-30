@@ -83,6 +83,8 @@ public abstract class HttpClientConfiguration {
 
     private Duration connectTimeout;
 
+    private Duration connectTtl;
+
     private Duration readTimeout = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS);
 
     private Duration readIdleTimeout = Duration.of(DEFAULT_READ_IDLE_TIMEOUT_MINUTES, ChronoUnit.MINUTES);
@@ -237,6 +239,13 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * @return The connectTtl.
+     */
+    public Optional<Duration> getConnectTtl() {
+        return Optional.ofNullable(connectTtl);
+    }
+
+    /**
      * The amount of time to wait for shutdown.
      *
      * @return The shutdown timeout
@@ -279,6 +288,15 @@ public abstract class HttpClientConfiguration {
      */
     public void setConnectTimeout(@Nullable Duration connectTimeout) {
         this.connectTimeout = connectTimeout;
+    }
+
+    /**
+     * Sets the connect timeout.
+     *
+     * @param connectTtl The connect timeout
+     */
+    public void setConnectTtl(@Nullable Duration connectTtl) {
+        this.connectTtl = connectTtl;
     }
 
     /**

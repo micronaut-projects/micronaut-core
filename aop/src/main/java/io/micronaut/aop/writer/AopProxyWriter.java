@@ -515,28 +515,52 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
             ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
                     proxyFullName, methodExecutorClassName, methodProxyShortName, isInterface, isAbstract, annotationMetadata) {
+
                 @Override
                 protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, GeneratorAdapter invokeMethodVisitor) {
-                    // load this
-                    invokeMethodVisitor.loadThis();
-                    // first argument to static bridge is reference to parent
-                    invokeMethodVisitor.getField(methodType, FIELD_PARENT, proxyType);
-                    // now remaining arguments
-                    for (int i = 0; i < argumentTypeList.size(); i++) {
-                        invokeMethodVisitor.loadArg(1);
-                        invokeMethodVisitor.push(i);
-                        invokeMethodVisitor.visitInsn(AALOAD);
-                        AopProxyWriter.pushCastToType(invokeMethodVisitor, argumentTypeList.get(i));
-                    }
-                    invokeMethodVisitor.visitMethodInsn(INVOKESTATIC, proxyInternalName, bridgeName, bridgeDesc, false);
-                    if (isVoidReturn) {
-                        invokeMethodVisitor.visitInsn(ACONST_NULL);
+                    if (isIntroduction && isAbstract && implementInterface) {
+                        // first argument is instance to invoke
+                        invokeMethodVisitor.loadArg(0);
+                        invokeMethodVisitor.checkCast(declaringTypeObject);
+                        // now remaining arguments
+                        for (int i = 0; i < argumentTypeList.size(); i++) {
+                            invokeMethodVisitor.loadArg(1);
+                            invokeMethodVisitor.push(i);
+                            invokeMethodVisitor.visitInsn(AALOAD);
+                            AopProxyWriter.pushCastToType(invokeMethodVisitor, argumentTypeList.get(i));
+                        }
+                        String desc = getMethodDescriptor(returnType, argumentTypeList);
+                        invokeMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL, declaringTypeObject.getInternalName(), methodName, desc, isInterface);
+                        if (isVoidReturn) {
+                            invokeMethodVisitor.visitInsn(ACONST_NULL);
+                        } else {
+                            AopProxyWriter.pushBoxPrimitiveIfNecessary(returnType, invokeMethodVisitor);
+                        }
+                        invokeMethodVisitor.visitInsn(ARETURN);
+                        invokeMethodVisitor.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);
+                        invokeMethodVisitor.visitEnd();
                     } else {
-                        AopProxyWriter.pushBoxPrimitiveIfNecessary(returnType, invokeMethodVisitor);
+                        // load this
+                        invokeMethodVisitor.loadThis();
+                        // first argument to static bridge is reference to parent
+                        invokeMethodVisitor.getField(methodType, FIELD_PARENT, proxyType);
+                        // now remaining arguments
+                        for (int i = 0; i < argumentTypeList.size(); i++) {
+                            invokeMethodVisitor.loadArg(1);
+                            invokeMethodVisitor.push(i);
+                            invokeMethodVisitor.visitInsn(AALOAD);
+                            AopProxyWriter.pushCastToType(invokeMethodVisitor, argumentTypeList.get(i));
+                        }
+                        invokeMethodVisitor.visitMethodInsn(INVOKESTATIC, proxyInternalName, bridgeName, bridgeDesc, false);
+                        if (isVoidReturn) {
+                            invokeMethodVisitor.visitInsn(ACONST_NULL);
+                        } else {
+                            AopProxyWriter.pushBoxPrimitiveIfNecessary(returnType, invokeMethodVisitor);
+                        }
+                        invokeMethodVisitor.visitInsn(ARETURN);
+                        invokeMethodVisitor.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);
+                        invokeMethodVisitor.visitEnd();
                     }
-                    invokeMethodVisitor.visitInsn(ARETURN);
-                    invokeMethodVisitor.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);
-                    invokeMethodVisitor.visitEnd();
                 }
 
             };

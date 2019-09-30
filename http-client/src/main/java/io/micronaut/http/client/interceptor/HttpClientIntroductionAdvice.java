@@ -635,7 +635,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
         return clients.computeIfAbsent(clientKey, integer -> {
-            HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(clientId)).orElse(null);
+            HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(NameUtils.hyphenate(clientId))).orElse(null);
             AnnotationValue<JacksonFeatures> jacksonFeatures = context.findAnnotation(JacksonFeatures.class).orElse(null);
             Optional<Class<?>> configurationClass = clientAnn.classValue("configuration");
 
