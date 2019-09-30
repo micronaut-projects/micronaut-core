@@ -10,6 +10,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.server.exceptions.HttpServerException
+import java.io.Writer
 
 //end::imports[]
 
@@ -24,17 +25,18 @@ class TemplateController {
         template = initTemplate() // <1>
     }
 
-//    @Get(value = "/welcome", produces = [MediaType.TEXT_PLAIN])
-//    internal fun render(): Writable { // <2>
-//        return { writer ->
-//            template.make( // <3>
-//                    CollectionUtils.mapOf(
-//                            "firstName", "Fred",
-//                            "lastName", "Flintstone"
-//                    )
-//            ).writeTo(writer)
-//        }
-//    }
+    @Get(value = "/welcome", produces = [MediaType.TEXT_PLAIN])
+    internal fun render(): Writable { // <2>
+        return { writer: Writer ->
+            val writable = template.make( // <3>
+                    CollectionUtils.mapOf(
+                            "firstName", "Fred",
+                            "lastName", "Flintstone"
+                    )
+            )
+            writable.writeTo(writer)
+        } as Writable
+    }
 
     private fun initTemplate(): Template {
         val template: Template
