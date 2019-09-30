@@ -33,6 +33,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import java.util.Collection;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -79,5 +80,13 @@ class ReactorInstrumentation {
                 LOG.error("Could not instrument Reactor for Tracing: " + e.getMessage(), e);
             }
         }
+    }
+
+    /**
+     * Removes the registered instrumentation.
+     */
+    @PreDestroy
+    void removeInstrumentation() {
+        Schedulers.removeExecutorServiceDecorator(Environment.MICRONAUT);
     }
 }

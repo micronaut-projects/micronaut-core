@@ -149,6 +149,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     protected static final String HANDLER_CHUNK = "chunk-writer";
     protected static final String HANDLER_STREAM = "stream-handler";
     protected static final String HANDLER_DECODER = "http-decoder";
+    protected static final String HANDLER_CONNECT_TTL = "handler-connect-ttl";
 
     private static final String HANDLER_IDLE_STATE = "handler-idle-state";
     private static final String HANDLER_MICRONAUT_WEBSOCKET_CLIENT = "handler-micronaut-websocket-client";
@@ -184,6 +185,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private final ChannelPoolMap<RequestKey, ChannelPool> poolMap;
     private final Logger log;
     private final @Nullable Long readTimeoutMillis;
+    private final @Nullable Long connectionTimeAliveMillis;
 
     private Set<String> clientIdentifiers = Collections.emptySet();
     private WebSocketBeanRegistry webSocketRegistry = WebSocketBeanRegistry.EMPTY;
@@ -250,6 +252,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         Optional<Duration> readTimeout = configuration.getReadTimeout();
         this.readTimeoutMillis = readTimeout.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
 
+        Optional<Duration> connectTtl = configuration.getConnectTtl();
+        this.connectionTimeAliveMillis = connectTtl.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
+
         HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration = configuration.getConnectionPoolConfiguration();
         if (connectionPoolConfiguration.isEnabled()) {
             int maxConnections = connectionPoolConfiguration.getMaxConnections();
@@ -259,7 +264,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     protected ChannelPool newPool(RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
                         newBootstrap.remoteAddress(key.getRemoteAddress());
-
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
                         final Long acquireTimeoutMillis = connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L);
@@ -281,6 +285,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     protected ChannelPool newPool(RequestKey key) {
                         Bootstrap newBootstrap = bootstrap.clone(group);
                         newBootstrap.remoteAddress(key.getRemoteAddress());
+
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
                         return new SimpleChannelPool(
                                 newBootstrap,
@@ -2122,10 +2127,22 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         // in the connection pooled scenario
                     }
                 });
+
+                if (connectionTimeAliveMillis != null) {
+                    ch.pipeline().addLast(HANDLER_CONNECT_TTL, new ConnectTTLHandler(connectionTimeAliveMillis));
+                }
             }
 
             @Override
             public void channelReleased(Channel ch) {
+                if (connectionTimeAliveMillis != null) {
+                    boolean shouldCloseOnRelease = Boolean.TRUE.equals(ch.attr(ConnectTTLHandler.RELEASE_CHANNEL).get());
+
+                    if (shouldCloseOnRelease && ch.isOpen() && !ch.eventLoop().isShuttingDown()) {
+                        ch.close();
+                    }
+                }
+
                 if (readTimeoutMillis != null) {
                     ChannelPipeline pipeline = ch.pipeline();
                     if (pipeline.context(HANDLER_READ_TIMEOUT) != null) {
@@ -2307,7 +2324,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         }
 
         public InetSocketAddress getRemoteAddress() {
-            return new InetSocketAddress(host, port);
+            return InetSocketAddress.createUnresolved(host, port);
         }
 
         public boolean isSecure() {
