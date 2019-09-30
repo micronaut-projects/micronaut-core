@@ -48,4 +48,9 @@ public @interface HttpMethodMapping {
      * @return The URI of the action
      */
     String value() default UriMapping.DEFAULT_URI;
+
+    /**
+     * @return The URIs of the action
+     */
+    String[] uris() default {UriMapping.DEFAULT_URI};
 }

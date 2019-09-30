@@ -39,4 +39,9 @@ public @interface UriMapping {
      * @return The URI of the action
      */
     String value() default DEFAULT_URI;
+
+    /**
+     * @return The URIs of the action
+     */
+    String[] uris() default {UriMapping.DEFAULT_URI};
 }

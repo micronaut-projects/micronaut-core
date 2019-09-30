@@ -52,6 +52,13 @@ public @interface Get {
     String uri() default UriMapping.DEFAULT_URI;
 
     /**
+     * @return The URIs of the GET route
+     */
+    @AliasFor(annotation = HttpMethodMapping.class, member = "uris")
+    @AliasFor(annotation = UriMapping.class, member = "uris")
+    String[] uris() default {UriMapping.DEFAULT_URI};
+
+    /**
      * @return The default produces, otherwise override from controller
      */
     @AliasFor(annotation = Produces.class, member = "value")
