@@ -9,6 +9,8 @@ class Headline {
     String title;
     String description;
 
+    Headline() {}
+
     Headline(String title, String description) {
         this.title = title;
         this.description = description;

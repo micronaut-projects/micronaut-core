@@ -1,15 +1,16 @@
-package io.micronaut.docs.server.sse;
+package io.micronaut.docs.server.sse
+
+import io.micronaut.http.annotation.Controller;
 
 // tag::imports[]
 
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.sse.Event
-import io.reactivex.Emitter;
+import io.reactivex.Emitter
 import io.reactivex.Flowable
-import io.reactivex.annotations.NonNull
-import io.reactivex.functions.BiFunction;
-import org.reactivestreams.Publisher;
+import io.reactivex.functions.BiFunction
+import org.reactivestreams.Publisher
+
 // end::imports[]
 
 /**
@@ -24,28 +25,19 @@ class HeadlineController {
     Publisher<Event<Headline>> index() { // <1>
         String[] versions = ["1.0", "2.0"] // <2>
 
-          return Flowable.generate({ ->0 }, new BiFunction<Integer, Emitter<Event<Headline>>, Integer>() {
-              @Override
-              Integer apply(@NonNull Integer i, @NonNull Emitter<Event<Headline>> tEmitter) throws Exception {
-                if (i < versions.length) {
-                    tEmitter.onNext( // <4>
-                              Event.of(new Headline("Micronaut " + versions[i] + " Released", "Come and get it"))
-                      )
-                  } else {
-                    tEmitter.onComplete() // <5>
-                  }
-                  ++i
-              }})
-//        return Flowable.generate({ -> 0 }, { i, emitter ->  // <3>
-//            if (i < versions.length) {
-//                emitter.onNext( // <4>
-//                        Event.of(new Headline("Micronaut " + versions[i] + " Released", "Come and get it"))
-//                )
-//            } else {
-//                emitter.onComplete() // <5>
-//            }
-//            ++i
-//        });
+        def initialState = { -> 0 }
+        def emitterFunction = { Integer i, Emitter emitter ->  // <3>
+            if (i < versions.length) {
+                emitter.onNext( // <4>
+                        Event.of(new Headline("Micronaut " + versions[i] + " Released", "Come and get it"))
+                );
+            } else {
+                emitter.onComplete(); // <5>
+            }
+            return ++i;
+        }
+
+        return Flowable.generate(initialState, emitterFunction as BiFunction<Integer,Emitter<Event<Headline>>,Integer>);
     }
 }
 // end::class[]
