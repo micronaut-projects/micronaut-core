@@ -25,7 +25,7 @@ class ShoppingController {
 
     // tag::view[]
     @Get("/cart")
-    @SessionValue(ATTR_CART) // <1>
+    @SessionValue("cart") // <1>
     Cart viewCart(@SessionValue @Nullable Cart cart) { // <2>
         if (cart == null) {
             cart = new Cart()
