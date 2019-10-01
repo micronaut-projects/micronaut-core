@@ -2,7 +2,6 @@ dependencies {
     compileOnly dependencyVersion("groovy")
     api project(":inject")
     api project(":http")
-    compileOnly project(":inject-java")
     annotationProcessor project(":inject-java")
     
     testImplementation project(":inject-groovy")

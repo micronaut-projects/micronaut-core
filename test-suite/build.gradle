@@ -15,7 +15,6 @@ apply from: "${rootProject.projectDir}/gradle/geb.gradle"
 apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
 
 dependencies {
-    compileOnly project(":inject-java")
     annotationProcessor project(":inject-java")
     api project(":inject")
 

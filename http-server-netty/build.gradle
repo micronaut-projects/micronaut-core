@@ -3,7 +3,6 @@ dependencies {
     api project(":http-netty")
 
     annotationProcessor project(":inject-java")
-    compileOnly project(":inject-java")
     compileOnly dependencyModuleVersion("netty", "netty-transport-native-epoll")
     compileOnly dependencyModuleVersion("netty", "netty-transport-native-kqueue")
 

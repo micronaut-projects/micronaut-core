@@ -3,7 +3,6 @@ dependencies {
     api project(":websocket")
     api project(":runtime")
     api project(":router")
-    compileOnly project(":inject-java")
     annotationProcessor project(":inject-java")
 }
 
