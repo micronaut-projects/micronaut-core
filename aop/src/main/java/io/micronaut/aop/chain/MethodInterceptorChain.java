@@ -54,7 +54,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     public R proceed() throws RuntimeException {
         Interceptor<T, R> interceptor;
         if (interceptorCount == 0 || index == interceptorCount) {
-            if (target instanceof Intercepted && executionHandle.isAbstract()) {
+            if (target instanceof Introduced && executionHandle.isAbstract()) {
                 throw new UnimplementedAdviceException(executionHandle);
             } else {
                 return executionHandle.invoke(target, getParameterValues());
