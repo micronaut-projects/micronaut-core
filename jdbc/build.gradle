@@ -1,5 +1,4 @@
 dependencies {
-    compileOnly project(":inject-java")
     annotationProcessor project(":inject-java")
     compileOnly project(":spring")
     compileOnly dependencyModuleVersion("spring", "spring-jdbc")
