@@ -19,7 +19,6 @@ dependencies {
     annotationProcessor project(":inject-java")
     api project(":inject")
 
-    testCompileOnly project(":test-suite-helper")
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
     testImplementation project(":validation")
@@ -54,6 +53,7 @@ dependencies {
     // end::testcontainers-dependencies[]
     testImplementation 'org.awaitility:awaitility:3.1.6'
 
+    testAnnotationProcessor project(":test-suite-helper")
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":test-suite")
 
