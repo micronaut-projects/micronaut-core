@@ -191,7 +191,7 @@ NOTE: To disable route compile time validation, set the system property `-Dmicro
 
 == Routing non-standard HTTP methods
 
-In most cases developer has to deal only with standard http methods, such as GET, POST and etc. However, there are cases when one has to provide additional methods like REPORT or LOCK (see  https://tools.ietf.org/html/rfc4918[RFC-4918 Webdav] as one of many examples). In that case you can use @CustomHttpMethod annotation.
+It may be necessary to support a non-standard HTTP method for a client or server. Specifications like https://tools.ietf.org/html/rfc4918[RFC-4918 Webdav] require additional methods like REPORT or LOCK for example. To support that use case the @CustomHttpMethod annotation can be used.
  
 .RoutingExample
 [source,java]
@@ -200,4 +200,4 @@ In most cases developer has to deal only with standard http methods, such as GET
 String lock(String name)
 ----
 
-You can use this annotation in controllers, as well as declarative clients, if you need to access an application that works with extension of HTTP.
+The annotation can be used anywhere any of the standard method annotations can be used, including controllers and declarative http clients.
