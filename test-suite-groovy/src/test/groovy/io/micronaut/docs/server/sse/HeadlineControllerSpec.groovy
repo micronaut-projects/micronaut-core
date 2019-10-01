@@ -30,7 +30,6 @@ import spock.util.concurrent.PollingConditions
  * @author Graeme Rocher
  * @since 1.0
  */
-@Ignore
 class HeadlineControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
