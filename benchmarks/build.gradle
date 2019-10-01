@@ -5,7 +5,6 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":validation")
-    compileOnly project(":inject-java")
     compileOnly project(":validation")
     api project(":inject")
     api project(":inject-java-test")

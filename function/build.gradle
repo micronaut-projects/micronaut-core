@@ -1,6 +1,5 @@
 dependencies {
     api project(":runtime")
-    compileOnly project(":inject-java")
     annotationProcessor project(":inject-java")
     api project(":http")
 

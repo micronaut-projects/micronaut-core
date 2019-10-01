@@ -1,6 +1,5 @@
 dependencies {
     api project(":inject")
-    compileOnly project(":inject-java")
     annotationProcessor project(":inject-java")
     api project(":graal")
 

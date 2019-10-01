@@ -7,7 +7,6 @@ dependencies {
 
     // the following are Tracing implementations and instrumentations which
     // are optionally loaded and not required
-    compileOnly project(":inject-java")
     annotationProcessor project(":inject-java")
     compileOnly dependencyModuleVersion('micronaut.netflix', 'micronaut-netflix-hystrix'), {
         exclude group:"io.micronaut", module:'micronaut-runtime'

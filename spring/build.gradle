@@ -3,7 +3,6 @@ dependencies {
     api dependencyModuleVersion("spring", "spring-tx")
     api dependencyModuleVersion("spring", "spring-context")
     api project(":inject")
-    compileOnly project(":inject-java")
     annotationProcessor project(":inject-java")
     compileOnly dependencyModuleVersion("spring", "spring-jdbc")
     api project(":aop")
