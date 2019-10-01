@@ -18,8 +18,10 @@ package io.micronaut.cache;
 import io.micronaut.core.type.Argument;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
 /**
@@ -121,6 +123,11 @@ public interface SyncCache<C> extends Cache<C> {
         return get(key, Argument.of(requiredType));
     }
 
+    @Nullable
+    default ExecutorService getExecutorService() {
+        return null;
+    }
+
     /**
      * <p>This method should return an async API version of this cache interface implementation.</p>
      * <p>
@@ -133,79 +140,11 @@ public interface SyncCache<C> extends Cache<C> {
      */
     @Nonnull
     default AsyncCache<C> async() {
-        return new AsyncCache<C>() {
-            @Override
-            public <T> CompletableFuture<Optional<T>> get(Object key, Argument<T> requiredType) {
-                try {
-                    return CompletableFuture.completedFuture(SyncCache.this.get(key, requiredType));
-                } catch (Exception e) {
-                    return handleException(e);
-                }
-            }
-
-            @Override
-            public <T> CompletableFuture<T> get(Object key, Argument<T> requiredType, Supplier<T> supplier) {
-                try {
-                    return CompletableFuture.completedFuture(SyncCache.this.get(key, requiredType, supplier));
-                } catch (Exception e) {
-                    return handleException(e);
-                }
-            }
-
-            @Override
-            public <T> CompletableFuture<Optional<T>> putIfAbsent(Object key, T value) {
-                try {
-                    return CompletableFuture.completedFuture(SyncCache.this.putIfAbsent(key, value));
-                } catch (Exception e) {
-                    return handleException(e);
-                }
-            }
-
-            @Override
-            public String getName() {
-                return SyncCache.this.getName();
-            }
-
-            @Override
-            public C getNativeCache() {
-                return SyncCache.this.getNativeCache();
-            }
-
-            @Override
-            public CompletableFuture<Boolean> put(Object key, Object value) {
-                try {
-                    SyncCache.this.put(key, value);
-                    return CompletableFuture.completedFuture(true);
-                } catch (Exception e) {
-                    return handleException(e);
-                }
-            }
-
-            @Override
-            public CompletableFuture<Boolean> invalidate(Object key) {
-                try {
-                    SyncCache.this.invalidate(key);
-                    return CompletableFuture.completedFuture(true);
-                } catch (Exception e) {
-                    return handleException(e);
-                }
-            }
-
-            @Override
-            public CompletableFuture<Boolean> invalidateAll() {
-                try {
-                    SyncCache.this.invalidateAll();
-                    return CompletableFuture.completedFuture(true);
-                } catch (Exception e) {
-                    return handleException(e);
-                }
-            }
-
-            private <T> CompletableFuture<T> handleException(Exception e) {
-                CompletableFuture<T> future = new CompletableFuture<>();
-                future.completeExceptionally(e);
-                return future;
-            }
-        };
+        ExecutorService executorService = getExecutorService();
+        if (executorService == null) {
+            return new DelegatingAsyncBlockingCache<>(this);
+        } else {
+            return new DelegatingAsyncCache<>(this, executorService);
+        }
     }
 }
