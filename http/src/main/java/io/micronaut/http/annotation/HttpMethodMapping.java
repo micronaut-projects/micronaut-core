@@ -50,6 +50,8 @@ public @interface HttpMethodMapping {
     String value() default UriMapping.DEFAULT_URI;
 
     /**
+     * Only to be used in the context of a server.
+     *
      * @return The URIs of the action
      */
     String[] uris() default {UriMapping.DEFAULT_URI};

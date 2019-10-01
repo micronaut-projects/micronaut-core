@@ -51,6 +51,8 @@ public @interface Trace {
     String uri() default UriMapping.DEFAULT_URI;
 
     /**
+     * Only to be used in the context of a server.
+     *
      * @return The URIs of the TRACE route
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "uris")

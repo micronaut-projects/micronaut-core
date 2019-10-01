@@ -51,6 +51,8 @@ public @interface Head {
     String uri() default UriMapping.DEFAULT_URI;
 
     /**
+     * Only to be used in the context of a server.
+     *
      * @return The URIs of the HEAD route
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "uris")

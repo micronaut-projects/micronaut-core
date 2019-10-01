@@ -15,10 +15,13 @@
  */
 package io.micronaut.validation.routes.rules;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.validation.routes.RouteValidationResult;
+
+import java.util.List;
 
 /**
  * Describes a rule to validate a route.
@@ -26,16 +29,17 @@ import io.micronaut.validation.routes.RouteValidationResult;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 public interface RouteValidationRule {
 
     /**
      * Validate the given uri template and route arguments.
      *
-     * @param template The URI match template
+     * @param templates The URI match templates
      * @param parameters The route parameters
      * @param method  The route method
      * @return A {@link RouteValidationResult}
      */
-    RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters, MethodElement method);
+    RouteValidationResult validate(List<UriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method);
 
 }
