@@ -1867,22 +1867,32 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         if (t instanceof HttpClientResponseException) {
                             emitter.onError(t);
                         } else {
-                            FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, null, true);
-                            HttpClientResponseException clientResponseError = new HttpClientResponseException(
-                                    "Error decoding HTTP response body: " + t.getMessage(),
-                                    t,
-                                    response,
-                                    new HttpClientErrorDecoder() {
-                                        @Override
-                                        public Class<?> getErrorType(MediaType mediaType) {
-                                            return errorType.getType();
-                                        }
-                                    }
-                            );
+                            FullNettyClientHttpResponse<Object> response = null;
+                            Throwable exceptionToEmit;
                             try {
-                                emitter.onError(clientResponseError);
+                                response = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, null, true);
+                                exceptionToEmit = new HttpClientResponseException(
+                                        "Error decoding HTTP response body: " + t.getMessage(),
+                                        t,
+                                        response,
+                                        new HttpClientErrorDecoder() {
+                                            @Override
+                                            public Class<?> getErrorType(MediaType mediaType) {
+                                                return errorType.getType();
+                                            }
+                                        }
+                                );
+                            }
+                            catch (Exception e) {
+                                LOG.warn("error constructing HttpClientResponseException; ignoring", e);
+                                exceptionToEmit = t;
+                            }
+                            try {
+                                emitter.onError(exceptionToEmit);
                             } finally {
-                                response.onComplete();
+                                if (response != null) {
+                                    response.onComplete();
+                                }
                             }
                         }
                     } else {
