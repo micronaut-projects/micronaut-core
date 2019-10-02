@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.condition;
 
+import io.micronaut.core.annotation.Introspected;
+
 import java.util.function.Predicate;
 
 /**
@@ -24,6 +26,7 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 @FunctionalInterface
+@Introspected
 public interface Condition extends Predicate<ConditionContext> {
 
     /**
