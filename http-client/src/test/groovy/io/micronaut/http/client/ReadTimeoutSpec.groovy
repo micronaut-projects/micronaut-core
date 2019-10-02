@@ -36,6 +36,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import javax.inject.Inject
 import java.lang.reflect.Field
@@ -274,6 +275,7 @@ class ReadTimeoutSpec extends Specification {
                 'micronaut.http.client.pool.enabled':true,
                 'micronaut.http.client.pool.max-connections':10
         )
+        PollingConditions conditions = new PollingConditions(timeout: 3)
 
         when:"Lots of read timeouts occur"
         TimeoutClient client = clientContext.getBean(TimeoutClient)
@@ -284,9 +286,12 @@ class ReadTimeoutSpec extends Specification {
                 it.join()
             } catch (Throwable e){ }
         }
+        def pool = getPool(clientContext.getBean(HttpClientIntroductionAdvice).clients.get("http://localhost:${embeddedServer.getPort()}".toString()))
 
         then:"Connections are not leaked"
-        getPool(clientContext.getBean(HttpClientIntroductionAdvice).clients.get("http://localhost:${embeddedServer.getPort()}".toString())).acquiredChannelCount() == 0
+        conditions.eventually {
+            pool.acquiredChannelCount() == 0
+        }
 
         cleanup:
         clientContext.close()
