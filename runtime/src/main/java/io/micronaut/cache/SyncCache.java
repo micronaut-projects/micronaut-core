@@ -20,7 +20,6 @@ import io.micronaut.core.type.Argument;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
@@ -123,6 +122,10 @@ public interface SyncCache<C> extends Cache<C> {
         return get(key, Argument.of(requiredType));
     }
 
+    /**
+     * @return The executor service used to construct the default
+     * asynchronous cache.
+     */
     @Nullable
     default ExecutorService getExecutorService() {
         return null;
