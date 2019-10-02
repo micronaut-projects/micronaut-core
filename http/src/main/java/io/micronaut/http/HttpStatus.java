@@ -143,7 +143,7 @@ public enum HttpStatus implements CharSequence {
     public static HttpStatus valueOf(int code) {
         HttpStatus status = BY_CODE.get(code);
         if (status == null) {
-            throw new IllegalArgumentException("Invalid HTTP status code: " + code);
+            throw new UnknownHttpStatusException(code);
         }
         return status;
     }
@@ -161,5 +161,31 @@ public enum HttpStatus implements CharSequence {
     @Override
     public CharSequence subSequence(int start, int end) {
         return name().subSequence(start, end);
+    }
+
+    /**
+     * Unknown (non-standard) http status requested by {@link #valueOf(int)}.
+     */
+    public static class UnknownHttpStatusException extends IllegalArgumentException {
+        private final int code;
+
+        /**
+         * Create instance of this error. Any old code catching IllegalArgumentException and parsing its message will still work.
+         *
+         * @param code http status code
+         */
+        protected UnknownHttpStatusException(int code) {
+            super("Invalid HTTP status code: " + code);
+            this.code = code;
+        }
+
+        /**
+         * Real http status code, one that is not available as enum value.
+         *
+         * @return status code (note: it is not guaranteed that it's in valid range)
+         */
+        public int getCode() {
+            return code;
+        }
     }
 }

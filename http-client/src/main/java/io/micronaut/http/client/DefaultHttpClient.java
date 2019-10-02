@@ -38,6 +38,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.*;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.HttpStatus.UnknownHttpStatusException;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
@@ -1866,6 +1867,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     if (complete.compareAndSet(false, true)) {
                         if (t instanceof HttpClientResponseException) {
                             emitter.onError(t);
+                        } else if (t instanceof UnknownHttpStatusException) {
+                            // TODO: HttpClientResponseException should be constructed, but means API change (io.micronaut.http.HttpResponse#getStatus())
+                            emitter.onError(t);
                         } else {
                             FullNettyClientHttpResponse<Object> response = null;
                             Throwable exceptionToEmit;
@@ -1882,8 +1886,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                             }
                                         }
                                 );
-                            }
-                            catch (Exception e) {
+                            } catch (Exception e) {
                                 LOG.warn("error constructing HttpClientResponseException; ignoring", e);
                                 exceptionToEmit = t;
                             }
