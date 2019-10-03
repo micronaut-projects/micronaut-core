@@ -25,7 +25,6 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Validates route parameters are nullable or optional for optional
