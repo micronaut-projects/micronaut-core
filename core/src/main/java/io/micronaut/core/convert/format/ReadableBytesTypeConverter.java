@@ -17,6 +17,7 @@ package io.micronaut.core.convert.format;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.util.StringUtils;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -38,6 +39,9 @@ public class ReadableBytesTypeConverter implements FormattingTypeConverter<CharS
 
     @Override
     public Optional<Number> convert(CharSequence object, Class<Number> targetType, ConversionContext context) {
+        if (StringUtils.isEmpty(object)) {
+            return Optional.empty();
+        }
         String value = object.toString().toUpperCase(Locale.ENGLISH);
         try {
             if (value.endsWith("KB")) {
