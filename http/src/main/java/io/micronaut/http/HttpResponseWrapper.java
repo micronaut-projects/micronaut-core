@@ -15,6 +15,8 @@
  */
 package io.micronaut.http;
 
+import javax.annotation.Nullable;
+
 /**
  * A wrapper around a {@link HttpResponse}.
  *
@@ -33,6 +35,23 @@ public class HttpResponseWrapper<B> extends HttpMessageWrapper<B> implements Htt
     @Override
     public HttpStatus getStatus() {
         return getDelegate().getStatus();
+    }
+
+    /**
+     * @return The response status code; negative if the status code is not available
+     */
+    @Override
+    public int code() {
+        return getDelegate().code();
+    }
+
+    /**
+     * @return The HTTP status reason phrase
+     */
+    @Override
+    @Nullable
+    public String reason() {
+        return getDelegate().reason();
     }
 
     @Override

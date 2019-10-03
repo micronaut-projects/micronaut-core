@@ -37,6 +37,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 
+import javax.annotation.Nullable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -114,7 +115,29 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public HttpStatus getStatus() {
-        return HttpStatus.valueOf(nettyResponse.status().code());
+        int code = code();
+        try {
+            return HttpStatus.valueOf(code);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * @return The response status code; negative if the status code is not available
+     */
+    @Override
+    public int code() {
+        return nettyResponse.status().code();
+    }
+
+    /**
+     * @return The HTTP status reason phrase
+     */
+    @Nullable
+    @Override
+    public String reason() {
+        return nettyResponse.status().reasonPhrase();
     }
 
     @Override

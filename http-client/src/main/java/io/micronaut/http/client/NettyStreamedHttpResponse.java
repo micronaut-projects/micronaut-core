@@ -38,6 +38,7 @@ import java.util.Optional;
 class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
 
     private final StreamedHttpResponse nettyResponse;
+    private final int statusCode;
     private final HttpStatus status;
     private final NettyHttpHeaders headers;
     private B body;
@@ -48,7 +49,14 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
      */
     NettyStreamedHttpResponse(StreamedHttpResponse response) {
         this.nettyResponse = response;
-        this.status = HttpStatus.valueOf(response.status().code());
+        this.statusCode = response.status().code();
+        HttpStatus statusEnum = null;
+        try {
+            statusEnum = HttpStatus.valueOf(this.statusCode);
+        } catch (IllegalArgumentException ignored) {
+            //ignore; getStatus() will be null
+        }
+        this.status = statusEnum;
         this.headers = new NettyHttpHeaders(response.headers(), ConversionService.SHARED);
     }
 
@@ -57,6 +65,14 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
      */
     public StreamedHttpResponse getNettyResponse() {
         return nettyResponse;
+    }
+
+    /**
+     * @return The response status code; negative if the status code is not available
+     */
+    @Override
+    public int code() {
+        return this.statusCode;
     }
 
     @Override

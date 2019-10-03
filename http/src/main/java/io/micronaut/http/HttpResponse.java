@@ -32,9 +32,10 @@ import java.util.Set;
 public interface HttpResponse<B> extends HttpMessage<B> {
 
     /**
-     * @return The current status
+     * @return The current status; can be <code>null</code> if the response contains non-standard status code.
+     * @see #code() 
      */
-    HttpStatus getStatus();
+    @Nullable HttpStatus getStatus();
 
     @Override
     default HttpResponse<B> setAttribute(CharSequence name, Object value) {
@@ -62,24 +63,32 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * @return The HTTP status
+     * @return The current status; can be <code>null</code> if the response contains non-standard status code.
      */
-    default HttpStatus status() {
+    default @Nullable HttpStatus status() {
         return getStatus();
     }
 
     /**
-     * @return The response status code
+     * @return The response status code; negative if the status code is not available
      */
     default int code() {
-        return getStatus().getCode();
+        HttpStatus status = getStatus();
+        if (status == null) {
+            return -1;
+        }
+        return status.getCode();
     }
 
     /**
      * @return The HTTP status reason phrase
      */
-    default String reason() {
-        return getStatus().getReason();
+    default @Nullable String reason() {
+        HttpStatus status = getStatus();
+        if (status == null) {
+            return null;
+        }
+        return status.getReason();
     }
 
     /**
