@@ -1181,8 +1181,30 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             @Nullable SslContext sslCtx,
             boolean isStream) {
         String host = uri.getHost();
+        int port;
+        if (host == null) {
+            host = uri.getAuthority();
+            if (host == null) {
+                throw new HttpClientException("URI specifies no host to connect to");
+            }
 
-        int port = uri.getPort() > -1 ? uri.getPort() : sslCtx != null ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+            final int i = host.indexOf(':');
+            if (i > -1) {
+                final String portStr = host.substring(i + 1);
+                host = host.substring(0, i);
+                try {
+                    port = Integer.parseInt(portStr);
+                } catch (NumberFormatException e) {
+                    throw new HttpClientException("URI specifies an invalid port: " + portStr);
+                }
+            } else {
+                port = uri.getPort() > -1 ? uri.getPort() : sslCtx != null ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+            }
+        } else {
+            port = uri.getPort() > -1 ? uri.getPort() : sslCtx != null ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+        }
+
+
         return doConnect(request, host, port, sslCtx, isStream);
     }
 
