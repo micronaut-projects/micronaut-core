@@ -145,6 +145,17 @@ The previous example used the link:{api}/io/micronaut/http/annotation/Get.html[@
 
 NOTE: All of the method annotations default to `/`.
 
+== Multiple URIs
+
+Each of the routing annotations support multiple URI templates. For each template, a route will be created. This feature is useful for example to change the path of the API and leaving the existing path as is for backwards compatibility. For example:
+
+snippet::io.micronaut.docs.server.routing.BackwardCompatibleController[tags="imports,class", indent=0, title="Multiple URIs"]
+
+<1> Specify multiple templates
+<2> Bind to the template arguments as normal
+
+NOTE: Route validation is more complicated with multiple templates. If a variable that would normally be required does not exist in all templates, then that variable is considered optional since it may not exist for every execution of the method.
+
 == Building Routes Programmatically
 
 If you prefer to not use annotations and declare all of your routes in code then never fear, Micronaut has a flexible link:{api}/io/micronaut/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
