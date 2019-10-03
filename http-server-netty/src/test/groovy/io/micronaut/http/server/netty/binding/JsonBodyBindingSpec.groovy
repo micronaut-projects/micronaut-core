@@ -85,7 +85,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == """Invalid JSON: Unexpected character ('T' (code 84)): expected a valid value (number, String, array, object, 'true', 'false' or 'null')
+        e.message == """Invalid JSON: Unexpected character ('T' (code 84)): expected a valid value ((JSON---) String, (Numbe)r(, A)r(r)ay, (O)bject( or) (-)t(ok)e(n )'(null'), '(tru-)e' or '(fa)l(se)')
  at [Source: UNKNOWN; line: 1, column: 11]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
