@@ -149,6 +149,14 @@ public interface HttpRequest<B> extends HttpMessage<B> {
             .map(Locale::forLanguageTag);
     }
 
+    /**
+     * Retrieves the Certificate used for mutual authentication.
+     *
+     * @return A certificate used for authentication, if applicable.
+     */
+    default Optional<Certificate> getCertificate() {
+        return this.getAttribute("javax.servlet.request.X509Certificate", Certificate.class);
+    }
 
     /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.

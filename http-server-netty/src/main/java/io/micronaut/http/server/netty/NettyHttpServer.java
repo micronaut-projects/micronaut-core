@@ -37,6 +37,7 @@ import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
+import io.micronaut.http.server.netty.ssl.SSLCertificateProviderHandler;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
@@ -289,6 +290,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         int port = ((InetSocketAddress) ch.localAddress()).getPort();
                         if (sslContext != null && sslConfiguration != null && port == sslConfiguration.getPort()) {
                             pipeline.addLast(sslContext.newHandler(ch.alloc()));
+                            pipeline.addLast(new SSLCertificateProviderHandler());
                         }
 
                         if (loggingHandler != null) {
