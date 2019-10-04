@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
+import java.security.cert.Certificate;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
