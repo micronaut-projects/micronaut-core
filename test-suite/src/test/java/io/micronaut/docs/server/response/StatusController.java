@@ -16,6 +16,7 @@
 package io.micronaut.docs.server.response;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
@@ -29,11 +30,6 @@ import java.util.concurrent.CompletableFuture;
 @Controller("/status")
 public class StatusController {
 
-    @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
-    public String simple() {
-        return "success";
-    }
-
     //tag::atstatus[]
     @Status(HttpStatus.CREATED)
     @Get(produces = MediaType.TEXT_PLAIN)
@@ -42,26 +38,17 @@ public class StatusController {
     }
     //end::atstatus[]
 
-    @Status(HttpStatus.CREATED)
-    @Get(value = "/voidreturn")
-    public void voidReturn() {
+    //tag::httpstatus[]
+    @Get("/http-status")
+    public HttpStatus httpStatus() {
+        return HttpStatus.CREATED;
     }
+    //end::httpstatus[]
 
-    @Status(HttpStatus.CREATED)
-    @Get(value = "/completableVoid")
-    public CompletableFuture<Void> voidCompletableFuture() {
-        return CompletableFuture.completedFuture(null);
+    //tag::httpresponse[]
+    @Get(value = "/http-response", produces = MediaType.TEXT_PLAIN)
+    public HttpResponse httpResponse() {
+        return HttpResponse.status(HttpStatus.CREATED).body("success");
     }
-
-    @Status(HttpStatus.CREATED)
-    @Get(value = "/maybeVoid")
-    public Maybe<Void> maybeVoid() {
-        return Maybe.empty();
-    }
-
-    @Status(HttpStatus.NOT_FOUND)
-    @Get(value = "/simple404", produces = MediaType.TEXT_PLAIN)
-    public String simple404() {
-        return "success";
-    }
+    //end::httpresponse[]
 }

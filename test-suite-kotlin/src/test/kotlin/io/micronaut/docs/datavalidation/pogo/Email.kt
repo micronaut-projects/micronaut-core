@@ -8,10 +8,8 @@ import javax.validation.constraints.NotBlank
 open class Email {
 
     @NotBlank // <1>
-    lateinit
-    var subject: String
+    var subject: String? = null
 
-    @NotBlank
-    lateinit // <1>
-    var recipient: String
+    @NotBlank // <1>
+    var recipient: String? = null
 }

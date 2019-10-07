@@ -1,21 +1,7 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.docs.server.json
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -23,15 +9,10 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 @Stepwise
 class PersonControllerSpec extends Specification {
 
@@ -41,77 +22,83 @@ class PersonControllerSpec extends Specification {
     @Shared @AutoCleanup RxHttpClient client = RxHttpClient.create(embeddedServer.URL)
 
     void "test global error handler"() {
-
         when:
-        client.exchange("/people/error", Map.class)
-              .blockingFirst()
+        client.exchange("/people/error", Map.class).blockingFirst()
+        
+        then:
+        def e = thrown(HttpClientResponseException)
+        HttpResponse<Map> response = (HttpResponse<Map>) e.getResponse()
+        response.getStatus() == HttpStatus.INTERNAL_SERVER_ERROR
+        response.getBody().get().get("message") == "Bad Things Happened: Something went wrong"
+    }
+
+    void testSave() {
+        when:
+        HttpResponse<Person> response = client.exchange(HttpRequest.POST("/people", "{\"firstName\":\"Fred\",\"lastName\":\"Flintstone\",\"age\":45}"), Person.class).blockingFirst()
+        Person person = response.getBody().get()
+        
+        then:
+        person.getFirstName() == "Fred"
+        response.getStatus() == HttpStatus.CREATED
+    }
+
+    void testGetPerson() {
+        when:
+        HttpResponse<Person> response = client.exchange(HttpRequest.GET("/people/Fred"), Person.class).blockingFirst()
+        Person person = response.getBody().get()
+
+        then:
+        person.getFirstName() == "Fred"
+        response.getStatus() == HttpStatus.OK
+    }
+
+    void testSaveReactive() {
+        HttpResponse<Person> response = client.exchange(HttpRequest.POST("/people/saveReactive", "{\"firstName\":\"Wilma\",\"lastName\":\"Flintstone\",\"age\":36}"), Person.class).blockingFirst()
+        Person person = response.getBody().get()
+
+        expect:
+        person.getFirstName() == "Wilma"
+        response.getStatus() == HttpStatus.CREATED
+    }
+
+    void testSaveFuture() {
+        HttpResponse<Person> response = client.exchange(HttpRequest.POST("/people/saveFuture", "{\"firstName\":\"Pebbles\",\"lastName\":\"Flintstone\",\"age\":0}"), Person.class).blockingFirst()
+        Person person = response.getBody().get()
+
+        expect:
+        person.getFirstName() == "Pebbles"
+        response.getStatus() == HttpStatus.CREATED
+    }
+
+    void testSaveArgs() {
+        HttpResponse<Person> response = client.exchange(HttpRequest.POST("/people/saveWithArgs", "{\"firstName\":\"Dino\",\"lastName\":\"Flintstone\",\"age\":3}"), Person.class).blockingFirst()
+        Person person = response.getBody().get()
+
+        expect:
+        person.getFirstName() == "Dino"
+        response.getStatus() == HttpStatus.CREATED
+    }
+
+    void testPersonNotFound() {
+        when:
+        client.exchange("/people/Sally", Map.class).blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
-
-        when:
-        def response = e.response
-
-        then:
-        response.status == HttpStatus.INTERNAL_SERVER_ERROR
-
-        when:
-        def json = response.body.orElse(null)
-
-        then:
-        json
-        json.message == 'Bad Things Happened: Something went wrong'
+        HttpResponse<Map> response = (HttpResponse<Map>) e.getResponse()
+        response.getBody().get().get("message") == "Person Not Found"
+        response.getStatus() == HttpStatus.NOT_FOUND
     }
 
-    void "test save person"() {
-        given:
-        String body = '{"firstName":"Fred","lastName":"Flintstone","age":45}'
-        HttpResponse<String> response = client.exchange(HttpRequest.POST('/people', body), String)
-                                              .blockingFirst()
-
-        expect:
-        response.body.isPresent()
-        response.body.get() == body
-        response.status == HttpStatus.CREATED
-    }
-
-
-
-    void "test retrieve person"() {
-
+    void testSaveInvalidJson() {
         when:
-        HttpResponse<Map> response = client.exchange('/people/Fred', Map).blockingFirst()
-
-        then:
-        response.status == HttpStatus.OK
-
-        when:
-        def json = response.body
-                        .orElseThrow({-> new AssertionError("body expected")})
-
-        then:
-        json.firstName == "Fred"
-
-        when:
-        client.exchange('/people/Barney')
-              .blockingFirst()
+        client.exchange(HttpRequest.POST("/people", "{\""), Argument.of(Person.class), Argument.of(Map.class)).blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.response.status == HttpStatus.NOT_FOUND
-
+        HttpResponse<Map> response = (HttpResponse<Map>) e.getResponse()
+        response.getBody(Map.class).get().get("message").toString().startsWith("Invalid JSON: Unexpected end-of-input")
+        response.getStatus() == HttpStatus.BAD_REQUEST
     }
-
-    void "test save person with args"() {
-        given:
-        String body = '{"firstName":"Fred","lastName":"Flintstone","age":45}'
-        HttpResponse<String> response = client.exchange(
-                HttpRequest.POST("/people/saveWithArgs", body), String
-        ).blockingFirst()
-
-        expect:
-        response.body.isPresent()
-        response.body.get() == body
-        response.status == HttpStatus.CREATED
-    }
+    
 }

@@ -1,7 +1,6 @@
 package io.micronaut.docs.server.body;
 
 // tag::imports[]
-
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
@@ -14,10 +13,6 @@ import io.reactivex.Single;
 import javax.validation.constraints.Size;
 // end::imports[]
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 // tag::class[]
 @Controller("/receive")
 public class MessageController {
@@ -39,5 +34,6 @@ public class MessageController {
                    );
     }
     // end::echoReactive[]
+// tag::class[]
 }
-
+// end::class[]

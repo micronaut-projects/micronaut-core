@@ -1,6 +1,7 @@
 package io.micronaut.docs.server.response;
 
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
@@ -27,6 +28,20 @@ class StatusController {
     }
     //end::atstatus[]
 
+    //tag::httpstatus[]
+    @Get("/http-status")
+    HttpStatus httpStatus() {
+        HttpStatus.CREATED
+    }
+    //end::httpstatus[]
+
+    //tag::httpresponse[]
+    @Get(value = "/http-response", produces = MediaType.TEXT_PLAIN)
+    HttpResponse httpResponse() {
+        HttpResponse.status(HttpStatus.CREATED).body("success")
+    }
+    //end::httpresponse[]
+
     @Status(HttpStatus.CREATED)
     @Get(value = "/voidreturn")
     void voidReturn() {
@@ -47,6 +62,7 @@ class StatusController {
     @Status(HttpStatus.NOT_FOUND)
     @Get(value = "/simple404", produces = MediaType.TEXT_PLAIN)
     String simple404() {
-        return "success"
+        "success"
     }
+
 }

@@ -12,20 +12,16 @@ import io.reactivex.Maybe;
 import io.reactivex.Single;
 
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 // tag::class[]
 @Controller("/people")
 public class PersonController {
 
-    Map<String, Person> inMemoryDatastore = new LinkedHashMap<>();
+    Map<String, Person> inMemoryDatastore = new ConcurrentHashMap<>();
 // end::class[]
 
     @Get
@@ -42,7 +38,7 @@ public class PersonController {
     }
 
     // tag::single[]
-    @Post
+    @Post("/saveReactive")
     public Single<HttpResponse<Person>> save(@Body Single<Person> person) { // <1>
         return person.map(p -> {
                     inMemoryDatastore.put(p.getFirstName(), p); // <2>
@@ -52,9 +48,8 @@ public class PersonController {
     }
     // end::single[]
 
-
-    @Post("/saveWithArgs")
     // tag::args[]
+    @Post("/saveWithArgs")
     public HttpResponse<Person> save(String firstName, String lastName, Optional<Integer> age) {
         Person p = new Person(firstName, lastName);
         age.ifPresent(p::setAge);
@@ -64,6 +59,7 @@ public class PersonController {
     // end::args[]
 
     // tag::future[]
+    @Post("/saveFuture")
     public CompletableFuture<HttpResponse<Person>> save(@Body CompletableFuture<Person> person) {
         return person.thenApply(p -> {
                     inMemoryDatastore.put(p.getFirstName(), p);
@@ -74,6 +70,7 @@ public class PersonController {
     // end::future[]
 
     // tag::regular[]
+    @Post
     public HttpResponse<Person> save(@Body Person person) {
         inMemoryDatastore.put(person.getFirstName(), person);
         return HttpResponse.created(person);
@@ -91,14 +88,13 @@ public class PersonController {
     }
     // end::localError[]
 
-
     @Get("/error")
     public String throwError() {
         throw new RuntimeException("Something went wrong");
     }
 
-    @Error // <1>
     // tag::globalError[]
+    @Error // <1>
     public HttpResponse<JsonError> error(HttpRequest request, Throwable e) {
         JsonError error = new JsonError("Bad Things Happened: " + e.getMessage()) // <2>
                 .link(Link.SELF, Link.of(request.getUri()));
@@ -108,14 +104,17 @@ public class PersonController {
     }
     // end::globalError[]
 
-    @Error(status = HttpStatus.NOT_FOUND)
     // tag::statusError[]
+    @Error(status = HttpStatus.NOT_FOUND)
     public HttpResponse<JsonError> notFound(HttpRequest request) { // <1>
-        JsonError error = new JsonError("Page Not Found") // <2>
+        JsonError error = new JsonError("Person Not Found") // <2>
                 .link(Link.SELF, Link.of(request.getUri()));
 
         return HttpResponse.<JsonError>notFound()
                 .body(error); // <3>
     }
     // end::statusError[]
+
+// tag::endclass[]
 }
+// end::endclass[]

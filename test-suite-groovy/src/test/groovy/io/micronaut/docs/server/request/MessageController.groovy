@@ -1,27 +1,24 @@
-package io.micronaut.docs.server.request;
+package io.micronaut.docs.server.request
 
 // tag::imports[]
-
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-
-import static io.micronaut.http.HttpResponse.ok;
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 // end::imports[]
 
 // tag::class[]
 @Controller("/request")
 class MessageController {
 
-    @Get("/hello") // <2>
+    @Get("/hello") // <1>
     HttpResponse<String> hello(HttpRequest<?> request) {
         String name = request.getParameters()
                              .getFirst("name")
-                             .orElse("Nobody") // <3>
+                             .orElse("Nobody") // <2>
 
-        ok("Hello " + name + "!!")
-                 .header("X-My-Header", "Foo") // <4>
+        HttpResponse.ok("Hello " + name + "!!")
+                 .header("X-My-Header", "Foo") // <3>
     }
 }
 // end::class[]

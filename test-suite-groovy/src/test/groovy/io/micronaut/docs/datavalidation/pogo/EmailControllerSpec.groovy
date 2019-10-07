@@ -32,21 +32,17 @@ class EmailControllerSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-
-        when:
         def response = e.response
-
-        then:
         response.status == HttpStatus.BAD_REQUEST
 
         when:
         email = new Email()
         email.subject = 'Hi'
         email.recipient = 'me@micronaut.example'
-        client.toBlocking().exchange(HttpRequest.POST('/email/send', email))
+        response = client.toBlocking().exchange(HttpRequest.POST('/email/send', email))
 
         then:
-        noExceptionThrown()
+        response.status == HttpStatus.OK
     }
     //end::pojovalidated[]
 }
