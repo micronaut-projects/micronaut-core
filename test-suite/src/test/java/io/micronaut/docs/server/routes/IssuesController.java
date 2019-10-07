@@ -16,23 +16,17 @@
 package io.micronaut.docs.server.routes;
 
 // tag::imports[]
-
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 // end::imports[]
 
-
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 // tag::class[]
 @Controller("/issues") // <1>
 public class IssuesController {
 
     @Get("/{number}") // <2>
-    String issue(@PathVariable Integer number) { // <3>
+    public String issue(@PathVariable Integer number) { // <3>
         return "Issue # " + number + "!"; // <4>
     }
 }

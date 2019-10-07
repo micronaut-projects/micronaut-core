@@ -14,10 +14,6 @@ import io.reactivex.Single
 import javax.validation.constraints.Size
 // end::imports[]
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 // tag::class[]
 @Controller("/receive")
 class MessageController {
@@ -39,5 +35,6 @@ class MessageController {
                    });
     }
     // end::echoReactive[]
+// tag::class[]
 }
-
+// end::class[]

@@ -14,10 +14,7 @@ snippet::io.micronaut.docs.datavalidation.params.EmailController[tags="imports,c
 
 The validation behaviour is shown in the following test:
 
-[source,groovy]
-----
-include::{testsuitegroovy}/datavalidation/params/EmailControllerSpec.groovy[tag=paramsvalidated,indent=0,title="Example]
-----
+snippet::io.micronaut.docs.datavalidation.params.EmailControllerSpec[tags="paramsvalidated",indent=0,title="Example Test"]
 
 Often, you may want to use POJOs as controller method parameters.
 

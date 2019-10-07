@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Produces;
 //tag::clazz[]
 @Controller("/books")
 class BookController {
+
     @Produces(MediaType.TEXT_PLAIN)
     @Get("/stock/{isbn}")
     Integer stock(String isbn) {

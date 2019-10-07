@@ -15,10 +15,6 @@
  */
 package io.micronaut.docs.server.json;
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 public class Person {
 
     private String firstName, lastName;
