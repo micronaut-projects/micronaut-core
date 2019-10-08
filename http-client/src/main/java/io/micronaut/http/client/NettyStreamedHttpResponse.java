@@ -45,6 +45,7 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
 
     /**
      * @param response The streamed Http response
+     * @param httpStatus The Http status
      */
     NettyStreamedHttpResponse(StreamedHttpResponse response, HttpStatus httpStatus) {
         this.nettyResponse = response;
