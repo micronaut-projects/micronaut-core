@@ -5,7 +5,6 @@ dependencies {
         exclude module:'micronaut-http-client'
         exclude module:'micronaut-inject'
     }
-    api project(":inject-java")
     annotationProcessor project(":inject-java")
     compileOnly dependencyVersion("micronaut.function.aws"), {
         exclude module:"micronaut-function"
