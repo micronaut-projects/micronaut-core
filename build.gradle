@@ -260,7 +260,8 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-micrometer-core',
                     modules:['micronaut-micrometer-registry-atlas', 'micronaut-micrometer-registry-graphite',
-                             'micronaut-micrometer-registry-prometheus', 'micronaut-micrometer-registry-statsd'  ]
+                             'micronaut-micrometer-registry-prometheus', 'micronaut-micrometer-registry-statsd',
+                             'micronaut-micrometer-registry-cloudwatch']
             ],
             'micronaut.spring': [
                     version:micronautSpringVersion,
