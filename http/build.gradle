@@ -1,7 +1,7 @@
 dependencies {
     api project(":inject")
     annotationProcessor project(":inject-java")
-    api project(":graal")
+    compileOnly project(":graal")
 
     testImplementation project(":inject-groovy")
     testAnnotationProcessor project(":inject-groovy")
