@@ -1,17 +1,3 @@
-/**
- * To use this when setting up Travis run the following commands to encrypt
- * the necessary environment variables for publishing to work
- *
- * $ travis encrypt SIGNING_PASSPHRASE=...
- * $ travis encrypt SONATYPE_USERNAME=...
- * $ travis encrypt SONATYPE_PASSWORD=...
- * $ travis encrypt ARTIFACTORY_USERNAME=...
- * $ travis encrypt ARTIFACTORY_PASSWORD=...
- * $ travis encrypt BINTRAY_USER=...
- * $ travis encrypt BINTRAY_KEY=...
- *
- */
-
 buildscript {
     repositories {
         maven { url "https://repo.grails.org/grails/core" }
@@ -49,119 +35,50 @@ ext.pomInfo = {
         delegate.developerConnection "scm:git@github.com:${githubSlug}.git"
     }
 
-    if(developers) {
-        delegate.developers {
-            for(dev in developers.split(',')) {
-                delegate.developer {
-                    delegate.id dev.toLowerCase().replace(' ', '')
-                    delegate.name dev
-                }
-            }
-        }
-    }
-    ext.extraPomInfo.delegate = delegate
-    ext.extraPomInfo.call()
+task sourcesJar(type: Jar, dependsOn: classes) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allSource
 }
 
-
-
-modifyPom {
-    project(pomInfo)
+task javadocJar(type: Jar) {
+    archiveClassifier = 'javadoc'
+    from javadoc.destinationDir
 }
 
 publishing {
-
-    repositories {
-        maven {
-            credentials {
-                def bintrayUser = System.getenv("BINTRAY_USER") ?: project.hasProperty("bintrayUser") ? project.bintrayUser : ''
-                def bintrayKey = System.getenv("BINTRAY_KEY") ?: project.hasProperty("bintrayKey") ? project.bintrayKey : ''
-
-                username = bintrayUser
-                password = bintrayKey
-            }
-            url  "https://oss.jfrog.org/oss-snapshot-local"
-        }
-    }
-
     publications {
-        maven(MavenPublication) { publication ->
-            artifactId( "micronaut-" + project.name.substring(project.name.indexOf('/') + 1) )
+        mavenJava(MavenPublication) {
+            artifactId "micronaut-${project.name}"
+            from components.java
 
-            def shadowJar = tasks.findByName("shadowJar")
-            if(shadowJar && shadowJar.enabled) {
-                artifact(project.tasks.shadowJar) {
-                    classifier = null
-                }
-                pom.withXml { xml ->
-                    def xmlNode = xml.asNode()
-                    def dependenciesNode = xmlNode.appendNode('dependencies')
-                    Set<Dependency> visited = new HashSet<>()
-                    
-                    project.configurations.compile.allDependencies.each {
-                        if (! (it instanceof SelfResolvingDependency)) {
-                            def dependencyNode = dependenciesNode.appendNode('dependency')
-                            dependencyNode.appendNode('groupId', it.group)
-                            dependencyNode.appendNode('artifactId', it.name)
-                            dependencyNode.appendNode('version', it.version)
-                            dependencyNode.appendNode('scope', 'compile')
-                        }
-                        else if(it instanceof ProjectDependency) {
-                            def dependencyNode = dependenciesNode.appendNode('dependency')
-                            dependencyNode.appendNode('groupId', project.group)
-                            dependencyNode.appendNode('artifactId', "micronaut-$it.name")
-                            dependencyNode.appendNode('version', project.version)
-                            dependencyNode.appendNode('scope', 'compile')
-                        }
-                        visited.add(it)
-                    }
-                    project.configurations.runtime.allDependencies.each {
-                        if (visited.contains(it)) {
-                            return
-                        }
-                        if (! (it instanceof SelfResolvingDependency)) {
-                            def dependencyNode = dependenciesNode.appendNode('dependency')
-                            dependencyNode.appendNode('groupId', it.group)
-                            dependencyNode.appendNode('artifactId', it.name)
-                            dependencyNode.appendNode('version', it.version)
-                            dependencyNode.appendNode('scope', 'runtime')
-                        }
-                        else if(it instanceof ProjectDependency) {
-                            def dependencyNode = dependenciesNode.appendNode('dependency')
-                            dependencyNode.appendNode('groupId', project.group)
-                            dependencyNode.appendNode('artifactId', "micronaut-$it.name")
-                            dependencyNode.appendNode('version', project.version)
-                            dependencyNode.appendNode('scope', 'runtime')
+            artifact sourcesJar
+            artifact javadocJar
 
-                        }
-                        visited.add(it)
-                    }
-                    xmlNode.children().last() + pomInfo
-                }
-                artifact sourcesJar {
-                    classifier "sources"
-                }
-                artifact javadocJar {
-                    classifier "javadoc"
-                }
-
-            }
-            else {
-
-                if (project.name != 'bom') {
-                    from components.java
-                    artifact sourcesJar {
-                        classifier "sources"
-                    }
-                    artifact javadocJar {
-                        classifier "javadoc"
+            pom {
+                name = project.title
+                description = project.projectDesc
+                url = projectUrl
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        distribution = 'repo'
                     }
                 }
-
-                pom.withXml {
-                    def xml = asNode()
-
-                    xml.children().last() + pomInfo
+                scm {
+                    url = "scm:git@github.com:${githubSlug}.git"
+                    connection = "scm:git@github.com:${githubSlug}.git"
+                    developerConnection = "scm:git@github.com:${githubSlug}.git"
+                }
+                if(project.developers) {
+                    developers {
+                        for(dev in project.developers.split(',')) {
+                            developer {
+                                id = dev.toLowerCase().replace(' ', '').toString()
+                                name = dev.toString()
+                            }
+                        }
+                    }
                 }
             }
 
