@@ -156,7 +156,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return A certificate used for authentication, if applicable.
      */
     default Optional<Certificate> getCertificate() {
-        return this.getAttribute("javax.servlet.request.X509Certificate", Certificate.class);
+        return this.getAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
     }
 
     /**
