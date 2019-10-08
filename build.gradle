@@ -626,7 +626,7 @@ subprojects { Project subproject ->
                         !subproject.toString().contains('benchmarks')
         ) {
 
-//            apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
+            apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
             apply plugin: 'checkstyle'
 
             checkstyle {
