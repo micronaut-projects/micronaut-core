@@ -1649,14 +1649,23 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) {
                 if (received.compareAndSet(false, true)) {
-                    NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg);
+                    HttpResponseStatus status = msg.status();
+                    int statusCode = status.code();
+                    HttpStatus httpStatus;
+                    try {
+                        httpStatus = HttpStatus.valueOf(statusCode);
+                    } catch (IllegalArgumentException e) {
+                        emitter.onError(e);
+                        return;
+                    }
+
+                    NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg, httpStatus);
                     HttpHeaders headers = msg.headers();
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());
                         traceHeaders(headers);
                     }
 
-                    int statusCode = response.getStatus().getCode();
                     if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
                         String location = headers.get(HttpHeaderNames.LOCATION);
                         Flowable<io.micronaut.http.HttpResponse<Object>> redirectedExchange;
@@ -1787,9 +1796,18 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
+                HttpResponseStatus status = fullResponse.status();
+                int statusCode = status.code();
+                HttpStatus httpStatus;
+                try {
+                    httpStatus = HttpStatus.valueOf(statusCode);
+                } catch (IllegalArgumentException e) {
+                    emitter.onError(e);
+                    return;
+                }
 
                 try {
-                    HttpResponseStatus status = fullResponse.status();
+
                     HttpHeaders headers = fullResponse.headers();
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
@@ -1797,7 +1815,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         traceHeaders(headers);
                         traceBody("Response", fullResponse.content());
                     }
-                    int statusCode = status.code();
+
                     // it is a redirect
                     if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
                         String location = headers.get(HttpHeaderNames.LOCATION);
@@ -1820,7 +1838,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     }
                     boolean errorStatus = statusCode >= 400;
                     FullNettyClientHttpResponse<O> response
-                            = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType, errorStatus);
+                            = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, errorStatus);
 
                     if (complete.compareAndSet(false, true)) {
                         if (errorStatus) {
@@ -1860,6 +1878,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                     response.onComplete();
                                     FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
                                             fullResponse,
+                                            httpStatus,
                                             mediaTypeCodecRegistry,
                                             byteBufferFactory,
                                             null,
@@ -1886,7 +1905,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         if (t instanceof HttpClientResponseException) {
                             emitter.onError(t);
                         } else {
-                            FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, null, true);
+                            FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, null, true);
                             HttpClientResponseException clientResponseError = new HttpClientResponseException(
                                     "Error decoding HTTP response body: " + t.getMessage(),
                                     t,
