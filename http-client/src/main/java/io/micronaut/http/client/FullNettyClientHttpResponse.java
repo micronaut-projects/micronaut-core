@@ -67,6 +67,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
 
     /**
      * @param fullHttpResponse       The full Http response
+     * @param httpStatus             The Http status
      * @param mediaTypeCodecRegistry The media type codec registry
      * @param byteBufferFactory      The byte buffer factory
      * @param bodyType               The body type
