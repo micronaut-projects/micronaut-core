@@ -45,10 +45,11 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
 
     /**
      * @param response The streamed Http response
+     * @param httpStatus The Http status
      */
-    NettyStreamedHttpResponse(StreamedHttpResponse response) {
+    NettyStreamedHttpResponse(StreamedHttpResponse response, HttpStatus httpStatus) {
         this.nettyResponse = response;
-        this.status = HttpStatus.valueOf(response.status().code());
+        this.status = httpStatus;
         this.headers = new NettyHttpHeaders(response.headers(), ConversionService.SHARED);
     }
 
