@@ -74,12 +74,13 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
      */
     FullNettyClientHttpResponse(
             FullHttpResponse fullHttpResponse,
+            HttpStatus httpStatus,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             ByteBufferFactory<ByteBufAllocator,
             ByteBuf> byteBufferFactory,
             Argument<B> bodyType, boolean errorStatus) {
 
-        this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
+        this.status = httpStatus;
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
         this.nettyHttpResponse = fullHttpResponse;
