@@ -42,14 +42,14 @@ public @interface Delete {
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
     @AliasFor(annotation = UriMapping.class, member = "value")
-    String[] value() default UriMapping.DEFAULT_URI;
+    String[] value() default {UriMapping.DEFAULT_URI};
 
     /**
      * @return The URI of the DELETE route
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
     @AliasFor(annotation = UriMapping.class, member = "value")
-    String[] uri() default UriMapping.DEFAULT_URI;
+    String[] uri() default {UriMapping.DEFAULT_URI};
 
     /**
      * @return The default consumes, otherwise override from controller

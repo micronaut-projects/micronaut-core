@@ -59,9 +59,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     public AnnotatedMethodRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         httpMethodsHandlers.put(Get.class, (BeanDefinition bean, ExecutableMethod method) -> {
-            AnnotationValue<Get> annotation = method.getAnnotation(Get.class);
-            Set<String> uris = CollectionUtils.setOf(annotation.stringValues());
-            for (String uri: uris) {
+            for (String uri: getUris(method)) {
                 MediaType[] produces = resolveProduces(method);
                 Route route = GET(resolveUri(bean, uri,
                         method,
@@ -85,9 +83,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Post.class, (BeanDefinition bean, ExecutableMethod method) -> {
-            AnnotationValue<Post> annotation = method.getAnnotation(Post.class);
-            Set<String> uris = CollectionUtils.setOf(annotation.stringValues());
-            for (String uri: uris) {
+            for (String uri: getUris(method)) {
                 MediaType[] consumes = resolveConsumes(method);
                 MediaType[] produces = resolveProduces(method);
                 Route route = POST(resolveUri(bean, uri,
@@ -103,9 +99,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(CustomHttpMethod.class, (BeanDefinition bean, ExecutableMethod method) -> {
-            AnnotationValue<CustomHttpMethod> annotation = method.getAnnotation(CustomHttpMethod.class);
-            Set<String> uris = CollectionUtils.setOf(annotation.stringValues());
-            for (String uri: uris) {
+            for (String uri: getUris(method)) {
                 MediaType[] consumes = resolveConsumes(method);
                 MediaType[] produces = resolveProduces(method);
                 String methodName = method.stringValue(CustomHttpMethod.class, "method").get();
@@ -123,9 +117,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Put.class, (BeanDefinition bean, ExecutableMethod method) -> {
-            AnnotationValue<Put> annotation = method.getAnnotation(Put.class);
-            Set<String> uris = CollectionUtils.setOf(annotation.stringValues());
-            for (String uri: uris) {
+            for (String uri: getUris(method)) {
                 MediaType[] consumes = resolveConsumes(method);
                 MediaType[] produces = resolveProduces(method);
                 Route route = PUT(resolveUri(bean, uri,
@@ -141,9 +133,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Patch.class, (BeanDefinition bean, ExecutableMethod method) -> {
-            AnnotationValue<Patch> annotation = method.getAnnotation(Patch.class);
-            Set<String> uris = CollectionUtils.setOf(annotation.stringValues());
-            for (String uri: uris) {
+            for (String uri: getUris(method)) {
                 MediaType[] consumes = resolveConsumes(method);
                 MediaType[] produces = resolveProduces(method);
                 Route route = PATCH(resolveUri(bean, uri,
@@ -159,9 +149,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Delete.class, (BeanDefinition bean, ExecutableMethod method) -> {
-            AnnotationValue<Delete> annotation = method.getAnnotation(Delete.class);
-            Set<String> uris = CollectionUtils.setOf(annotation.stringValues());
-            for (String uri: uris) {
+            for (String uri: getUris(method)) {
                 MediaType[] consumes = resolveConsumes(method);
                 MediaType[] produces = resolveProduces(method);
                 Route route = DELETE(resolveUri(bean, uri,
@@ -178,9 +166,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
 
 
         httpMethodsHandlers.put(Head.class, (BeanDefinition bean, ExecutableMethod method) -> {
-            AnnotationValue<Head> annotation = method.getAnnotation(Head.class);
-            Set<String> uris = CollectionUtils.setOf(annotation.stringValues());
-            for (String uri: uris) {
+            for (String uri: getUris(method)) {
                 Route route = HEAD(resolveUri(bean, uri,
                         method,
                         uriNamingStrategy),
@@ -193,9 +179,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Options.class, (BeanDefinition bean, ExecutableMethod method) -> {
-            AnnotationValue<Options> annotation = method.getAnnotation(Options.class);
-            Set<String> uris = CollectionUtils.setOf(annotation.stringValues());
-            for (String uri: uris) {
+            for (String uri: getUris(method)) {
                 MediaType[] consumes = resolveConsumes(method);
                 MediaType[] produces = resolveProduces(method);
                 Route route = OPTIONS(resolveUri(bean, uri,
@@ -211,9 +195,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         });
 
         httpMethodsHandlers.put(Trace.class, (BeanDefinition bean, ExecutableMethod method) -> {
-            AnnotationValue<Trace> annotation = method.getAnnotation(Trace.class);
-            Set<String> uris = CollectionUtils.setOf(annotation.stringValues());
-            for (String uri: uris) {
+            for (String uri: getUris(method)) {
                 Route route = TRACE(resolveUri(bean, uri,
                         method,
                         uriNamingStrategy),
@@ -266,6 +248,14 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         );
     }
 
+    private String[] getUris(ExecutableMethod method) {
+        String[] uris = method.stringValues(HttpMethodMapping.class);
+        if (uris.length == 0) {
+            uris = new String[] {UriMapping.DEFAULT_URI};
+        }
+        return uris;
+    }
+
     private MediaType[] resolveConsumes(ExecutableMethod method) {
         MediaType[] consumes = MediaType.of(method.stringValues(Consumes.class));
         if (ArrayUtils.isEmpty(consumes)) {
@@ -298,9 +288,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         );
 
         if (!actionAnn.isPresent() && method.isDeclaredAnnotationPresent(UriMapping.class)) {
-            AnnotationValue<UriMapping> annotation = method.getAnnotation(UriMapping.class);
-            Set<String> uris = CollectionUtils.setOf(annotation.stringValues());
-            for (String uri: uris) {
+            for (String uri: method.stringValues(UriMapping.class)) {
                 MediaType[] produces = MediaType.of(method.stringValues(Produces.class));
                 Route route = GET(resolveUri(beanDefinition, uri,
                         method,

@@ -185,7 +185,7 @@ class HttpPatchSpec extends Specification {
             return book
         }
 
-        @Patch(uris = ["/multiple", "/multiple/mappings"])
+        @Patch(["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
         }

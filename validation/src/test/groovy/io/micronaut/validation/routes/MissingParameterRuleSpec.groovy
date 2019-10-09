@@ -245,7 +245,7 @@ import io.micronaut.http.annotation.*;
 @Controller("/foo")
 class Foo {
 
-    @Get(uris = {"/{abc}"})
+    @Get({"/{abc}"})
     String abc(String abc) {
         return "";
     }
@@ -266,7 +266,7 @@ import io.micronaut.http.annotation.*;
 @Controller("/foo")
 class Foo {
 
-    @Get(uris = {"/{abc}", "/{def}"})
+    @Get({"/{abc}", "/{def}"})
     String abc(String abc) {
         return "";
     }
@@ -289,7 +289,7 @@ import javax.annotation.Nullable;
 @Controller("/foo")
 class Foo {
 
-    @Get(uris = {"/{abc}", "/{def}"})
+    @Get({"/{abc}", "/{def}"})
     String abc(@Nullable String abc, @Nullable String def) {
         return "";
     }

@@ -103,7 +103,7 @@ class HttpDeleteSpec extends Specification {
                         .body(content)
         }
 
-        @Delete(uris = ["/multiple", "/multiple/mappings"])
+        @Delete(["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
         }
