@@ -1851,8 +1851,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                             response,
                                             new HttpClientErrorDecoder() {
                                                 @Override
-                                                public Class<?> getErrorType(MediaType mediaType) {
-                                                    return errorType.getType();
+                                                public Argument<?> getErrorType(MediaType mediaType) {
+                                                    return errorType;
                                                 }
                                             }
                                     );
@@ -1912,8 +1912,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                     response,
                                     new HttpClientErrorDecoder() {
                                         @Override
-                                        public Class<?> getErrorType(MediaType mediaType) {
-                                            return errorType.getType();
+                                        public Argument<?> getErrorType(MediaType mediaType) {
+                                            return errorType;
                                         }
                                     }
                             );
