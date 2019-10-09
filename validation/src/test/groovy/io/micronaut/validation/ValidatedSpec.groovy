@@ -242,6 +242,21 @@ class ValidatedSpec extends Specification {
         server.close()
     }
 
+    void "test a java client can be validated"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        JavaClient client = server.applicationContext.getBean(JavaClient)
+
+        when:
+        client.test5("")
+
+        then:
+        thrown(ConstraintViolationException)
+
+        cleanup:
+        server.close()
+    }
+
     @Client("/validated/tests")
     static interface TestClient {
 
@@ -258,7 +273,7 @@ class ValidatedSpec extends Specification {
         String test4()
 
         @Get(value = "/validated")
-        String test5(@Header String header)
+        String test5(@NotBlank @Header String header)
     }
 
     @Controller("/validated/tests")
