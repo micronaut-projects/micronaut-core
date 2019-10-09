@@ -1,0 +1,18 @@
+++++
+<a id="io.micronaut.http.client.interceptor.configuration.DefaultClientVersioningConfiguration" href="#io.micronaut.http.client.interceptor.configuration.DefaultClientVersioningConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.client.interceptor.configuration.DefaultClientVersioningConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.http.client.versioning.default.headers+`
+|java.util.List
+|The list of request header names.
+
+
+| `+micronaut.http.client.versioning.default.parameters+`
+|java.util.List
+|The list of request query parameter names.
+
+
+|===

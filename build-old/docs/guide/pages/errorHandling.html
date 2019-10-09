@@ -1,0 +1,569 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>6.15 Error Handling 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/aop.html">&lt;&lt; <strong>5</strong><span>Aspect Oriented Programming</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>6.15 Error Handling</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="errorHandling"><a class="anchor" href="#errorHandling"></a>6.15 Error Handling</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/httpServer/errorHandling.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Sometimes with distributed applications, bad things happen. Having a good way to handle errors is important.</p>
+</div>
+<div class="sect1">
+<h2 id="_status_handlers"><a class="anchor" href="#_status_handlers"></a>Status Handlers</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/http/annotation/Error.html">Error</a> annotation supports defining either an exception class or an HTTP status. Methods decorated with the annotation will be invoked as the result of other controller methods. The annotation also supports the notion of global and local, local being the default.</p>
+</div>
+<div class="paragraph">
+<p>Local error handlers will only respond to methods defined in the same controller. Global error handlers can respond to any method in any controller. A local error handler is always searched for first when resolving which handler to execute.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+When defining an error handler for an exception, you can specify the exception instance as an argument to the method and omit the exception property of the annotation.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_local_error_handling"><a class="anchor" href="#_local_error_handling"></a>Local Error Handling</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>For example the following method will handling JSON parse exceptions from Jackson for the scope of the declaring controller:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Local exception handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Error
+    public HttpResponse&lt;JsonError&gt; jsonError(HttpRequest request, JsonParseException jsonParseException) { <b class="conum">(1)</b>
+        JsonError error = new JsonError("Invalid JSON: " + jsonParseException.getMessage()) <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.getUri()));
+
+        return HttpResponse.&lt;JsonError&gt;status(HttpStatus.BAD_REQUEST, "Fix Your JSON")
+                .body(error); <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Local exception handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Error
+    HttpResponse&lt;JsonError&gt; jsonError(HttpRequest request, JsonParseException jsonParseException) { <b class="conum">(1)</b>
+        JsonError error = new JsonError("Invalid JSON: " + jsonParseException.getMessage()) <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.getUri()))
+
+        HttpResponse.&lt;JsonError&gt;status(HttpStatus.BAD_REQUEST, "Fix Your JSON")
+                .body(error) <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Local exception handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Error
+    fun jsonError(request: HttpRequest&lt;*&gt;, jsonParseException: JsonParseException): HttpResponse&lt;JsonError&gt; { <b class="conum">(1)</b>
+        val error = JsonError("Invalid JSON: " + jsonParseException.message) <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.uri))
+
+        return HttpResponse.status&lt;JsonError&gt;(HttpStatus.BAD_REQUEST, "Fix Your JSON")
+                .body(error) <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>A method that explicitly handles <code>JsonParseException</code> is declared</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>An instance of <a href="../api/io/micronaut/http/hateoas/JsonError.html">JsonError</a> is returned.</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>A custom response is returned to handle the error</td>
+</tr>
+</table>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Local status handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Error(status = HttpStatus.NOT_FOUND)
+    public HttpResponse&lt;JsonError&gt; notFound(HttpRequest request) { <b class="conum">(1)</b>
+        JsonError error = new JsonError("Person Not Found") <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.getUri()));
+
+        return HttpResponse.&lt;JsonError&gt;notFound()
+                .body(error); <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Local status handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Error(status = HttpStatus.NOT_FOUND)
+    HttpResponse&lt;JsonError&gt; notFound(HttpRequest request) { <b class="conum">(1)</b>
+        JsonError error = new JsonError("Person Not Found") <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.getUri()))
+
+        HttpResponse.&lt;JsonError&gt;notFound()
+                .body(error) <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Local status handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Error(status = HttpStatus.NOT_FOUND)
+    fun notFound(request: HttpRequest&lt;*&gt;): HttpResponse&lt;JsonError&gt; { <b class="conum">(1)</b>
+        val error = JsonError("Person Not Found") <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.uri))
+
+        return HttpResponse.notFound&lt;JsonError&gt;()
+                .body(error) <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <a href="../api/io/micronaut/http/annotation/Error.html">Error</a> declares which <a href="../api/io/micronaut/http/HttpStatus.html">HttpStatus</a> error code to handle (in this case 404)</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>A <a href="../api/io/micronaut/http/hateoas/JsonError.html">JsonError</a> instance is returned for all 404 responses</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>An <a href="../api/io/micronaut/http/HttpStatus.html#NOT_FOUND">NOT_FOUND</a> response is returned</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_global_error_handling"><a class="anchor" href="#_global_error_handling"></a>Global Error Handling</h2>
+<div class="sectionbody">
+<div class="listingblock multi-language-sample">
+<div class="title">Global error handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Error <b class="conum">(1)</b>
+    public HttpResponse&lt;JsonError&gt; error(HttpRequest request, Throwable e) {
+        JsonError error = new JsonError("Bad Things Happened: " + e.getMessage()) <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.getUri()));
+
+        return HttpResponse.&lt;JsonError&gt;serverError()
+                .body(error); <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Global error handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Error <b class="conum">(1)</b>
+    HttpResponse&lt;JsonError&gt; error(HttpRequest request, Throwable e) {
+        JsonError error = new JsonError("Bad Things Happened: " + e.getMessage()) <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.getUri()))
+
+        HttpResponse.&lt;JsonError&gt;serverError()
+                .body(error) <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Global error handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Error <b class="conum">(1)</b>
+    fun error(request: HttpRequest&lt;*&gt;, e: Throwable): HttpResponse&lt;JsonError&gt; {
+        val error = JsonError("Bad Things Happened: " + e.message) <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.uri))
+
+        return HttpResponse.serverError&lt;JsonError&gt;()
+                .body(error) <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <a href="../api/io/micronaut/http/annotation/Error.html">Error</a> is used to declare the method a global error handler</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>A <a href="../api/io/micronaut/http/hateoas/JsonError.html">JsonError</a> instance is returned for all errors</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>An <a href="../api/io/micronaut/http/HttpStatus.html#INTERNAL_SERVER_ERROR">INTERNAL_SERVER_ERROR</a> response is returned</td>
+</tr>
+</table>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Global status handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Error(status = HttpStatus.NOT_FOUND)
+    public HttpResponse&lt;JsonError&gt; notFound(HttpRequest request) { <b class="conum">(1)</b>
+        JsonError error = new JsonError("Person Not Found") <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.getUri()));
+
+        return HttpResponse.&lt;JsonError&gt;notFound()
+                .body(error); <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Global status handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Error(status = HttpStatus.NOT_FOUND)
+    HttpResponse&lt;JsonError&gt; notFound(HttpRequest request) { <b class="conum">(1)</b>
+        JsonError error = new JsonError("Person Not Found") <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.getUri()))
+
+        HttpResponse.&lt;JsonError&gt;notFound()
+                .body(error) <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Global status handler</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Error(status = HttpStatus.NOT_FOUND)
+    fun notFound(request: HttpRequest&lt;*&gt;): HttpResponse&lt;JsonError&gt; { <b class="conum">(1)</b>
+        val error = JsonError("Person Not Found") <b class="conum">(2)</b>
+                .link(Link.SELF, Link.of(request.uri))
+
+        return HttpResponse.notFound&lt;JsonError&gt;()
+                .body(error) <b class="conum">(3)</b>
+    }</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <a href="../api/io/micronaut/http/annotation/Error.html">Error</a> declares which <a href="../api/io/micronaut/http/HttpStatus.html">HttpStatus</a> error code to handle (in this case 404)</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>A <a href="../api/io/micronaut/http/hateoas/JsonError.html">JsonError</a> instance is returned for all 404 responses</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>An <a href="../api/io/micronaut/http/HttpStatus.html#NOT_FOUND">NOT_FOUND</a> response is returned</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock important">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-important" title="Important"></i>
+</td>
+<td class="content">
+A few things to note about the <a href="../api/io/micronaut/http/annotation/Error.html">Error</a> annotation. Two identical <code>@Error</code> annotations that are
+global cannot be declared. Two identical <code>@Error</code> annotations that are non-global cannot be declared in the same controller.
+If an <code>@Error</code> annotation with the same parameter exists as global and another as a local, the local one will take precedence.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_exceptionhandler"><a class="anchor" href="#_exceptionhandler"></a>ExceptionHandler</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Additionally you can implement a <a href="../api/io/micronaut/http/server/exceptions/ExceptionHandler.html">ExceptionHandler</a>; a generic hook for handling exceptions that occurs during the execution of an HTTP request.</p>
+</div>
+<div class="paragraph">
+<p>Imagine your e-commerce app throws an <code>OutOfStockException</code> when a book is out of stock:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">public class OutOfStockException extends RuntimeException {
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">class OutOfStockException extends RuntimeException {
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">class OutOfStockException : RuntimeException()</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Along with <code>BookController</code>:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Controller("/books")
+public class BookController {
+
+    @Produces(MediaType.TEXT_PLAIN)
+    @Get("/stock/{isbn}")
+    Integer stock(String isbn) {
+        throw new OutOfStockException();
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Controller("/books")
+class BookController {
+
+    @Produces(MediaType.TEXT_PLAIN)
+    @Get("/stock/{isbn}")
+    Integer stock(String isbn) {
+        throw new OutOfStockException()
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Controller("/books")
+class BookController {
+
+    @Produces(MediaType.TEXT_PLAIN)
+    @Get("/stock/{isbn}")
+    internal fun stock(isbn: String): Int? {
+        throw OutOfStockException()
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you don&#8217;t handle the exception the server returns a 500 (Internal Server Error) status code.</p>
+</div>
+<div class="paragraph">
+<p>If you want to respond 200 OK with 0 (stock level) as the response body when the <code>OutOfStockException</code> is thrown, you could register a <code>ExceptionHandler</code>:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Produces
+@Singleton
+@Requires(classes = {OutOfStockException.class, ExceptionHandler.class})
+public class OutOfStockExceptionHandler implements ExceptionHandler&lt;OutOfStockException, HttpResponse&gt; {
+
+    @Override
+    public HttpResponse handle(HttpRequest request, OutOfStockException exception) {
+        return HttpResponse.ok(0);
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Produces
+@Singleton
+@Requires(classes = [OutOfStockException.class, ExceptionHandler.class])
+class OutOfStockExceptionHandler implements ExceptionHandler&lt;OutOfStockException, HttpResponse&gt; {
+
+    @Override
+    HttpResponse handle(HttpRequest request, OutOfStockException exception) {
+        HttpResponse.ok(0)
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Produces
+@Singleton
+@Requirements(
+        Requires(classes = [OutOfStockException::class, ExceptionHandler::class])
+)
+class OutOfStockExceptionHandler : ExceptionHandler&lt;OutOfStockException, HttpResponse&lt;*&gt;&gt; {
+
+    override fun handle(request: HttpRequest&lt;*&gt;, exception: OutOfStockException): HttpResponse&lt;*&gt; {
+        return HttpResponse.ok(0)
+    }
+}</code></pre>
+</div>
+</div>
+<div class="admonitionblock important">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-important" title="Important"></i>
+</td>
+<td class="content">
+An <code>@Error</code> annotation capturing an exception has precedence over an implementation of <code>ExceptionHandler</code> capturing the same exception.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/aop.html">&lt;&lt; <strong>5</strong><span>Aspect Oriented Programming</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

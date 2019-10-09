@@ -1,0 +1,43 @@
+++++
+<a id="io.micronaut.tracing.brave.BraveTracerConfiguration" href="#io.micronaut.tracing.brave.BraveTracerConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.tracing.brave.BraveTracerConfiguration[]
+|===
+|Property |Type |Description
+
+| `+tracing.zipkin.local-service-name+`
+|java.lang.String
+|
+
+
+| `+tracing.zipkin.local-ip+`
+|java.lang.String
+|
+
+
+| `+tracing.zipkin.local-port+`
+|int
+|
+
+
+| `+tracing.zipkin.trace-id128bit+`
+|boolean
+|
+
+
+| `+tracing.zipkin.supports-join+`
+|boolean
+|
+
+
+| `+tracing.zipkin.add-finished-span-handler+`
+|brave.handler.FinishedSpanHandler
+|
+
+
+| `+tracing.zipkin.enabled+`
+|boolean
+|Default value (false).
+
+
+|===

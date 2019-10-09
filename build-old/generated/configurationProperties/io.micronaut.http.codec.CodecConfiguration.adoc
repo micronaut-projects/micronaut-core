@@ -1,0 +1,13 @@
+++++
+<a id="io.micronaut.http.codec.CodecConfiguration" href="#io.micronaut.http.codec.CodecConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.codec.CodecConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.codec.*.additional-types+`
+|java.util.List
+|Default value (Empty list).
+
+
+|===

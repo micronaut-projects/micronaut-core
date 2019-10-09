@@ -1,0 +1,23 @@
+++++
+<a id="io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration$Parent" href="#io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration$Parent">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration$Parent[]
+|===
+|Property |Type |Description
+
+| `+micronaut.server.netty.parent.threads+`
+|int
+|Sets the number of threads for the event loop group.
+
+
+| `+micronaut.server.netty.parent.io-ratio+`
+|java.lang.Integer
+|Sets the I/O ratio.
+
+
+| `+micronaut.server.netty.parent.executor+`
+|java.lang.String
+|Sets the name of the executor.
+
+
+|===

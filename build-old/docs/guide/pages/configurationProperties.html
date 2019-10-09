@@ -1,0 +1,1042 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>4.4 Configuration Properties 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/ioc.html">&lt;&lt; <strong>3</strong><span>Inversion of Control</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>4.4 Configuration Properties</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="configurationProperties"><a class="anchor" href="#configurationProperties"></a>4.4 Configuration Properties</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/config/configurationProperties.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>You can create type safe configuration by creating classes that are annotated with
+ <a href="../api/io/micronaut/context/annotation/ConfigurationProperties.html">@ConfigurationProperties</a>.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut will produce a reflection-free <code>@ConfigurationProperties</code> bean and will also at compile time calculate the property paths to evaluate, greatly improving the speed and efficiency of loading <code>@ConfigurationProperties</code>.</p>
+</div>
+<div class="paragraph">
+<p>An example of a configuration class can be seen below:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">@ConfigurationProperties Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+
+@ConfigurationProperties("my.engine") <b class="conum">(1)</b>
+public class EngineConfig {
+    public String getManufacturer() {
+        return manufacturer;
+    }
+
+    public void setManufacturer(String manufacturer) {
+        this.manufacturer = manufacturer;
+    }
+
+    public int getCylinders() {
+        return cylinders;
+    }
+
+    public void setCylinders(int cylinders) {
+        this.cylinders = cylinders;
+    }
+
+    public CrankShaft getCrankShaft() {
+        return crankShaft;
+    }
+
+    public void setCrankShaft(CrankShaft crankShaft) {
+        this.crankShaft = crankShaft;
+    }
+
+    @NotBlank <b class="conum">(2)</b>
+    private String manufacturer = "Ford"; <b class="conum">(3)</b>
+    @Min(1L)
+    private int cylinders;
+    private CrankShaft crankShaft = new CrankShaft();
+
+    @ConfigurationProperties("crank-shaft")
+    public static class CrankShaft { <b class="conum">(4)</b>
+        public Optional&lt;Double&gt; getRodLength() {
+            return rodLength;
+        }
+
+        public void setRodLength(Optional&lt;Double&gt; rodLength) {
+            this.rodLength = rodLength;
+        }
+
+        private Optional&lt;Double&gt; rodLength = Optional.empty(); <b class="conum">(5)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">@ConfigurationProperties Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.context.annotation.ConfigurationProperties
+
+import javax.validation.constraints.Min
+import javax.validation.constraints.NotBlank
+
+@ConfigurationProperties('my.engine') <b class="conum">(1)</b>
+class EngineConfig {
+
+    @NotBlank <b class="conum">(2)</b>
+    String manufacturer = "Ford" <b class="conum">(3)</b>
+
+    @Min(1L)
+    int cylinders
+    CrankShaft crankShaft = new CrankShaft()
+
+    @ConfigurationProperties('crank-shaft')
+    static class CrankShaft { <b class="conum">(4)</b>
+        Optional&lt;Double&gt; rodLength = Optional.empty() <b class="conum">(5)</b>
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">@ConfigurationProperties Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.context.annotation.ConfigurationProperties
+import java.util.*
+
+import javax.validation.constraints.Min
+import javax.validation.constraints.NotBlank
+
+@ConfigurationProperties("my.engine") <b class="conum">(1)</b>
+class EngineConfig {
+
+    @NotBlank <b class="conum">(2)</b>
+    var manufacturer = "Ford" <b class="conum">(3)</b>
+    @Min(1L)
+    var cylinders: Int = 0
+    var crankShaft = CrankShaft()
+
+    @ConfigurationProperties("crank-shaft")
+    class CrankShaft { <b class="conum">(4)</b>
+        var rodLength: Optional&lt;Double&gt; = Optional.empty() <b class="conum">(5)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <code>@ConfigurationProperties</code> annotation takes the configuration prefix</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>You can use <code>javax.validation</code> to validate the configuration</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>Default values can be assigned to the property</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="4"></i><b>4</b></td>
+<td>Static inner classes can provided nested configuration</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="5"></i><b>5</b></td>
+<td>Optional configuration values can be wrapped in a <code>java.util.Optional</code></td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Once you have prepared a type safe configuration it can simply be injected into your objects like any other bean:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">@ConfigurationProperties Dependency Injection</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Singleton
+public class EngineImpl implements Engine {
+    private final EngineConfig config;
+
+    public EngineImpl(EngineConfig config) {<b class="conum">(1)</b>
+        this.config = config;
+    }
+
+    @Override
+    public int getCylinders() {
+        return config.getCylinders();
+    }
+
+    public String start() {<b class="conum">(2)</b>
+        return getConfig().getManufacturer() + " Engine Starting V" + getConfig().getCylinders() +
+                " [rodLength=" + getConfig().getCrankShaft().getRodLength().orElse(6.0d) + "]";
+    }
+
+    public final EngineConfig getConfig() {
+        return config;
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">@ConfigurationProperties Dependency Injection</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Singleton
+class EngineImpl implements Engine {
+    final EngineConfig config
+
+    EngineImpl(EngineConfig config) { <b class="conum">(1)</b>
+        this.config = config
+    }
+
+    @Override
+    int getCylinders() {
+        config.cylinders
+    }
+
+    String start() { <b class="conum">(2)</b>
+        "${config.manufacturer} Engine Starting V${config.cylinders} [rodLength=${config.crankShaft.rodLength.orElse(6.0d)}]"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">@ConfigurationProperties Dependency Injection</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Singleton
+class EngineImpl(val config: EngineConfig) : Engine {<b class="conum">(1)</b>
+
+    override val cylinders: Int
+        get() = config.cylinders
+
+    override fun start(): String {<b class="conum">(2)</b>
+        return "${config.manufacturer} Engine Starting V${config.cylinders} [rodLength=${config.crankShaft.rodLength.orElse(6.0)}]"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>Inject the <code>EngineConfig</code> bean</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>Use the configuration properties</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Configuration values can then be supplied from one of the <a href="../api/io/micronaut/context/env/PropertySource.html">PropertySource</a> instances. For example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Supply Configuration</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">        LinkedHashMap&lt;String, Object&gt; map = new LinkedHashMap(1);
+        map.put("my.engine.cylinders", "8");
+        ApplicationContext applicationContext = ApplicationContext.run(map, "test");
+
+        Vehicle vehicle = applicationContext.getBean(Vehicle.class);
+        DefaultGroovyMethods.println(this, vehicle.start());</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Supply Configuration</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">        ApplicationContext applicationContext = ApplicationContext.run(
+                ['my.engine.cylinders': '8'],
+                "test"
+        )
+
+        Vehicle vehicle = applicationContext
+                .getBean(Vehicle)
+        println(vehicle.start())</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Supply Configuration</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">        val map = mapOf( "my.engine.cylinders" to "8")
+        val applicationContext = ApplicationContext.run(map, "test")
+
+        val vehicle = applicationContext.getBean(Vehicle::class.java)
+        DefaultGroovyMethods.println(this, vehicle.start())</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example prints: <code>"Ford Engine Starting V8 [rodLength=6.0]"</code></p>
+</div>
+<div class="paragraph">
+<p>Note for more complex configurations you can structure <a href="../api/io/micronaut/context/annotation/ConfigurationProperties.html">@ConfigurationProperties</a> beans through inheritance.</p>
+</div>
+<div class="paragraph">
+<p>For example creating a subclass of <code>EngineConfig</code> with <code>@ConfigurationProperties('bar')</code> will resolve all properties under the path <code>my.engine.bar</code>.</p>
+</div>
+<div class="sect1">
+<h2 id="_property_type_conversion"><a class="anchor" href="#_property_type_conversion"></a>Property Type Conversion</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>When resolving properties Micronaut will use the <a href="../api/io/micronaut/core/convert/ConversionService.html">ConversionService</a> bean to convert properties. You can register additional converters for types not supported by micronaut by defining beans that implement the <a href="../api/io/micronaut/core/convert/TypeConverter.html">TypeConverter</a> interface.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut features some built-in conversions that are useful, which are detailed below.</p>
+</div>
+<div class="sect2">
+<h3 id="_duration_conversion"><a class="anchor" href="#_duration_conversion"></a>Duration Conversion</h3>
+<div class="paragraph">
+<p>Durations can be specified by appending the unit with a number. Supported units are <code>s</code>, <code>ms</code>, <code>m</code> etc. The following table summarizes examples:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Duration Conversion</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Configuration Value</th>
+<th class="tableblock halign-left valign-top">Resulting Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>10ms</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Duration</code> of 10 milliseconds</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>10m</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Duration</code> of 10 minutes</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>10s</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Duration</code> of 10 seconds</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>10d</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Duration</code> of 10 days</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>10h</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Duration</code> of 10 hours</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>10ns</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Duration</code> of 10 nanoseconds</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>PT15M</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Duration of 15 minutes using ISO-8601 format</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>For example to configure the default HTTP client read timeout:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using Duration Values</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    http:
+        client:
+            read-timeout: 15s</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_list_array_conversion"><a class="anchor" href="#_list_array_conversion"></a>List / Array Conversion</h3>
+<div class="paragraph">
+<p>Lists and arrays can be specified in Java properties files as comma-separated values or in YAML using native YAML lists. The generic types are used to convert the values. For example in YAML:</p>
+</div>
+<div class="listingblock">
+<div class="title">Specifying lists or arrays in YAML</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">my:
+    app:
+        integers:
+            - 1
+            - 2
+        urls:
+            - http://foo.com
+            - http://bar.com</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Or in Java properties file format:</p>
+</div>
+<div class="listingblock">
+<div class="title">Specifying lists or arrays in Java properties comma-separated</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-properties hljs" data-lang="properties">my.app.integers=1,2
+my.app.urls=http://foo.com,http://bar.com</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Alternatively you can use an index:</p>
+</div>
+<div class="listingblock">
+<div class="title">Specifying lists or arrays in Java properties using index</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-properties hljs" data-lang="properties">my.app.integers[0]=1
+my.app.integers[1]=2</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>For the above example configurations you can define properties to bind to with the target type supplied via generics:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">List&lt;Integer&gt; integers;
+List&lt;URL&gt; urls;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_readable_bytes"><a class="anchor" href="#_readable_bytes"></a>Readable Bytes</h3>
+<div class="paragraph">
+<p>You can annotate any setter parameter with <a href="../api/io/micronaut/core/convert/format/ReadableBytes.html">@ReadableBytes</a> to allow the value to be set using a shorthand syntax for specifying bytes, kilobytes etc. For example the following is taken from <a href="../api/io/micronaut/http/client/HttpClientConfiguration.html">HttpClientConfiguration</a>:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using <code>@ReadableBytes</code></div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">public void setMaxContentLength(@ReadableBytes int maxContentLength) {
+    this.maxContentLength = maxContentLength;
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>With the above in place you can set <code>micronaut.http.client.max-content-length</code> using the following values:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 2. @ReadabyeBytes Conversion</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Configuration Value</th>
+<th class="tableblock halign-left valign-top">Resulting Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>10mb</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">10 megabytes</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>10kb</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">10 kilobytes</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>10gb</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">10 gigabytes</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>1024</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A raw byte length</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_formatting_dates"><a class="anchor" href="#_formatting_dates"></a>Formatting Dates</h3>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/core/convert/format/Format.html">@Format</a> annotation can be used on any setter to allow the date format to be specified when binding <code>javax.time</code> date objects.</p>
+</div>
+<div class="listingblock">
+<div class="title">Using <code>@Format</code> for Dates</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">public void setMyDate(@Format("yy-mm-dd") LocalDate date) {
+    this.myDate = date;
+}</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_configuration_builder"><a class="anchor" href="#_configuration_builder"></a>Configuration Builder</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Many existing frameworks and tools already use builder-style classes to construct configuration.</p>
+</div>
+<div class="paragraph">
+<p>To support the ability for a builder style class to be populated with configuration values, the <a href="../api/io/micronaut/context/annotation/ConfigurationBuilder.html">@ConfigurationBuilder</a> annotation can be used. <a href="../api/io/micronaut/context/annotation/ConfigurationBuilder.html">ConfigurationBuilder</a> can be added to a field or method in a class annotated with <a href="../api/io/micronaut/context/annotation/ConfigurationProperties.html">@ConfigurationProperties</a>.</p>
+</div>
+<div class="paragraph">
+<p>Since there is no consistent way to define builders in the Java world, one or more method prefixes can be specified in the annotation to support builder methods like <code>withXxx</code> or <code>setXxx</code>. If the builder methods have no prefix, assign an empty string to the parameter.</p>
+</div>
+<div class="paragraph">
+<p>A configuration prefix can also be specified to tell Micronaut where to look for configuration values. By default, the builder methods will use the configuration prefix defined at the class level <a href="../api/io/micronaut/context/annotation/ConfigurationProperties.html">@ConfigurationProperties</a> annotation.</p>
+</div>
+<div class="paragraph">
+<p>For example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+@ConfigurationProperties("my.engine") <b class="conum">(1)</b>
+class EngineConfig {
+
+    @ConfigurationBuilder(prefixes = "with") <b class="conum">(2)</b>
+    EngineImpl.Builder builder = EngineImpl.builder();
+
+    @ConfigurationBuilder(prefixes = "with", configurationPrefix = "crank-shaft") <b class="conum">(3)</b>
+    CrankShaft.Builder crankShaft = CrankShaft.builder();
+
+    private SparkPlug.Builder sparkPlug = SparkPlug.builder();
+
+    SparkPlug.Builder getSparkPlug() { return this.sparkPlug; }
+
+    @ConfigurationBuilder(prefixes = "with", configurationPrefix = "spark-plug") <b class="conum">(4)</b>
+    void setSparkPlug(SparkPlug.Builder sparkPlug) {
+        this.sparkPlug = sparkPlug;
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.context.annotation.ConfigurationBuilder
+import io.micronaut.context.annotation.ConfigurationProperties
+
+@ConfigurationProperties('my.engine') <b class="conum">(1)</b>
+class EngineConfig {
+
+    @ConfigurationBuilder(prefixes = "with") <b class="conum">(2)</b>
+    EngineImpl.Builder builder = EngineImpl.builder()
+
+    @ConfigurationBuilder(prefixes = "with", configurationPrefix = "crank-shaft") <b class="conum">(3)</b>
+    CrankShaft.Builder crankShaft = CrankShaft.builder()
+
+    SparkPlug.Builder sparkPlug = SparkPlug.builder()
+
+    @ConfigurationBuilder(prefixes = "with", configurationPrefix = "spark-plug") <b class="conum">(4)</b>
+    void setSparkPlug(SparkPlug.Builder sparkPlug) {
+        this.sparkPlug = sparkPlug
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.context.annotation.ConfigurationBuilder
+import io.micronaut.context.annotation.ConfigurationProperties
+
+@ConfigurationProperties("my.engine") <b class="conum">(1)</b>
+internal class EngineConfig {
+    @ConfigurationBuilder(prefixes = ["with"])  <b class="conum">(2)</b>
+    val builder = EngineImpl.builder()
+
+    @ConfigurationBuilder(prefixes = ["with"], configurationPrefix = "crank-shaft") <b class="conum">(3)</b>
+    val crankShaft = CrankShaft.builder()
+
+    @set:ConfigurationBuilder(prefixes = ["with"], configurationPrefix = "spark-plug") <b class="conum">(4)</b>
+    var sparkPlug = SparkPlug.builder()
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <code>@ConfigurationProperties</code> annotation takes the configuration prefix</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The first builder can be configured without the class configuration prefix; it will inherit from the above.</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The second builder can be configured with the class configuration prefix + the <code>configurationPrefix</code> value.</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="4"></i><b>4</b></td>
+<td>The third builder demonstrates that the annotation can be applied to a method as well as a property.</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+By default, only builder methods that take a single argument are supported. To support methods with no arguments, set the <code>allowZeroArgs</code> parameter of the annotation to true.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Just like in the previous example, we can construct an <code>EngineImpl</code>. Since we are using a builder, a factory class can be used to build the engine from the builder.</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.context.annotation.Factory;
+
+import javax.inject.Singleton;
+
+@Factory
+class EngineFactory {
+
+    @Singleton
+    EngineImpl buildEngine(EngineConfig engineConfig) {
+        return engineConfig.builder.build(engineConfig.crankShaft, engineConfig.getSparkPlug());
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.context.annotation.Factory
+
+import javax.inject.Singleton
+
+@Factory
+class EngineFactory {
+
+    @Singleton
+    EngineImpl buildEngine(EngineConfig engineConfig) {
+        engineConfig.builder.build(engineConfig.crankShaft, engineConfig.sparkPlug)
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.context.annotation.Factory
+import javax.inject.Singleton
+
+@Factory
+internal class EngineFactory {
+
+    @Singleton
+    fun buildEngine(engineConfig: EngineConfig): EngineImpl {
+        return engineConfig.builder.build(engineConfig.crankShaft, engineConfig.sparkPlug)
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The engine that was returned can then be injected anywhere an engine is depended on.</p>
+</div>
+<div class="paragraph">
+<p>Configuration values can be supplied from one of the <a href="../api/io/micronaut/context/env/PropertySource.html">PropertySource</a> instances. For example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">        HashMap&lt;String, Object&gt; properties = new HashMap&lt;&gt;();
+        properties.put("my.engine.cylinders"             ,"4");
+        properties.put("my.engine.manufacturer"          , "Subaru");
+        properties.put("my.engine.crank-shaft.rod-length", 4);
+        properties.put("my.engine.spark-plug.name"       , "6619 LFR6AIX");
+        properties.put("my.engine.spark-plug.type"       , "Iridium");
+        properties.put("my.engine.spark-plug.companyName", "NGK");
+        ApplicationContext applicationContext = ApplicationContext.run(properties, "test");
+
+        Vehicle vehicle = applicationContext.getBean(Vehicle.class);
+        System.out.println(vehicle.start());</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">        ApplicationContext applicationContext = ApplicationContext.run(
+                ['my.engine.cylinders'             : '4',
+                 'my.engine.manufacturer'          : 'Subaru',
+                 'my.engine.crank-shaft.rod-length': 4,
+                 'my.engine.spark-plug.name'       : '6619 LFR6AIX',
+                 'my.engine.spark-plug.type'       : 'Iridium',
+                 'my.engine.spark-plug.companyName': 'NGK'
+                ],
+                "test"
+        )
+
+        Vehicle vehicle = applicationContext
+                .getBean(Vehicle)
+        println(vehicle.start())</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">        val applicationContext = ApplicationContext.run(
+                mapOf(
+                        "my.engine.cylinders" to "4",
+                        "my.engine.manufacturer" to "Subaru",
+                        "my.engine.crank-shaft.rod-length" to 4,
+                        "my.engine.spark-plug.name" to "6619 LFR6AIX",
+                        "my.engine.spark-plug.type" to "Iridium",
+                        "my.engine.spark-plug.company" to "NGK"
+                ),
+                "test"
+        )
+
+        val vehicle = applicationContext.getBean(Vehicle::class.java)
+        println(vehicle.start())</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example prints: <code>"Subaru Engine Starting V4 [rodLength=4.0, sparkPlug=Iridium(NGK 6619 LFR6AIX)]"</code></p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_mapformat"><a class="anchor" href="#_mapformat"></a>MapFormat</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>For some use cases it may be desirable to accept a map of arbitrary configuration properties that can be supplied to a bean, especially if the bean represents a third-party API where not all of the possible configuration properties are known by the developer. For example, a datasource may accept a map of configuration properties specific to a particular database driver, allowing the user to specify any desired options in the map without coding every single property explicitly.</p>
+</div>
+<div class="paragraph">
+<p>For this purpose, the <a href="../api/io/micronaut/core/convert/format/MapFormat.html">MapFormat</a> annotation allows you to bind a map to a single configuration property, and specify whether to accept a flat map of keys to values, or a nested map (where the values may be additional maps].</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">@MapFormat Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.context.annotation.ConfigurationProperties;
+import javax.validation.constraints.Min;
+import java.util.Map;
+import io.micronaut.core.convert.format.MapFormat;
+
+@ConfigurationProperties("my.engine")
+public class EngineConfig {
+    public int getCylinders() {
+        return cylinders;
+    }
+
+    public void setCylinders(int cylinders) {
+        this.cylinders = cylinders;
+    }
+
+    public Map&lt;Integer, String&gt; getSensors() {
+        return sensors;
+    }
+
+    public void setSensors(Map&lt;Integer, String&gt; sensors) {
+        this.sensors = sensors;
+    }
+
+    @Min(1L)
+    private int cylinders;
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT) <b class="conum">(1)</b>
+    private Map&lt;Integer, String&gt; sensors;
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">@MapFormat Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.context.annotation.ConfigurationProperties
+import javax.validation.constraints.Min
+import io.micronaut.core.convert.format.MapFormat
+
+@ConfigurationProperties('my.engine')
+class EngineConfig {
+
+    @Min(1L)
+    int cylinders
+
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT) <b class="conum">(1)</b>
+    Map&lt;Integer, String&gt; sensors
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">@MapFormat Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.context.annotation.ConfigurationProperties
+import javax.validation.constraints.Min
+import io.micronaut.core.convert.format.MapFormat
+
+@ConfigurationProperties("my.engine")
+class EngineConfig {
+
+    @Min(1L)
+    var cylinders: Int = 0
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT) <b class="conum">(1)</b>
+    var sensors: Map&lt;Int, String&gt;? = null
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>Note the <code>transformation</code> argument to the annotation; possible values are <code>MapTransformation.FLAT</code> (for flat maps) and <code>MapTransformation.NESTED</code> (for nested maps)</td>
+</tr>
+</table>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">EngineImpl</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Singleton
+public class EngineImpl implements Engine {
+    @Override
+    public Map getSensors() {
+        return config.getSensors();
+    }
+
+    public String start() {
+        return "Engine Starting V" + getConfig().getCylinders() + " [sensors=" + getSensors().size() + "]";
+    }
+
+    public EngineConfig getConfig() {
+        return config;
+    }
+
+    public void setConfig(EngineConfig config) {
+        this.config = config;
+    }
+
+    @Inject
+    private EngineConfig config;
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">EngineImpl</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Singleton
+class EngineImpl implements Engine {
+
+    @Inject EngineConfig config
+
+    @Override
+    Map getSensors() {
+        config.sensors
+    }
+
+    String start() {
+        "Engine Starting V${config.cylinders} [sensors=${sensors.size()}]"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">EngineImpl</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Singleton
+class EngineImpl : Engine {
+    override val sensors: Map&lt;*, *&gt;?
+        get() = config!!.sensors
+
+    @Inject
+    var config: EngineConfig? = null
+
+    override fun start(): String {
+        return "Engine Starting V${config!!.cylinders} [sensors=${sensors!!.size}]"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now a map of properties can be supplied to the <code>my.engine.sensors</code> configuration property.</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Use Map Configuration</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">        LinkedHashMap&lt;String, Object&gt; map = new LinkedHashMap(2);
+        map.put("my.engine.cylinders", "8");
+        LinkedHashMap&lt;Integer, String&gt; map1 = new LinkedHashMap(2);
+        map1.put(0, "thermostat");
+        map1.put(1, "fuel pressure");
+        map.put("my.engine.sensors", map1);
+        ApplicationContext applicationContext = ApplicationContext.run(map, "test");
+
+        Vehicle vehicle = applicationContext.getBean(Vehicle.class);
+        DefaultGroovyMethods.println(this, vehicle.start());</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Use Map Configuration</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">        ApplicationContext applicationContext = ApplicationContext.run(
+                ['my.engine.cylinders': '8', 'my.engine.sensors': [0: 'thermostat', 1: 'fuel pressure']],
+                "test"
+        )
+
+        Vehicle vehicle = applicationContext
+                .getBean(Vehicle)
+        println(vehicle.start())</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Use Map Configuration</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">        val subMap = mapOf(
+                0 to "thermostat",
+                1 to "fuel pressure"
+        )
+        val map = mapOf(
+                "my.engine.cylinders" to "8",
+                "my.engine.sensors" to subMap
+        )
+        val applicationContext = ApplicationContext.run(map, "test")
+
+        val vehicle = applicationContext.getBean(Vehicle::class.java)
+        DefaultGroovyMethods.println(this, vehicle.start())</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example prints: <code>"Engine Starting V8 [sensors=2]"</code></p>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/ioc.html">&lt;&lt; <strong>3</strong><span>Inversion of Control</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

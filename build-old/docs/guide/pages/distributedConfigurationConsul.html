@@ -1,0 +1,377 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>8.1.2 HashiCorp Consul Support 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>8.1.2 HashiCorp Consul Support</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="distributedConfigurationConsul"><a class="anchor" href="#distributedConfigurationConsul"></a>8.1.2 HashiCorp Consul Support</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/cloudConfiguration/distributedConfigurationConsul.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p><a href="https://www.consul.io">Consul</a> is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native <a href="../api/io/micronaut/discovery/consul/client/v1/ConsulClient.html">ConsulClient</a> that is built using Micronaut&#8217;s support for <a href="#clientAnnotation">Declarative HTTP Clients</a>.</p>
+</div>
+<div class="sect1">
+<h2 id="_starting_consul"><a class="anchor" href="#_starting_consul"></a>Starting Consul</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The quickest way to start using Consul is via Docker:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Starting Consul with Docker</p>
+</li>
+</ol>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>docker run -p 8500:8500 consul</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Alternatively you can <a href="https://www.consul.io/docs/install/index.html">install and run a local Consul instance</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_enabling_distributed_configuration_with_consul"><a class="anchor" href="#_enabling_distributed_configuration_with_consul"></a>Enabling Distributed Configuration with Consul</h2>
+<div class="sectionbody">
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">Using the CLI</div>
+<div class="paragraph">
+<p>If you are creating your project using the Micronaut CLI, supply the <code>config-consul</code> feature to enable Consul&#8217;s distributed configuration in your project:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ mn create-app my-app --features config-consul</pre>
+</div>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>To enable distributed configuration, similar to Spring Boot and Grails, you need to create a <code>src/main/resources/bootstrap.yml</code> configuration file and configure Consul as well as enable the configuration client:</p>
+</div>
+<div class="listingblock">
+<div class="title">bootstrap.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    application:
+        name: hello-world
+    config-client:
+        enabled: true
+consul:
+    client:
+        defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Once you have enabled distributed configuration you need to store the configuration you wish to share in Consul&#8217;s Key/Value store.</p>
+</div>
+<div class="paragraph">
+<p>There are a number of different ways to do that.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_storing_configuration_as_key_value_pairs"><a class="anchor" href="#_storing_configuration_as_key_value_pairs"></a>Storing Configuration as Key/Value Pairs</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>One way is to store each key and value directly in Consul. In this case by default Micronaut will look for configuration in the <code>/config</code> folder of Consul.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+You can alter the path searched for by setting <code>consul.client.config.path</code>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Within the <code>/config</code> folder Micronaut will search values within the following folders in order of precedence:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Configuration Resolution Precedence</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Folder</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/application</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration shared by all applications</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/application,prod</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration shared by all applications for the <code>prod</code> <a href="../api/io/micronaut/context/env/Environment.html">Environment</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/[APPLICATION_NAME]</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Application specific configuration, example <code>/config/hello-world</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/[APPLICATION_NAME],prod</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Application specific configuration for an active <a href="../api/io/micronaut/context/env/Environment.html">Environment</a></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The value of <code>APPLICATION_NAME</code> is whatever your have configured <code>micronaut.application.name</code> to be in <code>bootstrap.yml</code>.</p>
+</div>
+<div class="paragraph">
+<p>To see this in action use the following curl command to store a property called <code>foo.bar</code> with a value of <code>myvalue</code> in the folder <code>/config/application</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Using curl to Write a Value</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">curl -X PUT -d @- localhost:8500/v1/kv/config/application/foo.bar &lt;&lt;&lt; myvalue</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you know define a <code>@Value("${foo.bar}")</code> or call <code>environment.getProperty(..)</code> the value <code>myvalue</code> will be resolved from Consul.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_storing_configuration_in_yaml_json_etc"><a class="anchor" href="#_storing_configuration_in_yaml_json_etc"></a>Storing Configuration in YAML, JSON etc.</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Some Consul users prefer storing configuration in blobs of a certain format, such as YAML. Micronaut supports this mode and supports storing configuration in either YAML, JSON or Java properties format.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+The <a href="../api/io/micronaut/discovery/config/ConfigDiscoveryConfiguration.html">ConfigDiscoveryConfiguration</a> has a number of configuration options for configuring how distributed configuration is discovered.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>You can set the <code>consul.client.config.format</code> option to configure the format with which properties are read.</p>
+</div>
+<div class="paragraph">
+<p>For example, to configure JSON:</p>
+</div>
+<div class="listingblock">
+<div class="title">application.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">consul:
+    client:
+        config:
+            format: JSON</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now write your configuration in JSON format to Consul:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using curl write JSON</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">curl -X PUT  localhost:8500/v1/kv/config/application \
+-d @- &lt;&lt; EOF
+{ "foo": {  "bar": "myvalue" } }
+EOF</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_storing_configuration_as_file_references"><a class="anchor" href="#_storing_configuration_as_file_references"></a>Storing Configuration as File References</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Another option popular option is <a href="https://github.com/breser/git2consul">git2consul</a> which mirrors the contents of a Git repository to Consul&#8217;s Key/Value store.</p>
+</div>
+<div class="paragraph">
+<p>You can setup a Git repository that contains files like <code>application.yml</code>, <code>hello-world-test.json</code> etc. and the contents of these files are cloned to Consul.</p>
+</div>
+<div class="paragraph">
+<p>In this case each key in consul represents a file with an extension. For example <code>/config/application.yml</code> and you must configure the <code>FILE</code> format:</p>
+</div>
+<div class="listingblock">
+<div class="title">application.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">consul:
+    client:
+        config:
+            format: FILE</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

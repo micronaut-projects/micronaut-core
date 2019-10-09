@@ -1,0 +1,64 @@
+
+++++
+<a id="io.micronaut.function.client.aws.AWSInvokeRequestDefinition" href="#io.micronaut.function.client.aws.AWSInvokeRequestDefinition">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.function.client.aws.AWSInvokeRequestDefinition[]
+|===
+|Property |Type |Description
+
+| `+aws.lambda.functions.*.function-name+`
+|java.lang.String
+|
+
+
+| `+aws.lambda.functions.*.invocation-type+`
+|java.lang.String
+|
+
+
+| `+aws.lambda.functions.*.log-type+`
+|java.lang.String
+|
+
+
+| `+aws.lambda.functions.*.client-context+`
+|java.lang.String
+|
+
+
+| `+aws.lambda.functions.*.payload+`
+|java.nio.ByteBuffer
+|
+
+
+| `+aws.lambda.functions.*.qualifier+`
+|java.lang.String
+|
+
+
+| `+aws.lambda.functions.*.request-credentials-provider+`
+|com.amazonaws.auth.AWSCredentialsProvider
+|
+
+
+| `+aws.lambda.functions.*.request-metric-collector+`
+|com.amazonaws.metrics.RequestMetricCollector
+|
+
+
+| `+aws.lambda.functions.*.general-progress-listener+`
+|com.amazonaws.event.ProgressListener
+|
+
+
+| `+aws.lambda.functions.*.sdk-request-timeout+`
+|int
+|
+
+
+| `+aws.lambda.functions.*.sdk-client-execution-timeout+`
+|int
+|
+
+
+|===

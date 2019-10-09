@@ -1,0 +1,33 @@
+++++
+<a id="io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration" href="#io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.ssl.trust-store+`
+|api:io.micronaut.http.ssl.SslConfiguration$TrustStoreConfiguration[]
+|Sets the trust store configuration.
+
+
+| `+micronaut.ssl.trust-store.path+`
+|java.lang.String
+|Sets the path.
+
+
+| `+micronaut.ssl.trust-store.password+`
+|java.lang.String
+|Sets the password to use for the keystore.
+
+
+| `+micronaut.ssl.trust-store.type+`
+|java.lang.String
+|Sets the type of keystore.
+
+
+| `+micronaut.ssl.trust-store.provider+`
+|java.lang.String
+|Sets the keystore provider name.
+
+
+|===

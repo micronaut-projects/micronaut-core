@@ -1,0 +1,28 @@
+++++
+<a id="io.micronaut.http.client.DefaultHttpClientConfiguration$DefaultConnectionPoolConfiguration" href="#io.micronaut.http.client.DefaultHttpClientConfiguration$DefaultConnectionPoolConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.client.DefaultHttpClientConfiguration$DefaultConnectionPoolConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.http.client.pool.enabled+`
+|boolean
+|Sets whether connection pooling is enabled. Default value (false).
+
+
+| `+micronaut.http.client.pool.max-connections+`
+|int
+|Sets the maximum number of connections. Defaults to no maximum.
+
+
+| `+micronaut.http.client.pool.max-pending-acquires+`
+|int
+|Sets the max pending acquires.
+
+
+| `+micronaut.http.client.pool.acquire-timeout+`
+|java.time.Duration
+|Sets the timeout to wait for a connection.
+
+
+|===

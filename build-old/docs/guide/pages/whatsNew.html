@@ -1,0 +1,459 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>1.1 What's New? 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>1.1 What's New?</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="whatsNew"><a class="anchor" href="#whatsNew"></a>1.1 What's New?</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/introduction/whatsNew.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Micronaut 1.2.3.BUILD-SNAPSHOT includes the following changes:</p>
+</div>
+<div class="sect2">
+<h3 id="_native_bean_validation_support"><a class="anchor" href="#_native_bean_validation_support"></a>Native Bean Validation Support</h3>
+<div class="paragraph">
+<p>Hibernate Validator is no longer a required dependency to activate bean validation, with a new <a href="#beanValidation">native implementation of Bean Validation</a> available that is reflection free and supports reactive and AST level validations now available.</p>
+</div>
+<div class="paragraph">
+<p>The <code>micronaut-validation</code> dependency is all that it is needed now and provides the following benefits over Hibernate Validator:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Reflection Free</p>
+</li>
+<li>
+<p>Compile Time Computed Bean Metadata resulting in lower memory requirements</p>
+</li>
+<li>
+<p>Reduction in JAR size by 2MB</p>
+</li>
+<li>
+<p>Reduction in startup time by 300ms which was the cost of initializing Hibernate validator</p>
+</li>
+<li>
+<p>Out-of-the-box GraalVM native image support</p>
+</li>
+<li>
+<p>Reduction in GraalVM native image size by 10MB</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_reactive_bean_validation_support"><a class="anchor" href="#_reactive_bean_validation_support"></a>Reactive Bean Validation Support</h3>
+<div class="paragraph">
+<p>In previous versions of Micronaut manual validation had to be applied to reactive flows. You can now declare <code>@Valid</code> on method parameters that receive a reactive type and validation will automatically be applied.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_implicit_validated_and_valid"><a class="anchor" href="#_implicit_validated_and_valid"></a>Implicit @Validated and @Valid</h3>
+<div class="paragraph">
+<p>It is no longer necessary to apply the <a href="../api/io/micronaut/validation/Validated.html">@Validated</a> annotation to beans that accept <code>@Valid</code> arguments or use any <code>javax.validation</code> annotation.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_micronaut_kubernetes_1_0_release"><a class="anchor" href="#_micronaut_kubernetes_1_0_release"></a>Micronaut Kubernetes 1.0 Release</h3>
+<div class="paragraph">
+<p>There is a new <a href="https://micronaut-projects.github.io/micronaut-kubernetes/1.0.0/guide/">Micronaut Kubernetes</a> module, with an improved support for running Micronaut applications in a Kubernetes cluster, including support for Kubernetes' <code>ConfigMap</code>s, <code>Secret</code>s and more.</p>
+</div>
+<div class="paragraph">
+<p>To get started, use the <code>kubernetes</code> feature:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>mn create-app my-app --features kubernetes</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_micronaut_security_1_2_update"><a class="anchor" href="#_micronaut_security_1_2_update"></a>Micronaut Security 1.2 Update</h3>
+<div class="paragraph">
+<p>Support for OAuth 2.0 and OpenID clients has been added to the Micronaut security module through a new dependency: <code>micronaut-security-oauth2</code>. It is now very easy to add support for login through an OAuth providers. See the <a href="https://micronaut-projects.github.io/micronaut-security/latest/guide/#oauth">Oauth section</a> in the security documentation for more information.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_micronaut_micrometer_1_2_update"><a class="anchor" href="#_micronaut_micrometer_1_2_update"></a>Micronaut Micrometer 1.2 Update</h3>
+<div class="paragraph">
+<p><a href="https://micronaut-projects.github.io/micronaut-micrometer/1.2.x/guide/">Micronaut Micrometer has been updated to 1.2</a> which includes the following new features:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Update to Micrometer 1.2.0</p>
+</li>
+<li>
+<p>Support for GraalVM native images</p>
+</li>
+<li>
+<p>Meter registry support for AppOptics, Azure Monitor, Datadog, Dynatrace, Elastic, Ganglia, Humio, Influx, Jmx, Kairos, New Relic, SignalFX, Stackdriver and Wavefront</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Thanks to <a href="https://github.com/thiagolocatelli">Thiago Locatelli</a> for this contribution.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_micronaut_sql_1_2_update"><a class="anchor" href="#_micronaut_sql_1_2_update"></a>Micronaut SQL 1.2 Update</h3>
+<div class="paragraph">
+<p>The <a href="https://micronaut-projects.github.io/micronaut-sql/1.2.x/guide/index.html">Micronaut SQL</a> module has been updated with support for the following new features:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Improved Entity Scan support for JPA</p>
+</li>
+<li>
+<p>Integration with Micronaut 1.2 Validator for JPA</p>
+</li>
+<li>
+<p>GraalVM <code>native-image</code> metadata</p>
+</li>
+<li>
+<p>Support for <a href="https://www.jooq.org">JOOQ</a>. Thanks to <a href="https://github.com/lightoze">Vladimir Kulev</a>.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_micronaut_kafka_1_2_update"><a class="anchor" href="#_micronaut_kafka_1_2_update"></a>Micronaut Kafka 1.2 Update</h3>
+<div class="paragraph">
+<p>The <a href="https://micronaut-projects.github.io/micronaut-kafka/1.2.x/guide/index.html">Micronaut Kafka</a> module has been updated with support for the following new features:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Support for Kafka 2.3.0</p>
+</li>
+<li>
+<p>Improved Exception Handling</p>
+</li>
+<li>
+<p>Support for GraalVM <code>native-image</code></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_micronaut_rabbit_1_1_1_update"><a class="anchor" href="#_micronaut_rabbit_1_1_1_update"></a>Micronaut Rabbit 1.1.1 Update</h3>
+<div class="paragraph">
+<p>The <a href="https://micronaut-projects.github.io/micronaut-rabbitmq/1.1.x/guide/index.html">Micronaut RabbitMQ</a> module has been updated with support for GraalVM <code>native-image</code>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_micronaut_test_1_1_update"><a class="anchor" href="#_micronaut_test_1_1_update"></a>Micronaut Test 1.1 Update</h3>
+<div class="paragraph">
+<p>The <a href="https://micronaut-projects.github.io/micronaut-test/1.1.x/guide/index.html">Micronaut Test</a> module has been updated with support for the following new features:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Updated to JUnit 5.5</p>
+</li>
+<li>
+<p>Support for Dependency Injection in Constructors and Methods for JUnit 5</p>
+</li>
+<li>
+<p>Support for <a href="https://github.com/kotlintest/kotlintest">Kotlin Test</a></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_optional_beans_returned_from_factories"><a class="anchor" href="#_optional_beans_returned_from_factories"></a>Optional Beans Returned from Factories</h3>
+<div class="paragraph">
+<p>A <a href="../api/io/micronaut/context/annotation/Factory.html">@Factory</a> bean can now return <code>null</code> if it is not possible to create the bean which will indicate to the dependency injection container that the bean does not exist. This allows for more complex logic within factory beans that can conditionally disable the bean if certain conditions are not met.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_hashicorp_vault_support"><a class="anchor" href="#_hashicorp_vault_support"></a>HashiCorp Vault Support</h3>
+<div class="paragraph">
+<p>Initial support distributed configuration for <a href="https://www.vaultproject.io">HashiCorp Vault</a> has been added. See the documentation on <a href="#distributedConfigurationVault">HashiCorp Vault Support</a> for more information. Thanks to <a href="https://github.com/thiagolocatelli">Thiago Locatelli</a> for this contribution.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_oracle_cloud_support"><a class="anchor" href="#_oracle_cloud_support"></a>Oracle Cloud Support</h3>
+<div class="paragraph">
+<p>Initial support for environment detection and cloud metadata for Oracle Cloud has been added. Thanks to <a href="https://github.com/recursivecodes">Todd Sharp</a> for this contribution.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_client_and_manual_service_discovery"><a class="anchor" href="#_client_and_manual_service_discovery"></a>@Client and Manual Service Discovery</h3>
+<div class="paragraph">
+<p>If a service is configured statically with <code>micronaut.http.services.*</code>, it was previously not possible to override the configuration with the <a href="../api/io/micronaut/http/client/annotation/Client.html">@Client</a> annotation. It is now possible to override the configuration, which will result in a new client being created for the given client class.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_completable_support"><a class="anchor" href="#_completable_support"></a>Completable Support</h3>
+<div class="paragraph">
+<p>The RxJava2 reactive type <code>io.reactivex.Completable</code> is now supported as a return type for controller and client methods.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_client_and_server_host_resolution"><a class="anchor" href="#_client_and_server_host_resolution"></a>Client and Server Host Resolution</h3>
+<div class="paragraph">
+<p>New beans have been added to support lookup of the client address and the current server host. The implementations are aware of proxy headers and are configurable to look for custom headers. The <a href="../api/io/micronaut/http/server/util/HttpHostResolver.html">HttpHostResolver</a> can be injected to resolve the current server hostname and <a href="../api/io/micronaut/http/server/util/HttpClientAddressResolver.html">HttpClientAddressResolver</a> can be injected to resolve the client address of the current request.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_default_implementation_support"><a class="anchor" href="#_default_implementation_support"></a>Default Implementation Support</h3>
+<div class="paragraph">
+<p>When writing libraries for Micronaut, it is often the case that users will want to override part of your implementation. The most common way of doing so is creating custom beans that use the <a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a> annotation to replace your implementation. Because the <a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a> annotation requires a class argument to indicate which implementation to replace, it was required to make the implementation part of the public API. The class needed to be public because the user would need to reference the class directly in the annotation.</p>
+</div>
+<div class="paragraph">
+<p>A new annotation has been added to solve this problem: <a href="../api/io/micronaut/context/annotation/DefaultImplementation.html">@DefaultImplementation</a>. See the section on <a href="#replaces">Bean Replacements</a> for more information.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_head_routes"><a class="anchor" href="#_head_routes"></a>HEAD Routes</h3>
+<div class="paragraph">
+<p>For each route registered with the server that responds to GET requests, an additional route will be registered that responds to HEAD requests and will not include the body. This only applies to routes created by Micronaut through annotations. Any GET routes registered by custom route builders will not have corresponding HEAD routes added automatically.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_request_scope"><a class="anchor" href="#_request_scope"></a>Request Scope</h3>
+<div class="paragraph">
+<p>A new bean scope has been created to allow for beans that only exist in the scope of a given HTTP request. See <a href="../api/io/micronaut/runtime/http/scope/RequestScope.html">@RequestScope</a>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_environment_order_and_priority"><a class="anchor" href="#_environment_order_and_priority"></a>Environment Order and Priority</h3>
+<div class="paragraph">
+<p>In previous versions of Micronaut, the property sources for an active environment had no priority over any other active environment. It was non deterministic which environment&#8217;s properties would override other environments. Now the last environment supplied has the highest priority. For example, if an application is started with <code>-Dmicronaut.environments=first,second</code>, <code>application-second.yml</code> will override properties in <code>application-first.yml</code>. This change affects all sources of properties, including distributed configuration sources.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_environment_endpoint"><a class="anchor" href="#_environment_endpoint"></a>Environment Endpoint</h3>
+<div class="paragraph">
+<p>This version includes a new <code>/env</code> endpoint with information about the environment and its property sources See the <a href="#environmentEndpoint">documentation</a> for more information.</p>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_rss_2_0_module_included_in_bom"><a class="anchor" href="#_rss_2_0_module_included_in_bom"></a>RSS 2.0 Module Included in BOM</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>This version references the <a href="https://micronaut-projects.github.io/micronaut-rss/latest/guide/index.html">RSS configuration</a> which eases the generation of a RSS 2.0 feeds in a Micronaut app.</p>
+</div>
+<div class="sect2">
+<h3 id="_dependency_upgrades"><a class="anchor" href="#_dependency_upgrades"></a>Dependency Upgrades</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Groovy <code>2.5.4</code> &#8594; <code>2.5.6</code></p>
+</li>
+<li>
+<p>Gradle <code>5.1.1</code> &#8594; <code>Gradle 5.5</code> (for new applications)</p>
+</li>
+<li>
+<p>Micronaut SQL <code>1.1.1</code> &#8594; <code>1.2.0</code></p>
+</li>
+<li>
+<p>Micronaut Micrometer <code>1.1.0</code> &#8594; <code>1.2.0</code></p>
+</li>
+<li>
+<p>Micrometer <code>1.1.5</code> &#8594; <code>1.2.0</code></p>
+</li>
+<li>
+<p>Micronaut Security <code>1.1.1</code> &#8594; <code>1.2.0</code></p>
+</li>
+<li>
+<p>Micronaut Views <code>1.1.3</code> &#8594; <code>1.2.0</code></p>
+</li>
+<li>
+<p>Micronaut Test <code>1.0.4</code> &#8594; <code>1.1.0</code></p>
+</li>
+<li>
+<p>Netty <code>4.1.30.Final</code> &#8594; <code>4.1.38.Final</code></p>
+</li>
+<li>
+<p>Neo4j Driver <code>1.7.2</code> &#8594; <code>1.7.5</code></p>
+</li>
+<li>
+<p>Mongo Driver <code>3.8.0</code> &#8594; <code>3.10.1</code></p>
+</li>
+<li>
+<p>Mongo Reactive Streams <code>1.10.0</code> &#8594; <code>1.11.0</code></p>
+</li>
+<li>
+<p>Kafka <code>2.1.1</code> &#8594; <code>2.3.0</code></p>
+</li>
+<li>
+<p>Snake YAML <code>1.23</code> &#8594; <code>1.24</code></p>
+</li>
+<li>
+<p>Lettuce <code>5.1.3.RELEASE</code> &#8594; <code>5.1.7.RELEASE</code></p>
+</li>
+<li>
+<p>JUnit <code>5.3.2</code> &#8594; <code>5.5.0</code></p>
+</li>
+<li>
+<p>Picocli <code>3.5.2</code> &#8594; <code>4.0.1</code></p>
+</li>
+<li>
+<p>Jaeger <code>0.33.1</code> &#8594; <code>0.35.5</code></p>
+</li>
+<li>
+<p>Zipkin Reporter <code>2.8.4</code> &#8594; <code>2.10.0</code></p>
+</li>
+<li>
+<p>Open Tracing <code>0.31.0</code> &#8594; <code>0.33.0</code></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

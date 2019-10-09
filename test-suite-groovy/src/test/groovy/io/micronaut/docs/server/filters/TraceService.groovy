@@ -1,20 +1,16 @@
-package io.micronaut.docs.server.filters;
+package io.micronaut.docs.server.filters
 
 // tag::imports[]
 
-import io.micronaut.http.HttpRequest;
-import io.reactivex.Flowable;
-import io.reactivex.schedulers.Schedulers;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.micronaut.http.HttpRequest
+import io.reactivex.Flowable
+import io.reactivex.schedulers.Schedulers
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
-import javax.inject.Singleton;
+import javax.inject.Singleton
 // end::imports[]
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 // tag::class[]
 @Singleton
 class TraceService {

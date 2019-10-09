@@ -1,0 +1,13 @@
+++++
+<a id="io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration$CacheControlConfiguration" href="#io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration$CacheControlConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration$CacheControlConfiguration[]
+|===
+|Property |Type |Description
+
+| `+netty.responses.file.cache-control.public+`
+|boolean
+|Sets whether the cache control is public. Default value (false)
+
+
+|===

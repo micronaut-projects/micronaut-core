@@ -1,0 +1,985 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>8.1 Cloud Configuration 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>8.1 Cloud Configuration</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+                <div id="table-of-content">
+                    <h2>Table of Contents</h2>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#distributedConfiguration"><strong>8.1</strong><span>Distributed Configuration</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#distributedConfigurationConsul"><strong>8.2</strong><span>HashiCorp Consul Support</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#distributedConfigurationVault"><strong>8.3</strong><span>HashiCorp Vault Support</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#distributedConfigurationSpringCloud"><strong>8.4</strong><span>Spring Cloud Config Support</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#distributedConfigurationAwsParameterStore"><strong>8.5</strong><span>AWS Parameter Store Support</span></a>
+                    </div>
+                    
+                </div>
+                
+
+                
+<h2 id="cloudConfiguration"><a class="anchor" href="#cloudConfiguration"></a>8.1 Cloud Configuration</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/cloudConfiguration.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Applications that are built for the Cloud often need adapt to running in a Cloud environment, read and share configuration in a distributed manner and externalize configuration to the environment where necessary.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut&#8217;s <a href="#environments">Environment</a> concept is by default Cloud platform aware and will make a best effort to detect the underlying active environment.</p>
+</div>
+<div class="paragraph">
+<p>You can then use the <a href="../api/io/micronaut/context/annotation/Requires.html">Requires</a> annotation to <a href="#conditionalBeans">conditionally load bean definitions</a>.</p>
+</div>
+<div class="paragraph">
+<p>The following table summarizes the constants provided by the <a href="../api/io/micronaut/context/env/Environment.html">Environment</a> interface and provides an example:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Micronaut Environment Detection</caption>
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Constant</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Requires Example</th>
+<th class="tableblock halign-left valign-top">Environment name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#ANDROID">ANDROID</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The application is running as an Android application</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.ANDROID)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>android</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#TEST">TEST</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The application is running within a JUnit or Spock test</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.TEST)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>test</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#CLOUD">CLOUD</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The application is running in a Cloud environment (present for all other cloud platform types)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.CLOUD)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>cloud</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#AMAZON_EC2">AMAZON_EC2</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Running on <a href="https://aws.amazon.com/ec2">Amazon EC2</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.AMAZON_EC2)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>ec2</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#GOOGLE_COMPUTE">GOOGLE_COMPUTE</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Running on <a href="https://cloud.google.com/compute/">Google Compute</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.GOOGLE_COMPUTE)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>gcp</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#KUBERNETES">KUBERNETES</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Running on <a href="https://www.kubernetes.io">Kubernetes</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.KUBERNETES)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>k8s</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#HEROKU">HEROKU</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Running on <a href="https://heroku.com">Heroku</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.HEROKU)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>heroku</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#CLOUD_FOUNDRY">CLOUD_FOUNDRY</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Running on <a href="https://www.cloudfoundry.org">Cloud Foundry</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.CLOUD_FOUNDRY)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>pcf</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#AZURE">AZURE</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Running on <a href="https://azure.microsoft.com">Microsoft Azure</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.AZURE)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>azure</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#IBM">IBM</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Running on <a href="https://www.ibm.com/cloud/">IBM Cloud</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.IBM)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>ibm</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#DIGITAL_OCEAN">DIGITAL_OCEAN</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Running on <a href="https://www.digitalocean.com/">Digital Ocean</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.DIGITAL_OCEAN)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>digitalocean</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/context/env/Environment.html#ORACLE_CLOUD">ORACLE_CLOUD</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Running on <a href="https://cloud.oracle.com/">Oracle Cloud</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Requires(env = Environment.ORACLE_CLOUD)</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>oraclecloud</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Note that it may be the case that you have multiple active environment names since you may run Kubernetes on AWS for example.</p>
+</div>
+<div class="paragraph">
+<p>In addition, using the value of the constants defined in the table above you can create environment specific configuration files. For example if you create a <code>src/main/resources/application-gcp.yml</code> file then that configuration will only be loaded when running on Google Compute.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+Any configuration property in the <a href="../api/io/micronaut/context/env/Environment.html">Environment</a> can also be set via an environment variable. For example, setting the <code>CONSUL_CLIENT_HOST</code> environment variable will override the <code>host</code> property in <a href="../api/io/micronaut/discovery/consul/ConsulConfiguration.html">ConsulConfiguration</a>.
+</td>
+</tr>
+</table>
+</div>
+<div class="sect1">
+<h2 id="_using_cloud_instance_metadata"><a class="anchor" href="#_using_cloud_instance_metadata"></a>Using Cloud Instance Metadata</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>When Micronaut detects it is running on any of the cloud platforms listed above, such as Google Compute or AWS EC2, upon startup Micronaut will populate the interface <a href="../api/io/micronaut/discovery/cloud/ComputeInstanceMetadata.html">ComputeInstanceMetadata</a>.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+Depending on the environment you are running in the backing implementation will be either <a href="../api/io/micronaut/discovery/cloud/gcp/GoogleComputeInstanceMetadata.html">GoogleComputeInstanceMetadata</a>, <a href="../api/io/micronaut/discovery/cloud/aws/AmazonEC2InstanceMetadata.html">AmazonEC2InstanceMetadata</a>,  <a href="../api/io/micronaut/discovery/cloud/digitalocean/DigitalOceanInstanceMetadata.html">DigitalOceanInstanceMetadata</a> or <a href="../api/io/micronaut/discovery/cloud/oraclecloud/OracleCloudInstanceMetadata.html">OracleCloudInstanceMetadata</a> with metadata found from the cloud provider metadata services.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>All of this data is merged together into the <code>metadata</code> property for the running <a href="../api/io/micronaut/discovery/ServiceInstance.html">ServiceInstance</a>.</p>
+</div>
+<div class="paragraph">
+<p>If you need to access the metadata for your application instance you can use the interface <a href="../api/io/micronaut/runtime/server/EmbeddedServerInstance.html">EmbeddedServerInstance</a>, and call <code>getMetadata()</code> which will get a map of all of the metadata.</p>
+</div>
+<div class="paragraph">
+<p>If you are connecting remotely via client, the instance metadata can be referenced once you have retrieved a <a href="../api/io/micronaut/discovery/ServiceInstance.html">ServiceInstance</a> from either the <a href="../api/io/micronaut/http/client/LoadBalancer.html">LoadBalancer</a> or <a href="../api/io/micronaut/discovery/DiscoveryClient.html">DiscoveryClient</a> APIs.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+The Netflix Ribbon client side load balancer can be configured to use the metadata to do zone aware client side load balancing. See <a href="#clientSideLoadBalancing">Client Side Load Balancing</a>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>To obtain metadata for a service via <a href="#serviceDiscovery">Service Discovery</a> use the <a href="../api/io/micronaut/http/client/LoadBalancerResolver.html">LoadBalancerResolver</a> interface to resolve a <a href="../api/io/micronaut/http/client/LoadBalancer.html">LoadBalancer</a> and obtain a reference to a service by identifier:</p>
+</div>
+<div class="listingblock">
+<div class="title">Obtaining Metadata for a Service instance</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">LoadBalancer loadBalancer = loadBalancerResolver.resolve("some-service");
+Flowable.fromPublisher(
+    loadBalancer.select()
+).subscribe((instance) -&gt;
+    ConvertibleValues&lt;String&gt; metaData = instance.getMetadata();
+    ...
+);</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/runtime/server/EmbeddedServerInstance.html">EmbeddedServerInstance</a> is available through event listeners that listen for the <a href="../api/io/micronaut/discovery/event/ServiceStartedEvent.html">ServiceStartedEvent</a>. The <a href="../api/io/micronaut/runtime/event/annotation/EventListener.html">@EventListener</a> annotation makes it easy to listen for the event inside one of your existing beans.</p>
+</div>
+<div class="paragraph">
+<p>To obtain metadata for the locally running server use an <a href="#events">EventListener</a> for the <a href="../api/io/micronaut/discovery/event/ServiceStartedEvent.html">ServiceStartedEvent</a>:</p>
+</div>
+<div class="listingblock">
+<div class="title">Obtaining Metadata for a Local Server</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@EventListener
+void onServiceStarted(ServiceStartedEvent event) {
+    ServiceInstance serviceInstance = event.getSource()
+    ConvertibleValues&lt;String&gt; metadata = serviceInstance.metadata
+}</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="distributedConfiguration"><a class="anchor" href="#distributedConfiguration"></a>8.1.1 Distributed Configuration</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/cloudConfiguration/distributedConfiguration.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>As you can see, Micronaut features a robust system for externalizing and adapting configuration to the environment inspired by similar approaches found in Grails and Spring Boot.</p>
+</div>
+<div class="paragraph">
+<p>However, what if you want two Microservices to share configuration? Micronaut comes with built in APIs for doing distributed configuration.</p>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/discovery/config/ConfigurationClient.html">ConfigurationClient</a> interface has a single method called <code>getPropertySources</code> that can be implemented to read and resolve configuration from distributed sources.</p>
+</div>
+<div class="paragraph">
+<p>The <code>getPropertySources</code> returns a <a href="http://www.reactive-streams.org/reactive-streams-1.0.2-javadoc/org/reactivestreams/Publisher.html">Publisher</a> that emits zero or many <a href="../api/io/micronaut/context/env/PropertySource.html">PropertySource</a> instances.</p>
+</div>
+<div class="paragraph">
+<p>The default implementation is <a href="../api/io/micronaut/discovery/config/DefaultCompositeConfigurationClient.html">DefaultCompositeConfigurationClient</a> which merges all registered <code>ConfigurationClient</code> beans into a single bean.</p>
+</div>
+<div class="paragraph">
+<p>You can either implement your own <a href="../api/io/micronaut/discovery/config/ConfigurationClient.html">ConfigurationClient</a> implementation or you can use one of the ones already built into Micronaut. The following sections cover those.</p>
+</div>
+
+<h2 id="distributedConfigurationConsul"><a class="anchor" href="#distributedConfigurationConsul"></a>8.1.2 HashiCorp Consul Support</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/cloudConfiguration/distributedConfigurationConsul.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p><a href="https://www.consul.io">Consul</a> is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native <a href="../api/io/micronaut/discovery/consul/client/v1/ConsulClient.html">ConsulClient</a> that is built using Micronaut&#8217;s support for <a href="#clientAnnotation">Declarative HTTP Clients</a>.</p>
+</div>
+<div class="sect1">
+<h2 id="_starting_consul"><a class="anchor" href="#_starting_consul"></a>Starting Consul</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The quickest way to start using Consul is via Docker:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Starting Consul with Docker</p>
+</li>
+</ol>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>docker run -p 8500:8500 consul</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Alternatively you can <a href="https://www.consul.io/docs/install/index.html">install and run a local Consul instance</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_enabling_distributed_configuration_with_consul"><a class="anchor" href="#_enabling_distributed_configuration_with_consul"></a>Enabling Distributed Configuration with Consul</h2>
+<div class="sectionbody">
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">Using the CLI</div>
+<div class="paragraph">
+<p>If you are creating your project using the Micronaut CLI, supply the <code>config-consul</code> feature to enable Consul&#8217;s distributed configuration in your project:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ mn create-app my-app --features config-consul</pre>
+</div>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>To enable distributed configuration, similar to Spring Boot and Grails, you need to create a <code>src/main/resources/bootstrap.yml</code> configuration file and configure Consul as well as enable the configuration client:</p>
+</div>
+<div class="listingblock">
+<div class="title">bootstrap.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    application:
+        name: hello-world
+    config-client:
+        enabled: true
+consul:
+    client:
+        defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Once you have enabled distributed configuration you need to store the configuration you wish to share in Consul&#8217;s Key/Value store.</p>
+</div>
+<div class="paragraph">
+<p>There are a number of different ways to do that.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_storing_configuration_as_key_value_pairs"><a class="anchor" href="#_storing_configuration_as_key_value_pairs"></a>Storing Configuration as Key/Value Pairs</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>One way is to store each key and value directly in Consul. In this case by default Micronaut will look for configuration in the <code>/config</code> folder of Consul.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+You can alter the path searched for by setting <code>consul.client.config.path</code>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Within the <code>/config</code> folder Micronaut will search values within the following folders in order of precedence:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Configuration Resolution Precedence</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Folder</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/application</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration shared by all applications</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/application,prod</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration shared by all applications for the <code>prod</code> <a href="../api/io/micronaut/context/env/Environment.html">Environment</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/[APPLICATION_NAME]</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Application specific configuration, example <code>/config/hello-world</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/[APPLICATION_NAME],prod</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Application specific configuration for an active <a href="../api/io/micronaut/context/env/Environment.html">Environment</a></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The value of <code>APPLICATION_NAME</code> is whatever your have configured <code>micronaut.application.name</code> to be in <code>bootstrap.yml</code>.</p>
+</div>
+<div class="paragraph">
+<p>To see this in action use the following curl command to store a property called <code>foo.bar</code> with a value of <code>myvalue</code> in the folder <code>/config/application</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Using curl to Write a Value</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">curl -X PUT -d @- localhost:8500/v1/kv/config/application/foo.bar &lt;&lt;&lt; myvalue</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you know define a <code>@Value("${foo.bar}")</code> or call <code>environment.getProperty(..)</code> the value <code>myvalue</code> will be resolved from Consul.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_storing_configuration_in_yaml_json_etc"><a class="anchor" href="#_storing_configuration_in_yaml_json_etc"></a>Storing Configuration in YAML, JSON etc.</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Some Consul users prefer storing configuration in blobs of a certain format, such as YAML. Micronaut supports this mode and supports storing configuration in either YAML, JSON or Java properties format.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+The <a href="../api/io/micronaut/discovery/config/ConfigDiscoveryConfiguration.html">ConfigDiscoveryConfiguration</a> has a number of configuration options for configuring how distributed configuration is discovered.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>You can set the <code>consul.client.config.format</code> option to configure the format with which properties are read.</p>
+</div>
+<div class="paragraph">
+<p>For example, to configure JSON:</p>
+</div>
+<div class="listingblock">
+<div class="title">application.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">consul:
+    client:
+        config:
+            format: JSON</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now write your configuration in JSON format to Consul:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using curl write JSON</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">curl -X PUT  localhost:8500/v1/kv/config/application \
+-d @- &lt;&lt; EOF
+{ "foo": {  "bar": "myvalue" } }
+EOF</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_storing_configuration_as_file_references"><a class="anchor" href="#_storing_configuration_as_file_references"></a>Storing Configuration as File References</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Another option popular option is <a href="https://github.com/breser/git2consul">git2consul</a> which mirrors the contents of a Git repository to Consul&#8217;s Key/Value store.</p>
+</div>
+<div class="paragraph">
+<p>You can setup a Git repository that contains files like <code>application.yml</code>, <code>hello-world-test.json</code> etc. and the contents of these files are cloned to Consul.</p>
+</div>
+<div class="paragraph">
+<p>In this case each key in consul represents a file with an extension. For example <code>/config/application.yml</code> and you must configure the <code>FILE</code> format:</p>
+</div>
+<div class="listingblock">
+<div class="title">application.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">consul:
+    client:
+        config:
+            format: FILE</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="distributedConfigurationVault"><a class="anchor" href="#distributedConfigurationVault"></a>8.1.3 HashiCorp Vault Support</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/cloudConfiguration/distributedConfigurationVault.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Micronaut features support for integration with <a href="https://www.vaultproject.io/">HashiCorp Vault</a> as a distributed configuration source.</p>
+</div>
+<div class="paragraph">
+<p>To enable support for Vault Configuration simply add the following configuration to your <code>bootstrap.yml</code> file:</p>
+</div>
+<div class="listingblock">
+<div class="title">Integrating with HashiCorp Vault</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    application:
+        name: hello-world
+    config-client:
+        enabled: true
+
+vault:
+    client:
+        config:
+            enabled: true</code></pre>
+</div>
+</div>
+<a id="io.micronaut.discovery.vault.config.VaultClientConfiguration" href="#io.micronaut.discovery.vault.config.VaultClientConfiguration">&#128279;</a>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Configuration Properties for <a href="../api/io/micronaut/discovery/vault/config/VaultClientConfiguration.html">VaultClientConfiguration</a></caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Property</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.uri</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set the Vault Server Uri. Default value ("http://locahost:8200").</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.token</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set the Vault authentication token.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.kv-version</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/discovery/vault/config/VaultClientConfiguration.VaultKvVersion.html">VaultClientConfiguration$VaultKvVersion</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set the version of the Vault Secret engine. V1 or V2. Default value (V2).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.secret-engine-name</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set the name of the Vault Secret engine name. Default value ("secret").</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.fail-fast</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If set to true an exception will be thrown if configuration is not found
+ for the application or any of its environments. Default value (false).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.ssl-configuration</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/http/ssl/SslConfiguration.html">SslConfiguration</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.logger-name</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.follow-redirects</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.default-charset</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.nio.charset.Charset</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.channel-options</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.util.Map</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.shutdown-timeout</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.time.Duration</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.read-timeout</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.time.Duration</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.read-idle-timeout</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.time.Duration</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.connect-timeout</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.time.Duration</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.num-of-threads</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.Integer</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.thread-factory</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.Class</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.max-content-length</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.proxy-type</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.net.Proxy$Type</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.proxy-address</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.net.SocketAddress</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.proxy-username</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.proxy-password</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>vault.client.proxy-selector</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.net.ProxySelector</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Micronaut will use the configured <code>micronaut.application.name</code> to lookup property sources for the application from Vault.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 2. Configuration Resolution Precedence</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Folder</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/application</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration shared by all applications</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/[APPLICATION_NAME]</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Application specific configuration</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/application/[ENV_NAME]</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration shared by all applications for an active environment name</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/[APPLICATION_NAME]/[ENV_NAME]</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Application specific configuration for an active environment name</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>See the <a href="https://www.vaultproject.io/api/secret/kv/index.html">Documentation for HashiCorp Vault</a> for more information on how to setup the server.</p>
+</div>
+
+<h2 id="distributedConfigurationSpringCloud"><a class="anchor" href="#distributedConfigurationSpringCloud"></a>8.1.4 Spring Cloud Config Support</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/cloudConfiguration/distributedConfigurationSpringCloud.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Since 1.1, Micronaut features a native <a href="https://spring.io/projects/spring-cloud-config">Spring Cloud Configuration</a> for those who have not switched to a dedicated more complete solution like Consul.</p>
+</div>
+<div class="paragraph">
+<p>To enable support for Spring Cloud Configuration simply add the following configuration to your <code>bootstrap.yml</code> file:</p>
+</div>
+<div class="listingblock">
+<div class="title">Integrating with Spring Cloud Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    application:
+        name: hello-world
+    config-client:
+        enabled: true
+spring:
+    cloud:
+        config:
+            enabled: true
+            uri: http://localhost:8888/
+            retry-attempts: 4 # optional, number of times to retry
+            retry-delay: 2s # optional, delay between retries</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Micronaut will use the configured <code>micronaut.application.name</code> to lookup property sources for the application from Spring Cloud config server configured via <code>spring.cloud.config.uri</code>.</p>
+</div>
+<div class="paragraph">
+<p>See the <a href="https://spring.io/projects/spring-cloud-config#learn">Documentation for Spring Cloud Config Server</a> for more information on how to setup the server.</p>
+</div>
+
+<h2 id="distributedConfigurationAwsParameterStore"><a class="anchor" href="#distributedConfigurationAwsParameterStore"></a>8.1.5 AWS Parameter Store Support</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/cloudConfiguration/distributedConfigurationAwsParameterStore.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Micronaut supports configuration sharing via AWS System Manager Parameter Store. You will need the following dependencies configured:</p>
+</div>
+<div class="listingblock">
+<div class="title">Example <code>build.gradle</code> for AWS System Manager Parameter Store</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">compile "io.micronaut:micronaut-discovery-client"
+compile "io.micronaut.configuration:micronaut-aws-common"
+compile group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To enable distributed configuration a <code>src/main/resources/bootstrap.yml</code> configuration file must be created and configured to use Parameter Store:</p>
+</div>
+<div class="listingblock">
+<div class="title">bootstrap.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    application:
+        name: hello-world
+    config-client:
+        enabled: true</code></pre>
+</div>
+</div>
+<a id="io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration" href="#io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration">&#128279;</a>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Configuration Properties for <a href="../api/io/micronaut/discovery/aws/parameterstore/AWSParameterStoreConfiguration.html">AWSParameterStoreConfiguration</a></caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Property</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>aws.client.system-manager.parameterstore.use-secure-parameters</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Use auto-decryption via MKS for SecureString parameters. Default value ({@value DEFAULT_SECURE}).
+ If set to false, you will not get unencrypted values.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>aws.client.system-manager.parameterstore.root-hierarchy-path</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The the root hierarchy on the parameter store. Default value ("/" + PREFIX + "/").</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>aws.client.system-manager.parameterstore.enabled</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Enable or disable distributed configuration with AWS Parameter Store. Default value (false).</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>You can configure shared properties by going into the AWS Console &#8594; System Manager &#8594; Parameter Store</p>
+</div>
+<div class="paragraph">
+<p>Micronaut will use a hierarchy to read the configuration values, and supports <code>String</code>, <code>StringList</code>, and <code>SecureString</code> types.</p>
+</div>
+<div class="paragraph">
+<p>You can make environment specific configurations as well by including the environment name after an underscore <code>_</code>. For example if your <code>micronaut.application.name</code> setting is set to <code>helloworld</code> then providing configuration values under <code>helloworld_test</code> will be applied only to the <code>test</code> environment.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 2. Configuration Resolution Precedence</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Folder</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/application</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration shared by all applications</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/[APPLICATION_NAME]</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Application specific configuration, example <code>/config/hello-world</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/application_prod</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configuration shared by all applications for the <code>prod</code> <a href="../api/io/micronaut/context/env/Environment.html">Environment</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/config/[APPLICATION_NAME]_prod</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Application specific configuration for an active <a href="../api/io/micronaut/context/env/Environment.html">Environment</a></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>For example, if the configuration name <code>/config/application_test/server.url</code> is configured in AWS Parameter Store, then any application connecting to that parameter store can retrieve the value using <code>server.url</code>. If the application has <code>micronaut.application.name</code> configured to be <code>myapp</code>, then a value with the name <code>/config/myapp_test/server.url</code> will override the value just for that application.</p>
+</div>
+<div class="paragraph">
+<p>Each level of the tree can be composed of key=value pairs. If you want multiple key value pairs, set the type to 'StringList'.</p>
+</div>
+<div class="paragraph">
+<p>For special secure information, like keys or passwords, use the type "SecureString". KMS will be automatically invoked when you
+add and retrieve values and decrypt them with the default key store for your account. If you set the configuration to not use secure strings, they will be returned to you encrypted and you must manually decrypt them.</p>
+</div>
+<div class="paragraph">
+<p>The <a href="https://github.com/micronaut-projects/micronaut-examples/aws" class="bare">https://github.com/micronaut-projects/micronaut-examples/aws</a> repository showcases a sample application using this feature.</p>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

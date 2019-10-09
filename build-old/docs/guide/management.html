@@ -1,0 +1,1584 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>14 Management &amp; Monitoring 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../guide/languageSupport.html">&lt;&lt; <strong>13</strong><span>Language Support</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../guide/security.html"><strong>15</strong><span>Security</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>14 Management &amp; Monitoring</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+                <div id="table-of-content">
+                    <h2>Table of Contents</h2>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#buildingEndpoints"><strong>14.1</strong><span>Creating Endpoints</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#endpointAnnotation"><strong>14.1.1</strong><span>The Endpoint Annotation</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#endpointMethod"><strong>14.1.2</strong><span>Endpoint Methods</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#endpointConfiguration"><strong>14.1.3</strong><span>Endpoint Configuration</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#providedEndpoints"><strong>14.2</strong><span>Built-In Endpoints</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#beansEndpoint"><strong>14.2.1</strong><span>The Beans Endpoint</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#infoEndpoint"><strong>14.2.2</strong><span>The Info Endpoint</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#healthEndpoint"><strong>14.2.3</strong><span>The Health Endpoint</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#metricsEndpoint"><strong>14.2.4</strong><span>The Metrics Endpoint</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#refreshEndpoint"><strong>14.2.5</strong><span>The Refresh Endpoint</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#routesEndpoint"><strong>14.2.6</strong><span>The Routes Endpoint</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#loggersEndpoint"><strong>14.2.7</strong><span>The Loggers Endpoint</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#cachesEndpoint"><strong>14.2.8</strong><span>The Caches Endpoint</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#stopEndpoint"><strong>14.2.9</strong><span>The Server Stop Endpoint</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#environmentEndpoint"><strong>14.2.10</strong><span>The Environment Endpoint</span></a>
+                    </div>
+                    
+                </div>
+                
+
+                
+<h1 id="management"><a class="anchor" href="#management"></a>14 Management & Monitoring</h1>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">Using the CLI</div>
+<div class="paragraph">
+<p>If you are creating your project using the Micronaut CLI, supply the <code>management</code> feature to configure the management endpoints in your project:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ mn create-app my-app --features management</pre>
+</div>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Inspired by Spring Boot and Grails, the Micronaut <code>management</code> dependency adds support for monitoring of your application via <strong>endpoints</strong>: special URIs that return details about the health and state of your application. The <code>management</code> endpoints are also integrated with Micronaut&#8217;s <code>security</code> dependency, allowing for sensitive data to be restricted to authenticated users in your security system (see <a href="#builtInEndpointsAccess">Built-in Endpoints Access</a> in the Security section).</p>
+</div>
+<div class="paragraph">
+<p>To use the <code>management</code> features described in this section, add the dependency on your classpath.</p>
+</div>
+<div class="paragraph">
+<p>        <div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="gradle">compile <span class="hljs-string">'io.micronaut:micronaut-management'</span></code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="maven">&lt;dependency&gt;
+    &lt;groupId&gt;io.micronaut&lt;/groupId&gt;
+    &lt;artifactId&gt;micronaut-management&lt;/artifactId&gt;
+&lt;/dependency&gt;</code></pre>
+</div>
+</div>
+</p>
+</div>
+
+<h2 id="buildingEndpoints"><a class="anchor" href="#buildingEndpoints"></a>14.1 Creating Endpoints</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/buildingEndpoints.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>In addition to the <a href="#providedEndpoints">Built-In Endpoints</a>, the <code>management</code> dependency also provides support for creating custom endpoints.  Custom endpoints can be enabled and configured identically to the built-in endpoints, and can be used to retrieve and return any metrics or other application data that you require.</p>
+</div>
+
+<h2 id="endpointAnnotation"><a class="anchor" href="#endpointAnnotation"></a>14.1.1 The Endpoint Annotation</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/buildingEndpoints/endpointAnnotation.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>An Endpoint can be created by annotating a class with the <a href="../api/io/micronaut/management/endpoint/Endpoint.html">Endpoint</a> annotation, and supplying it with (at minimum) an endpoint id.</p>
+</div>
+<div class="listingblock">
+<div class="title">FooEndpoint.java</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@Endpoint("foo")
+class FooEndpoint {
+    ...
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If a single <code>String</code> argument is supplied to the annotation, it will be used as the endpoint id.</p>
+</div>
+<div class="paragraph">
+<p>It is possible to supply additional (named) arguments to the annotation. Other possible arguments to <code>@Endpoint</code> are described in the table below:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Endpoint Arguments</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Argument</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Endpoint Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>String id</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The endpoint id (or name)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Endpoint(id = "foo")</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>String prefix</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Prefix used for configuring the endpoint (see <a href="#endpointConfiguration">Endpoint Configuration</a>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Endpoint(prefix = "foo")</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>boolean defaultEnabled</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets whether the endpoint is enabled when no configuration is set (see <a href="#endpointConfiguration">Endpoint Configuration</a>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Endpoint(defaultEnabled = false)</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>boolean defaultSensitive</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets whether the endpoint is sensitive if no configuration is set (see <a href="#endpointConfiguration">Endpoint Configuration</a>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Endpoint(defaultSensitive = false)</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="sect1">
+<h2 id="_example_of_custom_endpoint"><a class="anchor" href="#_example_of_custom_endpoint"></a>Example of custom Endpoint</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The following example <code>Endpoint</code> class will create an endpoint accessible at <code>/date</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">CurrentDateEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+
+@Endpoint(id = "date",
+        prefix = "custom",
+        defaultEnabled = true,
+        defaultSensitive = false)
+class CurrentDateEndpoint {
+  //.. endpoint methods
+}</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="endpointMethod"><a class="anchor" href="#endpointMethod"></a>14.1.2 Endpoint Methods</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/buildingEndpoints/endpointMethod.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Endpoints respond to <code>GET</code> ("read"), <code>POST</code> ("write") and <code>DELETE</code> ("delete") requests. To return a response from an endpoint, annotate its public method/s with one of following annotations:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Endpoint Method Annotations</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Annotation</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/Read.html">Read</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Responds to <code>GET</code> requests</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/Write.html">Write</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Responds to <code>POST</code> requests</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/Delete.html">Delete</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Responds to <code>DELETE</code> requests</p></td>
+</tr>
+</tbody>
+</table>
+<div class="sect1">
+<h2 id="_read_methods"><a class="anchor" href="#_read_methods"></a>Read Methods</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Annotating a method with the <a href="../api/io/micronaut/management/endpoint/Read.html">Read</a> annotation will cause it to respond to <code>GET</code> requests.</p>
+</div>
+<div class="listingblock">
+<div class="title">CurrentDateEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Read
+
+@Endpoint(id = "date",
+        prefix = "custom",
+        defaultEnabled = true,
+        defaultSensitive = false)
+class CurrentDateEndpoint {
+
+    Date currentDate
+
+    @Read
+    Date currentDate() {
+        return currentDate
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above method responds to the following request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X GET localhost:55838/date
+
+1526085903689</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/management/endpoint/Read.html">Read</a> annotation accepts an optional <code>produces</code> argument, which sets the media type returned from the method (default is <code>application/json</code>):</p>
+</div>
+<div class="listingblock">
+<div class="title">CurrentDateEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Read
+
+@Endpoint(id = "date",
+        prefix = "custom",
+        defaultEnabled = true,
+        defaultSensitive = false)
+class CurrentDateEndpoint {
+
+    Date currentDate
+
+    @Read(produces = MediaType.TEXT_PLAIN) <i class="conum" data-value="1"></i><b>(1)</b>
+    String currentDatePrefix(@Selector String prefix) {
+        return "${prefix}: ${currentDate}"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>Supported media types are represented by <a href="../api/io/micronaut/http/MediaType.html">MediaType</a></td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The above method responds to the following request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X GET localhost:8080/date/the_date_is
+
+the_date_is: Fri May 11 19:24:21 CDT</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_write_methods"><a class="anchor" href="#_write_methods"></a>Write Methods</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Annotating a method with the <a href="../api/io/micronaut/management/endpoint/Write.html">Write</a> annotation will cause it to respond to <code>POST</code> requests.</p>
+</div>
+<div class="listingblock">
+<div class="title">CurrentDateEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Write
+import io.micronaut.http.MediaType
+import io.micronaut.management.endpoint.annotation.Selector
+
+
+@Endpoint(id = "date",
+        prefix = "custom",
+        defaultEnabled = true,
+        defaultSensitive = false)
+class CurrentDateEndpoint {
+
+    Date currentDate
+
+    @Write
+    String reset() {
+        currentDate = new Date()
+
+        return "Current date reset"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above method responds to the following request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X POST http://localhost:39357/date
+
+Current date reset</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/management/endpoint/Write.html">Write</a> annotation accepts an optional <code>consumes</code> argument, which sets the media type accepted by the method (default is <code>application/json</code>):</p>
+</div>
+<div class="listingblock">
+<div class="title">MessageEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Write
+import io.micronaut.http.MediaType
+
+@Endpoint(id = "message", defaultSensitive = false)
+class MessageEndpoint {
+
+    String message
+
+    @Write(consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+    String updateMessage(String newMessage) {  <i class="conum" data-value="1"></i><b>(1)</b>
+        message = newMessage
+
+        return "Message updated"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above method responds to the following request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X POST http://localhost:65013/message -H 'Content-Type: application/x-www-form-urlencoded' -d $'newMessage=A new message'
+
+Message updated</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_delete_methods"><a class="anchor" href="#_delete_methods"></a>Delete Methods</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Annotating a method with the <a href="../api/io/micronaut/management/endpoint/Delete.html">Delete</a> annotation will cause it to respond to <code>DELETE</code> requests.</p>
+</div>
+<div class="listingblock">
+<div class="title">MessageEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Delete
+
+@Endpoint(id = "message", defaultSensitive = false)
+class MessageEndpoint {
+
+    String message
+
+    @Delete
+    String deleteMessage() {
+        message = null
+
+        return "Message deleted"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above method responds to the following request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X DELETE http://localhost:65013/message
+
+Message deleted</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="endpointConfiguration"><a class="anchor" href="#endpointConfiguration"></a>14.1.3 Endpoint Configuration</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/buildingEndpoints/endpointConfiguration.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Endpoints with the <code>endpoints</code> prefix can be configured through their default endpoint id. If an endpoint exists with the id of <code>foo</code>, it can be configured through <code>endpoints.foo</code>. In addition, default values can be provided through the <code>all</code> prefix.</p>
+</div>
+<div class="paragraph">
+<p>For example, consider the following endpoint.</p>
+</div>
+<div class="listingblock">
+<div class="title">FooEndpoint.java</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@Endpoint("foo")
+class FooEndpoint {
+    ...
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>By default the endpoint will be enabled. To disable the endpoint, set <code>endpoints.foo.enabled</code> to false. If <code>endpoints.foo.enabled</code> is not set at all and <code>endpoints.all.enabled</code> is set to false, the endpoint will be disabled.</p>
+</div>
+<div class="paragraph">
+<p>The configuration values for the endpoint override the ones for <code>all</code>. If <code>endpoints.foo.enabled</code> is explicitly set to <code>true</code> and <code>endpoints.all.enabled</code> is explicitly set to <code>false</code>, the endpoint will be enabled.</p>
+</div>
+<div class="paragraph">
+<p>For all endpoints, the following configuration values can be set.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    &lt;any endpoint id&gt;:
+        enabled: Boolean
+        sensitive: Boolean</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+The base path for all endpoints is <code>/</code> by default. If you prefer the endpoints to be available under a different base path, configure <code>endpoints.all.path</code>. For example, if the value is set to <code>/endpoints</code>, the foo endpoint will be accessible at <code>/endpoints/foo</code>.
+</td>
+</tr>
+</table>
+</div>
+
+<h2 id="providedEndpoints"><a class="anchor" href="#providedEndpoints"></a>14.2 Built-In Endpoints</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>When the <code>management</code> dependency is added to your project, the following built-in endpoints are enabled by default:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Default Endpoints</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Endpoint</th>
+<th class="tableblock halign-left valign-top">URI</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/beans/BeansEndpoint.html">BeansEndpoint</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/beans</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Returns information about the loaded bean definitions in the application (see <a href="#beansEndpoint">BeansEndpoint</a>)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/health/HealthEndpoint.html">HealthEndpoint</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/health</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Returns information about the "health" of the application (see <a href="#healthEndpoint">HealthEndpoint</a>)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/info/InfoEndpoint.html">InfoEndpoint</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/info</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Returns static information from the state of the application (see <a href="#infoEndpoint">InfoEndpoint</a>)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/loggers/LoggersEndpoint.html">LoggersEndpoint</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/loggers</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Returns information about available loggers and permits changing the configured log level (see <a href="#loggersEndpoint">LoggersEndpoint</a>)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/configuration/metrics/management/endpoint/MetricsEndpoint.html">MetricsEndpoint</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/metrics</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Return the <a href="#metricsEndpoint">application metrics</a>. Requires the <code>micrometer-core</code> configuration on the classpath.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/refresh/RefreshEndpoint.html">RefreshEndpoint</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/refresh</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Refreshes the application state (see <a href="#refreshEndpoint">RefreshEndpoint</a>)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/routes/RoutesEndpoint.html">RoutesEndpoint</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/routes</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Returns information about URIs available to be called for your application (see <a href="#routesEndpoint">RoutesEndpoint</a>)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/env/EnvironmentEndpoint.html">EnvironmentEndpoint</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/env</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Returns information about the environment and its property sources (see <a href="#environmentEndpoint">EnvironmentEndpoint</a>)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/threads/ThreadDumpEndpoint.html">ThreadDumpEndpoint</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/env</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Returns information about the current threads in the application)</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>In addition, the following built-in endpoint(s) are provided by the <code>management</code> dependency but are not enabled by default:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 2. Disabled Endpoints</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Endpoint</th>
+<th class="tableblock halign-left valign-top">URI</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/caches/CachesEndpoint.html">CachesEndpoint</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/caches</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Returns information about the caches and permits invalidating them (see <a href="#cachesEndpoint">CachesEndpoint</a>)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/stop/ServerStopEndpoint.html">ServerStopEndpoint</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>/stop</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Shuts down the application server (see <a href="#stopEndpoint">ServerStopEndpoint</a>)</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+It is possible to open all endpoints for unauthenticated access defining <code>endpoints.all.sensitive: false</code> but
+this should be used with care because private and sensitive information will be exposed.
+</td>
+</tr>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_jmx"><a class="anchor" href="#_jmx"></a>JMX</h3>
+<div class="paragraph">
+<p>Micronaut provides functionality to register endpoints with JMX. See the section on <a href="#jmx">JMX</a> to get started.</p>
+</div>
+</div>
+
+<h2 id="beansEndpoint"><a class="anchor" href="#beansEndpoint"></a>14.2.1 The Beans Endpoint</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints/beansEndpoint.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The beans endpoint returns information about the loaded bean definitions in the application. The bean data returned by default is an object where the key is the bean definition class name and the value is an object of properties about the bean.</p>
+</div>
+<div class="paragraph">
+<p>To execute the beans endpoint, send a GET request to /beans.</p>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To configure the beans endpoint, supply configuration through <code>endpoints.beans</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Beans Endpoint Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    beans:
+        enabled: Boolean
+        sensitive: Boolean</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customization"><a class="anchor" href="#_customization"></a>Customization</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The beans endpoint is composed of a bean definition data collector and a bean data implementation. The bean definition data collector (<a href="../api/io/micronaut/management/endpoint/beans/BeanDefinitionDataCollector.html">BeanDefinitionDataCollector</a>) is responsible for returning a publisher that will return the data used in the response. The bean definition data (<a href="../api/io/micronaut/management/endpoint/beans/BeanDefinitionData.html">BeanDefinitionData</a>) is responsible for returning data about an individual bean definition.</p>
+</div>
+<div class="paragraph">
+<p>To override the default behavior for either of the helper classes, either extend the default implementations (<a href="../api/io/micronaut/management/endpoint/beans/impl/RxJavaBeanDefinitionDataCollector.html">RxJavaBeanDefinitionDataCollector</a>, <a href="../api/io/micronaut/management/endpoint/beans/impl/DefaultBeanDefinitionData.html">DefaultBeanDefinitionData</a>), or implement the relevant interface directly. To ensure your implementation is used instead of the default, add the <a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a> annotation to your class with the value being the default implementation.</p>
+</div>
+</div>
+</div>
+
+<h2 id="infoEndpoint"><a class="anchor" href="#infoEndpoint"></a>14.2.2 The Info Endpoint</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints/infoEndpoint.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The info endpoint returns static information from the state of the application. The info exposed can be provided by any number of "info sources".</p>
+</div>
+<div class="paragraph">
+<p>To execute the info endpoint, send a GET request to /info.</p>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To configure the info endpoint, supply configuration through <code>endpoints.info</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Info Endpoint Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    info:
+        enabled: Boolean
+        sensitive: Boolean</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customization"><a class="anchor" href="#_customization"></a>Customization</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The info endpoint consists of an info aggregator and any number of info sources. To add an info source, simply create a bean class that implements <a href="../api/io/micronaut/management/endpoint/info/InfoSource.html">InfoSource</a>.  If your info source needs to retrieve data from Java properties files, you can extend the <a href="../api/io/micronaut/management/endpoint/info/source/PropertiesInfoSource.html">PropertiesInfoSource</a> interface which provides a helper method for this purpose.</p>
+</div>
+<div class="paragraph">
+<p>All of the info source beans will be collected together with the info aggregator. To provide your own implementation of the info aggregator, create a class that implements <a href="../api/io/micronaut/management/endpoint/info/InfoAggregator.html">InfoAggregator</a> and register it as a bean. To ensure your implementation is used instead of the default, add the <a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a> annotation to your class with the value being the <a href="../api/io/micronaut/management/endpoint/info/impl/RxInfoAggregator.html">default implementation</a>.</p>
+</div>
+<div class="paragraph">
+<p>The default info aggregator returns map containing the combined properties returned by all the info sources. This map is returned as JSON from the /info endpoint.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_provided_info_sources"><a class="anchor" href="#_provided_info_sources"></a>Provided Info Sources</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_configuration_info_source"><a class="anchor" href="#_configuration_info_source"></a>Configuration Info Source</h3>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/management/endpoint/info/source/ConfigurationInfoSource.html">ConfigurationInfoSource</a> will return configuration properties under the <code>info</code> key. In addition to string, integer and boolean values, more complex properties can be exposed as maps in the JSON output (if the configuration format supports it).</p>
+</div>
+<div class="listingblock">
+<div class="title">Info Source Example (<code>application.groovy</code>)</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">info.demo.string = "demo string"
+info.demo.number = 123
+info.demo.map = [key: 'value', other_key: 123]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above config will result in the following JSON response from the info endpoint:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-json hljs" data-lang="json">{
+  "demo": {
+    "string": "demo string",
+    "number": 123,
+    "map": {
+      "key": "value",
+      "other_key": 123
+    }
+  }
+}</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_configuration_2"><a class="anchor" href="#_configuration_2"></a>Configuration</h4>
+<div class="paragraph">
+<p>The configuration info source can be disabled using the <code>endpoints.info.config.enabled</code> property.</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_git_info_source"><a class="anchor" href="#_git_info_source"></a>Git Info Source</h3>
+<div class="paragraph">
+<p>If a <code>git.properties</code> file is available on the classpath, the <a href="../api/io/micronaut/management/endpoint/info/source/GitInfoSource.html">GitInfoSource</a> will expose the values in that file under the <code>git</code> key. Generating of a <code>git.properties</code> file will need to be configured as part of your build. One easy option for Gradle users is the <a href="https://plugins.gradle.org/plugin/com.gorylenko.gradle-git-properties">Gradle Git Properties Plugin</a>. Maven users can look at the <a href="https://github.com/git-commit-id/maven-git-commit-id-plugin">Maven Git Commit Id Plugin</a>.</p>
+</div>
+<div class="sect3">
+<h4 id="_configuration_3"><a class="anchor" href="#_configuration_3"></a>Configuration</h4>
+<div class="paragraph">
+<p>To specify an alternate path/name of the properties file, you can supply a custom value in the <code>endpoints.info.git.location</code> property.</p>
+</div>
+<div class="paragraph">
+<p>The git info source can be disabled using the <code>endpoints.info.git.enabled</code> property.</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_build_info_source"><a class="anchor" href="#_build_info_source"></a>Build Info Source</h3>
+<div class="paragraph">
+<p>If a <code>META-INF/build-info.properties</code> file is available on the classpath, the <a href="../api/io/micronaut/management/endpoint/info/source/BuildInfoSource.html">BuildInfoSource</a> will expose the values in that file under the <code>build</code> key. Generating of a <code>build-info.properties</code> file will need to be configured as part of your build. One easy option for Gradle users is the <a href="https://plugins.gradle.org/plugin/com.pasam.gradle.buildinfo">Gradle Build Info Plugin</a>. Another option for Maven users is the <a href="https://docs.spring.io/spring-boot/docs/current/maven-plugin/examples/build-info.html">Spring Boot Maven Plugin</a></p>
+</div>
+<div class="sect3">
+<h4 id="_configuration_4"><a class="anchor" href="#_configuration_4"></a>Configuration</h4>
+<div class="paragraph">
+<p>To specify an alternate path/name of the properties file, you can supply a custom value in the <code>endpoints.info.build.location</code> property.</p>
+</div>
+<div class="paragraph">
+<p>The build info source can be disabled using the <code>endpoints.info.build.enabled</code> property.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="healthEndpoint"><a class="anchor" href="#healthEndpoint"></a>14.2.3 The Health Endpoint</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints/healthEndpoint.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The health endpoint returns information about the "health" of the application. The application health is determined by any number of "health indicators".</p>
+</div>
+<div class="paragraph">
+<p>To execute the health endpoint, send a GET request to /health.</p>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To configure the health endpoint, supply configuration through <code>endpoints.health</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Health Endpoint Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    health:
+        enabled: Boolean
+        sensitive: Boolean
+        details-visible: String <i class="conum" data-value="1"></i><b>(1)</b>
+        status:
+            http-mapping: Map&lt;String, HttpStatus&gt;</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>One of <a href="../api/io/micronaut/management/endpoint/health/DetailsVisibility.html">DetailsVisibility</a></td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The <code>details-visible</code> setting is used to control whether health detail should be exposed to users who are not authenticated.</p>
+</div>
+<div class="paragraph">
+<p>For example setting:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using <code>details-visible</code></div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    health:
+        details-visible: ANONYMOUS</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Will expose detailed information read from the various health indicators about the health status of the application to anonymous unauthenticated users.</p>
+</div>
+<div class="paragraph">
+<p>The <code>endpoints.health.status.http-mapping</code> setting can be used to control what status codes are returned for each health status. The defaults are described in the table below:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Status</th>
+<th class="tableblock halign-left valign-top">HTTP Code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/health/HealthStatus.html#UP">UP</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/http/HttpStatus.html#OK">OK</a> (200)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/health/HealthStatus.html#UNKNOWN">UNKNOWN</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/http/HttpStatus.html#OK">OK</a> (200)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/health/HealthStatus.html#DOWN">DOWN</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/http/HttpStatus.html#SERVICE_UNAVAILABLE">SERVICE_UNAVAILABLE</a> (503)</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>You can provide custom mappings in <code>application.yml</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">Custom Health Status Codes</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    health:
+        status:
+            http-mapping:
+                DOWN: 200</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above will return <a href="../api/io/micronaut/http/HttpStatus.html#OK">OK</a> (200) even when the <a href="../api/io/micronaut/health/HealthStatus.html">HealthStatus</a> is <a href="../api/io/micronaut/health/HealthStatus.html#DOWN">DOWN</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customization"><a class="anchor" href="#_customization"></a>Customization</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The health endpoint consists of a health aggregator and any number of health indicators. To add a health indicator, simply create a bean class that implements <a href="../api/io/micronaut/management/health/indicator/HealthIndicator.html">HealthIndicator</a>. A base class <a href="../api/io/micronaut/management/health/indicator/AbstractHealthIndicator.html">AbstractHealthIndicator</a> has been provided for you to extend to make the process easier.</p>
+</div>
+<div class="paragraph">
+<p>All of the health indicator beans will be collected together with the health aggregator. To provide your own implementation of the health aggregator, create a class that implements <a href="../api/io/micronaut/management/health/aggregator/HealthAggregator.html">HealthAggregator</a> and register it as a bean. To ensure your implementation is used instead of the default, add the <a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a> annotation to your class with the value being the <a href="../api/io/micronaut/management/health/aggregator/RxJavaHealthAggregator.html">default implementation</a>.</p>
+</div>
+<div class="paragraph">
+<p>The default health aggregator returns an overall status that is calculated based on the health statuses of the indicators. A <a href="../api/io/micronaut/health/HealthStatus.html">health status</a> consists of several pieces of information.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The name of the status</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Description</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The description of the status</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Operational</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether the functionality the indicator represents is functional</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Severity</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">How severe the status is. A higher number is more severe</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The "worst" status will be returned as the overall status. A non operational status will be selected over an operational status. A higher severity will be selected over a lower severity.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_provided_indicators"><a class="anchor" href="#_provided_indicators"></a>Provided Indicators</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_disk_space"><a class="anchor" href="#_disk_space"></a>Disk Space</h3>
+<div class="paragraph">
+<p>A health indicator is provided that determines the health of the application based on the amount of free disk space. Configuration for the disk space health indicator can be provided under the <code>endpoints.health.disk-space</code> key.</p>
+</div>
+<div class="listingblock">
+<div class="title">Disk Space Indicator Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    health:
+        disk-space:
+            enabled: Boolean
+            path: String #The file path used to determine the disk space
+            threshold: String | Long #The minimum amount of free space</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The threshold can be provided as a string like "10MB" or "200KB", or the number of bytes.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_jdbc"><a class="anchor" href="#_jdbc"></a>JDBC</h3>
+<div class="paragraph">
+<p>The JDBC health indicator determines the health of your application based on the ability to successfully create connections to datasources in the application context. The only configuration option supported is to enable or disable the indicator by the <code>endpoints.health.jdbc.enabled</code> key.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_discovery_client"><a class="anchor" href="#_discovery_client"></a>Discovery Client</h3>
+<div class="paragraph">
+<p>If your application is using service discovery, a health indicator will be included to monitor the health of the discovery client. The data returned can include a list of the services available.</p>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="metricsEndpoint"><a class="anchor" href="#metricsEndpoint"></a>14.2.4 The Metrics Endpoint</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints/metricsEndpoint.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Micronaut includes the ability to expose Metrics via integration with <a href="http://micrometer.io">Micrometer</a>.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">Using the CLI</div>
+<div class="paragraph">
+<p>If you are creating your project using the Micronaut CLI, supply one of <code>micrometer-atlas</code>, <code>micrometer-graphite</code>, <code>micrometer-prometheus</code>, or <code>micrometer-statsd</code> features to enable metrics and preconfigure the selected registery in your project:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ mn create-app my-app --features micrometer-atlas</pre>
+</div>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The metrics endpoint returns information about the "metrics" of the application. To execute the metrics endpoint, send a GET request to <code>/metrics</code>. This will return a list of availble metric names.</p>
+</div>
+<div class="paragraph">
+<p>You can get specific metrics by using <code>/metrics/[name]</code> such as <code>/metrics/jvm.memory.used</code>.</p>
+</div>
+<div class="paragraph">
+<p>See the documentation for <a href="https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/">Micronaut Micrometer</a> for information on how to configure, expose and customize metrics output.</p>
+</div>
+
+<h2 id="refreshEndpoint"><a class="anchor" href="#refreshEndpoint"></a>14.2.5 The Refresh Endpoint</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints/refreshEndpoint.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The refresh endpoint will refresh the application state, causing all <a href="../api/io/micronaut/runtime/context/scope/Refreshable.html">Refreshable</a> beans in the context to be destroyed and reinstantiated upon further requests. This is accomplished by publishing a <a href="../api/io/micronaut/runtime/context/scope/refresh/RefreshEvent.html">RefreshEvent</a> in the Application Context.</p>
+</div>
+<div class="paragraph">
+<p>To execute the refresh endpoint, send a POST request to /refresh.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X POST http://localhost:8080/refresh</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>When executed without a body, the endpoint will first refresh the <a href="../api/io/micronaut/context/env/Environment.html">Environment</a> and perform a diff to detect any changes, and will then only perform the refresh if changes are detected. To skip this check and refresh all <code>@Refreshable</code> beans regardless of environment changes (e.g., to force refresh of cached responses from third-party services), you can supply a <code>force</code> parameter in the POST request body.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X POST http://localhost:8080/refresh -H 'Content-Type: application/json' -d '{"force": true}'</code></pre>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To configure the refresh endpoint, supply configuration through <code>endpoints.refresh</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Beans Endpoint Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    refresh:
+        enabled: Boolean
+        sensitive: Boolean</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="routesEndpoint"><a class="anchor" href="#routesEndpoint"></a>14.2.6 The Routes Endpoint</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints/routesEndpoint.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The routes endpoint returns information about URIs available to be called for your application. By default the data returned includes the URI, allowed method, content types produced, and information about the method that would be executed.</p>
+</div>
+<div class="paragraph">
+<p>To execute the routes endpoint, send a GET request to /routes.</p>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To configure the routes endpoint, supply configuration through <code>endpoints.routes</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Routes Endpoint Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    routes:
+        enabled: Boolean
+        sensitive: Boolean</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customization"><a class="anchor" href="#_customization"></a>Customization</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The routes endpoint is composed of a route data collector and a route data implementation. The route data collector (<a href="../api/io/micronaut/management/endpoint/routes/RouteDataCollector.html">RouteDataCollector</a>) is responsible for returning a publisher that will return the data used in the response. The route data (<a href="../api/io/micronaut/management/endpoint/routes/RouteData.html">RouteData</a>) is responsible for returning data about an individual route.</p>
+</div>
+<div class="paragraph">
+<p>To override the default behavior for either of the helper classes, either extend the default implementations (<a href="../api/io/micronaut/management/endpoint/routes/impl/RxJavaRouteDataCollector.html">RxJavaRouteDataCollector</a>, <a href="../api/io/micronaut/management/endpoint/routes/impl/DefaultRouteData.html">DefaultRouteData</a>), or implement the relevant interface directly. To ensure your implementation is used instead of the default, add the <a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a> annotation to your class with the value being the default implementation.</p>
+</div>
+</div>
+</div>
+
+<h2 id="loggersEndpoint"><a class="anchor" href="#loggersEndpoint"></a>14.2.7 The Loggers Endpoint</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints/loggersEndpoint.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The loggers endpoint returns information about the available loggers in the application and
+permits configuring the their log level.</p>
+</div>
+<div class="paragraph">
+<p>To get a collection of all loggers by name with their configured and effective log levels,
+send a GET request to /loggers. This will also provide a list of the available log levels.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl http://localhost:8080/loggers
+
+{
+    "levels": [
+        "ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "OFF", "NOT_SPECIFIED"
+    ],
+    "loggers": {
+        "ROOT": {
+            "configuredLevel": "INFO",
+            "effectiveLevel": "INFO"
+        },
+        "io": {
+            "configuredLevel": "NOT_SPECIFIED",
+            "effectiveLevel": "INFO"
+        },
+        "io.micronaut": {
+            "configuredLevel": "NOT_SPECIFIED",
+            "effectiveLevel": "INFO"
+        },
+        // etc...
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To get the log levels of a particular logger, include the logger name in your GET request. For
+example, to access the log levels of the logger 'io.micronaut.http':</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl http://localhost:8080/loggers/io.micronaut.http
+
+{
+    "configuredLevel": "NOT_SPECIFIED",
+    "effectiveLevel": "INFO"
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If the named logger does not exist, it will be created with an unspecified (i.e. <code>NOT_SPECIFIED</code>)
+configured log level. (It&#8217;s effective log level will usually be that of the root logger.)</p>
+</div>
+<div class="paragraph">
+<p>To update the log level of a single logger, send a POST request to the named logger URL and include
+a body providing the log level to configure.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -i -X POST
+       -H "Content-Type: application/json" \
+       -d '{ "configuredLevel": "ERROR" }' \
+       http://localhost:8080/loggers/ROOT
+
+HTTP/1.1 200 OK
+
+$ curl http://localhost:8080/loggers/ROOT
+
+{
+    "configuredLevel": "ERROR",
+    "effectiveLevel": "ERROR"
+}</code></pre>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To configure the loggers endpoint, supply configuration through <code>endpoints.loggers</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Loggers Endpoint Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    loggers:
+        enabled: Boolean
+        sensitive: Boolean</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customization"><a class="anchor" href="#_customization"></a>Customization</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The loggers endpoint is composed of two customizable parts: a loggers manager and a logging system.</p>
+</div>
+<div class="paragraph">
+<p>The loggers manager
+(<a href="../api/io/micronaut/management/endpoint/loggers/LoggersManager.html">LoggersManager</a>)
+is responsible for returning a Publisher that will return data collected and transformed for the response,
+and it is also responsible for updating a logger with a new log level.</p>
+</div>
+<div class="paragraph">
+<p>To override the default behavior for the loggers manager, either extend the default implementation
+(<a href="../api/io/micronaut/management/endpoint/loggers/impl/DefaultLoggersManager.html">DefaultLoggersManager</a>)
+or implement the <a href="../api/io/micronaut/management/endpoint/loggers/LoggersManager.html">LoggersManager</a>
+interface directly. To ensure your implementation is used instead of the default, add the
+<a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a> annotation to your class with the
+value being the default implementation.</p>
+</div>
+<div class="paragraph">
+<p>The logging system
+(<a href="../api/io/micronaut/management/endpoint/loggers/LoggingSystem.html">LoggingSystem</a>)
+is responsible for processing requests from the loggers manager against a particular logging
+library (e.g. logback, log4j, etc.)</p>
+</div>
+<div class="paragraph">
+<p>The current default implementation for the logging system is
+<a href="../api/io/micronaut/management/endpoint/loggers/impl/LogbackLoggingSystem.html">LogbackLoggingSystem</a>,
+which works with the <a href="https://logback.qos.ch/">logback</a> logging framework. Additional logging systems will
+be implemented in future revisions of Micronaut. For custom logging system behavior, implement
+the <a href="../api/io/micronaut/management/endpoint/loggers/LoggingSystem.html">LoggingSystem</a> interface directly.
+To ensure your implementation is used instead of the default, add the
+<a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a> annotation to your class with the
+value being the default implementation.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@Singleton
+@Replaces(LogbackLoggingSystem.class)
+public class CustomLoggingSystem implements LoggingSystem {
+    // ...
+}</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="cachesEndpoint"><a class="anchor" href="#cachesEndpoint"></a>14.2.8 The Caches Endpoint</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints/cachesEndpoint.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The caches endpoint returns information about the caches in the application and
+permits invalidating them.</p>
+</div>
+<div class="paragraph">
+<p>To get a collection of all caches by name with their configuration, send a GET request to /caches.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl http://localhost:8080/caches</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To get the configuration of a particular cache, include the cache name in your GET request. For
+example, to access the configuration of the cache 'book-cache':</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl http://localhost:8080/caches/book-cache</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To invalidate all cached values within a single cache, send a DELETE request to the named cache URL.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X DELETE http://localhost:8080/caches/book-cache</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To invalidate all caches, send a DELETE request to /caches.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X DELETE http://localhost:8080/caches</code></pre>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To configure the caches endpoint, supply configuration through <code>endpoints.caches</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Caches Endpoint Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    caches:
+        enabled: Boolean
+        sensitive: Boolean</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customization"><a class="anchor" href="#_customization"></a>Customization</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The caches endpoint is composed of a cache data collector and a cache data implementation.
+The cache data collector (<a href="../api/io/micronaut/management/endpoint/caches/CacheDataCollector.html">CacheDataCollector</a>)
+is responsible for returning a publisher that will return the data used in the response.
+The cache data (<a href="../api/io/micronaut/management/endpoint/caches/CacheData.html">CacheData</a>) is responsible for returning
+data about an individual cache.</p>
+</div>
+<div class="paragraph">
+<p>To override the default behavior for either of the helper classes, either extend the default implementations
+(<a href="../api/io/micronaut/management/endpoint/caches/impl/RxJavaCacheDataCollector.html">RxJavaRouteDataCollector</a>, <a href="../api/io/micronaut/management/endpoint/caches/impl/DefaultCacheData.html">DefaultRouteData</a>),
+or implement the relevant interface directly.
+To ensure your implementation is used instead of the default, add the <a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a>
+annotation to your class with the value being the default implementation.</p>
+</div>
+</div>
+</div>
+
+<h2 id="stopEndpoint"><a class="anchor" href="#stopEndpoint"></a>14.2.9 The Server Stop Endpoint</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints/stopEndpoint.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The stop endpoint shuts down the application server.</p>
+</div>
+<div class="paragraph">
+<p>To execute the stop endpoint, send a POST request to /stop.</p>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To configure the stop endpoint, supply configuration through <code>endpoints.stop</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Stop Endpoint Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    stop:
+        enabled: Boolean
+        sensitive: Boolean</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+By default, the stop endpoint is disabled and needs to be explicitly enabled to be used.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+
+<h2 id="environmentEndpoint"><a class="anchor" href="#environmentEndpoint"></a>14.2.10 The Environment Endpoint</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints/environmentEndpoint.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The environment endpoint returns information about the <a href="../api/io/micronaut/context/env/Environment.html">Environment</a> and its <a href="../api/io/micronaut/context/env/PropertySource.html">PropertySource</a>s.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Properties that may contain sensitive data will be masked.
+</td>
+</tr>
+</table>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To configure the info endpoint, supply configuration through <code>endpoints.info</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Environment Endpoint Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    env:
+        enabled: Boolean    # default: true
+        sensitive: Boolean  # default: true</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_getting_information_about_the_environment"><a class="anchor" href="#_getting_information_about_the_environment"></a>Getting information about the environment</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To execute the endpoint, send a <code>GET</code> request to <code>/env</code>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_getting_information_about_a_particular_code_propertysource_code"><a class="anchor" href="#_getting_information_about_a_particular_code_propertysource_code"></a>Getting information about a particular <code>PropertySource</code></h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To execute the endpoint, send a <code>GET</code> request to <code>/env/{propertySourceName}</code>.</p>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../guide/languageSupport.html">&lt;&lt; <strong>13</strong><span>Language Support</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../guide/security.html"><strong>15</strong><span>Security</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

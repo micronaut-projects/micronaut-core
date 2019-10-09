@@ -1,0 +1,372 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>9.1.2 FunctionBean 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/cloud.html">&lt;&lt; <strong>8</strong><span>Cloud Native Features</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>9.1.2 FunctionBean</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="functionBean"><a class="anchor" href="#functionBean"></a>9.1.2 FunctionBean</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/serverlessFunctions/writingFunctions/functionBean.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+This section applies to Java &amp; Kotlin functions - for functions written in Groovy, see <a href="#groovyFunctions">Groovy Functions</a>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>To write your function&#8217;s behavior, annotate your class with the <a href="../api/io/micronaut/function/FunctionBean.html">@FunctionBean</a> annotation. Your class must also implement one of the interfaces from the <code>java.util.function</code> package.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+If you have the Micronaut CLI installed you can quickly create a Java function with <code>mn create-function hello-world</code> or <code>mn create-function hello-world --lang kotlin</code> for Kotlin
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The following examples implement Java&#8217;s <a href="https://docs.oracle.com/javase/8/docs/api/java/util/function/Supplier.html">Supplier</a> functional interface.</p>
+</div>
+<div class="listingblock">
+<div class="title">Example Java Function</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">package example;
+
+import io.micronaut.function.FunctionBean;
+import java.util.function.Supplier;
+
+@FunctionBean("hello-world-java")
+public class HelloJavaFunction implements Supplier&lt;String&gt; {
+
+    @Override
+    public String get() { <i class="conum" data-value="1"></i><b>(1)</b>
+        return "Hello world!";
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>Override the <code>get</code> method of <a href="https://docs.oracle.com/javase/8/docs/api/java/util/function/Supplier.html">Supplier</a> to return the response from your function.</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Alternatively you can also define a <a href="../api/io/micronaut/context/annotation/Factory.html">Factory</a> that returns a Java lambda:</p>
+</div>
+<div class="listingblock">
+<div class="title">Example Java Function as a Lambda</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">package example;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.function.FunctionBean;
+import java.util.function.Supplier;
+
+@Factory <i class="conum" data-value="1"></i><b>(1)</b>
+public class MyFunctions {
+
+    @FunctionBean("hello-world-java")
+    public Supplier&lt;String&gt; helloWorld() { <i class="conum" data-value="2"></i><b>(2)</b>
+        return () -&gt; "Hello world!";
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>A <a href="../api/io/micronaut/context/annotation/Factory.html">Factory</a> bean is defined</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The <a href="../api/io/micronaut/function/FunctionBean.html">@FunctionBean</a> annotation is used on a method that returns the function.</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>If you are using Kotlin then process is exactly the same:</p>
+</div>
+<div class="listingblock">
+<div class="title">Example Kotlin Function</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-kotlin hljs" data-lang="kotlin">package example
+
+import io.micronaut.function.FunctionBean
+import java.util.function.Supplier
+
+@FunctionBean("hello-world-kotlin")
+class HelloKotlinFunction : Supplier&lt;String&gt; {
+
+    override fun get(): String { <i class="conum" data-value="1"></i><b>(1)</b>
+        return "Hello world!"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>Override the <code>get</code> method of <a href="https://docs.oracle.com/javase/8/docs/api/java/util/function/Supplier.html">Supplier</a> to return the response from your function.</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The following table summarizes the supported interfaces:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Functional Interfaces</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Interface</th>
+<th class="tableblock halign-left valign-top">Dependency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="https://docs.oracle.com/javase/8/docs/api/java/util/function/Supplier.html">Supplier</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Accepts no arguments and returns a single result</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="https://docs.oracle.com/javase/8/docs/api/java/util/function/Consumer.html">Consumer</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Accepts a single argument and returns no result</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="https://docs.oracle.com/javase/8/docs/api/java/util/function/BiConsumer.html">BiConsumer</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Accepts two arguments and returns no result</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="https://docs.oracle.com/javase/8/docs/api/java/util/function/Function.html">Function</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Accepts a single argument and returns a single result</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="https://docs.oracle.com/javase/8/docs/api/java/util/function/BiFunction.html">BiFunction</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Accepts two arguments and returns a single result</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>In addition, functions have an input and/or an output. The input is represented by the accepted argument and represents the body consumed by the function and the output is represented by the return value of the function. The input and the output should be either a Java primitive or simple type (<code>int</code>, <code>String</code> etc.) or a POJO.</p>
+</div>
+<div class="paragraph">
+<p>Often, you want to accept a POJO and return a POJO. Use <code>java.util.function.Function</code> to accept a single argument and return a single result.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">import io.micronaut.function.FunctionBean;
+import java.util.function.Function;
+
+@FunctionBean("isbn-validator")
+public class IsbnValidatorFunction implements Function&lt;IsbnValidationRequest, IsbnValidationResponse&gt; {
+
+    @Override
+    public IsbnValidationResponse apply(IsbnValidationRequest request) {
+        return new IsbnValidationResponse();
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>A single project can define multiple functions, however only a single function should be configured for execution by the application. This can be configured using the <code>micronaut.function.name</code> property in <code>application.yml</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">Configuring the Function Name to Execute</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    function:
+        name: hello-world-java</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Alternatively you can specify the value when running your function (for example in the <code>Dockerfile</code>) either as an environment variable:</p>
+</div>
+<div class="listingblock">
+<div class="title">Specifying the Function to Execute as a Environment variable</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ export MICRONAUT_FUNCTION_NAME=hello-world-java
+$ java -jar build/libs/hello-world-function-all.jar</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Or as a system property:</p>
+</div>
+<div class="listingblock">
+<div class="title">Specifying the Function to Execute as a System property</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ java -Dmicronaut.function.name=hello-world-java -jar build/libs/hello-world-function-all.jar</code></pre>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/cloud.html">&lt;&lt; <strong>8</strong><span>Cloud Native Features</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

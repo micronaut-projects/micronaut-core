@@ -1,0 +1,40 @@
+++++
+<a id="io.micronaut.http.server.HttpServerConfiguration$MultipartConfiguration" href="#io.micronaut.http.server.HttpServerConfiguration$MultipartConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.server.HttpServerConfiguration$MultipartConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.server.multipart.location+`
+|java.io.File
+|Sets the location to store files.
+
+
+| `+micronaut.server.multipart.max-file-size+`
+|long
+|Sets the max file size. Default value (1024 * 1024 => 1MB).
+
+
+| `+micronaut.server.multipart.enabled+`
+|boolean
+|Sets whether multipart processing is enabled. Default value (false).
+
+
+| `+micronaut.server.multipart.disk+`
+|boolean
+|Sets whether to buffer data to disk or not. Default value (false).
+
+
+| `+micronaut.server.multipart.mixed+`
+|boolean
+|Sets whether to buffer data to disk if the size is greater than the
+ threshold. Default value (false).
+
+
+| `+micronaut.server.multipart.threshold+`
+|long
+|Sets the amount of data that should be received that will trigger
+ the data to be stored to disk. Default value (1024 * 1024 * 10).
+
+
+|===

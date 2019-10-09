@@ -1,0 +1,14 @@
+
+++++
+<a id="io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration" href="#io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration[]
+|===
+|Property |Type |Description
+
+| `+netty.responses.file.cache-seconds+`
+|int
+|Cache Seconds. Default value (60).
+
+
+|===

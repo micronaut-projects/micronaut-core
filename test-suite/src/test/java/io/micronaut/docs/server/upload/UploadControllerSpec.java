@@ -1,6 +1,5 @@
 package io.micronaut.docs.server.upload;
 
-import io.micronaut.AbstractMicronautSpec;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -66,46 +65,42 @@ public class UploadControllerSpec {
         assertEquals("Uploaded", response.getBody().get());
     }
 
-/*    void "test completed file upload"() {
-        given:
+    @Test
+    public void testCompletedFileUpload() {
         MultipartBody body = MultipartBody.builder()
-                .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, '{"title":"Foo"}'.bytes)
-                .build()
+                .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
+                .build();
 
-        when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/completed", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
-                String
-        ))
-        HttpResponse<String> response = flowable.blockingFirst()
+                String.class
+        ));
+        HttpResponse<String> response = flowable.blockingFirst();
 
-        then:
-        response.code() == HttpStatus.OK.code
-        response.getBody().get() == "Uploaded"
+        assertEquals(HttpStatus.OK.getCode(), response.code());
+        assertEquals("Uploaded", response.getBody().get());
     }
 
-    void "test completed file upload with filename but no bytes"() {
-        given:
+    @Test
+    public void testCompletedFileUploadWithFilenameButNoBytes() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, new byte[0])
-                .build()
+                .build();
 
-        when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/completed", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
-                String
-        ))
-        HttpResponse<String> response = flowable.blockingFirst()
+                String.class
+        ));
+        HttpResponse<String> response = flowable.blockingFirst();
 
-        then:
-        response.code() == HttpStatus.OK.code
-        response.getBody().get() == "Uploaded"
+        assertEquals(HttpStatus.OK.getCode(), response.code());
+        assertEquals("Uploaded", response.getBody().get());
     }
-*/
+
     @Test
     public void testCompletedFileUploadNoNameWithBytes() {
         MultipartBody body = MultipartBody.builder()
@@ -123,65 +118,59 @@ public class UploadControllerSpec {
 
         assertEquals("Required argument [CompletedFileUpload file] not specified", ex.getMessage());
     }
-/*
-    void "test completed file upload with no file name and no bytes"() {
-        given:
+
+    @Test
+    public void testCompletedFileUploadWithNoFileNameAndNoBytes() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "", MediaType.APPLICATION_JSON_TYPE, new byte[0])
-                .build()
+                .build();
 
-        when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/completed", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
-                String
-        ))
-        HttpResponse<String> response = flowable.blockingFirst()
+                String.class
+        ));
 
-        then:
-        def ex = thrown(HttpClientResponseException)
-        ex.message == "Required argument [CompletedFileUpload file] not specified"
+        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockingFirst());
+
+        assertEquals("Required argument [CompletedFileUpload file] not specified", ex.getMessage());
     }
 
-    void "test completed file upload with no part"() {
-        given:
+    @Test
+    public void testCompletedFileUploadWithNoPart() {
         MultipartBody body = MultipartBody.builder()
                 .addPart("filex", "", MediaType.APPLICATION_JSON_TYPE, new byte[0])
-                .build()
+                .build();
 
-        when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/completed", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
-                String
-        ))
-        HttpResponse<String> response = flowable.blockingFirst()
+                String.class
+        ));
 
-        then:
-        def ex = thrown(HttpClientResponseException)
-        ex.message == "Required argument [CompletedFileUpload file] not specified"
+        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockingFirst());
+
+        assertEquals("Required argument [CompletedFileUpload file] not specified", ex.getMessage());
     }
 
-    void "test file bytes upload"() {
-        given:
+    @Test
+    public void testFileBytesUpload() {
         MultipartBody body = MultipartBody.builder()
-                .addPart("file", "file.json", MediaType.TEXT_PLAIN_TYPE, 'some data'.bytes)
+                .addPart("file", "file.json", MediaType.TEXT_PLAIN_TYPE, "some data".getBytes())
                 .addPart("fileName", "bar")
-                .build()
+                .build();
 
-        when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/bytes", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
-                String
-        ))
-        HttpResponse<String> response = flowable.blockingFirst()
+                String.class
+        ));
+        HttpResponse<String> response = flowable.blockingFirst();
 
-        then:
-        response.code() == HttpStatus.OK.code
-        response.getBody().get() == "Uploaded"
-    }*/
+        assertEquals(HttpStatus.OK.getCode(), response.code());
+        assertEquals("Uploaded", response.getBody().get());
+    }
 }

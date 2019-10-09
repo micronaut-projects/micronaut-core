@@ -1,0 +1,23 @@
+++++
+<a id="io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration" href="#io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.ssl.DefaultSslConfiguration$DefaultKeyConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.ssl.key+`
+|api:io.micronaut.http.ssl.SslConfiguration$KeyConfiguration[]
+|Sets the key configuration.
+
+
+| `+micronaut.ssl.key.password+`
+|java.lang.String
+|Sets the password.
+
+
+| `+micronaut.ssl.key.alias+`
+|java.lang.String
+|Sets the alias.
+
+
+|===

@@ -1,0 +1,856 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>17.1 Creating a Project 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/multitenancy.html">&lt;&lt; <strong>16</strong><span>Multi-Tenancy</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>17.1 Creating a Project</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="createProject"><a class="anchor" href="#createProject"></a>17.1 Creating a Project</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/createProject.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Creating a project is the primary usage of the CLI. There are two primary commands for creating new projects: <code>create-app</code> and <code>create-function</code>. Both of these commands will generate a project based upon an associated profile (which can be overridden), and will set the <code>micronaut.application.name</code> configuration property in <code>src/main/resources/application.yml</code>.</p>
+</div>
+<div class="paragraph">
+<p>In addition, there are specialty commands for creating a "federation" of multiple Micronaut services (<code>create-federation</code>) and for creating new profiles for the CLI (<code>create-profile</code>).</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Micronaut CLI Project Creation Commands</caption>
+<colgroup>
+<col style="width: 11.1111%;">
+<col style="width: 22.2222%;">
+<col style="width: 22.2222%;">
+<col style="width: 44.4445%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Command</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Options</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>create-app</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Creates a basic Micronaut application, using the <code>service</code> profile by default.</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="ulist">
+<ul>
+<li>
+<p><code>-p</code>, <code>--profile</code></p>
+</li>
+<li>
+<p><code>-l</code>, <code>--lang</code></p>
+</li>
+<li>
+<p><code>-f</code>, <code>--features</code></p>
+</li>
+<li>
+<p><code>-b</code>, <code>--build</code></p>
+</li>
+<li>
+<p><code>-i</code>, <code>--inplace</code></p>
+</li>
+</ul>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn create-app my-project --features
+ mongo-reactive,security-jwt --build maven</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>create-cli-app</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Creates a command-line Micronaut application, using the <code>cli</code> profile by default.</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="ulist">
+<ul>
+<li>
+<p><code>-p</code>, <code>--profile</code></p>
+</li>
+<li>
+<p><code>-f</code>, <code>--features</code></p>
+</li>
+<li>
+<p><code>-l</code>, <code>--lang</code></p>
+</li>
+<li>
+<p><code>-t</code>, <code>--test</code></p>
+</li>
+<li>
+<p><code>-b</code>, <code>--build</code></p>
+</li>
+<li>
+<p><code>-i</code>, <code>--inplace</code></p>
+</li>
+</ul>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn create-cli-app my-project --features
+ http-client,jdbc-hikari --build maven
+ --lang kotlin --test kotlintest</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>create-function</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Creates a Micronaut serverless function, using the <code>function-aws</code> profile by default.</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="ulist">
+<ul>
+<li>
+<p><code>-p</code>, <code>--provider</code></p>
+</li>
+<li>
+<p><code>-l</code>, <code>--lang</code></p>
+</li>
+<li>
+<p><code>-t</code>, <code>--test</code></p>
+</li>
+<li>
+<p><code>-f</code>, <code>--features</code></p>
+</li>
+<li>
+<p><code>-b</code>, <code>--build</code></p>
+</li>
+<li>
+<p><code>-i</code>, <code>--inplace</code></p>
+</li>
+</ul>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn create-function my-lambda-function
+ --lang groovy --test spock</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>create-federation</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Creates a federation of Micronaut services with shared profile/features.</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="ulist">
+<ul>
+<li>
+<p><code>-s</code>, <code>--services</code></p>
+</li>
+<li>
+<p><code>-p</code>, <code>--profile</code></p>
+</li>
+<li>
+<p><code>-f</code>, <code>--features</code></p>
+</li>
+<li>
+<p><code>-b</code>, <code>--build</code></p>
+</li>
+<li>
+<p><code>-i</code>, <code>--inplace</code></p>
+</li>
+</ul>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn create-federation my-federation
+ --services users,inventory,billing</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>create-profile</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Creates a Micronaut profile</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="ulist">
+<ul>
+<li>
+<p><code>-p</code>, <code>--profile</code></p>
+</li>
+<li>
+<p><code>-f</code>, <code>--features</code></p>
+</li>
+<li>
+<p><code>-i</code>, <code>--inplace</code></p>
+</li>
+</ul>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn create-profile security-service
+ --profile service --features security-jwt</code></pre>
+</div>
+</div></div></td>
+</tr>
+</tbody>
+</table>
+<div class="sect1">
+<h2 id="_create_app"><a class="anchor" href="#_create_app"></a>Create-App</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <code>create-app</code> command will generate a basic Micronaut project, with optional flags to specify features, profile, and build tool. The project will include a default <code>Application</code> class for starting the application.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 2. Create-App Flags</caption>
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 37.5%;">
+<col style="width: 37.5%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-b</code>, <code>--build</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Build tool (one of <code>gradle</code>, <code>maven</code> - default is <code>gradle</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--build maven</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-p</code>, <code>--profile</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Profile to use for the project (default is <code>service</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--profile function-aws</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--features</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Features to use for the project, comma-separated</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">--features security-jwt,mongo-gorm</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>or</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">-f security-jwt -f mongo-gorm</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-i</code>, <code>--inplace</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If present, generates the project in the current directory (project name is optional if this flag is set)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--inplace</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Once created, the application can be started using the <code>Application</code> class, or the appropriate build tool task.</p>
+</div>
+<div class="listingblock">
+<div class="title">Starting a Gradle project</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./gradlew run</code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="title">Starting a Maven project</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./mvnw compile exec:exec</code></pre>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_language_test_features"><a class="anchor" href="#_language_test_features"></a>Language/Test Features</h3>
+<div class="paragraph">
+<p>By default, <code>create-app</code> will generate a Java application, with JUnit configured as the test framework. The language and test framework settings for a given project are stored as the <code>testFramework</code> and <code>sourceLanguage</code> properties in the <code>micronaut-cli.yml</code> file, as shown below:</p>
+</div>
+<div class="listingblock">
+<div class="title">micronaut-cli.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">profile: service
+defaultPackage: my.demo.app
+---
+testFramework: junit
+sourceLanguage: java</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+The values in <code>micronaut-cli.yml</code> are used by the CLI for code generation purposes. After a project has been generated, you can edit these values to change the project defaults, however you will still need to supply the required dependencies and/or configuration in order to use your chosen language/framework. E.g, you could edit the <code>testFramework</code> property to <code>spock</code> to cause the CLI to generate Spock tests when running commands (such as <code>create-controller</code>), but you will still need to add the Spock dependency to your project.
+</td>
+</tr>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_groovy"><a class="anchor" href="#_groovy"></a>Groovy</h4>
+<div class="paragraph">
+<p>To create an app with Groovy support (which comes with Spock by default), supply the appropriate language via the <code>lang</code> flag:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app my-groovy-app --lang groovy</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will include the Groovy &amp; Spock dependencies in your project, and write the appropriates values in <code>micronaut-cli.yml</code>.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_kotlin"><a class="anchor" href="#_kotlin"></a>Kotlin</h4>
+<div class="paragraph">
+<p>To create an app with Kotlin support (which comes with Kotlintest by default), supply the appropriate language via the <code>lang</code> flag:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app my-kotlin-app --lang kotlin</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will include the Kotlin &amp; Kotlintest dependencies in your project, and write the appropriates values in <code>micronaut-cli.yml</code>.</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_build_tool"><a class="anchor" href="#_build_tool"></a>Build Tool</h3>
+<div class="paragraph">
+<p>By default <code>create-app</code> will create a Gradle project, with a <code>build.gradle</code> file at the root of the project directory. To create an app using the Maven build tool, supply the appropriate option via the <code>build</code> flag:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app my-maven-app --build maven</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_create_cli_app"><a class="anchor" href="#_create_cli_app"></a>Create-Cli-App</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <code>create-cli-app</code> command will generate a <a href="#commandLineApps">Micronaut command line application</a> project,
+with optional flags to specify language, test framework, features, profile, and build tool.
+By default the project will have the <code>picocli</code> feature to support command line option parsing, and the <code>cli</code> profile to easily create additional commands.
+The project will include a <code>*Command</code> class (based on the project name - e.g., <code>hello-world</code> will generate <code>HelloWorldCommand</code>),
+and an associated test which will instantiate the command and verify that it can parse command line options.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 3. Create-Cli-App Flags</caption>
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 37.5%;">
+<col style="width: 37.5%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Language to use for the command (one of <code>java</code>, <code>groovy</code>, <code>kotlin</code> - default is <code>java</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-t</code>, <code>--test</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Test framework to use for the command (one of <code>junit</code>, <code>spock</code> - default is <code>junit</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--test spock</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-b</code>, <code>--build</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Build tool (one of <code>gradle</code>, <code>maven</code> - default is <code>gradle</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--build maven</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-p</code>, <code>--profile</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Profile to use for the project (default is <code>cli</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--profile function-aws</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--features</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Features to use for the project, comma-separated (picocli is included by default)</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">--features http-client,jdbc-hikari</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>or</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">-f http-client -f jdbc-hikari</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-i</code>, <code>--inplace</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If present, generates the project in the current directory (project name is optional if this flag is set)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--inplace</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Once created, the application can be started using the <code>*Command</code> class, or the appropriate build tool task.</p>
+</div>
+<div class="listingblock">
+<div class="title">Starting a Gradle project</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./gradlew run</code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="title">Starting a Maven project</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./mvnw compile exec:exec</code></pre>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_language_test_features_2"><a class="anchor" href="#_language_test_features_2"></a>Language/Test Features</h3>
+<div class="paragraph">
+<p>By default, <code>create-cli-app</code> will generate a Java application, with JUnit configured as the test framework.
+The language and test framework settings for a given project are stored as the <code>testFramework</code> and <code>sourceLanguage</code> properties in the <code>micronaut-cli.yml</code> file, as shown below:</p>
+</div>
+<div class="listingblock">
+<div class="title">micronaut-cli.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">profile: cli
+defaultPackage: my.demo.app
+---
+testFramework: junit
+sourceLanguage: java</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_groovy_2"><a class="anchor" href="#_groovy_2"></a>Groovy</h4>
+<div class="paragraph">
+<p>To create an app with Groovy &amp; Spock support, supply the appropriate features via the <code>lang</code> and <code>test</code> flags:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-cli-app my-groovy-app --lang=groovy --test=spock</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will include the Groovy &amp; Spock dependencies in your project, and write the appropriates values in <code>micronaut-cli.yml</code>.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_kotlin_2"><a class="anchor" href="#_kotlin_2"></a>Kotlin</h4>
+<div class="paragraph">
+<p>To create an app with Kotlin &amp; KotlinTest support, supply the appropriate features via the <code>lang</code> and <code>test</code> flags:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-cli-app my-kotlin-app --lang=kotlin --test=kotlintest</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will include the Kotlin &amp; KotlinTest dependencies in your project, and write the appropriates values in <code>micronaut-cli.yml</code>.</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_build_tool_2"><a class="anchor" href="#_build_tool_2"></a>Build Tool</h3>
+<div class="paragraph">
+<p>By default <code>create-cli-app</code> will create a Gradle project, with a <code>build.gradle</code> file at the root of the project directory. To create an app using the Maven build tool, supply the appropriate option via the <code>build</code> flag:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-cli-app my-maven-app --build maven</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_create_function"><a class="anchor" href="#_create_function"></a>Create-Function</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <code>create-function</code> command will generate a <a href="#serverlessFunctions">Micronaut function</a> project, optimized for serverless environments, with optional flags to specify language, test framework, features and build tool. The project will include a <code>*Function</code> class (based on the project name - e.g., <code>hello-world</code> will generate <code>HelloWorldFunction</code>), and an associated test which will instantiate the function and verify that it can receive requests.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+Currently AWS Lambda is the only supported cloud provider for Micronaut functions, so some of the information below will be specific to that platform. Other cloud providers will be added soon and this section will be updated accordingly.
+</td>
+</tr>
+</table>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 4. Create-Function Flags</caption>
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 40%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Language to use for the function (one of <code>java</code>, <code>groovy</code>, <code>kotlin</code> - default is <code>java</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-t</code>, <code>--test</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Test framework to use for the function (one of <code>junit</code>, <code>spock</code> - default is <code>junit</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--test spock</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-b</code>, <code>--build</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Build tool (one of <code>gradle</code>, <code>maven</code> - default is <code>gradle</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--build maven</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--features</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Features to use for the function, comma-separated</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">--features security-jwt,mongo-gorm</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>or</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">-f security-jwt -f mongo-gorm</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-p</code>, <code>--provider</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provider to use for the function (currently the only supported provider is <code>aws</code> for AWS Lambda - this is the default)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--provider aws</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-i</code>, <code>--inplace</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If present, generates the function in the current directory (function name is optional if this flag is set)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--inplace</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="sect2">
+<h3 id="_language"><a class="anchor" href="#_language"></a>Language</h3>
+<div class="paragraph">
+<p>Setting the language using the <code>lang</code> flag will generate a <code>*Function</code> file in the appropriate language. For Java/Kotlin, this will generate a class annotated with <a href="../api/io/micronaut/function/FunctionBean.html">@FunctionBean</a>. For Groovy, a Groovy function script will be generated. See <a href="#writingFunctions">Writing Functions</a> for more details on how to write and test Micronaut functions.</p>
+</div>
+<div class="paragraph">
+<p>Depending on language choice, an appropriate test will also be generated. By default, a Java function will include a JUnit test, a Groovy function will include a Spock test, and a Kotlin function will include a KotlinTest test. However, you can override the chosen test framework with the <code>test</code> flag.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-function hello-world --lang java --test spock</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_build_tool_3"><a class="anchor" href="#_build_tool_3"></a>Build Tool</h3>
+<div class="paragraph">
+<p>Depending upon the build tool selected, the project will include various tasks for building/deploying the function.</p>
+</div>
+<div class="sect3">
+<h4 id="_gradle"><a class="anchor" href="#_gradle"></a>Gradle</h4>
+<div class="paragraph">
+<p>Functions with a Gradle build are preconfigured with the <a href="https://github.com/classmethod/gradle-aws-plugin">Gradle AWS Plugin</a>. The configuration can be seen in the <code>build.gradle</code> file (see the section on <a href="#lambdaFunctions">Deploying Functions to AWS Lambda</a>). Assuming valid AWS credentials under <code>~/.aws/credentials</code>, the application can be deployed using the <code>deploy</code> task.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./gradlew deploy</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_maven"><a class="anchor" href="#_maven"></a>Maven</h4>
+<div class="paragraph">
+<p>Functions with a Maven build are preconfigured with the <a href="https://maven.apache.org/plugins/maven-shade-plugin/">Maven Shade Plugin</a>, which will generate an executable JAR suitable for uploading to AWS Lambda. The JAR file can be built using the <code>package</code> phase.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./mvnw package</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>For further details, consult the <a href="https://docs.aws.amazon.com/lambda/latest/dg/java-create-jar-pkg-maven-no-ide.html">AWS Lambda Documentation.</a></p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_create_federation"><a class="anchor" href="#_create_federation"></a>Create-Federation</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <code>create-federation</code> command accepts the same flags as the <code>create-app</code> command, and follows mostly the same behavior. The key difference is that this command accepts multiple project names following the <code>services</code> flag, and will generate a project (with the specified profile and features) for each name supplied. The <code>[NAME]</code> argument will be used to create the top-level multi-project build for the federation.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 5. Create-Federation Flags</caption>
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 40%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-s</code>, <code>--services</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Comma-separated list of services (applications) to create</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--services users,inventory,billing</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-b</code>, <code>--build</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Build tool (one of <code>gradle</code>, <code>maven</code> - default is <code>gradle</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--build maven</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-p</code>, <code>--profile</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Profile to use for all projects in the federation (default is <code>service</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--profile function-aws</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--features</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Features to use for all projects in the federation, comma-separated</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">--features security-jwt,mongo-gorm</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>or</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">-f security-jwt -f mongo-gorm</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-i</code>, <code>--inplace</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If present, generates the project in the current directory (project name is optional if this flag is set)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--inplace</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>When creating a federation, a top-level project file will be generated (using the chosen build tool), and subprojects/modules will be created for each service in the federation.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_create_profile"><a class="anchor" href="#_create_profile"></a>Create-Profile</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <code>create-profile</code> command is used to generate new profiles for the Micronaut CLI.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 6. Create-Profile Flags</caption>
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 40%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Language to use for the profile (one of <code>java</code>, <code>groovy</code>, <code>kotlin</code> - default is <code>java</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-b</code>, <code>--build</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Build tool (one of <code>gradle</code>, <code>maven</code> - default is <code>gradle</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--build maven</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-p</code>, <code>--profile</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Profile to extend</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--profile function-aws</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--features</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Features to use, comma-separated</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--features security-jwt,mongo-gorm</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-i</code>, <code>--inplace</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If present, generates the profile in the current directory (profile name is optional if this flag is set)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--inplace</code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/multitenancy.html">&lt;&lt; <strong>16</strong><span>Multi-Tenancy</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,1944 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>5 Aspect Oriented Programming 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../guide/config.html">&lt;&lt; <strong>4</strong><span>Application Configuration</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>5 Aspect Oriented Programming</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+                <div id="table-of-content">
+                    <h2>Table of Contents</h2>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#aroundAdvice"><strong>5.1</strong><span>Around Advice</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#introductionAdvice"><strong>5.2</strong><span>Introduction Advice</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#adapterAdvice"><strong>5.3</strong><span>Method Adapter Advice</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#validation"><strong>5.4</strong><span>Validation Advice</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#caching"><strong>5.5</strong><span>Cache Advice</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#retry"><strong>5.6</strong><span>Retry Advice</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#scheduling"><strong>5.7</strong><span>Scheduled Tasks</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#springAop"><strong>5.8</strong><span>Bridging Spring AOP</span></a>
+                    </div>
+                    
+                </div>
+                
+
+                
+<h1 id="aop"><a class="anchor" href="#aop"></a>5 Aspect Oriented Programming</h1>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/aop.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Aspect-Oriented Programming (AOP) historically has had many incarnations and some very complicated implementations. Generally AOP can be thought of as a way to define cross cutting concerns (logging, transactions, tracing etc.) separate from application code in the form of aspects that define advice.</p>
+</div>
+<div class="paragraph">
+<p>There are typically two forms of advice:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Around Advice - decorates a method or class</p>
+</li>
+<li>
+<p>Introduction Advice - introduces new behaviour to a class.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>In modern Java applications declaring advice typically takes the form of an annotation. The most well-known annotation advice in the Java world is probably <code>@Transactional</code> which is used to demarcate transaction boundries in Spring and Grails applications.</p>
+</div>
+<div class="paragraph">
+<p>The disadvantage of traditional approaches to AOP is the heavy reliance on runtime proxy creation and reflection, which slows application performance, makes debugging harder and increases memory consumption.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut tries to address these concerns by providing a simple compile time AOP API that does not use reflection.</p>
+</div>
+
+<h2 id="aroundAdvice"><a class="anchor" href="#aroundAdvice"></a>5.1 Around Advice</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/aop/aroundAdvice.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The most common type of advice you may want to apply is "Around" advice, which essentially allows you to decorate a methods behaviour.</p>
+</div>
+<div class="sect1">
+<h2 id="_writing_around_advice"><a class="anchor" href="#_writing_around_advice"></a>Writing Around Advice</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The first step to defining Around advice is to implement a <a href="../api/io/micronaut/aop/MethodInterceptor.html">MethodInterceptor</a>. For example the following interceptor disallows parameters with <code>null</code> values:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">MethodInterceptor Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.aop.*;
+import io.micronaut.core.type.MutableArgumentValue;
+
+import javax.inject.Singleton;
+import java.util.*;
+
+@Singleton
+public class NotNullInterceptor implements MethodInterceptor&lt;Object, Object&gt; { <b class="conum">(1)</b>
+    @Override
+    public Object intercept(MethodInvocationContext&lt;Object, Object&gt; context) {
+        Optional&lt;Map.Entry&lt;String, MutableArgumentValue&lt;?&gt;&gt;&gt; nullParam = context.getParameters()
+            .entrySet()
+            .stream()
+            .filter(entry -&gt; {
+                MutableArgumentValue&lt;?&gt; argumentValue = entry.getValue();
+                return Objects.isNull(argumentValue.getValue());
+            })
+            .findFirst(); <b class="conum">(2)</b>
+        if (nullParam.isPresent()) {
+            throw new IllegalArgumentException("Null parameter [" + nullParam.get().getKey() + "] not allowed"); <b class="conum">(3)</b>
+        } else {
+            return context.proceed(); <b class="conum">(4)</b>
+        }
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">MethodInterceptor Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.aop.MethodInterceptor
+import io.micronaut.aop.MethodInvocationContext
+import io.micronaut.core.type.MutableArgumentValue
+
+import javax.inject.Singleton
+
+@Singleton
+class NotNullInterceptor implements MethodInterceptor&lt;Object, Object&gt; { <b class="conum">(1)</b>
+    @Override
+    Object intercept(MethodInvocationContext&lt;Object, Object&gt; context) {
+        Optional&lt;Map.Entry&lt;String, MutableArgumentValue&lt;?&gt;&gt;&gt; nullParam = context.getParameters()
+            .entrySet()
+            .stream()
+            .filter({entry -&gt;
+                MutableArgumentValue&lt;?&gt; argumentValue = entry.getValue()
+                return Objects.isNull(argumentValue.getValue())
+            })
+            .findFirst() <b class="conum">(2)</b>
+        if (nullParam.isPresent()) {
+            throw new IllegalArgumentException("Null parameter [" + nullParam.get().getKey() + "] not allowed") <b class="conum">(3)</b>
+        } else {
+            return context.proceed() <b class="conum">(4)</b>
+        }
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">MethodInterceptor Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.aop.MethodInterceptor
+import io.micronaut.aop.MethodInvocationContext
+import io.micronaut.core.type.MutableArgumentValue
+
+import javax.inject.Singleton
+import java.util.Objects
+import java.util.Optional
+
+
+@Singleton
+class NotNullInterceptor : MethodInterceptor&lt;Any, Any&gt; { <b class="conum">(1)</b>
+    override fun intercept(context: MethodInvocationContext&lt;Any, Any&gt;): Any {
+        val nullParam = context.parameters
+                .entries
+                .stream()
+                .filter { entry -&gt;
+                    val argumentValue = entry.value
+                    Objects.isNull(argumentValue.value)
+                }
+                .findFirst() <b class="conum">(2)</b>
+        return if (nullParam.isPresent) {
+            throw IllegalArgumentException("Null parameter [" + nullParam.get().key + "] not allowed") <b class="conum">(3)</b>
+        } else {
+            context.proceed() <b class="conum">(4)</b>
+        }
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>An interceptor implements the <a href="../api/io/micronaut/aop/MethodInterceptor.html">MethodInterceptor</a> interface</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The passed <a href="../api/io/micronaut/aop/MethodInvocationContext.html">MethodInvocationContext</a> is used to find the first parameter that is <code>null</code></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>If a <code>null</code> parameter is found an exception is thrown</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="4"></i><b>4</b></td>
+<td>Otherwise <a href="../api/io/micronaut/aop/InvocationContext.html#proceed--">proceed()</a> is called to proceed with the method invocation.</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Micronaut AOP interceptors use no reflection which improves performance and reducing stack trace sizes, thus improving debugging.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>To put the new <code>MethodInterceptor</code> to work the next step is to define an annotation that will trigger the <code>MethodInterceptor</code>:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Around Advice Annotation Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.context.annotation.Type;
+import io.micronaut.aop.Around;
+import java.lang.annotation.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Documented
+@Retention(RUNTIME) <b class="conum">(1)</b>
+@Target({ElementType.TYPE, ElementType.METHOD}) <b class="conum">(2)</b>
+@Around <b class="conum">(3)</b>
+@Type(NotNullInterceptor.class) <b class="conum">(4)</b>
+public @interface NotNull {
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Around Advice Annotation Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.aop.Around
+import io.micronaut.context.annotation.Type
+
+import java.lang.annotation.Documented
+import java.lang.annotation.ElementType
+import java.lang.annotation.Retention
+import java.lang.annotation.Target
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME
+
+@Documented
+@Retention(RUNTIME) <b class="conum">(1)</b>
+@Target([ElementType.TYPE, ElementType.METHOD]) <b class="conum">(2)</b>
+@Around <b class="conum">(3)</b>
+@Type(NotNullInterceptor.class) <b class="conum">(4)</b>
+@interface NotNull {
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Around Advice Annotation Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.aop.Around
+import io.micronaut.context.annotation.Type
+
+import java.lang.annotation.Documented
+import java.lang.annotation.Retention
+
+import java.lang.annotation.RetentionPolicy.RUNTIME
+
+
+@Documented
+@Retention(RUNTIME) <b class="conum">(1)</b>
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FILE, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER) <b class="conum">(2)</b>
+@Around <b class="conum">(3)</b>
+@Type(NotNullInterceptor::class) <b class="conum">(4)</b>
+annotation class NotNull</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The retention policy of the annotation should be <code>RUNTIME</code></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>Generally you want to be able to apply advice at the class or method level so the target types are <code>TYPE</code> and <code>METHOD</code></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The <a href="../api/io/micronaut/aop/Around.html">Around</a> annotation is added to tell Micronaut that the annotation is Around advice</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="4"></i><b>4</b></td>
+<td>The <a href="../api/io/micronaut/context/annotation/Type.html">@Type</a> annotation is used to configure which type implements the advice (in this case the previously defined <code>NotNullInterceptor</code>)</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>With the interceptor and annotation implemented you can then simply apply the annotation to the target classes:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Around Advice Usage Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Singleton
+public class NotNullExample {
+
+    @NotNull
+    void doWork(String taskName) {
+        System.out.println("Doing job: " + taskName);
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Around Advice Usage Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Singleton
+class NotNullExample {
+
+    @NotNull
+    void doWork(String taskName) {
+        println("Doing job: " + taskName)
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Around Advice Usage Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Singleton
+open class NotNullExample {
+
+    @NotNull
+    open fun doWork(taskName: String?) {
+        println("Doing job: $taskName")
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Whenever the type <code>NotNullExample</code> is injected into any class, a compile time generated proxy will instead be injected that decorates the appropriate method calls with the <code>@NotNull</code> advice defined earlier. You can verify that the advice works by writing a test. The following test uses a JUnit <code>ExpectedException</code> rule to verify the appropriate exception is thrown when an argument is <code>null</code>:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Around Advice Test</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Rule
+    public ExpectedException thrown = ExpectedException.none();
+
+    @Test
+    public void testNotNull() {
+        ApplicationContext applicationContext = ApplicationContext.run();
+        NotNullExample exampleBean = applicationContext.getBean(NotNullExample.class);
+
+        thrown.expect(IllegalArgumentException.class);
+        thrown.expectMessage("Null parameter [taskName] not allowed");
+
+        exampleBean.doWork(null);
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Around Advice Test</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    void "test not null"() {
+        when:
+        ApplicationContext applicationContext = ApplicationContext.run()
+        NotNullExample exampleBean = applicationContext.getBean(NotNullExample.class)
+
+        exampleBean.doWork(null)
+
+        then:
+        IllegalArgumentException ex = thrown()
+        ex.message == 'Null parameter [taskName] not allowed'
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Around Advice Test</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Test
+    fun testNotNull() {
+        val applicationContext = ApplicationContext.run()
+        val exampleBean = applicationContext.getBean(NotNullExample::class.java)
+
+        val exception = shouldThrow&lt;IllegalArgumentException&gt; {
+            exampleBean.doWork(null)
+        }
+        exception.message shouldBe "Null parameter [taskName] not allowed"
+    }</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Since Micronaut injection is done at compile time, generally the advice should be packaged in a dependent JAR file that is on the classpath when the above test is compiled and should not be in the same codebase since you don&#8217;t want the test to be compiled before the advice itself is compiled.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customizing_proxy_generation"><a class="anchor" href="#_customizing_proxy_generation"></a>Customizing Proxy Generation</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The default behaviour of the <a href="../api/io/micronaut/aop/Around.html">Around</a> annotation is to generate a proxy at compile time that is a subclass of the class being proxied. In other words, in the previous example a compile time subclass of the <code>NotNullExample</code> class will be produced where methods that are proxied are decorated with interceptor handling and the original behaviour is invoked via a call to <code>super</code>.</p>
+</div>
+<div class="paragraph">
+<p>This behaviour is more efficient as only one instance of the bean is required, however depending on the use case you are trying to implement you may wish to alter this behaviour and the <code>@Around</code> annotation supports various attributes that allow you to alter this behaviour including:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>proxyTarget</code> (defaults to <code>false</code>) - If set to <code>true</code> instead of a subclass that calls <code>super</code>, the proxy will delegate to the original bean instance</p>
+</li>
+<li>
+<p><code>hotswap</code> (defaults to <code>false</code>) - Same as <code>proxyTarget=true</code>, but in addition the proxy will implement <a href="../api/io/micronaut/aop/HotSwappableInterceptedProxy.html">HotSwappableInterceptedProxy</a> which wraps each method call in a <code>ReentrantReadWriteLock</code> and allows swapping the target instance at runtime.</p>
+</li>
+<li>
+<p><code>lazy</code> (defaults to <code>false</code>) - By default Micronaut will eagerly intialize the proxy target when the proxy is created. If set to <code>true</code> the proxy target will instead be resolved lazily for each method call.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_aop_advice_on_factory_beans"><a class="anchor" href="#_aop_advice_on_factory_beans"></a>AOP Advice on @Factory Beans</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The semantics of AOP advice when applied to <a href="#factories">Bean Factories</a> differs to regular beans, with the following rules applying:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>AOP advice applied at the class level of a <a href="../api/io/micronaut/context/annotation/Factory.html">@Factory</a> bean will apply the advice to the factory itself and not to any beans defined with the <a href="../api/io/micronaut/context/annotation/Bean.html">@Bean</a> annotation.</p>
+</li>
+<li>
+<p>AOP advice applied on a method annotated with a bean scope will apply the AOP advice to the bean that the factory produces.</p>
+</li>
+</ol>
+</div>
+<div class="paragraph">
+<p>Consider the following two examples:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">AOP Advice at the type level of a <code>@Factory</code></div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Cacheable("my-cache")
+@Factory
+public class MyFactory {
+
+    @Prototype
+    public MyBean myBean() {
+        return new MyBean();
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">AOP Advice at the type level of a <code>@Factory</code></div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Cacheable("my-cache")
+@Factory
+class MyFactory {
+
+    @Prototype
+    MyBean myBean() {
+        return new MyBean()
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">AOP Advice at the type level of a <code>@Factory</code></div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Cacheable("my-cache")
+@Factory
+open class MyFactory {
+
+    @Prototype
+    open fun myBean(): MyBean {
+        return MyBean()
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example will cache creation of <code>MyBean</code> bean, according to the semantics defined by the <a href="../api/io/micronaut/cache/annotation/Cacheable.html">@Cacheable</a> cache configuration.</p>
+</div>
+<div class="paragraph">
+<p>Now consider this example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">AOP Advice at the method level of a <code>@Factory</code></div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Factory
+public class MyFactory {
+
+    @Prototype
+    @Cacheable("my-cache")
+    public MyBean myBean() {
+        return new MyBean();
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">AOP Advice at the method level of a <code>@Factory</code></div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Factory
+class MyFactory {
+
+    @Prototype
+    @Cacheable("my-cache")
+    MyBean myBean() {
+        return new MyBean()
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">AOP Advice at the method level of a <code>@Factory</code></div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Factory
+open class MyFactory {
+
+    @Prototype
+    @Cacheable("my-cache")
+    open fun myBean(): MyBean {
+        return MyBean()
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example will cache all of the public methods of the <code>MyBean</code> bean, but not the bean creation.</p>
+</div>
+<div class="paragraph">
+<p>The rationale for this behaviour is that you may at times wish to apply advice to a factory and at other times apply advice to the bean produced by the factory.</p>
+</div>
+<div class="paragraph">
+<p>Note that there is currently no way to apply advice at the method level to a <a href="../api/io/micronaut/context/annotation/Factory.html">@Factory</a> bean and all advice for factories must be applied at the type level. You can control which methods have advice applied by defining methods as non-public (non-public methods do not have advice applied).</p>
+</div>
+</div>
+</div>
+
+<h2 id="introductionAdvice"><a class="anchor" href="#introductionAdvice"></a>5.2 Introduction Advice</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/aop/introductionAdvice.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Introduction advice is distinct from Around advice in that it involves providing an implementation instead of decorating.</p>
+</div>
+<div class="paragraph">
+<p>Examples of introduction advice include things like <a href="http://gorm.grails.org">GORM</a> or <a href="http://projects.spring.io/spring-data">Spring Data</a> that will both automatically implement persistence logic for you.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut&#8217;s <a href="../api/io/micronaut/http/client/annotation/Client.html">Client</a> annotation is another example of introduction advice where Micronaut will, at compile time, implement HTTP client interfaces for you.</p>
+</div>
+<div class="paragraph">
+<p>The way you implement Introduction advice is very similar to how you implement Around advice.</p>
+</div>
+<div class="paragraph">
+<p>You start off by defining an annotation that will power the introduction advice. As an example, say you want to implement advice that will return a stubbed value for every method in an interface (a common requirement in testing frameworks). Consider the following <code>@Stub</code> annotation:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Introduction Advice Annotation Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import io.micronaut.aop.Introduction;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Type;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+@Introduction <b class="conum">(1)</b>
+@Type(StubIntroduction.class) <b class="conum">(2)</b>
+@Bean <b class="conum">(3)</b>
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.METHOD})
+public @interface Stub {
+    String value() default "";
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Introduction Advice Annotation Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.aop.Introduction
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Type
+
+import java.lang.annotation.Documented
+import java.lang.annotation.ElementType
+import java.lang.annotation.Retention
+import java.lang.annotation.Target
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME
+
+@Introduction <b class="conum">(1)</b>
+@Type(StubIntroduction.class) <b class="conum">(2)</b>
+@Bean <b class="conum">(3)</b>
+@Documented
+@Retention(RUNTIME)
+@Target([ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.METHOD])
+@interface Stub {
+    String value() default ""
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Introduction Advice Annotation Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.aop.Introduction
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Type
+
+import java.lang.annotation.Documented
+import java.lang.annotation.Retention
+
+import java.lang.annotation.RetentionPolicy.RUNTIME
+
+
+@Introduction <b class="conum">(1)</b>
+@Type(StubIntroduction::class) <b class="conum">(2)</b>
+@Bean <b class="conum">(3)</b>
+@Documented
+@Retention(RUNTIME)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FILE, AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER)
+annotation class Stub(val value: String = "")</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The introduction advice is annotated with <a href="../api/io/micronaut/aop/Introduction.html">Introduction</a></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The <a href="../api/io/micronaut/context/annotation/Type.html">Type</a> annotation is used to refer to the implementor of the advise. In this case <code>StubIntroduction</code></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The <a href="../api/io/micronaut/context/annotation/Bean.html">Bean</a> annotation is added so that all types annotated with <code>@Stub</code> become beans</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The <code>StubIntroduction</code> class referred to in the previous example must then implement the <a href="../api/io/micronaut/aop/MethodInterceptor.html">MethodInterceptor</a> interface, just like around advice.</p>
+</div>
+<div class="paragraph">
+<p>The following is an example implementation:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubIntroduction</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.aop.*;
+import javax.inject.Singleton;
+
+@Singleton
+public class StubIntroduction implements MethodInterceptor&lt;Object,Object&gt; { <b class="conum">(1)</b>
+
+    @Override
+    public Object intercept(MethodInvocationContext&lt;Object, Object&gt; context) {
+        return context.getValue( <b class="conum">(2)</b>
+                Stub.class,
+                context.getReturnType().getType()
+        ).orElse(null); <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubIntroduction</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.aop.MethodInterceptor
+import io.micronaut.aop.MethodInvocationContext
+
+import javax.inject.Singleton
+
+@Singleton
+class StubIntroduction implements MethodInterceptor&lt;Object,Object&gt; { <b class="conum">(1)</b>
+
+    @Override
+    Object intercept(MethodInvocationContext&lt;Object, Object&gt; context) {
+        return context.getValue( <b class="conum">(2)</b>
+                Stub.class,
+                context.getReturnType().getType()
+        ).orElse(null) <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubIntroduction</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.aop.MethodInterceptor
+import io.micronaut.aop.MethodInvocationContext
+
+import javax.inject.Singleton
+
+
+@Singleton
+class StubIntroduction : MethodInterceptor&lt;Any, Any&gt; { <b class="conum">(1)</b>
+
+    override fun intercept(context: MethodInvocationContext&lt;Any, Any&gt;): Any? {
+        return context.getValue&lt;Any&gt;( <b class="conum">(2)</b>
+                Stub::class.java,
+                context.returnType.type
+        ).orElse(null) <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The class is annotated with <code>@Singleton</code> and implements the <a href="../api/io/micronaut/aop/MethodInterceptor.html">MethodInterceptor</a> interface</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The value of the <code>@Stub</code> annotation is read from the context and an attempt made to convert the value to the return type</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>Otherwise <code>null</code> is returned</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>To now use this introduction advice in an application you simply annotate your abstract classes or interfaces with <code>@Stub</code>:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubExample</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Singleton
+public class StubIntroduction implements MethodInterceptor&lt;Object,Object&gt; { <b class="conum">(1)</b>
+
+    @Override
+    public Object intercept(MethodInvocationContext&lt;Object, Object&gt; context) {
+        return context.getValue( <b class="conum">(2)</b>
+                Stub.class,
+                context.getReturnType().getType()
+        ).orElse(null); <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubExample</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Singleton
+class StubIntroduction implements MethodInterceptor&lt;Object,Object&gt; { <b class="conum">(1)</b>
+
+    @Override
+    Object intercept(MethodInvocationContext&lt;Object, Object&gt; context) {
+        return context.getValue( <b class="conum">(2)</b>
+                Stub.class,
+                context.getReturnType().getType()
+        ).orElse(null) <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubExample</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Singleton
+class StubIntroduction : MethodInterceptor&lt;Any, Any&gt; { <b class="conum">(1)</b>
+
+    override fun intercept(context: MethodInvocationContext&lt;Any, Any&gt;): Any? {
+        return context.getValue&lt;Any&gt;( <b class="conum">(2)</b>
+                Stub::class.java,
+                context.returnType.type
+        ).orElse(null) <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>All abstract methods will delegate to the <code>StubIntroduction</code> class to be implemented.</p>
+</div>
+<div class="paragraph">
+<p>The following test demonstrates the behaviour or <code>StubIntroduction</code>:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Testing Introduction Advice</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">        StubExample stubExample = applicationContext.getBean(StubExample.class);
+
+        assertEquals(10, stubExample.getNumber());
+        assertNull(stubExample.getDate());</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Testing Introduction Advice</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">        when:
+        StubExample stubExample = applicationContext.getBean(StubExample.class)
+
+        then:
+        stubExample.getNumber() == 10
+        stubExample.getDate() == null</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Testing Introduction Advice</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">        val stubExample = applicationContext.getBean(StubExample::class.java)
+
+        stubExample.number.toLong().shouldBe(10)
+        stubExample.date.shouldBe(null)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Note that if the introduction advice cannot implement the method the <code>proceed</code> method of the <a href="../api/io/micronaut/aop/MethodInvocationContext.html">MethodInvocationContext</a> should be called. This gives the opportunity for other introduction advice interceptors to implement the method, otherwise a <code>UnsupportedOperationException</code> will be thrown if no advice can implement the method.</p>
+</div>
+<div class="paragraph">
+<p>In addition, if multiple introduction advice are present you may wish to override the <code>getOrder()</code> method of <a href="../api/io/micronaut/aop/MethodInterceptor.html">MethodInterceptor</a> to control the priority of advise.</p>
+</div>
+<div class="paragraph">
+<p>The following sections cover core advice types that are built into Micronaut and provided by the framework.</p>
+</div>
+
+<h2 id="adapterAdvice"><a class="anchor" href="#adapterAdvice"></a>5.3 Method Adapter Advice</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/aop/adapterAdvice.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>There are sometimes cases where you want to introduce a new bean based on the presence of an annotation on a method. An example of this case is the <a href="../api/io/micronaut/runtime/event/annotation/EventListener.html">@EventListener</a> annotation which for each method annotated with <a href="../api/io/micronaut/runtime/event/annotation/EventListener.html">@EventListener</a> produces an implementation of <a href="../api/io/micronaut/context/event/ApplicationEventListener.html">ApplicationEventListener</a> that invokes the annotated method.</p>
+</div>
+<div class="paragraph">
+<p>For example the following snippet will run the logic contained within the method when the <a href="../api/io/micronaut/context/ApplicationContext.html">ApplicationContext</a> starts up:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">import io.micronaut.context.event.StartupEvent;
+import io.micronaut.runtime.event.annotation.EventListener;
+...
+
+@EventListener
+void onStartup(StartupEvent event) {
+    // startup logic here
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The presence of the <a href="../api/io/micronaut/runtime/event/annotation/EventListener.html">@EventListener</a> annotation causes Micronaut to create a new class that implements the <a href="../api/io/micronaut/context/event/ApplicationEventListener.html">ApplicationEventListener</a> and invokes the <code>onStartup</code> method defined in the bean above.</p>
+</div>
+<div class="paragraph">
+<p>The actual implementation of the <a href="../api/io/micronaut/runtime/event/annotation/EventListener.html">@EventListener</a> is trivial, it simply uses the <a href="../api/io/micronaut/aop/Adapter.html">@Adapter</a> annotation to specify which SAM (single abstract method) type it adapts:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">import io.micronaut.aop.Adapter;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.core.annotation.Indexed;
+
+import java.lang.annotation.*;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD})
+@Adapter(ApplicationEventListener.class) <i class="conum" data-value="1"></i><b>(1)</b>
+@Indexed(ApplicationEventListener.class)
+public @interface EventListener {
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <a href="../api/io/micronaut/aop/Adapter.html">@Adapter</a> annotation is used to indicate which SAM type to adapt. In this case <a href="../api/io/micronaut/context/event/ApplicationEventListener.html">ApplicationEventListener</a>.</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Micronaut will also automatically align the generic types for the SAM interface if they are specified.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Using this mechanism you can define custom annotations that use the <a href="../api/io/micronaut/aop/Adapter.html">@Adapter</a> annotation and a SAM interface to automatically implement beans for you at compile time.</p>
+</div>
+
+<h2 id="validation"><a class="anchor" href="#validation"></a>5.4 Validation Advice</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/aop/validation.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Validation advice is one of the most common advice types you are likely to want to incorporate into your application.</p>
+</div>
+<div class="paragraph">
+<p>Validation advice is built on <a href="https://beanvalidation.org/2.0/spec/">Bean Validation JSR 380</a>.</p>
+</div>
+<div class="paragraph">
+<p>JSR 380 is a specification of the Java API for bean validation which ensures that the
+properties of a bean meet specific criteria, using <code>javax.validation</code> annotations such as <code>@NotNull</code>, <code>@Min</code>, and <code>@Max</code>.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut provides native support for the <code>javax.validation</code> annotations with the <code>micronaut-validation</code> dependency:</p>
+</div>
+<div class="paragraph">
+<p>        <div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="gradle">compile <span class="hljs-string">'io.micronaut:micronaut-validation'</span></code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="maven">&lt;dependency&gt;
+    &lt;groupId&gt;io.micronaut&lt;/groupId&gt;
+    &lt;artifactId&gt;micronaut-validation&lt;/artifactId&gt;
+&lt;/dependency&gt;</code></pre>
+</div>
+</div>
+</p>
+</div>
+<div class="paragraph">
+<p>Or full JSR 380 compliance with the <code>micronaut-hibernate-validator</code> dependency:</p>
+</div>
+<div class="paragraph">
+<p>        <div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="gradle">compile <span class="hljs-string">'io.micronaut:micronaut-hibernate-validator'</span></code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="maven">&lt;dependency&gt;
+    &lt;groupId&gt;io.micronaut&lt;/groupId&gt;
+    &lt;artifactId&gt;micronaut-hibernate-validator&lt;/artifactId&gt;
+&lt;/dependency&gt;</code></pre>
+</div>
+</div>
+</p>
+</div>
+<div class="paragraph">
+<p>See the section on <a href="#beanValidation">Bean Validation</a> for more information on how to apply validation rules to your bean classes.</p>
+</div>
+
+<h2 id="caching"><a class="anchor" href="#caching"></a>5.5 Cache Advice</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/aop/caching.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Similar to Spring and Grails, Micronaut provides a set of caching annotations within the <a href="../api/io/micronaut/cache/package-summary.html">io.micronaut.cache</a> package.</p>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/cache/CacheManager.html">CacheManager</a> interface allows different cache implementations to be plugged in as necessary.</p>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/cache/SyncCache.html">SyncCache</a> interface provides a synchronous API for caching, whilst the <a href="../api/io/micronaut/cache/AsyncCache.html">AsyncCache</a> API allows non-blocking operation.</p>
+</div>
+<div class="sect1">
+<h2 id="_cache_annotations"><a class="anchor" href="#_cache_annotations"></a>Cache Annotations</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The following cache annotations are supported:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="../api/io/micronaut/cache/annotation/Cacheable.html">@Cacheable</a> - Indicates a method is cacheable within the given cache name</p>
+</li>
+<li>
+<p><a href="../api/io/micronaut/cache/annotation/CachePut.html">@CachePut</a> - Indicates that the return value of a method invocation should be cached. Unlike <code>@Cacheable</code> the original operation is never skipped.</p>
+</li>
+<li>
+<p><a href="../api/io/micronaut/cache/annotation/CacheInvalidate.html">@CacheInvalidate</a> - Indicates the invocation of a method should cause the invalidation of one or many caches.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>By using one of the annotations the <a href="../api/io/micronaut/cache/interceptor/CacheInterceptor.html">CacheInterceptor</a> is activated which in the case of <code>@Cacheable</code> will cache the return result of the method.</p>
+</div>
+<div class="paragraph">
+<p>If the return type of the method is a non-blocking type (either <a href="https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletableFuture.html">CompletableFuture</a> or an instance of <a href="http://www.reactive-streams.org/reactive-streams-1.0.2-javadoc/org/reactivestreams/Publisher.html">Publisher</a> the emitted result will be cached.</p>
+</div>
+<div class="paragraph">
+<p>In addition if the underlying Cache implementation supports non-blocking cache operations then cache values will be read from the cache without blocking, resulting in the ability to implement completely non-blocking cache operations.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_configuring_caches"><a class="anchor" href="#_configuring_caches"></a>Configuring Caches</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>By default <a href="https://github.com/ben-manes/caffeine">Caffeine</a> is used for cache definitions which can be configured via application configuration. For example with <code>application.yml</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">Cache Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    caches:
+        my-cache:
+            maximumSize: 20</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example will configure a cache called "my-cache" with a maximum size of 20.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+<div class="title">Naming Caches</div>
+<div class="paragraph">
+<p>Names of caches under <code>micronaut.caches</code> should be defined in kebab case (lowercase and hyphen seperated), if camel case is used the names are normalized to kebab case. So for example specifing <code>myCache</code> will become <code>my-cache</code>. The kebab case form should be used when referencing caches in the <a href="../api/io/micronaut/cache/annotation/Cacheable.html">@Cacheable</a> annotation, like <code>@Cacheable("my-cache-name")</code>.</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>To configure a weigher to be used with the <code>maximumWeight</code> configuration, create a bean that implements <code>io.micronaut.caffeine.cache.Weigher</code>. To associate a given weigher with only a specific cache, annotate the bean with <code>@Named(&lt;cache name&gt;)</code>. Weighers without a named qualifier will apply to all caches that don&#8217;t have a named weigher. If no beans are found, a default implementation will be used.</p>
+</div>
+<a id="io.micronaut.cache.DefaultCacheConfiguration" href="#io.micronaut.cache.DefaultCacheConfiguration">&#128279;</a>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Configuration Properties for <a href="../api/io/micronaut/cache/DefaultCacheConfiguration.html">DefaultCacheConfiguration</a></caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Property</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.caches.*.charset</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.nio.charset.Charset</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The charset used to serialize and deserialize values</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.caches.*.initial-capacity</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.Integer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The initial cache capacity.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.caches.*.maximum-size</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.Long</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the maximum number of entries the cache may contain</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.caches.*.maximum-weight</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.Long</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the maximum weight of entries</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.caches.*.expire-after-write</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.time.Duration</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The cache expiration duration after writing into it.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.caches.*.expire-after-access</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.time.Duration</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The cache expiration duration after accessing it</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.caches.*.record-stats</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set whether record stats is enabled. Default value ({@value #DEFAULT_RECORD_STATS}).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.caches.*.test-mode</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set whether test mode is enabled. Default value ({@value #DEFAULT_TESTMODE}).</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_caching_with_redis"><a class="anchor" href="#_caching_with_redis"></a>Caching with Redis</h2>
+<div class="sectionbody">
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">Using the CLI</div>
+<div class="paragraph">
+<p>If you are creating your project using the Micronaut CLI, supply the <code>redis-lettuce</code> feature to configure Redis/Lettuce in your project:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ mn create-app my-app --features redis-lettuce</pre>
+</div>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>If you wish to use Redis to cache results the <a href="https://micronaut-projects.github.io/micronaut-redis/snapshot/guide/#cache">Micronaut Redis</a> module provides a <a href="../api/io/micronaut/cache/CacheManager.html">CacheManager</a> implementation that allows using Redis as a backing cache.</p>
+</div>
+</div>
+</div>
+
+<h2 id="retry"><a class="anchor" href="#retry"></a>5.6 Retry Advice</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/aop/retry.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>In distributed systems and Microservice environments, failure is something you have to plan for and it is pretty common to want to attempt to retry an operation if it fails. If first you don&#8217;t succeed try again!</p>
+</div>
+<div class="paragraph">
+<p>With this in mind Micronaut comes with a <a href="../api/io/micronaut/retry/annotation/Retryable.html">Retryable</a> annotation out of the box that is integrated into the container.</p>
+</div>
+<div class="sect1">
+<h2 id="_simple_retry"><a class="anchor" href="#_simple_retry"></a>Simple Retry</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The simplest form of retry is just to add the <code>@Retryable</code> annotation to any type or method. The default behaviour of <code>@Retryable</code> is to retry 3 times with a delay of 1 second between each retry.</p>
+</div>
+<div class="paragraph">
+<p>For example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Simple Retry Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Retryable
+    public List&lt;Book&gt; listBooks() {
+        // ...</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Simple Retry Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Retryable
+    List&lt;Book&gt; listBooks() {
+        // ...</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Simple Retry Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Retryable
+    open fun listBooks(): List&lt;Book&gt; {
+        // ...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>With the above example if the <code>listBooks()</code> method throws an exception it will be retried until the maximum number of attempts is reached.</p>
+</div>
+<div class="paragraph">
+<p>The <code>multiplier</code> value of the <code>@Retryable</code> annotation can be used to configure a multiplier used to calculate the delay between retries, thus allowing exponential retry support.</p>
+</div>
+<div class="paragraph">
+<p>Note also that the <code>@Retryable</code> annotation can be applied on interfaces and the behaviour will be inherited through annotation metadata. The implication of this is that <code>@Retryable</code> can be used in combination with <a href="#introductionAdvice">Introduction Advice</a> such as the HTTP <a href="../api/io/micronaut/http/client/annotation/Client.html">Client</a> annotation.</p>
+</div>
+<div class="paragraph">
+<p>To customize retry behaviour you can set the <code>attempts</code> and <code>delay</code> members, For example to configure 5 attempts with a 2 second delay:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Setting Retry Attempts</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Retryable( attempts = "5",
+                delay = "2s" )
+    public Book findBook(String title) {
+        // ...</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Setting Retry Attempts</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Retryable( attempts = "5",
+                delay = "2s" )
+    Book findBook(String title) {
+        // ...</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Setting Retry Attempts</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Retryable(attempts = "5", delay = "2s")
+    open fun findBook(title: String): Book {
+        // ...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Notice how both <code>attempts</code> and <code>delay</code> are defined as strings. This is to support configurability through annotation metadata. For example you can allow the retry policy to be configured using property placeholder resolution:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Setting Retry via Configuration</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Retryable( attempts = "${book.retry.attempts:3}",
+                delay = "${book.retry.delay:1s}" )
+    public Book getBook(String title) {
+        // ...</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Setting Retry via Configuration</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Retryable( attempts = "\${book.retry.attempts:3}",
+            delay = "\${book.retry.delay:1s}")
+    Book getBook(String title) {
+        // ...</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Setting Retry via Configuration</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Retryable(attempts = "\${book.retry.attempts:3}", delay = "\${book.retry.delay:1s}")
+    open fun getBook(title: String): Book {
+        // ...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>With the above in place if <code>book.retry.attempts</code> is specified in configuration it wil be bound the value of the <code>attempts</code> member of the <code>@Retryable</code> annotation via annotation metadata.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_reactive_retry"><a class="anchor" href="#_reactive_retry"></a>Reactive Retry</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><code>@Retryable</code> advice can also be applied to methods that return reactive types, such as an RxJava <code>Flowable</code>. For example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Applying Retry Policy to Reactive Types</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Retryable
+    public Flowable&lt;Book&gt; streamBooks() {
+        // ...</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Applying Retry Policy to Reactive Types</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Retryable
+    Flowable&lt;Book&gt; streamBooks() {
+        // ...</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Applying Retry Policy to Reactive Types</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Retryable
+    open fun streamBooks(): Flowable&lt;Book&gt; {
+        // ...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In this case <code>@Retryable</code> advice will apply the retry policy to the reactive type.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_circuit_breaker"><a class="anchor" href="#_circuit_breaker"></a>Circuit Breaker</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>In a Microservice environment retry is useful, but in some cases excessive retries can overwhelm the system as clients repeatedly re-attempt failing operations.</p>
+</div>
+<div class="paragraph">
+<p>The <a href="https://en.wikipedia.org/wiki/Circuit_breaker_design_pattern">Circuit Breaker</a> pattern is designed to resolve this issue by essentially allowing a certain number of failing requests and then opening a circuit that remains open for a period before allowing any additional retry attempts.</p>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/retry/annotation/CircuitBreaker.html">CircuitBreaker</a> annotation is a variation of the <code>@Retryable</code> annotation that supports a <code>reset</code> member that indicates how long the circuit should remain open before it is reset (the default is 20 seconds).</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Applying CircuitBreaker Advice</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @CircuitBreaker(reset = "30s")
+    public List&lt;Book&gt; findBooks() {
+        // ...</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Applying CircuitBreaker Advice</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @CircuitBreaker(reset = "30s")
+    List&lt;Book&gt; findBooks() {
+        // ...</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Applying CircuitBreaker Advice</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @CircuitBreaker(reset = "30s")
+    open fun findBooks(): List&lt;Book&gt; {
+        // ...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example will retry to <code>findBooks</code> method 3 times and then open the circuit for 30 seconds, rethrowing the original exception and preventing potential downstream traffic such as HTTP requests and I/O operations flooding the system.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_bean_creation_retry"><a class="anchor" href="#_bean_creation_retry"></a>Bean Creation Retry</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>As mentioned previously, <code>@Retryable</code> advice is integrated right at the container level. This is useful as it is common problem in Microservices and environments like Docker where there may be a delay in services becoming available.</p>
+</div>
+<div class="paragraph">
+<p>The following snippet is taken from the Neo4j driver support and demonstrates how bean creation can be wrapped in retry support:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@Factory <i class="conum" data-value="1"></i><b>(1)</b>
+public class Neo4jDriverFactory {
+    ...
+    @Retryable(ServiceUnavailableException.class) <i class="conum" data-value="2"></i><b>(2)</b>
+    @Bean(preDestroy = "close")
+    public Driver buildDriver() {
+        ...
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>A factory bean is created that defines methods that create beans</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The <code>@Retryable</code> annotation is used to catch <code>ServiceUnavailableException</code> and retry creating the driver before failing startup.</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_retry_events"><a class="anchor" href="#_retry_events"></a>Retry Events</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>You can register <a href="../api/io/micronaut/retry/event/RetryEventListener.html">RetryEventListener</a> instances as beans in order to listen for <a href="../api/io/micronaut/retry/event/RetryEvent.html">RetryEvent</a> events that are published every time an operation is retried.</p>
+</div>
+<div class="paragraph">
+<p>In addition, you can register event listeners for <a href="../api/io/micronaut/retry/event/CircuitOpenEvent.html">CircuitOpenEvent</a>, when a circuit breaker circuit is opened, or <a href="../api/io/micronaut/retry/event/CircuitClosedEvent.html">CircuitClosedEvent</a> for when a circuit is closed.</p>
+</div>
+</div>
+</div>
+
+<h2 id="scheduling"><a class="anchor" href="#scheduling"></a>5.7 Scheduled Tasks</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/aop/scheduling.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Like Spring and Grails, Micronaut features a <a href="../api/io/micronaut/scheduling/annotation/Scheduled.html">Scheduled</a> annotation that can be used for scheduling background tasks.</p>
+</div>
+<div class="sect1">
+<h2 id="_using_the_scheduled_annotation"><a class="anchor" href="#_using_the_scheduled_annotation"></a>Using the @Scheduled Annotation</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/scheduling/annotation/Scheduled.html">Scheduled</a> annotation can be added to any method of a bean and you should set either the <code>fixedRate</code>, <code>fixedDelay</code> or <code>cron</code> members.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Remember that the scope of the bean has an impact on behaviour. a <code>@Singleton</code> bean will share state (the fields of the instance) each time the scheduled method is executed, while for a <code>@Prototype</code> bean a new instance is created for each execution.
+</td>
+</tr>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_scheduling_at_a_fixed_rate"><a class="anchor" href="#_scheduling_at_a_fixed_rate"></a>Scheduling at a Fixed Rate</h3>
+<div class="paragraph">
+<p>To schedule a task at a fixed rate, use the <code>fixedRate</code> member. For example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Fixed Rate Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Scheduled(fixedRate = "5m")
+    void everyFiveMinutes() {
+        System.out.println("Executing everyFiveMinutes()");
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Fixed Rate Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Scheduled(fixedRate = "5m")
+    void everyFiveMinutes() {
+        System.out.println("Executing everyFiveMinutes()")
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Fixed Rate Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Scheduled(fixedRate = "5m")
+    internal fun everyFiveMinutes() {
+        println("Executing everyFiveMinutes()")
+    }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The task above will execute every 5 minutes.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_scheduling_with_a_fixed_delay"><a class="anchor" href="#_scheduling_with_a_fixed_delay"></a>Scheduling with a Fixed Delay</h3>
+<div class="paragraph">
+<p>To schedule a task so that it runs 5 minutes after the termination of the previous task use the <code>fixedDelay</code> member. For example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Fixed Delay Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Scheduled(fixedDelay = "5m")
+    void fiveMinutesAfterLastExecution() {
+        System.out.println("Executing fiveMinutesAfterLastExecution()");
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Fixed Delay Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Scheduled(fixedDelay = "5m")
+    void fiveMinutesAfterLastExecution() {
+        System.out.println("Executing fiveMinutesAfterLastExecution()")
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Fixed Delay Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Scheduled(fixedDelay = "5m")
+    internal fun fiveMinutesAfterLastExecution() {
+        println("Executing fiveMinutesAfterLastExecution()")
+    }</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_scheduling_a_cron_task"><a class="anchor" href="#_scheduling_a_cron_task"></a>Scheduling a Cron Task</h3>
+<div class="paragraph">
+<p>To schedule a <a href="https://en.wikipedia.org/wiki/Cron">Cron</a> task use the <code>cron</code> member:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Cron Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Scheduled(cron = "0 15 10 ? * MON" )
+    void everyMondayAtTenFifteenAm() {
+        System.out.println("Executing everyMondayAtTenFifteenAm()");
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Cron Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Scheduled(cron = "0 15 10 ? * MON" )
+    void everyMondayAtTenFifteenAm() {
+        System.out.println("Executing everyMondayAtTenFifteenAm()")
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Cron Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Scheduled(cron = "0 15 10 ? * MON")
+    internal fun everyMondayAtTenFifteenAm() {
+        println("Executing everyMondayAtTenFifteenAm()")
+    }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example will run the task every Monday morning at 10:15AM for the time zone of the server.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_scheduling_with_only_an_initial_delay"><a class="anchor" href="#_scheduling_with_only_an_initial_delay"></a>Scheduling with only an Initial Delay</h3>
+<div class="paragraph">
+<p>To schedule a task so that it runs a single time after the server starts, use the <code>initialDelay</code> member:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Initial Delay Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Scheduled(initialDelay = "1m" )
+    void onceOneMinuteAfterStartup() {
+        System.out.println("Executing onceOneMinuteAfterStartup()");
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Initial Delay Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Scheduled(initialDelay = "1m" )
+    void onceOneMinuteAfterStartup() {
+        System.out.println("Executing onceOneMinuteAfterStartup()")
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Initial Delay Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Scheduled(initialDelay = "1m")
+    internal fun onceOneMinuteAfterStartup() {
+        println("Executing onceOneMinuteAfterStartup()")
+    }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example will only run a single time 1 minute after the server starts.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_programmatically_scheduling_tasks"><a class="anchor" href="#_programmatically_scheduling_tasks"></a>Programmatically Scheduling Tasks</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If you wish to programmatically schedule tasks, then you can use the <a href="../api/io/micronaut/scheduling/TaskScheduler.html">TaskScheduler</a> bean which can be injected as follows:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Inject
+    @Named(TaskExecutors.SCHEDULED)
+    TaskScheduler taskScheduler;</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Inject
+    @Named(TaskExecutors.SCHEDULED)
+    TaskScheduler taskScheduler</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Inject
+    @Named(TaskExecutors.SCHEDULED)
+    lateinit var taskScheduler: TaskScheduler</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_configuring_scheduled_tasks_with_annotation_metadata"><a class="anchor" href="#_configuring_scheduled_tasks_with_annotation_metadata"></a>Configuring Scheduled Tasks with Annotation Metadata</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If you wish to make your application&#8217;s tasks configurable then you can use annotation metadata and property placeholder configuration to do so. For example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Allow tasks to be configured</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Scheduled( fixedRate = "${my.task.rate:5m}",
+                initialDelay = "${my.task.delay:1m}" )
+    void configuredTask() {
+        System.out.println("Executing configuredTask()");
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Allow tasks to be configured</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Scheduled( fixedRate = "\${my.task.rate:5m}",
+                initialDelay = "\${my.task.delay:1m}" )
+    void configuredTask() {
+        System.out.println("Executing configuredTask()")
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Allow tasks to be configured</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Scheduled(fixedRate = "\${my.task.rate:5m}",
+            initialDelay = "\${my.task.delay:1m}")
+    internal fun configuredTask() {
+        println("Executing configuredTask()")
+    }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example allows the task execution frequency to be configured with the property <code>my.task.rate</code> and the initial delay to be configured with the property <code>my.task.delay</code>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_configuring_the_scheduled_task_thread_pool"><a class="anchor" href="#_configuring_the_scheduled_task_thread_pool"></a>Configuring the Scheduled Task Thread Pool</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Tasks executed by <code>@Scheduled</code> are by default run on a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html">ScheduledExecutorService</a> that is configured to have twice the number of threads as available processors.</p>
+</div>
+<div class="paragraph">
+<p>You can configure this thread pool as desired using <code>application.yml</code>, for example:</p>
+</div>
+<div class="listingblock">
+<div class="title">Configuring Scheduled Task Thread Pool</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    executors:
+        scheduled:
+            type: scheduled
+            core-pool-size: 30</code></pre>
+</div>
+</div>
+<a id="io.micronaut.scheduling.executor.UserExecutorConfiguration" href="#io.micronaut.scheduling.executor.UserExecutorConfiguration">&#128279;</a>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Configuration Properties for <a href="../api/io/micronaut/scheduling/executor/UserExecutorConfiguration.html">UserExecutorConfiguration</a></caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Property</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.executors.*.n-threads</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.Integer</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.executors.*.type</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/scheduling/executor/ExecutorType.html">ExecutorType</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the executor type. Default value (<a href="../api/io/micronaut/scheduling/executor/ExecutorType.html#SCHEDULED">SCHEDULED</a>).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.executors.*.parallelism</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.Integer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the parallelism for <a href="../api/io/micronaut/scheduling/executor/ExecutorType.html#WORK_STEALING">WORK_STEALING</a>. Default value (Number of processors available to the Java virtual machine).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.executors.*.core-pool-size</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.Integer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the core pool size for <a href="../api/io/micronaut/scheduling/executor/ExecutorType.html#SCHEDULED">SCHEDULED</a>. Default value (2 * Number of processors available to the Java virtual machine).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.executors.*.thread-factory-class</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.Class</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the thread factory class.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.executors.*.number-of-threads</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.Integer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the number of threads for <a href="../api/io/micronaut/scheduling/executor/ExecutorType.html#FIXED">FIXED</a>. Default value (2 * Number of processors available to the Java virtual machine).</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_handling_exceptions"><a class="anchor" href="#_handling_exceptions"></a>Handling Exceptions</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>By default Micronaut includes a <a href="../api/io/micronaut/scheduling/DefaultTaskExceptionHandler.html">DefaultTaskExceptionHandler</a> bean that implements the <a href="../api/io/micronaut/scheduling/TaskExceptionHandler.html">TaskExceptionHandler</a> and simply logs the exception if an error occurs invoking a scheduled task.</p>
+</div>
+<div class="paragraph">
+<p>If you have custom requirements you can replace this bean with a custom implementation (for example if you wish to send an email or shutdown context to fail fast). To do so simply write your own <a href="../api/io/micronaut/scheduling/TaskExceptionHandler.html">TaskExceptionHandler</a> and annotate it with <code>@Replaces(DefaultTaskExceptionHandler.class)</code>.</p>
+</div>
+</div>
+</div>
+
+<h2 id="springAop"><a class="anchor" href="#springAop"></a>5.8 Bridging Spring AOP</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/aop/springAop.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Although Micronaut&#8217;s design is based on a compile time approach and does not rely on Spring dependency injection, there is still a lot of value in the Spring ecosystem that does not depend directly on the Spring container.</p>
+</div>
+<div class="paragraph">
+<p>You may wish to use existing Spring projects within Micronaut and configure beans to be used within Micronaut.</p>
+</div>
+<div class="paragraph">
+<p>You may also wish to leverage existing AOP advice from Spring. One example of this is Spring&#8217;s support for declarative transactions with <code>@Transactional</code>.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut provides support for Spring based transaction management without requiring Spring itself. You simply need to add the <code>spring</code> module to your application dependencies:</p>
+</div>
+<div class="paragraph">
+<p>        <div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="gradle">implementation <span class="hljs-string">'io.micronaut:micronaut-spring'</span></code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="maven">&lt;dependency&gt;
+    &lt;groupId&gt;io.micronaut&lt;/groupId&gt;
+    &lt;artifactId&gt;micronaut-spring&lt;/artifactId&gt;
+&lt;/dependency&gt;</code></pre>
+</div>
+</div>
+</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+If you use Micronaut&#8217;s <a href="#hibernateSupport">Hibernate support</a> you already get this dependency and a <code>HibernateTransactionManager</code> is configured for you.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>This is done by defining a Micronaut <a href="../api/io/micronaut/spring/tx/annotation/Transactional.html">@Transactional</a> annotation that uses <a href="../api/io/micronaut/context/annotation/AliasFor.html">@AliasFor</a> in a manner that every time you set a value with <a href="../api/io/micronaut/spring/tx/annotation/Transactional.html">@Transactional</a> it aliases the value to equivalent value in Spring&#8217;s version of <code>@Transactional</code>.</p>
+</div>
+<div class="paragraph">
+<p>The benefit here is you can use Micronaut&#8217;s compile-time, reflection free AOP to declare programmatic Spring transactions. For example:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using @Transactional</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">import io.micronaut.spring.tx.annotation.*;
+...
+
+@Transactional
+public Book saveBook(String title) {
+    ...
+}</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Micronaut&#8217;s version of <a href="../api/io/micronaut/spring/tx/annotation/Transactional.html">@Transactional</a> is also annotated with <a href="../api/io/micronaut/core/annotation/Blocking.html">@Blocking</a> ensuring that all methods annotated with use the I/O thread pool when executing within the HTTP server
+</td>
+</tr>
+</table>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../guide/config.html">&lt;&lt; <strong>4</strong><span>Application Configuration</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,38 @@
+++++
+<a id="io.micronaut.scheduling.executor.UserExecutorConfiguration" href="#io.micronaut.scheduling.executor.UserExecutorConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.scheduling.executor.UserExecutorConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.executors.*.n-threads+`
+|java.lang.Integer
+|
+
+
+| `+micronaut.executors.*.type+`
+|api:io.micronaut.scheduling.executor.ExecutorType[]
+|Sets the executor type. Default value (api:scheduling.executor.ExecutorType#SCHEDULED[]).
+
+
+| `+micronaut.executors.*.parallelism+`
+|java.lang.Integer
+|Sets the parallelism for api:scheduling.executor.ExecutorType#WORK_STEALING[]. Default value (Number of processors available to the Java virtual machine).
+
+
+| `+micronaut.executors.*.core-pool-size+`
+|java.lang.Integer
+|Sets the core pool size for api:scheduling.executor.ExecutorType#SCHEDULED[]. Default value (2 * Number of processors available to the Java virtual machine).
+
+
+| `+micronaut.executors.*.thread-factory-class+`
+|java.lang.Class
+|Sets the thread factory class.
+
+
+| `+micronaut.executors.*.number-of-threads+`
+|java.lang.Integer
+|Sets the number of threads for api:scheduling.executor.ExecutorType#FIXED[]. Default value (2 * Number of processors available to the Java virtual machine).
+
+
+|===

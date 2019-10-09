@@ -1,0 +1,18 @@
+++++
+<a id="io.micronaut.management.endpoint.EndpointConfiguration" href="#io.micronaut.management.endpoint.EndpointConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.management.endpoint.EndpointConfiguration[]
+|===
+|Property |Type |Description
+
+| `+endpoints.*.enabled+`
+|java.lang.Boolean
+|Sets whether the endpoint is enabled.
+
+
+| `+endpoints.*.sensitive+`
+|java.lang.Boolean
+|Sets whether the endpoint is sensitive.
+
+
+|===

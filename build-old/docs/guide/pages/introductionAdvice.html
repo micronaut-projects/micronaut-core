@@ -1,0 +1,445 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>5.2 Introduction Advice 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/config.html">&lt;&lt; <strong>4</strong><span>Application Configuration</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>5.2 Introduction Advice</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="introductionAdvice"><a class="anchor" href="#introductionAdvice"></a>5.2 Introduction Advice</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/aop/introductionAdvice.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Introduction advice is distinct from Around advice in that it involves providing an implementation instead of decorating.</p>
+</div>
+<div class="paragraph">
+<p>Examples of introduction advice include things like <a href="http://gorm.grails.org">GORM</a> or <a href="http://projects.spring.io/spring-data">Spring Data</a> that will both automatically implement persistence logic for you.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut&#8217;s <a href="../api/io/micronaut/http/client/annotation/Client.html">Client</a> annotation is another example of introduction advice where Micronaut will, at compile time, implement HTTP client interfaces for you.</p>
+</div>
+<div class="paragraph">
+<p>The way you implement Introduction advice is very similar to how you implement Around advice.</p>
+</div>
+<div class="paragraph">
+<p>You start off by defining an annotation that will power the introduction advice. As an example, say you want to implement advice that will return a stubbed value for every method in an interface (a common requirement in testing frameworks). Consider the following <code>@Stub</code> annotation:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Introduction Advice Annotation Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import io.micronaut.aop.Introduction;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Type;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+@Introduction <b class="conum">(1)</b>
+@Type(StubIntroduction.class) <b class="conum">(2)</b>
+@Bean <b class="conum">(3)</b>
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.METHOD})
+public @interface Stub {
+    String value() default "";
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Introduction Advice Annotation Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.aop.Introduction
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Type
+
+import java.lang.annotation.Documented
+import java.lang.annotation.ElementType
+import java.lang.annotation.Retention
+import java.lang.annotation.Target
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME
+
+@Introduction <b class="conum">(1)</b>
+@Type(StubIntroduction.class) <b class="conum">(2)</b>
+@Bean <b class="conum">(3)</b>
+@Documented
+@Retention(RUNTIME)
+@Target([ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.METHOD])
+@interface Stub {
+    String value() default ""
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Introduction Advice Annotation Example</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.aop.Introduction
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Type
+
+import java.lang.annotation.Documented
+import java.lang.annotation.Retention
+
+import java.lang.annotation.RetentionPolicy.RUNTIME
+
+
+@Introduction <b class="conum">(1)</b>
+@Type(StubIntroduction::class) <b class="conum">(2)</b>
+@Bean <b class="conum">(3)</b>
+@Documented
+@Retention(RUNTIME)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FILE, AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER, AnnotationTarget.PROPERTY_SETTER)
+annotation class Stub(val value: String = "")</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The introduction advice is annotated with <a href="../api/io/micronaut/aop/Introduction.html">Introduction</a></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The <a href="../api/io/micronaut/context/annotation/Type.html">Type</a> annotation is used to refer to the implementor of the advise. In this case <code>StubIntroduction</code></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The <a href="../api/io/micronaut/context/annotation/Bean.html">Bean</a> annotation is added so that all types annotated with <code>@Stub</code> become beans</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The <code>StubIntroduction</code> class referred to in the previous example must then implement the <a href="../api/io/micronaut/aop/MethodInterceptor.html">MethodInterceptor</a> interface, just like around advice.</p>
+</div>
+<div class="paragraph">
+<p>The following is an example implementation:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubIntroduction</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.aop.*;
+import javax.inject.Singleton;
+
+@Singleton
+public class StubIntroduction implements MethodInterceptor&lt;Object,Object&gt; { <b class="conum">(1)</b>
+
+    @Override
+    public Object intercept(MethodInvocationContext&lt;Object, Object&gt; context) {
+        return context.getValue( <b class="conum">(2)</b>
+                Stub.class,
+                context.getReturnType().getType()
+        ).orElse(null); <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubIntroduction</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.aop.MethodInterceptor
+import io.micronaut.aop.MethodInvocationContext
+
+import javax.inject.Singleton
+
+@Singleton
+class StubIntroduction implements MethodInterceptor&lt;Object,Object&gt; { <b class="conum">(1)</b>
+
+    @Override
+    Object intercept(MethodInvocationContext&lt;Object, Object&gt; context) {
+        return context.getValue( <b class="conum">(2)</b>
+                Stub.class,
+                context.getReturnType().getType()
+        ).orElse(null) <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubIntroduction</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.aop.MethodInterceptor
+import io.micronaut.aop.MethodInvocationContext
+
+import javax.inject.Singleton
+
+
+@Singleton
+class StubIntroduction : MethodInterceptor&lt;Any, Any&gt; { <b class="conum">(1)</b>
+
+    override fun intercept(context: MethodInvocationContext&lt;Any, Any&gt;): Any? {
+        return context.getValue&lt;Any&gt;( <b class="conum">(2)</b>
+                Stub::class.java,
+                context.returnType.type
+        ).orElse(null) <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The class is annotated with <code>@Singleton</code> and implements the <a href="../api/io/micronaut/aop/MethodInterceptor.html">MethodInterceptor</a> interface</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The value of the <code>@Stub</code> annotation is read from the context and an attempt made to convert the value to the return type</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>Otherwise <code>null</code> is returned</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>To now use this introduction advice in an application you simply annotate your abstract classes or interfaces with <code>@Stub</code>:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubExample</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Singleton
+public class StubIntroduction implements MethodInterceptor&lt;Object,Object&gt; { <b class="conum">(1)</b>
+
+    @Override
+    public Object intercept(MethodInvocationContext&lt;Object, Object&gt; context) {
+        return context.getValue( <b class="conum">(2)</b>
+                Stub.class,
+                context.getReturnType().getType()
+        ).orElse(null); <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubExample</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Singleton
+class StubIntroduction implements MethodInterceptor&lt;Object,Object&gt; { <b class="conum">(1)</b>
+
+    @Override
+    Object intercept(MethodInvocationContext&lt;Object, Object&gt; context) {
+        return context.getValue( <b class="conum">(2)</b>
+                Stub.class,
+                context.getReturnType().getType()
+        ).orElse(null) <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">StubExample</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Singleton
+class StubIntroduction : MethodInterceptor&lt;Any, Any&gt; { <b class="conum">(1)</b>
+
+    override fun intercept(context: MethodInvocationContext&lt;Any, Any&gt;): Any? {
+        return context.getValue&lt;Any&gt;( <b class="conum">(2)</b>
+                Stub::class.java,
+                context.returnType.type
+        ).orElse(null) <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>All abstract methods will delegate to the <code>StubIntroduction</code> class to be implemented.</p>
+</div>
+<div class="paragraph">
+<p>The following test demonstrates the behaviour or <code>StubIntroduction</code>:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Testing Introduction Advice</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">        StubExample stubExample = applicationContext.getBean(StubExample.class);
+
+        assertEquals(10, stubExample.getNumber());
+        assertNull(stubExample.getDate());</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Testing Introduction Advice</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">        when:
+        StubExample stubExample = applicationContext.getBean(StubExample.class)
+
+        then:
+        stubExample.getNumber() == 10
+        stubExample.getDate() == null</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Testing Introduction Advice</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">        val stubExample = applicationContext.getBean(StubExample::class.java)
+
+        stubExample.number.toLong().shouldBe(10)
+        stubExample.date.shouldBe(null)</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Note that if the introduction advice cannot implement the method the <code>proceed</code> method of the <a href="../api/io/micronaut/aop/MethodInvocationContext.html">MethodInvocationContext</a> should be called. This gives the opportunity for other introduction advice interceptors to implement the method, otherwise a <code>UnsupportedOperationException</code> will be thrown if no advice can implement the method.</p>
+</div>
+<div class="paragraph">
+<p>In addition, if multiple introduction advice are present you may wish to override the <code>getOrder()</code> method of <a href="../api/io/micronaut/aop/MethodInterceptor.html">MethodInterceptor</a> to control the priority of advise.</p>
+</div>
+<div class="paragraph">
+<p>The following sections cover core advice types that are built into Micronaut and provided by the framework.</p>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/config.html">&lt;&lt; <strong>4</strong><span>Application Configuration</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

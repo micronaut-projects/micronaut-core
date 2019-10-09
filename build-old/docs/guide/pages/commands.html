@@ -1,0 +1,510 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>17.4 Commands 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/multitenancy.html">&lt;&lt; <strong>16</strong><span>Multi-Tenancy</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>17.4 Commands</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="commands"><a class="anchor" href="#commands"></a>17.4 Commands</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/commands.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Profiles can include commands for generating common code artifacts. Not all commands are supported by all profiles; the available commands for a given profile can be viewed using the <code>profile-info</code> command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn profile-info service
+Profile: service
+------------------
+The service profile
+
+Provided Commands:
+--------------------
+  create-bean              Creates a singleton bean
+  create-client            Creates a client interface
+  create-controller        Creates a controller and associated test
+  create-job               Creates a job with scheduled method
+  create-test              Creates a simple test for the project's testing framework
+  create-websocket-client  Creates a Websocket client
+  create-websocket-server  Creates a Websocket server
+  help                     Prints help information for a specific command
+
+
+Provided Features:
+------------------
+...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>All of the code-generation commands will honor the values written in <code>micronaut-cli.yml</code>. For example, assume the following <code>micronaut-cli.yml</code> file.</p>
+</div>
+<div class="listingblock">
+<div class="title">micronaut-cli.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">profile: service
+defaultPackage: example
+---
+testFramework: spock
+sourceLanguage: java</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>With the above settings, the <code>create-controller</code> command will (by default) generate Java controllers with an associated Spock test, under the <code>example</code> package. Commands accept arguments and these defaults can be overriden on a per-command basis.</p>
+</div>
+<div class="sect1">
+<h2 id="_base_profile_commands"><a class="anchor" href="#_base_profile_commands"></a>Base Profile Commands</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Commands in the base profile are inherited by all other profiles and are always available.</p>
+</div>
+<div class="sect2">
+<h3 id="_create_bean"><a class="anchor" href="#_create_bean"></a>Create-Bean</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Create-Bean Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the bean class</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-bean</code> command generates a simple <a href="https://docs.oracle.com/javaee/6/api/javax/inject/Singleton.html">Singleton</a> class. It does not create an associated test.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-bean EmailService
+| Rendered template Bean.java to destination src/main/java/example/EmailService.java</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_create_job"><a class="anchor" href="#_create_job"></a>Create-Job</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 2. Create-Job Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the job class</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-job</code> command generates a simple <a href="../api/io/micronaut/scheduling/annotation/Scheduled.html">Scheduled</a> class. It follows a <code>*Job</code> convention for generating the class name. It does not create an associated test.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-job UpdateFeeds --lang groovy
+| Rendered template Job.groovy to destination src/main/groovy/example/UpdateFeedsJob.groovy</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_service_profile_commands"><a class="anchor" href="#_service_profile_commands"></a>Service Profile Commands</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The service profile includes commands that are dependent upon the HTTP server and client dependencies (which are not included in the base profile).</p>
+</div>
+<div class="sect2">
+<h3 id="_create_controller"><a class="anchor" href="#_create_controller"></a>Create-Controller</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 3. Create-Controller Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the controller</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-controller</code> command generates a <a href="../api/io/micronaut/http/annotation/Controller.html">Controller</a> class. It follows a <code>*Controller</code> convention for generating the class name. It creates an associated test that will run the application and instantiate an HTTP client, which can make requests against the controller.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-controller Book
+| Rendered template Controller.java to destination src/main/java/example/BookController.java
+| Rendered template ControllerTest.java to destination src/test/java/example/BookControllerTest.java</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_create_client"><a class="anchor" href="#_create_client"></a>Create-Client</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 4. Create-Client Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the client</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-client</code> command generates a simple <a href="../api/io/micronaut/http/client/annotation/Client.html">Client</a> interface. It follows a <code>*Client</code> convention for generating the class name. It does not create an associated test.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-client Book
+| Rendered template Client.java to destination src/main/java/example/BookClient.java</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_create_websocket_server"><a class="anchor" href="#_create_websocket_server"></a>Create-Websocket-Server</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 5. Create-Websocket-Server Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the server</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-websocket-server</code> command generates a simple <a href="../api/io/micronaut/websocket/WebSocketServer.html">WebSocketServer</a> class. It follows a <code>*Server</code> convention for generating the class name. It does not create an associated test.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-websocket-server MyChat
+| Rendered template WebsocketServer.java to destination src/main/java/example/MyChatServer.java</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_create_websocket_client"><a class="anchor" href="#_create_websocket_client"></a>Create-Websocket-Client</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 6. Create-Websocket-Client Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the client</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-websocket-client</code> command generates a simple <a href="../api/io/micronaut/websocket/WebSocketClient.html">WebSocketClient</a> abstract class. It follows a <code>*Client</code> convention for generating the class name. It does not create an associated test.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-websocket-client MyChat
+| Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_cli_profile_commands"><a class="anchor" href="#_cli_profile_commands"></a>CLI Profile Commands</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The cli profile lets you generate CLI commands to control your application.</p>
+</div>
+<div class="sect2">
+<h3 id="_create_command"><a class="anchor" href="#_create_command"></a>Create-Command</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 7. Create-Command Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the command</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-command</code> command generates a standalone application that can be executed as a
+<a href="http://picocli.info">picocli</a> <a href="http://picocli.info/apidocs/picocli/CommandLine.Command.html">Command</a>.
+It follows a <code>*Command</code> convention for generating the class name.
+It creates an associated test that will run the application and verify that a command line option was set.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-command print
+| Rendered template Command.java to destination src/main/java/example/PrintCommand.java
+| Rendered template CommandTest.java to destination src/test/java/example/PrintCommandTest.java</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/multitenancy.html">&lt;&lt; <strong>16</strong><span>Multi-Tenancy</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

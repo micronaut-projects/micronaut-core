@@ -1,0 +1,535 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>6.4 Simple Request Binding 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/aop.html">&lt;&lt; <strong>5</strong><span>Aspect Oriented Programming</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>6.4 Simple Request Binding</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="binding"><a class="anchor" href="#binding"></a>6.4 Simple Request Binding</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/httpServer/binding.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The examples in the previous section demonstrates how Micronaut allows you to bind method parameters from URI path variables. This section will discuss how to bind arguments from other parts of the request.</p>
+</div>
+<div class="sect1">
+<h2 id="_binding_annotations"><a class="anchor" href="#_binding_annotations"></a>Binding Annotations</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>All of the binding annotations support customization of the name of the variable being bound from with their <code>name</code> member.</p>
+</div>
+<div class="paragraph">
+<p>The following table summarizes the annotations, their purpose and provides an example:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Parameter Binding Annotations</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Annotation</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/http/annotation/Body.html">@Body</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Binds from the body of the request</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Body String body</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/http/annotation/CookieValue.html">@CookieValue</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Binds a parameter from a cookie</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@CookieValue String myCookie</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/http/annotation/Header.html">@Header</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Binds a parameter from an HTTP header</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Header String contentType</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/http/annotation/QueryValue.html">@QueryValue</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Binds from a request query parameter</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@QueryValue String myParam</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/http/annotation/Part.html">@Part</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Binds from a part of a multipart request</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Part CompletedFileUpload file</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/http/annotation/RequestAttribute.html">@RequestAttribute</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Binds from an attribute of the request. Attributes are typically created in filters</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@RequestAttribute String myAttribute</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/http/annotation/RequestAttribute.html">@PathVariable</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Binds from the path of the request</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@PathVariable String id</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>When a value is not specified to any binding annotation then the parameter name is used. In other words the following two methods are equivalent and both bind from a cookie called <code>myCookie</code>:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Get("/cookieName")
+    public String cookieName(@CookieValue("myCookie") String myCookie) {
+        // ...
+    }
+
+    @Get("/cookieInferred")
+    public String cookieInferred(@CookieValue String myCookie) {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Get("/cookieName")
+    String cookieName(@CookieValue("myCookie") String myCookie) {
+        // ...
+    }
+
+    @Get("/cookieInferred")
+    String cookieInferred(@CookieValue String myCookie) {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Get("/cookieName")
+    fun cookieName(@CookieValue("myCookie") myCookie: String): String {
+        // ...
+    }
+
+    @Get("/cookieInferred")
+    fun cookieInferred(@CookieValue myCookie: String): String {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Because hyphens are not allowed in variable names it may be necessary to set the name in the annotation. The following two definitions are equivalent:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Get("/headerName")
+    public String headerName(@Header("Content-Type") String contentType) {
+        // ...
+    }
+
+    @Get("/headerInferred")
+    public String headerInferred(@Header String contentType) {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Get("/headerName")
+    String headerName(@Header("Content-Type") String contentType) {
+        // ...
+    }
+
+    @Get("/headerInferred")
+    String headerInferred(@Header String contentType) {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Get("/headerName")
+    fun headerName(@Header("Content-Type") contentType: String): String {
+        // ...
+    }
+
+    @Get("/headerInferred")
+    fun headerInferred(@Header contentType: String): String {
+        // ...
+    }</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_binding_from_multiple_values"><a class="anchor" href="#_binding_from_multiple_values"></a>Binding from Multiple values</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Instead of binding from a single section of the request, it may be desirable to bind all query values for example to a POJO. This can be achieved by using the exploded operator (<code>?pojo*</code>) in the URI template. For example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Binding Request parameters to POJO</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.http.HttpStatus;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+
+import javax.annotation.Nullable;
+import javax.validation.Valid;
+
+@Controller("/api")
+public class BookmarkController {
+
+    @Get("/bookmarks/list{?paginationCommand*}")
+    public HttpStatus list(@Valid @Nullable PaginationCommand paginationCommand) {
+        return HttpStatus.OK;
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Binding Request parameters to POJO</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+
+import javax.annotation.Nullable
+import javax.validation.Valid
+
+@Controller("/api")
+class BookmarkController {
+
+    @Get("/bookmarks/list{?paginationCommand*}")
+    HttpStatus list(@Valid @Nullable PaginationCommand paginationCommand) {
+        HttpStatus.OK
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Binding Request parameters to POJO</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.validation.Validated
+import javax.validation.Valid
+
+@Controller("/api")
+open class BookmarkController {
+
+    @Get("/bookmarks/list{?paginationCommand*}")
+    open fun list(@Valid paginationCommand: PaginationCommand): HttpStatus {
+        return HttpStatus.OK
+    }
+}</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_bindable_types"><a class="anchor" href="#_bindable_types"></a>Bindable Types</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Generally any type that can be converted from a String representation to a Java type via the <a href="../api/io/micronaut/core/convert/ConversionService.html">ConversionService</a> API can be bound to.</p>
+</div>
+<div class="paragraph">
+<p>This includes most common Java types, however additional <a href="../api/io/micronaut/core/convert/TypeConverter.html">TypeConverter</a> instances can be registered simply be creating <code>@Singleton</code> beans of type <code>TypeConverter</code>.</p>
+</div>
+<div class="paragraph">
+<p>The handling of nullability deserves special mention. Consider for example the following example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Get("/headerInferred")
+    public String headerInferred(@Header String contentType) {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Get("/headerInferred")
+    String headerInferred(@Header String contentType) {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Get("/headerInferred")
+    fun headerInferred(@Header contentType: String): String {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In this case if the HTTP header <code>Content-Type</code> is not present in the request the route is considered invalid, since it cannot be satisfied and a HTTP 400 <code>BAD REQUEST</code> is returned.</p>
+</div>
+<div class="paragraph">
+<p>If you wish for the <code>Content-Type</code> header to be optional, you can instead write:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Get("/headerNullable")
+    public String headerNullable(@Nullable @Header String contentType) {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Get("/headerNullable")
+    String headerNullable(@Nullable @Header String contentType) {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Get("/headerNullable")
+    fun headerNullable(@Header contentType: String?): String? {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>An null string will be passed if the header is absent from the request.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+<code>java.util.Optional</code> can also be used, however that is discouraged for method parameters.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Additionally, any <code>DateTime</code> that conforms to <a href="https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html#RFC_1123_DATE_TIME">RFC-1123</a> can be bound to a parameter, alternatively the format can be customized with the <a href="../api/io/micronaut/core/convert/format/Format.html">Format</a> annotation:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Get("/date")
+    public String date(@Header ZonedDateTime date) {
+        // ...
+    }
+
+    @Get("/dateFormat")
+    public String dateFormat(@Format("dd/MM/yyyy hh:mm:ss a z") @Header ZonedDateTime date) {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Get("/date")
+    String date(@Header ZonedDateTime date) {
+        // ...
+    }
+
+    @Get("/dateFormat")
+    String dateFormat(@Format("dd/MM/yyyy hh:mm:ss a z") @Header ZonedDateTime date) {
+        // ...
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">    @Get("/date")
+    fun date(@Header date: ZonedDateTime): String {
+        // ...
+    }
+
+    @Get("/dateFormat")
+    fun dateFormat(@Format("dd/MM/yyyy hh:mm:ss a z") @Header date: ZonedDateTime): String {
+        // ...
+    }</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_variables_resolution"><a class="anchor" href="#_variables_resolution"></a>Variables resolution</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Micronaut will try to populate method arguments in the following order:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>URI variables like <code>/{id}</code>.</p>
+</li>
+<li>
+<p>If the request is a <code>GET</code> request from query parameters (ie. <code>?foo=bar</code>).</p>
+</li>
+<li>
+<p>If there is a <code>@Body</code> and request allows the body, bind the body to it.</p>
+</li>
+<li>
+<p>if the request can have a body and no <code>@Body</code> is defined then try parse the body (either JSON or form data) and
+bind the method arguments from the body.</p>
+</li>
+<li>
+<p>Finally, if the method arguments cannot be populated return <code>400 BAD REQUEST</code>.</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/aop.html">&lt;&lt; <strong>5</strong><span>Aspect Oriented Programming</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

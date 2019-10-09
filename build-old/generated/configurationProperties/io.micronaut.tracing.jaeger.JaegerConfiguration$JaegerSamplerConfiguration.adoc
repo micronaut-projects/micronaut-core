@@ -1,0 +1,30 @@
+
+++++
+<a id="io.micronaut.tracing.jaeger.JaegerConfiguration$JaegerSamplerConfiguration" href="#io.micronaut.tracing.jaeger.JaegerConfiguration$JaegerSamplerConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.tracing.jaeger.JaegerConfiguration$JaegerSamplerConfiguration[]
+|===
+|Property |Type |Description
+
+| `+tracing.jaeger.sampler.type+`
+|java.lang.String
+|
+
+
+| `+tracing.jaeger.sampler.param+`
+|java.lang.Number
+|
+
+
+| `+tracing.jaeger.sampler.manager-host-port+`
+|java.lang.String
+|
+
+
+| `+tracing.jaeger.sampler.probability+`
+|float
+|Sets the sampler probability used by the default {@link brave.sampler.CountingSampler}. A value of 1.0
+ indicates to sample all requests. A value of 0.1 indicates to sample 10% of requests.
+
+
+|===

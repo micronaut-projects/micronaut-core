@@ -1,0 +1,63 @@
+++++
+<a id="io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration" href="#io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.server.netty.child-options+`
+|java.util.Map
+|Sets the Netty child worker options.
+
+
+| `+micronaut.server.netty.options+`
+|java.util.Map
+|Sets the channel options.
+
+
+| `+micronaut.server.netty.max-initial-line-length+`
+|int
+|Sets the maximum initial line length for the HTTP request. Default value (4096).
+
+
+| `+micronaut.server.netty.max-header-size+`
+|int
+|Sets the maximum size of any one header. Default value (8192).
+
+
+| `+micronaut.server.netty.max-chunk-size+`
+|int
+|Sets the maximum size of any single request chunk. Default value (8192).
+
+
+| `+micronaut.server.netty.chunked-supported+`
+|boolean
+|Sets whether chunked transfer encoding is supported. Default value (true).
+
+
+| `+micronaut.server.netty.validate-headers+`
+|boolean
+|Sets whether to validate incoming headers. Default value (true).
+
+
+| `+micronaut.server.netty.initial-buffer-size+`
+|int
+|Sets the initial buffer size. Default value (128).
+
+
+| `+micronaut.server.netty.log-level+`
+|io.netty.handler.logging.LogLevel
+|Sets the Netty log level.
+
+
+| `+micronaut.server.netty.compression-threshold+`
+|int
+|Sets the minimum size of a request body must be in order to be compressed. Default value (1024).
+
+
+| `+micronaut.server.netty.use-native-transport+`
+|boolean
+|Sets whether to use netty's native transport (epoll or kqueue) if available . Default value (false).
+
+
+|===

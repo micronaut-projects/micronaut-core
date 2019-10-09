@@ -1,0 +1,18 @@
+++++
+<a id="io.micronaut.multitenancy.tenantresolver.FixedTenantResolverConfigurationProperties" href="#io.micronaut.multitenancy.tenantresolver.FixedTenantResolverConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.tenantresolver.FixedTenantResolverConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantresolver.fixed.enabled+`
+|boolean
+|Enables api:multitenancy.tenantresolver.FixedTenantResolver[]. Default value (false).
+
+
+| `+micronaut.multitenancy.tenantresolver.fixed.tenant-id+`
+|java.lang.String
+|The fixed tenant ID. Default value to ("DEFAULT").
+
+
+|===

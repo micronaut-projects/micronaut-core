@@ -1,0 +1,94 @@
+++++
+<a id="io.micronaut.http.client.DefaultHttpClientConfiguration" href="#io.micronaut.http.client.DefaultHttpClientConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.client.DefaultHttpClientConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.http.client.ssl-configuration+`
+|api:io.micronaut.http.ssl.SslConfiguration[]
+|Sets the SSL configuration for the client.
+
+
+| `+micronaut.http.client.logger-name+`
+|java.lang.String
+|Sets the client-specific logger name.
+
+
+| `+micronaut.http.client.follow-redirects+`
+|boolean
+|Sets whether redirects should be followed. Default value (api:http.client.HttpClientConfiguration#DEFAULT_FOLLOW_REDIRECTS[]).
+
+
+| `+micronaut.http.client.default-charset+`
+|java.nio.charset.Charset
+|Sets the default charset to use. Default value (UTF-8);
+
+
+| `+micronaut.http.client.channel-options+`
+|java.util.Map
+|The Netty channel options
+
+
+| `+micronaut.http.client.shutdown-timeout+`
+|java.time.Duration
+|Sets the amount of time to wait for shutdown of client thread pools. Default value (100 milliseconds).
+
+
+| `+micronaut.http.client.read-timeout+`
+|java.time.Duration
+|Sets the read timeout. Default value (10 seconds).
+
+
+| `+micronaut.http.client.read-idle-timeout+`
+|java.time.Duration
+|Sets the max read idle time for streaming requests. Default value (5 seconds).
+
+
+| `+micronaut.http.client.connect-timeout+`
+|java.time.Duration
+|Sets the connect timeout.
+
+
+| `+micronaut.http.client.num-of-threads+`
+|java.lang.Integer
+|Sets the number of threads the client should use for requests.
+
+
+| `+micronaut.http.client.thread-factory+`
+|java.lang.Class
+|Sets a thread factory.
+
+
+| `+micronaut.http.client.max-content-length+`
+|int
+|Sets the maximum content length the client can consume. Default value (1024 * 1024 * 10 => 10MB).
+
+
+| `+micronaut.http.client.proxy-type+`
+|java.net.Proxy$Type
+|The proxy type
+
+
+| `+micronaut.http.client.proxy-address+`
+|java.net.SocketAddress
+|Sets a proxy address.
+
+
+| `+micronaut.http.client.proxy-username+`
+|java.lang.String
+|Sets the proxy user name to use.
+
+
+| `+micronaut.http.client.proxy-password+`
+|java.lang.String
+|Sets the proxy password.
+
+
+| `+micronaut.http.client.proxy-selector+`
+|java.net.ProxySelector
+|Sets the proxy selector.
+ ProxySelector decides what proxy to use and take precedence over {@link #setProxyAddress(SocketAddress)} and {@link #setProxyType(Proxy.Type)}.
+
+
+|===

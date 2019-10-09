@@ -1,0 +1,2080 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>17 Micronaut CLI 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../guide/multitenancy.html">&lt;&lt; <strong>16</strong><span>Multi-Tenancy</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../guide/appendix.html"><strong>18</strong><span>Appendices</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>17 Micronaut CLI</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+                <div id="table-of-content">
+                    <h2>Table of Contents</h2>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#createProject"><strong>17.1</strong><span>Creating a Project</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#profiles"><strong>17.2</strong><span>Profiles</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#comparingVersions"><strong>17.2.1</strong><span>Comparing Versions</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#features"><strong>17.3</strong><span>Features</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#commands"><strong>17.4</strong><span>Commands</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#reloading"><strong>17.5</strong><span>Reloading</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#automaticRestart"><strong>17.5.1</strong><span>Automatic Restart</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#jrebel"><strong>17.5.2</strong><span>JRebel</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#springloaded"><strong>17.5.3</strong><span>Spring-Loaded</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#gradleReload"><strong>17.5.4</strong><span>Reloading with Gradle</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#ideReload"><strong>17.5.5</strong><span>Reloading with an IDE</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#proxy"><strong>17.6</strong><span>Proxy Configuration</span></a>
+                    </div>
+                    
+                </div>
+                
+
+                
+<h1 id="cli"><a class="anchor" href="#cli"></a>17 Micronaut CLI</h1>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The Micronaut CLI is the recommended way to create new Micronaut projects. The CLI includes commands for generating specific categories of projects, allowing you to choose between build tools, test frameworks, and even pick the language you wish to use in your application. The CLI also provides commands for generating artifacts such as controllers, client interfaces, and serverless functions.</p>
+</div>
+<div class="paragraph">
+<p>When <a href="#buildCLI">Micronaut is installed on your computer</a>, you can call the CLI with the <code>mn</code> command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app my-app</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>A Micronaut CLI project can be identified by the <code>micronaut-cli.yml</code> file, which will be included at the root of the project (if it was generated via the CLI). This file will include the project&#8217;s profile, default package, and other variables. The project&#8217;s default package is evaluated based on the project name, for example:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app my-demo-app</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Will result in the following <code>micronaut-cli-yml</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">micronaut-cli.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">profile: service
+defaultPackage: my.demo.app
+---
+testFramework: junit
+sourceLanguage: java</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can supply your own default package when creating the application by prefixing the application name with the package:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app example.my-demo-app</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Will result in the following <code>micronaut-cli-yml</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">micronaut-cli.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">profile: service
+defaultPackage: example
+---
+testFramework: junit
+sourceLanguage: java</code></pre>
+</div>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+Throughout the user guide, references to CLI features/commands have been provided as applicable.
+</td>
+</tr>
+</table>
+</div>
+<div class="sect1">
+<h2 id="_definitions"><a class="anchor" href="#_definitions"></a>Definitions</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Projects created with the CLI are based on one of several <strong>profiles</strong>, which consist of a project template (or <strong>skeleton</strong>), optional features, and profile-specific commands. Commands from a profile typically are specific to the profile application type; for example, the <code>service</code> profile (designed for creation of web service applications) provides the <code>create-controller</code> and <code>create-client</code> commands.</p>
+</div>
+<div class="paragraph">
+<p>CLI commands typically accept at least one <strong>argument</strong>, such as the name of the project or controller to generate.</p>
+</div>
+<div class="paragraph">
+<p>CLI commands can accept optional <strong>flags</strong> to control their behavior. Some flags accept multiple arguments, which are separated by commas.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_interactive_mode"><a class="anchor" href="#_interactive_mode"></a>Interactive Mode</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If you run <code>mn</code> without any arguments, the Micronaut CLI will launch in interactive mode. This is a shell-like mode which allows you to run multiple CLI commands without re-initializing the CLI runtime, and is especially suitable when you are making use of code-generation commands (such as <code>create-controller</code>), creating multiple projects, or simply exploring the features included in the CLI. Tab-completion is enabled in the CLI, enabling you to hit the <code>TAB</code> key to see possible options for a given command or flag.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn
+| Starting interactive mode...
+| Enter a command name to run. Use TAB for completion:
+mn&gt;</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_help_and_info"><a class="anchor" href="#_help_and_info"></a>Help and Info</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>General usage information can be viewed using the <code>help</code> command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn&gt; help create-app
+    Usage: mn create-app [-hinvVx] [-b=BUILD-TOOL] [-l=LANG] [-p=PROFILE] [-f=FEATURE[,FEATURE...]]...
+                         [NAME]
+    Creates an application
+          [NAME]               The name of the application to create.
+      -b, --build=BUILD-TOOL   Which build tool to configure. Possible values: gradle, maven.
+      -f, --features=FEATURE[,FEATURE...]
+                               The features to use
+      -h, --help               Show this help message and exit.
+      -i, --inplace            Create a service using the current directory
+      -l, --lang=LANG          Which language to use. Possible values: java, groovy, kotlin.
+...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>For details about a specific command, supply the command name after the <code>help</code> command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn&gt; help create-app
+| Command: create-app
+| Description:
+Creates an application
+
+| Usage:
+create-app [NAME]
+...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>A list of available profiles can be viewed using the <code>list-profiles</code> command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn&gt; list-profiles
+| Available Profiles
+--------------------
+  base          The base profile
+  cli           The cli profile
+  federation    The federation profile
+  function      The function profile
+  function-aws  The function profile for AWS Lambda
+  kafka         The Kafka messaging profile
+  profile       A profile for creating new Micronaut profiles
+  service       The service profile</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To view details on a specific profile, use the <code>profile-info</code> command, followed by the profile name.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn&gt; profile-info service
+    | Profile: service
+    --------------------
+    The service profile
+
+    | Provided Commands:
+    --------------------
+      create-bean        Creates a singleton bean
+      create-client      Creates a client interface
+      create-controller  Creates a controller and associated test
+      create-job         Creates a job with scheduled method
+      help               Prints help information for a specific command
+
+    | Provided Features:
+    --------------------
+      annotation-api    Adds Java annotation API
+      config-consul     Adds support for Distributed Configuration with Consul (https://www.consul.io)
+      discovery-consul  Adds support for Service Discovery with Consul (https://www.consul.io)
+      discovery-eureka  Adds support for Service Discovery with Eureka
+      groovy            Creates a Groovy application
+...</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="createProject"><a class="anchor" href="#createProject"></a>17.1 Creating a Project</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/createProject.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Creating a project is the primary usage of the CLI. There are two primary commands for creating new projects: <code>create-app</code> and <code>create-function</code>. Both of these commands will generate a project based upon an associated profile (which can be overridden), and will set the <code>micronaut.application.name</code> configuration property in <code>src/main/resources/application.yml</code>.</p>
+</div>
+<div class="paragraph">
+<p>In addition, there are specialty commands for creating a "federation" of multiple Micronaut services (<code>create-federation</code>) and for creating new profiles for the CLI (<code>create-profile</code>).</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Micronaut CLI Project Creation Commands</caption>
+<colgroup>
+<col style="width: 11.1111%;">
+<col style="width: 22.2222%;">
+<col style="width: 22.2222%;">
+<col style="width: 44.4445%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Command</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Options</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>create-app</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Creates a basic Micronaut application, using the <code>service</code> profile by default.</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="ulist">
+<ul>
+<li>
+<p><code>-p</code>, <code>--profile</code></p>
+</li>
+<li>
+<p><code>-l</code>, <code>--lang</code></p>
+</li>
+<li>
+<p><code>-f</code>, <code>--features</code></p>
+</li>
+<li>
+<p><code>-b</code>, <code>--build</code></p>
+</li>
+<li>
+<p><code>-i</code>, <code>--inplace</code></p>
+</li>
+</ul>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn create-app my-project --features
+ mongo-reactive,security-jwt --build maven</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>create-cli-app</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Creates a command-line Micronaut application, using the <code>cli</code> profile by default.</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="ulist">
+<ul>
+<li>
+<p><code>-p</code>, <code>--profile</code></p>
+</li>
+<li>
+<p><code>-f</code>, <code>--features</code></p>
+</li>
+<li>
+<p><code>-l</code>, <code>--lang</code></p>
+</li>
+<li>
+<p><code>-t</code>, <code>--test</code></p>
+</li>
+<li>
+<p><code>-b</code>, <code>--build</code></p>
+</li>
+<li>
+<p><code>-i</code>, <code>--inplace</code></p>
+</li>
+</ul>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn create-cli-app my-project --features
+ http-client,jdbc-hikari --build maven
+ --lang kotlin --test kotlintest</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>create-function</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Creates a Micronaut serverless function, using the <code>function-aws</code> profile by default.</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="ulist">
+<ul>
+<li>
+<p><code>-p</code>, <code>--provider</code></p>
+</li>
+<li>
+<p><code>-l</code>, <code>--lang</code></p>
+</li>
+<li>
+<p><code>-t</code>, <code>--test</code></p>
+</li>
+<li>
+<p><code>-f</code>, <code>--features</code></p>
+</li>
+<li>
+<p><code>-b</code>, <code>--build</code></p>
+</li>
+<li>
+<p><code>-i</code>, <code>--inplace</code></p>
+</li>
+</ul>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn create-function my-lambda-function
+ --lang groovy --test spock</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>create-federation</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Creates a federation of Micronaut services with shared profile/features.</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="ulist">
+<ul>
+<li>
+<p><code>-s</code>, <code>--services</code></p>
+</li>
+<li>
+<p><code>-p</code>, <code>--profile</code></p>
+</li>
+<li>
+<p><code>-f</code>, <code>--features</code></p>
+</li>
+<li>
+<p><code>-b</code>, <code>--build</code></p>
+</li>
+<li>
+<p><code>-i</code>, <code>--inplace</code></p>
+</li>
+</ul>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn create-federation my-federation
+ --services users,inventory,billing</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>create-profile</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Creates a Micronaut profile</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="ulist">
+<ul>
+<li>
+<p><code>-p</code>, <code>--profile</code></p>
+</li>
+<li>
+<p><code>-f</code>, <code>--features</code></p>
+</li>
+<li>
+<p><code>-i</code>, <code>--inplace</code></p>
+</li>
+</ul>
+</div></div></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn create-profile security-service
+ --profile service --features security-jwt</code></pre>
+</div>
+</div></div></td>
+</tr>
+</tbody>
+</table>
+<div class="sect1">
+<h2 id="_create_app"><a class="anchor" href="#_create_app"></a>Create-App</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <code>create-app</code> command will generate a basic Micronaut project, with optional flags to specify features, profile, and build tool. The project will include a default <code>Application</code> class for starting the application.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 2. Create-App Flags</caption>
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 37.5%;">
+<col style="width: 37.5%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-b</code>, <code>--build</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Build tool (one of <code>gradle</code>, <code>maven</code> - default is <code>gradle</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--build maven</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-p</code>, <code>--profile</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Profile to use for the project (default is <code>service</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--profile function-aws</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--features</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Features to use for the project, comma-separated</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">--features security-jwt,mongo-gorm</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>or</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">-f security-jwt -f mongo-gorm</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-i</code>, <code>--inplace</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If present, generates the project in the current directory (project name is optional if this flag is set)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--inplace</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Once created, the application can be started using the <code>Application</code> class, or the appropriate build tool task.</p>
+</div>
+<div class="listingblock">
+<div class="title">Starting a Gradle project</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./gradlew run</code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="title">Starting a Maven project</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./mvnw compile exec:exec</code></pre>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_language_test_features"><a class="anchor" href="#_language_test_features"></a>Language/Test Features</h3>
+<div class="paragraph">
+<p>By default, <code>create-app</code> will generate a Java application, with JUnit configured as the test framework. The language and test framework settings for a given project are stored as the <code>testFramework</code> and <code>sourceLanguage</code> properties in the <code>micronaut-cli.yml</code> file, as shown below:</p>
+</div>
+<div class="listingblock">
+<div class="title">micronaut-cli.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">profile: service
+defaultPackage: my.demo.app
+---
+testFramework: junit
+sourceLanguage: java</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+The values in <code>micronaut-cli.yml</code> are used by the CLI for code generation purposes. After a project has been generated, you can edit these values to change the project defaults, however you will still need to supply the required dependencies and/or configuration in order to use your chosen language/framework. E.g, you could edit the <code>testFramework</code> property to <code>spock</code> to cause the CLI to generate Spock tests when running commands (such as <code>create-controller</code>), but you will still need to add the Spock dependency to your project.
+</td>
+</tr>
+</table>
+</div>
+<div class="sect3">
+<h4 id="_groovy"><a class="anchor" href="#_groovy"></a>Groovy</h4>
+<div class="paragraph">
+<p>To create an app with Groovy support (which comes with Spock by default), supply the appropriate language via the <code>lang</code> flag:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app my-groovy-app --lang groovy</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will include the Groovy &amp; Spock dependencies in your project, and write the appropriates values in <code>micronaut-cli.yml</code>.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_kotlin"><a class="anchor" href="#_kotlin"></a>Kotlin</h4>
+<div class="paragraph">
+<p>To create an app with Kotlin support (which comes with Kotlintest by default), supply the appropriate language via the <code>lang</code> flag:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app my-kotlin-app --lang kotlin</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will include the Kotlin &amp; Kotlintest dependencies in your project, and write the appropriates values in <code>micronaut-cli.yml</code>.</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_build_tool"><a class="anchor" href="#_build_tool"></a>Build Tool</h3>
+<div class="paragraph">
+<p>By default <code>create-app</code> will create a Gradle project, with a <code>build.gradle</code> file at the root of the project directory. To create an app using the Maven build tool, supply the appropriate option via the <code>build</code> flag:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app my-maven-app --build maven</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_create_cli_app"><a class="anchor" href="#_create_cli_app"></a>Create-Cli-App</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <code>create-cli-app</code> command will generate a <a href="#commandLineApps">Micronaut command line application</a> project,
+with optional flags to specify language, test framework, features, profile, and build tool.
+By default the project will have the <code>picocli</code> feature to support command line option parsing, and the <code>cli</code> profile to easily create additional commands.
+The project will include a <code>*Command</code> class (based on the project name - e.g., <code>hello-world</code> will generate <code>HelloWorldCommand</code>),
+and an associated test which will instantiate the command and verify that it can parse command line options.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 3. Create-Cli-App Flags</caption>
+<colgroup>
+<col style="width: 25%;">
+<col style="width: 37.5%;">
+<col style="width: 37.5%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Language to use for the command (one of <code>java</code>, <code>groovy</code>, <code>kotlin</code> - default is <code>java</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-t</code>, <code>--test</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Test framework to use for the command (one of <code>junit</code>, <code>spock</code> - default is <code>junit</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--test spock</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-b</code>, <code>--build</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Build tool (one of <code>gradle</code>, <code>maven</code> - default is <code>gradle</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--build maven</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-p</code>, <code>--profile</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Profile to use for the project (default is <code>cli</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--profile function-aws</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--features</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Features to use for the project, comma-separated (picocli is included by default)</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">--features http-client,jdbc-hikari</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>or</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">-f http-client -f jdbc-hikari</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-i</code>, <code>--inplace</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If present, generates the project in the current directory (project name is optional if this flag is set)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--inplace</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Once created, the application can be started using the <code>*Command</code> class, or the appropriate build tool task.</p>
+</div>
+<div class="listingblock">
+<div class="title">Starting a Gradle project</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./gradlew run</code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="title">Starting a Maven project</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./mvnw compile exec:exec</code></pre>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_language_test_features_2"><a class="anchor" href="#_language_test_features_2"></a>Language/Test Features</h3>
+<div class="paragraph">
+<p>By default, <code>create-cli-app</code> will generate a Java application, with JUnit configured as the test framework.
+The language and test framework settings for a given project are stored as the <code>testFramework</code> and <code>sourceLanguage</code> properties in the <code>micronaut-cli.yml</code> file, as shown below:</p>
+</div>
+<div class="listingblock">
+<div class="title">micronaut-cli.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">profile: cli
+defaultPackage: my.demo.app
+---
+testFramework: junit
+sourceLanguage: java</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_groovy_2"><a class="anchor" href="#_groovy_2"></a>Groovy</h4>
+<div class="paragraph">
+<p>To create an app with Groovy &amp; Spock support, supply the appropriate features via the <code>lang</code> and <code>test</code> flags:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-cli-app my-groovy-app --lang=groovy --test=spock</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will include the Groovy &amp; Spock dependencies in your project, and write the appropriates values in <code>micronaut-cli.yml</code>.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_kotlin_2"><a class="anchor" href="#_kotlin_2"></a>Kotlin</h4>
+<div class="paragraph">
+<p>To create an app with Kotlin &amp; KotlinTest support, supply the appropriate features via the <code>lang</code> and <code>test</code> flags:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-cli-app my-kotlin-app --lang=kotlin --test=kotlintest</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will include the Kotlin &amp; KotlinTest dependencies in your project, and write the appropriates values in <code>micronaut-cli.yml</code>.</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_build_tool_2"><a class="anchor" href="#_build_tool_2"></a>Build Tool</h3>
+<div class="paragraph">
+<p>By default <code>create-cli-app</code> will create a Gradle project, with a <code>build.gradle</code> file at the root of the project directory. To create an app using the Maven build tool, supply the appropriate option via the <code>build</code> flag:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-cli-app my-maven-app --build maven</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_create_function"><a class="anchor" href="#_create_function"></a>Create-Function</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <code>create-function</code> command will generate a <a href="#serverlessFunctions">Micronaut function</a> project, optimized for serverless environments, with optional flags to specify language, test framework, features and build tool. The project will include a <code>*Function</code> class (based on the project name - e.g., <code>hello-world</code> will generate <code>HelloWorldFunction</code>), and an associated test which will instantiate the function and verify that it can receive requests.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+Currently AWS Lambda is the only supported cloud provider for Micronaut functions, so some of the information below will be specific to that platform. Other cloud providers will be added soon and this section will be updated accordingly.
+</td>
+</tr>
+</table>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 4. Create-Function Flags</caption>
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 40%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Language to use for the function (one of <code>java</code>, <code>groovy</code>, <code>kotlin</code> - default is <code>java</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-t</code>, <code>--test</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Test framework to use for the function (one of <code>junit</code>, <code>spock</code> - default is <code>junit</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--test spock</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-b</code>, <code>--build</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Build tool (one of <code>gradle</code>, <code>maven</code> - default is <code>gradle</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--build maven</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--features</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Features to use for the function, comma-separated</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">--features security-jwt,mongo-gorm</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>or</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">-f security-jwt -f mongo-gorm</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-p</code>, <code>--provider</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provider to use for the function (currently the only supported provider is <code>aws</code> for AWS Lambda - this is the default)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--provider aws</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-i</code>, <code>--inplace</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If present, generates the function in the current directory (function name is optional if this flag is set)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--inplace</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="sect2">
+<h3 id="_language"><a class="anchor" href="#_language"></a>Language</h3>
+<div class="paragraph">
+<p>Setting the language using the <code>lang</code> flag will generate a <code>*Function</code> file in the appropriate language. For Java/Kotlin, this will generate a class annotated with <a href="../api/io/micronaut/function/FunctionBean.html">@FunctionBean</a>. For Groovy, a Groovy function script will be generated. See <a href="#writingFunctions">Writing Functions</a> for more details on how to write and test Micronaut functions.</p>
+</div>
+<div class="paragraph">
+<p>Depending on language choice, an appropriate test will also be generated. By default, a Java function will include a JUnit test, a Groovy function will include a Spock test, and a Kotlin function will include a KotlinTest test. However, you can override the chosen test framework with the <code>test</code> flag.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-function hello-world --lang java --test spock</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_build_tool_3"><a class="anchor" href="#_build_tool_3"></a>Build Tool</h3>
+<div class="paragraph">
+<p>Depending upon the build tool selected, the project will include various tasks for building/deploying the function.</p>
+</div>
+<div class="sect3">
+<h4 id="_gradle"><a class="anchor" href="#_gradle"></a>Gradle</h4>
+<div class="paragraph">
+<p>Functions with a Gradle build are preconfigured with the <a href="https://github.com/classmethod/gradle-aws-plugin">Gradle AWS Plugin</a>. The configuration can be seen in the <code>build.gradle</code> file (see the section on <a href="#lambdaFunctions">Deploying Functions to AWS Lambda</a>). Assuming valid AWS credentials under <code>~/.aws/credentials</code>, the application can be deployed using the <code>deploy</code> task.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./gradlew deploy</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_maven"><a class="anchor" href="#_maven"></a>Maven</h4>
+<div class="paragraph">
+<p>Functions with a Maven build are preconfigured with the <a href="https://maven.apache.org/plugins/maven-shade-plugin/">Maven Shade Plugin</a>, which will generate an executable JAR suitable for uploading to AWS Lambda. The JAR file can be built using the <code>package</code> phase.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./mvnw package</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>For further details, consult the <a href="https://docs.aws.amazon.com/lambda/latest/dg/java-create-jar-pkg-maven-no-ide.html">AWS Lambda Documentation.</a></p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_create_federation"><a class="anchor" href="#_create_federation"></a>Create-Federation</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <code>create-federation</code> command accepts the same flags as the <code>create-app</code> command, and follows mostly the same behavior. The key difference is that this command accepts multiple project names following the <code>services</code> flag, and will generate a project (with the specified profile and features) for each name supplied. The <code>[NAME]</code> argument will be used to create the top-level multi-project build for the federation.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 5. Create-Federation Flags</caption>
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 40%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-s</code>, <code>--services</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Comma-separated list of services (applications) to create</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--services users,inventory,billing</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-b</code>, <code>--build</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Build tool (one of <code>gradle</code>, <code>maven</code> - default is <code>gradle</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--build maven</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-p</code>, <code>--profile</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Profile to use for all projects in the federation (default is <code>service</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--profile function-aws</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--features</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Features to use for all projects in the federation, comma-separated</p></td>
+<td class="tableblock halign-left valign-top"><div><div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">--features security-jwt,mongo-gorm</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>or</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">-f security-jwt -f mongo-gorm</code></pre>
+</div>
+</div></div></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-i</code>, <code>--inplace</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If present, generates the project in the current directory (project name is optional if this flag is set)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--inplace</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>When creating a federation, a top-level project file will be generated (using the chosen build tool), and subprojects/modules will be created for each service in the federation.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_create_profile"><a class="anchor" href="#_create_profile"></a>Create-Profile</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <code>create-profile</code> command is used to generate new profiles for the Micronaut CLI.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 6. Create-Profile Flags</caption>
+<colgroup>
+<col style="width: 20%;">
+<col style="width: 40%;">
+<col style="width: 40%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Language to use for the profile (one of <code>java</code>, <code>groovy</code>, <code>kotlin</code> - default is <code>java</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-b</code>, <code>--build</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Build tool (one of <code>gradle</code>, <code>maven</code> - default is <code>gradle</code>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--build maven</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-p</code>, <code>--profile</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Profile to extend</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--profile function-aws</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--features</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Features to use, comma-separated</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--features security-jwt,mongo-gorm</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-i</code>, <code>--inplace</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If present, generates the profile in the current directory (profile name is optional if this flag is set)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--inplace</code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<h2 id="profiles"><a class="anchor" href="#profiles"></a>17.2 Profiles</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/profiles.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Profiles are essentially project templates, consisting of a "skeleton" project structure with default configuration, build dependencies and other assets, along with a set of commands for generating appropriate artifacts (such as controllers, client interfaces, etc).</p>
+</div>
+<div class="paragraph">
+<p>Profiles can inherit from other profiles, augmenting/overriding defaults set in their parent. All profiles inherit from the <code>base</code> profile, which provides the bare minimum required to set up a Micronaut application.</p>
+</div>
+<div class="paragraph">
+<p>Many Micronaut apps (including projects generated by the <code>create-app</code> command) will use the <code>service</code> profile, which augments the <code>base</code> profile to add HTTP client/server libraries, <code>create-controller</code> and <code>create-client</code> commands, and other features that are appropriate for web service applications.</p>
+</div>
+<div class="paragraph">
+<p>Other Micronaut apps (including projects generated by the <code>create-cli-app</code> command) may be interested in the <code>cli</code> profile, which adds the <code>create-command</code> command and the picocli library for command line parsing.</p>
+</div>
+<div class="paragraph">
+<p>Profiles can be chosen using the <code>profile</code> flag on the <code>create-app</code>, <code>create-cli-app</code>, and <code>create-federation</code> commands.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app my-project</code></pre>
+</div>
+</div>
+
+<h2 id="comparingVersions"><a class="anchor" href="#comparingVersions"></a>17.2.1 Comparing Versions</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/profiles/comparingVersions.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The easiest way to see version dependency updates and other changes for a new version of Micronaut, is to produce one clean application using the older and one using the newer version of the <code>mn</code> CLI, and then comparing those directories.</p>
+</div>
+
+<h2 id="features"><a class="anchor" href="#features"></a>17.3 Features</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/features.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Features consist of additional dependencies and configuration to enable specific functionality in your application. The Micronaut profiles define a large number of features, including features for many of the configurations provided by Micronaut, such as the <a href="#dataAccess">Data Access Configurations</a></p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app my-demo-app --features mongo-reactive</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will add the necessary dependencies and configuration for the <a href="http://mongodb.github.io/mongo-java-driver-reactivestreams">MongoDB Reactive Driver</a> in your application. You can view all the available features using the <code>profile-info</code> command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn profile-info service
+Profile: service
+------------------
+The service profile
+
+...
+
+Provided Features:
+------------------
+  annotation-api    Adds Java annotation API
+  config-consul     Adds support for Distributed Configuration with Consul (https://www.consul.io)
+  discovery-consul  Adds support for Service Discovery with Consul (https://www.consul.io)
+  discovery-eureka  Adds support for Service Discovery with Eureka
+  groovy            Creates a Groovy application
+  hibernate-gorm    Adds support for GORM persistence framework
+  hibernate-jpa     Adds support for Hibernate/JPA
+  http-client       Adds support for creating HTTP clients
+  http-server       Adds support for running a Netty server
+  java              Creates a Java application
+  jdbc-dbcp         Configures SQL DataSource instances using Commons DBCP
+  jdbc-hikari       Configures SQL DataSource instances using Hikari Connection Pool
+  jdbc-tomcat       Configures SQL DataSource instances using Tomcat Connection Pool
+  jrebel            Adds support for class reloading with JRebel (requires separate JRebel installation)
+  junit             Adds support for the JUnit testing framework
+  kafka             Adds support for Kafka
+  kotlin            Creates a Kotlin application
+  mongo-gorm        Configures GORM for MongoDB for Groovy applications
+  mongo-reactive    Adds support for the Mongo Reactive Streams Driver
+  neo4j-bolt        Adds support for the Neo4j Bolt Driver
+  neo4j-gorm        Configures GORM for Neo4j for Groovy applications
+  picocli           Adds support for command line parsing (http://picocli.info)
+  redis-lettuce     Configures the Lettuce driver for Redis
+  security-jwt      Adds support for JWT (JSON Web Token) based Authentication
+  security-session  Adds support for Session based Authentication
+  spek              Adds support for the Spek testing framework
+  spock             Adds support for the Spock testing framework
+  springloaded      Adds support for class reloading with Spring-Loaded
+  tracing-jaeger    Adds support for distributed tracing with Jaeger (https://www.jaegertracing.io)
+  tracing-zipkin    Adds support for distributed tracing with Zipkin (https://zipkin.io)</code></pre>
+</div>
+</div>
+
+<h2 id="commands"><a class="anchor" href="#commands"></a>17.4 Commands</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/commands.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Profiles can include commands for generating common code artifacts. Not all commands are supported by all profiles; the available commands for a given profile can be viewed using the <code>profile-info</code> command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn profile-info service
+Profile: service
+------------------
+The service profile
+
+Provided Commands:
+--------------------
+  create-bean              Creates a singleton bean
+  create-client            Creates a client interface
+  create-controller        Creates a controller and associated test
+  create-job               Creates a job with scheduled method
+  create-test              Creates a simple test for the project's testing framework
+  create-websocket-client  Creates a Websocket client
+  create-websocket-server  Creates a Websocket server
+  help                     Prints help information for a specific command
+
+
+Provided Features:
+------------------
+...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>All of the code-generation commands will honor the values written in <code>micronaut-cli.yml</code>. For example, assume the following <code>micronaut-cli.yml</code> file.</p>
+</div>
+<div class="listingblock">
+<div class="title">micronaut-cli.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">profile: service
+defaultPackage: example
+---
+testFramework: spock
+sourceLanguage: java</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>With the above settings, the <code>create-controller</code> command will (by default) generate Java controllers with an associated Spock test, under the <code>example</code> package. Commands accept arguments and these defaults can be overriden on a per-command basis.</p>
+</div>
+<div class="sect1">
+<h2 id="_base_profile_commands"><a class="anchor" href="#_base_profile_commands"></a>Base Profile Commands</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Commands in the base profile are inherited by all other profiles and are always available.</p>
+</div>
+<div class="sect2">
+<h3 id="_create_bean"><a class="anchor" href="#_create_bean"></a>Create-Bean</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Create-Bean Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the bean class</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-bean</code> command generates a simple <a href="https://docs.oracle.com/javaee/6/api/javax/inject/Singleton.html">Singleton</a> class. It does not create an associated test.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-bean EmailService
+| Rendered template Bean.java to destination src/main/java/example/EmailService.java</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_create_job"><a class="anchor" href="#_create_job"></a>Create-Job</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 2. Create-Job Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the job class</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-job</code> command generates a simple <a href="../api/io/micronaut/scheduling/annotation/Scheduled.html">Scheduled</a> class. It follows a <code>*Job</code> convention for generating the class name. It does not create an associated test.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-job UpdateFeeds --lang groovy
+| Rendered template Job.groovy to destination src/main/groovy/example/UpdateFeedsJob.groovy</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_service_profile_commands"><a class="anchor" href="#_service_profile_commands"></a>Service Profile Commands</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The service profile includes commands that are dependent upon the HTTP server and client dependencies (which are not included in the base profile).</p>
+</div>
+<div class="sect2">
+<h3 id="_create_controller"><a class="anchor" href="#_create_controller"></a>Create-Controller</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 3. Create-Controller Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the controller</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-controller</code> command generates a <a href="../api/io/micronaut/http/annotation/Controller.html">Controller</a> class. It follows a <code>*Controller</code> convention for generating the class name. It creates an associated test that will run the application and instantiate an HTTP client, which can make requests against the controller.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-controller Book
+| Rendered template Controller.java to destination src/main/java/example/BookController.java
+| Rendered template ControllerTest.java to destination src/test/java/example/BookControllerTest.java</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_create_client"><a class="anchor" href="#_create_client"></a>Create-Client</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 4. Create-Client Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the client</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-client</code> command generates a simple <a href="../api/io/micronaut/http/client/annotation/Client.html">Client</a> interface. It follows a <code>*Client</code> convention for generating the class name. It does not create an associated test.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-client Book
+| Rendered template Client.java to destination src/main/java/example/BookClient.java</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_create_websocket_server"><a class="anchor" href="#_create_websocket_server"></a>Create-Websocket-Server</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 5. Create-Websocket-Server Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the server</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-websocket-server</code> command generates a simple <a href="../api/io/micronaut/websocket/WebSocketServer.html">WebSocketServer</a> class. It follows a <code>*Server</code> convention for generating the class name. It does not create an associated test.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-websocket-server MyChat
+| Rendered template WebsocketServer.java to destination src/main/java/example/MyChatServer.java</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_create_websocket_client"><a class="anchor" href="#_create_websocket_client"></a>Create-Websocket-Client</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 6. Create-Websocket-Client Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the client</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-websocket-client</code> command generates a simple <a href="../api/io/micronaut/websocket/WebSocketClient.html">WebSocketClient</a> abstract class. It follows a <code>*Client</code> convention for generating the class name. It does not create an associated test.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-websocket-client MyChat
+| Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_cli_profile_commands"><a class="anchor" href="#_cli_profile_commands"></a>CLI Profile Commands</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The cli profile lets you generate CLI commands to control your application.</p>
+</div>
+<div class="sect2">
+<h3 id="_create_command"><a class="anchor" href="#_create_command"></a>Create-Command</h3>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 7. Create-Command Flags</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Flag</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-l</code>, <code>--lang</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The language used for the command</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--lang groovy</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>-f</code>, <code>--force</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Whether to overwrite existing files</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>--force</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>create-command</code> command generates a standalone application that can be executed as a
+<a href="http://picocli.info">picocli</a> <a href="http://picocli.info/apidocs/picocli/CommandLine.Command.html">Command</a>.
+It follows a <code>*Command</code> convention for generating the class name.
+It creates an associated test that will run the application and verify that a command line option was set.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-command print
+| Rendered template Command.java to destination src/main/java/example/PrintCommand.java
+| Rendered template CommandTest.java to destination src/test/java/example/PrintCommandTest.java</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="reloading"><a class="anchor" href="#reloading"></a>17.5 Reloading</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/reloading.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Reloading (or "hot-loading") refers to the framework reinitializing classes (and parts of the application) when changes to the source files are detected.</p>
+</div>
+<div class="paragraph">
+<p>Since Micronaut prioritizes startup time and most Micronaut apps can start up within seconds, a productive workflow can often be had by restarting the application as changes are made; for example, by running a test class within an IDE.</p>
+</div>
+<div class="paragraph">
+<p>However, if you wish to have your changes automatically reloaded Micronaut does support automatic restart or the use of third-party reloading agents.</p>
+</div>
+
+<h2 id="automaticRestart"><a class="anchor" href="#automaticRestart"></a>17.5.1 Automatic Restart</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/reloading/automaticRestart.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>There are various ways to achieve reloading of classes on the JVM, all have their advantages and disadvantages. The following are possible ways to achieve reloading without restarting the JVM:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>JVM Agents</strong> - A JVM agent like JRebel can be used, however these can produce unusual errors, may not support all JDK versions and can result in cached / stale classes.</p>
+</li>
+<li>
+<p><strong>ClassLoader Reloading</strong> - Class Loader based reloading is a popular solution used by most JVM frameworks, however it once again can lead to cached / stale classes, memory leaks and weird errors if the incorrect classloader is used at any moment.</p>
+</li>
+<li>
+<p><strong>Debugger HotSwap</strong> - The Java debugger supports hotswapping of changes at runtime, but only supports a few use cases.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Given the problems with existing solutions and a lack of a way built into the JVM to reload changes, the safest and best solution to reloading, and the one recommended by the Micronaut team, is to use automatic application restart via third-party tool.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut&#8217;s startup time is fast and automatic restart leads to a clean slate without potential hard to debug problems cropping up or memory leaks.</p>
+</div>
+<div class="sect2">
+<h3 id="_configuring_file_watch"><a class="anchor" href="#_configuring_file_watch"></a>Configuring File Watch</h3>
+<div class="paragraph">
+<p>The following demonstrates how to configure Micronaut to automatically stop the application if a change occurs to an external file.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+You can create a new application with the <code>file-watch</code> feature already configured using the CLI with the command <code>mn create-app myapp --features file-watch</code>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>First configure your <code>application.yml</code> file to enable file watch:</p>
+</div>
+<div class="listingblock">
+<div class="title">Configuring File Watch</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    io:
+        watch:
+            paths: src/main
+            restart: true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>By setting <code>micronaut.io.watch.paths</code> what happens is that Micronaut will fire a <a href="../api/io/micronaut/scheduling/io/watch/event/FileChangedEvent.html">FileChangedEvent</a> if any file is changed. Setting <code>micronaut.io.watch.restart</code> tells Micronaut to stop the server if a file is changed.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+The <code>micronaut.io.watch.paths</code> setting can be used for more than just automatic restart, you can use this setting to monitor for file changes within your production application.
+</td>
+</tr>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_file_watch_and_mac_os_x"><a class="anchor" href="#_file_watch_and_mac_os_x"></a>File Watch and Mac OS X</h3>
+<div class="paragraph">
+<p>The native JVM implementation of the <code>WatchService</code> interface for Mac OS X using polling which is slow. To improve file watch performance add the following dependencies to your build if you are using OS X:</p>
+</div>
+<div class="listingblock">
+<div class="title">Gradle - Configuring Native File Watch on Mac OS X</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-gradle hljs" data-lang="gradle">configurations {
+    developmentOnly
+}
+dependencies {
+    // Automatically added with the 'file-watch' feature in the CLi
+    developmentOnly "io.micronaut:micronaut-runtime-osx"
+    ...
+    developmentOnly "net.java.dev.jna:jna"
+    developmentOnly "io.methvin:directory-watcher"
+
+}
+run.classpath += configurations.developmentOnly</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+A custom <code>developmentOnly</code> configuration is used to ensure the dependencies don&#8217;t go into the production JAR.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Or with Maven:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="xml">&lt;dependency&gt;
+  &lt;groupId&gt;io.methvin&lt;/groupId&gt;
+  &lt;artifactId&gt;directory-watcher&lt;/artifactId&gt;
+  &lt;scope&gt;provided&lt;/scope&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;net.java.dev.jna&lt;/groupId&gt;
+  &lt;artifactId&gt;jna&lt;/artifactId&gt;
+  &lt;scope&gt;provided&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+The <code>provided</code> scope is used to ensure the dependencies don&#8217;t go into the production JAR.
+</td>
+</tr>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_restarting_the_server"><a class="anchor" href="#_restarting_the_server"></a>Restarting the Server</h3>
+<div class="paragraph">
+<p>Once set to <code>true</code> the <code>micronaut.io.watch.restart</code> setting will stop  the server when a file changes, it is then up to an external process to restart the server. For example, with Gradle this can be achieved with a continuous build:</p>
+</div>
+<div class="listingblock">
+<div class="title">Automatic Restart with Gradle Continuous Build</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ gradle run --continuous</code></pre>
+</div>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+You can also use a Kubernetes replication controller to restart the application if this feature is used in production
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Maven does not have an equivalent feature, however you can achieve a similar effect with a bash script:</p>
+</div>
+<div class="listingblock">
+<div class="title">Automatic Restart with Maven and Bash</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">#!/usr/bin/env sh
+
+while true; do
+	./mvn compile exec:exec
+	sleep 1s
+done</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If automatic restart is for some reason not your preferred approach then you can use most JVM agents with Micronaut. See the following sections for a description on how to setup JVM agents.</p>
+</div>
+</div>
+
+<h2 id="jrebel"><a class="anchor" href="#jrebel"></a>17.5.2 JRebel</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/reloading/jrebel.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p><a href="https://zeroturnaround.com/software/jrebel/">JRebel</a> is a proprietary reloading solution that involves an agent library, as well as sophisticated IDE support. The JRebel documentation includes detailed steps for IDE integration and usage of the tool. In this section, we will simply show how to install and configure the agent for Maven and Gradle projects.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">Using the CLI</div>
+<div class="paragraph">
+<p>If you are creating your project using the Micronaut CLI, supply the <code>jrebel</code> feature to preconfigure JRebel reloading in your project. Please note that you will still need to install JRebel and supply the correct path to the agent in the <code>gradle.properties</code> file (for Gradle) or <code>pom.xml</code> (for Maven). The steps necessary are described below.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ mn create-app my-app --features jrebel</pre>
+</div>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="sect1">
+<h2 id="_install_configure_jrebel_agent"><a class="anchor" href="#_install_configure_jrebel_agent"></a>Install/configure JRebel Agent</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The simplest way to install JRebel is to download the "standalone" installation package from the <a href="https://zeroturnaround.com/software/jrebel/download">JRebel download page</a>. Unzip the downloaded file to a convenient location within your user&#8217;s directory - for example, <code>~/bin/jrebel</code></p>
+</div>
+<div class="paragraph">
+<p>The installation directory will contain a <code>lib</code> directory containing the agent files. The appropriate agent based on your operating system, following the table below:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. JRebel Agent</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">OS</th>
+<th class="tableblock halign-left valign-top">Agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Windows 64-bit JDK</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>[jrebel directory]\lib\jrebel64.dll</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Windows 32-bit JDK</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>[jrebel directory]\lib\jrebel32.dll</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Mac OS X 64-bit JDK</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>[jrebel directory]/lib/libjrebel64.dylib</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Mac OS X 32-bit JDK</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>[jrebel directory]/lib/libjrebel32.dylib</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Linux 64-bit JDK</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>[jrebel directory]/lib/libjrebel64.so</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Linux 32-bit JDK</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>[jrebel directory]/lib/libjrebel32.so</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Note the path to the appropriate agent, and add the value to your project build.</p>
+</div>
+<div class="sect2">
+<h3 id="_gradle"><a class="anchor" href="#_gradle"></a>Gradle</h3>
+<div class="paragraph">
+<p>Add the path to <code>gradle.properties</code> (create the file if necessary), as the <code>rebelAgent</code> property.</p>
+</div>
+<div class="listingblock">
+<div class="title">gradle.properties</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-properties hljs" data-lang="properties">#Assuming installation path of ~/bin/jrebel/
+rebelAgent= -agentpath:~/bin/jrebel/lib/libjrebel64.dylib</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Add the appropriate JVM arg to <code>build.gradle</code> (not necessary if using the CLI feature)</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">run.dependsOn(generateRebel)
+if (project.hasProperty('rebelAgent')) {
+    run.jvmArgs += rebelAgent
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can start the application with <code>./gradlew run</code>, and it will include the agent. See the section on <a href="#gradleReload">Gradle Reloading</a> or <a href="#ideReload">IDE Reloading</a> to set up the recompilation.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_maven"><a class="anchor" href="#_maven"></a>Maven</h3>
+<div class="paragraph">
+<p>Add the path to <code>pom.xml</code> as a build profile (if using the CLI feature, the profile <code>jrebel</code> is already provided - simply update the path to the agent JAR).</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="xml">&lt;project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"&gt;
+&lt;!-- ... --&gt;
+    &lt;profiles&gt;
+        &lt;profile&gt;
+            &lt;id&gt;jrebel&lt;/id&gt;
+            &lt;build&gt;
+                &lt;plugins&gt;
+                    &lt;plugin&gt;
+                        &lt;groupId&gt;org.codehaus.mojo&lt;/groupId&gt;
+                        &lt;artifactId&gt;exec-maven-plugin&lt;/artifactId&gt;
+                        &lt;version&gt;1.6.0&lt;/version&gt;
+                        &lt;configuration&gt;
+                            &lt;executable&gt;java&lt;/executable&gt;
+                            &lt;arguments&gt;
+                                &lt;argument&gt;-noverify&lt;/argument&gt;
+                                &lt;argument&gt;-XX:TieredStopAtLevel=1&lt;/argument&gt;
+                                &lt;argument&gt;-agentpath:~/bin/jrebel/lib/jrebel6/lib/libjrebel64.dylib&lt;/argument&gt;
+                                &lt;argument&gt;-classpath&lt;/argument&gt;
+                                &lt;classpath/&gt;
+                                &lt;argument&gt;${exec.mainClass}&lt;/argument&gt;
+                            &lt;/arguments&gt;
+                        &lt;/configuration&gt;
+                    &lt;/plugin&gt;
+                &lt;/plugins&gt;
+            &lt;/build&gt;
+        &lt;/profile&gt;
+    &lt;/profiles&gt;
+&lt;/project&gt;</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="springloaded"><a class="anchor" href="#springloaded"></a>17.5.3 Spring-Loaded</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/reloading/springloaded.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>"Spring Loaded is a JVM agent for reloading class file changes whilst a JVM is running." (via the <a href="https://github.com/spring-projects/spring-loaded">official README</a>).</p>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+Spring-Loaded is not actively maintained and currently only supports Java versions &lt; 9.
+</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">Using the CLI</div>
+<div class="paragraph">
+<p>If you are creating your project using the Micronaut CLI, supply the <code>springloaded</code> feature to preconfigure Springloaded in your project. This feature will include the Spring-Loaded agent JAR and provide the appropriate build tool config for Gradle or Maven to load the agent.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ mn create-app my-app --features springloaded</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can start the application with <code>./gradlew run</code> (Gradle) or <code>./mvnw compile exec:exec</code> (Maven).</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Configuring Spring-Loaded requires the agent JAR file to be downloaded on your system, and configured to be loaded as a <code>javaagent</code> by the build tool (or IDE).</p>
+</div>
+<div class="listingblock">
+<div class="title">Gradle build.gradle example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">run.jvmArgs('-noverify', '-javaagent:/usr/local/libs/springloaded/springloaded-1.2.8.RELEASE.jar')</code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="title">Maven pom.xml example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="xml">&lt;project&gt;
+    &lt;!-- --&gt;
+    &lt;build&gt;
+        &lt;plugins&gt;
+
+            &lt;plugin&gt;
+                &lt;groupId&gt;org.codehaus.mojo&lt;/groupId&gt;
+                &lt;artifactId&gt;exec-maven-plugin&lt;/artifactId&gt;
+                &lt;version&gt;1.6.0&lt;/version&gt;
+                &lt;configuration&gt;
+                    &lt;executable&gt;java&lt;/executable&gt;
+                    &lt;arguments&gt;
+                        &lt;argument&gt;-noverify&lt;/argument&gt; &lt;!-- 1 --&gt;
+                        &lt;argument&gt;-javaagent:/usr/local/libs/springloaded/springloaded-1.2.8.RELEASE.jar&lt;/argument&gt; &lt;!-- 2 --&gt;
+                    &lt;/arguments&gt;</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>Add <code>noverify</code> argument</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>Add <code>javaagent</code> argument</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>You can now start the application with <code>./gradlew run</code> (Gradle) or <code>./mvnw compile exec:exec</code> (Maven).</p>
+</div>
+</div>
+</div>
+
+<h2 id="gradleReload"><a class="anchor" href="#gradleReload"></a>17.5.4 Reloading with Gradle</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/reloading/gradleReload.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Gradle supports <a href="https://docs.gradle.org/current/userguide/command_line_interface.html#sec:continuous_build">continuous builds</a>, allowing you to run a task that will be rerun every time the source files change. In order to make use of this with a reloading agent (configured as described above), you will run the application normally (with the agent), and then run a recompilation task in a separate terminal with continuous mode enabled.</p>
+</div>
+<div class="listingblock">
+<div class="title">Run the app</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./gradlew run</code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="title">Run the recompilation</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./gradlew -t classes</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>classes</code> task will be rerun every time a source file is modified, allowing the reloading agent to pick up the change.</p>
+</div>
+
+<h2 id="ideReload"><a class="anchor" href="#ideReload"></a>17.5.5 Reloading with an IDE</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/reloading/ideReload.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>If you are using a build tool such as Maven, which does not support automatic recompilation on file changes, you may choose to use your IDE to recompile classes in combination with a reloading agent (as configured in the above sections).</p>
+</div>
+<div class="sect2">
+<h3 id="_intellij"><a class="anchor" href="#_intellij"></a>IntelliJ</h3>
+<div class="paragraph">
+<p>IntelliJ unfortunately does not have an automatic rebuild option that works for a running application. However, you can trigger a "rebuild" of the project with <code>CMD-F9</code> (Mac) or <code>CTRL-F9</code> (Windows).</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_eclipse"><a class="anchor" href="#_eclipse"></a>Eclipse</h3>
+<div class="paragraph">
+<p>Under the <code>Project</code> menu, check the <code>Build Automatically</code> option. This will trigger a recompilation of the project whenever file changes are saved to disk.</p>
+</div>
+</div>
+
+<h2 id="proxy"><a class="anchor" href="#proxy"></a>17.6 Proxy Configuration</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cli/proxy.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>To configure the CLI to use an HTTP proxy there are two steps. Configuration options can be passed to the cli through the <code>MN_OPTS</code> environment variable.</p>
+</div>
+<div class="paragraph">
+<p>For example on *nix systems:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">export MN_OPTS="-Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=3128 -Dhttp.proxyUser=test -Dhttp.proxyPassword=test"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The profile dependencies are resolved over HTTPS so the proxy port and host are configured with <code>https.</code>, however the user and password are specified with <code>http.</code>.</p>
+</div>
+<div class="paragraph">
+<p>For Windows systems the environment variable can be configured under <code>My Computer/Advanced/Environment Variables</code>.</p>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../guide/multitenancy.html">&lt;&lt; <strong>16</strong><span>Multi-Tenancy</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../guide/appendix.html"><strong>18</strong><span>Appendices</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

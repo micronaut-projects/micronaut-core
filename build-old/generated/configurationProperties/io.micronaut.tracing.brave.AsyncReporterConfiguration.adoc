@@ -1,0 +1,48 @@
+++++
+<a id="io.micronaut.tracing.brave.AsyncReporterConfiguration" href="#io.micronaut.tracing.brave.AsyncReporterConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.tracing.brave.AsyncReporterConfiguration[]
+|===
+|Property |Type |Description
+
+| `+tracing.zipkin.reporter.thread-factory+`
+|java.util.concurrent.ThreadFactory
+|
+
+
+| `+tracing.zipkin.reporter.metrics+`
+|zipkin2.reporter.ReporterMetrics
+|
+
+
+| `+tracing.zipkin.reporter.message-max-bytes+`
+|int
+|
+
+
+| `+tracing.zipkin.reporter.message-timeout+`
+|java.time.Duration
+|
+
+
+| `+tracing.zipkin.reporter.close-timeout+`
+|java.time.Duration
+|
+
+
+| `+tracing.zipkin.reporter.queued-max-spans+`
+|int
+|
+
+
+| `+tracing.zipkin.reporter.queued-max-bytes+`
+|int
+|
+
+
+| `+tracing.zipkin.reporter.build+`
+|zipkin2.codec.BytesEncoder
+|
+
+
+|===

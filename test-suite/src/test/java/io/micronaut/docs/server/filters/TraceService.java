@@ -11,10 +11,7 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 // end::imports[]
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
+
 // tag::class[]
 @Singleton
 public class TraceService {

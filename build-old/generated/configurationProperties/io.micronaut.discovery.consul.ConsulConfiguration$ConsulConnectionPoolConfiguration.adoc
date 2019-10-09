@@ -1,0 +1,28 @@
+++++
+<a id="io.micronaut.discovery.consul.ConsulConfiguration$ConsulConnectionPoolConfiguration" href="#io.micronaut.discovery.consul.ConsulConfiguration$ConsulConnectionPoolConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.consul.ConsulConfiguration$ConsulConnectionPoolConfiguration[]
+|===
+|Property |Type |Description
+
+| `+consul.client.pool.enabled+`
+|boolean
+|
+
+
+| `+consul.client.pool.max-connections+`
+|int
+|
+
+
+| `+consul.client.pool.max-pending-acquires+`
+|int
+|
+
+
+| `+consul.client.pool.acquire-timeout+`
+|java.time.Duration
+|
+
+
+|===

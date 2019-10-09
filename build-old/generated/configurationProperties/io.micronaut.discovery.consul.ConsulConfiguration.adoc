@@ -1,0 +1,139 @@
+++++
+<a id="io.micronaut.discovery.consul.ConsulConfiguration" href="#io.micronaut.discovery.consul.ConsulConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.consul.ConsulConfiguration[]
+|===
+|Property |Type |Description
+
+| `+consul.client.asl-token+`
+|java.lang.String
+|The asl token
+
+
+| `+consul.client.health-check+`
+|boolean
+|Sets whether the Consul server should be considered for health checks.
+ @see io.micronaut.discovery.consul.health.ConsulHealthIndicator
+
+
+| `+consul.client.ssl-configuration+`
+|api:io.micronaut.http.ssl.SslConfiguration[]
+|
+
+
+| `+consul.client.logger-name+`
+|java.lang.String
+|
+
+
+| `+consul.client.follow-redirects+`
+|boolean
+|
+
+
+| `+consul.client.default-charset+`
+|java.nio.charset.Charset
+|
+
+
+| `+consul.client.channel-options+`
+|java.util.Map
+|
+
+
+| `+consul.client.shutdown-timeout+`
+|java.time.Duration
+|
+
+
+| `+consul.client.read-timeout+`
+|java.time.Duration
+|
+
+
+| `+consul.client.read-idle-timeout+`
+|java.time.Duration
+|
+
+
+| `+consul.client.connect-timeout+`
+|java.time.Duration
+|
+
+
+| `+consul.client.num-of-threads+`
+|java.lang.Integer
+|
+
+
+| `+consul.client.thread-factory+`
+|java.lang.Class
+|
+
+
+| `+consul.client.max-content-length+`
+|int
+|
+
+
+| `+consul.client.proxy-type+`
+|java.net.Proxy$Type
+|
+
+
+| `+consul.client.proxy-address+`
+|java.net.SocketAddress
+|
+
+
+| `+consul.client.proxy-username+`
+|java.lang.String
+|
+
+
+| `+consul.client.proxy-password+`
+|java.lang.String
+|
+
+
+| `+consul.client.proxy-selector+`
+|java.net.ProxySelector
+|
+
+
+| `+consul.client.should-use-dns+`
+|boolean
+|Whether DNS should be used to resolve the discovery servers.
+
+
+| `+consul.client.context-path+`
+|java.lang.String
+|Sets the context path.
+
+
+| `+consul.client.default-zone+`
+|java.util.List
+|Sets the Discovery servers to use for the default zone.
+
+
+| `+consul.client.zones+`
+|java.util.Map
+|Configures Discovery servers in other zones.
+
+
+| `+consul.client.secure+`
+|boolean
+|Set if the discovery server is exposed over HTTPS
+
+
+| `+consul.client.host+`
+|java.lang.String
+|The Discovery server host name
+
+
+| `+consul.client.port+`
+|int
+|The port for the Discovery server
+
+
+|===

@@ -1,0 +1,404 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>6.21 HTTP Filters 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/aop.html">&lt;&lt; <strong>5</strong><span>Aspect Oriented Programming</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>6.21 HTTP Filters</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="filters"><a class="anchor" href="#filters"></a>6.21 HTTP Filters</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/httpServer/filters.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The Micronaut HTTP server supports the ability to apply filters to request/response processing in a similar, but reactive, way to Servlet filters in traditional Java applications.</p>
+</div>
+<div class="paragraph">
+<p>Filters provide the ability to support the following use cases:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Decoration of the incoming <a href="../api/io/micronaut/http/HttpRequest.html">HttpRequest</a></p>
+</li>
+<li>
+<p>Modification of the outgoing <a href="../api/io/micronaut/http/HttpResponse.html">HttpResponse</a></p>
+</li>
+<li>
+<p>Implementation of cross cutting concerns such as security, tracing etc.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>For a server application, the <a href="../api/io/micronaut/http/filter/HttpServerFilter.html">HttpServerFilter</a> interface&#8217;s <code>doFilter</code> method can be implemented.</p>
+</div>
+<div class="paragraph">
+<p>The <code>doFilter</code> method accepts the <a href="../api/io/micronaut/http/HttpRequest.html">HttpRequest</a> and an instance of <a href="../api/io/micronaut/http/filter/ServerFilterChain.html">ServerFilterChain</a>.</p>
+</div>
+<div class="paragraph">
+<p>The <code>ServerFilterChain</code> interface contains a resolved chain of filters with the final entry in the chain being the matched route. The <a href="../api/io/micronaut/http/filter/ServerFilterChain.html#proceed-io.micronaut.http.HttpRequest-">ServerFilterChain.proceed(io.micronaut.http.HttpRequest)</a> method can be used to resume processing of the request.</p>
+</div>
+<div class="paragraph">
+<p>The <code>proceed(..)</code> method returns a Reactive Streams <a href="http://www.reactive-streams.org/reactive-streams-1.0.2-javadoc/org/reactivestreams/Publisher.html">Publisher</a> that emits the response that will be returned to the client. Implementors of filters can subscribe to the <a href="http://www.reactive-streams.org/reactive-streams-1.0.2-javadoc/org/reactivestreams/Publisher.html">Publisher</a> and mutate the emitted <a href="../api/io/micronaut/http/MutableHttpResponse.html">MutableHttpResponse</a> object to modify the response prior to returning the response to the client.</p>
+</div>
+<div class="paragraph">
+<p>To put these concepts into practise lets look at an example.</p>
+</div>
+<div class="sect1">
+<h2 id="_writing_a_filter"><a class="anchor" href="#_writing_a_filter"></a>Writing a Filter</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Consider a hypothetical use case whereby you wish to trace each request to the Micronaut "Hello World" example using some external system. The external system could be a database, a distributed tracing service and may require I/O operations.</p>
+</div>
+<div class="paragraph">
+<p>What you don&#8217;t want to do is block the underlying Netty event loop within your filter, instead you want to the filter to proceed with execution once any I/O is complete.</p>
+</div>
+<div class="paragraph">
+<p>As an example, consider the following example <code>TraceService</code> that uses RxJava to compose an I/O operation:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">A TraceService Example using RxJava</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.http.HttpRequest;
+import io.reactivex.Flowable;
+import io.reactivex.schedulers.Schedulers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.inject.Singleton;
+
+@Singleton
+public class TraceService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TraceService.class);
+
+    Flowable&lt;Boolean&gt; trace(HttpRequest&lt;?&gt; request) {
+        return Flowable.fromCallable(() -&gt; { <b class="conum">(1)</b>
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Tracing request: " + request.getUri());
+            }
+            // trace logic here, potentially performing I/O <b class="conum">(2)</b>
+            return true;
+        }).subscribeOn(Schedulers.io()); <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">A TraceService Example using RxJava</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.http.HttpRequest
+import io.reactivex.Flowable
+import io.reactivex.schedulers.Schedulers
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+
+import javax.inject.Singleton
+
+@Singleton
+class TraceService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TraceService.class)
+
+    Flowable&lt;Boolean&gt; trace(HttpRequest&lt;?&gt; request) {
+        Flowable.fromCallable({ -&gt;  <b class="conum">(1)</b>
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Tracing request: " + request.getUri())
+            }
+            // trace logic here, potentially performing I/O <b class="conum">(2)</b>
+            return true
+        }).subscribeOn(Schedulers.io()) <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <a href="http://reactivex.io/RxJava/2.x/javadoc/io/reactivex/Flowable.html">Flowable</a> type is used to create logic that executes potentially blocking operations to write the trace data from the request</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>Since this is just an example the logic does nothing and a place holder comment is used</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The RxJava I/O scheduler is used to execute the logic</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>You can then inject this implementation into your filter definition:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">An Example HttpServerFilter</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.http.*;
+import io.micronaut.http.annotation.Filter;
+import io.micronaut.http.filter.*;
+import org.reactivestreams.Publisher;
+
+@Filter("/hello/**") <b class="conum">(1)</b>
+public class TraceFilter implements HttpServerFilter { <b class="conum">(2)</b>
+    private final TraceService traceService;
+
+    public TraceFilter(TraceService traceService) { <b class="conum">(3)</b>
+        this.traceService = traceService;
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">An Example HttpServerFilter</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.http.HttpRequest
+import io.micronaut.http.MutableHttpResponse
+import io.micronaut.http.annotation.Filter
+import io.micronaut.http.filter.HttpServerFilter
+import io.micronaut.http.filter.ServerFilterChain
+import org.reactivestreams.Publisher
+
+@Filter("/hello/**") <b class="conum">(1)</b>
+class TraceFilter implements HttpServerFilter { <b class="conum">(2)</b>
+    private final TraceService traceService
+
+    TraceFilter(TraceService traceService) { <b class="conum">(3)</b>
+        this.traceService = traceService
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <a href="../api/io/micronaut/http/annotation/Filter.html">Filter</a> annotation is used to define the URI patterns the filter matches</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The class implements the <a href="../api/io/micronaut/http/filter/HttpServerFilter.html">HttpServerFilter</a> interface</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The previously defined <code>TraceService</code> is injected via a constructor argument</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The final step is write the <code>doFilter</code> implementation of the <a href="../api/io/micronaut/http/filter/HttpServerFilter.html">HttpServerFilter</a> interface.</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">The doFilter implementation</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Override
+    public Publisher&lt;MutableHttpResponse&lt;?&gt;&gt; doFilter(HttpRequest&lt;?&gt; request, ServerFilterChain chain) {
+        return traceService.trace(request) <b class="conum">(1)</b>
+                           .switchMap(aBoolean -&gt; chain.proceed(request)) <b class="conum">(2)</b>
+                           .doOnNext(res -&gt; <b class="conum">(3)</b>
+                                res.getHeaders().add("X-Trace-Enabled", "true")
+                           );
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">The doFilter implementation</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Override
+    Publisher&lt;MutableHttpResponse&lt;?&gt;&gt; doFilter(HttpRequest&lt;?&gt; request, ServerFilterChain chain) {
+        traceService.trace(request) <b class="conum">(1)</b>
+                           .switchMap({ aBoolean -&gt; chain.proceed(request) }) <b class="conum">(2)</b>
+                           .doOnNext({ res -&gt; <b class="conum">(3)</b>
+                               res.getHeaders().add("X-Trace-Enabled", "true")
+                           })
+    }</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The previously defined <code>TraceService</code> is called to trace the request</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>If the trace call succeeds then the filter switches back to resuming the request processing using RxJava&#8217;s <code>switchMap</code> method, which invokes the <code>proceed</code> method of the <a href="../api/io/micronaut/http/filter/ServerFilterChain.html">ServerFilterChain</a></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>Finally, RxJava&#8217;s <code>doOnNext</code> method is used to add a header called <code>X-Trace-Enabled</code> to the response.</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The previous example demonstrates some key concepts such as executing logic in a non-blocking matter before proceeding with the request and modifying the outgoing response.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+The examples use RxJava, however you can use any reactive framework that supports the Reactive streams specifications
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/aop.html">&lt;&lt; <strong>5</strong><span>Aspect Oriented Programming</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

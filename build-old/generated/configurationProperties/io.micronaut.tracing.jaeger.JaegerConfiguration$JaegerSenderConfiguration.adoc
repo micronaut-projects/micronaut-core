@@ -1,0 +1,38 @@
+++++
+<a id="io.micronaut.tracing.jaeger.JaegerConfiguration$JaegerSenderConfiguration" href="#io.micronaut.tracing.jaeger.JaegerConfiguration$JaegerSenderConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.tracing.jaeger.JaegerConfiguration$JaegerSenderConfiguration[]
+|===
+|Property |Type |Description
+
+| `+tracing.jaeger.sender.agent-host+`
+|java.lang.String
+|
+
+
+| `+tracing.jaeger.sender.agent-port+`
+|java.lang.Integer
+|
+
+
+| `+tracing.jaeger.sender.endpoint+`
+|java.lang.String
+|
+
+
+| `+tracing.jaeger.sender.auth-token+`
+|java.lang.String
+|
+
+
+| `+tracing.jaeger.sender.auth-username+`
+|java.lang.String
+|
+
+
+| `+tracing.jaeger.sender.auth-password+`
+|java.lang.String
+|
+
+
+|===

@@ -1,0 +1,138 @@
+++++
+<a id="io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration" href="#io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration[]
+|===
+|Property |Type |Description
+
+| `+aws.route53.discovery.client.aws-service-id+`
+|java.lang.String
+|set service id for easier testing.
+
+
+| `+aws.route53.discovery.client.namespace-id+`
+|java.lang.String
+|allows you to override the namespace id for testing.
+
+
+| `+aws.route53.discovery.client.ssl-configuration+`
+|api:io.micronaut.http.ssl.SslConfiguration[]
+|
+
+
+| `+aws.route53.discovery.client.logger-name+`
+|java.lang.String
+|
+
+
+| `+aws.route53.discovery.client.follow-redirects+`
+|boolean
+|
+
+
+| `+aws.route53.discovery.client.default-charset+`
+|java.nio.charset.Charset
+|
+
+
+| `+aws.route53.discovery.client.channel-options+`
+|java.util.Map
+|
+
+
+| `+aws.route53.discovery.client.shutdown-timeout+`
+|java.time.Duration
+|
+
+
+| `+aws.route53.discovery.client.read-timeout+`
+|java.time.Duration
+|
+
+
+| `+aws.route53.discovery.client.read-idle-timeout+`
+|java.time.Duration
+|
+
+
+| `+aws.route53.discovery.client.connect-timeout+`
+|java.time.Duration
+|
+
+
+| `+aws.route53.discovery.client.num-of-threads+`
+|java.lang.Integer
+|
+
+
+| `+aws.route53.discovery.client.thread-factory+`
+|java.lang.Class
+|
+
+
+| `+aws.route53.discovery.client.max-content-length+`
+|int
+|
+
+
+| `+aws.route53.discovery.client.proxy-type+`
+|java.net.Proxy$Type
+|
+
+
+| `+aws.route53.discovery.client.proxy-address+`
+|java.net.SocketAddress
+|
+
+
+| `+aws.route53.discovery.client.proxy-username+`
+|java.lang.String
+|
+
+
+| `+aws.route53.discovery.client.proxy-password+`
+|java.lang.String
+|
+
+
+| `+aws.route53.discovery.client.proxy-selector+`
+|java.net.ProxySelector
+|
+
+
+| `+aws.route53.discovery.client.should-use-dns+`
+|boolean
+|Whether DNS should be used to resolve the discovery servers.
+
+
+| `+aws.route53.discovery.client.context-path+`
+|java.lang.String
+|Sets the context path.
+
+
+| `+aws.route53.discovery.client.default-zone+`
+|java.util.List
+|Sets the Discovery servers to use for the default zone.
+
+
+| `+aws.route53.discovery.client.zones+`
+|java.util.Map
+|Configures Discovery servers in other zones.
+
+
+| `+aws.route53.discovery.client.secure+`
+|boolean
+|Set if the discovery server is exposed over HTTPS
+
+
+| `+aws.route53.discovery.client.host+`
+|java.lang.String
+|The Discovery server host name
+
+
+| `+aws.route53.discovery.client.port+`
+|int
+|The port for the Discovery server
+
+
+|===

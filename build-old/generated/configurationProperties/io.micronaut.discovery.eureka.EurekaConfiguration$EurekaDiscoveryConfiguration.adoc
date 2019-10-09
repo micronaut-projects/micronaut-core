@@ -1,0 +1,19 @@
+
+++++
+<a id="io.micronaut.discovery.eureka.EurekaConfiguration$EurekaDiscoveryConfiguration" href="#io.micronaut.discovery.eureka.EurekaConfiguration$EurekaDiscoveryConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.eureka.EurekaConfiguration$EurekaDiscoveryConfiguration[]
+|===
+|Property |Type |Description
+
+| `+eureka.client.discovery.use-secure-port+`
+|boolean
+|Sets whether the secure port is used for communication.
+
+
+| `+eureka.client.discovery.enabled+`
+|boolean
+|
+
+
+|===

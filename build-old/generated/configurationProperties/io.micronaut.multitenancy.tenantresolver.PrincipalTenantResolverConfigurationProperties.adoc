@@ -1,0 +1,13 @@
+++++
+<a id="io.micronaut.multitenancy.tenantresolver.PrincipalTenantResolverConfigurationProperties" href="#io.micronaut.multitenancy.tenantresolver.PrincipalTenantResolverConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.tenantresolver.PrincipalTenantResolverConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantresolver.principal.enabled+`
+|boolean
+|Enables api:multitenancy.tenantresolver.PrincipalTenantResolver[]. The default enable is false.
+
+
+|===

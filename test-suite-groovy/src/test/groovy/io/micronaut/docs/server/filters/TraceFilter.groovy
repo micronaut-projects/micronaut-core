@@ -1,13 +1,13 @@
-package io.micronaut.docs.server.filters;
+package io.micronaut.docs.server.filters
 
 // tag::imports[]
 
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.filter.HttpServerFilter;
-import io.micronaut.http.filter.ServerFilterChain;
-import org.reactivestreams.Publisher;
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.MutableHttpResponse
+import io.micronaut.http.annotation.Filter
+import io.micronaut.http.filter.HttpServerFilter
+import io.micronaut.http.filter.ServerFilterChain
+import org.reactivestreams.Publisher
 // end::imports[]
 
 /**
@@ -34,4 +34,7 @@ class TraceFilter implements HttpServerFilter { // <2>
                            })
     }
     // end::doFilter[]
+
+// tag::endclass[]
 }
+// end::endclass[]

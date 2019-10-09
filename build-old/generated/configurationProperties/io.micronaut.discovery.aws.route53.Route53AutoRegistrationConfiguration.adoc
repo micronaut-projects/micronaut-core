@@ -1,0 +1,58 @@
+++++
+<a id="io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration" href="#io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration[]
+|===
+|Property |Type |Description
+
+| `+aws.route53.registration.aws-service-id+`
+|java.lang.String
+|Setting for service id to make easier testing.
+
+
+| `+aws.route53.registration.ip-addr+`
+|java.lang.String
+|
+
+
+| `+aws.route53.registration.prefer-ip-address+`
+|boolean
+|
+
+
+| `+aws.route53.registration.timeout+`
+|java.time.Duration
+|
+
+
+| `+aws.route53.registration.fail-fast+`
+|boolean
+|
+
+
+| `+aws.route53.registration.deregister+`
+|boolean
+|
+
+
+| `+aws.route53.registration.enabled+`
+|boolean
+|
+
+
+| `+aws.route53.registration.retry-count+`
+|int
+|
+
+
+| `+aws.route53.registration.retry-delay+`
+|java.time.Duration
+|
+
+
+| `+aws.route53.registration.health-path+`
+|java.lang.String
+|
+
+
+|===
