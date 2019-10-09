@@ -259,8 +259,26 @@ ext {
                     version:micronautMicrometerVersion,
                     group:'io.micronaut.configuration',
                     name:'micronaut-micrometer-core',
-                    modules:['micronaut-micrometer-registry-atlas', 'micronaut-micrometer-registry-graphite',
-                             'micronaut-micrometer-registry-prometheus', 'micronaut-micrometer-registry-statsd'  ]
+                    modules:[
+                            'micrometer-registry-appoptics',
+                            'micrometer-registry-atlas',
+                            'micrometer-registry-azure-monitor',
+                            'micrometer-registry-cloudwatch',
+                            'micrometer-registry-datadog',
+                            'micrometer-registry-dynatrace',
+                            'micrometer-registry-elastic',
+                            'micrometer-registry-ganglia',
+                            'micrometer-registry-graphite',
+                            'micrometer-registry-humio',
+                            'micrometer-registry-influx',
+                            'micrometer-registry-jmx',
+                            'micrometer-registry-kairos',
+                            'micrometer-registry-new-relic',
+                            'micrometer-registry-prometheus',
+                            'micrometer-registry-signalfx',
+                            'micrometer-registry-stackdriver',
+                            'micrometer-registry-statsd',
+                            'micrometer-registry-wavefront']
             ],
             'micronaut.spring': [
                     version:micronautSpringVersion,

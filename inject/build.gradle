@@ -13,4 +13,6 @@ dependencies {
     testCompile dependencyVersion("validation")
     testCompile project(":inject-groovy")
     testCompile "com.github.stefanbirkner:system-rules:$systemRulesVersion"
+    //system-rules has a transitive on junit-dep:[4.9,), so hard setting the version instead
+    testCompile "junit:junit-dep:4.9"
 }

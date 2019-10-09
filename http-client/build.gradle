@@ -14,6 +14,7 @@ dependencies {
     testCompile dependencyVersion("rxjava2")
     testCompile dependencyVersion("reactor")
     testCompile project(":http-server-netty")
+    testCompile "com.github.tomakehurst:wiremock-jre8:2.25.0"
 }
 
 //tasks.withType(Test) {

@@ -572,6 +572,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 typeAnnotationMetadata
                         );
                     }
+
+                    if (!annotationMetadata.hasStereotype("io.micronaut.validation.Validated") &&
+                            isDeclaredBean &&
+                            params.getParameterMetadata().values().stream().anyMatch(IS_CONSTRAINT)) {
+                        annotationMetadata = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder().annotate(
+                                annotationMetadata,
+                                io.micronaut.core.annotation.AnnotationValue.builder("io.micronaut.validation.Validated").build());
+                    }
+
                     if (annotationUtils.hasStereotype(method, AROUND_TYPE)) {
                         Object[] interceptorTypes = annotationMetadata
                                 .getAnnotationNamesByStereotype(AROUND_TYPE)

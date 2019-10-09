@@ -435,6 +435,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        @CompileStatic
         protected void visitIntroductionTypePublicMethods(AopProxyWriter aopProxyWriter, ClassNode node) {
             AnnotationMetadata typeAnnotationMetadata = aopProxyWriter.getAnnotationMetadata()
             SourceUnit source = this.sourceUnit
@@ -480,6 +481,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                 typeAnnotationMetadata
                         )
+                    }
+
+                    if (!annotationMetadata.hasStereotype("io.micronaut.validation.Validated") &&
+                            isDeclaredBean) {
+                        boolean hasConstraint
+                        for (Parameter p: methodNode.getParameters()) {
+                            AnnotationMetadata parameterMetadata = AstAnnotationUtils.getAnnotationMetadata(source, p)
+                            if (parameterMetadata.hasStereotype(InjectTransform.ANN_CONSTRAINT) ||
+                                    parameterMetadata.hasStereotype(InjectTransform.ANN_VALID)) {
+                                hasConstraint = true
+                                break
+                            }
+                        }
+                        if (hasConstraint) {
+                            annotationMetadata = addValidated(annotationMetadata)
+                        }
                     }
 
                     if (AstAnnotationUtils.hasStereotype(source, methodNode, AROUND_TYPE)) {
