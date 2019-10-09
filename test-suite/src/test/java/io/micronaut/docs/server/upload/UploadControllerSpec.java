@@ -1,42 +1,72 @@
-package io.micronaut.docs.server.upload
+package io.micronaut.docs.server.upload;
 
-import io.micronaut.AbstractMicronautSpec
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.client.multipart.MultipartBody
-import io.reactivex.Flowable
+import io.micronaut.AbstractMicronautSpec;
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.multipart.MultipartBody;
+import io.micronaut.runtime.server.EmbeddedServer;
+import io.reactivex.Flowable;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
-class UploadSpec extends AbstractMicronautSpec {
+import java.io.File;
+import java.io.IOException;
 
-    void cleanup() {
-        File file = File.createTempFile("file.json", "temp")
-        file.delete()
+import static org.junit.Assert.assertEquals;
+
+public class UploadControllerSpec {
+
+    private static EmbeddedServer server;
+    private static RxHttpClient client;
+
+    @BeforeClass
+    public static void setupServer() {
+        server = ApplicationContext.run(EmbeddedServer.class);
+        client = server
+                .getApplicationContext()
+                .createBean(RxHttpClient.class, server.getURL());
     }
 
-    void "test file upload"() {
-        given:
-        MultipartBody body = MultipartBody.builder()
-                .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, '{"title":"Foo"}'.bytes)
-                .build()
+    @AfterClass
+    public static void stopServer() {
+        if(server != null) {
+            server.stop();
+        }
+        if(client != null) {
+            client.stop();
+        }
+        try {
+            File file = File.createTempFile("file.json", "temp");
+            file.delete();
+        } catch (IOException e) { }
+    }
 
-        when:
+    @Test
+    public void testFileUpload() {
+        MultipartBody body = MultipartBody.builder()
+                .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
+                .build();
+
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
-                String
-        ))
-        HttpResponse<String> response = flowable.blockingFirst()
+                String.class
+        ));
+        HttpResponse<String> response = flowable.blockingFirst();
 
-        then:
-        response.code() == HttpStatus.OK.code
-        response.getBody().get() == "Uploaded"
+        assertEquals(HttpStatus.OK.getCode(), response.code());
+        assertEquals("Uploaded", response.getBody().get());
     }
 
-    void "test completed file upload"() {
+/*    void "test completed file upload"() {
         given:
         MultipartBody body = MultipartBody.builder()
                 .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, '{"title":"Foo"}'.bytes)
@@ -75,27 +105,25 @@ class UploadSpec extends AbstractMicronautSpec {
         response.code() == HttpStatus.OK.code
         response.getBody().get() == "Uploaded"
     }
-
-    void "test completed file upload with no filename but with bytes"() {
-        given:
+*/
+    @Test
+    public void testCompletedFileUploadNoNameWithBytes() {
         MultipartBody body = MultipartBody.builder()
-                .addPart("file", "", MediaType.APPLICATION_JSON_TYPE, '{"title":"Foo"}'.bytes)
-                .build()
+                .addPart("file", "", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".getBytes())
+                .build();
 
-        when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/completed", body)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .accept(MediaType.TEXT_PLAIN_TYPE),
-                String
-        ))
-        HttpResponse<String> response = flowable.blockingFirst()
+                String.class
+        ));
 
-        then:
-        def ex = thrown(HttpClientResponseException)
-        ex.message == "Required argument [CompletedFileUpload file] not specified"
+        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () -> flowable.blockingFirst());
+
+        assertEquals("Required argument [CompletedFileUpload file] not specified", ex.getMessage());
     }
-
+/*
     void "test completed file upload with no file name and no bytes"() {
         given:
         MultipartBody body = MultipartBody.builder()
@@ -155,5 +183,5 @@ class UploadSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.OK.code
         response.getBody().get() == "Uploaded"
-    }
+    }*/
 }
