@@ -21,6 +21,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -34,6 +35,18 @@ public interface RouteValidationRule {
 
     /**
      * Validate the given uri template and route arguments.
+     *
+     * @param template The URI match templates
+     * @param parameters The route parameters
+     * @param method  The route method
+     * @return A {@link RouteValidationResult}
+     */
+    default RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters, MethodElement method) {
+        return validate(Collections.singletonList(template), parameters, method);
+    }
+
+    /**
+     * Validate the given uri templates and route arguments.
      *
      * @param templates The URI match templates
      * @param parameters The route parameters
