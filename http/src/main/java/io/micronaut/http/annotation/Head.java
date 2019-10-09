@@ -41,21 +41,13 @@ public @interface Head {
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
     @AliasFor(annotation = UriMapping.class, member = "value")
-    String value() default UriMapping.DEFAULT_URI;
+    String[] value() default UriMapping.DEFAULT_URI;
 
     /**
      * @return The URI of the HEAD route
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
     @AliasFor(annotation = UriMapping.class, member = "value")
-    String uri() default UriMapping.DEFAULT_URI;
+    String[] uri() default UriMapping.DEFAULT_URI;
 
-    /**
-     * Only to be used in the context of a server.
-     *
-     * @return The URIs of the HEAD route
-     */
-    @AliasFor(annotation = HttpMethodMapping.class, member = "uris")
-    @AliasFor(annotation = UriMapping.class, member = "uris")
-    String[] uris() default {UriMapping.DEFAULT_URI};
 }
