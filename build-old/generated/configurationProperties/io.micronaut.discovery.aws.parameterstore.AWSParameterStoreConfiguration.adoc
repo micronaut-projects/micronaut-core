@@ -1,0 +1,24 @@
+++++
+<a id="io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration" href="#io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.aws.parameterstore.AWSParameterStoreConfiguration[]
+|===
+|Property |Type |Description
+
+| `+aws.client.system-manager.parameterstore.use-secure-parameters+`
+|boolean
+|Use auto-decryption via MKS for SecureString parameters. Default value ({@value DEFAULT_SECURE}).
+ If set to false, you will not get unencrypted values.
+
+
+| `+aws.client.system-manager.parameterstore.root-hierarchy-path+`
+|java.lang.String
+|The the root hierarchy on the parameter store. Default value ("/" + PREFIX + "/").
+
+
+| `+aws.client.system-manager.parameterstore.enabled+`
+|boolean
+|Enable or disable distributed configuration with AWS Parameter Store. Default value (false).
+
+
+|===

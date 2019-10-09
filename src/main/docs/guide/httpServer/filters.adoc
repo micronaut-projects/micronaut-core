@@ -33,7 +33,7 @@ snippet::io.micronaut.docs.server.filters.TraceService[tags="imports,class", ind
 
 You can then inject this implementation into your filter definition:
 
-snippet::io.micronaut.docs.server.filters.TraceFilter[tags="imports,class", indent=0, title="An Example HttpServerFilter"]
+snippet::io.micronaut.docs.server.filters.TraceFilter[tags="imports,class,endclass", indent=0, title="An Example HttpServerFilter"]
 
 <1> The api:http.annotation.Filter[] annotation is used to define the URI patterns the filter matches
 <2> The class implements the api:http.filter.HttpServerFilter[] interface

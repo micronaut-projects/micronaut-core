@@ -1,0 +1,33 @@
+++++
+<a id="io.micronaut.discovery.consul.ConsulConfiguration$ConsulDiscoveryConfiguration" href="#io.micronaut.discovery.consul.ConsulConfiguration$ConsulDiscoveryConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.consul.ConsulConfiguration$ConsulDiscoveryConfiguration[]
+|===
+|Property |Type |Description
+
+| `+consul.client.discovery.tags+`
+|java.util.Map
+|The tags to use for querying
+
+
+| `+consul.client.discovery.schemes+`
+|java.util.Map
+|The service ID to protocol scheme
+
+
+| `+consul.client.discovery.datacenters+`
+|java.util.Map
+|The data centers to query
+
+
+| `+consul.client.discovery.passing+`
+|boolean
+|Whether services that are not passing health checks should be returned
+
+
+| `+consul.client.discovery.enabled+`
+|boolean
+|
+
+
+|===

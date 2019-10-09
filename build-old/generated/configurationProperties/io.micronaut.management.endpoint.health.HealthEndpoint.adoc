@@ -1,0 +1,13 @@
+++++
+<a id="io.micronaut.management.endpoint.health.HealthEndpoint" href="#io.micronaut.management.endpoint.health.HealthEndpoint">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.management.endpoint.health.HealthEndpoint[]
+|===
+|Property |Type |Description
+
+| `+endpoints.health.details-visible+`
+|api:io.micronaut.management.endpoint.health.DetailsVisibility[]
+|Sets the visibility policy for health information.
+
+
+|===

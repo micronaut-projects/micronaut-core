@@ -1,0 +1,48 @@
+++++
+<a id="io.micronaut.http.client.ServiceHttpClientConfiguration$ServiceSslClientConfiguration" href="#io.micronaut.http.client.ServiceHttpClientConfiguration$ServiceSslClientConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.client.ServiceHttpClientConfiguration$ServiceSslClientConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.http.services.*.ssl-configuration+`
+|api:io.micronaut.http.ssl.SslConfiguration[]
+|Sets the SSL configuration for the client.
+
+
+| `+micronaut.http.services.*.ssl.enabled+`
+|boolean
+|
+
+
+| `+micronaut.http.services.*.ssl.port+`
+|int
+|
+
+
+| `+micronaut.http.services.*.ssl.build-self-signed+`
+|boolean
+|
+
+
+| `+micronaut.http.services.*.ssl.client-authentication+`
+|api:io.micronaut.http.ssl.ClientAuthentication[]
+|
+
+
+| `+micronaut.http.services.*.ssl.ciphers+`
+|java.lang.String[]
+|
+
+
+| `+micronaut.http.services.*.ssl.protocols+`
+|java.lang.String[]
+|
+
+
+| `+micronaut.http.services.*.ssl.protocol+`
+|java.lang.String
+|
+
+
+|===

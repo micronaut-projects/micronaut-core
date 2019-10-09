@@ -1,0 +1,23 @@
+++++
+<a id="io.micronaut.web.router.resource.StaticResourceConfiguration" href="#io.micronaut.web.router.resource.StaticResourceConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.web.router.resource.StaticResourceConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.router.static-resources.*.enabled+`
+|boolean
+|Sets whether this specific mapping is enabled. Default value (true).
+
+
+| `+micronaut.router.static-resources.*.paths+`
+|java.util.List
+|A list of paths either starting with `classpath:` or `file:`. You can serve files from anywhere on disk or the classpath. For example to serve static resources from `src/main/resources/public`, you would use `classpath:public` as the path.
+
+
+| `+micronaut.router.static-resources.*.mapping+`
+|java.lang.String
+|The path resources should be served from. Uses ant path matching. Default value ("/**").
+
+
+|===

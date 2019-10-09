@@ -1,0 +1,1212 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>8.2 Service Discovery 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>8.2 Service Discovery</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+                <div id="table-of-content">
+                    <h2>Table of Contents</h2>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#serviceDiscoveryConsul"><strong>8.1</strong><span>Consul Support</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#serviceDiscoveryEureka"><strong>8.2</strong><span>Eureka Support</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#serviceDiscoveryKubernetes"><strong>8.3</strong><span>Kubernetes Support</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#serviceDiscoveryRoute53"><strong>8.4</strong><span>AWS Route 53 Support</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#serviceDiscoveryManual"><strong>8.5</strong><span>Manual Service Discovery Configuration</span></a>
+                    </div>
+                    
+                </div>
+                
+
+                
+<h2 id="serviceDiscovery"><a class="anchor" href="#serviceDiscovery"></a>8.2 Service Discovery</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/serviceDiscovery.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">Using the CLI</div>
+<div class="paragraph">
+<p>If you are creating your project using the Micronaut CLI, supply either of <code>discovery-consul</code> or <code>discovery-eureka</code> features to enable service-discovery in your project:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ mn create-app my-app --features discovery-consul</pre>
+</div>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Service Discovery enables the ability for Microservices to find each other without necessarily knowing the physical location or IP address of associated services.</p>
+</div>
+<div class="paragraph">
+<p>There are many ways Service Discovery can be implemented, including:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Manually implement Service Discovery using DNS without requiring a third party tool or component.</p>
+</li>
+<li>
+<p>Use a discovery server such as <a href="https://github.com/Netflix/eureka">Eureka</a>, <a href="https://www.consul.io">Consul</a> or <a href="https://zookeeper.apache.org">ZooKeeper</a>.</p>
+</li>
+<li>
+<p>Delegate the work to a container runtime, such as <a href="https://kubernetes.io">Kubernetes</a>.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>With that in mind, Micronaut tries to flexible to support all of these approaches. As of this writing, Micronaut features integrated support for the popular Service Discovery servers:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Eureka</p>
+</li>
+<li>
+<p>Consul</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>To include Service Discovery in your application simply the first step is to add the <code>discovery-client</code> dependency to your application:</p>
+</div>
+<div class="paragraph">
+<p>        <div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="gradle">compile <span class="hljs-string">'io.micronaut:micronaut-discovery-client'</span></code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="maven">&lt;dependency&gt;
+    &lt;groupId&gt;io.micronaut&lt;/groupId&gt;
+    &lt;artifactId&gt;micronaut-discovery-client&lt;/artifactId&gt;
+&lt;/dependency&gt;</code></pre>
+</div>
+</div>
+</p>
+</div>
+<div class="paragraph">
+<p>The <code>discovery-client</code> dependency provides implementations of the <a href="../api/io/micronaut/discovery/DiscoveryClient.html">DiscoveryClient</a> interface.</p>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/discovery/DiscoveryClient.html">DiscoveryClient</a> is fairly simple and provides two main entry points:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="../api/io/micronaut/discovery/DiscoveryClient.html#getServiceIds--">DiscoveryClient.getServiceIds()</a> - Returns all discovered service IDs</p>
+</li>
+<li>
+<p><a href="../api/io/micronaut/discovery/DiscoveryClient.html#getInstances-java.lang.String-">DiscoveryClient.getInstances(java.lang.String)</a> - Returns all the <a href="../api/io/micronaut/discovery/ServiceInstance.html">ServiceInstance</a> objects for a given service ID</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Both methods return <a href="http://www.reactive-streams.org/reactive-streams-1.0.2-javadoc/org/reactivestreams/Publisher.html">Publisher</a> instances since the operation to retrieve service ID information may result in a blocking network call depending on the underlying implementation.</p>
+</div>
+<div class="paragraph">
+<p>The default implementation of the <code>DiscoveryClient</code> interface is <a href="../api/io/micronaut/discovery/client/CachingCompositeDiscoveryClient.html">CachingCompositeDiscoveryClient</a> which merges all other <code>DiscoveryClient</code> beans into a single bean and provides caching of the results of the methods. The default behaviour is to cache for 30 seconds. This cache can be disabled in application configuration:</p>
+</div>
+<div class="listingblock">
+<div class="title">Disabling the Discovery Client Cache</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    caches:
+        discovery-client:
+            enabled: false</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Alternatively you can alter the cache&#8217;s expiration policy:</p>
+</div>
+<div class="listingblock">
+<div class="title">Configuring the Discovery Client Cache</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    caches:
+        discovery-client:
+            expire-after-access: 60s</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>See the <a href="../api/io/micronaut/discovery/client/DiscoveryClientCacheConfiguration.html">DiscoveryClientCacheConfiguration</a> class for available configuration options.</p>
+</div>
+
+<h2 id="serviceDiscoveryConsul"><a class="anchor" href="#serviceDiscoveryConsul"></a>8.2.1 Consul Support</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/serviceDiscovery/serviceDiscoveryConsul.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p><a href="https://www.consul.io">Consul</a> is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native non-blocking <a href="../api/io/micronaut/discovery/consul/client/v1/ConsulClient.html">ConsulClient</a> that is built using Micronaut&#8217;s support for <a href="#clientAnnotation">Declarative HTTP Clients</a>.</p>
+</div>
+<div class="sect1">
+<h2 id="_starting_consul"><a class="anchor" href="#_starting_consul"></a>Starting Consul</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The quickest way to start using Consul is via Docker:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Starting Consul with Docker. Currently only v1.2.x is supported.</p>
+</li>
+</ol>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>docker run -p 8500:8500 consul:1.2.4</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Alternatively you can <a href="https://www.consul.io/docs/install/index.html">install and run a local Consul instance</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_auto_registering_with_consul"><a class="anchor" href="#_auto_registering_with_consul"></a>Auto Registering with Consul</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To register a Micronaut application with Consul simply add the necessary <a href="../api/io/micronaut/discovery/consul/ConsulConfiguration.html">ConsulConfiguration</a>. A minimal example can be seen below:</p>
+</div>
+<div class="listingblock">
+<div class="title">Auto Registering with Consul (application.yml)</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    application:
+        name: hello-world
+consul:
+  client:
+    registration:
+      enabled: true
+    defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"</code></pre>
+</div>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+Using the Micronaut CLI you can quickly create a new service setup with Consul using: <code>mn create-app my-app --features discovery-consul</code>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The <code>consul.client.defaultZone</code> settings accepts a list of Consul servers to be used by default.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+You could also simply set <code>consul.client.host</code> and <code>consul.client.port</code>, however <a href="../api/io/micronaut/discovery/consul/ConsulConfiguration.html">ConsulConfiguration</a> allows you specify per zone discovery services for the purpose load balancing. A zone maps onto a AWS availability zone or a Google Cloud zone.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>By default registering with Consul is disabled hence you should set <code>consul.client.registration.enabled</code> to <code>true</code>. Note that you may wish to do this only in your production configuration.</p>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+Running multiple instances of a service may require an additional configuration param.  See below.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>If you are running the same applications on the same port across different servers it is important to set the <code>micronaut.application.instance.id</code> property or you will experience instance registration collision.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+  application:
+    name: hello-world
+    instance:
+      id: ${random.shortuuid}</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customizing_consul_service_registration"><a class="anchor" href="#_customizing_consul_service_registration"></a>Customizing Consul Service Registration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/discovery/consul/ConsulConfiguration.html">ConsulConfiguration</a> class features a range of customization options for altering how an instance registers with Consul. You can customize the tags, the retry attempts, the fail fast behaviour and so on.</p>
+</div>
+<div class="paragraph">
+<p>Notice too that <code>ConsulConfiguration</code> extends <a href="../api/io/micronaut/discovery/client/DiscoveryClientConfiguration.html">DiscoveryClientConfiguration</a>  which in turn extends <a href="../api/io/micronaut/http/client/HttpClientConfiguration.html">HttpClientConfiguration</a> allowing you to customize the settings for the Consul client, including read timeout, proxy configuration and so on.</p>
+</div>
+<div class="paragraph">
+<p>For example:</p>
+</div>
+<div class="listingblock">
+<div class="title">Customizing Consul Registration Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    application:
+        name: hello-world
+consul:
+  client:
+    registration:
+      enabled: true
+      # Alters the tags
+      tags:
+        - hello
+        - world
+      # Alters the retry count
+      retry-count: 5
+      # Alters fail fast behaviour
+      fail-fast: false
+    defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_discovery_services_from_consul"><a class="anchor" href="#_discovery_services_from_consul"></a>Discovery Services from Consul</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To discovery other services you could manually interact with the <a href="../api/io/micronaut/discovery/DiscoveryClient.html">DiscoveryClient</a>, however typically instead you use the <a href="#clientAnnotation">Client Annotation</a> to declare how an HTTP client maps to a service.</p>
+</div>
+<div class="paragraph">
+<p>For example the configuration in the previous section declared a value for <code>micronaut.application.name</code> of <code>hello-world</code>. This is the value that will be used as the service ID when registering with Consul.</p>
+</div>
+<div class="paragraph">
+<p>Other services can discovery instances of the <code>hello-world</code> service simply by declaring a client as follows:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using @Client to Discover Services</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@Client(id = "hello-world")
+interface HelloClient{
+	...
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Alternatively you can also use <a href="../api/io/micronaut/http/client/annotation/Client.html">@Client</a> as a qualifier to <code>@Inject</code> an instance of <a href="../api/io/micronaut/http/client/HttpClient.html">HttpClient</a>:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using @Client to Discover Services</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@Client(id = "hello-world")
+@Inject
+RxHttpClient httpClient;</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_consul_health_checks"><a class="anchor" href="#_consul_health_checks"></a>Consul Health Checks</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>By default when registering with Consul Micronaut will register a <a href="https://www.consul.io/docs/agent/checks.html">TTL check</a>. A TTL check basically means that if the application does not send a heartbeat back to Consul after a period of time the service is put in a failing state.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut applications feature a <a href="../api/io/micronaut/health/HeartbeatConfiguration.html">HeartbeatConfiguration</a> which starts a thread using <a href="../api/io/micronaut/health/HeartbeatTask.html">HeartbeatTask</a> that fires <a href="../api/io/micronaut/health/HeartbeatEvent.html">HeartbeatEvent</a> instances.</p>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/discovery/consul/registration/ConsulAutoRegistration.html">ConsulAutoRegistration</a> class listens for these events and sends a callback to the <a href="https://www.consul.io/api/agent/check.html">/agent/check/pass/:check_id</a> endpoint provided by Consul, effectively keeping the service alive.</p>
+</div>
+<div class="paragraph">
+<p>With this arrangement the responsibility is on the Micronaut application to send TTL callbacks to Consul on a regular basis.</p>
+</div>
+<div class="paragraph">
+<p>If you prefer you can push the responsibility for health checks to Consul itself by registering an HTTP check:</p>
+</div>
+<div class="listingblock">
+<div class="title">Consul HTTP Check Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">consul:
+  client:
+    registration:
+       check:
+          http: true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>With this configuration option in place Consul will assume responsibility of invoking the Micronaut applications <a href="#healthEndpoint">Health Endpoint</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_controlling_ip_host_registration"><a class="anchor" href="#_controlling_ip_host_registration"></a>Controlling IP/Host Registration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Occasionally, depending on the deployment environment you may wish to expose the IP address and not the host name, since by default Micronaut will register with Consul with either the value of the <code>HOST</code> environment variable or the value configured via <code>micronaut.server.host</code>.</p>
+</div>
+<div class="paragraph">
+<p>You can use the <code>consul.client.registration.prefer-ip-address</code> setting to indicate you would prefer to register with the IP address.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut will by default perform an IP lookup to try and figure out the IP address, however you can use the <code>consul.client.registration.ip-addr</code> setting to specify the IP address of the service directly.</p>
+</div>
+<div class="listingblock">
+<div class="title">Consul HTTP Check Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">consul:
+  client:
+    registration:
+        ip-addr: &lt;your base container ip&gt;
+        prefer-ip-address: true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will tell Consul to register the IP that other instances can use to access your service and not the NAT IP it is running under (or 127.0.0.1).</p>
+</div>
+<div class="paragraph">
+<p>If you use HTTP health checks (see the previous section) then Consul will use the configured IP address to check the Micronaut <code>/health</code> endpoint.</p>
+</div>
+<div class="listingblock">
+<div class="title">Consul HTTP Check Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">consul:
+  client:
+    registration:
+        ip-addr: &lt;your base container ip&gt;
+        prefer-ip-address: true
+        check:
+            http: true</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="serviceDiscoveryEureka"><a class="anchor" href="#serviceDiscoveryEureka"></a>8.2.2 Eureka Support</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/serviceDiscovery/serviceDiscoveryEureka.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p><a href="https://github.com/Netflix/eureka">Netflix Eureka</a> is a popular discovery server deployed at scale at organizations like Netflix.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut features a native non-blocking <a href="../api/io/micronaut/discovery/eureka/client/v2/EurekaClient.html">EurekaClient</a> as part of the <code>discovery-client</code> module that does not require any additional third-party dependencies and is built using Micronaut&#8217;s support for <a href="#clientAnnotation">Declarative HTTP Clients</a>.</p>
+</div>
+<div class="sect1">
+<h2 id="_starting_eureka"><a class="anchor" href="#_starting_eureka"></a>Starting Eureka</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The quickest way to start a Eureka server is to use to use <a href="https://spring.io/guides/gs/service-registration-and-discovery/#initial">Spring Boot&#8217;s Eureka starters</a>.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+As of this writing the official Docker images for Eureka are significantly out-of-date so it is recommended to create a Eureka server following the steps above.
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_auto_registering_with_eureka"><a class="anchor" href="#_auto_registering_with_eureka"></a>Auto Registering with Eureka</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The process to register a Micronaut application with Eureka is very similar to with Consul, as seen in the previous section, simply add the necessary <a href="../api/io/micronaut/discovery/eureka/EurekaConfiguration.html">EurekaConfiguration</a>. A minimal example can be seen below:</p>
+</div>
+<div class="listingblock">
+<div class="title">Auto Registering with Eureka (application.yml)</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    application:
+        name: hello-world
+eureka:
+  client:
+    registration:
+      enabled: true
+    defaultZone: "${EUREKA_HOST:localhost}:${EUREKA_PORT:8761}"</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customizing_eureka_service_registration"><a class="anchor" href="#_customizing_eureka_service_registration"></a>Customizing Eureka Service Registration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>You can customize various aspects of registration with Eureka using the <a href="../api/io/micronaut/discovery/eureka/EurekaConfiguration.html">EurekaConfiguration</a>. Notice that <code>EurekaConfiguration</code> extends <a href="../api/io/micronaut/discovery/client/DiscoveryClientConfiguration.html">DiscoveryClientConfiguration</a>  which in turn extends <a href="../api/io/micronaut/http/client/HttpClientConfiguration.html">HttpClientConfiguration</a> allowing you to customize the settings for the Eureka client, including read timeout, proxy configuration and so on.</p>
+</div>
+<div class="listingblock">
+<div class="title">Example Eureka Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">eureka:
+  client:
+     readTimeout: 5s
+     registration:
+         asgName: myAsg # the auto scaling group name
+         countryId: 10 # the country id
+         vipAddress: 'myapp' # The Eureka VIP address
+         leaseInfo:
+            durationInSecs: 60 # The lease information
+         metadata: # arbitrary instance metadata
+            foo: bar
+         retry-count: 10 # How many times to retry
+         retry-delay: 5s # How long to wait between retries
+
+         appname: some-app-name     # optional, eureka instance application name, defaults to ${micronaut.application.name}
+         hostname: foo.example.com  # optional, exposed eureka instance hostname, useful in docker bridged network environments
+         ip-addr: 1.2.3.4           # optional, exposed eureka instance ip address, useful in docker bridged network environments
+         port: 9090                 # optional, exposed eureka instance port, useful in docker bridged network environments</code></pre>
+</div>
+</div>
+<a id="io.micronaut.discovery.eureka.EurekaConfiguration$EurekaRegistrationConfiguration" href="#io.micronaut.discovery.eureka.EurekaConfiguration$EurekaRegistrationConfiguration">&#128279;</a>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Configuration Properties for <a href="../api/io/micronaut/discovery/eureka/EurekaConfiguration.EurekaRegistrationConfiguration.html">EurekaConfiguration$EurekaRegistrationConfiguration</a></caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Property</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.secure-port</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.port</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.instance-id</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.asg-name</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.home-page-url</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.lease-info</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/discovery/eureka/client/v2/LeaseInfo.html">LeaseInfo</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.country-id</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.status-page-url</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.health-check-url</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.secure-health-check-url</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.data-center-info</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/discovery/eureka/client/v2/DataCenterInfo.html">DataCenterInfo</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.status</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/discovery/eureka/client/v2/InstanceInfo.Status.html">InstanceInfo$Status</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.app-group-name</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.ip-addr</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.vip-address</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.secure-vip-address</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.metadata</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.util.Map</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.lease-info.registration-timestamp</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">long</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.lease-info.renewal-timestamp</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">long</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.lease-info.eviction-timestamp</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">long</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.lease-info.service-up-timestamp</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">long</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.lease-info.duration-in-secs</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.lease-info.renewal-interval-in-secs</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.prefer-ip-address</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.timeout</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.time.Duration</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.fail-fast</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.deregister</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.enabled</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.retry-count</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.retry-delay</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.time.Duration</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>eureka.client.registration.health-path</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.lang.String</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_eureka_basic_authentication"><a class="anchor" href="#_eureka_basic_authentication"></a>Eureka Basic Authentication</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>You can customize the Eureka credentials in the URI you specify to in <code>defaultZone</code>.</p>
+</div>
+<div class="paragraph">
+<p>For example:</p>
+</div>
+<div class="listingblock">
+<div class="title">Auto Registering with Eureka</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">eureka:
+  client:
+    defaultZone: "https://${EUREKA_USERNAME}:${EUREKA_PASSWORD}@localhost:8761"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example externalizes configuration of the username and password Eureka to environment variables called <code>EUREKA_USERNAME</code> and <code>EUREKA_PASSWORD</code>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_eureka_health_checks"><a class="anchor" href="#_eureka_health_checks"></a>Eureka Health Checks</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Like Consul, the <a href="../api/io/micronaut/discovery/eureka/registration/EurekaAutoRegistration.html">EurekaAutoRegistration</a> will send <a href="../api/io/micronaut/health/HeartbeatEvent.html">HeartbeatEvent</a> instances with the <a href="../api/io/micronaut/health/HealthStatus.html">HealthStatus</a> of the Micronaut application to Eureka.</p>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/management/health/monitor/HealthMonitorTask.html">HealthMonitorTask</a> will by default continuously monitor the <a href="../api/io/micronaut/health/HealthStatus.html">HealthStatus</a> of the application by running health checks and the <a href="../api/io/micronaut/health/CurrentHealthStatus.html">CurrentHealthStatus</a> will be sent to Eureka.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_secure_communication_with_eureka"><a class="anchor" href="#_secure_communication_with_eureka"></a>Secure Communication with Eureka</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If you wish to configure HTTPS and have clients discovery Eureka instances and communicate over HTTPS then you should set the <code>eureka.client.discovery.use-secure-port</code> option to <code>true</code> to ensure that service communication happens over HTTPS and also configure <a href="#https">HTTPS</a> appropriately for each instance.</p>
+</div>
+</div>
+</div>
+
+<h2 id="serviceDiscoveryKubernetes"><a class="anchor" href="#serviceDiscoveryKubernetes"></a>8.2.3 Kubernetes Support</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/serviceDiscovery/serviceDiscoveryKubernetes.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Kubernetes is a container runtime which has a whole bunch of features including integrated Service Discovery. The <a href="https://kubernetes.io/docs/concepts/services-networking/service/#environment-variables">strategy for Service Discovery in Kubernetes</a> is pretty simple in that for each Pod, Kubernetes will expose environment variables in the format <code>[SERVICE_NAME]_SERVICE_HOST</code> and <code>[SERVICE_NAME]_SERVICE_PORT</code>.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut features a <a href="../api/io/micronaut/discovery/kubernetes/KubernetesDiscoveryClient.html">KubernetesDiscoveryClient</a> that simply looks at the environment variables and translates those into the available services.</p>
+</div>
+<div class="paragraph">
+<p>For example given a service exposed as <code>HELLO_WORLD_SERVICE_HOST</code> to your application, you can declare clients that will be automatically discovered using:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using @Client to Discover Services</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@Client(id = "hello-world")
+interface HelloClient{
+    ...
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Since Kubernetes itself assumes responsibility for tasks such as health checks, load balancing and so on there is no need to send <a href="../api/io/micronaut/health/HeartbeatEvent.html">HeartbeatEvent</a> instances and so on.</p>
+</div>
+
+<h2 id="serviceDiscoveryRoute53"><a class="anchor" href="#serviceDiscoveryRoute53"></a>8.2.4 AWS Route 53 Support</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/serviceDiscovery/serviceDiscoveryRoute53.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>To use the <a href="https://aws.amazon.com/route53/">Route 53 Service Discovery</a>, you must meet the following criteria:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Run EC2 instances of some type</p>
+</li>
+<li>
+<p>Have a domain name hosted in Route 53</p>
+</li>
+<li>
+<p>Have a newer version of AWS-CLI (such as 14+)</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Assuming you have those things, you are ready. It is not as fancy as Consul or Eureka, but other than some initial setup
+with the AWS-CLI, there is no other software running to go wrong. You can even support health checks
+if you add a custom health check to your service. If you would like to test if your account can create and use Service Discovery see the Integration Test section.
+More information can be found at <a href="https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html" class="bare">https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html</a>.</p>
+</div>
+<div class="paragraph">
+<p>Here are the steps:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Use AWS-CLI to create a namespace. You can make either a public or private one depending on what IPs or subnets
+you are using</p>
+</li>
+<li>
+<p>Create a service with DNS Records with AWS-CLI command</p>
+</li>
+<li>
+<p>Add health checks or custom health checks (optional)</p>
+</li>
+<li>
+<p>Add Service ID to your application configuration file like so:</p>
+</li>
+</ol>
+</div>
+<div class="listingblock">
+<div class="title">Sample application.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">aws:
+    route53:
+        registration
+            enabled: true
+            aws-service-id: srv-978fs98fsdf
+            namespace: micronaut.io
+micronaut:
+    application:
+        name: something</code></pre>
+</div>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Make sure you have the following dependencies included in your build file:</p>
+</li>
+</ol>
+</div>
+<div class="listingblock">
+<div class="title">Sample build.gradle</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">compile "io.micronaut:micronaut-discovery-client"
+compile "io.micronaut.configuration:micronaut-aws-common"
+compile group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
+compile group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
+compile group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
+compile group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'</code></pre>
+</div>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>On the client side, you will need the same dependencies and less configuration options:</p>
+</li>
+</ol>
+</div>
+<div class="listingblock">
+<div class="title">Sample application.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">aws:
+    route53:
+        discovery:
+            client:
+                enabled: true
+                aws-service-id: srv-978fs98fsdf
+                namespace-id: micronaut.io</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can then use the <a href="../api/io/micronaut/discovery/DiscoveryClient.html">DiscoveryClient</a> API to find other services registered via Route 53. For example:</p>
+</div>
+<div class="listingblock">
+<div class="title">Sample code for client</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient);
+List&lt;String&gt; serviceIds = Flowable.fromPublisher(discoveryClient.getServiceIds()).blockingFirst();
+List&lt;ServiceInstance&gt; instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceIds.get(0))).blockingFirst();</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_creating_the_namespace"><a class="anchor" href="#_creating_the_namespace"></a>Creating the Namespace</h4>
+<div class="paragraph">
+<p>Namespaces are similar to a regular Route53 hosted zone, and they appear in the Route53 console but the console doesn&#8217;t support
+ modifying them. You must use the AWS-CLI at this time for any Service Discovery functionality.</p>
+</div>
+<div class="paragraph">
+<p>First decide if you are creating a public facing namespace or a private one, as the commands are different:</p>
+</div>
+<div class="listingblock">
+<div class="title">Creating Namespace</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ aws servicediscovery create-public-dns-namespace --name micronaut.io --create-request-id create-1522767790 --description adescrptionhere
+
+or
+
+$ aws servicediscovery create-private-dns-namespace --name micronaut.internal.io --create-request-id create-1522767790 --description adescrptionhere --vpc yourvpcID</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>When you run this you will get an operation ID. You can check the status with the <code>get-operation</code> CLI command:</p>
+</div>
+<div class="listingblock">
+<div class="title">Get Operation Results</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ aws servicediscovery get-operation --operation-id asdffasdfsda</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can use this command to get the status of any call you make that returns an operation id.</p>
+</div>
+<div class="paragraph">
+<p>The result of the command will tell you the ID of the namespace. Write that down, you&#8217;ll need it for the next steps. If you get an error it will say what the error was.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_creating_the_service_dns_records"><a class="anchor" href="#_creating_the_service_dns_records"></a>Creating the Service &amp; DNS Records</h4>
+<div class="paragraph">
+<p>The next step is creating the Service and DNS records.</p>
+</div>
+<div class="listingblock">
+<div class="title">Create Service</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ aws create-service --name yourservicename --create-request-id somenumber --description someservicedescrption --dns-config NamespaceId=yournamespaceid,RoutingPolicy=WEIGHTED,DnsRecords=[{Type=A,TTL=1000},{Type=A,TTL=1000}]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>DnsRecord</code> type can be <code>A</code>(ipv4),<code>AAAA</code>(ipv6),<code>SRV</code>, or <code>CNAME</code>. <code>RoutingPolicy</code> can be <code>WEIGHTED</code> or <code>MULTIVALUE</code>. Keep in mind <code>CNAME</code> must use weighted routing type, <code>SRV</code> must have a valid port configured.</p>
+</div>
+<div class="paragraph">
+<p>If you want to add a health check, you can use the following syntax on the CLI:</p>
+</div>
+<div class="listingblock">
+<div class="title">Specifying a Health Check</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">Type=string,ResourcePath=string,FailureThreshold=integer</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Type can be 'HTTP','HTTPS', or 'TCP'. You can only use a standard health check on a public namespace. See Custom Health Checks for private namespaces. Resource path should be a url that returns 200 OK if it&#8217;s healthy.</p>
+</div>
+<div class="paragraph">
+<p>For a custom health check, you only need to specify <code>--health-check-custom-config FailureThreshold=integer</code> which will work on private namespaces as well.</p>
+</div>
+<div class="paragraph">
+<p>This is also good because Micronaut will send out pulsation commands to let AWS know the instance is still healthy.</p>
+</div>
+<div class="paragraph">
+<p>For more help run 'aws discoveryservice create-service help'.</p>
+</div>
+<div class="paragraph">
+<p>You will get a service ID and an ARN back from this command if successful. Write that down, it&#8217;s going to go into the Micronaut configuration.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_setting_up_the_configuration_in_micronaut"><a class="anchor" href="#_setting_up_the_configuration_in_micronaut"></a>Setting up the configuration in Micronaut</h4>
+
+</div>
+<div class="sect3">
+<h4 id="_auto_naming_registration"><a class="anchor" href="#_auto_naming_registration"></a>Auto Naming Registration</h4>
+<div class="paragraph">
+<p>You will need to add the configuration to make your applications register with Route 53 Auto-discovery:</p>
+</div>
+<div class="listingblock">
+<div class="title">Registration Properties</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">aws:
+    route53:
+        registration:
+            enabled: true
+            aws-service-id=&lt;enter the service id you got after creation on aws cli&gt;
+        discovery:
+            namespace-id=&lt;enter the namespace id you got after creating the namespace&gt;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_discovery_client_configuration"><a class="anchor" href="#_discovery_client_configuration"></a>Discovery Client Configuration</h4>
+<div class="listingblock">
+<div class="title">Discovery Properties</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">aws:
+    route53:
+        discovery:
+            client
+                enabled: true
+                aws-service-id: &lt;enter the service id you got after creation on aws cli&gt;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can also call the following methods by getting the bean "Route53AutoNamingClient":</p>
+</div>
+<div class="listingblock">
+<div class="title">Discovery Methods</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">// if serviceId is null it will use property "aws.route53.discovery.client.awsServiceId"
+Publisher&lt;List&lt;ServiceInstance&gt;&gt; getInstances(String serviceId)
+// reads property "aws.route53.discovery.namespaceId"
+Publisher&lt;List&lt;String&gt;&gt; getServiceIds()</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_integration_tests"><a class="anchor" href="#_integration_tests"></a>Integration Tests</h4>
+<div class="paragraph">
+<p>If you set the environment variable AWS_SUBNET_ID and have credentials configured in your home directory that are valid (in <code>~/.aws/credentials</code>)
+you can run the integration tests. You will still need a domain hosted on route53 as well. This test will create a t2.nano instance, a namespace, service, and register that instance to service discovery.
+When the test completes it will remove/terminate all resources it spun up.</p>
+</div>
+</div>
+
+<h2 id="serviceDiscoveryManual"><a class="anchor" href="#serviceDiscoveryManual"></a>8.2.5 Manual Service Discovery Configuration</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/serviceDiscovery/serviceDiscoveryManual.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>If you do not wish to involve a service discovery server like Consul or you are interacting with a third-party service that cannot register with Consul you can instead manually configure services that are available via Service discovery.</p>
+</div>
+<div class="paragraph">
+<p>To do this you should use the <code>micronaut.http.services</code> setting. The following is an example configuration:</p>
+</div>
+<div class="listingblock">
+<div class="title">Manually configuring services</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    http:
+        services:
+            foo:
+                urls:
+                    - http://foo1
+                    - http://foo2</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can then inject a client with <code>@Client("foo")</code> and it will use the above configuration to load balance between the two configured servers.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+You can override this configuration in production by specifying an environment variable such as <code>MICRONAUT_HTTP_SERVICES_FOO_URLS=http://prod1,http://prod2</code>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Note that by default no health checking will happen to assert that the referenced services are operational. You can alter that by enabling health checking and optionally specifying a health check path (the default is <code>/health</code>):</p>
+</div>
+<div class="listingblock">
+<div class="title">Enabling Health Checking</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    http:
+        services:
+            foo:
+                ...
+                health-check: true <i class="conum" data-value="1"></i><b>(1)</b>
+                health-check-interval: 15s <i class="conum" data-value="2"></i><b>(2)</b>
+                health-check-uri: /health <i class="conum" data-value="3"></i><b>(3)</b></code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>Whether to health check the service</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The interval to wait between checks</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The URI to send the health check request to</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Micronaut will start a background thread to check the health status of the service and if any of the configured services respond with an error code, they will be removed from the list of available services.</p>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>8.4.1 Tracing with Zipkin 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>8.4.1 Tracing with Zipkin</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="zipkin"><a class="anchor" href="#zipkin"></a>8.4.1 Tracing with Zipkin</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/distributedTracing/zipkin.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p><a href="https://zipkin.io">Zipkin</a> is a distributed tracing system. It helps gather timing data needed to troubleshoot latency problems in microservice architectures. It manages both the collection and lookup of this data.</p>
+</div>
+<div class="sect1">
+<h2 id="_running_zipkin"><a class="anchor" href="#_running_zipkin"></a>Running Zipkin</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The quickest way to get up and started with Zipkin is with Docker:</p>
+</div>
+<div class="listingblock">
+<div class="title">Running Zipkin with Docker</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ docker run -d -p 9411:9411 openzipkin/zipkin</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can then open a browser tab to the location <code><a href="http://localhost:9411" class="bare">http://localhost:9411</a></code> to view traces.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_sending_traces_to_zipkin"><a class="anchor" href="#_sending_traces_to_zipkin"></a>Sending Traces to Zipkin</h2>
+<div class="sectionbody">
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+<div class="title">Using the CLI</div>
+<div class="paragraph">
+<p>If you are creating your project using the Micronaut CLI, supply the <code>tracing-zipkin</code> feature to include Zipkin tracing in your project:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>$ mn create-app my-app --features tracing-zipkin</pre>
+</div>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>To send tracing spans to Zipkin the minimal configuration requires you add the following dependencies to <code>build.gradle</code> or <code>pom.xml</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">Adding Zipkin Dependencies</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">runtime 'io.zipkin.brave:brave-instrumentation-http'
+runtime 'io.zipkin.reporter2:zipkin-reporter'
+compile 'io.opentracing.brave:brave-opentracing'</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Then you need to enable ZipKin tracing in your configuration (potentially only your production configuration):</p>
+</div>
+<div class="listingblock">
+<div class="title">application.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">tracing:
+    zipkin:
+        enabled: true</code></pre>
+</div>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+Or alternatively if you have the Micronaut CLI installed you can configure Zipkin when creating your service with: <code>mn create-app hello-world --features tracing-zipkin</code>
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customizing_the_zipkin_sender"><a class="anchor" href="#_customizing_the_zipkin_sender"></a>Customizing the Zipkin Sender</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>In order to send spans you need to configure a Zipkin sender. You can configure a <a href="../api/io/micronaut/tracing/brave/sender/HttpClientSender.html">HttpClientSender</a> that sends Spans asynchronously using Micronaut&#8217;s native HTTP client using the <code>tracing.zipkin.http.url</code> setting:</p>
+</div>
+<div class="listingblock">
+<div class="title">Configuring Multiple Zipkin Servers</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">tracing:
+    zipkin:
+        enabled: true
+        http:
+            url: http://localhost:9411</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>It is unlikely that sending spans to localhost will be suitable for production deployment so you generally will want to configure the location of one or many Zipkin servers for production:</p>
+</div>
+<div class="listingblock">
+<div class="title">Configuring Multiple Zipkin Servers</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">tracing:
+    zipkin:
+        enabled: true
+        http:
+            urls:
+                - http://foo:9411
+                - http://bar:9411</code></pre>
+</div>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+In production, setting <code>TRACING_ZIPKIN_HTTP_URLS</code> environment variable with a comma separated list of URLs will also work.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Alternatively if you wish to use a different <code>zipkin2.reporter.Sender</code> implementation, you can simply define a bean that is of type <code>zipkin2.reporter.Sender</code> and it will be picked up.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_zipkin_configuration"><a class="anchor" href="#_zipkin_configuration"></a>Zipkin Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>There are many configuration options available for the Brave client that sends Spans to Zipkin and they are generally exposed via the <a href="../api/io/micronaut/tracing/brave/BraveTracerConfiguration.html">BraveTracerConfiguration</a> class. You can refer to the javadoc for all the available options.</p>
+</div>
+<div class="paragraph">
+<p>Below is an example of customizing Zipkin configuration:</p>
+</div>
+<div class="listingblock">
+<div class="title">Customizing Zipkin Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">tracing:
+    zipkin:
+        enabled: true
+        traceId128Bit: true
+        sampler:
+            probability: 1</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can also optionally dependency inject common configuration classes into <a href="../api/io/micronaut/tracing/brave/BraveTracerConfiguration.html">BraveTracerConfiguration</a> such as <code>brave.sampler.Sampler</code> just by defining them as beans. See the API for <a href="../api/io/micronaut/tracing/brave/BraveTracerConfiguration.html">BraveTracerConfiguration</a> for available injection points.</p>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

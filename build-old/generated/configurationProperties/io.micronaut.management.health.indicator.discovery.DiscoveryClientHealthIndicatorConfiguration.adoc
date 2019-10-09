@@ -1,0 +1,13 @@
+++++
+<a id="io.micronaut.management.health.indicator.discovery.DiscoveryClientHealthIndicatorConfiguration" href="#io.micronaut.management.health.indicator.discovery.DiscoveryClientHealthIndicatorConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.management.health.indicator.discovery.DiscoveryClientHealthIndicatorConfiguration[]
+|===
+|Property |Type |Description
+
+| `+endpoints.health.discovery-client.enabled+`
+|boolean
+|If health indicator should be enabled. Default is true.
+
+
+|===

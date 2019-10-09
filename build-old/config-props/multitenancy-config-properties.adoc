@@ -1,0 +1,216 @@
+
+++++
+<a id="io.micronaut.multitenancy.writer.HttpHeaderTenantWriterConfigurationProperties" href="#io.micronaut.multitenancy.writer.HttpHeaderTenantWriterConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.writer.HttpHeaderTenantWriterConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantwriter.httpheader.header-name+`
+|java.lang.String
+|Http Header name. Default value ("tenantId").
+
+
+| `+micronaut.multitenancy.tenantwriter.httpheader.enabled+`
+|boolean
+|Enables api:multitenancy.writer.HttpHeaderTenantWriter[]. Default value (false).
+
+
+|===
+<<<
+++++
+<a id="io.micronaut.multitenancy.propagation.TenantPropagationConfigurationProperties" href="#io.micronaut.multitenancy.propagation.TenantPropagationConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.propagation.TenantPropagationConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.propagation.enabled+`
+|boolean
+|Whether api:multitenancy.propagation.TenantPropagationHttpClientFilter[] should be enabled. Default value (false).
+
+
+| `+micronaut.multitenancy.propagation.service-id-regex+`
+|java.lang.String
+|Regular expression to match service ID.
+
+
+| `+micronaut.multitenancy.propagation.uri-regex+`
+|java.lang.String
+|Regular expression to match URI.
+
+
+| `+micronaut.multitenancy.propagation.path+`
+|java.lang.String
+|Configures api:multitenancy.propagation.TenantPropagationHttpClientFilter[] path. Default value "/**"
+
+
+|===
+<<<
+++++
+<a id="io.micronaut.multitenancy.tenantresolver.SystemPropertyTenantResolverConfigurationProperties" href="#io.micronaut.multitenancy.tenantresolver.SystemPropertyTenantResolverConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.tenantresolver.SystemPropertyTenantResolverConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantresolver.systemproperty.enabled+`
+|boolean
+|Enable api:multitenancy.tenantresolver.SystemPropertyTenantResolver[]. Default value (false).
+
+
+| `+micronaut.multitenancy.tenantresolver.systemproperty.property-name+`
+|java.lang.String
+|System property name. Default value ("tenantId").
+
+
+|===
+<<<
+++++
+<a id="io.micronaut.multitenancy.tenantresolver.SubdomainTenantResolverConfigurationProperties" href="#io.micronaut.multitenancy.tenantresolver.SubdomainTenantResolverConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.tenantresolver.SubdomainTenantResolverConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantresolver.subdomain.enabled+`
+|boolean
+|Enables api:multitenancy.tenantresolver.SubdomainTenantResolver[]. Default value (false).
+
+
+|===
+<<<
+++++
+<a id="io.micronaut.multitenancy.writer.CookieTenantWriterConfigurationProperties" href="#io.micronaut.multitenancy.writer.CookieTenantWriterConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.writer.CookieTenantWriterConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantwriter.cookie.cookiename+`
+|java.lang.String
+|Cookie Name. Default value ("tenantId").
+
+
+| `+micronaut.multitenancy.tenantwriter.cookie.cookie-domain+`
+|java.lang.String
+|Sets the domain name of this Cookie. Default value ("tenantId").
+
+
+| `+micronaut.multitenancy.tenantwriter.cookie.cookie-path+`
+|java.lang.String
+|Sets the path of the cookie. Default value ("/".
+
+
+| `+micronaut.multitenancy.tenantwriter.cookie.cookie-http-only+`
+|java.lang.Boolean
+|Whether the Cookie can only be accessed via HTTP. Default value (true.
+
+
+| `+micronaut.multitenancy.tenantwriter.cookie.cookie-secure+`
+|java.lang.Boolean
+|Sets whether the cookie is secured. Default value (true.
+
+
+| `+micronaut.multitenancy.tenantwriter.cookie.cookie-max-age+`
+|java.time.Duration
+|Sets the maximum age of the cookie.
+
+
+| `+micronaut.multitenancy.tenantwriter.cookie.enabled+`
+|boolean
+|Enables api:multitenancy.writer.CookieTenantWriter[]. Default value (false).
+
+
+|===
+<<<
+++++
+<a id="io.micronaut.multitenancy.tenantresolver.FixedTenantResolverConfigurationProperties" href="#io.micronaut.multitenancy.tenantresolver.FixedTenantResolverConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.tenantresolver.FixedTenantResolverConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantresolver.fixed.enabled+`
+|boolean
+|Enables api:multitenancy.tenantresolver.FixedTenantResolver[]. Default value (false).
+
+
+| `+micronaut.multitenancy.tenantresolver.fixed.tenant-id+`
+|java.lang.String
+|The fixed tenant ID. Default value to ("DEFAULT").
+
+
+|===
+<<<
+++++
+<a id="io.micronaut.multitenancy.tenantresolver.CookieTenantResolverConfigurationProperties" href="#io.micronaut.multitenancy.tenantresolver.CookieTenantResolverConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.tenantresolver.CookieTenantResolverConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantresolver.cookie.cookiename+`
+|java.lang.String
+|Cookie name which should be used to resolve the tenant id from. Default value ("tenantId").
+
+
+| `+micronaut.multitenancy.tenantresolver.cookie.enabled+`
+|boolean
+|Whether to enable api:multitenancy.tenantresolver.CookieTenantResolver[]. Default value (false).
+
+
+|===
+<<<
+++++
+<a id="io.micronaut.multitenancy.tenantresolver.PrincipalTenantResolverConfigurationProperties" href="#io.micronaut.multitenancy.tenantresolver.PrincipalTenantResolverConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.tenantresolver.PrincipalTenantResolverConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantresolver.principal.enabled+`
+|boolean
+|Enables api:multitenancy.tenantresolver.PrincipalTenantResolver[]. The default enable is false.
+
+
+|===
+<<<
+++++
+<a id="io.micronaut.multitenancy.tenantresolver.SessionTenantResolverConfigurationProperties" href="#io.micronaut.multitenancy.tenantresolver.SessionTenantResolverConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.tenantresolver.SessionTenantResolverConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantresolver.session.attribute+`
+|java.lang.String
+|Session Attribute name. Default value ("tenantId")
+
+
+| `+micronaut.multitenancy.tenantresolver.session.enabled+`
+|boolean
+|Enables api:multitenancy.tenantresolver.SessionTenantResolver[]. The default value (false).
+
+
+|===
+<<<
+++++
+<a id="io.micronaut.multitenancy.tenantresolver.HttpHeaderTenantResolverConfigurationProperties" href="#io.micronaut.multitenancy.tenantresolver.HttpHeaderTenantResolverConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.tenantresolver.HttpHeaderTenantResolverConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantresolver.httpheader.header-name+`
+|java.lang.String
+|Http Header name which should be used to resolve the tenant id from. Default value ("tenantId").
+
+
+| `+micronaut.multitenancy.tenantresolver.httpheader.enabled+`
+|boolean
+|Enables api:multitenancy.tenantresolver.HttpHeaderTenantResolver[]. Default value (false).
+
+
+|===
+<<<

@@ -66,4 +66,6 @@ class UploadController {
     }
     // end::bytesUpload[]
 
+// tag::endclass[]
 }
+// end::endclass[]

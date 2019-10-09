@@ -1,0 +1,29 @@
+
+++++
+<a id="io.micronaut.runtime.ApplicationConfiguration$InstanceConfiguration" href="#io.micronaut.runtime.ApplicationConfiguration$InstanceConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.runtime.ApplicationConfiguration$InstanceConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.application.instance.id+`
+|java.lang.String
+|The instance identifier
+
+
+| `+micronaut.application.instance.group+`
+|java.lang.String
+|The instance auto scaling group
+
+
+| `+micronaut.application.instance.zone+`
+|java.lang.String
+|The instance availability zone
+
+
+| `+micronaut.application.instance.metadata+`
+|java.util.Map
+|The metadata to associate with the instance
+
+
+|===

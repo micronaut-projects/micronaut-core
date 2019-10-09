@@ -1,0 +1,9 @@
+<testsuite tests="0" failures="0" errors="0" time="0" name="/Users/xtheshadowgod/Repository/oci/micronaut-core/build/docs/index.html">
+  <testcase assertions="0" time="0" name="External Links Check" />
+  <testcase assertions="0" time="0" name="Missing alt-attribute declaration in image tags" />
+  <testcase assertions="0" time="0" name="Missing Local Images Check" />
+  <testcase assertions="0" time="0" name="Broken Internal Links Check" />
+  <testcase assertions="0" time="0" name="Duplicate Definition of id Check" />
+  <testcase assertions="0" time="0" name="Consistency of ImageMaps" />
+  <testcase assertions="0" time="0" name="Missing Local Resources Check" />
+</testsuite>

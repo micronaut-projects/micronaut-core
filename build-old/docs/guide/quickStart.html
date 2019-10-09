@@ -1,0 +1,986 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>2 Quick Start 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../guide/introduction.html">&lt;&lt; <strong>1</strong><span>Introduction</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>2 Quick Start</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+                <div id="table-of-content">
+                    <h2>Table of Contents</h2>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#buildCLI"><strong>2.1</strong><span>Build/Install the CLI</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#installSdkman"><strong>2.1.1</strong><span>Install with Sdkman</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#installHomebrew"><strong>2.1.2</strong><span>Install with Homebrew</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#installWindows"><strong>2.1.3</strong><span>Install through Binary on Windows</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:10px"><a href="#buildSource"><strong>2.1.4</strong><span>Building from Source</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#creatingServer"><strong>2.2</strong><span>Creating a Server Application</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#ideSetup"><strong>2.3</strong><span>Setting up an IDE</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#creatingClient"><strong>2.4</strong><span>Creating a Client</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#deployingApp"><strong>2.5</strong><span>Deploying the Application</span></a>
+                    </div>
+                    
+                </div>
+                
+
+                
+<h1 id="quickStart"><a class="anchor" href="#quickStart"></a>2 Quick Start</h1>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/quickStart.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The following sections will walk you through a Quick start on how to use Micronaut to setup a basic "Hello World" application.</p>
+</div>
+<div class="paragraph">
+<p>Before getting started ensure you have a Java 8 or above SDK installed and it is recommended having a suitable IDE such as IntelliJ IDEA.</p>
+</div>
+<div class="paragraph">
+<p>To follow the Quick Start it is also recommended that you have the Micronaut CLI installed.</p>
+</div>
+
+<h2 id="buildCLI"><a class="anchor" href="#buildCLI"></a>2.1 Build/Install the CLI</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/quickStart/buildCLI.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The best way to install Micronaut on Unix systems is with <a href="http://sdkman.io/">SDKMAN</a> which greatly simplifies installing and managing multiple Micronaut versions.</p>
+</div>
+
+<h2 id="installSdkman"><a class="anchor" href="#installSdkman"></a>2.1.1 Install with Sdkman</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/quickStart/buildCLI/installSdkman.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Before updating make sure you have latest version of SDKMAN installed. If not, run</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ sdk update</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In order to install Micronaut, run following command:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ sdk install micronaut</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can also specify the version to the <code>sdk install</code> command.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ sdk install micronaut 1.2.3.BUILD-SNAPSHOT</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can find more information about SDKMAN usage on the <a href="http://sdkman.io/usage.html">SDKMAN Docs</a></p>
+</div>
+<div class="paragraph">
+<p>You should now be able to run the Micronaut CLI.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn
+| Starting interactive mode...
+| Enter a command name to run. Use TAB for completion:
+mn&gt;</code></pre>
+</div>
+</div>
+
+<h2 id="installHomebrew"><a class="anchor" href="#installHomebrew"></a>2.1.2 Install with Homebrew</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/quickStart/buildCLI/installHomebrew.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Before installing make sure you have latest Homebrew updates.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ brew update</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In order to install Micronaut, run following command:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ brew install micronaut</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can find more information about Homebrew usage on their <a href="https://brew.sh/">homepage</a>.</p>
+</div>
+<div class="paragraph">
+<p>You should now be able to run the Micronaut CLI.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn
+| Starting interactive mode...
+| Enter a command name to run. Use TAB for completion:
+mn&gt;</code></pre>
+</div>
+</div>
+
+<h2 id="installWindows"><a class="anchor" href="#installWindows"></a>2.1.3 Install through Binary on Windows</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/quickStart/buildCLI/installWindows.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="ulist">
+<ul>
+<li>
+<p>Download the latest binary from <a href="http://micronaut.io/download.html">Micronaut Website</a></p>
+</li>
+<li>
+<p>Extract the binary to appropriate location (For example: <code>C:\micronaut</code>)</p>
+</li>
+<li>
+<p>Create an environment variable <code>MICRONAUT_HOME</code> which points to the installation directory i.e. <code>C:\micronaut</code></p>
+</li>
+<li>
+<p>Update the <code>PATH</code> environment variable, append <code>%MICRONAUT_HOME%\bin</code>.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>You should now be able to run the Micronaut CLI from the command prompt as follows:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn
+| Starting interactive mode...
+| Enter a command name to run. Use TAB for completion:
+mn&gt;</code></pre>
+</div>
+</div>
+
+<h2 id="buildSource"><a class="anchor" href="#buildSource"></a>2.1.4 Building from Source</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/quickStart/buildCLI/buildSource.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Clone the repository as follows:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ git clone https://github.com/micronaut-projects/micronaut-core.git</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p><code>cd</code> into the <code>micronaut-core</code> directory and run the following command:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./gradlew cli:fatJar</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This created the fatJar for use in the CLI.</p>
+</div>
+<div class="paragraph">
+<p>In your shell profile (<code>~/.bash_profile</code> if you are using the Bash shell), export the <code>MICRONAUT_HOME</code> directory and add the CLI path to your <code>PATH</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">bash_profile/.bashrc</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">export MICRONAUT_HOME=~/path/to/micronaut-core
+export PATH="$PATH:$MICRONAUT_HOME/cli/build/bin"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Reload your terminal or <code>source</code> your shell profile with <code>source</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">&gt; source ~/.bash_profile</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You are now be able to run the Micronaut CLI.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn
+| Starting interactive mode...
+| Enter a command name to run. Use TAB for completion:
+mn&gt;</code></pre>
+</div>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+You can also point SDKMAN to local installation for dev purpose using following command <code>sdk install micronaut dev /path/to/checkout/cli/build</code>
+</td>
+</tr>
+</table>
+</div>
+
+<h2 id="creatingServer"><a class="anchor" href="#creatingServer"></a>2.2 Creating a Server Application</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/quickStart/creatingServer.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Although not required to use Micronaut, the Micronaut CLI is the quickest way to create a new server application.</p>
+</div>
+<div class="paragraph">
+<p>Using the CLI you can create a new Micronaut application in either Groovy, Java or Kotlin (the default is Java).</p>
+</div>
+<div class="paragraph">
+<p>The following command creates a new "Hello World" server application in Java with a Gradle build:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app hello-world</code></pre>
+</div>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+You can supply <code>--build maven</code> if you wish to create a Maven based build instead
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The previous command will create a new Java application in a directory called <code>hello-world</code> featuring a Gradle a build. The application can be run with <code>./gradlew run</code>:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ ./gradlew run
+&gt; Task :run
+[main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 972ms. Server Running: http://localhost:28933</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you have created a Maven based project, use <code>./mvnw compile exec:exec</code> instead.</p>
+</div>
+<div class="paragraph">
+<p>By default the Micronaut HTTP server is configured to run on port 8080. See the section <a href="#runningSpecificPort">Running Server on a Specific Port</a> in the user guide for more options.</p>
+</div>
+<div class="paragraph">
+<p>In order to create a service that responds to "Hello World" you first need a controller. The following is an example of a controller:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+
+@Controller("/hello") <b class="conum">(1)</b>
+public class HelloController {
+
+    @Get(produces = MediaType.TEXT_PLAIN) <b class="conum">(2)</b>
+    public String index() {
+        return "Hello World"; <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+
+@Controller('/hello') <b class="conum">(1)</b>
+class HelloController {
+
+    @Get(produces = MediaType.TEXT_PLAIN) <b class="conum">(2)</b>
+    String index() {
+        'Hello World' <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+
+@Controller("/hello") <b class="conum">(1)</b>
+class HelloController {
+
+    @Get(produces = [MediaType.TEXT_PLAIN]) <b class="conum">(2)</b>
+    fun index(): String {
+        return "Hello World" <b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The class is defined as a controller with the <a href="../api/io/micronaut/http/annotation/Controller.html">@Controller</a> annotation mapped to the path <code>/hello</code></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The <a href="../api/io/micronaut/http/annotation/Get.html">@Get</a> annotation is used to map the <code>index</code> method to all requests that use an HTTP <code>GET</code></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>A String "Hello World" is returned as the result</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>If you are using Java, place the previous file in <code>src/main/java/hello/world</code>.
+If you are using Groovy, place the previous file in <code>src/main/groovy/hello/world</code>.
+If you are using Kotlin, place the previous file in <code>src/main/kotlin/hello/world</code>.</p>
+</div>
+<div class="paragraph">
+<p>If you start the application and send a request to the <code>/hello</code> URI then the text "Hello World" is returned:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl http://localhost:8080/hello
+Hello World</code></pre>
+</div>
+</div>
+
+<h2 id="ideSetup"><a class="anchor" href="#ideSetup"></a>2.3 Setting up an IDE</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/quickStart/ideSetup.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The application created in the previous section contains a "main class" located in <code>src/main/java</code> that looks like the following:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.runtime.Micronaut;
+
+public class Application {
+
+    public static void main(String[] args) {
+        Micronaut.run(Application.class);
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.runtime.Micronaut
+
+class Application {
+
+    static void main(String... args) {
+        Micronaut.run Application.class
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.runtime.Micronaut
+
+object Application {
+
+    @JvmStatic
+    fun main(args: Array&lt;String&gt;) {
+        Micronaut.run(Application.javaClass)
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This is the class that is run when running the application via Gradle or via deployment. You can also run the main class directly within your IDE if it is configured correctly.</p>
+</div>
+<div class="sect1">
+<h2 id="_configuring_intellij_idea"><a class="anchor" href="#_configuring_intellij_idea"></a>Configuring IntelliJ IDEA</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To import a Micronaut project into IntelliJ IDEA simply open the <code>build.gradle</code> or <code>pom.xml</code> file and follow the instructions to import the project.</p>
+</div>
+<div class="paragraph">
+<p>For IntelliJ IDEA if you plan to use the IntelliJ compiler then you should enable annotation processing under the "Build, Execution, Deployment &#8594; Compiler &#8594; Annotation Processors" by ticking the "Enable annotation processing" checkbox:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../img/intellij-annotation-processors.png" alt="Intellij Settings" width="1024" height="768">
+</div>
+</div>
+<div class="paragraph">
+<p>Once you have enabled annotation processing in IntelliJ you can run the application and tests directly within the IDE without the need of an external build tool such as Gradle or Maven.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_configuring_eclipse_ide"><a class="anchor" href="#_configuring_eclipse_ide"></a>Configuring Eclipse IDE</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If you wish to use Eclipse IDE, it is recommended you import your Micronaut project into Eclipse using either <a href="https://projects.eclipse.org/projects/tools.buildship">Gradle BuildShip</a> for Gradle or <a href="http://www.eclipse.org/m2e/">M2Eclipse</a> for Maven.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Micronaut requires Eclipse IDE 4.9 or above
+</td>
+</tr>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_eclipse_and_gradle"><a class="anchor" href="#_eclipse_and_gradle"></a>Eclipse and Gradle</h3>
+<div class="paragraph">
+<p>Once you have setup Eclipse 4.9 or above with <a href="https://projects.eclipse.org/projects/tools.buildship">Gradle BuildShip</a> first run the <code>gradle eclipse</code> task from the root of your project then import the project by selecting <code>File &#8594; Import</code> then choosing <code>Gradle &#8594; Existing Gradle Project</code> and navigating to the root directory of your project (where the <code>build.gradle</code> is located).</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_eclipse_and_maven"><a class="anchor" href="#_eclipse_and_maven"></a>Eclipse and Maven</h3>
+<div class="paragraph">
+<p>For Eclipse 4.9 and above with Maven you need the following Eclipse plugins:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="http://www.eclipse.org/m2e/">M2Eclipse for Maven</a></p>
+</li>
+<li>
+<p><a href="https://github.com/jbosstools/m2e-apt">Maven integration with Eclipse JDT Annotation Processor Toolkit</a></p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Once installed you need to import the project by selecting <code>File &#8594; Import</code> then choosing <code>Maven &#8594; Existing Maven Project</code> and navigating to the root directory of your project (where the <code>pom.xml</code> is located).</p>
+</div>
+<div class="paragraph">
+<p>You should then enable annotation processing by opening <code>Eclipse &#8594; Preferences</code> and navigating to <code>Maven &#8594; Annotation Processing</code> and selecting the option <code>Automatically configure JDT APT</code>.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_configuring_visual_studio_code"><a class="anchor" href="#_configuring_visual_studio_code"></a>Configuring Visual Studio Code</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Micronaut can be setup within Visual Studio Code. You will need to first install the The <a href="https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack">Java Extension Pack</a>.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Visual Studio Code support currently only works for Maven builds.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Once the extension pack is installed follow the same setup steps as Eclipse above or if you have setup <a href="https://code.visualstudio.com/docs/setup/mac">terminal integration</a> just type <code>code .</code> in any project directory and the project will be automatically setup.</p>
+</div>
+</div>
+</div>
+
+<h2 id="creatingClient"><a class="anchor" href="#creatingClient"></a>2.4 Creating a Client</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/quickStart/creatingClient.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>As mentioned previously, Micronaut includes both an <a href="#httpServer">HTTP server</a> and an <a href="#httpClient">HTTP client</a>. A <a href="#lowLevelHttpClient">low-level HTTP client</a> is provided out of the box which you can use to test the <code>HelloController</code> created in the previous section.</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.context.annotation.Property;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.annotation.Client;
+import io.micronaut.runtime.server.EmbeddedServer;
+import io.micronaut.test.annotation.MicronautTest;
+import org.junit.jupiter.api.Test;
+
+import javax.inject.Inject;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+@MicronautTest
+public class HelloControllerSpec {
+    @Inject
+    EmbeddedServer server; <b class="conum">(1)</b>
+
+    @Inject
+    @Client("/")
+    HttpClient client; <b class="conum">(2)</b>
+
+    @Test
+    void testHelloWorldResponse() {
+        String response = client.toBlocking() <b class="conum">(3)</b>
+                .retrieve(HttpRequest.GET("/hello"));
+        assertEquals("Hello World", response); //) <b class="conum">(4)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.http.HttpRequest
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.test.annotation.MicronautTest
+import spock.lang.Specification
+import javax.inject.Inject
+
+@MicronautTest
+class HelloControllerSpec extends Specification {
+    @Inject
+    EmbeddedServer embeddedServer <b class="conum">(1)</b>
+
+    @Inject
+    @Client("/")
+    HttpClient client <b class="conum">(2)</b>
+
+    void "test hello world response"() {
+        expect:
+            client.toBlocking() <b class="conum">(3)</b>
+                    .retrieve(HttpRequest.GET('/hello')) == "Hello World" <b class="conum">(4)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.context.annotation.Property
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.test.annotation.MicronautTest
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import javax.inject.Inject
+
+@MicronautTest
+class HelloControllerSpec {
+    @Inject
+    lateinit var server: EmbeddedServer <b class="conum">(1)</b>
+
+    @Inject
+    @field:Client("/")
+    lateinit var client: HttpClient <b class="conum">(2)</b>
+
+    @Test
+    fun testHelloWorldResponse() {
+        val rsp: String = client.toBlocking() <b class="conum">(3)</b>
+                .retrieve("/hello")
+        assertEquals("Hello World", rsp) <b class="conum">(4)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <a href="../api/io/micronaut/runtime/server/EmbeddedServer.html">EmbeddedServer</a> is configured as a shared test field</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>A <a href="../api/io/micronaut/http/client/HttpClient.html">HttpClient</a> instance shared field is also defined</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The test using the <code>toBlocking()</code> method to make a blocking call</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="4"></i><b>4</b></td>
+<td>The <code>retrieve</code> method returns the response of the controller as a <code>String</code></td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>In addition to a low-level client, Micronaut features a <a href="#clientAnnotation">declarative, compile-time HTTP client</a>, powered by the <a href="../api/io/micronaut/http/client/annotation/Client.html">Client</a> annotation.</p>
+</div>
+<div class="paragraph">
+<p>To create a client, simply create an interface annotated with <code>@Client</code>. For example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.http.annotation.Get;
+import io.micronaut.http.client.annotation.Client;
+import io.reactivex.Single;
+
+@Client("/hello") <b class="conum">(1)</b>
+public interface HelloClient {
+
+    @Get <b class="conum">(2)</b>
+    Single&lt;String&gt; hello(); <b class="conum">(3)</b>
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.annotation.Client
+import io.reactivex.Single
+
+@Client("/hello") <b class="conum">(1)</b>
+interface HelloClient {
+
+    @Get <b class="conum">(2)</b>
+    Single&lt;String&gt; hello() <b class="conum">(3)</b>
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.annotation.Client
+import io.reactivex.Single
+
+@Client("/hello") <b class="conum">(1)</b>
+interface HelloClient {
+
+    @Get <b class="conum">(2)</b>
+    fun hello(): Single&lt;String&gt;  <b class="conum">(3)</b>
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <code>@Client</code> annotation is used with value that is a relative path to the current server</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The same <a href="../api/io/micronaut/http/annotation/Get.html">@Get</a> annotation used on the server is used to define the client mapping</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>A RxJava <a href="http://reactivex.io/RxJava/2.x/javadoc/io/reactivex/Single.html">Single</a> is returned with the value read from the server</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>To test the <code>HelloClient</code> simply retrieve it from the <a href="../api/io/micronaut/context/ApplicationContext.html">ApplicationContext</a> associated with the server:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.test.annotation.MicronautTest;
+import javax.inject.Inject;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+@MicronautTest <b class="conum">(1)</b>
+public class HelloClientSpec  {
+
+    @Inject
+    HelloClient client; <b class="conum">(2)</b>
+
+    @Test
+    public void testHelloWorldResponse(){
+        assertEquals("Hello World", client.hello().blockingGet());<b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.test.annotation.MicronautTest
+import spock.lang.Specification
+
+import javax.inject.Inject
+
+@MicronautTest <b class="conum">(1)</b>
+class HelloClientSpec extends Specification {
+
+    @Inject HelloClient client <b class="conum">(2)</b>
+
+
+    void "test hello world response"() {
+        expect:
+        client.hello().blockingGet() == "Hello World" <b class="conum">(3)</b>
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.context.annotation.Property
+import io.micronaut.test.annotation.MicronautTest
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import javax.inject.Inject
+
+@MicronautTest <b class="conum">(1)</b>
+class HelloClientSpec {
+
+    @Inject
+    lateinit var client: HelloClient <b class="conum">(2)</b>
+
+    @Test
+    fun testHelloWorldResponse() {
+        assertEquals("Hello World", client.hello().blockingGet())<b class="conum">(3)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <code>@MicronautTest</code> annotation is used to define the test</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The <code>HelloClient</code> is injected from the <a href="../api/io/micronaut/context/ApplicationContext.html">ApplicationContext</a></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The client is invoked using RxJava&#8217;s <code>blockingGet</code> method</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/http/client/annotation/Client.html">Client</a> annotation produces an implementation automatically for you at compile time without the need to use proxies or runtime reflection.</p>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/http/client/annotation/Client.html">Client</a> annotation is very flexible. See the section on the <a href="#httpClient">Micronaut HTTP Client</a> for more information.</p>
+</div>
+
+<h2 id="deployingApp"><a class="anchor" href="#deployingApp"></a>2.5 Deploying the Application</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/quickStart/deployingApp.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>To deploy a Micronaut application you create a runnable JAR file by running <code>./gradlew assemble</code> or <code>./mvnw package</code>.</p>
+</div>
+<div class="paragraph">
+<p>The constructed JAR file can then be executed with <code>java -jar</code>. For example:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ java -jar build/libs/hello-world-all.jar</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The runnable JAR can also easily be packaged within a Docker container or deployed to any Cloud infrastructure that supports runnable JAR  files.</p>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../guide/introduction.html">&lt;&lt; <strong>1</strong><span>Introduction</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

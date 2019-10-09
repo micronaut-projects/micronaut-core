@@ -1,0 +1,410 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>8.2.1 Consul Support 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>8.2.1 Consul Support</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="serviceDiscoveryConsul"><a class="anchor" href="#serviceDiscoveryConsul"></a>8.2.1 Consul Support</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/serviceDiscovery/serviceDiscoveryConsul.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p><a href="https://www.consul.io">Consul</a> is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native non-blocking <a href="../api/io/micronaut/discovery/consul/client/v1/ConsulClient.html">ConsulClient</a> that is built using Micronaut&#8217;s support for <a href="#clientAnnotation">Declarative HTTP Clients</a>.</p>
+</div>
+<div class="sect1">
+<h2 id="_starting_consul"><a class="anchor" href="#_starting_consul"></a>Starting Consul</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The quickest way to start using Consul is via Docker:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Starting Consul with Docker. Currently only v1.2.x is supported.</p>
+</li>
+</ol>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>docker run -p 8500:8500 consul:1.2.4</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Alternatively you can <a href="https://www.consul.io/docs/install/index.html">install and run a local Consul instance</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_auto_registering_with_consul"><a class="anchor" href="#_auto_registering_with_consul"></a>Auto Registering with Consul</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To register a Micronaut application with Consul simply add the necessary <a href="../api/io/micronaut/discovery/consul/ConsulConfiguration.html">ConsulConfiguration</a>. A minimal example can be seen below:</p>
+</div>
+<div class="listingblock">
+<div class="title">Auto Registering with Consul (application.yml)</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    application:
+        name: hello-world
+consul:
+  client:
+    registration:
+      enabled: true
+    defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"</code></pre>
+</div>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+Using the Micronaut CLI you can quickly create a new service setup with Consul using: <code>mn create-app my-app --features discovery-consul</code>
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The <code>consul.client.defaultZone</code> settings accepts a list of Consul servers to be used by default.</p>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+You could also simply set <code>consul.client.host</code> and <code>consul.client.port</code>, however <a href="../api/io/micronaut/discovery/consul/ConsulConfiguration.html">ConsulConfiguration</a> allows you specify per zone discovery services for the purpose load balancing. A zone maps onto a AWS availability zone or a Google Cloud zone.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>By default registering with Consul is disabled hence you should set <code>consul.client.registration.enabled</code> to <code>true</code>. Note that you may wish to do this only in your production configuration.</p>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+Running multiple instances of a service may require an additional configuration param.  See below.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>If you are running the same applications on the same port across different servers it is important to set the <code>micronaut.application.instance.id</code> property or you will experience instance registration collision.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+  application:
+    name: hello-world
+    instance:
+      id: ${random.shortuuid}</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customizing_consul_service_registration"><a class="anchor" href="#_customizing_consul_service_registration"></a>Customizing Consul Service Registration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/discovery/consul/ConsulConfiguration.html">ConsulConfiguration</a> class features a range of customization options for altering how an instance registers with Consul. You can customize the tags, the retry attempts, the fail fast behaviour and so on.</p>
+</div>
+<div class="paragraph">
+<p>Notice too that <code>ConsulConfiguration</code> extends <a href="../api/io/micronaut/discovery/client/DiscoveryClientConfiguration.html">DiscoveryClientConfiguration</a>  which in turn extends <a href="../api/io/micronaut/http/client/HttpClientConfiguration.html">HttpClientConfiguration</a> allowing you to customize the settings for the Consul client, including read timeout, proxy configuration and so on.</p>
+</div>
+<div class="paragraph">
+<p>For example:</p>
+</div>
+<div class="listingblock">
+<div class="title">Customizing Consul Registration Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    application:
+        name: hello-world
+consul:
+  client:
+    registration:
+      enabled: true
+      # Alters the tags
+      tags:
+        - hello
+        - world
+      # Alters the retry count
+      retry-count: 5
+      # Alters fail fast behaviour
+      fail-fast: false
+    defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_discovery_services_from_consul"><a class="anchor" href="#_discovery_services_from_consul"></a>Discovery Services from Consul</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To discovery other services you could manually interact with the <a href="../api/io/micronaut/discovery/DiscoveryClient.html">DiscoveryClient</a>, however typically instead you use the <a href="#clientAnnotation">Client Annotation</a> to declare how an HTTP client maps to a service.</p>
+</div>
+<div class="paragraph">
+<p>For example the configuration in the previous section declared a value for <code>micronaut.application.name</code> of <code>hello-world</code>. This is the value that will be used as the service ID when registering with Consul.</p>
+</div>
+<div class="paragraph">
+<p>Other services can discovery instances of the <code>hello-world</code> service simply by declaring a client as follows:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using @Client to Discover Services</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@Client(id = "hello-world")
+interface HelloClient{
+	...
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Alternatively you can also use <a href="../api/io/micronaut/http/client/annotation/Client.html">@Client</a> as a qualifier to <code>@Inject</code> an instance of <a href="../api/io/micronaut/http/client/HttpClient.html">HttpClient</a>:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using @Client to Discover Services</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@Client(id = "hello-world")
+@Inject
+RxHttpClient httpClient;</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_consul_health_checks"><a class="anchor" href="#_consul_health_checks"></a>Consul Health Checks</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>By default when registering with Consul Micronaut will register a <a href="https://www.consul.io/docs/agent/checks.html">TTL check</a>. A TTL check basically means that if the application does not send a heartbeat back to Consul after a period of time the service is put in a failing state.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut applications feature a <a href="../api/io/micronaut/health/HeartbeatConfiguration.html">HeartbeatConfiguration</a> which starts a thread using <a href="../api/io/micronaut/health/HeartbeatTask.html">HeartbeatTask</a> that fires <a href="../api/io/micronaut/health/HeartbeatEvent.html">HeartbeatEvent</a> instances.</p>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/discovery/consul/registration/ConsulAutoRegistration.html">ConsulAutoRegistration</a> class listens for these events and sends a callback to the <a href="https://www.consul.io/api/agent/check.html">/agent/check/pass/:check_id</a> endpoint provided by Consul, effectively keeping the service alive.</p>
+</div>
+<div class="paragraph">
+<p>With this arrangement the responsibility is on the Micronaut application to send TTL callbacks to Consul on a regular basis.</p>
+</div>
+<div class="paragraph">
+<p>If you prefer you can push the responsibility for health checks to Consul itself by registering an HTTP check:</p>
+</div>
+<div class="listingblock">
+<div class="title">Consul HTTP Check Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">consul:
+  client:
+    registration:
+       check:
+          http: true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>With this configuration option in place Consul will assume responsibility of invoking the Micronaut applications <a href="#healthEndpoint">Health Endpoint</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_controlling_ip_host_registration"><a class="anchor" href="#_controlling_ip_host_registration"></a>Controlling IP/Host Registration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Occasionally, depending on the deployment environment you may wish to expose the IP address and not the host name, since by default Micronaut will register with Consul with either the value of the <code>HOST</code> environment variable or the value configured via <code>micronaut.server.host</code>.</p>
+</div>
+<div class="paragraph">
+<p>You can use the <code>consul.client.registration.prefer-ip-address</code> setting to indicate you would prefer to register with the IP address.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut will by default perform an IP lookup to try and figure out the IP address, however you can use the <code>consul.client.registration.ip-addr</code> setting to specify the IP address of the service directly.</p>
+</div>
+<div class="listingblock">
+<div class="title">Consul HTTP Check Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">consul:
+  client:
+    registration:
+        ip-addr: &lt;your base container ip&gt;
+        prefer-ip-address: true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This will tell Consul to register the IP that other instances can use to access your service and not the NAT IP it is running under (or 127.0.0.1).</p>
+</div>
+<div class="paragraph">
+<p>If you use HTTP health checks (see the previous section) then Consul will use the configured IP address to check the Micronaut <code>/health</code> endpoint.</p>
+</div>
+<div class="listingblock">
+<div class="title">Consul HTTP Check Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">consul:
+  client:
+    registration:
+        ip-addr: &lt;your base container ip&gt;
+        prefer-ip-address: true
+        check:
+            http: true</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

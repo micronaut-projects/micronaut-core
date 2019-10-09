@@ -1,0 +1,18 @@
+++++
+<a id="io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration" href="#io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration[]
+|===
+|Property |Type |Description
+
+| `+aws.route53.discovery.aws-service-id+`
+|java.lang.String
+|set service ID for easier testing.
+
+
+| `+aws.route53.discovery.enabled+`
+|boolean
+|enable/disabled this feature. Default value (true).
+
+
+|===

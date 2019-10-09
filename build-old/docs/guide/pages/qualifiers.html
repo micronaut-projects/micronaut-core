@@ -1,0 +1,595 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>3.5 Bean Qualifiers 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/quickStart.html">&lt;&lt; <strong>2</strong><span>Quick Start</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>3.5 Bean Qualifiers</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="qualifiers"><a class="anchor" href="#qualifiers"></a>3.5 Bean Qualifiers</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/ioc/qualifiers.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>If you have multiple possible implementations for a given interface that you want to inject, you need to use a qualifier.</p>
+</div>
+<div class="paragraph">
+<p>Once again Micronaut leverages JSR-330 and the <a href="https://docs.oracle.com/javaee/6/api/javax/inject/Qualifier.html">Qualifier</a> and <a href="https://docs.oracle.com/javaee/6/api/javax/inject/Named.html">Named</a> annotations to support this use case.</p>
+</div>
+<div class="sect1">
+<h2 id="_qualifying_by_name"><a class="anchor" href="#_qualifying_by_name"></a>Qualifying By Name</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To qualify by name you can use the <a href="https://docs.oracle.com/javaee/6/api/javax/inject/Named.html">Named</a> annotation. For example, consider the following classes:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">public interface Engine { <b class="conum">(1)</b>
+    int getCylinders();
+    String start();
+}
+
+@Singleton
+public class V6Engine implements Engine {  <b class="conum">(2)</b>
+    public String start() {
+        return "Starting V6";
+    }
+
+    public int getCylinders() {
+        return 6;
+    }
+}
+
+@Singleton
+public class V8Engine implements Engine {
+    public String start() {
+        return "Starting V8";
+    }
+
+    public int getCylinders() {
+        return 8;
+    }
+
+}
+
+@Singleton
+public class Vehicle {
+    private final Engine engine;
+
+    @Inject
+    public Vehicle(@Named("v8") Engine engine) {<b class="conum">(4)</b>
+        this.engine = engine;
+    }
+
+    public String start() {
+        return engine.start();<b class="conum">(5)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">interface Engine { <b class="conum">(1)</b>
+    int getCylinders()
+    String start()
+}
+
+@Singleton
+class V6Engine implements Engine { <b class="conum">(2)</b>
+    int cylinders = 6
+
+    String start() {
+        "Starting V6"
+    }
+}
+
+@Singleton
+class V8Engine implements Engine { <b class="conum">(3)</b>
+    int cylinders = 8
+
+    String start() {
+        "Starting V8"
+    }
+}
+
+@Singleton
+class Vehicle {
+    final Engine engine
+
+    @Inject Vehicle(@Named('v8') Engine engine) { <b class="conum">(4)</b>
+        this.engine = engine
+    }
+
+    String start() {
+        engine.start() <b class="conum">(5)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">interface Engine { <b class="conum">(1)</b>
+    val cylinders: Int
+    fun start(): String
+}
+
+@Singleton
+class V6Engine : Engine {  <b class="conum">(2)</b>
+
+    override var cylinders: Int = 6
+
+    override fun start(): String {
+        return "Starting V6"
+    }
+}
+
+@Singleton
+class V8Engine : Engine {
+
+    override var cylinders: Int = 8
+
+    override fun start(): String {
+        return "Starting V8"
+    }
+
+}
+
+@Singleton
+class Vehicle @Inject
+constructor(@param:Named("v8") private val engine: Engine)<b class="conum">(4)</b>
+{
+
+    fun start(): String {
+        return engine.start()<b class="conum">(5)</b>
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <code>Engine</code> interface defines the common contract</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The <code>V6Engine</code> class is the first implementation</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The <code>V8Engine</code> class is the second implementation</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="4"></i><b>4</b></td>
+<td>The <a href="https://docs.oracle.com/javaee/6/api/javax/inject/Named.html">Named</a> annotation is used to indicate the <code>V8Engine</code> implementation is required</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="5"></i><b>5</b></td>
+<td>Calling the start method prints: <code>"Starting V8"</code></td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>You can also declare <a href="https://docs.oracle.com/javaee/6/api/javax/inject/Named.html">@Named</a> at the class level of a bean to explicitly define the name of the bean.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_qualifying_by_annotation"><a class="anchor" href="#_qualifying_by_annotation"></a>Qualifying By Annotation</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>In addition to being able to qualify by name, you can build your own qualifiers using the <a href="https://docs.oracle.com/javaee/6/api/javax/inject/Qualifier.html">Qualifier</a> annotation. For example, consider the following annotation:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import javax.inject.Qualifier;
+import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Qualifier
+@Retention(RUNTIME)
+public @interface V8 {
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import javax.inject.Qualifier
+import java.lang.annotation.Retention
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME
+
+@Qualifier
+@Retention(RUNTIME)
+@interface V8 {
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import javax.inject.Qualifier
+import java.lang.annotation.Retention
+import java.lang.annotation.RetentionPolicy.RUNTIME
+
+@Qualifier
+@Retention(RUNTIME)
+annotation class V8</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above annotation is itself annotated with the <code>@Qualifier</code> annotation to designate it as a qualifier. You can then use the annotation at any injection point in your code. For example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">    @Inject Vehicle(@V8 Engine engine) {
+        this.engine = engine;
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">    @Inject Vehicle(@V8 Engine engine) {
+        this.engine = engine
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Inject constructor(@V8 val engine: Engine) {</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_primary_and_secondary_beans"><a class="anchor" href="#_primary_and_secondary_beans"></a>Primary and Secondary Beans</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><a href="../api/io/micronaut/context/annotation/Primary.html">Primary</a> is a qualifier that indicates that a bean is the primary bean that should be selected in the case of multiple possible interface implementations.</p>
+</div>
+<div class="paragraph">
+<p>Consider the following example:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">public interface ColorPicker {
+    String color();
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">interface ColorPicker {
+    String color()
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">interface ColorPicker {
+    fun color(): String
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Given a common interface called <code>ColorPicker</code> that is implemented by multiple classes.</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">The Primary Bean</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.context.annotation.Primary;
+import javax.inject.Singleton;
+
+@Primary
+@Singleton
+class Green implements ColorPicker {
+
+    @Override
+    public String color() {
+        return "green";
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">The Primary Bean</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.context.annotation.Primary
+import javax.inject.Singleton
+
+@Primary
+@Singleton
+class Green implements ColorPicker {
+
+    @Override
+    String color() {
+        return "green"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">The Primary Bean</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.context.annotation.Primary
+import javax.inject.Singleton
+
+
+@Primary
+@Singleton
+class Green: ColorPicker {
+    override fun color(): String {
+        return "green"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>Green</code> bean is a <code>ColorPicker</code>, but is annotated with <code>@Primary</code>.</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Another Bean of the Same Type</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import javax.inject.Singleton;
+
+
+@Singleton
+public class Blue implements ColorPicker {
+
+    @Override
+    public String color() {
+        return "blue";
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Another Bean of the Same Type</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import javax.inject.Singleton
+
+
+@Singleton
+class Blue implements ColorPicker {
+
+    @Override
+    String color() {
+        return "blue"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Another Bean of the Same Type</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import javax.inject.Singleton
+
+
+@Singleton
+class Blue: ColorPicker {
+    override fun color(): String {
+        return "blue"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>Blue</code> bean is also a <code>ColorPicker</code> and hence you have two possible candidates when injecting the <code>ColorPicker</code> interface. Since <code>Green</code> is the primary it will always be favoured.</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Controller("/testPrimary")
+public class TestController {
+
+    protected final ColorPicker colorPicker;
+
+    public TestController(ColorPicker colorPicker) { <b class="conum">(1)</b>
+        this.colorPicker = colorPicker;
+    }
+
+    @Get
+    public String index() {
+        return colorPicker.color();
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Controller("/test")
+class TestController {
+
+    protected final ColorPicker colorPicker
+
+    TestController(ColorPicker colorPicker) { <b class="conum">(1)</b>
+        this.colorPicker = colorPicker
+    }
+
+    @Get
+    String index() {
+        colorPicker.color()
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Controller("/test")
+class TestController(val colorPicker: ColorPicker) { <b class="conum">(1)</b>
+
+    @Get
+    fun index(): String {
+        return colorPicker.color()
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>Although there are two <code>ColorPicker</code> beans, <code>Green</code> gets injected due to the <code>@Primary</code> annotation.</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>If multiple possible candidates are present and no <code>@Primary</code> is defined then a <a href="../api/io/micronaut/context/exceptions/NonUniqueBeanException.html">NonUniqueBeanException</a> will be thrown.</p>
+</div>
+<div class="paragraph">
+<p>In addition to <code>@Primary</code>, there is also a <a href="../api/io/micronaut/context/annotation/Secondary.html">Secondary</a> annotation which causes the opposite effect and allows de-prioritizing a bean.</p>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/quickStart.html">&lt;&lt; <strong>2</strong><span>Quick Start</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

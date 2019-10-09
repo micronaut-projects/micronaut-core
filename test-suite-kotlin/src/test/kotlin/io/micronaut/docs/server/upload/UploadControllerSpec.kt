@@ -41,6 +41,40 @@ class UploadControllerSpec: StringSpec() {
             response.body.get() shouldBe "Uploaded"
         }
 
+        "test completed file upload"() {
+            val body = MultipartBody.builder()
+                    .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".toByteArray())
+                    .build()
+
+            val flowable = Flowable.fromPublisher(client!!.exchange(
+                    HttpRequest.POST("/upload/completed", body)
+                            .contentType(MediaType.MULTIPART_FORM_DATA)
+                            .accept(MediaType.TEXT_PLAIN_TYPE),
+                    String::class.java
+            ))
+            val response = flowable.blockingFirst()
+
+            response.status() shouldBe HttpStatus.OK
+            response.body.get() shouldBe "Uploaded"
+        }
+
+        "test completed file upload with filename but no bytes"() {
+            val body = MultipartBody.builder()
+                    .addPart("file", "file.json", MediaType.APPLICATION_JSON_TYPE, ByteArray(0))
+                    .build()
+
+            val flowable = Flowable.fromPublisher(client!!.exchange(
+                    HttpRequest.POST("/upload/completed", body)
+                            .contentType(MediaType.MULTIPART_FORM_DATA)
+                            .accept(MediaType.TEXT_PLAIN_TYPE),
+                    String::class.java
+            ))
+            val response = flowable.blockingFirst()
+
+            response.status() shouldBe HttpStatus.OK
+            response.body.get() shouldBe "Uploaded"
+        }
+
         "test completed file upload with no name but with bytes"() {
             val body = MultipartBody.builder()
                     .addPart("file", "", MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".toByteArray())
@@ -56,6 +90,57 @@ class UploadControllerSpec: StringSpec() {
             val ex = shouldThrow<HttpClientResponseException> { flowable.blockingFirst() }
 
             ex.message shouldBe "Required argument [CompletedFileUpload file] not specified"
+        }
+
+        "test completed file upload with no filename and no bytes"() {
+            val body = MultipartBody.builder()
+                    .addPart("file", "", MediaType.APPLICATION_JSON_TYPE, ByteArray(0))
+                    .build()
+
+            val flowable = Flowable.fromPublisher(client!!.exchange(
+                    HttpRequest.POST("/upload/completed", body)
+                            .contentType(MediaType.MULTIPART_FORM_DATA)
+                            .accept(MediaType.TEXT_PLAIN_TYPE),
+                    String::class.java
+            ))
+
+            val ex = shouldThrow<HttpClientResponseException> { flowable.blockingFirst() }
+
+            ex.message shouldBe "Required argument [CompletedFileUpload file] not specified"
+        }
+
+        "test completed file upload with no part"() {
+            val body = MultipartBody.builder()
+                    .addPart("filex", "", MediaType.APPLICATION_JSON_TYPE, ByteArray(0))
+                    .build()
+
+            val flowable = Flowable.fromPublisher(client!!.exchange(
+                    HttpRequest.POST("/upload/completed", body)
+                            .contentType(MediaType.MULTIPART_FORM_DATA)
+                            .accept(MediaType.TEXT_PLAIN_TYPE),
+                    String::class.java
+            ))
+            val ex = shouldThrow<HttpClientResponseException> { flowable.blockingFirst() }
+
+            ex.message shouldBe "Required argument [CompletedFileUpload file] not specified"
+        }
+
+        "test file bytes uploaded"() {
+            val body = MultipartBody.builder()
+                    .addPart("file", "file.json", MediaType.TEXT_PLAIN_TYPE, "some data".toByteArray())
+                    .addPart("fileName", "bar")
+                    .build()
+
+            val flowable = Flowable.fromPublisher(client!!.exchange(
+                    HttpRequest.POST("/upload/bytes", body)
+                            .contentType(MediaType.MULTIPART_FORM_DATA)
+                            .accept(MediaType.TEXT_PLAIN_TYPE),
+                    String::class.java
+            ))
+            val response = flowable.blockingFirst()
+
+            response.status() shouldBe HttpStatus.OK
+            response.body.get() shouldBe "Uploaded"
         }
     }
 }

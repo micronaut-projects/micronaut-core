@@ -1,0 +1,109 @@
+++++
+<a id="io.micronaut.discovery.spring.config.SpringCloudClientConfiguration" href="#io.micronaut.discovery.spring.config.SpringCloudClientConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.spring.config.SpringCloudClientConfiguration[]
+|===
+|Property |Type |Description
+
+| `+spring.cloud.config.uri+`
+|java.lang.String
+|Set the Spring Cloud config server uri.  Default value ("http://localhost:8888").
+
+
+| `+spring.cloud.config.label+`
+|java.lang.String
+|Set the Spring Cloud config server label.
+
+
+| `+spring.cloud.config.fail-fast+`
+|boolean
+|If set to true an exception will be thrown if configuration is not found.
+ Default value (false).
+
+
+| `+spring.cloud.config.ssl-configuration+`
+|api:io.micronaut.http.ssl.SslConfiguration[]
+|
+
+
+| `+spring.cloud.config.logger-name+`
+|java.lang.String
+|
+
+
+| `+spring.cloud.config.follow-redirects+`
+|boolean
+|
+
+
+| `+spring.cloud.config.default-charset+`
+|java.nio.charset.Charset
+|
+
+
+| `+spring.cloud.config.channel-options+`
+|java.util.Map
+|
+
+
+| `+spring.cloud.config.shutdown-timeout+`
+|java.time.Duration
+|
+
+
+| `+spring.cloud.config.read-timeout+`
+|java.time.Duration
+|
+
+
+| `+spring.cloud.config.read-idle-timeout+`
+|java.time.Duration
+|
+
+
+| `+spring.cloud.config.connect-timeout+`
+|java.time.Duration
+|
+
+
+| `+spring.cloud.config.num-of-threads+`
+|java.lang.Integer
+|
+
+
+| `+spring.cloud.config.thread-factory+`
+|java.lang.Class
+|
+
+
+| `+spring.cloud.config.max-content-length+`
+|int
+|
+
+
+| `+spring.cloud.config.proxy-type+`
+|java.net.Proxy$Type
+|
+
+
+| `+spring.cloud.config.proxy-address+`
+|java.net.SocketAddress
+|
+
+
+| `+spring.cloud.config.proxy-username+`
+|java.lang.String
+|
+
+
+| `+spring.cloud.config.proxy-password+`
+|java.lang.String
+|
+
+
+| `+spring.cloud.config.proxy-selector+`
+|java.net.ProxySelector
+|
+
+
+|===

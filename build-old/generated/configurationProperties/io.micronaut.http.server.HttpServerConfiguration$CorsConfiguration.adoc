@@ -1,0 +1,23 @@
+++++
+<a id="io.micronaut.http.server.HttpServerConfiguration$CorsConfiguration" href="#io.micronaut.http.server.HttpServerConfiguration$CorsConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.server.HttpServerConfiguration$CorsConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.server.cors.enabled+`
+|boolean
+|Sets whether CORS is enabled. Default value (false)
+
+
+| `+micronaut.server.cors.single-header+`
+|boolean
+|Sets whether CORS header values should be joined into a single header. Default value (false).
+
+
+| `+micronaut.server.cors.configurations+`
+|java.util.Map
+|Sets the CORS configurations.
+
+
+|===

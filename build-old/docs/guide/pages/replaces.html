@@ -1,0 +1,563 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>3.9 Bean Replacement 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/quickStart.html">&lt;&lt; <strong>2</strong><span>Quick Start</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>3.9 Bean Replacement</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="replaces"><a class="anchor" href="#replaces"></a>3.9 Bean Replacement</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/ioc/replaces.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>One significant difference between Micronaut&#8217;s Dependency Injection system and Spring is the way beans can be replaced.</p>
+</div>
+<div class="paragraph">
+<p>In a Spring application, beans have names and can effectively be overridden simply by creating a bean with the same name, regardless of the type of the bean. Spring also has the notion of bean registration order, hence in Spring Boot you have <code>@AutoConfigureBefore</code> and <code>@AutoConfigureAfter</code> the control how beans override each other.</p>
+</div>
+<div class="paragraph">
+<p>This strategy leads to difficult to debug problems, for example:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Bean loading order changes, leading to unexpected results</p>
+</li>
+<li>
+<p>A bean with the same name overrides another bean with a different type</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>To avoid these problems, Micronaut&#8217;s DI has no concept of bean names or load order. Beans have a type and a <a href="../api/io/micronaut/context/Qualifier.html">Qualifier</a>. You cannot override a bean of a completely different type with another.</p>
+</div>
+<div class="paragraph">
+<p>A useful benefit of Spring&#8217;s approach is that it allows overriding existing beans to customize behaviour. In order to support the same ability, Micronaut&#8217;s DI provides an explicit <a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a> annotation, which integrates nicely with support for <a href="#conditionalBeans">Conditional Beans</a> and clearly documents and expresses the intention of the developer.</p>
+</div>
+<div class="paragraph">
+<p>Any existing bean can be replaced by another bean that declares <a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a>. For example, consider the following class:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">JdbcBookService</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Singleton
+@Requires(beans = DataSource.class)
+@Requires(property = "datasource.url")
+public class JdbcBookService implements BookService {
+
+    DataSource dataSource;
+
+    public JdbcBookService(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">JdbcBookService</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Singleton
+@Requires(beans = DataSource.class)
+@Requires(property = "datasource.url")
+class JdbcBookService implements BookService {
+
+    DataSource dataSource</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">JdbcBookService</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Singleton
+@Requirements(Requires(beans = [DataSource::class]), Requires(property = "datasource.url"))
+class JdbcBookService(internal var dataSource: DataSource) : BookService {</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can define a class in <code>src/test/java</code> that replaces this class just for your tests:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Using @Replaces</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Replaces(JdbcBookService.class) <b class="conum">(1)</b>
+@Singleton
+public class MockBookService implements BookService {
+
+    Map&lt;String, Book&gt; bookMap = new LinkedHashMap&lt;&gt;();
+
+    @Override
+    public Book findBook(String title) {
+        return bookMap.get(title);
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Using @Replaces</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Replaces(JdbcBookService.class) <b class="conum">(1)</b>
+@Singleton
+class MockBookService implements BookService {
+
+    Map&lt;String, Book&gt; bookMap = [:]
+
+    @Override
+    Book findBook(String title) {
+        bookMap.get(title)
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Using @Replaces</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Replaces(JdbcBookService::class) <b class="conum">(1)</b>
+@Singleton
+class MockBookService : BookService {
+
+    var bookMap: Map&lt;String, Book&gt; = LinkedHashMap()
+
+    override fun findBook(title: String): Book? {
+        return bookMap[title]
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <code>MockBookService</code> declares that it replaces <code>JdbcBookService</code></td>
+</tr>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_factory_replacement"><a class="anchor" href="#_factory_replacement"></a>Factory Replacement</h3>
+<div class="paragraph">
+<p>The <code>@Replaces</code> annotation also supports a <code>factory</code> argument. That argument allows the replacement of factory beans in their entirety or specific types created by the factory.</p>
+</div>
+<div class="paragraph">
+<p>For example, it may be desired to replace all or part of the given factory class:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">BookFactory</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Factory
+public class BookFactory {
+
+    @Singleton
+    Book novel() {
+        return new Book("A Great Novel");
+    }
+
+    @Singleton
+    TextBook textBook() {
+        return new TextBook("Learning 101");
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">BookFactory</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Factory
+class BookFactory {
+
+    @Singleton
+    Book novel() {
+        new Book('A Great Novel')
+    }
+
+    @Singleton
+    TextBook textBook() {
+        new TextBook('Learning 101')
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">BookFactory</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Factory
+class BookFactory {
+
+    @Singleton
+    internal fun novel(): Book {
+        return Book("A Great Novel")
+    }
+
+    @Singleton
+    internal fun textBook(): TextBook {
+        return TextBook("Learning 101")
+    }
+}</code></pre>
+</div>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+To replace a factory in its entirety, it is necessary that your factory methods match the return types of all of the methods in the replaced factory.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>In this example, the <code>BookFactory#textBook()</code> will <strong>not</strong> be replaced because this factory does not have a factory method that returns a TextBook.</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">CustomBookFactory</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Factory
+@Replaces(factory = BookFactory.class)
+public class CustomBookFactory {
+
+    @Singleton
+    Book otherNovel() {
+        return new Book("An OK Novel");
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">CustomBookFactory</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Factory
+@Replaces(factory = BookFactory.class)
+class CustomBookFactory {
+
+    @Singleton
+    Book otherNovel() {
+        new Book('An OK Novel')
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">CustomBookFactory</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Factory
+@Replaces(factory = BookFactory::class)
+class CustomBookFactory {
+
+    @Singleton
+    internal fun otherNovel(): Book {
+        return Book("An OK Novel")
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>It may be the case that you don&#8217;t wish for the factory methods to be replaced, except for a select few. For that use case, you can apply the <code>@Replaces</code> annotation on the method and denote the factory that it should apply to.</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">TextBookFactory</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Factory
+public class TextBookFactory {
+
+    @Singleton
+    @Replaces(value = TextBook.class, factory = BookFactory.class)
+    TextBook textBook() {
+        return new TextBook("Learning 305");
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">TextBookFactory</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Factory
+class TextBookFactory {
+
+    @Singleton
+    @Replaces(value = TextBook.class, factory = BookFactory.class)
+    TextBook textBook() {
+        new TextBook('Learning 305')
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">TextBookFactory</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Factory
+class TextBookFactory {
+
+    @Singleton
+    @Replaces(value = TextBook::class, factory = BookFactory::class)
+    internal fun textBook(): TextBook {
+        return TextBook("Learning 305")
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>BookFactory#novel()</code> method will not be replaced because the TextBook class is defined in the annotation.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_default_implementation"><a class="anchor" href="#_default_implementation"></a>Default Implementation</h3>
+<div class="paragraph">
+<p>When exposing an API, it may be desirable for the default implementation of an interface to not be exposed as part of the public API. Doing so would prevent users from being able to replace the implementation because they would not be able to reference the class. The solution is to annotate the interface with <a href="../api/io/micronaut/context/annotation/DefaultImplementation.html">DefaultImplementation</a> to indicate which implementation should be replaced if a user creates a bean that <code>@Replaces(YourInterface.class)</code>.</p>
+</div>
+<div class="paragraph">
+<p>For example consider:</p>
+</div>
+<div class="paragraph">
+<p>A public API contract</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.context.annotation.DefaultImplementation;
+
+@DefaultImplementation(DefaultResponseStrategy.class)
+public interface ResponseStrategy {
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.context.annotation.DefaultImplementation
+
+@DefaultImplementation(DefaultResponseStrategy)
+interface ResponseStrategy {
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.context.annotation.DefaultImplementation
+
+@DefaultImplementation(DefaultResponseStrategy::class)
+interface ResponseStrategy</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The default implementation</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import javax.inject.Singleton;
+
+@Singleton
+class DefaultResponseStrategy implements ResponseStrategy {
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import javax.inject.Singleton
+
+@Singleton
+class DefaultResponseStrategy implements ResponseStrategy {
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import javax.inject.Singleton
+
+@Singleton
+internal class DefaultResponseStrategy : ResponseStrategy</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The custom implementation</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.context.annotation.Replaces;
+import javax.inject.Singleton;
+
+@Singleton
+@Replaces(ResponseStrategy.class)
+public class CustomResponseStrategy implements ResponseStrategy {
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.context.annotation.Replaces
+import javax.inject.Singleton
+
+@Singleton
+@Replaces(ResponseStrategy)
+class CustomResponseStrategy implements ResponseStrategy {
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.context.annotation.Replaces
+import javax.inject.Singleton
+
+@Singleton
+@Replaces(ResponseStrategy::class)
+class CustomResponseStrategy : ResponseStrategy</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In the above example, the <code>CustomResponseStrategy</code> will replace the <code>DefaultResponseStrategy</code> because the <a href="../api/io/micronaut/context/annotation/DefaultImplementation.html">DefaultImplementation</a> annotation points to the <code>DefaultResponseStrategy</code>.</p>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/quickStart.html">&lt;&lt; <strong>2</strong><span>Quick Start</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,552 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>4.2 Externalized Configuration with PropertySources 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/ioc.html">&lt;&lt; <strong>3</strong><span>Inversion of Control</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>4.2 Externalized Configuration with PropertySources</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="propertySource"><a class="anchor" href="#propertySource"></a>4.2 Externalized Configuration with PropertySources</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/config/propertySource.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Additional <a href="../api/io/micronaut/context/env/PropertySource.html">PropertySource</a> instances can be added to the environment prior to initializing the <a href="../api/io/micronaut/context/ApplicationContext.html">ApplicationContext</a>.</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Initializing the Environment</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">        ApplicationContext applicationContext = ApplicationContext.run(
+                PropertySource.of(
+                        "test",
+                        CollectionUtils.mapOf(
+                            "micronaut.server.host", "foo",
+                            "micronaut.server.port", 8080
+                        )
+                ),
+                "test", "android");
+        Environment environment = applicationContext.getEnvironment();
+
+        assertEquals(
+                "foo",
+                environment.getProperty("micronaut.server.host", String.class).orElse("localhost")
+        );</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Initializing the Environment</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">        when:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                PropertySource.of(
+                        "test",
+                        [
+                            "micronaut.server.host": "foo",
+                            "micronaut.server.port": 8080
+                        ]
+                ),
+                "test", "android")
+        Environment environment = applicationContext.getEnvironment()
+
+        then:
+        "foo" == environment.getProperty("micronaut.server.host", String.class).orElse("localhost")</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Initializing the Environment</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">        val applicationContext = ApplicationContext.run(
+                PropertySource.of(
+                        "test",
+                        mapOf(
+                                "micronaut.server.host" to "foo",
+                                "micronaut.server.port" to 8080
+                        )
+                ),
+                "test", "android")
+        val environment = applicationContext.getEnvironment()
+
+        assertEquals(
+                "foo",
+                environment.getProperty("micronaut.server.host", String::class.java).orElse("localhost")
+        )</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/context/env/PropertySource.html">PropertySource.of</a> method can be used to create a <code>ProperySource</code> from a map of values.</p>
+</div>
+<div class="paragraph">
+<p>Alternatively one can register a <a href="../api/io/micronaut/context/env/PropertySourceLoader.html">PropertySourceLoader</a> by creating a <code>META-INF/services/io.micronaut.context.env.PropertySourceLoader</code> containing a reference to the class name of the <code>PropertySourceLoader</code>.</p>
+</div>
+<div class="sect2">
+<h3 id="_included_propertysource_loaders"><a class="anchor" href="#_included_propertysource_loaders"></a>Included PropertySource Loaders</h3>
+<div class="paragraph">
+<p>Micronaut by default contains <code>PropertySourceLoader</code> implementations that load properties from the given locations and priority:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Command line arguments</p>
+</li>
+<li>
+<p>Properties from <code>SPRING_APPLICATION_JSON</code> (for Spring compatibility)</p>
+</li>
+<li>
+<p>Properties from <code>MICRONAUT_APPLICATION_JSON</code></p>
+</li>
+<li>
+<p>Java System Properties</p>
+</li>
+<li>
+<p>OS environment variables</p>
+</li>
+<li>
+<p>Enviroment-specific properties from <code>application-{environment}.{extension}</code> (Either <code>.properties</code>, <code>.json</code>, <code>.yml</code> or <code>.groovy</code> property formats supported)</p>
+</li>
+<li>
+<p>Application-specific properties from <code>application.{extension}</code> (Either <code>.properties</code>, <code>.json</code>, <code>.yml</code> or <code>.groovy</code> property formats supported)</p>
+</li>
+</ol>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+To use custom properties from local files, you can either call your application with <code>-Dmicronaut.config.files=myfile.yml</code> or set the environment variable <code>MICRONAUT_CONFIG_FILES=myfile.yml</code>. The value can be a comma-separated list.
+</td>
+</tr>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_property_value_placeholders"><a class="anchor" href="#_property_value_placeholders"></a>Property Value Placeholders</h3>
+<div class="paragraph">
+<p>Micronaut includes a property placeholder syntax which can be used to reference configuration properties both within configuration values and with any Micronaut annotation (see <a href="../api/io/micronaut/context/annotation/Value.html">@Value</a> and the section on <a href="#valueAnnotation">Configuration Injection</a>).</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+Programmatic usage is also possible via the <a href="../api/io/micronaut/context/env/PropertyPlaceholderResolver.html">PropertyPlaceholderResolver</a> interface.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The basic syntax is to wrap a reference to a property in <code>${&#8230;&#8203;}</code>. For example in <code>application.yml</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">Defining Property Placeholders</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">myapp:
+    endpoint: http://${micronaut.server.host}:${micronaut.server.port}/foo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example embeds references to the <code>micronaut.server.host</code> and <code>micronaut.server.port</code> properties.</p>
+</div>
+<div class="paragraph">
+<p>You can specify default values by defining a value after the <code>:</code> character. For example:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using Default Values</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">myapp:
+    endpoint: http://${micronaut.server.host:localhost}:${micronaut.server.port:8080}/foo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example will default to <code>localhost</code> and port <code>8080</code> if no value is found (rather than throwing an exception). Note that if default value itself contains a <code>:</code> character, you should escape it using back ticks:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using Backticks</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">myapp:
+    endpoint: ${server.address:`http://localhost:8080`}/foo</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example tries to read a <code>server.address</code> property otherwise fallbacks back to <code><a href="http://localhost:8080" class="bare">http://localhost:8080</a></code>, since the address has a <code>:</code> character we have to escape it with back ticks.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_property_value_binding"><a class="anchor" href="#_property_value_binding"></a>Property Value Binding</h3>
+<div class="paragraph">
+<p>Note that these property references should always be in kebab case (lowercase and hyphen-separated) when placing references in code or in placeholder values. In other words you should use for example <code>micronaut.server.default-charset</code> and not <code>micronaut.server.defaultCharset</code>.</p>
+</div>
+<div class="paragraph">
+<p>Micronaut still allows specifying the latter in configuration, but normalizes the properties into kebab case form to optimize memory consumption and reduce complexity when resolving properties. The following table summarizes how properties are normalized from different sources:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Property Value Normalization</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Configuration Value</th>
+<th class="tableblock halign-left valign-top">Resulting Properties</th>
+<th class="tableblock halign-left valign-top">Property Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>myApp.myStuff</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>my-app.my-stuff</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Properties, YAML etc.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>myApp.myStuff</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>my-app.my-stuff</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Properties, YAML etc.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>myApp.my-stuff</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>my-app.my-stuff</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Properties, YAML etc.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>MYAPP_MYSTUFF</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>myapp.mystuff</code>, <code>myapp-mystuff</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Environment Variable</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>MY_APP_MY_STUFF</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>my.app.my.stuff</code>, <code>my.app.my-stuff</code>, <code>my.app-my.stuff</code>, <code>my.app-my-stuff</code>, <code>my-app.my.stuff</code>, <code>my-app.my-stuff</code>, <code>my-app-my.stuff</code>, <code>my-app-my-stuff</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Environment Variable</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Environment variables are given special treatment to allow the definition of environment variables to be more flexible.</p>
+</div>
+<div class="admonitionblock important">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-important" title="Important"></i>
+</td>
+<td class="content">
+Because the number of properties generated is exponential based on the number of <code>_</code> characters in the environment variable, it is recommended to refine which, if any, environment variables are included in configuration if the number of environment variables with a large number of underscores is high.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>To control how environment properties participate in configuration, call the respective methods on the <code>Micronaut</code> builder.</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Application class</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">import io.micronaut.runtime.Micronaut;
+
+public class Application {
+
+    public static void main(String[] args) {
+        Micronaut.build(null)
+                .mainClass(Application.class)
+                .environmentPropertySource(false)
+                //or
+                .environmentVariableIncludes("THIS_ENV_ONLY")
+                //or
+                .environmentVariableExcludes("EXCLUDED_ENV")
+                .start();
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Application class</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">import io.micronaut.runtime.Micronaut
+
+class Application {
+
+    static void main(String[] args) {
+        Micronaut.build()
+                .mainClass(Application)
+                .environmentPropertySource(false)
+                //or
+                .environmentVariableIncludes("THIS_ENV_ONLY")
+                //or
+                .environmentVariableExcludes("EXCLUDED_ENV")
+                .start()
+    }
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Application class</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">import io.micronaut.runtime.Micronaut
+
+object Application {
+
+    @JvmStatic
+    fun main(args: Array&lt;String&gt;) {
+        Micronaut.build(null)
+                .mainClass(Application::class.java)
+                .environmentPropertySource(false)
+                //or
+                .environmentVariableIncludes("THIS_ENV_ONLY")
+                //or
+                .environmentVariableExcludes("EXCLUDED_ENV")
+                .start()
+    }
+}</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+The configuration above does not have any impact on property placeholders. It is still possible to reference an environment variable in a placeholder regardless of whether environment configuration is disabled, or even if the specific property is explicitly excluded.
+</td>
+</tr>
+</table>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_using_random_properties"><a class="anchor" href="#_using_random_properties"></a>Using Random Properties</h3>
+<div class="paragraph">
+<p>You can use <code>random</code> values by using the following properties.  These can be used in configuration files as variables like the following.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+  application:
+    name: myapplication
+    instance:
+      id: ${random.shortuuid}</code></pre>
+</div>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 2. Random Values</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Property</th>
+<th class="tableblock halign-left valign-top">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">random.port</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">An available random port number</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">random.int</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Random int</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">random.integer</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Random int</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">random.long</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Random long</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">random.float</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Random float</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">random.shortuuid</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Random UUID of only 10 chars in length (Note: As this isn&#8217;t full UUID, collision COULD occur)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">random.uuid</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Random UUID with dashes</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">random.uuid2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Random UUID without dashes</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="_fail_fast_property_injection"><a class="anchor" href="#_fail_fast_property_injection"></a>Fail Fast Property Injection</h3>
+<div class="paragraph">
+<p>For beans that inject required properties, the injection and potential failure will not occur until the bean is requested. To verify at startup that the properties exist and can be injected, the bean can be annotated with <a href="../api/io/micronaut/context/annotation/Context.html">@Context</a>. Context scoped beans will be injected at startup time and thus will fail at startup time if any required properties are missing or could not be converted to the required type.</p>
+</div>
+<div class="admonitionblock important">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-important" title="Important"></i>
+</td>
+<td class="content">
+To maintain a fast startup time, it is recommended to use this feature as sparingly as possible.
+</td>
+</tr>
+</table>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/ioc.html">&lt;&lt; <strong>3</strong><span>Inversion of Control</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,119 @@
+
+++++
+<a id="io.micronaut.function.client.aws.AWSInvokeRequestDefinition" href="#io.micronaut.function.client.aws.AWSInvokeRequestDefinition">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.function.client.aws.AWSInvokeRequestDefinition[]
+|===
+|Property |Type |Description
+
+| `+aws.lambda.functions.*.function-name+`
+|java.lang.String
+|
+
+
+| `+aws.lambda.functions.*.invocation-type+`
+|java.lang.String
+|
+
+
+| `+aws.lambda.functions.*.log-type+`
+|java.lang.String
+|
+
+
+| `+aws.lambda.functions.*.client-context+`
+|java.lang.String
+|
+
+
+| `+aws.lambda.functions.*.payload+`
+|java.nio.ByteBuffer
+|
+
+
+| `+aws.lambda.functions.*.qualifier+`
+|java.lang.String
+|
+
+
+| `+aws.lambda.functions.*.request-credentials-provider+`
+|com.amazonaws.auth.AWSCredentialsProvider
+|
+
+
+| `+aws.lambda.functions.*.request-metric-collector+`
+|com.amazonaws.metrics.RequestMetricCollector
+|
+
+
+| `+aws.lambda.functions.*.general-progress-listener+`
+|com.amazonaws.event.ProgressListener
+|
+
+
+| `+aws.lambda.functions.*.sdk-request-timeout+`
+|int
+|
+
+
+| `+aws.lambda.functions.*.sdk-client-execution-timeout+`
+|int
+|
+
+
+|===
+<<<
+++++
+<a id="io.micronaut.function.client.aws.AWSLambdaConfiguration" href="#io.micronaut.function.client.aws.AWSLambdaConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.function.client.aws.AWSLambdaConfiguration[]
+|===
+|Property |Type |Description
+
+| `+aws.lambda.executor-factory+`
+|com.amazonaws.client.builder.ExecutorFactory
+|
+
+
+| `+aws.lambda.credentials+`
+|com.amazonaws.auth.AWSCredentialsProvider
+|
+
+
+| `+aws.lambda.client-configuration+`
+|com.amazonaws.ClientConfiguration
+|
+
+
+| `+aws.lambda.metrics-collector+`
+|com.amazonaws.metrics.RequestMetricCollector
+|
+
+
+| `+aws.lambda.region+`
+|com.amazonaws.regions.Regions
+|
+
+
+| `+aws.lambda.endpoint-configuration+`
+|com.amazonaws.client.builder.AwsClientBuilder$EndpointConfiguration
+|
+
+
+| `+aws.lambda.request-handlers+`
+|com.amazonaws.handlers.RequestHandler2[]
+|
+
+
+| `+aws.lambda.monitoring-listener+`
+|com.amazonaws.monitoring.MonitoringListener
+|
+
+
+| `+aws.lambda.client-side-monitoring-configuration-provider+`
+|com.amazonaws.monitoring.CsmConfigurationProvider
+|
+
+
+|===
+<<<

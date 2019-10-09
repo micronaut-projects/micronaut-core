@@ -1,0 +1,564 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>6.12 JSON Binding with Jackson 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/aop.html">&lt;&lt; <strong>5</strong><span>Aspect Oriented Programming</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>6.12 JSON Binding with Jackson</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="jsonBinding"><a class="anchor" href="#jsonBinding"></a>6.12 JSON Binding with Jackson</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/httpServer/jsonBinding.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The most common data interchange format nowadays is JSON.</p>
+</div>
+<div class="paragraph">
+<p>In fact, the defaults in the <a href="../api/io/micronaut/http/annotation/Controller.html">Controller</a> annotation specify that the controllers in Micronaut consume and produce JSON by default.</p>
+</div>
+<div class="paragraph">
+<p>In order to do so in a non-blocking manner Micronaut builds on the <a href="https://github.com/FasterXML/jackson">Jackson</a> Asynchronous JSON parsing API and Netty such that the reading of incoming JSON is done in a non-blocking manner.</p>
+</div>
+<div class="sect1">
+<h2 id="_binding_using_reactive_frameworks"><a class="anchor" href="#_binding_using_reactive_frameworks"></a>Binding using Reactive Frameworks</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>From a developer perspective however, you can generally just work with Plain Old Java Objects (POJOs) and can optionally use a Reactive framework such as RxJava or Reactor. The following is an example of a controller that reads and saves an incoming POJO in a non-blocking way from JSON:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Using RxJava 2 to Read the JSON</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Controller("/people")
+public class PersonController {
+
+    Map&lt;String, Person&gt; inMemoryDatastore = new ConcurrentHashMap&lt;&gt;();
+
+    @Post("/saveReactive")
+    public Single&lt;HttpResponse&lt;Person&gt;&gt; save(@Body Single&lt;Person&gt; person) { <b class="conum">(1)</b>
+        return person.map(p -&gt; {
+                    inMemoryDatastore.put(p.getFirstName(), p); <b class="conum">(2)</b>
+                    return HttpResponse.created(p); <b class="conum">(3)</b>
+                }
+        );
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Using RxJava 2 to Read the JSON</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Controller("/people")
+class PersonController {
+
+    ConcurrentHashMap&lt;String, Person&gt; inMemoryDatastore = [:]
+
+    @Post("/saveReactive")
+    Single&lt;HttpResponse&lt;Person&gt;&gt; save(@Body Single&lt;Person&gt; person) { <b class="conum">(1)</b>
+        person.map({ p -&gt;
+            inMemoryDatastore.put(p.getFirstName(), p) <b class="conum">(2)</b>
+            HttpResponse.created(p) <b class="conum">(3)</b>
+        })
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Using RxJava 2 to Read the JSON</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Controller("/people")
+class PersonController {
+
+    internal var inMemoryDatastore: MutableMap&lt;String, Person&gt; = ConcurrentHashMap()
+
+    @Post("/saveReactive")
+    fun save(@Body person: Single&lt;Person&gt;): Single&lt;HttpResponse&lt;Person&gt;&gt; { <b class="conum">(1)</b>
+        return person.map { p -&gt;
+            inMemoryDatastore[p.firstName] = p <b class="conum">(2)</b>
+            HttpResponse.created(p) <b class="conum">(3)</b>
+        }
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The method receives a RxJava <a href="http://reactivex.io/RxJava/2.x/javadoc/io/reactivex/Single.html">Single</a> which emits the POJO once the JSON has been read</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The <code>map</code> method is used to store the instance in <code>Map</code></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>An <a href="../api/io/micronaut/http/HttpResponse.html">HttpResponse</a> is returned</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Using CURL from the command line you can POST JSON to the <code>/people</code> URI for the server to receive it:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using CURL to Post JSON</div>
+<div class="content">
+<pre>$ curl -X POST localhost:8080/people -d '{"firstName":"Fred","lastName":"Flintstone","age":45}'</pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_binding_using_completablefuture"><a class="anchor" href="#_binding_using_completablefuture"></a>Binding Using CompletableFuture</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The same method as the previous example can also be written with the <a href="https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletableFuture.html">CompletableFuture</a> API instead:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Using CompletableFuture to Read the JSON</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Controller("/people")
+public class PersonController {
+
+    Map&lt;String, Person&gt; inMemoryDatastore = new ConcurrentHashMap&lt;&gt;();
+
+    @Post("/saveFuture")
+    public CompletableFuture&lt;HttpResponse&lt;Person&gt;&gt; save(@Body CompletableFuture&lt;Person&gt; person) {
+        return person.thenApply(p -&gt; {
+                    inMemoryDatastore.put(p.getFirstName(), p);
+                    return HttpResponse.created(p);
+                }
+        );
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Using CompletableFuture to Read the JSON</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Controller("/people")
+class PersonController {
+
+    ConcurrentHashMap&lt;String, Person&gt; inMemoryDatastore = [:]
+
+    @Post("/saveFuture")
+    CompletableFuture&lt;HttpResponse&lt;Person&gt;&gt; save(@Body CompletableFuture&lt;Person&gt; person) {
+        person.thenApply({ p -&gt;
+            inMemoryDatastore.put(p.getFirstName(), p)
+            HttpResponse.created(p)
+        })
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Using CompletableFuture to Read the JSON</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Controller("/people")
+class PersonController {
+
+    internal var inMemoryDatastore: MutableMap&lt;String, Person&gt; = ConcurrentHashMap()
+
+    @Post("/saveFuture")
+    fun save(@Body person: CompletableFuture&lt;Person&gt;): CompletableFuture&lt;HttpResponse&lt;Person&gt;&gt; {
+        return person.thenApply { p -&gt;
+            inMemoryDatastore[p.firstName] = p
+            HttpResponse.created(p)
+        }
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example uses the <code>thenApply</code> method to achieve the same as the previous example.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_binding_using_pojos"><a class="anchor" href="#_binding_using_pojos"></a>Binding using POJOs</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Note however, that if your method does not do any blocking I/O then you can just as easily write:</p>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Binding JSON POJOs</div>
+<div class="content">
+<pre class="highlight"><code class="language-java" data-lang="java">@Controller("/people")
+public class PersonController {
+
+    Map&lt;String, Person&gt; inMemoryDatastore = new ConcurrentHashMap&lt;&gt;();
+
+    @Post
+    public HttpResponse&lt;Person&gt; save(@Body Person person) {
+        inMemoryDatastore.put(person.getFirstName(), person);
+        return HttpResponse.created(person);
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Binding JSON POJOs</div>
+<div class="content">
+<pre class="highlight"><code class="language-groovy" data-lang="groovy">@Controller("/people")
+class PersonController {
+
+    ConcurrentHashMap&lt;String, Person&gt; inMemoryDatastore = [:]
+
+    @Post
+    HttpResponse&lt;Person&gt; save(@Body Person person) {
+        inMemoryDatastore.put(person.getFirstName(), person)
+        HttpResponse.created(person)
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="title">Binding JSON POJOs</div>
+<div class="content">
+<pre class="highlight"><code class="language-kotlin" data-lang="kotlin">@Controller("/people")
+class PersonController {
+
+    internal var inMemoryDatastore: MutableMap&lt;String, Person&gt; = ConcurrentHashMap()
+
+    @Post
+    fun save(@Body person: Person): HttpResponse&lt;Person&gt; {
+        inMemoryDatastore[person.firstName] = person
+        return HttpResponse.created(person)
+    }
+
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Micronaut will still using non-blocking I/O to read the JSON and only execute your method once the data has been read.</p>
+</div>
+<div class="paragraph">
+<p>In other words, as a rule reactive types should be used when you plan to do further downstream I/O operations in which case they can greatly simplify composing operations.</p>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+The output produced by Jackson can be customized in a variety of manners, from defining Jackson modules to using <a href="https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations">Jackson&#8217;s annotations</a>
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_jackson_configuration"><a class="anchor" href="#_jackson_configuration"></a>Jackson Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The Jackson ObjectMapper can be configured through normal configuration with the <a href="../api/io/micronaut/jackson/JacksonConfiguration.html">JacksonConfiguration</a> class.</p>
+</div>
+<div class="paragraph">
+<p>All jackson configuration keys start with <code>jackson</code>.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">dateFormat</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">String</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The date format</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">locale</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">String</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Uses <a href="https://docs.oracle.com/javase/8/docs/api/java/util/Locale.html#forLanguageTag-java.lang.String-">Locale.forLanguageTag</a>. Example: <code>en-US</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">timeZone</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">String</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Uses <a href="https://docs.oracle.com/javase/8/docs/api/java/util/TimeZone.html#getTimeZone-java.lang.String-">TimeZone.getTimeZone</a>. Example: <code>PST</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">serializationInclusion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">String</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">One of <a href="http://fasterxml.github.io/jackson-annotations/javadoc/2.9/com/fasterxml/jackson/annotation/JsonInclude.Include.html">JsonInclude.Include</a>. Example: <code>ALWAYS</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">propertyNamingStrategy</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">String</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of an instance of <a href="http://fasterxml.github.io/jackson-databind/javadoc/2.9/com/fasterxml/jackson/databind/PropertyNamingStrategy.html">PropertyNamingStrategy</a>. Example: <code>SNAKE_CASE</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">defaultTyping</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">String</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The global defaultTyping for polymorphic type handling from enum <a href="http://fasterxml.github.io/jackson-databind/javadoc/2.9/com/fasterxml/jackson/databind/ObjectMapper.DefaultTyping.html">ObjectMapper.DefaultTyping</a>. Example: <code>NON_FINAL</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Example:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">jackson:
+    serializationInclusion: ALWAYS</code></pre>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_features"><a class="anchor" href="#_features"></a>Features</h3>
+<div class="paragraph">
+<p>All features can be configured with their name as the key and a boolean to indicate enabled or disabled.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">serialization</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Map</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="http://fasterxml.github.io/jackson-databind/javadoc/2.9/com/fasterxml/jackson/databind/SerializationFeature.html">SerializationFeature</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">deserialization</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Map</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="http://fasterxml.github.io/jackson-databind/javadoc/2.9/com/fasterxml/jackson/databind/DeserializationFeature.html">DeserializationFeature</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">mapper</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Map</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="http://fasterxml.github.io/jackson-databind/javadoc/2.9/com/fasterxml/jackson/databind/MapperFeature.html">MapperFeature</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">parser</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Map</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="http://fasterxml.github.io/jackson-core/javadoc/2.9/com/fasterxml/jackson/core/JsonParser.Feature.html">JsonParser.Feature</a></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">generator</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Map</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="http://fasterxml.github.io/jackson-core/javadoc/2.9/com/fasterxml/jackson/core/JsonGenerator.Feature.html">JsonGenerator.Feature</a></p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Example:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">jackson:
+    serialization:
+        indentOutput: true
+        writeDatesAsTimestamps: false
+    deserialization:
+        useBigIntegerForInts: true
+        failOnUnknownProperties: false</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_support_for_code_jsonview_code"><a class="anchor" href="#_support_for_code_jsonview_code"></a>Support for <code>@JsonView</code></h3>
+<div class="paragraph">
+<p>You can use the <code>@JsonView</code> annotation to controller methods if you set <code>jackson.json-view.enabled</code> to <code>true</code> in <code>application.yml</code>.</p>
+</div>
+<div class="paragraph">
+<p>Jackson&#8217;s <code>@JsonView</code> annotation allows you to control which properties are exposes on a per response basis. See <a href="https://www.baeldung.com/jackson-json-view-annotation">Jackson JSON Views</a> for more information.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_beans"><a class="anchor" href="#_beans"></a>Beans</h3>
+<div class="paragraph">
+<p>In addition to configuration, beans can be registered to customize Jackson. All beans that extend any of the following classes will be registered with the object mapper.</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><a href="http://fasterxml.github.io/jackson-databind/javadoc/2.9/com/fasterxml/jackson/databind/Module.html">Module</a></p>
+</li>
+<li>
+<p><a href="http://fasterxml.github.io/jackson-databind/javadoc/2.9/com/fasterxml/jackson/databind/JsonDeserializer.html">JsonDeserializer</a></p>
+</li>
+<li>
+<p><a href="http://fasterxml.github.io/jackson-databind/javadoc/2.9/com/fasterxml/jackson/databind/JsonSerializer.html">JsonSerializer</a></p>
+</li>
+<li>
+<p><a href="http://fasterxml.github.io/jackson-databind/javadoc/2.9/com/fasterxml/jackson/databind/deser/BeanDeserializerModifier.html">BeanDeserializerModifier</a></p>
+</li>
+<li>
+<p><a href="http://fasterxml.github.io/jackson-databind/javadoc/2.9/com/fasterxml/jackson/databind/ser/BeanSerializerModifier.html">BeanSerializerModifier</a></p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_service_loader"><a class="anchor" href="#_service_loader"></a>Service Loader</h3>
+<div class="paragraph">
+<p>Any modules registered via the service loader will also be added to the default object mapper.</p>
+</div>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/aop.html">&lt;&lt; <strong>5</strong><span>Aspect Oriented Programming</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

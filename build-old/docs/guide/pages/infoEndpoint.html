@@ -1,0 +1,274 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>14.2.2 The Info Endpoint 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/languageSupport.html">&lt;&lt; <strong>13</strong><span>Language Support</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/security.html"><strong>15</strong><span>Security</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>14.2.2 The Info Endpoint</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="infoEndpoint"><a class="anchor" href="#infoEndpoint"></a>14.2.2 The Info Endpoint</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/providedEndpoints/infoEndpoint.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The info endpoint returns static information from the state of the application. The info exposed can be provided by any number of "info sources".</p>
+</div>
+<div class="paragraph">
+<p>To execute the info endpoint, send a GET request to /info.</p>
+</div>
+<div class="sect1">
+<h2 id="_configuration"><a class="anchor" href="#_configuration"></a>Configuration</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To configure the info endpoint, supply configuration through <code>endpoints.info</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Info Endpoint Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    info:
+        enabled: Boolean
+        sensitive: Boolean</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_customization"><a class="anchor" href="#_customization"></a>Customization</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The info endpoint consists of an info aggregator and any number of info sources. To add an info source, simply create a bean class that implements <a href="../api/io/micronaut/management/endpoint/info/InfoSource.html">InfoSource</a>.  If your info source needs to retrieve data from Java properties files, you can extend the <a href="../api/io/micronaut/management/endpoint/info/source/PropertiesInfoSource.html">PropertiesInfoSource</a> interface which provides a helper method for this purpose.</p>
+</div>
+<div class="paragraph">
+<p>All of the info source beans will be collected together with the info aggregator. To provide your own implementation of the info aggregator, create a class that implements <a href="../api/io/micronaut/management/endpoint/info/InfoAggregator.html">InfoAggregator</a> and register it as a bean. To ensure your implementation is used instead of the default, add the <a href="../api/io/micronaut/context/annotation/Replaces.html">@Replaces</a> annotation to your class with the value being the <a href="../api/io/micronaut/management/endpoint/info/impl/RxInfoAggregator.html">default implementation</a>.</p>
+</div>
+<div class="paragraph">
+<p>The default info aggregator returns map containing the combined properties returned by all the info sources. This map is returned as JSON from the /info endpoint.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_provided_info_sources"><a class="anchor" href="#_provided_info_sources"></a>Provided Info Sources</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="_configuration_info_source"><a class="anchor" href="#_configuration_info_source"></a>Configuration Info Source</h3>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/management/endpoint/info/source/ConfigurationInfoSource.html">ConfigurationInfoSource</a> will return configuration properties under the <code>info</code> key. In addition to string, integer and boolean values, more complex properties can be exposed as maps in the JSON output (if the configuration format supports it).</p>
+</div>
+<div class="listingblock">
+<div class="title">Info Source Example (<code>application.groovy</code>)</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">info.demo.string = "demo string"
+info.demo.number = 123
+info.demo.map = [key: 'value', other_key: 123]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above config will result in the following JSON response from the info endpoint:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-json hljs" data-lang="json">{
+  "demo": {
+    "string": "demo string",
+    "number": 123,
+    "map": {
+      "key": "value",
+      "other_key": 123
+    }
+  }
+}</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_configuration_2"><a class="anchor" href="#_configuration_2"></a>Configuration</h4>
+<div class="paragraph">
+<p>The configuration info source can be disabled using the <code>endpoints.info.config.enabled</code> property.</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_git_info_source"><a class="anchor" href="#_git_info_source"></a>Git Info Source</h3>
+<div class="paragraph">
+<p>If a <code>git.properties</code> file is available on the classpath, the <a href="../api/io/micronaut/management/endpoint/info/source/GitInfoSource.html">GitInfoSource</a> will expose the values in that file under the <code>git</code> key. Generating of a <code>git.properties</code> file will need to be configured as part of your build. One easy option for Gradle users is the <a href="https://plugins.gradle.org/plugin/com.gorylenko.gradle-git-properties">Gradle Git Properties Plugin</a>. Maven users can look at the <a href="https://github.com/git-commit-id/maven-git-commit-id-plugin">Maven Git Commit Id Plugin</a>.</p>
+</div>
+<div class="sect3">
+<h4 id="_configuration_3"><a class="anchor" href="#_configuration_3"></a>Configuration</h4>
+<div class="paragraph">
+<p>To specify an alternate path/name of the properties file, you can supply a custom value in the <code>endpoints.info.git.location</code> property.</p>
+</div>
+<div class="paragraph">
+<p>The git info source can be disabled using the <code>endpoints.info.git.enabled</code> property.</p>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_build_info_source"><a class="anchor" href="#_build_info_source"></a>Build Info Source</h3>
+<div class="paragraph">
+<p>If a <code>META-INF/build-info.properties</code> file is available on the classpath, the <a href="../api/io/micronaut/management/endpoint/info/source/BuildInfoSource.html">BuildInfoSource</a> will expose the values in that file under the <code>build</code> key. Generating of a <code>build-info.properties</code> file will need to be configured as part of your build. One easy option for Gradle users is the <a href="https://plugins.gradle.org/plugin/com.pasam.gradle.buildinfo">Gradle Build Info Plugin</a>. Another option for Maven users is the <a href="https://docs.spring.io/spring-boot/docs/current/maven-plugin/examples/build-info.html">Spring Boot Maven Plugin</a></p>
+</div>
+<div class="sect3">
+<h4 id="_configuration_4"><a class="anchor" href="#_configuration_4"></a>Configuration</h4>
+<div class="paragraph">
+<p>To specify an alternate path/name of the properties file, you can supply a custom value in the <code>endpoints.info.build.location</code> property.</p>
+</div>
+<div class="paragraph">
+<p>The build info source can be disabled using the <code>endpoints.info.build.enabled</code> property.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/languageSupport.html">&lt;&lt; <strong>13</strong><span>Language Support</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/security.html"><strong>15</strong><span>Security</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

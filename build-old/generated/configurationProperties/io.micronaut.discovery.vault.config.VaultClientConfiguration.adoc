@@ -1,0 +1,119 @@
+++++
+<a id="io.micronaut.discovery.vault.config.VaultClientConfiguration" href="#io.micronaut.discovery.vault.config.VaultClientConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.vault.config.VaultClientConfiguration[]
+|===
+|Property |Type |Description
+
+| `+vault.client.uri+`
+|java.lang.String
+|Set the Vault Server Uri. Default value ("http://locahost:8200").
+
+
+| `+vault.client.token+`
+|java.lang.String
+|Set the Vault authentication token.
+
+
+| `+vault.client.kv-version+`
+|api:io.micronaut.discovery.vault.config.VaultClientConfiguration$VaultKvVersion[]
+|Set the version of the Vault Secret engine. V1 or V2. Default value (V2).
+
+
+| `+vault.client.secret-engine-name+`
+|java.lang.String
+|Set the name of the Vault Secret engine name. Default value ("secret").
+
+
+| `+vault.client.fail-fast+`
+|boolean
+|If set to true an exception will be thrown if configuration is not found
+ for the application or any of its environments. Default value (false).
+
+
+| `+vault.client.ssl-configuration+`
+|api:io.micronaut.http.ssl.SslConfiguration[]
+|
+
+
+| `+vault.client.logger-name+`
+|java.lang.String
+|
+
+
+| `+vault.client.follow-redirects+`
+|boolean
+|
+
+
+| `+vault.client.default-charset+`
+|java.nio.charset.Charset
+|
+
+
+| `+vault.client.channel-options+`
+|java.util.Map
+|
+
+
+| `+vault.client.shutdown-timeout+`
+|java.time.Duration
+|
+
+
+| `+vault.client.read-timeout+`
+|java.time.Duration
+|
+
+
+| `+vault.client.read-idle-timeout+`
+|java.time.Duration
+|
+
+
+| `+vault.client.connect-timeout+`
+|java.time.Duration
+|
+
+
+| `+vault.client.num-of-threads+`
+|java.lang.Integer
+|
+
+
+| `+vault.client.thread-factory+`
+|java.lang.Class
+|
+
+
+| `+vault.client.max-content-length+`
+|int
+|
+
+
+| `+vault.client.proxy-type+`
+|java.net.Proxy$Type
+|
+
+
+| `+vault.client.proxy-address+`
+|java.net.SocketAddress
+|
+
+
+| `+vault.client.proxy-username+`
+|java.lang.String
+|
+
+
+| `+vault.client.proxy-password+`
+|java.lang.String
+|
+
+
+| `+vault.client.proxy-selector+`
+|java.net.ProxySelector
+|
+
+
+|===

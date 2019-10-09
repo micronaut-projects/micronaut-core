@@ -1,0 +1,560 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>14.1 Creating Endpoints 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/languageSupport.html">&lt;&lt; <strong>13</strong><span>Language Support</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/security.html"><strong>15</strong><span>Security</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>14.1 Creating Endpoints</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+                <div id="table-of-content">
+                    <h2>Table of Contents</h2>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#endpointAnnotation"><strong>14.1</strong><span>The Endpoint Annotation</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#endpointMethod"><strong>14.2</strong><span>Endpoint Methods</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#endpointConfiguration"><strong>14.3</strong><span>Endpoint Configuration</span></a>
+                    </div>
+                    
+                </div>
+                
+
+                
+<h2 id="buildingEndpoints"><a class="anchor" href="#buildingEndpoints"></a>14.1 Creating Endpoints</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/buildingEndpoints.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>In addition to the <a href="#providedEndpoints">Built-In Endpoints</a>, the <code>management</code> dependency also provides support for creating custom endpoints.  Custom endpoints can be enabled and configured identically to the built-in endpoints, and can be used to retrieve and return any metrics or other application data that you require.</p>
+</div>
+
+<h2 id="endpointAnnotation"><a class="anchor" href="#endpointAnnotation"></a>14.1.1 The Endpoint Annotation</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/buildingEndpoints/endpointAnnotation.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>An Endpoint can be created by annotating a class with the <a href="../api/io/micronaut/management/endpoint/Endpoint.html">Endpoint</a> annotation, and supplying it with (at minimum) an endpoint id.</p>
+</div>
+<div class="listingblock">
+<div class="title">FooEndpoint.java</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@Endpoint("foo")
+class FooEndpoint {
+    ...
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If a single <code>String</code> argument is supplied to the annotation, it will be used as the endpoint id.</p>
+</div>
+<div class="paragraph">
+<p>It is possible to supply additional (named) arguments to the annotation. Other possible arguments to <code>@Endpoint</code> are described in the table below:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Endpoint Arguments</caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Argument</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Endpoint Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>String id</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The endpoint id (or name)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Endpoint(id = "foo")</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>String prefix</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Prefix used for configuring the endpoint (see <a href="#endpointConfiguration">Endpoint Configuration</a>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Endpoint(prefix = "foo")</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>boolean defaultEnabled</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets whether the endpoint is enabled when no configuration is set (see <a href="#endpointConfiguration">Endpoint Configuration</a>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Endpoint(defaultEnabled = false)</code></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>boolean defaultSensitive</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets whether the endpoint is sensitive if no configuration is set (see <a href="#endpointConfiguration">Endpoint Configuration</a>)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>@Endpoint(defaultSensitive = false)</code></p></td>
+</tr>
+</tbody>
+</table>
+<div class="sect1">
+<h2 id="_example_of_custom_endpoint"><a class="anchor" href="#_example_of_custom_endpoint"></a>Example of custom Endpoint</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The following example <code>Endpoint</code> class will create an endpoint accessible at <code>/date</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">CurrentDateEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+
+@Endpoint(id = "date",
+        prefix = "custom",
+        defaultEnabled = true,
+        defaultSensitive = false)
+class CurrentDateEndpoint {
+  //.. endpoint methods
+}</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="endpointMethod"><a class="anchor" href="#endpointMethod"></a>14.1.2 Endpoint Methods</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/buildingEndpoints/endpointMethod.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Endpoints respond to <code>GET</code> ("read"), <code>POST</code> ("write") and <code>DELETE</code> ("delete") requests. To return a response from an endpoint, annotate its public method/s with one of following annotations:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Endpoint Method Annotations</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Annotation</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/Read.html">Read</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Responds to <code>GET</code> requests</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/Write.html">Write</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Responds to <code>POST</code> requests</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../api/io/micronaut/management/endpoint/Delete.html">Delete</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Responds to <code>DELETE</code> requests</p></td>
+</tr>
+</tbody>
+</table>
+<div class="sect1">
+<h2 id="_read_methods"><a class="anchor" href="#_read_methods"></a>Read Methods</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Annotating a method with the <a href="../api/io/micronaut/management/endpoint/Read.html">Read</a> annotation will cause it to respond to <code>GET</code> requests.</p>
+</div>
+<div class="listingblock">
+<div class="title">CurrentDateEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Read
+
+@Endpoint(id = "date",
+        prefix = "custom",
+        defaultEnabled = true,
+        defaultSensitive = false)
+class CurrentDateEndpoint {
+
+    Date currentDate
+
+    @Read
+    Date currentDate() {
+        return currentDate
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above method responds to the following request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X GET localhost:55838/date
+
+1526085903689</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/management/endpoint/Read.html">Read</a> annotation accepts an optional <code>produces</code> argument, which sets the media type returned from the method (default is <code>application/json</code>):</p>
+</div>
+<div class="listingblock">
+<div class="title">CurrentDateEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Read
+
+@Endpoint(id = "date",
+        prefix = "custom",
+        defaultEnabled = true,
+        defaultSensitive = false)
+class CurrentDateEndpoint {
+
+    Date currentDate
+
+    @Read(produces = MediaType.TEXT_PLAIN) <i class="conum" data-value="1"></i><b>(1)</b>
+    String currentDatePrefix(@Selector String prefix) {
+        return "${prefix}: ${currentDate}"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>Supported media types are represented by <a href="../api/io/micronaut/http/MediaType.html">MediaType</a></td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The above method responds to the following request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X GET localhost:8080/date/the_date_is
+
+the_date_is: Fri May 11 19:24:21 CDT</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_write_methods"><a class="anchor" href="#_write_methods"></a>Write Methods</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Annotating a method with the <a href="../api/io/micronaut/management/endpoint/Write.html">Write</a> annotation will cause it to respond to <code>POST</code> requests.</p>
+</div>
+<div class="listingblock">
+<div class="title">CurrentDateEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Write
+import io.micronaut.http.MediaType
+import io.micronaut.management.endpoint.annotation.Selector
+
+
+@Endpoint(id = "date",
+        prefix = "custom",
+        defaultEnabled = true,
+        defaultSensitive = false)
+class CurrentDateEndpoint {
+
+    Date currentDate
+
+    @Write
+    String reset() {
+        currentDate = new Date()
+
+        return "Current date reset"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above method responds to the following request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X POST http://localhost:39357/date
+
+Current date reset</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <a href="../api/io/micronaut/management/endpoint/Write.html">Write</a> annotation accepts an optional <code>consumes</code> argument, which sets the media type accepted by the method (default is <code>application/json</code>):</p>
+</div>
+<div class="listingblock">
+<div class="title">MessageEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Write
+import io.micronaut.http.MediaType
+
+@Endpoint(id = "message", defaultSensitive = false)
+class MessageEndpoint {
+
+    String message
+
+    @Write(consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+    String updateMessage(String newMessage) {  <i class="conum" data-value="1"></i><b>(1)</b>
+        message = newMessage
+
+        return "Message updated"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above method responds to the following request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X POST http://localhost:65013/message -H 'Content-Type: application/x-www-form-urlencoded' -d $'newMessage=A new message'
+
+Message updated</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_delete_methods"><a class="anchor" href="#_delete_methods"></a>Delete Methods</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Annotating a method with the <a href="../api/io/micronaut/management/endpoint/Delete.html">Delete</a> annotation will cause it to respond to <code>DELETE</code> requests.</p>
+</div>
+<div class="listingblock">
+<div class="title">MessageEndpoint.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Delete
+
+@Endpoint(id = "message", defaultSensitive = false)
+class MessageEndpoint {
+
+    String message
+
+    @Delete
+    String deleteMessage() {
+        message = null
+
+        return "Message deleted"
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above method responds to the following request:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ curl -X DELETE http://localhost:65013/message
+
+Message deleted</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="endpointConfiguration"><a class="anchor" href="#endpointConfiguration"></a>14.1.3 Endpoint Configuration</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/management/buildingEndpoints/endpointConfiguration.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Endpoints with the <code>endpoints</code> prefix can be configured through their default endpoint id. If an endpoint exists with the id of <code>foo</code>, it can be configured through <code>endpoints.foo</code>. In addition, default values can be provided through the <code>all</code> prefix.</p>
+</div>
+<div class="paragraph">
+<p>For example, consider the following endpoint.</p>
+</div>
+<div class="listingblock">
+<div class="title">FooEndpoint.java</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">@Endpoint("foo")
+class FooEndpoint {
+    ...
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>By default the endpoint will be enabled. To disable the endpoint, set <code>endpoints.foo.enabled</code> to false. If <code>endpoints.foo.enabled</code> is not set at all and <code>endpoints.all.enabled</code> is set to false, the endpoint will be disabled.</p>
+</div>
+<div class="paragraph">
+<p>The configuration values for the endpoint override the ones for <code>all</code>. If <code>endpoints.foo.enabled</code> is explicitly set to <code>true</code> and <code>endpoints.all.enabled</code> is explicitly set to <code>false</code>, the endpoint will be enabled.</p>
+</div>
+<div class="paragraph">
+<p>For all endpoints, the following configuration values can be set.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">endpoints:
+    &lt;any endpoint id&gt;:
+        enabled: Boolean
+        sensitive: Boolean</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+The base path for all endpoints is <code>/</code> by default. If you prefer the endpoints to be available under a different base path, configure <code>endpoints.all.path</code>. For example, if the value is set to <code>/endpoints</code>, the foo endpoint will be accessible at <code>/endpoints/foo</code>.
+</td>
+</tr>
+</table>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/languageSupport.html">&lt;&lt; <strong>13</strong><span>Language Support</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/security.html"><strong>15</strong><span>Security</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

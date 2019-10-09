@@ -1,0 +1,488 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>13.2 Micronaut for Groovy 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/configurations.html">&lt;&lt; <strong>12</strong><span>Configurations</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>13.2 Micronaut for Groovy</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="groovy"><a class="anchor" href="#groovy"></a>13.2 Micronaut for Groovy</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/languageSupport/groovy.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The <a href="http://groovy-lang.org">Groovy language</a> has first class support in Micronaut.</p>
+</div>
+<div class="sect1">
+<h2 id="_groovy_specific_modules"><a class="anchor" href="#_groovy_specific_modules"></a>Groovy Specific Modules</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Additional modules exist specific to Groovy that improve the overall experience. These are detailed in the table below:</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Groovy Specific Modules</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Dependency</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>io.micronaut:micronaut-inject-groovy</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Includes AST transformations to generate bean definitions. Should be <code>compileOnly</code> on your classpath.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>io.micronaut:micronaut-runtime-groovy</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Adds the ability to specify configuration placed in <code>src/main/resources</code> in Groovy format (i.e. <code>application.groovy</code>)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>io.micronaut:micronaut-function-groovy</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Includes AST transforms that make it easier to write <a href="#serverlessFunctions">Functions</a> for AWS Lambda</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The most common module you will need is <code>micronaut-inject-groovy</code>, which enables DI and AOP for classes written in Groovy.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_groovy_support_in_the_cli"><a class="anchor" href="#_groovy_support_in_the_cli"></a>Groovy Support in the CLI</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The <a href="#cli">Command Line Interface</a> for Micronaut includes special support for Groovy. To create a Groovy application use the <code>groovy</code> lang option. For example:</p>
+</div>
+<div class="listingblock">
+<div class="title">Create a Micronaut Groovy application</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn create-app hello-world --lang groovy</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above will generate a Groovy project, built with Gradle. You can use the <code>-build maven</code> flag to generate a project built with Maven instead.</p>
+</div>
+<div class="paragraph">
+<p>Once you have created an application with the <code>groovy</code> feature commands like <code>create-controller</code>, <code>create-client</code> etc. will generate Groovy files instead of Java. The following example demonstrates this action when using interactive mode of the CLI:</p>
+</div>
+<div class="listingblock">
+<div class="title">Create a bean</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ mn
+| Starting interactive mode...
+| Enter a command name to run. Use TAB for completion:
+mn&gt;
+
+create-bean          create-client        create-controller
+create-job           help
+
+mn&gt; create-bean helloBean
+| Rendered template Bean.groovy to destination src/main/groovy/hello/world/HelloBean.groovy</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above example demonstrates creating a Groovy bean that looks like the following:</p>
+</div>
+<div class="listingblock">
+<div class="title">Micronaut Bean</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">package hello.world
+
+import javax.inject.Singleton
+
+@Singleton
+class HelloBean {
+
+}</code></pre>
+</div>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+Groovy automatically imports <code>groovy.lang.Singleton</code> which can be confusing as it conflicts with <code>javax.inject.Singleton</code>. Make sure you use <code>javax.inject.Singleton</code> when declaring a Micronaut singleton bean to avoid surprising behavior.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>We can also create a client - don&#8217;t forget Micronaut can act as a client or a server!</p>
+</div>
+<div class="listingblock">
+<div class="title">Create a client</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn&gt; create-client helloClient
+| Rendered template Client.groovy to destination src/main/groovy/hello/world/HelloClient.groovy</code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="title">Micronaut Client</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">package hello.world
+
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.HttpStatus
+
+@Client("hello")
+interface HelloClient {
+
+    @Get
+    HttpStatus index()
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now let&#8217;s create a controller:</p>
+</div>
+<div class="listingblock">
+<div class="title">Create a controller</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">mn&gt; create-controller helloController
+| Rendered template Controller.groovy to destination src/main/groovy/hello/world/HelloController.groovy
+| Rendered template ControllerSpec.groovy to destination src/test/groovy/hello/world/HelloControllerSpec.groovy
+mn&gt;</code></pre>
+</div>
+</div>
+<div class="listingblock">
+<div class="title">Micronaut Controller</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">package hello.world
+
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.HttpStatus
+
+
+@Controller("/hello")
+class HelloController {
+
+    @Get
+    HttpStatus index() {
+        return HttpStatus.OK
+    }
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>As you can see from the output from the CLI a <a href="http://spockframework.org">Spock</a> test was also generated for you demonstrating how to test the controller:</p>
+</div>
+<div class="listingblock">
+<div class="title">HelloControllerSpec.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">...
+    void "test index"() {
+        given:
+        HttpResponse response = client.toBlocking().exchange("/hello")
+
+        expect:
+        response.status == HttpStatus.OK
+    }
+...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Notice how you use Micronaut both as client and as a server to test itself.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_programmatic_routes_with_groovyrouterbuilder"><a class="anchor" href="#_programmatic_routes_with_groovyrouterbuilder"></a>Programmatic Routes with GroovyRouterBuilder</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>If you prefer to build your routes programmatically (similar to Grails <code>UrlMappings</code>) then a special <code>io.micronaut.web.router.GroovyRouteBuilder</code> exists that has some enhancements to make the DSL better.</p>
+</div>
+<div class="paragraph">
+<p>The following example shows <code>GroovyRouteBuilder</code> in act:</p>
+</div>
+<div class="listingblock">
+<div class="title">Using GroovyRouteBuilder</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">@Singleton
+static class MyRoutes extends GroovyRouteBuilder {
+
+    MyRoutes(ApplicationContext beanContext) {
+        super(beanContext)
+    }
+
+    @Inject
+    void bookResources(BookController bookController, AuthorController authorController) {
+        GET(bookController) {
+            POST("/hello{/message}", bookController.&amp;hello) <i class="conum" data-value="1"></i><b>(1)</b>
+        }
+        GET(bookController, ID) { <i class="conum" data-value="2"></i><b>(2)</b>
+            GET(authorController)
+        }
+    }
+}</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>You can use injected controllers to create routes by convention and Groovy method references to create routes to methods</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The <code>ID</code> property can be used to reference include an <code>{id}</code> URI variable</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>The above example results in the following routes:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><code>/book</code> - Maps to <code>BookController.index()</code></p>
+</li>
+<li>
+<p><code>/book/hello/{message}</code> - Maps to <code>BookController.hello(String)</code></p>
+</li>
+<li>
+<p><code>/book/{id}</code> - Maps to <code>BookController.show(String id)</code></p>
+</li>
+<li>
+<p><code>/book/{id}/author</code> - Maps to <code>AuthorController.index</code></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_using_gorm_in_a_groovy_application"><a class="anchor" href="#_using_gorm_in_a_groovy_application"></a>Using GORM in a Groovy application</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p><a href="http://gorm.grails.org">GORM</a> is a data access toolkit originally created as part of Grails framework. It supports multiple database types. The following table summarizes the modules needed to use GORM and links to documentation.</p>
+</div>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 2. GORM Modules</caption>
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Dependency</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>io.micronaut.configuration:micronaut-hibernate-gorm</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configures <a href="http://gorm.grails.org/latest/hibernate/manual">GORM for Hibernate</a> for Groovy applications. See the <a href="#hibernateSupport">Hibernate Support</a> docs</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>io.micronaut.configuration:micronaut-mongo-gorm</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configures <a href="http://gorm.grails.org/latest/mongodb/manual">GORM for MongoDB</a> for Groovy applications. See the <a href="#mongoSupport">Mongo Support</a> docs.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>io.micronaut.configuration:micronaut-neo4j-gorm</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configures <a href="http://gorm.grails.org/latest/neo4j/manual">GORM for Neo4j</a> for Groovy applications. See the <a href="#neo4jSupport">Neo4j Support</a> docs.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>Once you have configured a GORM implementation per the instructions linked in the table above you can use all features of GORM.</p>
+</div>
+<div class="paragraph">
+<p><a href="http://gorm.grails.org/latest/hibernate/manual/index.html#dataServices">GORM Data Services</a> can also participate in dependency injection and life cycle methods:</p>
+</div>
+<div class="listingblock">
+<div class="title">GORM Data Service VehicleService.groovy</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">@Service(Vehicle)
+abstract class VehicleService {
+    @PostConstruct
+    void init() {
+       // do something on initialization
+
+    }
+
+    abstract Vehicle findVehicle(@NotBlank String name)
+
+    abstract Vehicle saveVehicle(@NotBlank String name)
+
+}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can also define the service as an interface instead of an abstract class if you want GORM to do all of the work and you don&#8217;t want to add your own behaviors.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_serverless_functions_with_groovy"><a class="anchor" href="#_serverless_functions_with_groovy"></a>Serverless Functions with Groovy</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>A microservice application is just one way to use Micronaut. You can also use it for serverless functions like on AWS Lambda.</p>
+</div>
+<div class="paragraph">
+<p>With the <code>function-groovy</code> module, Micronaut features enhanced support for functions written in Groovy.</p>
+</div>
+<div class="paragraph">
+<p>See the section on <a href="#serverlessFunctions">Serverless Functions</a> for more information.</p>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/configurations.html">&lt;&lt; <strong>12</strong><span>Configurations</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

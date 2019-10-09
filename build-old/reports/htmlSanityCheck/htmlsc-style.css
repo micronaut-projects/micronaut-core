@@ -1,0 +1,142 @@
+
+/* html Sanity Checker css,
+ based on Gradle and CodeNarc styles
+ */
+
+body {
+    margin:  0;
+    padding: 0;
+    padding-left: 50px;
+    padding-right: 100px;
+    padding-top: 30px;
+    padding-bottom: 30px;
+    font-family: sans-serif;
+    font-size: 12pt;
+}
+
+body, a, a:visited {
+    color: #303030;
+}
+
+
+h1 {
+    font-size: 160%;
+    margin-bottom: 10px;
+}
+
+#footer {
+    margin-top: 100px;
+    font-size: 80%;
+    white-space: nowrap;
+}
+
+#footer, #footer a {
+    color: #a0a0a0;
+}
+
+ul {
+    margin-left: 0;
+}
+
+h1, h2, h3 {
+    white-space: nowrap;
+}
+
+h2 {
+    font-size: 120%;
+}
+
+
+#summary {
+    margin-top: 30px;
+    margin-bottom: 40px;
+}
+
+#summary table {
+    border-collapse: collapse;
+}
+
+#summary td {
+    vertical-align: top;
+}
+
+
+.infoBox {
+    width: 100px;
+    padding-top: 15px;
+    padding-bottom: 15px;
+    text-align: center;
+}
+
+.infoBox p {
+    margin: 0;
+}
+
+.counter, .percent {
+    font-size: 120%;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+
+#successRate, .summaryGroup {
+    border: solid 2px #d0d0d0;
+    -moz-border-radius: 20px;
+    border-radius: 20px;
+
+}
+
+#successRate {
+    width: 140px;
+    margin-left: 35px;
+}
+
+#successRate .percent {
+    font-size: 180%;
+}
+
+.success, .success a {
+    color: #008000;
+}
+
+div.success, #successRate.success {
+    background-color: #bbd9bb;
+    border-color: #008000;
+}
+
+.failures, .failures a {
+    color: #b60727;
+}
+
+div.failures, #successRate.failures {
+    background-color: #ecdada;
+    border-color: #b60727;
+}
+
+.number {
+    text-align: center;
+}
+
+table {
+    border-collapse: collapse;
+    width: auto !important;
+
+}
+
+th {
+    padding: 10px 10px 10px 10px;
+    font-size: 90%;
+    background-color: #fffde7;
+}
+
+
+td {
+    white-space: nowrap;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+
+.logo {
+    float: right;
+}

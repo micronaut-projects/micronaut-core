@@ -1,0 +1,75 @@
+
+++++
+<a id="io.micronaut.http.server.HttpServerConfiguration" href="#io.micronaut.http.server.HttpServerConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.http.server.HttpServerConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.server.port+`
+|java.lang.Integer
+|Sets the port to bind to. Default value (-1)
+
+
+| `+micronaut.server.host+`
+|java.lang.String
+|Sets the host to bind to.
+
+
+| `+micronaut.server.read-timeout+`
+|java.lang.Integer
+|Sets the default read timeout.
+
+
+| `+micronaut.server.max-request-size+`
+|long
+|Sets the maximum request size. Default value (1024 * 1024 * 10 => // 10MB)
+
+
+| `+micronaut.server.read-idle-timeout+`
+|java.time.Duration
+|Sets the amount of time a connection can remain idle without any reads occurring. Default value (5 seconds).
+
+
+| `+micronaut.server.write-idle-timeout+`
+|java.time.Duration
+|Sets the amount of time a connection can remain idle without any writes occurring. Default value (5 seconds).
+
+
+| `+micronaut.server.idle-timeout+`
+|java.time.Duration
+|Sets the idle time of connections for the server. Default value (5 seconds).
+
+
+| `+micronaut.server.server-header+`
+|java.lang.String
+|Sets the name of the server header.
+
+
+| `+micronaut.server.date-header+`
+|boolean
+|Sets whether a date header should be sent back. Default value (true).
+
+
+| `+micronaut.server.log-handled-exceptions+`
+|boolean
+|Sets whether exceptions handled by either an error route or exception handler
+ should still be logged. Default value (false).
+
+
+| `+micronaut.server.client-address-header+`
+|java.lang.String
+|The header that stores the original client address
+
+
+| `+micronaut.server.context-path+`
+|java.lang.String
+|Sets the context path for the web server.
+
+
+| `+micronaut.server.default-charset+`
+|java.nio.charset.Charset
+|The default charset to use
+
+
+|===

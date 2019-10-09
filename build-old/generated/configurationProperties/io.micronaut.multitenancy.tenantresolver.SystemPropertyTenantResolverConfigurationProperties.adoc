@@ -1,0 +1,18 @@
+++++
+<a id="io.micronaut.multitenancy.tenantresolver.SystemPropertyTenantResolverConfigurationProperties" href="#io.micronaut.multitenancy.tenantresolver.SystemPropertyTenantResolverConfigurationProperties">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.multitenancy.tenantresolver.SystemPropertyTenantResolverConfigurationProperties[]
+|===
+|Property |Type |Description
+
+| `+micronaut.multitenancy.tenantresolver.systemproperty.enabled+`
+|boolean
+|Enable api:multitenancy.tenantresolver.SystemPropertyTenantResolver[]. Default value (false).
+
+
+| `+micronaut.multitenancy.tenantresolver.systemproperty.property-name+`
+|java.lang.String
+|System property name. Default value ("tenantId").
+
+
+|===

@@ -1,0 +1,53 @@
+++++
+<a id="io.micronaut.discovery.consul.ConsulConfiguration$ConsulRegistrationConfiguration$CheckConfiguration" href="#io.micronaut.discovery.consul.ConsulConfiguration$ConsulRegistrationConfiguration$CheckConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.consul.ConsulConfiguration$ConsulRegistrationConfiguration$CheckConfiguration[]
+|===
+|Property |Type |Description
+
+| `+consul.client.registration.check.method+`
+|api:io.micronaut.http.HttpMethod[]
+|The HTTP method to be used for an HTTP check.
+
+
+| `+consul.client.registration.check.interval+`
+|java.time.Duration
+|Default value (15).
+
+
+| `+consul.client.registration.check.headers+`
+|java.util.Map
+|Headers for the HTTP checks
+
+
+| `+consul.client.registration.check.deregister-critical-service-after+`
+|java.time.Duration
+|Specifies that checks associated with a service should deregister after this time
+
+
+| `+consul.client.registration.check.notes+`
+|java.lang.String
+|Arbitrary information for humans
+
+
+| `+consul.client.registration.check.id+`
+|java.lang.String
+|The unique ID for this check on the node
+
+
+| `+consul.client.registration.check.tls-skip-verify+`
+|java.lang.Boolean
+|Specifies if the certificate for an HTTPS check should not be verified.
+
+
+| `+consul.client.registration.check.enabled+`
+|boolean
+|Default value (true).
+
+
+| `+consul.client.registration.check.http+`
+|boolean
+|Default value (false).
+
+
+|===

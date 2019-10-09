@@ -1,0 +1,53 @@
+++++
+<a id="io.micronaut.discovery.client.DiscoveryClientCacheConfiguration" href="#io.micronaut.discovery.client.DiscoveryClientCacheConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.client.DiscoveryClientCacheConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.caches.discovery-client.charset+`
+|java.nio.charset.Charset
+|
+
+
+| `+micronaut.caches.discovery-client.enabled+`
+|boolean
+|Enable or disable the discovery client
+
+
+| `+micronaut.caches.discovery-client.initial-capacity+`
+|java.lang.Integer
+|
+
+
+| `+micronaut.caches.discovery-client.maximum-size+`
+|java.lang.Long
+|
+
+
+| `+micronaut.caches.discovery-client.maximum-weight+`
+|java.lang.Long
+|
+
+
+| `+micronaut.caches.discovery-client.expire-after-write+`
+|java.time.Duration
+|
+
+
+| `+micronaut.caches.discovery-client.expire-after-access+`
+|java.time.Duration
+|
+
+
+| `+micronaut.caches.discovery-client.record-stats+`
+|boolean
+|
+
+
+| `+micronaut.caches.discovery-client.test-mode+`
+|boolean
+|
+
+
+|===

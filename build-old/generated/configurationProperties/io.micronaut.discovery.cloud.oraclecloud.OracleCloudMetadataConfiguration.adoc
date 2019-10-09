@@ -1,0 +1,33 @@
+++++
+<a id="io.micronaut.discovery.cloud.oraclecloud.OracleCloudMetadataConfiguration" href="#io.micronaut.discovery.cloud.oraclecloud.OracleCloudMetadataConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.cloud.oraclecloud.OracleCloudMetadataConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.application.oraclecloud.metadata.url+`
+|java.lang.String
+|Default value ("http://169.254.169.254/opc/v1/instance/").
+
+
+| `+micronaut.application.oraclecloud.metadata.metadata-url+`
+|java.lang.String
+|The metadata Url
+
+
+| `+micronaut.application.oraclecloud.metadata.instance-document-url+`
+|java.lang.String
+|The instance document Url
+
+
+| `+micronaut.application.oraclecloud.metadata.vnic-url+`
+|java.lang.String
+|The instance document Url
+
+
+| `+micronaut.application.oraclecloud.metadata.enabled+`
+|boolean
+|Default value (true).
+
+
+|===

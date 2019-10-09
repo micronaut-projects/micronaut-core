@@ -1,0 +1,832 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>6.26 Configuring the HTTP Server 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/aop.html">&lt;&lt; <strong>5</strong><span>Aspect Oriented Programming</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>6.26 Configuring the HTTP Server</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+                <div id="table-of-content">
+                    <h2>Table of Contents</h2>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#threadPools"><strong>6.1</strong><span>Configuring Server Thread Pools</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#cors"><strong>6.2</strong><span>Configuring CORS</span></a>
+                    </div>
+                    
+                    <div class="toc-item" style="margin-left:0px"><a href="#https"><strong>6.3</strong><span>Securing the Server with HTTPS</span></a>
+                    </div>
+                    
+                </div>
+                
+
+                
+<h2 id="serverConfiguration"><a class="anchor" href="#serverConfiguration"></a>6.26 Configuring the HTTP Server</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/httpServer/serverConfiguration.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The HTTP server features a number of configuration options you may wish to tweak. They are defined in the <a href="../api/io/micronaut/http/server/netty/configuration/NettyHttpServerConfiguration.html">NettyHttpServerConfiguration</a> configuration class, which extends <a href="../api/io/micronaut/http/server/HttpServerConfiguration.html">HttpServerConfiguration</a>.</p>
+</div>
+<div class="paragraph">
+<p>The following example shows how to tweak configuration options for the server via <code>application.yml</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">Configuring HTTP server settings</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    server:
+        maxRequestSize: 1MB
+        host: localhost <i class="conum" data-value="1"></i><b>(1)</b>
+        netty:
+           maxHeaderSize: 500KB <i class="conum" data-value="2"></i><b>(2)</b>
+           worker:
+              threads: 8 <i class="conum" data-value="3"></i><b>(3)</b>
+           childOptions:
+              autoRead: true <i class="conum" data-value="4"></i><b>(4)</b></code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>By default Micronaut will bind to all the network interfaces. Use <code>localhost</code> to bind only to loopback network interface</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>Maximum size for headers</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>Number of netty worker threads</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="4"></i><b>4</b></td>
+<td>Auto read request body</td>
+</tr>
+</table>
+</div>
+<a id="io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration" href="#io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration">&#128279;</a>
+<table class="tableblock frame-all grid-all spread">
+<caption class="title">Table 1. Configuration Properties for <a href="../api/io/micronaut/http/server/netty/configuration/NettyHttpServerConfiguration.html">NettyHttpServerConfiguration</a></caption>
+<colgroup>
+<col style="width: 33.3333%;">
+<col style="width: 33.3333%;">
+<col style="width: 33.3334%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Property</th>
+<th class="tableblock halign-left valign-top">Type</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.server.netty.child-options</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.util.Map</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the Netty child worker options.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.server.netty.options</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">java.util.Map</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the channel options.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.server.netty.max-initial-line-length</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the maximum initial line length for the HTTP request. Default value (4096).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.server.netty.max-header-size</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the maximum size of any one header. Default value (8192).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.server.netty.max-chunk-size</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the maximum size of any single request chunk. Default value (8192).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.server.netty.chunked-supported</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets whether chunked transfer encoding is supported. Default value (true).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.server.netty.validate-headers</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets whether to validate incoming headers. Default value (true).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.server.netty.initial-buffer-size</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the initial buffer size. Default value (128).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.server.netty.log-level</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">io.netty.handler.logging.LogLevel</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the Netty log level.</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.server.netty.compression-threshold</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">int</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets the minimum size of a request body must be in order to be compressed. Default value (1024).</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>micronaut.server.netty.use-native-transport</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Sets whether to use netty&#8217;s native transport (epoll or kqueue) if available . Default value (false).</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p>The <code>use-native-transport</code> option also requires the relevant netty dependency to take effect. The native transports add features specific to a particular platform, generate less garbage, and generally improve performance when compared to the NIO based transport.</p>
+</div>
+<div class="paragraph">
+<p>For macOS:</p>
+</div>
+<div class="paragraph">
+<p>        <div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="gradle">runtime <span class="hljs-string">'io.netty:netty-transport-native-kqueue:osx-x86_64'</span></code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="maven">&lt;dependency&gt;
+    &lt;groupId&gt;io.netty&lt;/groupId&gt;
+    &lt;artifactId&gt;netty-transport-native-kqueue&lt;/artifactId&gt;
+    &lt;scope&gt;runtime&lt;/scope&gt;
+    &lt;classifier&gt;osx-x86_64&lt;/classifier&gt;
+&lt;/dependency&gt;</code></pre>
+</div>
+</div>
+</p>
+</div>
+<div class="paragraph">
+<p>For Linux:</p>
+</div>
+<div class="paragraph">
+<p>        <div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="gradle">runtime <span class="hljs-string">'io.netty:netty-transport-native-epoll:linux-x86_64'</span></code></pre>
+</div>
+</div>
+<div class="listingblock multi-language-sample">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="maven">&lt;dependency&gt;
+    &lt;groupId&gt;io.netty&lt;/groupId&gt;
+    &lt;artifactId&gt;netty-transport-native-epoll&lt;/artifactId&gt;
+    &lt;scope&gt;runtime&lt;/scope&gt;
+    &lt;classifier&gt;linux-x86_64&lt;/classifier&gt;
+&lt;/dependency&gt;</code></pre>
+</div>
+</div>
+</p>
+</div>
+
+<h2 id="threadPools"><a class="anchor" href="#threadPools"></a>6.26.1 Configuring Server Thread Pools</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/httpServer/serverConfiguration/threadPools.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>The HTTP server is built on <a href="http://netty.io">Netty</a> which is designed as a non-blocking I/O toolkit in an event loop model.</p>
+</div>
+<div class="paragraph">
+<p>To configure the number of threads used by the Netty <a href="https://netty.io/4.0/api/io/netty/channel/EventLoop.html">EventLoop</a>, you can use <code>application.yml</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">Configuring Netty Event Loop Threads</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    server:
+        netty:
+           worker:
+              threads: 8 # number of netty worker threads</code></pre>
+</div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+The default value is the value of the system property <code>io.netty.eventLoopThreads</code> or if not specified the available processors x 2
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>When dealing with blocking operations, Micronaut will shift the blocking operations to an unbound, caching I/O thread pool by default. You can configure the I/O thread pool using the <a href="../api/io/micronaut/scheduling/executor/ExecutorConfiguration.html">ExecutorConfiguration</a> named <code>io</code>. For example:</p>
+</div>
+<div class="listingblock">
+<div class="title">Configuring the Server I/O Thread Pool</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    executors:
+        io:
+           type: fixed
+           nThreads: 75</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The above configuration will create a fixed thread pool with 75 threads.</p>
+</div>
+
+<h2 id="cors"><a class="anchor" href="#cors"></a>6.26.2 Configuring CORS</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/httpServer/serverConfiguration/cors.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Micronaut supports CORS (<a href="https://www.w3.org/TR/cors/">Cross Origin Resource Sharing</a>) out of the box. By default, CORS requests will be rejected. To enable processing of CORS requests, modify your configuration. For example with <code>application.yml</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">CORS Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    server:
+        cors:
+            enabled: true</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>By only enabling CORS processing, a "wide open" strategy will be adopted that will allow requests from any origin.</p>
+</div>
+<div class="paragraph">
+<p>To change the settings for all origins or a specific origin, change the configuration to provide a set of "configurations". By providing any configuration, the default "wide open" configuration is not configured.</p>
+</div>
+<div class="listingblock">
+<div class="title">CORS Configurations (&#8230;&#8203; is a placeholder)</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    server:
+        cors:
+            enabled: true
+            configurations:
+                all:
+                    ...
+                web:
+                    ...
+                mobile:
+                    ...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>In the above example, three configurations are being provided. Their names (<code>all</code>, <code>web</code>, <code>mobile</code>) are not important and have no significance inside Micronaut. They are there purely to be able to easily recognize the intended user of the configuration.</p>
+</div>
+<div class="paragraph">
+<p>The same configuration properties can be applied to each configuration. See <a href="../api/io/micronaut/http/server/cors/CorsOriginConfiguration.html">CorsOriginConfiguration</a> for the reference of properties that can be defined. Each configuration supplied will have its values default to the default values of the corresponding fields.</p>
+</div>
+<div class="paragraph">
+<p>When a CORS request is made, configurations are searched for allowed origins that are an exact match or match the request origin through a regular expression.</p>
+</div>
+<div class="sect1">
+<h2 id="_allowed_origins"><a class="anchor" href="#_allowed_origins"></a>Allowed Origins</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To allow any origin for a given configuration, simply don&#8217;t include the <code>allowedOrigins</code> key in your configuration.</p>
+</div>
+<div class="paragraph">
+<p>To specify a list of valid origins, set the <code>allowedOrigins</code> key of the configuration to a list of strings. Each value can either be a static value (<code><a href="http://www.foo.com" class="bare">http://www.foo.com</a></code>) or a regular expression (<code>^http(|s)://www\.google\.com$</code>).</p>
+</div>
+<div class="paragraph">
+<p>Any regular expressions are passed to <a href="https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html#compile-java.lang.String-">Pattern#compile</a> and compared to the request origin with <a href="https://docs.oracle.com/javase/8/docs/api/java/util/regex/Matcher.html#matches--">Matcher#matches</a>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Example CORS Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    server:
+        cors:
+            enabled: true
+            configurations:
+                web:
+                    allowedOrigins:
+                        - http://foo.com
+                        - ^http(|s):\/\/www\.google\.com$</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_allowed_methods"><a class="anchor" href="#_allowed_methods"></a>Allowed Methods</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To allow any request method for a given configuration, simply don&#8217;t include the <code>allowedMethods</code> key in your configuration.</p>
+</div>
+<div class="paragraph">
+<p>To specify a list of allowed methods, set the <code>allowedMethods</code> key of the configuration to a list of strings.</p>
+</div>
+<div class="listingblock">
+<div class="title">Example CORS Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    server:
+        cors:
+            enabled: true
+            configurations:
+                web:
+                    allowedMethods:
+                        - POST
+                        - PUT</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_allowed_headers"><a class="anchor" href="#_allowed_headers"></a>Allowed Headers</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To allow any request header for a given configuration, simply don&#8217;t include the <code>allowedHeaders</code> key in your configuration.</p>
+</div>
+<div class="paragraph">
+<p>To specify a list of allowed headers, set the <code>allowedHeaders</code> key of the configuration to a list of strings.</p>
+</div>
+<div class="listingblock">
+<div class="title">Example CORS Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    server:
+        cors:
+            enabled: true
+            configurations:
+                web:
+                    allowedHeaders:
+                        - Content-Type
+                        - Authorization</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_exposed_headers"><a class="anchor" href="#_exposed_headers"></a>Exposed Headers</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To configure the list of headers that are sent in the response to a CORS request through the <code>Access-Control-Expose-Headers</code> header, include a list of strings for the <code>exposedHeaders</code> key in your configuration. By default no headers are exposed.</p>
+</div>
+<div class="listingblock">
+<div class="title">Example CORS Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    server:
+        cors:
+            enabled: true
+            configurations:
+                web:
+                    exposedHeaders:
+                        - Content-Type
+                        - Authorization</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_allow_credentials"><a class="anchor" href="#_allow_credentials"></a>Allow Credentials</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Credentials are allowed by default for CORS requests. To disallow credentials, simply set the <code>allowCredentials</code> option to <code>false</code>.</p>
+</div>
+<div class="listingblock">
+<div class="title">Example CORS Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    server:
+        cors:
+            enabled: true
+            configurations:
+                web:
+                    allowCredentials: false</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_max_age"><a class="anchor" href="#_max_age"></a>Max Age</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The default maximum age that preflight requests can be cached is 30 minutes. To change that behavior, specify a value in seconds.</p>
+</div>
+<div class="listingblock">
+<div class="title">Example CORS Configuration</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    server:
+        cors:
+            enabled: true
+            configurations:
+                web:
+                    maxAge: 3600 # 1 hour</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_multiple_header_values"><a class="anchor" href="#_multiple_header_values"></a>Multiple Header Values</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>By default when a header has multiple values, multiple headers will be sent each with a single value. It is possible to change the behavior to send a single header with the list of values comma separated by setting a configuration option.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    server:
+        cors:
+            single-header: true</code></pre>
+</div>
+</div>
+</div>
+</div>
+
+<h2 id="https"><a class="anchor" href="#https"></a>6.26.3 Securing the Server with HTTPS</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/httpServer/serverConfiguration/https.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>Micronaut supports HTTPS out of the box. By default HTTPS is disabled and all requests are served using HTTP. To enable
+HTTPS support, modify your configuration. For example with <code>application.yml</code>:</p>
+</div>
+<div class="listingblock">
+<div class="title">HTTPS Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    ssl:
+        enabled: true
+        buildSelfSigned: true <i class="conum" data-value="1"></i><b>(1)</b></code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>Micronaut will create a self-signed certificate.</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock tip">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-tip" title="Tip"></i>
+</td>
+<td class="content">
+By default Micronaut with HTTPS support starts on port <code>8443</code> but you can change the port the property
+ <code>micronaut.ssl.port</code>.
+</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+Keep in mind that this configuration will generate a warning on the browser.
+</td>
+</tr>
+</table>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../img/https-warning.jpg" alt="https warning">
+</div>
+</div>
+<div class="sect1">
+<h2 id="_using_a_valid_x509_certificate"><a class="anchor" href="#_using_a_valid_x509_certificate"></a>Using a valid x509 certificate</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>It is also possible to configure Micronaut to use an existing valid x509 certificate, for example one created with
+<a href="https://letsencrypt.org/">Let&#8217;s Encrypt</a>. You will need the <code>server.crt</code> and <code>server.key</code> files and convert them to a
+ PKCS #12 file.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ openssl pkcs12 -export \
+                 -in server.crt \ <i class="conum" data-value="1"></i><b>(1)</b>
+                 -inkey server.key \ <i class="conum" data-value="2"></i><b>(2)</b>
+                 -out server.p12 \ <i class="conum" data-value="3"></i><b>(3)</b>
+                 -name someAlias \ <i class="conum" data-value="4"></i><b>(4)</b>
+                 -CAfile ca.crt -caname root</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The original <code>server.crt</code> file</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The original <code>server.key</code> file</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The <code>server.p12</code> file that will be created</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="4"></i><b>4</b></td>
+<td>The alias for the certificate</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>During the creation of the <code>server.p12</code> file it is necessary to define a password that will be required later when using
+the certificate in Micronaut.</p>
+</div>
+<div class="paragraph">
+<p>Now modify your configuration:</p>
+</div>
+<div class="listingblock">
+<div class="title">HTTPS Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    ssl:
+        enabled: true
+        keyStore:
+            path: classpath:server.p12 <i class="conum" data-value="1"></i><b>(1)</b>
+            password: mypassword <i class="conum" data-value="2"></i><b>(2)</b>
+            type: PKCS12</code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>The <code>p12</code> file created. It can also be referenced as <code>file:/path/to/the/file</code></td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The password defined during the export</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>With this configuration if we start Micronaut and connect to <code><a href="https://localhost:8443" class="bare">https://localhost:8443</a></code> we still see the warning on the
+browser but if we inspect the certificate we can check that it&#8217;s the one generated by Let&#8217;s Encrypt.</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../img/https-certificate.jpg" alt="https certificate">
+</div>
+</div>
+<div class="paragraph">
+<p>Finally we can test that the certificate is valid for the browser just by adding an alias to the domain in <code>/etc/hosts</code> file:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ cat /etc/hosts
+...
+127.0.0.1   my-domain.org
+...</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now we can connect to <code><a href="https://my-domain.org:8443" class="bare">https://my-domain.org:8443</a></code>:</p>
+</div>
+<div class="imageblock">
+<div class="content">
+<img src="../img/https-valid-certificate.jpg" alt="https valid certificate">
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_using_java_keystore_jks"><a class="anchor" href="#_using_java_keystore_jks"></a>Using Java Keystore (JKS)</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>It is not recommended using this type of certificate because it is a proprietary format and it&#8217;s better to use a PKCS12
+format. In any case Micronaut also supports it.</p>
+</div>
+<div class="paragraph">
+<p>Convert the <code>p12</code> certificate to a JKS one:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ keytool -importkeystore \
+          -deststorepass newPassword -destkeypass newPassword \ <i class="conum" data-value="1"></i><b>(1)</b>
+          -destkeystore server.keystore \ <i class="conum" data-value="2"></i><b>(2)</b>
+          -srckeystore server.p12 -srcstoretype PKCS12 -srcstorepass mypassword \ <i class="conum" data-value="3"></i><b>(3)</b>
+          -alias someAlias <i class="conum" data-value="4"></i><b>(4)</b></code></pre>
+</div>
+</div>
+<div class="colist arabic">
+<table>
+<tr>
+<td><i class="conum" data-value="1"></i><b>1</b></td>
+<td>It is necessary to define a the password for the keystore</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="2"></i><b>2</b></td>
+<td>The file that will be created</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="3"></i><b>3</b></td>
+<td>The PKCS12 file created before and the password defined during the creation</td>
+</tr>
+<tr>
+<td><i class="conum" data-value="4"></i><b>4</b></td>
+<td>The alias used before</td>
+</tr>
+</table>
+</div>
+<div class="admonitionblock warning">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-warning" title="Warning"></i>
+</td>
+<td class="content">
+If either <code>srcstorepass</code> or <code>alias</code> are not the same as defined in the <code>p12</code> file, the conversion will fail.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Now modify your configuration:</p>
+</div>
+<div class="listingblock">
+<div class="title">HTTPS Configuration Example</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">micronaut:
+    ssl:
+        enabled: true
+        keyStore:
+            path: classpath:server.keystore
+            password: newPassword
+            type: JKS</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Start Micronaut and the application is running on <code><a href="https://localhost:8443" class="bare">https://localhost:8443</a></code> using the certificate in the keystore.</p>
+</div>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/aop.html">&lt;&lt; <strong>5</strong><span>Aspect Oriented Programming</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

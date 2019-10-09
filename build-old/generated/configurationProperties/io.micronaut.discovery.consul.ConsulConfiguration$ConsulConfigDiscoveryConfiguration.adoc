@@ -1,0 +1,28 @@
+++++
+<a id="io.micronaut.discovery.consul.ConsulConfiguration$ConsulConfigDiscoveryConfiguration" href="#io.micronaut.discovery.consul.ConsulConfiguration$ConsulConfigDiscoveryConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.consul.ConsulConfiguration$ConsulConfigDiscoveryConfiguration[]
+|===
+|Property |Type |Description
+
+| `+consul.client.config.datacenter+`
+|java.lang.String
+|The datacenter
+
+
+| `+consul.client.config.enabled+`
+|boolean
+|
+
+
+| `+consul.client.config.path+`
+|java.lang.String
+|
+
+
+| `+consul.client.config.format+`
+|api:io.micronaut.discovery.config.ConfigDiscoveryConfiguration$Format[]
+|
+
+
+|===

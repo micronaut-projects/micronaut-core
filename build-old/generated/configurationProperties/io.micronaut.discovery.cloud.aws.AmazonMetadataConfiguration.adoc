@@ -1,0 +1,28 @@
+++++
+<a id="io.micronaut.discovery.cloud.aws.AmazonMetadataConfiguration" href="#io.micronaut.discovery.cloud.aws.AmazonMetadataConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.cloud.aws.AmazonMetadataConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.application.ec2.metadata.url+`
+|java.lang.String
+|Default value ("http://169.254.169.254/").
+
+
+| `+micronaut.application.ec2.metadata.metadata-url+`
+|java.lang.String
+|The metadata Url
+
+
+| `+micronaut.application.ec2.metadata.instance-document-url+`
+|java.lang.String
+|The instance document Url
+
+
+| `+micronaut.application.ec2.metadata.enabled+`
+|boolean
+|Default value (true).
+
+
+|===

@@ -1,0 +1,399 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+    <title>8.2.4 AWS Route 53 Support 1.2.3.BUILD-SNAPSHOT</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link rel="stylesheet" href="../css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8"/>
+    <link rel="stylesheet" href="../css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8"/>
+    <script type="text/javascript">
+function addJsClass() {
+    var classes = document.body.className.split(" ");
+    classes.push("js");
+    document.body.className = classes.join(" ");
+}
+    </script>
+</head>
+
+<body class="body" onload="addJsClass();">
+<div id="navigation">
+    <div class="navTitle">
+        
+        Micronaut
+    </div>
+    <div class="navLinks">
+        <ul>
+            <li>
+                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
+                    <a href="../../guide/index.html" class="button">Table of contents</a>
+
+                    <div id="nav-summary-childs" style="display:none;">
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/introduction.html"><strong>1</strong><span>Introduction</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/quickStart.html"><strong>2</strong><span>Quick Start</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/ioc.html"><strong>3</strong><span>Inversion of Control</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/config.html"><strong>4</strong><span>Application Configuration</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/aop.html"><strong>5</strong><span>Aspect Oriented Programming</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpServer.html"><strong>6</strong><span>The HTTP Server</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/httpClient.html"><strong>7</strong><span>The HTTP Client</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cloud.html"><strong>8</strong><span>Cloud Native Features</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/messaging.html"><strong>10</strong><span>Message-Driven Microservices</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/commandLineApps.html"><strong>11</strong><span>Standalone Command Line Applications</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/configurations.html"><strong>12</strong><span>Configurations</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/languageSupport.html"><strong>13</strong><span>Language Support</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/management.html"><strong>14</strong><span>Management &amp; Monitoring</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/security.html"><strong>15</strong><span>Security</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/multitenancy.html"><strong>16</strong><span>Multi-Tenancy</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/cli.html"><strong>17</strong><span>Micronaut CLI</span></a>
+                        </div>
+                        
+                        <div class="toc-item" style="margin-left:0"><a href="../../guide/appendix.html"><strong>18</strong><span>Appendices</span></a>
+                        </div>
+                        
+                    </div>
+                </div>
+            </li>
+            <li class="separator selected">
+                <a id="ref-button" onclick="localToggle(); return false;" href="#">Quick Reference</a>
+            </li>
+        </ul>
+    </div>
+
+
+</div>
+
+<table id="colset" border="0" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="col1">
+            <div id="main" class="corner-all">
+
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+
+                <span id='toggle-col1' class="toggle">(<a href="#" onclick="localToggle(); return false;">Quick Reference</a>)</span>
+
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+
+
+                <div class="project">
+                    <h1>8.2.4 AWS Route 53 Support</h1>
+
+                    <p><strong>Version:</strong> 1.2.3.BUILD-SNAPSHOT</p>
+                </div>
+
+                
+
+                
+<h2 id="serviceDiscoveryRoute53"><a class="anchor" href="#serviceDiscoveryRoute53"></a>8.2.4 AWS Route 53 Support</h2>
+
+<div class='contribute-btn'>
+    <button type='button' class='btn btn-default' onclick='window.location.href="https://github.com/micronaut-projects/micronaut-core/edit/master/src/main/docs/guide/cloud/serviceDiscovery/serviceDiscoveryRoute53.adoc"'>
+        <i class='fa fa-pencil-square-o'></i> Improve this doc
+    </button>
+</div>
+
+
+<div class="paragraph">
+<p>To use the <a href="https://aws.amazon.com/route53/">Route 53 Service Discovery</a>, you must meet the following criteria:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Run EC2 instances of some type</p>
+</li>
+<li>
+<p>Have a domain name hosted in Route 53</p>
+</li>
+<li>
+<p>Have a newer version of AWS-CLI (such as 14+)</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Assuming you have those things, you are ready. It is not as fancy as Consul or Eureka, but other than some initial setup
+with the AWS-CLI, there is no other software running to go wrong. You can even support health checks
+if you add a custom health check to your service. If you would like to test if your account can create and use Service Discovery see the Integration Test section.
+More information can be found at <a href="https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html" class="bare">https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html</a>.</p>
+</div>
+<div class="paragraph">
+<p>Here are the steps:</p>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Use AWS-CLI to create a namespace. You can make either a public or private one depending on what IPs or subnets
+you are using</p>
+</li>
+<li>
+<p>Create a service with DNS Records with AWS-CLI command</p>
+</li>
+<li>
+<p>Add health checks or custom health checks (optional)</p>
+</li>
+<li>
+<p>Add Service ID to your application configuration file like so:</p>
+</li>
+</ol>
+</div>
+<div class="listingblock">
+<div class="title">Sample application.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">aws:
+    route53:
+        registration
+            enabled: true
+            aws-service-id: srv-978fs98fsdf
+            namespace: micronaut.io
+micronaut:
+    application:
+        name: something</code></pre>
+</div>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>Make sure you have the following dependencies included in your build file:</p>
+</li>
+</ol>
+</div>
+<div class="listingblock">
+<div class="title">Sample build.gradle</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">compile "io.micronaut:micronaut-discovery-client"
+compile "io.micronaut.configuration:micronaut-aws-common"
+compile group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
+compile group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
+compile group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
+compile group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'</code></pre>
+</div>
+</div>
+<div class="olist arabic">
+<ol class="arabic">
+<li>
+<p>On the client side, you will need the same dependencies and less configuration options:</p>
+</li>
+</ol>
+</div>
+<div class="listingblock">
+<div class="title">Sample application.yml</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-groovy hljs" data-lang="groovy">aws:
+    route53:
+        discovery:
+            client:
+                enabled: true
+                aws-service-id: srv-978fs98fsdf
+                namespace-id: micronaut.io</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can then use the <a href="../api/io/micronaut/discovery/DiscoveryClient.html">DiscoveryClient</a> API to find other services registered via Route 53. For example:</p>
+</div>
+<div class="listingblock">
+<div class="title">Sample code for client</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient);
+List&lt;String&gt; serviceIds = Flowable.fromPublisher(discoveryClient.getServiceIds()).blockingFirst();
+List&lt;ServiceInstance&gt; instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceIds.get(0))).blockingFirst();</code></pre>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_creating_the_namespace"><a class="anchor" href="#_creating_the_namespace"></a>Creating the Namespace</h4>
+<div class="paragraph">
+<p>Namespaces are similar to a regular Route53 hosted zone, and they appear in the Route53 console but the console doesn&#8217;t support
+ modifying them. You must use the AWS-CLI at this time for any Service Discovery functionality.</p>
+</div>
+<div class="paragraph">
+<p>First decide if you are creating a public facing namespace or a private one, as the commands are different:</p>
+</div>
+<div class="listingblock">
+<div class="title">Creating Namespace</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ aws servicediscovery create-public-dns-namespace --name micronaut.io --create-request-id create-1522767790 --description adescrptionhere
+
+or
+
+$ aws servicediscovery create-private-dns-namespace --name micronaut.internal.io --create-request-id create-1522767790 --description adescrptionhere --vpc yourvpcID</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>When you run this you will get an operation ID. You can check the status with the <code>get-operation</code> CLI command:</p>
+</div>
+<div class="listingblock">
+<div class="title">Get Operation Results</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ aws servicediscovery get-operation --operation-id asdffasdfsda</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can use this command to get the status of any call you make that returns an operation id.</p>
+</div>
+<div class="paragraph">
+<p>The result of the command will tell you the ID of the namespace. Write that down, you&#8217;ll need it for the next steps. If you get an error it will say what the error was.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_creating_the_service_dns_records"><a class="anchor" href="#_creating_the_service_dns_records"></a>Creating the Service &amp; DNS Records</h4>
+<div class="paragraph">
+<p>The next step is creating the Service and DNS records.</p>
+</div>
+<div class="listingblock">
+<div class="title">Create Service</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">$ aws create-service --name yourservicename --create-request-id somenumber --description someservicedescrption --dns-config NamespaceId=yournamespaceid,RoutingPolicy=WEIGHTED,DnsRecords=[{Type=A,TTL=1000},{Type=A,TTL=1000}]</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>The <code>DnsRecord</code> type can be <code>A</code>(ipv4),<code>AAAA</code>(ipv6),<code>SRV</code>, or <code>CNAME</code>. <code>RoutingPolicy</code> can be <code>WEIGHTED</code> or <code>MULTIVALUE</code>. Keep in mind <code>CNAME</code> must use weighted routing type, <code>SRV</code> must have a valid port configured.</p>
+</div>
+<div class="paragraph">
+<p>If you want to add a health check, you can use the following syntax on the CLI:</p>
+</div>
+<div class="listingblock">
+<div class="title">Specifying a Health Check</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">Type=string,ResourcePath=string,FailureThreshold=integer</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Type can be 'HTTP','HTTPS', or 'TCP'. You can only use a standard health check on a public namespace. See Custom Health Checks for private namespaces. Resource path should be a url that returns 200 OK if it&#8217;s healthy.</p>
+</div>
+<div class="paragraph">
+<p>For a custom health check, you only need to specify <code>--health-check-custom-config FailureThreshold=integer</code> which will work on private namespaces as well.</p>
+</div>
+<div class="paragraph">
+<p>This is also good because Micronaut will send out pulsation commands to let AWS know the instance is still healthy.</p>
+</div>
+<div class="paragraph">
+<p>For more help run 'aws discoveryservice create-service help'.</p>
+</div>
+<div class="paragraph">
+<p>You will get a service ID and an ARN back from this command if successful. Write that down, it&#8217;s going to go into the Micronaut configuration.</p>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_setting_up_the_configuration_in_micronaut"><a class="anchor" href="#_setting_up_the_configuration_in_micronaut"></a>Setting up the configuration in Micronaut</h4>
+
+</div>
+<div class="sect3">
+<h4 id="_auto_naming_registration"><a class="anchor" href="#_auto_naming_registration"></a>Auto Naming Registration</h4>
+<div class="paragraph">
+<p>You will need to add the configuration to make your applications register with Route 53 Auto-discovery:</p>
+</div>
+<div class="listingblock">
+<div class="title">Registration Properties</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">aws:
+    route53:
+        registration:
+            enabled: true
+            aws-service-id=&lt;enter the service id you got after creation on aws cli&gt;
+        discovery:
+            namespace-id=&lt;enter the namespace id you got after creating the namespace&gt;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_discovery_client_configuration"><a class="anchor" href="#_discovery_client_configuration"></a>Discovery Client Configuration</h4>
+<div class="listingblock">
+<div class="title">Discovery Properties</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-yaml hljs" data-lang="yaml">aws:
+    route53:
+        discovery:
+            client
+                enabled: true
+                aws-service-id: &lt;enter the service id you got after creation on aws cli&gt;</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>You can also call the following methods by getting the bean "Route53AutoNamingClient":</p>
+</div>
+<div class="listingblock">
+<div class="title">Discovery Methods</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">// if serviceId is null it will use property "aws.route53.discovery.client.awsServiceId"
+Publisher&lt;List&lt;ServiceInstance&gt;&gt; getInstances(String serviceId)
+// reads property "aws.route53.discovery.namespaceId"
+Publisher&lt;List&lt;String&gt;&gt; getServiceIds()</code></pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_integration_tests"><a class="anchor" href="#_integration_tests"></a>Integration Tests</h4>
+<div class="paragraph">
+<p>If you set the environment variable AWS_SUBNET_ID and have credentials configured in your home directory that are valid (in <code>~/.aws/credentials</code>)
+you can run the integration tests. You will still need a domain hosted on route53 as well. This test will create a t2.nano instance, a namespace, service, and register that instance to service discovery.
+When the test completes it will remove/terminate all resources it spun up.</p>
+</div>
+</div>
+
+
+                <div style="clear:both;margin-top:15px;"></div>
+                
+                    <div class="toc-item prev-left"><a href="../../guide/httpClient.html">&lt;&lt; <strong>7</strong><span>The HTTP Client</span></a></div>
+                
+                    <div class="toc-item next-right"><a href="../../guide/serverlessFunctions.html"><strong>9</strong><span>Serverless Functions</span> >></a></div>
+                
+                <div style="clear:both"></div>
+            </div>
+        </td>
+        <td id="col2">
+            <div class="local clearfix">
+                <div class="local-title">
+                    <a href="../../guide/index.html" target="mainFrame">Quick Reference</a>
+                    <span class="toggle">(<a href="#" onclick="localToggle(); return false;">hide</a>)</span>
+                </div>
+                <div class="menu">
+                    
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+<div id="footer">
+    
+    
+</div>
+
+<script type="text/javascript" src="../js/docs.js"></script>
+
+</body>
+</html>

@@ -9,10 +9,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
+
 class UploadSpec extends AbstractMicronautSpec {
 
     void cleanup() {

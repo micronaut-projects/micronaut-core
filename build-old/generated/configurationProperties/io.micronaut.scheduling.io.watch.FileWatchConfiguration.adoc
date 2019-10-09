@@ -1,0 +1,28 @@
+++++
+<a id="io.micronaut.scheduling.io.watch.FileWatchConfiguration" href="#io.micronaut.scheduling.io.watch.FileWatchConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.scheduling.io.watch.FileWatchConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.io.watch.enabled+`
+|boolean
+|Whether watch is enabled.
+
+
+| `+micronaut.io.watch.restart+`
+|boolean
+|Set whether restart is enabled.
+
+
+| `+micronaut.io.watch.paths+`
+|java.util.List
+|Sets the watch paths to use.
+
+
+| `+micronaut.io.watch.check-interval+`
+|java.time.Duration
+|Sets the interval to wait between file watch polls.
+
+
+|===

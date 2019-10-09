@@ -49,7 +49,6 @@ class UploadController {
         } catch (exception: IOException) {
             HttpResponse.badRequest("Upload Failed")
         }
-
     }
     // end::completedUpload[]
 
@@ -64,7 +63,6 @@ class UploadController {
         } catch (exception: IOException) {
             HttpResponse.badRequest("Upload Failed")
         }
-
     }
     // end::bytesUpload[]
 

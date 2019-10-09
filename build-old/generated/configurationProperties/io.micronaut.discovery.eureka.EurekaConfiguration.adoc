@@ -1,0 +1,128 @@
+++++
+<a id="io.micronaut.discovery.eureka.EurekaConfiguration" href="#io.micronaut.discovery.eureka.EurekaConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.eureka.EurekaConfiguration[]
+|===
+|Property |Type |Description
+
+| `+eureka.client.ssl-configuration+`
+|api:io.micronaut.http.ssl.SslConfiguration[]
+|
+
+
+| `+eureka.client.logger-name+`
+|java.lang.String
+|
+
+
+| `+eureka.client.follow-redirects+`
+|boolean
+|
+
+
+| `+eureka.client.default-charset+`
+|java.nio.charset.Charset
+|
+
+
+| `+eureka.client.channel-options+`
+|java.util.Map
+|
+
+
+| `+eureka.client.shutdown-timeout+`
+|java.time.Duration
+|
+
+
+| `+eureka.client.read-timeout+`
+|java.time.Duration
+|
+
+
+| `+eureka.client.read-idle-timeout+`
+|java.time.Duration
+|
+
+
+| `+eureka.client.connect-timeout+`
+|java.time.Duration
+|
+
+
+| `+eureka.client.num-of-threads+`
+|java.lang.Integer
+|
+
+
+| `+eureka.client.thread-factory+`
+|java.lang.Class
+|
+
+
+| `+eureka.client.max-content-length+`
+|int
+|
+
+
+| `+eureka.client.proxy-type+`
+|java.net.Proxy$Type
+|
+
+
+| `+eureka.client.proxy-address+`
+|java.net.SocketAddress
+|
+
+
+| `+eureka.client.proxy-username+`
+|java.lang.String
+|
+
+
+| `+eureka.client.proxy-password+`
+|java.lang.String
+|
+
+
+| `+eureka.client.proxy-selector+`
+|java.net.ProxySelector
+|
+
+
+| `+eureka.client.should-use-dns+`
+|boolean
+|Whether DNS should be used to resolve the discovery servers.
+
+
+| `+eureka.client.context-path+`
+|java.lang.String
+|Sets the context path.
+
+
+| `+eureka.client.default-zone+`
+|java.util.List
+|Sets the Discovery servers to use for the default zone.
+
+
+| `+eureka.client.zones+`
+|java.util.Map
+|Configures Discovery servers in other zones.
+
+
+| `+eureka.client.secure+`
+|boolean
+|Set if the discovery server is exposed over HTTPS
+
+
+| `+eureka.client.host+`
+|java.lang.String
+|The Discovery server host name
+
+
+| `+eureka.client.port+`
+|int
+|The port for the Discovery server
+
+
+|===

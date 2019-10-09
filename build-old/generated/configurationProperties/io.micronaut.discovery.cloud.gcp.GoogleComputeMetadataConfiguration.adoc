@@ -1,0 +1,33 @@
+++++
+<a id="io.micronaut.discovery.cloud.gcp.GoogleComputeMetadataConfiguration" href="#io.micronaut.discovery.cloud.gcp.GoogleComputeMetadataConfiguration">&#128279;</a>
+++++
+.Configuration Properties for api:io.micronaut.discovery.cloud.gcp.GoogleComputeMetadataConfiguration[]
+|===
+|Property |Type |Description
+
+| `+micronaut.application.gcp.metadata.enabled+`
+|boolean
+|Default value (true).
+
+
+| `+micronaut.application.gcp.metadata.metadata-url+`
+|java.lang.String
+|Default value ("http://metadata.google.internal/computeMetadata/v1/project/").
+
+
+| `+micronaut.application.gcp.metadata.project-metadata-url+`
+|java.lang.String
+|Default value ("http://metadata.google.internal/project/v1/project/").
+
+
+| `+micronaut.application.gcp.metadata.read-timeout+`
+|java.time.Duration
+|Default value (5 seconds).
+
+
+| `+micronaut.application.gcp.metadata.connect-timeout+`
+|java.time.Duration
+|Default value (2).
+
+
+|===

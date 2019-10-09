@@ -1,0 +1,145 @@
+buildscript {
+    repositories {
+        mavenLocal()
+        maven { url "https://repo.grails.org/grails/core" }
+    }
+    dependencies {
+        classpath "org.grails:grails-docs:${project.ext.properties.grailsDocsVersion ?: grailsVersion}"
+        classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
+    }
+}
+
+def DOCUMENTATION_GROUP = 'Documentation'
+
+def commonGithubOrg = 'grails'
+def commonGithubSlug = 'grails-common-build'
+def commonBranch = 'master'
+def docResourcesDir = "${buildDir}/resources/${commonGithubSlug}-${commonBranch}/src/main/resources"
+
+task prepareDocResources {
+    group = DOCUMENTATION_GROUP
+    description = 'Downloads common documentation resoruces and unzips them to build folder'   
+    doLast {
+        ant.mkdir(dir:buildDir)
+        ant.get(src:"https://github.com/${commonGithubOrg}/${commonGithubSlug}/archive/${commonBranch}.zip", dest:"${buildDir}/resources.zip")    
+        ant.unzip(src:"${buildDir}/resources.zip", dest:"${buildDir}/resources")
+    }
+}
+
+task copyLocalDocResources(type: Copy, dependsOn:prepareDocResources) {
+    group = DOCUMENTATION_GROUP
+    description = 'Copy local resources to build folder'  
+    mustRunAfter prepareDocResources
+    from ('src/main/docs/resources') 
+    into docResourcesDir
+}
+
+configurations {
+    documentation
+}
+
+dependencies {
+    if (configurations.find { it.name == 'documentation' }) {
+        documentation("org.fusesource.jansi:jansi:1.14")
+        documentation 'info.picocli:picocli:3.8.0'
+    }
+}
+
+subprojects {
+    dependencies {
+        if (configurations.find { it.name == 'documentation' }) {
+            documentation "org.codehaus.groovy:groovy-dateutil:$groovyVersion"
+            documentation "org.codehaus.groovy:groovy-cli-picocli:$groovyVersion"
+        }
+    }
+}
+
+def cleanTask = project.tasks.findByName("clean")
+if(cleanTask == null) {
+    task clean(type: Delete) {
+        delete(buildDir)
+    }
+}
+else {
+    cleanTask.doLast {
+        ant.delete(dir:"build/docs")
+    }
+}
+
+task groovydoc(type:org.groovy.lang.groovydoc.tasks.GroovydocTask, overwrite:true) {
+    group = DOCUMENTATION_GROUP
+    docTitle = "${project.title} - ${project.version}"
+    destinationDir = project.file("build/docs/api")
+    notimestamp = true
+    noversionstamp = true
+    def files = []
+    project.rootProject.subprojects
+            .findAll { !it.name != 'docs' && !it.name.startsWith('examples') }
+            .each { subproject ->
+        if(subproject.file('src/main/groovy').exists()) {
+            files += subproject.files("src/main/groovy")
+        }
+    }
+    if(project.file('src/main/groovy').exists()) {
+        files += project.files("src/main/groovy")
+    }
+    source = files
+    classpath = configurations.documentation
+    jvmArgs "-Xmx1024m"
+}
+
+task publishGuide(type: grails.doc.gradle.PublishGuide) {
+    group = DOCUMENTATION_GROUP
+    description = 'Generate Guide'  
+    dependsOn copyLocalDocResources
+
+    targetDir = project.file("${buildDir}/docs")
+    sourceRepo = "https://github.com/${githubSlug}/edit/${githubBranch}/src/main/docs"
+    sourceDir = new File(projectDir, "src/main/docs")
+    propertiesFiles = [ new File(rootProject.projectDir, "gradle.properties") ]
+    asciidoc = true
+    resourcesDir = project.file(docResourcesDir)
+    properties = [
+            'safe':'UNSAFE',
+            'version': project.version,
+            'subtitle': project.projectDesc,
+            'api': '../api',
+            'sourceDir':rootProject.projectDir.absolutePath,
+            'sourcedir':rootProject.projectDir.absolutePath,
+            'javaee': 'https://docs.oracle.com/javaee/7/api/',
+            'javase': 'https://docs.oracle.com/javase/7/docs/api/',
+            'groovyapi': 'http://docs.groovy-lang.org/latest/html/gapi/',
+            'grailsapi': 'http://docs.grails.org/latest/api/',
+            'gormapi': 'http://gorm.grails.org/latest/api/',
+            'springapi': 'https://docs.spring.io/spring/docs/current/javadoc-api/'
+    ]
+    doLast {
+        ant.move(file:"${project.buildDir}/docs/guide/single.html",
+                tofile:"${project.buildDir}/docs/guide/index.html", overwrite:true)
+        new File(project.buildDir, "docs/index.html").text = '''
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+<head>
+<meta http-equiv="refresh" content="0; url=guide/index.html" />
+</head>
+
+</body>
+</html>
+'''
+    }
+}
+
+task docs(dependsOn:[groovydoc, publishGuide]) {
+    group = DOCUMENTATION_GROUP
+}
+
+def assembleTask = project.tasks.findByName("assemble")
+if(assembleTask == null) {
+    task assemble(dependsOn: docs, type:Zip) {
+        baseName = "${project.name}-${project.version}"
+        destinationDir = new File(project.buildDir, "distributions")
+        from project.files("${buildDir}/docs")
+    }
+}
+
+
