@@ -534,7 +534,7 @@ class HttpHeadSpec extends Specification {
             return "success"
         }
 
-        @Head(["/multiple", "/multiple/mappings"])
+        @Head(uris = ["/multiple", "/multiple/mappings"])
         HttpResponse multipleMappings() {
             return HttpResponse.ok().header("X-Test", "multiple mappings")
         }

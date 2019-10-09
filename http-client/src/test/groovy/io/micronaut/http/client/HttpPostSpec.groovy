@@ -465,7 +465,7 @@ class HttpPostSpec extends Specification {
             "$id - $name"
         }
 
-        @Post(["/multiple", "/multiple/mappings"])
+        @Post(uris = ["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
         }

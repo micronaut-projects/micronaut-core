@@ -230,7 +230,7 @@ class HttpPutSpec extends Specification {
             sb.toString()
         }
 
-        @Put(["/multiple", "/multiple/mappings"])
+        @Put(uris = ["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
         }

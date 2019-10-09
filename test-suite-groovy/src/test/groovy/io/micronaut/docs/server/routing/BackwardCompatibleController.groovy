@@ -11,7 +11,7 @@ import io.micronaut.http.annotation.Get
 @Controller("/hello")
 class BackwardCompatibleController {
 
-    @Get(["/{name}", "/person/{name}"]) // <1>
+    @Get(uris = ["/{name}", "/person/{name}"]) // <1>
     String hello(String name) { // <2>
         "Hello, " + name
     }

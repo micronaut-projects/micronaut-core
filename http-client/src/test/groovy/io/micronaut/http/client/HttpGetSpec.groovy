@@ -633,7 +633,7 @@ class HttpGetSpec extends Specification {
             return Completable.error(new RuntimeException("completable error"))
         }
 
-        @Get(["/multiple", "/multiple/mappings"])
+        @Get(uris = ["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
         }
