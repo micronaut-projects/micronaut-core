@@ -487,7 +487,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             isDeclaredBean) {
                         boolean hasConstraint
                         for (Parameter p: methodNode.getParameters()) {
-                            AnnotationMetadata parameterMetadata = AnnotationMetadata.EMPTY_METADATA//AstAnnotationUtils.getAnnotationMetadata(sourceUnit, p)
+                            AnnotationMetadata parameterMetadata = AstAnnotationUtils.getAnnotationMetadata(source, p)
                             if (parameterMetadata.hasStereotype(InjectTransform.ANN_CONSTRAINT) ||
                                     parameterMetadata.hasStereotype(InjectTransform.ANN_VALID)) {
                                 hasConstraint = true
@@ -496,9 +496,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                         if (hasConstraint) {
                             annotationMetadata = addValidated(annotationMetadata)
-                            if (!aopProxyWriter.isValidated()) {
-                                aopProxyWriter.setValidated(true)
-                            }
                         }
                     }
 
