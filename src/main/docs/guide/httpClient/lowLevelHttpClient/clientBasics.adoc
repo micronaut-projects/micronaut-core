@@ -12,7 +12,7 @@ The above example will inject a client that targets the Twitter API.
 
 [source,kotlin]
 ----
-@Client("\${myapp.api.twitter.url}") @Inject httpClient: RxHttpClient
+@field:Client("\${myapp.api.twitter.url}") @Inject lateinit var httpClient: RxHttpClient
 ----
 
 The above Kotlin example will inject a client that targets the Twitter API using a configuration path. Note the required escaping (backslash) on `"\${path.to.config}"` which is required due to Kotlin string interpolation.
