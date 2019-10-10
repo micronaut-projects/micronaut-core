@@ -1,4 +1,3 @@
-
 package io.micronaut.docs.session;
 
 // tag::imports[]
@@ -13,10 +12,7 @@ import javax.annotation.Nullable;
 import javax.validation.constraints.NotBlank;
 // end::imports[]
 
-/**
- * @author graemerocher
- * @since 1.0
- */
+
 // tag::class[]
 @Controller("/shopping")
 public class ShoppingController {
@@ -55,4 +51,7 @@ public class ShoppingController {
         }
     }
     // end::clear[]
+
+// tag::endclass[]
 }
+// end::endclass[]

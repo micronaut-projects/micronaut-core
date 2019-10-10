@@ -1,9 +1,7 @@
 package io.micronaut.docs.server.sse
 
-import io.micronaut.http.annotation.Controller;
-
 // tag::imports[]
-
+import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.sse.Event
 import io.reactivex.Emitter
@@ -30,14 +28,14 @@ class HeadlineController {
             if (i < versions.length) {
                 emitter.onNext( // <4>
                         Event.of(new Headline("Micronaut " + versions[i] + " Released", "Come and get it"))
-                );
+                )
             } else {
-                emitter.onComplete(); // <5>
+                emitter.onComplete() // <5>
             }
-            return ++i;
+            return ++i
         }
 
-        return Flowable.generate(initialState, emitterFunction as BiFunction<Integer,Emitter<Event<Headline>>,Integer>);
+        return Flowable.generate(initialState, emitterFunction as BiFunction<Integer,Emitter<Event<Headline>>,Integer>)
     }
 }
 // end::class[]

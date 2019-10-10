@@ -10,9 +10,6 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -43,10 +40,6 @@ public class TraceFilterSpec {
         if(client != null) {
             client.stop();
         }
-        try {
-            File file = File.createTempFile("file.json", "temp");
-            file.delete();
-        } catch (IOException e) { }
     }
 
     @Test
