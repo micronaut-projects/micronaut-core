@@ -63,7 +63,7 @@ The above configuration enables header resolution, but disables cookie resolutio
 
 A api:session.Session[] object can be retrieved simply by declaring the api:session.Session[] in a controller method signature. For example consider the following controller:
 
-snippet::io.micronaut.docs.session.ShoppingController[tags="imports,class,add", indent=0]
+snippet::io.micronaut.docs.session.ShoppingController[tags="imports,class,add,endclass", indent=0]
 
 <1> The `ShoppingController` declares a api:session.Session[] attribute called `cart`
 <2> The api:session.Session[] is declared as a parameter to the method
@@ -85,10 +85,7 @@ If the client is a web browser then sessions should just work if you have cookie
 For example, when invoking the `viewCart` method of the `StoreController` in the previous example the HTTP client will receive by default a `AUTHORIZATION_INFO` header. The following example, using a Spock test, demonstrates this:
 
 .Retrieving the AUTHORIZATION_INFO header
-[source,groovy]
-----
-include::{testssession}/ShoppingControllerSpec.groovy[tags=view, indent=0]
-----
+snippet::io.micronaut.docs.session.ShoppingControllerSpec[tags="view", indent=0]
 
 <1> A request is made to `/shopping/cart`
 <2> The `AUTHORIZATION_INFO` header is present in the response
@@ -96,10 +93,7 @@ include::{testssession}/ShoppingControllerSpec.groovy[tags=view, indent=0]
 You can then pass this `AUTHORIZATION_INFO` in subsequent requests to re-use the existing api:session.Session[]:
 
 .Sending the AUTHORIZATION_INFO header
-[source,groovy]
-----
-include::{testssession}/ShoppingControllerSpec.groovy[tags=add, indent=0]
-----
+snippet::io.micronaut.docs.session.ShoppingControllerSpec[tags="add", indent=0]
 
 <1> The `AUTHORIZATION_INFO` is retrieved from the response
 <2> And then sent as a header in the subsequent request
