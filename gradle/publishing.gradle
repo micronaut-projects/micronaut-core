@@ -77,7 +77,6 @@ publishing {
                 def bintrayUser = System.getenv("BINTRAY_USER") ?: project.hasProperty("bintrayUser") ? project.bintrayUser : ''
                 def bintrayKey = System.getenv("BINTRAY_KEY") ?: project.hasProperty("bintrayKey") ? project.bintrayKey : ''
 
-
                 username = bintrayUser
                 password = bintrayKey
             }
@@ -88,6 +87,7 @@ publishing {
     publications {
         maven(MavenPublication) { publication ->
             artifactId( "micronaut-" + project.name.substring(project.name.indexOf('/') + 1) )
+
             def shadowJar = tasks.findByName("shadowJar")
             if(shadowJar && shadowJar.enabled) {
                 artifact(project.tasks.shadowJar) {
@@ -147,12 +147,15 @@ publishing {
 
             }
             else {
-                from components.java
-                artifact sourcesJar {
-                    classifier "sources"
-                }
-                artifact javadocJar {
-                    classifier "javadoc"
+
+                if (project.name != 'bom') {
+                    from components.java
+                    artifact sourcesJar {
+                        classifier "sources"
+                    }
+                    artifact javadocJar {
+                        classifier "javadoc"
+                    }
                 }
 
                 pom.withXml {
