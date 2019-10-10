@@ -42,7 +42,7 @@ public abstract class AbstractBeanConfiguration extends AbstractBeanContextCondi
 
     @Override
     public Package getPackage() {
-        return Package.getPackage(packageName);
+        return getClass().getPackage();
     }
 
     @Override
