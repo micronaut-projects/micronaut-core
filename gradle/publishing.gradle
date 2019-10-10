@@ -74,18 +74,14 @@ publishing {
     repositories {
         maven {
             credentials {
-                def ossUser = System.getenv("SONATYPE_USERNAME") ?: project.hasProperty("sonatypeOssUsername") ? project.sonatypeOssUsername : ''
-                def ossPass = System.getenv("SONATYPE_PASSWORD") ?: project.hasProperty("sonatypeOssPassword") ? project.sonatypeOssPassword : ''
+                def bintrayUser = System.getenv("BINTRAY_USER") ?: project.hasProperty("bintrayUser") ? project.bintrayUser : ''
+                def bintrayKey = System.getenv("BINTRAY_KEY") ?: project.hasProperty("bintrayKey") ? project.bintrayKey : ''
 
-                username = ossUser
-                password = ossPass
+
+                username = bintrayUser
+                password = bintrayKey
             }
-            if(isBuildSnapshot) {
-                url  "https://oss.sonatype.org/content/repositories/snapshots"
-            }
-            else {
-                url "https://repo.micronaut.io/artifactory/libs-releases-local"
-            }
+            url  "https://oss.jfrog.org/oss-snapshot-local"
         }
     }
 
