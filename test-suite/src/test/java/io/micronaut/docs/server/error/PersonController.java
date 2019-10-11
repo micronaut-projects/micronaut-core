@@ -113,8 +113,8 @@ public class PersonController {
         throw new RuntimeException("Something went wrong");
     }
 
-    @Error // <1>
     // tag::globalError[]
+    @Error // <1>
     public HttpResponse<JsonError> error(HttpRequest request, Throwable e) {
         JsonError error = new JsonError("Bad Things Happened: " + e.getMessage()) // <2>
                 .link(Link.SELF, Link.of(request.getUri()));
@@ -124,8 +124,8 @@ public class PersonController {
     }
     // end::globalError[]
 
-    @Error(status = HttpStatus.NOT_FOUND)
     // tag::statusError[]
+    @Error(status = HttpStatus.NOT_FOUND)
     public HttpResponse<JsonError> notFound(HttpRequest request) { // <1>
         JsonError error = new JsonError("Page Not Found") // <2>
                 .link(Link.SELF, Link.of(request.getUri()));
