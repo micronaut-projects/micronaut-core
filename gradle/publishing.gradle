@@ -35,8 +35,10 @@ publishing {
             artifactId "micronaut-${project.name}"
             from components.java
 
-            artifact sourcesJar
-            artifact javadocJar
+            afterEvaluate {
+                artifact sourcesJar
+                artifact javadocJar
+            }
 
             pom {
                 name = project.title
