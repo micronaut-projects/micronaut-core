@@ -73,7 +73,7 @@ task fatJar(type: Jar, dependsOn: ['createStartScripts']) {
                 'Implementation-Version': project.version
     }
     from {
-        configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) }
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     }
     with jar
     destinationDir = project.buildDir
@@ -93,12 +93,13 @@ task cliZip(type: Zip, dependsOn: ['fatJar']) {
     }
 }
 
-//publishing {
-//    publications {
-//        maven(MavenPublication) {
-//            artifact cliZip {
-//                classifier "dist"
-//            }
-//        }
-//    }
-//}
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifactId "micronaut-${project.name}"
+            artifact cliZip {
+                classifier "dist"
+            }
+        }
+    }
+}
