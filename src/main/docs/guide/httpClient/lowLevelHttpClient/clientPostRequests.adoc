@@ -38,10 +38,7 @@ A `create` method also exists to construct a request for any api:http.HttpMethod
 
 The following example demonstrates how to send a simply `String` body:
 
-.Sending a `String` body
-====
-snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="poststring", indent=0]
-====
+snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="poststring", indent=0, title="Sending a `String` body"]
 
 <1> The `POST` method is used with the first argument being the URI and the second argument the body
 <2> The content type and accepted type are set to `text/plain` (the default content type is `application/json`)
@@ -53,10 +50,7 @@ The previous example sends plain text, if you wish send JSON you can simply pass
 
 For example, the `Message` class from the previous section, you can create an instance and pass it to the `POST` method:
 
-.Sending a JSON body
-====
-snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="postpojo", indent=0]
-====
+snippet::io.micronaut.docs.basics.HelloControllerSpec[tags="postpojo", indent=0, title="Sending a JSON body"]
 
 <1> And instance of `Message` is created and passed to the `POST` method
 <2> The same class is used to decode the response
