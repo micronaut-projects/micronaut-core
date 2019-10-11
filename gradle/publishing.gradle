@@ -1,3 +1,17 @@
+/**
+ * To use this when setting up Travis run the following commands to encrypt
+ * the necessary environment variables for publishing to work
+ *
+ * $ travis encrypt SIGNING_PASSPHRASE=...
+ * $ travis encrypt SONATYPE_USERNAME=...
+ * $ travis encrypt SONATYPE_PASSWORD=...
+ * $ travis encrypt ARTIFACTORY_USERNAME=...
+ * $ travis encrypt ARTIFACTORY_PASSWORD=...
+ * $ travis encrypt BINTRAY_USER=...
+ * $ travis encrypt BINTRAY_KEY=...
+ *
+ */
+
 buildscript {
     repositories {
         maven { url "https://repo.grails.org/grails/core" }
@@ -14,36 +28,6 @@ import static groovyx.net.http.ContentType.*
 apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
 apply plugin: 'com.bmuschko.nexus'
-
-ext.extraPomInfo = {}
-ext.pomInfo = {
-    delegate.name project.title
-    delegate.description project.projectDesc
-    delegate.url projectUrl
-
-    delegate.licenses {
-        delegate.license {
-            delegate.name 'The Apache Software License, Version 2.0'
-            delegate.url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-            delegate.distribution 'repo'
-        }
-    }
-
-    delegate.scm {
-        delegate.url "scm:git@github.com:${githubSlug}.git"
-        delegate.connection "scm:git@github.com:${githubSlug}.git"
-        delegate.developerConnection "scm:git@github.com:${githubSlug}.git"
-    }
-
-task sourcesJar(type: Jar, dependsOn: classes) {
-    archiveClassifier = 'sources'
-    from sourceSets.main.allSource
-}
-
-task javadocJar(type: Jar) {
-    archiveClassifier = 'javadoc'
-    from javadoc.destinationDir
-}
 
 publishing {
     publications {
