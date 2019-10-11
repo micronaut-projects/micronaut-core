@@ -1,4 +1,4 @@
-package io.micronaut.http.client.docs.basics;
+package io.micronaut.docs.basics;
 
 // tag::imports[]
 
