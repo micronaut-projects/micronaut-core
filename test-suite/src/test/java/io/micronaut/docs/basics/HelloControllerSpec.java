@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.docs.basics;
+package io.micronaut.docs.basics;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.type.Argument;
@@ -39,7 +39,7 @@ import static org.junit.Assert.assertTrue;
  * @author graemerocher
  * @since 1.0
  */
-public class HelloControllerTest {
+public class HelloControllerSpec {
 
     @Test
     public void testSimpleRetrieve() {
