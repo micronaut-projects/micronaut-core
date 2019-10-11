@@ -13,10 +13,7 @@ TIP: When defining an error handler for an exception, you can specify the except
 For example the following method will handling JSON parse exceptions from Jackson for the scope of the declaring controller:
 
 .Local exception handler
-[source,java]
-----
-include::{testsuite}/server/json/PersonController.java[tags=localError, indent=0]
-----
+snippet::io.micronaut.docs.server.error.PersonController[tags="localError", indent=0]
 
 <1> A method that explicitly handles `JsonParseException` is declared
 <2> An instance of api:http.hateoas.JsonError[] is returned.
