@@ -19,8 +19,10 @@ import groovy.transform.InheritConstructors
 import groovy.xml.MarkupBuilder
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
+import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.repository.MavenProfileRepository
 import io.micronaut.cli.util.VersionInfo
+import org.eclipse.aether.artifact.Artifact
 import org.eclipse.aether.graph.Dependency
 import org.eclipse.aether.graph.Exclusion
 
@@ -47,7 +49,7 @@ class MavenBuildTokens extends BuildTokens {
     }
 
     @Override
-    Map getTokens(Profile profile, List<Feature> features) {
+    Map getTokens(ProfileRepository profileRepository, Profile profile, List<Feature> features) {
         Map tokens = [:]
         tokens.put("testFramework", testFramework)
         tokens.put("sourceLanguage", sourceLanguage)
@@ -143,14 +145,21 @@ class MavenBuildTokens extends BuildTokens {
             annotationProcessorPathsXml."$methodToCall" {
                 groupId(artifact.groupId)
                 artifactId(artifact.artifactId)
+                def artifactVersion = artifact.version
+                if (!artifactVersion || artifactVersion == 'BOM') {
+                    def resolvedVersion = profileRepository.findVersion(artifact.artifactId)
+                    if (resolvedVersion ) {
+                        artifactVersion = resolvedVersion
+                    }
+                }
                 if (artifact.groupId.startsWith("io.micronaut")) {
-                    if (!artifact.version || artifact.version == 'BOM') {
+                    if (!artifactVersion || artifactVersion == 'BOM') {
                         version("\${micronaut.version}")
                     } else {
-                        version(artifact.version)
+                        version(artifactVersion)
                     }
                 } else {
-                    version(artifact.version)
+                    version(artifactVersion)
                 }
             }
         }
