@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
@@ -53,6 +54,7 @@ import java.util.stream.Stream;
  */
 @Primary
 @Singleton
+@Internal
 public class MatchingFilterResolver implements FilterResolver {
     private static final Logger LOG = LoggerFactory.getLogger(MatchingFilterResolver.class);
 

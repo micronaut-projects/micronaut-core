@@ -16,6 +16,7 @@
 
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.filter.HttpClientFilter;
 
 import java.net.URI;
@@ -27,6 +28,7 @@ import java.util.List;
  * @since 1.2.4
  * @author svishnyakoff
  */
+@Internal
 public interface FilterResolver {
 
     List<HttpClientFilter> resolveFilters(io.micronaut.http.HttpRequest<?> request, URI requestURI);
