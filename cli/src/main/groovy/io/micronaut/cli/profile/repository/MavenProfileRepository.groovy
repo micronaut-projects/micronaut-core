@@ -82,6 +82,12 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
     }
 
     @Override
+    @CompileDynamic
+    String findVersion(String artifactId) {
+        return profileDependencyVersions.find(artifactId)?.version
+    }
+
+    @Override
     Profile getProfile(String profileName, Boolean parentProfile) {
         String profileShortName = profileName
         if (profileName.contains(':')) {
