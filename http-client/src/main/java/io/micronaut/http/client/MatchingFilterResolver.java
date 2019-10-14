@@ -32,6 +32,8 @@ import io.micronaut.http.annotation.FilterAnnotation;
 import io.micronaut.http.filter.FilterProperties;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.MatchingHttpClientFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -52,6 +54,7 @@ import java.util.stream.Stream;
 @Primary
 @Singleton
 public class MatchingFilterResolver implements FilterResolver {
+    private static final Logger LOG = LoggerFactory.getLogger(MatchingFilterResolver.class);
 
     private final Collection<HttpClientFilter> filters;
     private final AnnotationMetadata annotationMetadata;
@@ -119,6 +122,12 @@ public class MatchingFilterResolver implements FilterResolver {
                     .map(MatchingHttpClientFilter::getFilterProperties)
                     .orElse(FilterProperties.EMPTY_FILTER_PROPERTIES);
 
+            for (Class<? extends Annotation> stereotype : instanceProperties.getStereotypes()) {
+                if (!annotationMetadataResolver.resolveMetadata(stereotype).hasStereotype(FilterAnnotation.class)) {
+                    LOG.warn("Filter stereotype annotation {} is not marked with @FilterAnnotation that makes it completely ignored.", stereotype.getSimpleName());
+                }
+            }
+
             FilterProperties filterProperties = instanceProperties.merge(annotationFilterProperties);
 
             BooleanSupplier pathMatches = () -> filterByPath(filterProperties.getPatterns(), requestPath);
@@ -154,9 +163,9 @@ public class MatchingFilterResolver implements FilterResolver {
                                        Class[] declaredFilterAnnotations) {
 
         Set<Class> declaredAnnotationSet = Arrays.stream(declaredFilterAnnotations).collect(Collectors.toSet());
-        boolean markerPresent = Arrays.stream(filterStereotypes).anyMatch(declaredAnnotationSet::contains);
-        boolean markerIsRequired = filterStereotypes.length > 0;
+        boolean filterAnnotationPresent = Arrays.stream(filterStereotypes).anyMatch(declaredAnnotationSet::contains);
+        boolean filterByAnnotationIsRequired = filterStereotypes.length > 0;
 
-        return !markerIsRequired || markerPresent;
+        return !filterByAnnotationIsRequired || filterAnnotationPresent;
     }
 }

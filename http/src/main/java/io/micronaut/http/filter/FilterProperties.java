@@ -15,11 +15,11 @@
  */
 package io.micronaut.http.filter;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.annotation.Filter;
 
+import javax.annotation.Nonnull;
 import java.lang.annotation.Annotation;
 
 /**
@@ -28,7 +28,6 @@ import java.lang.annotation.Annotation;
  * @author svishnyakoff
  * @since 1.2.4
  */
-@Internal
 public final class FilterProperties {
 
     /**
@@ -52,10 +51,10 @@ public final class FilterProperties {
      * @param serviceId         the serviceId to match
      * @param stereotypes the annotation markers to match
      */
-    public FilterProperties(String[] patterns,
-                            HttpMethod[] methods,
-                            String[] serviceId,
-                            Class<? extends Annotation>[] stereotypes) {
+    public FilterProperties(@Nonnull String[] patterns,
+                            @Nonnull HttpMethod[] methods,
+                            @Nonnull String[] serviceId,
+                            @Nonnull Class<? extends Annotation>[] stereotypes) {
         this.patterns = patterns;
         this.methods = methods;
         this.serviceId = serviceId;
@@ -66,6 +65,7 @@ public final class FilterProperties {
      * @param properties additional properties you want to include
      * @return new {@link FilterProperties} that contains properties from current and given object.
      */
+    @Nonnull
     public FilterProperties merge(FilterProperties properties) {
         return new FilterProperties(
                 ArrayUtils.concat(patterns, properties.patterns),
@@ -78,6 +78,7 @@ public final class FilterProperties {
     /**
      * @return The patterns this filter should match
      */
+    @Nonnull
     public String[] getPatterns() {
         return this.patterns;
     }
@@ -85,6 +86,7 @@ public final class FilterProperties {
     /**
      * @return The methods to match. Defaults to all
      */
+    @Nonnull
     public HttpMethod[] getMethods() {
         return this.methods;
     }
@@ -94,6 +96,7 @@ public final class FilterProperties {
      *
      * @return The service identifiers
      */
+    @Nonnull
     public String[] getServiceId() {
         return this.serviceId;
     }
@@ -102,8 +105,11 @@ public final class FilterProperties {
      * If provided, filter will be applied only to {@code io.micronaut.http.client.Client} that are marked
      * with one of provided annotations.
      *
-     * @return Marker annotations
+     * All the provided stereotype annotations must be marked with {@link io.micronaut.http.annotation.FilterAnnotation}.
+     *
+     * @return Stereotype annotations
      */
+    @Nonnull
     public Class<? extends Annotation>[] getStereotypes() {
         return this.stereotypes;
     }

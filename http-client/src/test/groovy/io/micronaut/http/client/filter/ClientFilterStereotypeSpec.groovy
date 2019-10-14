@@ -98,7 +98,7 @@ class ClientFilterStereotypeSpec extends Specification {
         String echo()
     }
 
-    @Client("/filters/unmarked")
+    @Client("/filters/marked")
     static interface UnmarkedClient {
         @Get("/")
         String echo()
@@ -110,15 +110,10 @@ class ClientFilterStereotypeSpec extends Specification {
         String marked() {
             return "echo"
         }
-
-        @Get('/unmarked')
-        String unmarked() {
-            return "echo"
-        }
     }
 
 
-    @Filter(patterns = '/filters/*')
+    @Filter
     @MarkerStereotypeAnnotation
     static class MarkerFilter implements HttpClientFilter {
 

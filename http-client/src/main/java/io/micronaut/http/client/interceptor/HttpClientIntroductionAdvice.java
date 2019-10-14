@@ -41,32 +41,9 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
-import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.CookieValue;
-import io.micronaut.http.annotation.CustomHttpMethod;
-import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.HttpMethodMapping;
-import io.micronaut.http.annotation.PathVariable;
-import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.annotation.QueryValue;
-import io.micronaut.http.annotation.RequestAttribute;
-import io.micronaut.http.client.BlockingHttpClient;
-import io.micronaut.http.client.DefaultHttpClient;
-import io.micronaut.http.client.FilterResolver;
-import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.LoadBalancer;
-import io.micronaut.http.client.LoadBalancerResolver;
-import io.micronaut.http.client.ReactiveClientResultTransformer;
-import io.micronaut.http.client.StreamingHttpClient;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -97,13 +74,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.Closeable;
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
@@ -132,7 +103,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final int HEADERS_INITIAL_CAPACITY = 3;
     private final int ATTRIBUTES_INITIAL_CAPACITY = 1;
     private final BeanContext beanContext;
-    private final Map<String, HttpClient> clients = new ConcurrentHashMap<>();
+    private final Map<ClientKey, HttpClient> clients = new ConcurrentHashMap<>();
     private final Map<String, ClientVersioningConfiguration> versioningConfigurations = new ConcurrentHashMap<>();
     private final List<ReactiveClientResultTransformer> transformers;
     private final LoadBalancerResolver loadBalancerResolver;
@@ -190,9 +161,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         Class<?> declaringType = context.getDeclaringType();
         if (Closeable.class == declaringType || AutoCloseable.class == declaringType) {
-            String clientId = clientAnnotation.stringValue().orElse(null);
-            String path = clientAnnotation.stringValue("path").orElse(null);
-            String clientKey = computeClientKey(clientId, path);
+            ClientKey clientKey = new ClientKey(clientAnnotation, context);
             clients.remove(clientKey);
             httpClient.close();
             return null;
@@ -658,10 +627,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn) {
         String clientId = getClientId(clientAnn);
         String path = clientAnn.stringValue("path").orElse(null);
-        String clientKey = computeClientKey(clientId, path);
-        if (clientKey == null) {
-            return null;
-        }
+        ClientKey clientKey = new ClientKey(clientAnn, context);
 
         return clients.computeIfAbsent(clientKey, integer -> {
             HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(NameUtils.hyphenate(clientId))).orElse(null);
@@ -764,17 +730,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return clientId;
     }
 
-    private String computeClientKey(String clientId, String path) {
-        if (StringUtils.isEmpty(clientId)) {
-            return null;
-        }
-        String clientKey = clientId;
-        if (StringUtils.isNotEmpty(path)) {
-            clientKey = clientKey + path;
-        }
-        return clientKey;
-    }
-
     private String appendQuery(String uri, Map<String, String> queryParams) {
         if (!queryParams.isEmpty()) {
             final UriBuilder builder = UriBuilder.of(uri);
@@ -795,6 +750,40 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     public void close() {
         for (HttpClient client : clients.values()) {
             client.close();
+        }
+    }
+
+    /**
+     * Client key.
+     */
+    private class ClientKey {
+        final String clientId;
+        final String path;
+        final Set<Class> filterAnnotations;
+
+        public ClientKey(AnnotationValue<Client> clientAnn, MethodInvocationContext<Object, Object> context) {
+            this.clientId = getClientId(clientAnn);
+            this.path = clientAnn.stringValue("path").orElse(null);
+            this.filterAnnotations = new HashSet<>(context.getAnnotationMetadata().getAnnotationTypesByStereotype(FilterAnnotation.class));
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            ClientKey clientKey = (ClientKey) o;
+            return Objects.equals(clientId, clientKey.clientId) &&
+                    Objects.equals(filterAnnotations, clientKey.filterAnnotations) &&
+                    Objects.equals(path, clientKey.path);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(clientId, path, filterAnnotations);
         }
     }
 }
