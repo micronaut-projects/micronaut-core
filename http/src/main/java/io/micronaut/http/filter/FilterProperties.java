@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.filter;
 
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
@@ -39,32 +38,22 @@ public final class FilterProperties {
     private final String[] patterns;
     private final HttpMethod[] methods;
     private final String[] serviceId;
-    private final Class<? extends Annotation>[] annotationMarkers;
+    private final Class<? extends Annotation>[] stereotypes;
 
     /**
      * @param patterns          the patterns this filter should match
      * @param methods           the methods to match
      * @param serviceId         the serviceId to match
-     * @param annotationMarkers the annotation markers to match
+     * @param stereotypes the annotation markers to match
      */
     public FilterProperties(String[] patterns,
                             HttpMethod[] methods,
                             String[] serviceId,
-                            Class<? extends Annotation>[] annotationMarkers) {
+                            Class<? extends Annotation>[] stereotypes) {
         this.patterns = patterns;
         this.methods = methods;
         this.serviceId = serviceId;
-        this.annotationMarkers = annotationMarkers;
-    }
-
-    /**
-     * @param annotationValue source of filter properties
-     */
-    public FilterProperties(AnnotationValue<Filter> annotationValue) {
-        this.patterns = annotationValue.stringValues("patterns");
-        this.methods = annotationValue.get("methods", io.micronaut.http.HttpMethod[].class, null);
-        this.serviceId = annotationValue.stringValues("serviceId");
-        this.annotationMarkers = (Class<? extends Annotation>[]) annotationValue.classValues("annotationMarkers");
+        this.stereotypes = stereotypes;
     }
 
     /**
@@ -76,7 +65,7 @@ public final class FilterProperties {
                 ArrayUtils.concat(patterns, properties.patterns),
                 ArrayUtils.concat(methods, properties.methods),
                 ArrayUtils.concat(serviceId, properties.serviceId),
-                ArrayUtils.concat(annotationMarkers, properties.annotationMarkers)
+                ArrayUtils.concat(stereotypes, properties.stereotypes)
         );
     }
 
@@ -109,7 +98,7 @@ public final class FilterProperties {
      *
      * @return Marker annotations
      */
-    public Class<? extends Annotation>[] getAnnotationMarkers() {
-        return this.annotationMarkers;
+    public Class<? extends Annotation>[] getStereotypes() {
+        return this.stereotypes;
     }
 }

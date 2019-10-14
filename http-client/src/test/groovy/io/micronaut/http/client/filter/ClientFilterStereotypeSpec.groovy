@@ -32,7 +32,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class ClientFilterMarkerSpec extends Specification {
+class ClientFilterStereotypeSpec extends Specification {
 
     @Shared
     @AutoCleanup
@@ -54,7 +54,7 @@ class ClientFilterMarkerSpec extends Specification {
     }
 
     @Client("/filters/marked")
-    @MarkerAnnotation
+    @MarkerStereotypeAnnotation
     static interface MarkedClient {
         @Get("/")
         String echo()
@@ -80,7 +80,8 @@ class ClientFilterMarkerSpec extends Specification {
     }
 
 
-    @Filter(patterns = '/filters/*', annotationMarkers = [MarkerAnnotation])
+    @Filter(patterns = '/filters/*')
+    @MarkerStereotypeAnnotation
     static class MarkerFilter implements HttpClientFilter {
 
         @Override

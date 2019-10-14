@@ -21,10 +21,15 @@ import io.micronaut.context.LifeCycle;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.scope.CustomScope;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.client.*;
+import io.micronaut.http.client.FilterResolver;
+import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.inject.BeanDefinition;
@@ -38,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Provider;
 import javax.inject.Singleton;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -134,12 +140,9 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
                 throw new IllegalStateException("Referenced HTTP client configuration class must be an instance of HttpClientConfiguration for injection point: " + segment);
             }
 
-            HttpClient client = (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration, contextPath);
-            if (client instanceof DefaultHttpClient) {
-                DefaultHttpClient defaultClient = (DefaultHttpClient) client;
-                defaultClient.setClientIdentifiers(value);
-            }
-            return client;
+            FilterResolver filterResolver = beanContext.createBean(FilterResolver.class, AnnotationMetadata.EMPTY_METADATA, //todo svishnyakoff is it really should be empty or we should take information from annotated filed
+                                                                   Collections.singleton(value));
+            return (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration, contextPath, filterResolver);
         });
     }
 

@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.http.HttpMethod;
 
 import javax.inject.Singleton;
-import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -69,13 +68,4 @@ public @interface Filter {
      * @return The service identifiers
      */
     String[] serviceId() default {};
-
-
-    /**
-     * If provided, filter will be applied only to {@code io.micronaut.http.client.Client} that are marked
-     * with one of provided annotations.
-     *
-     * @return Marker annotations
-     */
-    Class<? extends Annotation>[] annotationMarkers() default {};
 }

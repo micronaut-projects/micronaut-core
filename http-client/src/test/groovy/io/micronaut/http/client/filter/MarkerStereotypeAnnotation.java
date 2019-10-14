@@ -16,6 +16,8 @@
 
 package io.micronaut.http.client.filter;
 
+import io.micronaut.http.annotation.FilterAnnotation;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -25,6 +27,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-public @interface MarkerAnnotation {
+@FilterAnnotation
+public @interface MarkerStereotypeAnnotation {
 
 }

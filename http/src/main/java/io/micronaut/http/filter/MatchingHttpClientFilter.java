@@ -22,7 +22,7 @@ package io.micronaut.http.filter;
  * the filter should be applied to that is static configuration, by implementing this interface you can
  * configure filter at runtime.
  */
-public interface RuntimeHttpClientFilter extends HttpClientFilter {
+public interface MatchingHttpClientFilter extends HttpClientFilter {
 
     /**
      * The method returns {@link FilterProperties} which controls what request filter is applied to.

@@ -16,7 +16,12 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Secondary;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
@@ -28,7 +33,11 @@ import io.micronaut.scheduling.TaskScheduler;
 import io.reactivex.Flowable;
 
 import java.net.URI;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -92,15 +101,12 @@ public class ServiceHttpClientFactory {
 
         Optional<String> path = configuration.getPath();
         LoadBalancer loadBalancer = loadBalancerFactory.create(instanceList);
-        DefaultHttpClient httpClient;
-        if (path.isPresent()) {
-            httpClient = beanContext.createBean(DefaultHttpClient.class, loadBalancer, configuration, path.get());
-        } else {
-            httpClient = beanContext.createBean(DefaultHttpClient.class, loadBalancer, configuration);
-        }
+        // todo svishnyakoff stereotype filtering will not work properly for annotated instances of HttpClient
+        FilterResolver filterResolver = beanContext.createBean(FilterResolver.class,
+                                                               AnnotationMetadata.EMPTY_METADATA,
+                                                               Collections.singleton(configuration.getServiceId()));
 
-        httpClient.setClientIdentifiers(configuration.getServiceId());
-
+        DefaultHttpClient httpClient = beanContext.createBean(DefaultHttpClient.class, loadBalancer, configuration, path.orElse(null), filterResolver);
         if (isHealthCheck) {
             taskScheduler.scheduleWithFixedDelay(configuration.getHealthCheckInterval(), configuration.getHealthCheckInterval(), () -> Flowable.fromIterable(originalURLs).flatMap(originalURI -> {
                 URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());

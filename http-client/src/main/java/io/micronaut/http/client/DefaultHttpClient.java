@@ -23,8 +23,6 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
@@ -173,16 +171,12 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -234,12 +228,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
     private final String contextPath;
-    private final AnnotationMetadata annotationMetadata;
     private final SslContext sslContext;
-    private final AnnotationMetadataResolver annotationMetadataResolver;
     private final ThreadFactory threadFactory;
 
-    private final List<HttpClientFilter> filters;
     private final Charset defaultCharset;
     private final ChannelPoolMap<RequestKey, ChannelPool> poolMap;
     private final Logger log;
@@ -247,7 +238,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private final @Nullable Long connectionTimeAliveMillis;
     private final FilterResolver filterResolver;
 
-    private Set<String> clientIdentifiers = Collections.emptySet();
     private WebSocketBeanRegistry webSocketRegistry = WebSocketBeanRegistry.EMPTY;
     private RequestBinderRegistry requestBinderRegistry;
 
@@ -260,8 +250,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param threadFactory              The thread factory to use for client threads
      * @param nettyClientSslBuilder      The SSL builder
      * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
-     * @param annotationMetadataResolver The annotation metadata resolver
-     * @param filters                    The filters to use
      */
     public DefaultHttpClient(@Parameter LoadBalancer loadBalancer,
                              @Parameter HttpClientConfiguration configuration,
@@ -269,9 +257,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
-                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              HttpClientFilter... filters) {
-        this(loadBalancer, configuration, contextPath, AnnotationMetadata.EMPTY_METADATA, threadFactory, nettyClientSslBuilder, codecRegistry, annotationMetadataResolver, Arrays.asList(filters));
+        this(loadBalancer, configuration, contextPath, new SimpleFilterResolver(filters), threadFactory, nettyClientSslBuilder, codecRegistry);
     }
 
     /**
@@ -280,28 +267,23 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
      * @param configuration              The {@link HttpClientConfiguration} object
      * @param contextPath                The base URI to prepend to request uris
-     * @param annotationMetadata         The annotation metadata of a declarative http client
+     * @param filterResolver             The resolver to get filters applicable to request
      * @param threadFactory              The thread factory to use for client threads
      * @param nettyClientSslBuilder      The SSL builder
      * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
-     * @param annotationMetadataResolver The annotation metadata resolver
-     * @param filters                    The filters to use
      */
     @Inject
     public DefaultHttpClient(@Parameter LoadBalancer loadBalancer,
                              @Parameter HttpClientConfiguration configuration,
                              @Parameter @Nullable String contextPath,
-                             @Parameter @Nullable AnnotationMetadata annotationMetadata,
+                             @Parameter FilterResolver filterResolver,
                              @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
                              NettyClientSslBuilder nettyClientSslBuilder,
-                             MediaTypeCodecRegistry codecRegistry,
-                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
-                             List<HttpClientFilter> filters) {
+                             MediaTypeCodecRegistry codecRegistry) {
 
         this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
         this.contextPath = contextPath;
-        this.annotationMetadata = Optional.ofNullable(annotationMetadata).orElse(AnnotationMetadata.EMPTY_METADATA);
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
         this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration()).orElse(null);
@@ -375,10 +357,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             }
         }
         this.mediaTypeCodecRegistry = codecRegistry;
-        this.filters = filters;
-        this.annotationMetadataResolver = annotationMetadataResolver != null ? annotationMetadataResolver : AnnotationMetadataResolver.DEFAULT;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(LOG);
-        this.filterResolver = new FilterResolver(this.filters, this.annotationMetadata, this.annotationMetadataResolver, () -> this.clientIdentifiers);
+        this.filterResolver = filterResolver;
     }
 
     /**
@@ -393,7 +373,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
                              HttpClientFilter... filters) {
-        this(LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class), nettyClientSslBuilder, codecRegistry, AnnotationMetadataResolver.DEFAULT, filters);
+        this(LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class), nettyClientSslBuilder, codecRegistry, filters);
     }
 
     /**
@@ -405,7 +385,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 null,
                 new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
-                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+                createDefaultMediaTypeRegistry());
     }
 
     /**
@@ -422,8 +402,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
                 LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry(),
-                AnnotationMetadataResolver.DEFAULT
+                new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry()
         );
     }
 
@@ -435,8 +414,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration, String contextPath) {
         this(
                 LoadBalancer.fixed(url), configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry(),
-                AnnotationMetadataResolver.DEFAULT
+                new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry()
         );
     }
 
@@ -448,7 +426,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this(loadBalancer,
                 configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
-                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+                createDefaultMediaTypeRegistry());
     }
 
     /**
@@ -460,7 +438,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this(loadBalancer,
                 configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
-                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+                createDefaultMediaTypeRegistry());
     }
 
     /**
@@ -525,28 +503,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             }
         }
         return this;
-    }
-
-    /**
-     * Sets the client identifiers that this client applies to. Used to select a subset of {@link HttpClientFilter}.
-     * The client identifiers are equivalents to the value of {@link io.micronaut.http.client.annotation.Client#id()}
-     *
-     * @param clientIdentifiers The client identifiers
-     */
-    public void setClientIdentifiers(Set<String> clientIdentifiers) {
-        if (clientIdentifiers != null) {
-            this.clientIdentifiers = clientIdentifiers;
-        }
-    }
-
-    /**
-     * @param clientIdentifiers The client identifiers
-     * @see #setClientIdentifiers(Set)
-     */
-    public void setClientIdentifiers(String... clientIdentifiers) {
-        if (clientIdentifiers != null) {
-            this.clientIdentifiers = new HashSet<>(Arrays.asList(clientIdentifiers));
-        }
     }
 
     /**
@@ -1365,28 +1321,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return sslCtx;
     }
 
-    /**
-     * Resolve the filters for the request path.
-     *
-     *
-     * @param parentRequest The parent request
-     * @param request    The path
-     * @param requestURI The URI of the request
-     * @return The filters
-     */
-    protected List<HttpClientFilter> resolveFilters(
-            @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
-            io.micronaut.http.HttpRequest<?> request,
-            URI requestURI) {
-        List<HttpClientFilter> filterList = new ArrayList<>();
-        if (parentRequest != null) {
-            filterList.add(new ClientServerContextFilter(parentRequest));
-        }
-        filterList.addAll(filterResolver.resolveFilters(request, requestURI));
-
-        return filterList;
-    }
-
 
     /**
      * Configures the HTTP proxy for the pipeline.
@@ -1454,8 +1388,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         if (request instanceof MutableHttpRequest) {
             ((MutableHttpRequest<I>) request).uri(requestURI);
         }
+        List<HttpClientFilter> filters = filterResolver.resolveFilters(request, requestURI);
         if (CollectionUtils.isNotEmpty(filters)) {
-            List<HttpClientFilter> httpClientFilters = resolveFilters(parentRequest, request, requestURI);
+            List<HttpClientFilter> httpClientFilters = new ArrayList<>();
+            if (parentRequest != null) {
+                httpClientFilters.add(new ClientServerContextFilter(parentRequest));
+            }
+            httpClientFilters.addAll(filters);
             OrderUtil.reverseSort(httpClientFilters);
             Publisher<io.micronaut.http.HttpResponse<O>> finalResponsePublisher = responsePublisher;
             httpClientFilters.add((req, chain) -> finalResponsePublisher);

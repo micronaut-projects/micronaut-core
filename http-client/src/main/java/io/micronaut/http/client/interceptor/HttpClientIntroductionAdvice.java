@@ -60,6 +60,7 @@ import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClient;
+import io.micronaut.http.client.FilterResolver;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
@@ -696,10 +697,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             );
             Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>) configurationClass.orElse(HttpClientConfiguration.class);
             configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
-            HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath, context);
+            FilterResolver filterResolver = beanContext.createBean(FilterResolver.class, context, Collections.singleton(clientId));
+            HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath, filterResolver);
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
-                defaultClient.setClientIdentifiers(clientId);
 
                 if (jacksonFeatures != null) {
                     Optional<MediaTypeCodec> existingCodec = defaultClient.getMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE);
