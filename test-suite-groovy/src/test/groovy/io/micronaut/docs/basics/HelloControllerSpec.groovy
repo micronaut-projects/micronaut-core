@@ -16,7 +16,7 @@ import spock.lang.Specification
 import static io.micronaut.http.HttpRequest.GET
 import static io.micronaut.http.HttpRequest.POST
 
-class HelloControllerSpec  extends Specification {
+class HelloControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.getApplicationContext()
