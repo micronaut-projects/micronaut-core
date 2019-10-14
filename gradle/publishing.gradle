@@ -74,24 +74,20 @@ publishing {
     repositories {
         maven {
             credentials {
-                def ossUser = System.getenv("SONATYPE_USERNAME") ?: project.hasProperty("sonatypeOssUsername") ? project.sonatypeOssUsername : ''
-                def ossPass = System.getenv("SONATYPE_PASSWORD") ?: project.hasProperty("sonatypeOssPassword") ? project.sonatypeOssPassword : ''
+                def bintrayUser = System.getenv("BINTRAY_USER") ?: project.hasProperty("bintrayUser") ? project.bintrayUser : ''
+                def bintrayKey = System.getenv("BINTRAY_KEY") ?: project.hasProperty("bintrayKey") ? project.bintrayKey : ''
 
-                username = ossUser
-                password = ossPass
+                username = bintrayUser
+                password = bintrayKey
             }
-            if(isBuildSnapshot) {
-                url  "https://oss.sonatype.org/content/repositories/snapshots"
-            }
-            else {
-                url "https://repo.micronaut.io/artifactory/libs-releases-local"
-            }
+            url  "https://oss.jfrog.org/oss-snapshot-local"
         }
     }
 
     publications {
         maven(MavenPublication) { publication ->
             artifactId( "micronaut-" + project.name.substring(project.name.indexOf('/') + 1) )
+
             def shadowJar = tasks.findByName("shadowJar")
             if(shadowJar && shadowJar.enabled) {
                 artifact(project.tasks.shadowJar) {
@@ -151,12 +147,15 @@ publishing {
 
             }
             else {
-                from components.java
-                artifact sourcesJar {
-                    classifier "sources"
-                }
-                artifact javadocJar {
-                    classifier "javadoc"
+
+                if (project.name != 'bom') {
+                    from components.java
+                    artifact sourcesJar {
+                        classifier "sources"
+                    }
+                    artifact javadocJar {
+                        classifier "javadoc"
+                    }
                 }
 
                 pom.withXml {

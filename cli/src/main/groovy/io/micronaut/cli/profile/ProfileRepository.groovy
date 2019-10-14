@@ -17,6 +17,9 @@ package io.micronaut.cli.profile
 
 import io.micronaut.cli.io.support.Resource
 import org.eclipse.aether.artifact.Artifact
+import org.eclipse.aether.graph.Dependency
+
+import javax.annotation.Nullable
 
 /**
  *
@@ -70,4 +73,11 @@ interface ProfileRepository {
      * @return The {@link Artifact} that resolves to the profile
      */
     Artifact getProfileArtifact(String profileName)
+
+    /**
+     * Finds the version for the given artifact ID.
+     * @return the version
+     */
+    @Nullable String findVersion(String artifactId);
+
 }
