@@ -17,10 +17,13 @@ package io.micronaut.http.filter;
 
 /**
  * The implementation of this class can define at runtime what clients, paths, http methods this filter will be applied to.
- *
+ * <p>
  * Unlike with {@link HttpClientFilter} where {@link io.micronaut.http.annotation.Filter} fully controls what request or client
  * the filter should be applied to that is static configuration, by implementing this interface you can
  * configure filter at runtime.
+ *
+ * @author svishnyakoff
+ * @since 1.2.4
  */
 public interface MatchingHttpClientFilter extends HttpClientFilter {
 

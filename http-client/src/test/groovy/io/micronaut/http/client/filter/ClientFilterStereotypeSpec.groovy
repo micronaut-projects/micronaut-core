@@ -22,6 +22,7 @@ import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
@@ -32,6 +33,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.inject.Singleton
+
 class ClientFilterStereotypeSpec extends Specification {
 
     @Shared
@@ -40,17 +43,52 @@ class ClientFilterStereotypeSpec extends Specification {
 
     @Shared
     MarkedClient markedClient = embeddedServer.applicationContext.getBean(MarkedClient)
+
     @Shared
     UnmarkedClient unmarkedClient = embeddedServer.applicationContext.getBean(UnmarkedClient)
 
-    void "filter should be applied only to annotated clients "() {
+    @Shared
+    MatchedBean matchedBean = embeddedServer.applicationContext.getBean(MatchedBean)
+
+    @Shared
+    UnmatchedBean unmatchedBean = embeddedServer.applicationContext.getBean(UnmatchedBean);
+
+    void "filter should be applied only to annotated declarative clients"() {
         expect:
         markedClient.echo() == "Intercepted"
     }
 
-    void "filter should not be applied because client has no annotation "() {
+    void "filter should not be applied because declarative client has no annotation"() {
         expect:
         unmarkedClient.echo() == "echo"
+    }
+
+    void "low-level annotated client and injected in constructor intercepted by http filter"() {
+        expect:
+        matchedBean.httpClient.toBlocking().retrieve('/') == "Intercepted"
+    }
+
+    void "low-level not annotated client not intercepted by http filter"() {
+        expect:
+        unmatchedBean.httpClient.toBlocking().retrieve('/') == "echo"
+    }
+
+    @Singleton
+    static class MatchedBean {
+        HttpClient httpClient
+
+        MatchedBean(@MarkerStereotypeAnnotation @Client('/filters/marked') HttpClient httpClient) {
+            this.httpClient = httpClient
+        }
+    }
+
+    @Singleton
+    static class UnmatchedBean {
+        HttpClient httpClient
+
+        UnmatchedBean(@Client('/filters/marked') HttpClient httpClient) {
+            this.httpClient = httpClient
+        }
     }
 
     @Client("/filters/marked")

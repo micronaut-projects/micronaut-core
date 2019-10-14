@@ -17,6 +17,7 @@
 
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.filter.HttpClientFilter;
 
@@ -26,11 +27,12 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Resolver that responsible to finding all the http client filters that should be applied to given request.
+ * Resolver that unconditionally resolves to same list of filters.
  *
- * @since 1.2.3
+ * @since 1.2.4
  * @author svishnyakoff
  */
+@Internal
 public class SimpleFilterResolver implements FilterResolver {
 
     private final Collection<HttpClientFilter> filters;

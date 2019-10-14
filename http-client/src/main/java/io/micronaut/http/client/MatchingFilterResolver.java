@@ -38,13 +38,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -52,7 +46,7 @@ import java.util.stream.Stream;
 /**
  * Resolver that responsible to finding all the http client filters that should be applied to given request.
  *
- * @since 1.2.3
+ * @since 1.2.4
  * @author svishnyakoff
  */
 @Primary

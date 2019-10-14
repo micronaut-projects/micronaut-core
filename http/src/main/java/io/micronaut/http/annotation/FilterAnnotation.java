@@ -17,11 +17,7 @@
 
 package io.micronaut.http.annotation;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 
 /**
  *  Stereotype annotation that helps to link together instance of the filter and http client that filter should be applied to.
@@ -47,6 +43,9 @@ import java.lang.annotation.Target;
  *  }</pre>
  *
  *  In the example above only clients annotated with {@code @Metered} annotations are going to be filtered by MeteredHttpFilter
+ *
+ *  @since 1.2.4
+ *  @author svishnyakoff
  */
 @Documented
 @Target({ElementType.ANNOTATION_TYPE})

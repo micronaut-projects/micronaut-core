@@ -35,17 +35,9 @@ import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpResponseWrapper;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpHeaders;
-import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.*;
 import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.client.exceptions.ContentLengthExceededException;
-import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
-import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.client.exceptions.ReadTimeoutException;
+import io.micronaut.http.client.exceptions.*;
 import io.micronaut.http.client.filters.ClientServerContextFilter;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.sse.RxSseClient;
@@ -78,49 +70,18 @@ import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.CompositeByteBuf;
-import io.netty.buffer.EmptyByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.MultithreadEventLoopGroup;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.buffer.*;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.pool.AbstractChannelPoolHandler;
-import io.netty.channel.pool.AbstractChannelPoolMap;
-import io.netty.channel.pool.ChannelHealthChecker;
-import io.netty.channel.pool.ChannelPool;
-import io.netty.channel.pool.ChannelPoolMap;
-import io.netty.channel.pool.FixedChannelPool;
-import io.netty.channel.pool.SimpleChannelPool;
+import io.netty.channel.pool.*;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.TooLongFrameException;
-import io.netty.handler.codec.http.DefaultHttpContent;
-import io.netty.handler.codec.http.EmptyHttpHeaders;
-import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpClientCodec;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpContentDecompressor;
-import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpUtil;
-import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
 import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
@@ -138,11 +99,7 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
-import io.reactivex.BackpressureStrategy;
-import io.reactivex.Emitter;
-import io.reactivex.Flowable;
-import io.reactivex.FlowableEmitter;
-import io.reactivex.Scheduler;
+import io.reactivex.*;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Cancellable;
 import io.reactivex.functions.Function;
@@ -159,24 +116,12 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
-import java.net.Proxy;
+import java.net.*;
 import java.net.Proxy.Type;
-import java.net.SocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.OptionalInt;
+import java.util.*;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -228,6 +173,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
     private final String contextPath;
+    private final NettyClientSslBuilder nettyClientSslBuilder;
     private final SslContext sslContext;
     private final ThreadFactory threadFactory;
 
@@ -284,6 +230,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
         this.contextPath = contextPath;
+        this.nettyClientSslBuilder = nettyClientSslBuilder;
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
         this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration()).orElse(null);
@@ -439,6 +386,16 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry());
+    }
+
+    /**
+     * Factory method to create new instance of {@link DefaultHttpClient} with overridden {@link FilterResolver}.
+     *
+     * @param filterResolver filter resolver that new instance should be created with
+     * @return new instance of {@link DefaultHttpClient} with overridden {@link FilterResolver}.
+     */
+    public DefaultHttpClient withFilterResolver(FilterResolver filterResolver) {
+        return new DefaultHttpClient(this.loadBalancer, this.configuration, this.contextPath, filterResolver, this.threadFactory, this.nettyClientSslBuilder, this.mediaTypeCodecRegistry);
     }
 
     /**

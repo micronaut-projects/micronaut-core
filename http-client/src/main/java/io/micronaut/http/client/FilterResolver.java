@@ -24,7 +24,7 @@ import java.util.List;
 /**
  * Resolver that responsible to finding all the http client filters that should be applied to given request.
  *
- * @since 1.2.3
+ * @since 1.2.4
  * @author svishnyakoff
  */
 public interface FilterResolver {

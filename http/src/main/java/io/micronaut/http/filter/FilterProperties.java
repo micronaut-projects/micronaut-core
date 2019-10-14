@@ -24,10 +24,16 @@ import java.lang.annotation.Annotation;
 
 /**
  * Encapsulates all the possible configurations that might be defined in {@link Filter} annotation.
+ *
+ * @author svishnyakoff
+ * @since 1.2.4
  */
 @Internal
 public final class FilterProperties {
 
+    /**
+     * Filter properties without any filter criteria. Filters build with the usage of this instance will be applied to all http clients.
+     */
     public static final FilterProperties EMPTY_FILTER_PROPERTIES = new FilterProperties(
             new String[0],
             new HttpMethod[0],
