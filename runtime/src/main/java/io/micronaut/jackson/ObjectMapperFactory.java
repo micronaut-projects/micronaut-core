@@ -113,6 +113,9 @@ public class ObjectMapperFactory {
                 for (Class aClass : value) {
                     module.addDeserializer(aClass, deserializer);
                 }
+            } else {
+                Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
+                targetType.ifPresent(aClass -> module.addDeserializer(aClass, deserializer));
             }
         }
 
@@ -124,9 +127,6 @@ public class ObjectMapperFactory {
                 for (Class clazz : value) {
                     module.addKeyDeserializer(clazz, keyDeserializer);
                 }
-            } else {
-                Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
-                targetType.ifPresent(clazz -> module.addKeyDeserializer(clazz, keyDeserializer));
             }
         }
         objectMapper.registerModule(module);
