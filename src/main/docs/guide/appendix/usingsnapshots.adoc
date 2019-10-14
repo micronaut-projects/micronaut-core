@@ -8,10 +8,8 @@ ext {
   micronautVersion = '1.0.2.BUILD-SNAPSHOT'
 }
 repositories {
-  mavenLocal()
-  mavenCentral()
   jcenter() <1>
-  maven { url "https://oss.sonatype.org/content/repositories/snapshots/" } // <2>
+  maven { url "https://oss.jfrog.org/oss-snapshot-local" } // <2>
 }
 dependencyManagement {
   imports {
@@ -20,8 +18,8 @@ dependencyManagement {
 }
 ----
 
-<1> Micronaut releases are available on jcenter
-<2> Micronaut snapshots are available on sonatype
+<1> Micronaut releases are available on JCenter and Maven Central
+<2> Micronaut snapshots are available on JFrog OSS
 
 In the case of Maven, edit `pom.xml`:
 
@@ -41,8 +39,8 @@ In the case of Maven, edit `pom.xml`:
       <url>https://jcenter.bintray.com</url> <!--2-->
     </repository>
     <repository>
-      <id>sonatype-snapshots</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots/</url> <!--3-->
+      <id>jfrog-snapshots</id>
+      <url>https://oss.jfrog.org/oss-snapshot-local</url> <!--3-->
     </repository>
   </repositories>
 
@@ -63,5 +61,5 @@ In the case of Maven, edit `pom.xml`:
 
 ----
 <1> Set the snapshot version.
-<2> Micronaut releases are available on jcenter
-<3> Micronaut snapshots are available on sonatype
+<2> Micronaut releases are available on JCenter and Maven Central
+<3> Micronaut snapshots are available on JFrog OSS Snapshots

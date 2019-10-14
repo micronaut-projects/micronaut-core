@@ -27,6 +27,7 @@ import io.micronaut.cli.profile.ProjectContext
 import io.micronaut.cli.profile.ProjectContextAware
 import org.eclipse.aether.artifact.Artifact
 import org.eclipse.aether.artifact.DefaultArtifact
+import org.eclipse.aether.graph.Dependency
 
 /**
  * A repository that loads profiles from JAR files
@@ -46,6 +47,11 @@ abstract class AbstractJarProfileRepository implements ProfileRepository {
     @Override
     Profile getProfile(String profileName) {
         return profilesByName[profileName]
+    }
+
+    @Override
+    String findVersion(String artifactId) {
+        return null
     }
 
     @Override

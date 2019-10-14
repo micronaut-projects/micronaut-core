@@ -17,6 +17,7 @@ package io.micronaut.cli.io.support
 
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
+import io.micronaut.cli.profile.ProfileRepository
 import org.eclipse.aether.graph.Dependency
 import org.eclipse.aether.graph.Exclusion
 import org.eclipse.aether.util.graph.selector.ExclusionDependencySelector
@@ -30,7 +31,7 @@ abstract class BuildTokens {
         this.appname = appname
     }
 
-    abstract Map getTokens(Profile profile, List<Feature> features)
+    abstract Map getTokens(ProfileRepository profileRepository, Profile profile, List<Feature> features)
 
     protected List<Dependency> materializeDependencies(Profile profile, List<Feature> features) {
         List<Dependency> profileDependencies = profile.dependencies
