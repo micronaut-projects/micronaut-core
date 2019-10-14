@@ -1806,7 +1806,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 return Qualifiers.byType(byType);
             } else {
                 Qualifier qualifier = null;
-                boolean isIterable = isIterable();
+                boolean isIterable = isIterable() || resolutionContext.get(EachProperty.class.getName(), Class.class).map(getBeanType()::equals).orElse(false);
                 if (isIterable) {
                     Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
                             .map(map -> (Qualifier) map.get(argument));

@@ -25,8 +25,7 @@ import io.micronaut.http.client.ServiceHttpClientConfiguration
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.ssl.ClientSslConfiguration
-import io.micronaut.http.ssl.DefaultSslConfiguration
+import io.micronaut.http.ssl.ClientAuthentication
 import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
@@ -49,12 +48,20 @@ class ManualHttpServiceDefinitionSpec extends Specification {
                 'micronaut.http.services.foo.health-check-interval':'100ms',
                 'micronaut.http.services.foo.read-timeout':'15s',
                 'micronaut.http.services.foo.pool.enabled':false,
+                "micronaut.http.services.foo.ssl.enabled": false,
+                "micronaut.http.services.foo.ssl.client-authentication": "NEED",
+                "micronaut.http.services.foo.ssl.key-store.path": "classpath:foo",
+                "micronaut.http.services.foo.ssl.key-store.password": "secret",
                 'micronaut.http.services.bar.url': firstApp.getURI(),
                 'micronaut.http.services.bar.path': '/manual/http/service',
                 'micronaut.http.services.bar.health-check':true,
                 'micronaut.http.services.bar.health-check-interval':'100ms',
                 'micronaut.http.services.bar.read-timeout':'10s',
                 'micronaut.http.services.bar.pool.enabled':true,
+                "micronaut.http.services.bar.ssl.enabled": false,
+                "micronaut.http.services.bar.ssl.client-authentication": "NEED",
+                "micronaut.http.services.bar.ssl.key-store.path": "classpath:bar",
+                "micronaut.http.services.bar.ssl.key-store.password": "secret",
                 'micronaut.http.services.baz.url': firstApp.getURI(),
                 'micronaut.http.services.baz.path': '/manual/http/service',
         )
@@ -66,7 +73,12 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
         then:
         config.readTimeout.get() == Duration.ofSeconds(15)
-        !config.getConnectionPoolConfiguration().isEnabled()
+        !config.connectionPoolConfiguration.enabled
+        !config.sslConfiguration.enabled
+        config.sslConfiguration.keyStore.password.get() == "secret"
+        config.sslConfiguration.keyStore.path.get() == "classpath:foo"
+        config.sslConfiguration.clientAuthentication.get() == ClientAuthentication.NEED
+
 
         when:
         RxHttpClient client = clientApp.getBean(RxHttpClient, Qualifiers.byName("foo"))
@@ -83,6 +95,10 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         then:
         config.readTimeout.get() == Duration.ofSeconds(10)
         config.getConnectionPoolConfiguration().isEnabled()
+        !config.sslConfiguration.enabled
+        config.sslConfiguration.keyStore.password.get() == "secret"
+        config.sslConfiguration.keyStore.path.get() == "classpath:bar"
+        config.sslConfiguration.clientAuthentication.get() == ClientAuthentication.NEED
 
         when:
         client = clientApp.getBean(RxHttpClient, Qualifiers.byName("bar"))
