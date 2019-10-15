@@ -30,6 +30,10 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
+    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-kotlintest"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
     testCompile 'io.kotlintest:kotlintest-runner-junit5:3.3.0'
     testRuntime "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
 }
