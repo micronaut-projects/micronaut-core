@@ -42,11 +42,15 @@ public abstract class SslBuilder<T> {
     }
 
     /**
+     * @param ssl The ssl configuration
+     *
      * @return Builds the SSL configuration wrapped inside an optional
      */
     public abstract Optional<T> build(SslConfiguration ssl);
 
     /**
+     * @param ssl The ssl configuration
+     *
      * @return The {@link TrustManagerFactory}
      */
     protected TrustManagerFactory getTrustManagerFactory(SslConfiguration ssl) {
@@ -62,6 +66,8 @@ public abstract class SslBuilder<T> {
     }
 
     /**
+     * @param ssl The ssl configuration
+     *
      * @return An optional {@link KeyStore}
      * @throws Exception if there is an error
      */
@@ -75,6 +81,8 @@ public abstract class SslBuilder<T> {
     }
 
     /**
+     * @param ssl The ssl configuration
+     *
      * @return The {@link KeyManagerFactory}
      */
     protected KeyManagerFactory getKeyManagerFactory(SslConfiguration ssl) {
@@ -95,6 +103,8 @@ public abstract class SslBuilder<T> {
     }
 
     /**
+     * @param ssl The ssl configuration
+     *
      * @return An optional {@link KeyStore}
      * @throws Exception if there is an error
      */

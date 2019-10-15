@@ -47,6 +47,7 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
     private KeyStore trustStoreCache = null;
 
     /**
+     * @param ssl              The ssl configuration
      * @param resourceResolver The resource resolver
      */
     public CertificateProvidedSslBuilder(ServerSslConfiguration ssl, ResourceResolver resourceResolver) {

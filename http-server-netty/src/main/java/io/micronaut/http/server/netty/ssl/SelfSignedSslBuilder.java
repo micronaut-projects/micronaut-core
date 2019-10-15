@@ -28,7 +28,6 @@ import io.netty.handler.ssl.util.SelfSignedCertificate;
 
 import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
-import java.security.KeyStore;
 import java.security.cert.CertificateException;
 import java.util.Optional;
 
