@@ -1796,18 +1796,39 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
-                HttpResponseStatus status = fullResponse.status();
-                int statusCode = status.code();
-                HttpStatus httpStatus;
                 try {
-                    httpStatus = HttpStatus.valueOf(statusCode);
-                } catch (IllegalArgumentException e) {
-                    emitter.onError(e);
-                    return;
+
+                    HttpResponseStatus status = fullResponse.status();
+                    int statusCode = status.code();
+                    HttpStatus httpStatus;
+                    try {
+                        httpStatus = HttpStatus.valueOf(statusCode);
+                    } catch (IllegalArgumentException e) {
+                        emitter.onError(e);
+                        return;
+                    }
+
+                    handleResponse(fullResponse, status, statusCode, httpStatus);
+                } finally {
+                    if (fullResponse.refCnt() > 0) {
+                        try {
+                            ReferenceCountUtil.release(fullResponse);
+                        } catch (Throwable e) {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Failed to release response: {}", fullResponse);
+                            }
+                        }
+                    }
+                    if (!HttpUtil.isKeepAlive(fullResponse)) {
+                        keepAlive = false;
+                    }
+                    pipeline.remove(this);
+
                 }
+            }
 
+            private void handleResponse(FullHttpResponse fullResponse, HttpResponseStatus status, int statusCode, HttpStatus httpStatus) {
                 try {
-
                     HttpHeaders headers = fullResponse.headers();
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
@@ -1928,21 +1949,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             LOG.warn("Exception fired after handler completed: " + t.getMessage(), t);
                         }
                     }
-                } finally {
-                    if (fullResponse.refCnt() > 0) {
-                        try {
-                            ReferenceCountUtil.release(fullResponse);
-                        } catch (Throwable e) {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Failed to release response: {}", fullResponse);
-                            }
-                        }
-                    }
-                    if (!HttpUtil.isKeepAlive(fullResponse)) {
-                        keepAlive = false;
-                    }
-                    pipeline.remove(this);
-
                 }
             }
 
