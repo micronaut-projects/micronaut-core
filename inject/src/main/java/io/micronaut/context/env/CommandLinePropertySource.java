@@ -13,12 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.runtime.context.env;
+package io.micronaut.context.env;
 
-import io.micronaut.context.env.MapPropertySource;
-import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.cli.CommandLine;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,9 +25,7 @@ import java.util.Map;
  *
  * @author Graeme Rocher
  * @since 1.0
- * @deprecated Use {@link io.micronaut.context.env.CommandLinePropertySource} instead
  */
-@Deprecated
 public class CommandLinePropertySource extends MapPropertySource {
 
     /**
@@ -68,3 +63,4 @@ public class CommandLinePropertySource extends MapPropertySource {
         return map;
     }
 }
+
