@@ -1804,7 +1804,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     try {
                         httpStatus = HttpStatus.valueOf(statusCode);
                     } catch (IllegalArgumentException e) {
-                        emitter.onError(e);
+                        if (complete.compareAndSet(false, true)) {
+                            emitter.onError(e);
+                        } else {
+                            getLog().warn("unsupported http status after completion", e);
+                        }
                         return;
                     }
 
