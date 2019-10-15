@@ -12,13 +12,13 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
-
 package io.micronaut.http.client;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -38,7 +38,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.util.*;
@@ -53,8 +52,9 @@ import java.util.stream.Stream;
  * @author svishnyakoff
  */
 @Primary
-@Singleton
+@Prototype
 @Internal
+@BootstrapContextCompatible
 public class MatchingFilterResolver implements FilterResolver {
     private static final Logger LOG = LoggerFactory.getLogger(MatchingFilterResolver.class);
 
@@ -70,10 +70,10 @@ public class MatchingFilterResolver implements FilterResolver {
      * @param filters                    all filters
      */
     @Inject
-    MatchingFilterResolver(@Nullable @Parameter AnnotationMetadata annotationMetadata,
-                           @Nullable @Parameter Set<String> clientIdentifiers,
-                           @Nullable AnnotationMetadataResolver annotationMetadataResolver,
-                           Collection<HttpClientFilter> filters) {
+    public MatchingFilterResolver(@Nullable @Parameter AnnotationMetadata annotationMetadata,
+                                  @Nullable @Parameter Set<String> clientIdentifiers,
+                                  @Nullable AnnotationMetadataResolver annotationMetadataResolver,
+                                  @Nullable Collection<HttpClientFilter> filters) {
         this.filters = filters;
         this.annotationMetadata = Optional.ofNullable(annotationMetadata).orElse(AnnotationMetadata.EMPTY_METADATA);
         this.annotationMetadataResolver = Optional.ofNullable(annotationMetadataResolver)
@@ -116,7 +116,7 @@ public class MatchingFilterResolver implements FilterResolver {
                             f.stringValues("serviceId"),
                             declaredFilterAnnotations)
                     )
-                    .orElse(FilterProperties.EMPTY_FILTER_PROPERTIES);
+                    .orElse(new FilterProperties(declaredFilterAnnotations));
 
             FilterProperties instanceProperties = Optional.of(filter)
                     .filter(f -> f instanceof MatchingFilterResolver)

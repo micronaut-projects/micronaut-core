@@ -20,7 +20,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
@@ -112,9 +111,8 @@ class ClientFilterStereotypeSpec extends Specification {
         }
     }
 
-
-    @Filter
     @MarkerStereotypeAnnotation
+    @Singleton
     static class MarkerFilter implements HttpClientFilter {
 
         @Override

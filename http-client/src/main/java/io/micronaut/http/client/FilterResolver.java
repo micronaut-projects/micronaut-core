@@ -31,5 +31,12 @@ import java.util.List;
 @Internal
 public interface FilterResolver {
 
+    /**
+     * Resolves given request to a set of http filters.
+     *
+     * @param request    http request
+     * @param requestURI request uri
+     * @return List of http filters that should be applied to a given request.
+     */
     List<HttpClientFilter> resolveFilters(io.micronaut.http.HttpRequest<?> request, URI requestURI);
 }

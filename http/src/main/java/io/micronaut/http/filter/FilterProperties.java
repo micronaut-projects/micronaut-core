@@ -17,13 +17,12 @@ package io.micronaut.http.filter;
 
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.http.annotation.Filter;
 
 import javax.annotation.Nonnull;
 import java.lang.annotation.Annotation;
 
 /**
- * Encapsulates all the possible configurations that might be defined in {@link Filter} annotation.
+ * Encapsulates all the possible configurations that might be defined in {@link io.micronaut.http.annotation.Filter} annotation.
  *
  * @author svishnyakoff
  * @since 1.2.4
@@ -58,6 +57,16 @@ public final class FilterProperties {
         this.patterns = patterns;
         this.methods = methods;
         this.serviceId = serviceId;
+        this.stereotypes = stereotypes;
+    }
+
+    /**
+     * @param stereotypes the annotation markers to match
+     */
+    public FilterProperties(@Nonnull Class<? extends Annotation>[] stereotypes) {
+        this.patterns = new String[0];
+        this.methods = new HttpMethod[0];
+        this.serviceId = new String[0];
         this.stereotypes = stereotypes;
     }
 

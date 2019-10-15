@@ -12,9 +12,7 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
-
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
@@ -37,7 +35,9 @@ public class SimpleFilterResolver implements FilterResolver {
 
     private final Collection<HttpClientFilter> filters;
 
-
+    /**
+     * @param filters set of filters this instance always will resolve to
+     */
     public SimpleFilterResolver(HttpClientFilter... filters) {
         this.filters = Arrays.asList(filters);
     }
