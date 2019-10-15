@@ -18,6 +18,7 @@ package io.micronaut.function.client.http;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.function.client.FunctionDefinition;
@@ -38,6 +39,7 @@ import io.micronaut.http.netty.channel.NettyThreadFactory;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.PreDestroy;
+import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.Closeable;
@@ -68,6 +70,7 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
      * @param annotationMetadataResolver annotationMetadataResolver
      * @param filters filters
      */
+    @Deprecated
     public HttpFunctionExecutor(
             HttpClientConfiguration configuration,
             @Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
@@ -81,10 +84,40 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
             configuration,
             null,
             threadFactory,
-            nettyClientSslBuilder,
+            new ResourceResolver(),
             codecRegistry,
             annotationMetadataResolver,
             filters
+        );
+    }
+
+    /**
+     * Constructor.
+     * @param configuration configuration
+     * @param threadFactory threadFactory
+     * @param resourceResolver resourceResolver
+     * @param codecRegistry codecRegistry
+     * @param annotationMetadataResolver annotationMetadataResolver
+     * @param filters filters
+     */
+    @Inject
+    public HttpFunctionExecutor(
+            HttpClientConfiguration configuration,
+            @Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
+            ResourceResolver resourceResolver,
+            MediaTypeCodecRegistry codecRegistry,
+            AnnotationMetadataResolver annotationMetadataResolver,
+            HttpClientFilter... filters) {
+        super();
+        this.httpClient = new DefaultHttpClient(
+                LoadBalancer.empty(),
+                configuration,
+                null,
+                threadFactory,
+                resourceResolver,
+                codecRegistry,
+                annotationMetadataResolver,
+                filters
         );
     }
 

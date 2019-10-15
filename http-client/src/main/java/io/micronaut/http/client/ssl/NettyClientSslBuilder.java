@@ -39,27 +39,23 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
-@Singleton
 @Internal
-@BootstrapContextCompatible
 public class NettyClientSslBuilder extends SslBuilder<SslContext> {
-
-    /**
-     * @param ssl              The SSL configuration
-     * @param resourceResolver The resource resolver
-     */
-    @Inject
-    public NettyClientSslBuilder(ClientSslConfiguration ssl, ResourceResolver resourceResolver) {
-        super(ssl, resourceResolver);
-    }
 
     /**
      * @param ssl The SSL configuration
      */
-    public NettyClientSslBuilder(SslConfiguration ssl/*, ResourceResolver resourceResolver*/) {
+    public NettyClientSslBuilder(SslConfiguration ssl) {
         super(ssl, new ResourceResolver());
     }
 
+    /**
+     * @param ssl The SSL configuration
+     * @param resourceResolver The resource resolver
+     */
+    public NettyClientSslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
+        super(ssl, resourceResolver);
+    }
 
     /**
      * @return The SSL configuration

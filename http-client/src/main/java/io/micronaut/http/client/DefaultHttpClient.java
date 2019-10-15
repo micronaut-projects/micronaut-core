@@ -198,8 +198,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param configuration              The {@link HttpClientConfiguration} object
      * @param contextPath                The base URI to prepend to request uris
      * @param threadFactory              The thread factory to use for client threads
-     * @param nettyClientSslBuilder      The SSL builder
      * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param resourceResolver           The resource resolver
      * @param annotationMetadataResolver The annotation metadata resolver
      * @param filters                    The filters to use
      */
@@ -207,11 +207,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              @Parameter HttpClientConfiguration configuration,
                              @Parameter @Nullable String contextPath,
                              @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
-                             NettyClientSslBuilder nettyClientSslBuilder,
+                             ResourceResolver resourceResolver,
                              MediaTypeCodecRegistry codecRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              HttpClientFilter... filters) {
-        this(loadBalancer, configuration, contextPath, threadFactory, nettyClientSslBuilder, codecRegistry, annotationMetadataResolver, Arrays.asList(filters));
+        this(loadBalancer, configuration, contextPath, threadFactory, resourceResolver, codecRegistry, annotationMetadataResolver, Arrays.asList(filters));
     }
 
     /**
@@ -221,7 +221,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param configuration              The {@link HttpClientConfiguration} object
      * @param contextPath                The base URI to prepend to request uris
      * @param threadFactory              The thread factory to use for client threads
-     * @param nettyClientSslBuilder      The SSL builder
+     * @param resourceResolver           The resource resolver. Required for SSL
      * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      * @param annotationMetadataResolver The annotation metadata resolver
      * @param filters                    The filters to use
@@ -231,7 +231,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              @Parameter HttpClientConfiguration configuration,
                              @Parameter @Nullable String contextPath,
                              @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
-                             NettyClientSslBuilder nettyClientSslBuilder,
+                             ResourceResolver resourceResolver,
                              MediaTypeCodecRegistry codecRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              List<HttpClientFilter> filters) {
@@ -241,7 +241,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.contextPath = contextPath;
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
-        this.sslContext = nettyClientSslBuilder.build().orElse(null);
+        this.sslContext = Optional.ofNullable(configuration.getSslConfiguration())
+                .map(sslConfig -> new NettyClientSslBuilder(sslConfig, resourceResolver))
+                .flatMap(NettyClientSslBuilder::build)
+                .orElse(null);
         this.group = createEventLoopGroup(configuration, threadFactory);
         this.scheduler = Schedulers.from(group);
         this.threadFactory = threadFactory;
@@ -321,16 +324,16 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     /**
      * @param url                   The URL
      * @param configuration         The {@link HttpClientConfiguration} object
-     * @param nettyClientSslBuilder The SSL builder
+     * @param resourceResolver      The resource resolver
      * @param codecRegistry         The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      * @param filters               The filters to use
      */
     public DefaultHttpClient(URL url,
                              HttpClientConfiguration configuration,
-                             NettyClientSslBuilder nettyClientSslBuilder,
+                             ResourceResolver resourceResolver,
                              MediaTypeCodecRegistry codecRegistry,
                              HttpClientFilter... filters) {
-        this(LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class), nettyClientSslBuilder, codecRegistry, AnnotationMetadataResolver.DEFAULT, filters);
+        this(LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class), resourceResolver, codecRegistry, AnnotationMetadataResolver.DEFAULT, filters);
     }
 
     /**
@@ -340,8 +343,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this(loadBalancer,
                 new DefaultHttpClientConfiguration(),
                 null,
-                new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
+                new DefaultThreadFactory(MultithreadEventLoopGroup.class), new ResourceResolver(),
                 createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -358,8 +360,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      */
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
-                LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                createSslBuilder(configuration), createDefaultMediaTypeRegistry(),
+                LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class), new ResourceResolver(), createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT
         );
     }
@@ -372,8 +373,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration, String contextPath) {
         this(
                 LoadBalancer.fixed(url), configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                createSslBuilder(configuration), createDefaultMediaTypeRegistry(),
-                AnnotationMetadataResolver.DEFAULT
+                new ResourceResolver(), createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT
         );
     }
 
@@ -384,8 +384,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
         this(loadBalancer,
                 configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
-                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+                new ResourceResolver(), createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
     /**
@@ -396,8 +395,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration, String contextPath) {
         this(loadBalancer,
                 configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
-                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
+                new ResourceResolver(), createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
     /**
