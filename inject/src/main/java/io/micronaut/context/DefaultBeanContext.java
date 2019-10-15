@@ -43,7 +43,6 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1546,6 +1545,7 @@ public class DefaultBeanContext implements BeanContext {
                        @Nullable Qualifier<T> qualifier,
                        boolean isSingleton,
                        @Nullable Map<String, Object> argumentValues) {
+        argumentValues = Optional.ofNullable(argumentValues).orElse(Collections.emptyMap());
         Qualifier declaredQualifier = resolveDeclaredQualifier(beanDefinition);
         T bean;
         Class<T> beanType = beanDefinition.getBeanType();
@@ -1574,9 +1574,6 @@ public class DefaultBeanContext implements BeanContext {
                 if (beanFactory instanceof ParametrizedBeanFactory) {
                     ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) beanFactory;
                     Argument<?>[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-                    if (argumentValues == null) {
-                        throw new BeanInstantiationException(resolutionContext, "Missing bean arguments for type: " + beanType.getName() + ". Requires arguments: " + ArrayUtils.toString(requiredArguments));
-                    }
                     Map<String, Object> convertedValues = new LinkedHashMap<>(argumentValues);
                     for (Argument<?> requiredArgument : requiredArguments) {
                         String argumentName = requiredArgument.getName();
