@@ -13,35 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.intro
+package io.micronaut.docs.server.routing
 
-// tag::imports[]
+import io.kotlintest.specs.StringSpec
 import io.micronaut.context.annotation.Property
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.annotation.MicronautTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import javax.inject.Inject
-// end::imports[]
-@Property(name = "spec.name", value = "HelloControllerSpec")
-// tag::class[]
-@MicronautTest
-class HelloControllerSpec {
 
-    @Inject
-    lateinit var server: EmbeddedServer // <1>
+import javax.inject.Inject
+
+@Property(name = "spec.name", value = "BackwardCompatibleControllerSpec")
+@MicronautTest
+class BackwardCompatibleControllerSpec {
 
     @Inject
     @field:Client("/")
-    lateinit var client: HttpClient // <2>
+    lateinit var client: HttpClient
 
     @Test
     fun testHelloWorldResponse() {
-        val rsp: String = client.toBlocking() // <3>
-                .retrieve("/hello")
-        assertEquals("Hello World", rsp) // <4>
+        var response = client.toBlocking()
+                .retrieve(HttpRequest.GET<Any>("/hello/World"))
+        assertEquals("Hello, World", response)
+
+        response = client.toBlocking()
+                .retrieve(HttpRequest.GET<Any>("/hello/person/John"))
+
+        assertEquals("Hello, John", response)
     }
 }
-//end::class[]

@@ -52,6 +52,15 @@ public @interface Options {
     String uri() default UriMapping.DEFAULT_URI;
 
     /**
+     * Only to be used in the context of a server.
+     *
+     * @return The URIs of the OPTIONS route
+     */
+    @AliasFor(annotation = HttpMethodMapping.class, member = "uris")
+    @AliasFor(annotation = UriMapping.class, member = "uris")
+    String[] uris() default {UriMapping.DEFAULT_URI};
+
+    /**
      * @return The default consumes, otherwise override from controller
      */
     @AliasFor(annotation = Consumes.class, member = "value")
