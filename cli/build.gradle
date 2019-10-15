@@ -75,11 +75,11 @@ task fatJar(type: Jar, dependsOn: ['createStartScripts']) {
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     }
     with jar
-    destinationDir = project.buildDir
+    destinationDirectory = project.buildDir
 }
 
 task cliZip(type: Zip, dependsOn: ['fatJar']) {
-    archiveName = "micronaut-${project.version}.zip"
+    archiveFileName = "micronaut-${project.version}.zip"
     into("micronaut-${project.version}") {
         from('build/bin') {
             into('bin')
