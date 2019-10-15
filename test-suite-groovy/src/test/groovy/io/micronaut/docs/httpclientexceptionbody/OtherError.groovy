@@ -1,4 +1,4 @@
-package io.micronaut.http.client.docs.httpclientexceptionbody
+package io.micronaut.docs.httpclientexceptionbody
 
 import groovy.transform.CompileStatic
 

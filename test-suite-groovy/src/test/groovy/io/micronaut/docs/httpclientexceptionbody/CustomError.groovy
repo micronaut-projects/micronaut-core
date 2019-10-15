@@ -13,20 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.docs.streaming;
+package io.micronaut.docs.httpclientexceptionbody
 
-/**
- * @author graemerocher
- * @since 1.0
- */
-public class Headline {
-    private String text;
+import groovy.transform.CompileStatic
 
-    public String getText() {
-        return text;
-    }
-
-    public void setText(String text) {
-        this.text = text;
-    }
+@CompileStatic
+class CustomError {
+    Integer status
+    String error
+    String message
+    String path
 }
