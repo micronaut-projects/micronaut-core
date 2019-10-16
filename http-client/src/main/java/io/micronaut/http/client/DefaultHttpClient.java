@@ -62,7 +62,6 @@ import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.sse.Event;
-import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -241,7 +240,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.contextPath = contextPath;
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
-        this.sslContext = nettyClientSslBuilder.build().orElse(null);
+        this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration()).orElse(null);
         this.group = createEventLoopGroup(configuration, threadFactory);
         this.scheduler = Schedulers.from(group);
         this.threadFactory = threadFactory;
@@ -341,7 +340,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 new DefaultHttpClientConfiguration(),
                 null,
                 new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
+                new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -359,7 +358,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
                 LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                createSslBuilder(configuration), createDefaultMediaTypeRegistry(),
+                new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT
         );
     }
@@ -372,7 +371,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration, String contextPath) {
         this(
                 LoadBalancer.fixed(url), configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                createSslBuilder(configuration), createDefaultMediaTypeRegistry(),
+                new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT
         );
     }
@@ -384,7 +383,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
         this(loadBalancer,
                 configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
+                new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -396,7 +395,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration, String contextPath) {
         this(loadBalancer,
                 configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
+                new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -2106,10 +2105,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return MediaTypeCodecRegistry.of(
                 new JsonMediaTypeCodec(objectMapper, applicationConfiguration, null), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration, null)
         );
-    }
-
-    private static NettyClientSslBuilder createSslBuilder(HttpClientConfiguration configuration) {
-        return new NettyClientSslBuilder(configuration.getSslConfiguration());
     }
 
     private <I> NettyRequestWriter prepareRequest(io.micronaut.http.HttpRequest<I> request, URI requestURI) throws HttpPostRequestEncoder.ErrorDataEncoderException {
