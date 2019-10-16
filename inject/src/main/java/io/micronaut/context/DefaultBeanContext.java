@@ -1579,7 +1579,7 @@ public class DefaultBeanContext implements BeanContext {
                         String argumentName = requiredArgument.getName();
                         Object val = argumentValues.get(argumentName);
                         if (val == null && !requiredArgument.isDeclaredNullable()) {
-                            throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "].");
+                            throw new BeanInstantiationException(resolutionContext, "Missing bean argument [" + requiredArgument + "] for type: " + beanType.getName() + ". Requires arguments: " + ArrayUtils.toString(requiredArguments));
                         }
                         BeanResolutionContext finalResolutionContext = resolutionContext;
                         Object convertedValue = null;
