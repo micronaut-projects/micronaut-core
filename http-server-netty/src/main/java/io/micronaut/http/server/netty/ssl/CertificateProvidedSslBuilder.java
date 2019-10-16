@@ -99,7 +99,7 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
         if (trustStoreCache == null) {
             super.getTrustStore(ssl).ifPresent(trustStore -> trustStoreCache = trustStore);
         }
-        return Optional.of(trustStoreCache);
+        return Optional.ofNullable(trustStoreCache);
     }
 
     @Override
@@ -107,6 +107,6 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
         if (keyStoreCache == null) {
             super.getKeyStore(ssl).ifPresent(keyStore -> keyStoreCache = keyStore);
         }
-        return Optional.of(keyStoreCache);
+        return Optional.ofNullable(keyStoreCache);
     }
 }
