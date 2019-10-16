@@ -16,14 +16,14 @@
 
 package io.micronaut.http.client.filter;
 
-import io.micronaut.http.annotation.FilterAnnotation;
+import io.micronaut.http.annotation.HttpFilterQualifier;
 
 import java.lang.annotation.*;
 
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.PARAMETER})
-@FilterAnnotation
+@HttpFilterQualifier
 public @interface MarkerStereotypeAnnotation {
 
 }

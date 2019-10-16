@@ -764,7 +764,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         public ClientKey(AnnotationValue<Client> clientAnn, MethodInvocationContext<Object, Object> context) {
             this.clientId = getClientId(clientAnn);
             this.path = clientAnn.stringValue("path").orElse(null);
-            this.filterAnnotations = new HashSet<>(context.getAnnotationMetadata().getAnnotationTypesByStereotype(FilterAnnotation.class));
+            this.filterAnnotations = new HashSet<>(context.getAnnotationMetadata().getAnnotationTypesByStereotype(
+                    HttpFilterQualifier.class));
         }
 
         @Override

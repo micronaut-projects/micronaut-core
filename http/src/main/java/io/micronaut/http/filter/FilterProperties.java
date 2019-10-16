@@ -114,7 +114,7 @@ public final class FilterProperties {
      * If provided, filter will be applied only to {@code io.micronaut.http.client.Client} that are marked
      * with one of provided annotations.
      *
-     * All the provided stereotype annotations must be marked with {@link io.micronaut.http.annotation.FilterAnnotation}.
+     * All the provided stereotype annotations must be marked with {@link io.micronaut.http.annotation.HttpFilterQualifier}.
      *
      * @return Stereotype annotations
      */

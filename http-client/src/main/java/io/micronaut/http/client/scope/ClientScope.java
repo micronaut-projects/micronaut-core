@@ -24,7 +24,7 @@ import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.annotation.FilterAnnotation;
+import io.micronaut.http.annotation.HttpFilterQualifier;
 import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
@@ -95,7 +95,8 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
                 new DependencyInjectionException(resolutionContext, argument, "No value specified for @Client")
         );
 
-        Set<Class> filterAnnotations = new HashSet<>(argument.getAnnotationMetadata().getAnnotationTypesByStereotype(FilterAnnotation.class));
+        Set<Class> filterAnnotations = new HashSet<>(argument.getAnnotationMetadata().getAnnotationTypesByStereotype(
+                HttpFilterQualifier.class));
 
         //noinspection unchecked
         return (T) clients.computeIfAbsent(new ClientKey(identifier, value, filterAnnotations), clientKey -> {

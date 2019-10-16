@@ -29,7 +29,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.annotation.FilterAnnotation;
+import io.micronaut.http.annotation.HttpFilterQualifier;
 import io.micronaut.http.filter.FilterProperties;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.MatchingHttpClientFilter;
@@ -41,9 +41,6 @@ import javax.inject.Inject;
 import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.util.*;
-import java.util.function.BooleanSupplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Resolver that responsible to finding all the http client filters that should be applied to given request.
@@ -88,7 +85,7 @@ public class MatchingFilterResolver implements FilterResolver {
      */
     public List<HttpClientFilter> resolveFilters(io.micronaut.http.HttpRequest<?> request,
                                           URI requestURI) {
-        List<HttpClientFilter> filterList = new ArrayList<>();
+        List<HttpClientFilter> filterList = new ArrayList<>(10);
         String requestPath = StringUtils.prependUri("/", requestURI.getPath());
         io.micronaut.http.HttpMethod method = request.getMethod();
         for (HttpClientFilter filter : filters) {
@@ -96,13 +93,10 @@ public class MatchingFilterResolver implements FilterResolver {
                 continue;
             }
 
-            Class<? extends Annotation>[] clientDeclaredFilterAnnotations = (Class<? extends Annotation>[]) annotationMetadata
-                    .getAnnotationTypesByStereotype(FilterAnnotation.class)
-                    .stream()
-                    .toArray(Class[]::new);
+            List<Class<? extends Annotation>> clientDeclaredFilterAnnotations = annotationMetadata.getAnnotationTypesByStereotype(HttpFilterQualifier.class);
 
             Class<? extends Annotation>[] declaredFilterAnnotations = (Class<? extends Annotation>[]) annotationMetadataResolver.resolveMetadata(filter)
-                    .getAnnotationTypesByStereotype(FilterAnnotation.class)
+                    .getAnnotationTypesByStereotype(HttpFilterQualifier.class)
                     .stream()
                     .toArray(Class[]::new);
 
@@ -125,22 +119,18 @@ public class MatchingFilterResolver implements FilterResolver {
                     .orElse(FilterProperties.EMPTY_FILTER_PROPERTIES);
 
             for (Class<? extends Annotation> stereotype : instanceProperties.getStereotypes()) {
-                if (!annotationMetadataResolver.resolveMetadata(stereotype).hasStereotype(FilterAnnotation.class)) {
+                if (!annotationMetadataResolver.resolveMetadata(stereotype).hasStereotype(HttpFilterQualifier.class)) {
                     LOG.warn("Filter stereotype annotation {} is not marked with @FilterAnnotation that makes it completely ignored.", stereotype.getSimpleName());
                 }
             }
 
             FilterProperties filterProperties = instanceProperties.merge(annotationFilterProperties);
 
-            BooleanSupplier pathMatches = () -> filterByPath(filterProperties.getPatterns(), requestPath);
-            BooleanSupplier methodMatches = () -> filterByMethod(filterProperties.getMethods(), method);
-            BooleanSupplier serviceIdMatches = () -> filterByServiceId(filterProperties.getServiceId());
-            BooleanSupplier filterStereotypeMatched = () -> filterByStereotype(filterProperties.getStereotypes(), clientDeclaredFilterAnnotations);
-
-            boolean filterMatched = Stream.of(pathMatches, methodMatches, serviceIdMatches, filterStereotypeMatched)
-                    .allMatch(BooleanSupplier::getAsBoolean);
-
-            if (filterMatched) {
+            if (isPathMatches(filterProperties.getPatterns(), requestPath)
+                    && isMethodMatches(filterProperties.getMethods(), method)
+                    && isServiceIdMatches(filterProperties.getServiceId())
+                    && isStereotypeMatches(filterProperties.getStereotypes(), clientDeclaredFilterAnnotations)
+            ) {
                 filterList.add(filter);
             }
         }
@@ -148,23 +138,23 @@ public class MatchingFilterResolver implements FilterResolver {
         return filterList;
     }
 
-    private boolean filterByPath(String[] patterns, String requestPath) {
+    private boolean isPathMatches(String[] patterns, String requestPath) {
         return patterns.length == 0
                 || Arrays.stream(patterns).anyMatch(pathPattern -> PathMatcher.ANT.matches(pathPattern, requestPath));
     }
 
-    private boolean filterByMethod(io.micronaut.http.HttpMethod[] methods, HttpMethod method) {
+    private boolean isMethodMatches(io.micronaut.http.HttpMethod[] methods, HttpMethod method) {
         return ArrayUtils.isEmpty(methods) || Arrays.asList(methods).contains(method);
     }
 
-    private boolean filterByServiceId(String[] clients) {
+    private boolean isServiceIdMatches(String[] clients) {
         return ArrayUtils.isEmpty(clients) || Arrays.stream(clients).anyMatch(clientIdentifiers::contains);
     }
 
-    private boolean filterByStereotype(Class[] filterStereotypes,
-                                       Class[] declaredFilterAnnotations) {
+    private boolean isStereotypeMatches(Class[] filterStereotypes,
+                                        List<Class<? extends Annotation>> declaredFilterAnnotations) {
 
-        Set<Class> declaredAnnotationSet = Arrays.stream(declaredFilterAnnotations).collect(Collectors.toSet());
+        Set<Class> declaredAnnotationSet = new HashSet<>(declaredFilterAnnotations);
         boolean filterAnnotationPresent = Arrays.stream(filterStereotypes).anyMatch(declaredAnnotationSet::contains);
         boolean filterByAnnotationIsRequired = filterStereotypes.length > 0;
 

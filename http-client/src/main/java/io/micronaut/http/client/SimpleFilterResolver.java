@@ -36,7 +36,7 @@ public class SimpleFilterResolver implements FilterResolver {
     private final Collection<HttpClientFilter> filters;
 
     /**
-     * @param filters set of filters this instance always will resolve to
+     * @param filters set of filters this instance will always resolve to
      */
     public SimpleFilterResolver(HttpClientFilter... filters) {
         this.filters = Arrays.asList(filters);

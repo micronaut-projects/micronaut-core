@@ -19,6 +19,7 @@ package io.micronaut.http.client;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.filter.HttpClientFilter;
 
+import javax.validation.constraints.NotNull;
 import java.net.URI;
 import java.util.List;
 
@@ -38,5 +39,6 @@ public interface FilterResolver {
      * @param requestURI request uri
      * @return List of http filters that should be applied to a given request.
      */
-    List<HttpClientFilter> resolveFilters(io.micronaut.http.HttpRequest<?> request, URI requestURI);
+    @NotNull List<HttpClientFilter> resolveFilters(@NotNull io.micronaut.http.HttpRequest<?> request,
+                                                   @NotNull URI requestURI);
 }

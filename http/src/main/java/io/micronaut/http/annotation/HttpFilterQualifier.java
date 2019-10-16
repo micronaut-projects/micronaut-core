@@ -20,7 +20,7 @@ import java.lang.annotation.*;
 /**
  *  Stereotype annotation that helps to link together instance of the filter and http client that filter should be applied to.
  *
- *  In order to use you will need to create new annotation and apply {@link FilterAnnotation} on it. After that apply newly
+ *  In order to use you will need to create new annotation and apply {@link HttpFilterQualifier} on it. After that apply newly
  *  created annotation on both instance of the http filter and instance of a http client.
  *
  *  <pre>{@code
@@ -48,5 +48,5 @@ import java.lang.annotation.*;
 @Documented
 @Target({ElementType.ANNOTATION_TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface FilterAnnotation {
+public @interface HttpFilterQualifier {
 }
