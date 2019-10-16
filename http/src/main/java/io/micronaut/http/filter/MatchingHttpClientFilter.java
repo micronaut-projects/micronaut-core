@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.filter;
 
+import javax.annotation.Nonnull;
+
 /**
  * The implementation of this class can define at runtime what clients, paths, http methods this filter will be applied to.
  * <p>
@@ -34,5 +36,6 @@ public interface MatchingHttpClientFilter extends HttpClientFilter {
      *
      * @return {@link FilterProperties} which controls what request filter is applied to
      */
+    @Nonnull
     FilterProperties getFilterProperties();
 }
