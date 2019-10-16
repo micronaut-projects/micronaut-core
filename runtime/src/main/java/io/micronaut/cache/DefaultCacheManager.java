@@ -20,7 +20,9 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.util.CollectionUtils;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.*;
 
@@ -35,14 +37,33 @@ import java.util.*;
 @Singleton
 @Primary
 public class DefaultCacheManager<C> implements CacheManager<C> {
+
     private final Map<String, SyncCache<C>> cacheMap;
+    /**
+     * Prevents early initialization of the dynamic cache manager until it is
+     * actually needed. Caches requested that already exist can proceed
+     * without the bean being initialized.
+     */
+    private final Provider<DynamicCacheManager<C>> dynamicCacheManager;
+
+    /**
+     * Create default cache manager for the given caches.
+     *
+     * @param caches List of synchronous cache implementations
+     * @deprecated Use {@link #DefaultCacheManager(List, Provider)} instead.
+     */
+    @Deprecated
+    public DefaultCacheManager(List<SyncCache<C>> caches) {
+        this(caches, null);
+    }
 
     /**
      * Create default cache manager for the given caches.
      *
      * @param caches List of synchronous cache implementations
      */
-    @Inject public DefaultCacheManager(List<SyncCache<C>> caches) {
+    @Inject public DefaultCacheManager(List<SyncCache<C>> caches, @Nullable Provider<DynamicCacheManager<C>> dynamicCacheManager) {
+        this.dynamicCacheManager = dynamicCacheManager;
         if (CollectionUtils.isEmpty(caches)) {
             this.cacheMap = Collections.emptyMap();
         } else {
@@ -78,7 +99,13 @@ public class DefaultCacheManager<C> implements CacheManager<C> {
     public SyncCache<C> getCache(String name) {
         SyncCache<C> cache = cacheMap.get(name);
         if (cache == null) {
-            throw new ConfigurationException("No cache configured for name: " + name);
+            if (dynamicCacheManager != null) {
+                cache = dynamicCacheManager.get().getCache(name);
+                Objects.requireNonNull(cache);
+                cacheMap.put(name, cache);
+            } else {
+                throw new ConfigurationException("No cache configured for name: " + name);
+            }
         }
         return cache;
     }
