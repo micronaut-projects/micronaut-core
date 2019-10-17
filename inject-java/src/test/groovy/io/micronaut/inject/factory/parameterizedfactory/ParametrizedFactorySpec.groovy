@@ -47,7 +47,7 @@ class ParametrizedFactorySpec extends Specification  {
 
         then:
         def e = thrown(BeanInstantiationException)
-        e.message.contains('Missing bean argument [int count] for type: io.micronaut.inject.factory.parameterizedfactory.C. Requires arguments: int count')
+        e.message.contains('Missing bean argument [int count] for type: io.micronaut.inject.factory.parameterizedfactory.C. Required arguments: int count')
 
     }
 

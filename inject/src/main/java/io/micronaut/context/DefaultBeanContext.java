@@ -1545,7 +1545,9 @@ public class DefaultBeanContext implements BeanContext {
                        @Nullable Qualifier<T> qualifier,
                        boolean isSingleton,
                        @Nullable Map<String, Object> argumentValues) {
-        argumentValues = Optional.ofNullable(argumentValues).orElse(Collections.emptyMap());
+        if (argumentValues == null) {
+            argumentValues = Collections.emptyMap();
+        }
         Qualifier declaredQualifier = resolveDeclaredQualifier(beanDefinition);
         T bean;
         Class<T> beanType = beanDefinition.getBeanType();
