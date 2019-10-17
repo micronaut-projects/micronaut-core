@@ -6,21 +6,11 @@ The rs:Publisher[] itself could publish events from a background task, via an ev
 
 Imagine for an example a event stream of news headlines, you may define a data class as follows:
 
-.Headline.java
-[source,java]
-----
-include::{testsuite}/server/sse/Headline.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.server.sse.Headline[tags="class", indent=0,title="Headline"]
 
 To emit news headline events you can write a controller that returns a rs:Publisher[] of api:http.sse.Event[] instances using which ever Reactive library you prefer. The example below uses RxJava 2's rx:Flowable[] via the `generate` method:
 
-.Publishing Server Sent Events from a Controller
-[source,java]
-----
-include::{testsuite}/server/sse/HeadlineController.java[tags=imports, indent=0]
-
-include::{testsuite}/server/sse/HeadlineController.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.server.sse.HeadlineController[tags="imports,class", indent=0,title="Publishing Server Sent Events from a Controller"]
 
 <1> The controller method returns a rs:Publisher[] of api:http.sse.Event[]
 <2> For each version of Micronaut a headline is emitted

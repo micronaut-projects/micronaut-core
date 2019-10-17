@@ -17,13 +17,7 @@ Micronaut's HTTP client includes support for streaming data over HTTP via the ap
 
 In order to do JSON streaming you should on the server side declare a controller method that returns a `application/x-json-stream` of JSON objects. For example:
 
-.Streaming JSON on the Server
-[source,java]
-----
-include::{testsclient}/streaming/HeadlineController.java[tags=imports, indent=0]
-
-include::{testsclient}/streaming/HeadlineController.java[tags=streaming, indent=0]
-----
+snippet::io.micronaut.docs.streaming.HeadlineController[tags="imports, streaming", indent=0, title="Streaming JSON on the Server"]
 
 <1> A method `streamHeadlines` is defined that produces `application/x-json-stream`
 <2> A rx:Flowable[] is created from a `Callable` function (note no blocking occurs within the function so this is ok, otherwise you would want to `subscribeOn` an I/O thread pool).
@@ -34,11 +28,7 @@ NOTE: The server does not have to be written in Micronaut, any server that suppo
 
 Then on the client simply subscribe to the stream using `jsonStream` and every time the server emits a JSON object the client will decode and consume it:
 
-.Streaming JSON on the Client
-[source,java]
-----
-include::{testsclient}/streaming/HeadlineControllerTest.java[tags=streaming, indent=0]
-----
+snippet::io.micronaut.docs.streaming.HeadlineControllerSpec[tags="streaming", indent=0, title="Streaming JSON on the Client"]
 
 <1> The `jsonStream` method is used return a rx:Flowable[]
 <2> A `CompletableFuture` is used in the example to receive a value, but what you do with each emitted item is application specific
