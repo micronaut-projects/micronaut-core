@@ -4,7 +4,7 @@ The ann:http.client.Client[] annotation can also handle streaming HTTP responses
 
 For example to write a client that streams data from the controller defined in the <<clientStreaming, JSON Streaming>> section of the documentation you can simply define a client that returns an unbound rs:Publisher[] such as a RxJava rx:Flowable[] or Reactor `Flux`:
 
-snippet::io.micronaut.docs.streaming.HeadlineClient[tags="imports, class", indent=0, title="HeadlineClient.java"]
+snippet::io.micronaut.docs.streaming.HeadlineClient[tags="imports, class, endclass", indent=0, title="HeadlineClient.java"]
 
 <1> The `@Get` method is defined as processing responses of type `APPLICATION_JSON_STREAM`
 <2> A rx:Flowable[] is used as the return type
