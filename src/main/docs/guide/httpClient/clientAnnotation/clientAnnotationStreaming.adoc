@@ -4,25 +4,14 @@ The ann:http.client.Client[] annotation can also handle streaming HTTP responses
 
 For example to write a client that streams data from the controller defined in the <<clientStreaming, JSON Streaming>> section of the documentation you can simply define a client that returns an unbound rs:Publisher[] such as a RxJava rx:Flowable[] or Reactor `Flux`:
 
-.HeadlineClient.java
-[source,java]
-----
-include::{testsclient}/streaming/HeadlineClient.java[tags=imports, indent=0]
-
-include::{testsclient}/streaming/HeadlineClient.java[tags=class, indent=0]
-}
-----
+snippet::io.micronaut.docs.streaming.HeadlineClient[tags="imports, class, endclass", indent=0, title="HeadlineClient.java"]
 
 <1> The `@Get` method is defined as processing responses of type `APPLICATION_JSON_STREAM`
 <2> A rx:Flowable[] is used as the return type
 
 The following example shows how the previously defined `HeadlineClient` can be invoked from a JUnit test:
 
-.Streaming HeadlineClient
-[source,java]
-----
-include::{testsclient}/streaming/HeadlineControllerTest.java[tags=streamingClient, indent=0]
-----
+snippet::io.micronaut.docs.streaming.HeadlineControllerSpec[tags="streamingClient", indent=0, title="Streaming HeadlineClient"]
 
 <1> The client is retrieved from the api:context.ApplicationContext[]
 <2> The `firstElement` method is used to return the first emitted item from the rx:Flowable[] as a rx:Maybe[].
@@ -87,11 +76,7 @@ NOTE: Although SSE streams are typically consumed by a browser `EventSource`, th
 
 The ann:http.client.Client[] annotation also supports consuming SSE streams. For example, consider the following controller method that produces a stream of SSE events:
 
-.SSE Controller
-[source,java]
-----
-include::{testsclient}/sse/HeadlineController.java[tags=streaming, indent=0]
-----
+snippet::io.micronaut.docs.sse.HeadlineController[tags="streaming", indent=0, title="SSE Controller"]
 
 <1> The controller defines a ann:http.annotation.Get[] annotation that produces a `MediaType.TEXT_EVENT_STREAM`
 <2> The method itself uses Reactor to emit a hypothetical `Headline` object
@@ -102,10 +87,6 @@ Notice that the return type of the controller is also api:http.sse.Event[] and t
 
 To define a client that consumes the events you simply have to define a method that processes `MediaType.TEXT_EVENT_STREAM`:
 
-.SSE Client
-[source,java]
-----
-include::{testsclient}/sse/HeadlineClient.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.sse.HeadlineClient[tags="class", indent=0, title="SSE Client"]
 
 The generic type of the `Flux` or `Flowable` can be either an api:http.sse.Event[], in which case you will receive the full event object, or a POJO, in which case you will receive only the data contained within the event converted from JSON.
