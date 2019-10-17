@@ -10,11 +10,7 @@ In fact the mechanism is not strictly linked to Retry, you can declare any class
 
 To illustrate this consider again the `PetOperations` interface declared earlier. You can define a `PetFallback` class that will be called in the case of failure:
 
-.Defining a Fallback
-[source,java]
-----
-include::{testsclient}/annotation/retry/PetFallback.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.annotation.retry.PetFallback[tags="class", indent=0, title="Defining a Fallback"]
 
 TIP: If you purely want to use fallbacks to help with testing against external Microservices you can define fallbacks in the `src/test/java` directory so they are not included in production code.
 
