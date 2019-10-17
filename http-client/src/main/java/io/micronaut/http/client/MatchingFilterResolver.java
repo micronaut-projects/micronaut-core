@@ -128,7 +128,7 @@ public class MatchingFilterResolver implements FilterResolver {
 
         FilterProperties annotationFilterProperties = filterAnnotationMetadataOpt
                 .map(f -> new FilterProperties(
-                        f.stringValues("patterns"),
+                        f.stringValues(),
                         f.get("methods", io.micronaut.http.HttpMethod[].class, null),
                         f.stringValues("serviceId"),
                         declaredFilterAnnotations)

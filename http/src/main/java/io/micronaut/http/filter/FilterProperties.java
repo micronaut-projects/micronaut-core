@@ -20,6 +20,8 @@ import io.micronaut.http.HttpMethod;
 
 import javax.annotation.Nonnull;
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
+import java.util.StringJoiner;
 
 /**
  * Encapsulates all the possible configurations that might be defined in {@link io.micronaut.http.annotation.Filter} annotation.
@@ -121,5 +123,15 @@ public final class FilterProperties {
     @Nonnull
     public Class<? extends Annotation>[] getStereotypes() {
         return this.stereotypes;
+    }
+
+    @Override
+    public String toString() {
+        return new StringJoiner(", ", FilterProperties.class.getSimpleName() + "[", "]")
+                .add("patterns=" + Arrays.toString(patterns))
+                .add("methods=" + Arrays.toString(methods))
+                .add("serviceId=" + Arrays.toString(serviceId))
+                .add("stereotypes=" + Arrays.toString(stereotypes))
+                .toString();
     }
 }

@@ -16,19 +16,16 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.io.socket.SocketUtils
-import io.micronaut.http.HttpHeaderValues
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.http.annotation.Get
 import io.netty.channel.pool.AbstractChannelPoolMap
 import io.netty.channel.pool.FixedChannelPool
 import io.reactivex.Flowable
@@ -41,7 +38,6 @@ import spock.util.concurrent.PollingConditions
 import javax.inject.Inject
 import java.lang.reflect.Field
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -286,7 +282,13 @@ class ReadTimeoutSpec extends Specification {
                 it.join()
             } catch (Throwable e){ }
         }
-        def pool = getPool(clientContext.getBean(HttpClientIntroductionAdvice).clients.get("http://localhost:${embeddedServer.getPort()}".toString()))
+
+        def clients = clientContext.getBean(HttpClientIntroductionAdvice).clients;
+        def clientKey = clients.keySet().stream()
+                .filter { it.clientId == "http://localhost:${embeddedServer.getPort()}" }
+                .findFirst()
+                .get()
+        def pool = getPool(clients.get(clientKey))
 
         then:"Connections are not leaked"
         conditions.eventually {
