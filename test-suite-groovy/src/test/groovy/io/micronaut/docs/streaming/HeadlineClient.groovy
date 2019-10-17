@@ -18,4 +18,6 @@ interface HeadlineClient {
 
     @Get(value = "/headlines", processes = MediaType.APPLICATION_JSON_STREAM) // <1>
     Flux<Headline> streamFlux()
+// tag::endclass[]
 }
+// end::endclass[]
