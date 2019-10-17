@@ -37,12 +37,9 @@ import java.util.Optional;
 public interface BeanResolutionContext extends ValueResolver<CharSequence>, AutoCloseable {
 
     @Override
-    void close();
-
-    /**
-     * Trigger the next nested context state. Only once the outer most context is closed will it be cleared.
-     */
-    void nest();
+    default void close() {
+        // no-op
+    }
 
     /**
      * @return The context
@@ -86,6 +83,13 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @param <T> THe instance type
      */
     <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance);
+
+    /**
+     * Removes a bean that is in the process of being created. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
+     * @param beanIdentifier The bean identifier
+     * @param <T> THe instance type
+     */
+    <T> void removeInFlightBean(BeanIdentifier beanIdentifier);
 
     /**
      * Obtains an inflight bean for the given identifier. An "In Flight" bean is one that is currently being

@@ -60,7 +60,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -507,24 +506,15 @@ public class DefaultBeanContext implements BeanContext {
     @Nonnull
     private BeanResolutionContext newResolutionContext(BeanDefinition<?> beanDefinition, @Nullable BeanResolutionContext currentContext) {
         if (currentContext == null) {
-            AtomicInteger counter = new AtomicInteger(0);
             return new AbstractBeanResolutionContext(this, beanDefinition) {
-                @Override
-                public void close() {
-                    int i = counter.getAndDecrement();
-                    if (i == 0) {
-                        singlesInCreation.clear();
-                    }
-                }
-
-                @Override
-                public void nest() {
-                    counter.getAndIncrement();
-                }
-
                 @Override
                 public <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance) {
                     singlesInCreation.put(beanIdentifier, instance);
+                }
+
+                @Override
+                public void removeInFlightBean(BeanIdentifier beanIdentifier) {
+                    singlesInCreation.remove(beanIdentifier);
                 }
 
                 @Nullable
@@ -534,7 +524,6 @@ public class DefaultBeanContext implements BeanContext {
                 }
             };
         } else {
-            currentContext.nest();
             return currentContext;
         }
     }
