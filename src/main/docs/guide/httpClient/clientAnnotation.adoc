@@ -4,21 +4,11 @@ Essentially, the `@Client` annotation can be declared on any interface or abstra
 
 Let's start with a simple example. Given the following class:
 
-.Pet.java
-[source,java]
-----
-include::{testsclient}/annotation/Pet.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.annotation.Pet[tags="class", indent=0, title="Pet.java"]
 
 You can define a common interface for saving new `Pet` instances:
 
-.PetOperations.java
-[source,java]
-----
-include::{testsclient}/annotation/PetOperations.java[tags=imports, indent=0]
-
-include::{testsclient}/annotation/PetOperations.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.annotation.PetOperations[tags="imports, class", indent=0, title="PetOperations.java"]
 
 Note how the interface uses Micronaut's HTTP annotations which are usable on both the server and client side. Also, as you can see you can use `javax.validation` constraints to validate arguments.
 
@@ -33,23 +23,11 @@ compile "io.micronaut.configuration:micronaut-hibernate-validator"
 
 On the server-side of Micronaut you can implement the `PetOperations` interface:
 
-.PetController.java
-[source,java]
-----
-include::{testsclient}/annotation/PetController.java[tags=imports, indent=0]
-
-include::{testsclient}/annotation/PetController.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.annotation.PetController[tags="imports, class", indent=0, title="PetController.java"]
 
 You can then define a declarative client in `src/test/java` that uses `@Client` to automatically, at compile time, implement a client:
 
-.PetClient.java
-[source,java]
-----
-include::{testsclient}/annotation/PetClient.java[tags=imports, indent=0]
-
-include::{testsclient}/annotation/PetClient.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.annotation.PetClient[tags="imports, class", indent=0, title="PetClient.java"]
 
 <1> The api:http.client.annotation.Client[] annotation is used with a value relative to the current server. In this case `/pets`
 <2> The interface extends from `PetOperations`
