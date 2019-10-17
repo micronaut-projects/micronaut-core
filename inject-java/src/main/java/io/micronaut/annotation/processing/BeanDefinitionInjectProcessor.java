@@ -330,7 +330,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             this.concreteClassMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
             beanDefinitionWriters = new LinkedHashMap<>();
             this.isFactoryType = concreteClassMetadata.hasStereotype(Factory.class);
-            this.isConfigurationPropertiesType = isConfigurationProperties(concreteClass);
+            this.isConfigurationPropertiesType = concreteClassMetadata.hasDeclaredStereotype(ConfigurationReader.class) || concreteClassMetadata.hasDeclaredStereotype(EachProperty.class);
             this.isAopProxyType = concreteClassMetadata.hasStereotype(AROUND_TYPE) && !modelUtils.isAbstract(concreteClass);
             this.aopSettings = isAopProxyType ? concreteClassMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.empty();
             ExecutableElement constructor = modelUtils.concreteConstructorFor(concreteClass, annotationUtils);
@@ -712,10 +712,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (declaringClass != null) {
 
                 AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
+
+                String propertyName = NameUtils.getPropertyNameForSetter(method.getSimpleName().toString());
+                if (shouldExclude(configurationMetadata, propertyName)) {
+                    return;
+                }
                 if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                     writer.visitConfigBuilderMethod(
                             fieldType,
-                            NameUtils.getterNameFor(NameUtils.getPropertyNameForSetter(method.getSimpleName().toString())),
+                            NameUtils.getterNameFor(propertyName),
                             methodAnnotationMetadata,
                             metadataBuilder);
                     try {
@@ -730,7 +735,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             concreteClass,
                             declaringClass,
                             getPropertyMetadataTypeReference(valueType),
-                            NameUtils.getPropertyNameForSetter(setterName),
+                            propertyName,
                             docComment,
                             null
                     );
@@ -1612,6 +1617,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 String fieldName = field.getSimpleName().toString();
+                if (shouldExclude(configurationMetadata, fieldName)) {
+                    return null;
+                }
+
                 if (fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
 
                     boolean accessible = false;
@@ -1742,10 +1751,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     String methodName = method.getSimpleName().toString();
                     String prefix = getMethodPrefix(prefixes, methodName);
                     String propertyName = NameUtils.decapitalize(methodName.substring(prefix.length()));
-                    if (!includes.isEmpty() && !includes.contains(propertyName)) {
-                        return;
-                    }
-                    if (!excludes.isEmpty() && excludes.contains(propertyName)) {
+                    if (shouldExclude(includes, excludes, propertyName)) {
                         return;
                     }
 
@@ -1883,11 +1889,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionWriter.visitTypeArguments(
                     typeArguments
             );
-        }
-
-        private boolean isConfigurationProperties(TypeElement concreteClass) {
-            AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
-            return annotationMetadata.hasDeclaredStereotype(ConfigurationReader.class) || annotationMetadata.hasDeclaredStereotype(EachProperty.class);
         }
 
         private DynamicName createProxyKey(String beanName) {
@@ -2098,6 +2099,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             });
 
             return params;
+        }
+
+        private boolean shouldExclude(Set<String> includes, Set<String> excludes, String propertyName) {
+            if (!includes.isEmpty() && !includes.contains(propertyName)) {
+                return true;
+            }
+            if (!excludes.isEmpty() && excludes.contains(propertyName)) {
+                return true;
+            }
+            return false;
+        }
+
+        private boolean shouldExclude(ConfigurationMetadata configurationMetadata, String propertyName) {
+            return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
     }
 
