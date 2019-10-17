@@ -671,15 +671,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         resolvedValueCache.clear();
     }
 
-    private void processSubmapKey(Map<String, Object> map, String key, Object value, StringConvention keyConvention) {
+    private void processSubmapKey(Map<String, Object> map, String key, Object value, @Nullable StringConvention keyConvention) {
         int index = key.indexOf('.');
+        final boolean hasKeyConvention = keyConvention != null;
         if (index == -1) {
-            key = keyConvention.format(key);
+            key = hasKeyConvention ? keyConvention.format(key) : key;
             map.put(key, value);
         } else {
 
             String mapKey = key.substring(0, index);
-            mapKey = keyConvention.format(mapKey);
+            mapKey = hasKeyConvention ? keyConvention.format(mapKey) : mapKey;
             if (!map.containsKey(mapKey)) {
                 map.put(mapKey, new LinkedHashMap<>());
             }
