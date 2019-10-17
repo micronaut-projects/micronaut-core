@@ -161,7 +161,7 @@ save () {
 }
 APP_ARGS=\$(save "\$@")
 JAVA_ADD_OPENS="\$(java --add-opens 2>&1)"
-if [[ \$JAVA_ADD_OPENS = *"Unrecognized"* ]]; then
+if [ -z "${JAVA_ADD_OPENS##*Unrecognized*}" ] ; then
     JAVA_MODULES_UNSUPPORTED=true
 else
         JAVA_OPTS="\$JAVA_OPTS -Dgroovy.jaxb=jaxb"
