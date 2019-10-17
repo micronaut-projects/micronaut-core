@@ -27,7 +27,6 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
