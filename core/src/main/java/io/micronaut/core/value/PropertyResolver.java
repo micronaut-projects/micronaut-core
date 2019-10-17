@@ -88,11 +88,12 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @return The properties
      */
     default @Nonnull Map<String, Object> getProperties(@Nonnull String name) {
-        return getProperties(name, StringConvention.RAW);
+        return getProperties(name, null);
     }
 
     /**
-     * Return all the properties under the given key.
+     * Return all the properties under the given key. By default Micronaut stores keys in keb-case, such that normalized lookups
+     * are more efficient. You can obtain the raw key values by passing in {@link StringConvention#RAW}.
      *
      * @param name The name
      * @param keyFormat The key format to use for the keys. Default is kebab-case.
