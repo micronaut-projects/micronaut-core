@@ -843,6 +843,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
                         Parameter parameter = methodNode.parameters[0]
 
+                        if (shouldExclude(configurationMetadata, propertyName)) {
+                            return
+                        }
+
                         if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                             getBeanWriter().visitConfigBuilderMethod(
                                     parameter.type.name,
@@ -1149,9 +1153,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     Object fieldType = AstGenericUtils.resolveTypeReference(fieldNode.type)
                     if (isValue) {
                         if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
+                            if (shouldExclude(configurationMetadata, fieldName)) {
+                                return
+                            }
                             if(requiresReflection) {
                                 // Using the field would throw a IllegalAccessError, use the method instead
-                                String fieldGetterName = NameUtils.getterNameFor(fieldNode.name)
+                                String fieldGetterName = NameUtils.getterNameFor(fieldName)
                                 MethodNode getterMethod = declaringClass.methods?.find { it.name == fieldGetterName}
                                 if(getterMethod != null) {
                                     getBeanWriter().visitConfigBuilderMethod(fieldType, getterMethod.name, fieldAnnotationMetadata, configurationMetadataBuilder)
@@ -1168,6 +1175,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             }
                         } else {
                             if (isConfigurationProperties) {
+                                if (shouldExclude(configurationMetadata, fieldName)) {
+                                    return
+                                }
                                 PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
                                         concreteClass,
                                         declaringClass,
@@ -1288,6 +1298,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     )
                 } else if (isValue) {
                     if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
+                        if (shouldExclude(configurationMetadata, propertyName)) {
+                            return
+                        }
                         Object resolvedFieldType = fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name
                         getBeanWriter().visitConfigBuilderMethod(
                                 resolvedFieldType,
@@ -1301,6 +1314,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                     } else {
                         if (isConfigurationProperties) {
+                            if (shouldExclude(configurationMetadata, propertyName)) {
+                                return
+                            }
                             PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
                                     concreteClass,
                                     declaringClass,
@@ -1773,11 +1789,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     ClassNode returnType = method.getReturnType()
                     Parameter[] params = method.getParameters()
                     String prefix = getMethodPrefix(name)
-                    String propertyName = NameUtils.decapitalize(name.substring(prefix.length()));
-                    if (!includes.isEmpty() && !includes.contains(propertyName)) {
-                        return
-                    }
-                    if (!excludes.isEmpty() && excludes.contains(propertyName)) {
+                    String propertyName = NameUtils.decapitalize(name.substring(prefix.length()))
+                    if (shouldExclude(includes, excludes, propertyName)) {
                         return
                     }
 
@@ -1859,6 +1872,20 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
 
             visitor.accept(classNode)
+        }
+
+        private boolean shouldExclude(Set<String> includes, Set<String> excludes, String propertyName) {
+            if (!includes.isEmpty() && !includes.contains(propertyName)) {
+                return true;
+            }
+            if (!excludes.isEmpty() && excludes.contains(propertyName)) {
+                return true;
+            }
+            return false;
+        }
+
+        private boolean shouldExclude(ConfigurationMetadata configurationMetadata, String propertyName) {
+            return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
     }
 }

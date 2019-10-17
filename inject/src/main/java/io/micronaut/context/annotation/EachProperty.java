@@ -95,4 +95,16 @@ public @interface EachProperty {
      * @return The name of the key returned by {@link #value()} that should be regarded as the {@link Primary} bean
      */
     String primary() default "";
+
+    /**
+     * @return The names of the properties to include
+     */
+    @AliasFor(annotation = ConfigurationReader.class, member = "includes")
+    String[] includes() default {};
+
+    /**
+     * @return The names of the properties to exclude
+     */
+    @AliasFor(annotation = ConfigurationReader.class, member = "excludes")
+    String[] excludes() default {};
 }

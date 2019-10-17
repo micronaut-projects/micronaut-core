@@ -1,18 +1,3 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
@@ -23,11 +8,7 @@ import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
-class   ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
+class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
 
     void "test inner class paths - pojo inheritance"() {
         when:
@@ -595,5 +576,107 @@ public class FooConfigurationProperties {
         beanDefinition.injectedMethods[0].name == "setIssuer"
         beanDefinition.injectedMethods[1].name == "setEnabled"
         beanDefinition.injectedFields[0].name == "isOther"
+    }
+
+    void "test includes on fields"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@ConfigurationProperties(value = "foo", includes = {"publicField", "parentPublicField"})
+class MyProperties extends Parent {
+    public String publicField;
+    public String anotherPublicField;
+}
+
+class Parent {
+    public String parentPublicField;
+    public String anotherParentPublicField;
+}
+''')
+        then:
+        noExceptionThrown()
+        beanDefinition.injectedFields.size() == 2
+        beanDefinition.injectedFields[0].name == "parentPublicField"
+        beanDefinition.injectedFields[1].name == "publicField"
+    }
+
+    void "test includes on methods"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@ConfigurationProperties(value = "foo", includes = {"publicMethod", "parentPublicMethod"})
+class MyProperties extends Parent {
+
+    public void setPublicMethod(String value) {}
+    public void setAnotherPublicMethod(String value) {}
+}
+
+class Parent {
+    public void setParentPublicMethod(String value) {}
+    public void setAnotherParentPublicMethod(String value) {}
+}
+''')
+        then:
+        noExceptionThrown()
+        beanDefinition.injectedMethods.size() == 2
+        beanDefinition.injectedMethods[0].name == "setParentPublicMethod"
+        beanDefinition.injectedMethods[1].name == "setPublicMethod"
+    }
+
+    void "test excludes on fields"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@ConfigurationProperties(value = "foo", excludes = {"anotherPublicField", "anotherParentPublicField"})
+class MyProperties extends Parent {
+    public String publicField;
+    public String anotherPublicField;
+}
+
+class Parent {
+    public String parentPublicField;
+    public String anotherParentPublicField;
+}
+''')
+        then:
+        noExceptionThrown()
+        beanDefinition.injectedFields.size() == 2
+        beanDefinition.injectedFields[0].name == "parentPublicField"
+        beanDefinition.injectedFields[1].name == "publicField"
+    }
+
+    void "test excludes on methods"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@ConfigurationProperties(value = "foo", excludes = {"anotherPublicMethod", "anotherParentPublicMethod"})
+class MyProperties extends Parent {
+
+    public void setPublicMethod(String value) {}
+    public void setAnotherPublicMethod(String value) {}
+}
+
+class Parent {
+    public void setParentPublicMethod(String value) {}
+    public void setAnotherParentPublicMethod(String value) {}
+}
+''')
+        then:
+        noExceptionThrown()
+        beanDefinition.injectedMethods.size() == 2
+        beanDefinition.injectedMethods[0].name == "setParentPublicMethod"
+        beanDefinition.injectedMethods[1].name == "setPublicMethod"
     }
 }
