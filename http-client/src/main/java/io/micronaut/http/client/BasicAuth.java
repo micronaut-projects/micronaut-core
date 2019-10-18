@@ -15,15 +15,13 @@
  */
 package io.micronaut.http.client;
 
-import io.micronaut.context.annotation.Prototype;
-
 /**
  * A class representing basic auth authorization header.
  * To be used in {@link io.micronaut.http.client.annotation.Client}
  *
  * @author Ashwini Mutalik Desai
+ * @since 1.3.0
  */
-@Prototype
 public final class BasicAuth {
 
     private final String username;
