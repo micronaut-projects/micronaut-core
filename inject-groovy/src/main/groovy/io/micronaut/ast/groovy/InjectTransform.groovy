@@ -843,10 +843,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
                         Parameter parameter = methodNode.parameters[0]
 
-                        if (shouldExclude(configurationMetadata, propertyName)) {
-                            return
-                        }
-
                         if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                             getBeanWriter().visitConfigBuilderMethod(
                                     parameter.type.name,
@@ -859,6 +855,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 getBeanWriter().visitConfigBuilderEnd()
                             }
                         } else if (declaringClass.getField(propertyName) == null) {
+                            if (shouldExclude(configurationMetadata, propertyName)) {
+                                return
+                            }
                             PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
                                     concreteClass,
                                     declaringClass,
@@ -1153,9 +1152,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     Object fieldType = AstGenericUtils.resolveTypeReference(fieldNode.type)
                     if (isValue) {
                         if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
-                            if (shouldExclude(configurationMetadata, fieldName)) {
-                                return
-                            }
                             if(requiresReflection) {
                                 // Using the field would throw a IllegalAccessError, use the method instead
                                 String fieldGetterName = NameUtils.getterNameFor(fieldName)
@@ -1298,9 +1294,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     )
                 } else if (isValue) {
                     if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
-                        if (shouldExclude(configurationMetadata, propertyName)) {
-                            return
-                        }
                         Object resolvedFieldType = fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name
                         getBeanWriter().visitConfigBuilderMethod(
                                 resolvedFieldType,
