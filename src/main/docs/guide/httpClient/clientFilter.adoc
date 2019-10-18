@@ -6,21 +6,14 @@ As an example say you want to build a client to communicate with the https://bin
 
 To resolve this burden you can define a filter. The following is an example `BintrayService`:
 
-[source,groovy]
-----
-include::{testsdir}/client/ThirdPartyClientFilterSpec.groovy[tags=bintrayApiConstants, indent=0]
-include::{testsdir}/client/ThirdPartyClientFilterSpec.groovy[tags=bintrayService, indent=0]
-----
+snippet::io.micronaut.docs.client.ThirdPartyClientFilterSpec[tags="bintrayApiConstants, bintrayService", indent=0]
 
 <1> An api:http.client.RxHttpClient[] is injected for the Bintray API
 <2> The organization is configurable via configuration
 
 The Bintray API is secured. To authenticate you need to add an `Authorization` header for every request. You could modify `fetchRepositories` and `fetchPackages` methods to include the necessary HTTP Header for each request. Using a filter is much simpler though:
 
-[source,groovy]
-----
-include::{testsdir}/client/ThirdPartyClientFilterSpec.groovy[tags=bintrayFilter, indent=0]
-----
+snippet::io.micronaut.docs.client.ThirdPartyClientFilterSpec[tags="bintrayFilter", indent=0]
 
 <1> You can match only a subset of paths with a Client filter.
 <2> The `username` and `token` are injected via configuration
