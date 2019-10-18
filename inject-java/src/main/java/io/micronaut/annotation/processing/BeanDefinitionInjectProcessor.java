@@ -714,9 +714,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
 
                 String propertyName = NameUtils.getPropertyNameForSetter(method.getSimpleName().toString());
-                if (shouldExclude(configurationMetadata, propertyName)) {
-                    return;
-                }
                 if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                     writer.visitConfigBuilderMethod(
                             fieldType,
@@ -729,6 +726,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         writer.visitConfigBuilderEnd();
                     }
                 } else {
+                    if (shouldExclude(configurationMetadata, propertyName)) {
+                        return;
+                    }
                     String docComment = elementUtils.getDocComment(method);
                     String setterName = method.getSimpleName().toString();
                     PropertyMetadata propertyMetadata = metadataBuilder.visitProperty(
@@ -1617,9 +1617,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 String fieldName = field.getSimpleName().toString();
-                if (shouldExclude(configurationMetadata, fieldName)) {
-                    return null;
-                }
 
                 if (fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
 
@@ -1649,7 +1646,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         writer.visitConfigBuilderEnd();
                     }
                 } else {
-
+                    if (shouldExclude(configurationMetadata, fieldName)) {
+                        return null;
+                    }
                     if (setterMethod.isPresent()) {
                         ExecutableElement method = setterMethod.get();
                         // Just visit the field metadata, the setter will be processed
