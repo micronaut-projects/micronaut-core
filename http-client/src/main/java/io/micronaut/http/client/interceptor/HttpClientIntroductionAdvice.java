@@ -81,6 +81,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * Introduction advice that implements the {@link Client} annotation.
@@ -355,6 +356,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             uriVariables.forEach(queryParams::remove);
 
             request = HttpRequest.create(httpMethod, appendQuery(uri, queryParams), httpMethodName);
+
+            Stream<Argument> argumentStream = Arrays.stream(arguments);
+            Optional<Argument> basicAuthArgument = argumentStream.filter(arg -> arg.getType() == BasicAuth.class).findFirst();
+            basicAuthArgument.ifPresent(a -> {
+                final BasicAuth auth = (BasicAuth) paramMap.get(a.getName());
+                request.basicAuth(auth.getUsername(), auth.getPassword());
+            });
+
             if (body != null) {
                 request.body(body);
 
