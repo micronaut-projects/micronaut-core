@@ -7,6 +7,7 @@ import io.micronaut.core.convert.format.ReadableBytes
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.configuration.Engine
 
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
 
@@ -678,5 +679,53 @@ class Parent {
         beanDefinition.injectedMethods.size() == 2
         beanDefinition.injectedMethods[0].name == "setParentPublicMethod"
         beanDefinition.injectedMethods[1].name == "setPublicMethod"
+    }
+
+    void "test excludes on configuration builder"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.configuration.Engine;
+
+@ConfigurationProperties(value = "foo", excludes = {"engine", "engine2"})
+class MyProperties extends Parent {
+
+    @ConfigurationBuilder(prefixes = "with") 
+    Engine.Builder engine = Engine.builder();
+    
+    private Engine.Builder engine2 = Engine.builder();
+    
+    @ConfigurationBuilder(configurationPrefix = "two", prefixes = "with") 
+    public void setEngine2(Engine.Builder engine3) {
+        this.engine2 = engine3;
+    }
+    
+    public Engine.Builder getEngine2() {
+        return engine2;
+    }
+}
+
+class Parent {
+    void setEngine(Engine.Builder engine) {}
+}
+''')
+        then:
+        noExceptionThrown()
+        beanDefinition.injectedMethods.isEmpty()
+        beanDefinition.injectedFields.isEmpty()
+
+        when:
+        BeanFactory factory = beanDefinition
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'foo.manufacturer':'Subaru',
+                'foo.two.manufacturer':'Subaru'
+        )
+        def bean = factory.build(applicationContext, beanDefinition)
+
+        then:
+        ((Engine.Builder) bean.engine).build().manufacturer == 'Subaru'
+        ((Engine.Builder) bean.getEngine2()).build().manufacturer == 'Subaru'
     }
 }
