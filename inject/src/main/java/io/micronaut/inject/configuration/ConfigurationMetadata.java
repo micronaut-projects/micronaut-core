@@ -55,10 +55,16 @@ public class ConfigurationMetadata implements Writable {
         return description;
     }
 
+    /**
+     * @return The properties to include
+     */
     public Set<String> getIncludes() {
         return includes;
     }
 
+    /**
+     * @return The properties to exclude
+     */
     public Set<String> getExcludes() {
         return excludes;
     }
