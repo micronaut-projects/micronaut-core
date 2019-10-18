@@ -16,7 +16,9 @@
 package io.micronaut.validation.properties
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import spock.lang.Ignore
 
+@Ignore("Mixed case properties are now allowed")
 class MixedCasePropertySpec extends AbstractTypeElementSpec {
 
     void "test wrong property name in @Property"() {
