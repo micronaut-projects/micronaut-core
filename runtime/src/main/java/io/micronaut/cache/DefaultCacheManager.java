@@ -61,6 +61,7 @@ public class DefaultCacheManager<C> implements CacheManager<C> {
      * Create default cache manager for the given caches.
      *
      * @param caches List of synchronous cache implementations
+     * @param dynamicCacheManager The dynamic cache manager
      */
     @Inject public DefaultCacheManager(List<SyncCache<C>> caches, @Nullable Provider<DynamicCacheManager<C>> dynamicCacheManager) {
         this.dynamicCacheManager = dynamicCacheManager;
