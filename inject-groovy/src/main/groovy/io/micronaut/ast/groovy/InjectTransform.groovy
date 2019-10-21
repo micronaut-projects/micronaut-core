@@ -884,6 +884,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                             getBeanWriter().visitSetterValue(
                                     AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                    AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                     methodAnnotationMetadata,
                                     false,
                                     resolveParameterType(parameter),
@@ -1335,6 +1336,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                         getBeanWriter().visitSetterValue(
                                 AstGenericUtils.resolveTypeReference(declaringClass),
+                                void.class,
                                 fieldAnnotationMetadata,
                                 false,
                                 fieldTypeReference,

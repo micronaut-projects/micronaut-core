@@ -23,16 +23,17 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.runtime.server.EmbeddedServer;
-
-import static io.micronaut.http.HttpRequest.*;
-import static org.junit.Assert.*;
-
 import io.reactivex.Flowable;
 import org.junit.Test;
 
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+
+import static io.micronaut.http.HttpRequest.GET;
+import static io.micronaut.http.HttpRequest.POST;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author graemerocher

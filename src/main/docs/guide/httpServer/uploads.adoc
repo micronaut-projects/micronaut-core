@@ -24,16 +24,7 @@ Route arguments of type rs:Publisher[Publisher<PartData>] will be treated as onl
 
 If requirements dictate you must have knowledge about the metadata of the file being received, a special class called api:http.multipart.StreamingFileUpload[] has been created that is a rs:Publisher[Publisher<PartData>], but also has file information like the content type and file name.
 
-[source,java]
-----
-include::{testsuite}/server/upload/UploadController.java[tags=imports, indent=0]
-
-include::{testsuite}/server/upload/UploadController.java[tags=class, indent=0]
-
-include::{testsuite}/server/upload/UploadController.java[tags=upload, indent=4]
-
-}
-----
+snippet::io.micronaut.docs.server.upload.UploadController[tags="imports,class,upload,endclass", indent=0]
 
 <1> The method is set to consume api:http.MediaType#MULTIPART_FORM_DATA[]
 <2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
@@ -46,16 +37,7 @@ Route arguments that are not publishers will cause the route execution to be del
 
 If requirements dictate you must have knowledge about the metadata of the file being received, a special class called api:http.multipart.CompletedFileUpload[] has been created that has methods to retrieve the data of the file, but also has file information like the content type and file name.
 
-[source,java]
-----
-include::{testsuite}/server/upload/UploadController.java[tags=completedImports, indent=0]
-
-include::{testsuite}/server/upload/UploadController.java[tags=class, indent=0]
-
-include::{testsuite}/server/upload/UploadController.java[tags=completedUpload, indent=4]
-
-}
-----
+snippet::io.micronaut.docs.server.upload.UploadController[tags="class,completedUpload,endclass", indent=0]
 
 <1> The method is set to consume api:http.MediaType#MULTIPART_FORM_DATA[]
 <2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`

@@ -25,12 +25,7 @@ What you don't want to do is block the underlying Netty event loop within your f
 
 As an example, consider the following example `TraceService` that uses RxJava to compose an I/O operation:
 
-.A TraceService Example using RxJava
-[source,java]
-----
-include::{testsuite}/server/filters/TraceService.java[tags=imports, indent=0]
-include::{testsuite}/server/filters/TraceService.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.server.filters.TraceService[tags="imports,class", indent=0, title="A TraceService Example using RxJava"]
 
 <1> The rx:Flowable[] type is used to create logic that executes potentially blocking operations to write the trace data from the request
 <2> Since this is just an example the logic does nothing and a place holder comment is used
@@ -38,15 +33,7 @@ include::{testsuite}/server/filters/TraceService.java[tags=class, indent=0]
 
 You can then inject this implementation into your filter definition:
 
-.An Example HttpServerFilter
-[source,java]
-----
-include::{testsuite}/server/filters/TraceFilter.java[tags=imports, indent=0]
-
-include::{testsuite}/server/filters/TraceFilter.java[tags=class, indent=0]
-    ...
-}
-----
+snippet::io.micronaut.docs.server.filters.TraceFilter[tags="imports,class,endclass", indent=0, title="An Example HttpServerFilter"]
 
 <1> The api:http.annotation.Filter[] annotation is used to define the URI patterns the filter matches
 <2> The class implements the api:http.filter.HttpServerFilter[] interface
@@ -54,11 +41,7 @@ include::{testsuite}/server/filters/TraceFilter.java[tags=class, indent=0]
 
 The final step is write the `doFilter` implementation of the api:http.filter.HttpServerFilter[] interface.
 
-.The doFilter implementation
-[source,java]
-----
-include::{testsuite}/server/filters/TraceFilter.java[tags=doFilter, indent=0]
-----
+snippet::io.micronaut.docs.server.filters.TraceFilter[tags="doFilter", indent=0, title="The doFilter implementation"]
 
 <1> The previously defined `TraceService` is called to trace the request
 <2> If the trace call succeeds then the filter switches back to resuming the request processing using RxJava's `switchMap` method, which invokes the `proceed` method of the api:http.filter.ServerFilterChain[]

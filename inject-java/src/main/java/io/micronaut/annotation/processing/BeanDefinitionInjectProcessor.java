@@ -766,6 +766,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     writer.visitSetterValue(
                             modelUtils.resolveTypeReference(declaringClass),
+                            modelUtils.resolveTypeReference(method.getReturnType()),
                             annotationMetadata,
                             requiresReflection,
                             fieldType,

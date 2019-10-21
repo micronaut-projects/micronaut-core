@@ -3,25 +3,13 @@ The Micronaut HTTP Client supports the ability to create multipart requests. In 
 
 For example:
 
-.Creating the body
-[source,groovy]
-----
-include::{testsuite}/client/upload/MultipartFileUploadSpec.groovy[tags=multipartBodyImports,indent=0]
-
-File file = ...
-include::{testsuite}/client/upload/MultipartFileUploadSpec.groovy[tags=multipartBody,indent=0]
-----
+snippet::io.micronaut.docs.client.upload.MultipartFileUploadSpec[tags="multipartBodyImports, file, multipartBody", indent=0, title="Creating the body"]
 
 <1> You need to create a MultipartBody builder for adding parts to the body.
 <2> Method to add a part to the body, in this case a file. There are different variations of this method which you can see in link:{api}/io/micronaut/http/client/multipart/MultipartBody.Builder.html[MultipartBody.Builder, window="_blank"].
 <3> Call the build method to assemble all parts from the builder into a MultipartBody. At least one part is required.
 
-
-.Creating a request
-[source,groovy]
-----
-include::{testsuite}/client/upload/MultipartFileUploadSpec.groovy[tags=request,indent=0]
-----
+snippet::io.micronaut.docs.client.upload.MultipartFileUploadSpec[tags="request", indent=0, title="Creating a request"]
 
 <1> The multipart request body with different sets of data.
 <2> Set the content-type header of the request to `multipart/form-data`.

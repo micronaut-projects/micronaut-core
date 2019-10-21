@@ -47,13 +47,13 @@ public final class DefaultBeanResolutionContext extends AbstractBeanResolutionCo
     }
 
     @Override
-    public void nest() {
-        // no-op
+    public <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance) {
+        singlesInCreation.put(beanIdentifier, instance);
     }
 
     @Override
-    public <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance) {
-        singlesInCreation.put(beanIdentifier, instance);
+    public <T> void removeInFlightBean(BeanIdentifier beanIdentifier) {
+        singlesInCreation.remove(beanIdentifier);
     }
 
     @Nullable
