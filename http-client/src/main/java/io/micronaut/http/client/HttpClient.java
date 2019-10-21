@@ -159,6 +159,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
                 return body
                         .orElseThrow(() -> new HttpClientResponseException(
                                 "Empty body",
+                                request,
                                 response
                         ));
             }

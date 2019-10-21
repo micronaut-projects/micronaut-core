@@ -50,7 +50,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == """Invalid JSON: Unexpected end-of-input
+        e.message == """Request [/json/string] failed with error: Invalid JSON: Unexpected end-of-input
  at [Source: UNKNOWN; line: 1, column: 21]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
@@ -85,7 +85,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == """Invalid JSON: Unexpected character ('T' (code 84)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+        e.message == """Request [/json/string] failed with error: Invalid JSON: Unexpected character ('T' (code 84)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
  at [Source: UNKNOWN; line: 1, column: 11]"""
         e.response.status == HttpStatus.BAD_REQUEST
 

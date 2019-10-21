@@ -57,7 +57,7 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
 
         then:"The original exception is thrown"
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad count"
+        e.message == "Request [/circuit-breaker-test/count] failed with error: Internal Server Error: Bad count"
         controller.countValue == 6
 
         when:"the method is called again"
@@ -66,7 +66,7 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
 
         then:"The value is not incremented because the circuit is open"
         e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad count"
+        e.message == "Request [/circuit-breaker-test/count] failed with error: Internal Server Error: Bad count"
         controller.countValue == 6
 
     }
@@ -92,7 +92,7 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
 
         then:"The original exception is thrown"
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad count"
+        e.message == "Request [/circuit-breaker-test/rx-count] failed with error: Internal Server Error: Bad count"
         controller.countRx == 6
 
         when:"The method is called again"
@@ -101,7 +101,7 @@ class HttpClientWithCircuitBreakerSpec extends Specification {
 
         then:"The value is not incremented because the circuit is open"
          e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad count"
+        e.message == "Request [/circuit-breaker-test/rx-count] failed with error: Internal Server Error: Bad count"
         controller.countRx == 6
     }
 

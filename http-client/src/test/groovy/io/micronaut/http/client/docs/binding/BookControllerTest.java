@@ -59,7 +59,7 @@ public class BookControllerTest {
         // end::postform[]
 
         thrown.expect(HttpClientResponseException.class);
-        thrown.expectMessage(CoreMatchers.startsWith("Failed to convert argument [pages] for value [notnumber]"));
+        thrown.expectMessage(CoreMatchers.startsWith("Request [/binding/book] failed with error: Failed to convert argument [pages] for value [notnumber]"));
 
         HttpResponse<Book> response = call.blockingFirst();
 

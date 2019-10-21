@@ -39,7 +39,7 @@ class ServerErrorSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Bad things happening"
+        e.message == "Request [/server-errors/five-hundred] failed with error: Bad things happening"
     }
 
     void "test 500 error - single"() {
@@ -48,7 +48,7 @@ class ServerErrorSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Bad things happening"
+        e.message == "Request [/server-errors/five-hundred] failed with error: Bad things happening"
     }
 
     void "test exception error"() {
@@ -57,7 +57,7 @@ class ServerErrorSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad things happening"
+        e.message == "Request [/server-errors/exception] failed with error: Internal Server Error: Bad things happening"
     }
 
     void "test exception error - single"() {
@@ -66,7 +66,7 @@ class ServerErrorSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad things happening"
+        e.message == "Request [/server-errors/exception] failed with error: Internal Server Error: Bad things happening"
     }
 
     void "test single error"() {
@@ -75,7 +75,7 @@ class ServerErrorSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad things happening"
+        e.message == "Request [/server-errors/single-error] failed with error: Internal Server Error: Bad things happening"
     }
 
     void "test single error - single"() {
@@ -84,7 +84,7 @@ class ServerErrorSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error: Bad things happening"
+        e.message == "Request [/server-errors/single-error] failed with error: Internal Server Error: Bad things happening"
     }
 
     @Client('/server-errors')

@@ -141,6 +141,7 @@ public interface BlockingHttpClient extends Closeable {
                     .getBody()
                     .orElseThrow(() -> new HttpClientResponseException(
                             "Empty body",
+                            request,
                             response
                     ));
         }

@@ -1709,7 +1709,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     } else {
                         boolean errorStatus = statusCode >= 400;
                         if (errorStatus) {
-                            emitter.onError(new HttpClientResponseException(response.getStatus().getReason(), response));
+                            emitter.onError(new HttpClientResponseException(response.getStatus().getReason(), requestWrapper.get(), response));
                         } else {
                             emitter.onNext(response);
                             emitter.onComplete();
@@ -1850,6 +1850,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                 if (errorType != HttpClient.DEFAULT_ERROR_TYPE) {
                                     clientError = new HttpClientResponseException(
                                             status.reasonPhrase(),
+                                            request,
                                             null,
                                             response,
                                             new HttpClientErrorDecoder() {
@@ -1862,6 +1863,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                 } else {
                                     clientError = new HttpClientResponseException(
                                             status.reasonPhrase(),
+                                            request,
                                             response
                                     );
                                 }
@@ -1890,6 +1892,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                     errorResponse.onComplete();
                                     HttpClientResponseException clientResponseError = new HttpClientResponseException(
                                             "Error decoding HTTP error response body: " + t.getMessage(),
+                                            request,
                                             t,
                                             errorResponse,
                                             null
@@ -1911,6 +1914,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, null, true);
                             HttpClientResponseException clientResponseError = new HttpClientResponseException(
                                     "Error decoding HTTP response body: " + t.getMessage(),
+                                    request,
                                     t,
                                     response,
                                     new HttpClientErrorDecoder() {
