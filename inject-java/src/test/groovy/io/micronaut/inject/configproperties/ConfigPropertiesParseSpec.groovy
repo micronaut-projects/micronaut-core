@@ -579,13 +579,35 @@ public class FooConfigurationProperties {
         beanDefinition.injectedFields[0].name == "isOther"
     }
 
+    void "test configuration properties returns self"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
+    @ConfigurationProperties("my")
+    class MyConfig {
+        String host;
+        public String getHost() {
+            return host;
+        }
+        public MyConfig setHost(String host) {
+            this.host = host;
+            return this;
+        }
+    }''')
+        BeanFactory factory = beanDefinition
+        ApplicationContext applicationContext = ApplicationContext.build(["my.host": "abc"]).start()
+        def bean = factory.build(applicationContext, beanDefinition)
+
+        then:
+        bean.getHost() == "abc"
+    }
+
     void "test includes on fields"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
 package test;
 
 import io.micronaut.context.annotation.*;
-
+        
 @ConfigurationProperties(value = "foo", includes = {"publicField", "parentPublicField"})
 class MyProperties extends Parent {
     public String publicField;

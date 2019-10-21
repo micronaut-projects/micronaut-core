@@ -1,0 +1,85 @@
+package io.micronaut.docs.server.binding;
+
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.runtime.server.EmbeddedServer;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
+public class BindingControllerTest {
+
+    private static EmbeddedServer server;
+    private static HttpClient client;
+
+    @BeforeClass
+    public static void setupServer() {
+        server = ApplicationContext.run(EmbeddedServer.class);
+        client = server
+                .getApplicationContext()
+                .createBean(HttpClient.class, server.getURL());
+    }
+
+    @AfterClass
+    public static void stopServer() {
+        if(server != null) {
+            server.stop();
+        }
+        if(client != null) {
+            client.stop();
+        }
+    }
+
+    @Test
+    public void testCookieBinding() {
+        String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/cookieName").cookie(Cookie.of("myCookie", "cookie value")));
+
+        assertNotNull(body);
+        assertEquals("cookie value", body);
+
+        body = client.toBlocking().retrieve(HttpRequest.GET("/binding/cookieInferred").cookie(Cookie.of("myCookie", "cookie value")));
+
+        assertNotNull(body);
+        assertEquals("cookie value", body);
+    }
+
+    @Test
+    public void testHeaderBinding() {
+        String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerName").header("Content-Type", "test"));
+
+        assertNotNull(body);
+        assertEquals("test", body);
+
+        body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerInferred").header("Content-Type", "test"));
+
+        assertNotNull(body);
+        assertEquals("test", body);
+
+        HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () ->
+            client.toBlocking().retrieve(HttpRequest.GET("/binding/headerNullable")));
+
+        assertEquals(ex.getResponse().getStatus(), HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    public void testHeaderDateBinding() {
+        String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/date").header("date", "Tue, 3 Jun 2008 11:05:30 GMT"));
+
+        assertNotNull(body);
+        assertEquals("2008-06-03T11:05:30Z", body);
+
+        body = client.toBlocking().retrieve(HttpRequest.GET("/binding/dateFormat").header("date", "03/06/2008 11:05:30 AM GMT"));
+
+        assertNotNull(body);
+        assertEquals("2008-06-03T11:05:30Z[GMT]", body);
+    }
+}

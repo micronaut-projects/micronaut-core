@@ -2,22 +2,13 @@ A Micronaut's controller action responds with a 200 HTTP status code by default.
 
 If the controller's action responds a `HttpResponse` object, you can configure the status code for the response object with the `status` method.
 
-[source,java]
-----
-include::{testsclient}/httpstatus/HttpResponseStatusController.java[tags=httpResponseStatus, indent=0]
-----
+snippet::io.micronaut.docs.server.response.StatusController[tags="httpresponse", indent=0]
 
 You can also use the `@Status` annotation.
 
-[source,java]
-----
-include::{testsclient}/httpstatus/StatusController.java[tags=atstatus, indent=0]
-----
+snippet::io.micronaut.docs.server.response.StatusController[tags="atstatus", indent=0]
 
-or even respond a `HttpStatus`
+or even respond with an `HttpStatus`
 
-[source,java]
-----
-include::{testsclient}/httpstatus/RespondHttpStatusController.java[tags=respondHttpStatus, indent=0]
-----
+snippet::io.micronaut.docs.server.response.StatusController[tags="httpstatus", indent=0]
 

@@ -12,22 +12,13 @@ TIP: When defining an error handler for an exception, you can specify the except
 
 For example the following method will handling JSON parse exceptions from Jackson for the scope of the declaring controller:
 
-.Local exception handler
-[source,java]
-----
-include::{testsuite}/server/json/PersonController.java[tags=localError, indent=0]
-----
+snippet::io.micronaut.docs.server.json.PersonController[tags="localError", indent=0, title="Local exception handler"]
 
 <1> A method that explicitly handles `JsonParseException` is declared
 <2> An instance of api:http.hateoas.JsonError[] is returned.
 <3> A custom response is returned to handle the error
 
-.Local status handler
-[source,java]
-----
-@Error(status = HttpStatus.NOT_FOUND)
-include::{testsuite}/server/json/PersonController.java[tags=statusError, indent=0]
-----
+snippet::io.micronaut.docs.server.json.PersonController[tags="statusError", indent=0, title="Local status handler"]
 
 <1> The api:http.annotation.Error[] declares which api:http.HttpStatus[] error code to handle (in this case 404)
 <2> A api:http.hateoas.JsonError[] instance is returned for all 404 responses
@@ -35,23 +26,13 @@ include::{testsuite}/server/json/PersonController.java[tags=statusError, indent=
 
 == Global Error Handling
 
-.Global error handler
-[source,java]
-----
-@Error(global = true) // <1>
-include::{testsuite}/server/json/PersonController.java[tags=globalError, indent=0]
-----
+snippet::io.micronaut.docs.server.json.PersonController[tags="globalError", indent=0, title="Global error handler"]
 
 <1> The api:http.annotation.Error[] is used to declare the method a global error handler
 <2> A api:http.hateoas.JsonError[] instance is returned for all errors
 <3> An api:http.HttpStatus#INTERNAL_SERVER_ERROR[] response is returned
 
-.Global status handler
-[source,java]
-----
-@Error(status = HttpStatus.NOT_FOUND, global = true)
-include::{testsuite}/server/json/PersonController.java[tags=statusError, indent=0]
-----
+snippet::io.micronaut.docs.server.json.PersonController[tags="statusError", indent=0, title="Global status handler"]
 
 <1> The api:http.annotation.Error[] declares which api:http.HttpStatus[] error code to handle (in this case 404)
 <2> A api:http.hateoas.JsonError[] instance is returned for all 404 responses
@@ -67,23 +48,16 @@ Additionally you can implement a api:http.server.exceptions.ExceptionHandler[]; 
 
 Imagine your e-commerce app throws an `OutOfStockException` when a book is out of stock:
 
-[source,java]
-----
-include::{testshttpservernetty}/http/server/exception/OutOfStockException.java[tags=clazz, indent=0]
-----
+snippet::io.micronaut.docs.server.exception.OutOfStockException[tags="clazz", indent=0]
 
-[source,java]
-----
-include::{testshttpservernetty}/http/server/exception/BookController.java[tags=clazz, indent=0]
-----
+Along with `BookController`:
+
+snippet::io.micronaut.docs.server.exception.BookController[tags="clazz", indent=0]
 
 If you don't handle the exception the server returns a 500 (Internal Server Error) status code.
 
 If you want to respond 200 OK with 0 (stock level) as the response body when the `OutOfStockException` is thrown, you could register a `ExceptionHandler`:
 
-[source,java]
-----
-include::{testshttpservernetty}/http/server/exception/OutOfStockExceptionHandler.java[tags=clazz, indent=0]
-----
+snippet::io.micronaut.docs.server.exception.OutOfStockExceptionHandler[tags="clazz", indent=0]
 
 IMPORTANT: An `@Error` annotation capturing an exception has precedence over an implementation of `ExceptionHandler` capturing the same exception.
