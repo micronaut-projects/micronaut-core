@@ -17,13 +17,13 @@ class BytesUploadController {
 
     @Post(value = "/bytes", consumes = [MediaType.MULTIPART_FORM_DATA]) // <1>
     fun uploadBytes(file: ByteArray, fileName: String): HttpResponse<String> { // <2>
-        try {
+        return try {
             val tempFile = File.createTempFile(fileName, "temp")
             val path = Paths.get(tempFile.absolutePath)
             Files.write(path, file) // <3>
-            return HttpResponse.ok("Uploaded")
+            HttpResponse.ok("Uploaded")
         } catch (exception: IOException) {
-            return HttpResponse.badRequest("Upload Failed")
+            HttpResponse.badRequest("Upload Failed")
         }
 
     }
