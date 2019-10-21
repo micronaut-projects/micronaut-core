@@ -97,7 +97,7 @@ class HttpStatusSpec extends Specification {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message == "success"
+        e.message == "Request [/status/simple404] failed with error: success"
         e.status == HttpStatus.NOT_FOUND
     }
 }

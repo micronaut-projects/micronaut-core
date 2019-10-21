@@ -41,8 +41,7 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == """Invalid JSON: Unexpected end-of-input
- at [Source: UNKNOWN; line: 1, column: 21]"""
+        e.message == """Request [/errors/string] failed with error: Invalid JSON: Unexpected end-of-input\n at [Source: UNKNOWN; line: 1, column: 21]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:

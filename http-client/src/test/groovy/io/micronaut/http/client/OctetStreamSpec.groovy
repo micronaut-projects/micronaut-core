@@ -37,7 +37,7 @@ class OctetStreamSpec extends Specification {
         new String(client.byteArray(data), StandardCharsets.UTF_8) == new String(data, StandardCharsets.UTF_8)
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == 'The content length [150000] exceeds the maximum allowed content length [10240]'
+        e.message == 'Request [/binary/byte-array] failed with error: The content length [150000] exceeds the maximum allowed content length [10240]'
     }
 
     void "test exchange byte[] non blocking"() {

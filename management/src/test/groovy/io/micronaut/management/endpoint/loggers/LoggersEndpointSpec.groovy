@@ -195,7 +195,7 @@ class LoggersEndpointSpec extends Specification {
 
         and:
         e.response.status == HttpStatus.BAD_REQUEST
-        e.message == 'Argument [LogLevel configuredLevel] not satisfied: Invalid log level specified: NOT_SPECIFIED'
+        e.message == 'Request [/loggers/ROOT] failed with error: Argument [LogLevel configuredLevel] not satisfied: Invalid log level specified: NOT_SPECIFIED'
     }
 
 }

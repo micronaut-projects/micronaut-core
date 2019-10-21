@@ -116,7 +116,7 @@ class HttpTracingSpec extends Specification {
             span.tags.get('http.path') == '/traced/error/John'
             span.tags.get('http.status_code') == 500
             span.tags.get('http.method') == 'GET'
-            span.tags.get('error') == 'Internal Server Error: bad'
+            span.tags.get('error') == 'Request [/traced/error/John] failed with error: Internal Server Error: bad'
             span.operationName == 'GET /traced/error/John'
 
         }
@@ -294,7 +294,7 @@ class HttpTracingSpec extends Specification {
                 it.operationName == 'GET /traced/error/{name}' &&
                         it.tags.get('http.path') == '/traced/error/John' &&
                         it.tags.get('http.status_code') == 500 &&
-                        it.tags.get('error') == 'Internal Server Error: bad' &&
+                        it.tags.get('error') == 'Request [/traced/error/John] failed with error: Internal Server Error: bad' &&
                         it.tags.get('http.client')
             } != null
             reporter.spans.find {
