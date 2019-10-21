@@ -43,7 +43,7 @@ public class HelloControllerSpec {
 
     @Test
     public void testSimpleRetrieve() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
         RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
 
         // tag::simple[]
@@ -66,7 +66,7 @@ public class HelloControllerSpec {
 
     @Test
     public void testRetrieveWithHeaders() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
         RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
 
         // tag::headers[]
@@ -87,7 +87,7 @@ public class HelloControllerSpec {
 
     @Test
     public void testRetrieveWithJSON() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
         RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
 
         // tag::jsonmap[]
@@ -118,7 +118,7 @@ public class HelloControllerSpec {
 
     @Test
     public void testRetrieveWithPOJO() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
         RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
 
         // tag::jsonpojo[]
@@ -138,7 +138,7 @@ public class HelloControllerSpec {
 
     @Test
     public void testRetrieveWithPOJOResponse() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
         RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
 
         // tag::pojoresponse[]
@@ -167,7 +167,7 @@ public class HelloControllerSpec {
 
     @Test
     public void testPostRequestWithString() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
         RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
 
         // tag::poststring[]
@@ -199,7 +199,7 @@ public class HelloControllerSpec {
 
     @Test
     public void testPostRequestWithPOJO() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", HelloControllerSpec.class.getSimpleName()));
         RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
 
         // tag::postpojo[]
