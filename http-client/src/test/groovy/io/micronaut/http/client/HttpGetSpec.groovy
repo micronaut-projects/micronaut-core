@@ -86,7 +86,7 @@ class HttpGetSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Request [/get/doesntexist] failed with error: Page Not Found"
+        e.message == "Page Not Found"
         e.status == HttpStatus.NOT_FOUND
 
         cleanup:
@@ -107,7 +107,7 @@ class HttpGetSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Request [/get/error] failed with error: Server error"
+        e.message == "Server error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
         e.response.getBody(String).get() == "Server error"
 
@@ -129,7 +129,7 @@ class HttpGetSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Request [/get/jsonError] failed with error: {foo=bar}"
+        e.message == "{foo=bar}"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
 
         cleanup:
@@ -363,7 +363,7 @@ class HttpGetSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Request [/get/empty] failed with error: Page Not Found"
+        e.message == "Page Not Found"
         e.status == HttpStatus.NOT_FOUND
 
         cleanup:

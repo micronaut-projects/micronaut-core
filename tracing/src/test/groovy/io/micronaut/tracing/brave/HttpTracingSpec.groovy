@@ -174,13 +174,13 @@ class HttpTracingSpec extends Specification {
                 Span.Kind.SERVER)
         assertSpan(reporter.spans[2],
                 "get /traced/error/{name}",
-                "Request [/traced/error/John] failed with error: Internal Server Error: bad",
+                "Internal Server Error: bad",
                 "/traced/error/John",
                 Span.Kind.CLIENT)
 
         assertSpan(reporter.spans[3],
                 "get /traced/nestederror/{name}",
-                "Request [/traced/error/John] failed with error: Internal Server Error: bad",
+                "Internal Server Error: bad",
                 "/traced/nestedError/John",
                 Span.Kind.SERVER)
         assertSpan(reporter.spans[4],
@@ -190,7 +190,7 @@ class HttpTracingSpec extends Specification {
                 Span.Kind.SERVER)
         assertSpan(reporter.spans[5],
                 "get",
-                "Request [/traced/nestedError/John] failed with error: Internal Server Error: Request [/traced/error/John] failed with error: Internal Server Error: bad",
+                "Internal Server Error: Internal Server Error: bad",
                 "/traced/nestedError/John",
                 Span.Kind.CLIENT)
 

@@ -186,7 +186,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == 'Request [/validated/tests/test1/x] failed with error: value: size must be between 2 and 2147483647'
+        e.message == 'value: size must be between 2 and 2147483647'
 
 
         cleanup:
@@ -203,7 +203,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == 'Request [/validated/tests/test3] failed with error: something is invalid'
+        e.message == 'something is invalid'
 
 
         cleanup:
@@ -220,7 +220,7 @@ class ValidatedSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == 'Request [/validated/tests/test4] failed with error: another thing is invalid'
+        e.message == 'another thing is invalid'
 
 
         cleanup:

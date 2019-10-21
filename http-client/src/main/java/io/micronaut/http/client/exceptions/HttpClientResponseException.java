@@ -16,9 +16,11 @@
 package io.micronaut.http.client.exceptions;
 
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.HttpResponseProvider;
 
-import java.net.URI;
 import java.util.Optional;
 
 /**
@@ -29,15 +31,14 @@ import java.util.Optional;
  */
 public class HttpClientResponseException extends HttpClientException implements HttpResponseProvider {
     private final HttpResponse<?> response;
-    private final HttpRequest<?> request;
     private final HttpClientErrorDecoder errorDecoder;
 
     /**
      * @param message  The message
      * @param response The Http response
      */
-    public HttpClientResponseException(String message, HttpRequest<?> request, HttpResponse<?> response) {
-        this(message, request, null, response);
+    public HttpClientResponseException(String message, HttpResponse<?> response) {
+        this(message, null, response);
     }
 
     /**
@@ -45,8 +46,8 @@ public class HttpClientResponseException extends HttpClientException implements 
      * @param cause    The throwable
      * @param response The Http response
      */
-    public HttpClientResponseException(String message, HttpRequest<?> request, Throwable cause, HttpResponse<?> response) {
-        this(message, request, cause, response, HttpClientErrorDecoder.DEFAULT);
+    public HttpClientResponseException(String message, Throwable cause, HttpResponse<?> response) {
+        this(message, cause, response, HttpClientErrorDecoder.DEFAULT);
     }
 
     /**
@@ -55,20 +56,21 @@ public class HttpClientResponseException extends HttpClientException implements 
      * @param response The Http response
      * @param errorDecoder The error decoder
      */
-    public HttpClientResponseException(String message, HttpRequest<?> request, Throwable cause, HttpResponse<?> response, HttpClientErrorDecoder errorDecoder) {
+    public HttpClientResponseException(String message, Throwable cause, HttpResponse<?> response, HttpClientErrorDecoder errorDecoder) {
         super(message, cause);
         this.errorDecoder = errorDecoder;
         this.response = response;
-        this.request = request;
         initResponse(response);
     }
 
     @Override
     public String getMessage() {
         Optional<Argument<?>> errorType = Optional.ofNullable(getErrorType(response));
-        return "Request ["+ this.request.getUri().getPath() +"] failed with error: "+ errorType.map(errType ->
-             getResponse().getBody(errorType.get()).flatMap(errorDecoder::getMessage).orElse(super.getMessage())
-        ).orElse(super.getMessage());
+        if (errorType.isPresent()) {
+            return getResponse().getBody(errorType.get()).flatMap(errorDecoder::getMessage).orElse(super.getMessage());
+        } else {
+            return super.getMessage();
+        }
     }
 
     /**

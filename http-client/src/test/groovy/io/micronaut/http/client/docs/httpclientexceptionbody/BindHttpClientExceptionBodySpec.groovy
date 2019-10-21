@@ -90,7 +90,7 @@ class BindHttpClientExceptionBodySpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         e.response.status == HttpStatus.OK
-        e.message.startsWith("Request [/books/1491950358] failed with error: Error decoding HTTP response body")
+        e.message.startsWith("Error decoding HTTP response body")
         e.message.contains('cannot deserialize from Object value') // the jackson error
     }
 }
