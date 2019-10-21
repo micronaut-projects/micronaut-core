@@ -18,13 +18,13 @@ class CompletedUploadController {
 
     @Post(value = "/completed", consumes = [MediaType.MULTIPART_FORM_DATA]) // <1>
     fun uploadCompleted(file: CompletedFileUpload): HttpResponse<String> { // <2>
-        try {
+        return try {
             val tempFile = File.createTempFile(file.filename, "temp") //<3>
             val path = Paths.get(tempFile.absolutePath)
             Files.write(path, file.bytes) //<3>
-            return HttpResponse.ok("Uploaded")
+            HttpResponse.ok("Uploaded")
         } catch (exception: IOException) {
-            return HttpResponse.badRequest("Upload Failed")
+            HttpResponse.badRequest("Upload Failed")
         }
 
     }
