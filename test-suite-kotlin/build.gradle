@@ -19,6 +19,7 @@ dependencies {
     testCompile "org.jetbrains.kotlin:kotlin-test:$kotlinVersion"
 
     testCompile project(":validation")
+    testCompile project(":management")
     testCompile project(":inject")
     testCompile dependencyVersion("jcache")
     testCompile project(':validation')

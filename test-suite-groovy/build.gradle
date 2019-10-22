@@ -5,6 +5,7 @@ dependencies {
     testCompile project(":runtime")
     testCompile project(":validation")
     testCompile project(":inject")
+    testCompile project(":management")
     testCompile project(":session")
     testCompile dependencyVersion("jcache")
     testCompile dependencyVersion("reactor")
