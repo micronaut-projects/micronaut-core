@@ -386,12 +386,12 @@ class HttpHeadSpec extends Specification {
         ex = thrown(HttpClientResponseException)
         ex.message == "Request [/head/dateQuery] failed with error: Empty body"
 
-//        when:
-//        client.formatDateTime(dt)
-//
-//        then:
-//        ex = thrown(HttpClientResponseException)
-//        ex.message == "Request [/head/dateTime/3918-11-20] failed with error: Empty body"
+        when:
+        client.formatDateTime(dt)
+
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.message == "Request [/head/dateTime/3918-11-20] failed with error: Empty body"
 
         when:
         client.formatDateTimeQuery(dt)

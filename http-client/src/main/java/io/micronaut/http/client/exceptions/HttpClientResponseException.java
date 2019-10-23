@@ -66,10 +66,15 @@ public class HttpClientResponseException extends HttpClientException implements 
     @Override
     public String getMessage() {
         Optional<Argument<?>> errorType = Optional.ofNullable(getErrorType(response));
-        return "Request ["+ this.request.getUri().getPath() +"] failed with error: "+ errorType.map(errType ->
+        return "Request ["+ getRequest().getUri().getPath() +"] failed with error: "+ errorType.map(errType ->
              getResponse().getBody(errorType.get()).flatMap(errorDecoder::getMessage).orElse(super.getMessage())
         ).orElse(super.getMessage());
     }
+
+    /**
+     * @return The {@link HttpRequest}
+     */
+    public HttpRequest<?> getRequest() { return request; }
 
     /**
      * @return The {@link HttpResponse}
