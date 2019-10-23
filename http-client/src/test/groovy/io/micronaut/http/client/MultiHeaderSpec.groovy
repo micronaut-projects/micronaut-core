@@ -42,16 +42,17 @@ class MultiHeaderSpec extends Specification {
         )
 
         then:
-        response.body() == "[a, b]"
+        response.body() == expected
 
         cleanup:
         embeddedServer.close()
 
         where:
-        path | _
-        "/echo-multi-header-as-list/from-request" | _
-        "/echo-multi-header-as-list/from-list-param" | _
-        "/echo-multi-header-as-list/from-array-param" | _
+        path | expected
+        "/echo-multi-header-as-list/from-request" | "[a, b]"
+        "/echo-multi-header-as-list/from-list-param" | "[a, b]"
+        "/echo-multi-header-as-list/from-array-param" | "[a, b]"
+        "/echo-multi-header-as-list/from-string-param" | "a"
     }
 
     @Controller("/echo-multi-header-as-list")
@@ -69,6 +70,11 @@ class MultiHeaderSpec extends Specification {
 
         @Get(uri = "/from-array-param", produces = MediaType.TEXT_PLAIN)
         String fromArrayParam(@Header String[] multi) {
+            multi
+        }
+
+        @Get(uri = "/from-string-param", produces = MediaType.TEXT_PLAIN)
+        String fromStringParam(@Header String multi) {
             multi
         }
     }
