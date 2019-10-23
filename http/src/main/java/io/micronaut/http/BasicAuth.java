@@ -13,22 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client;
+package io.micronaut.http;
+
+import javax.annotation.concurrent.Immutable;
 
 /**
- * A class representing basic auth authorization header.
- * To be used in {@link io.micronaut.http.client.annotation.Client}
+ * A class representing basic auth authorization header. Used in
+ * declarative clients and server routes.
  *
  * @author Ashwini Mutalik Desai
  * @since 1.3.0
  */
+@Immutable
 public final class BasicAuth {
 
     private final String username;
     private final String password;
 
     /**
-     *
      * @param username The username
      * @param password The password
      */
@@ -38,7 +40,6 @@ public final class BasicAuth {
     }
 
     /**
-     *
      * @return username
      */
     public String getUsername() {
@@ -46,7 +47,6 @@ public final class BasicAuth {
     }
 
     /**
-     *
      * @return password
      */
     public String getPassword() {
