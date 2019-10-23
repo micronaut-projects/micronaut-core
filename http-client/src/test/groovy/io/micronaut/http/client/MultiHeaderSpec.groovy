@@ -22,7 +22,6 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
-import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
@@ -51,19 +50,25 @@ class MultiHeaderSpec extends Specification {
         where:
         path | _
         "/echo-multi-header-as-list/from-request" | _
-        "/echo-multi-header-as-list/from-param" | _
+        "/echo-multi-header-as-list/from-list-param" | _
+        "/echo-multi-header-as-list/from-array-param" | _
     }
 
     @Controller("/echo-multi-header-as-list")
     static class EchoMultiHeaderController {
 
         @Get(uri = "/from-request", produces = MediaType.TEXT_PLAIN)
-        String fromRequest() {
-            ServerRequestContext.currentRequest().get().headers.getAll("multi")
+        String fromRequest(HttpRequest request) {
+            request.headers.getAll("multi")
         }
 
-        @Get(uri = "/from-param", produces = MediaType.TEXT_PLAIN)
-        String fromParam(@Header List<String> multi) {
+        @Get(uri = "/from-list-param", produces = MediaType.TEXT_PLAIN)
+        String fromListParam(@Header List<String> multi) {
+            multi
+        }
+
+        @Get(uri = "/from-array-param", produces = MediaType.TEXT_PLAIN)
+        String fromArrayParam(@Header String[] multi) {
             multi
         }
     }
