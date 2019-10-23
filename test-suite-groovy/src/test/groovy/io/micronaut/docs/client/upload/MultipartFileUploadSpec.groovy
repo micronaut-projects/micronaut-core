@@ -1,36 +1,29 @@
 package io.micronaut.docs.client.upload
 
+// tag::imports[]
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.multipart.MultipartBody
-import io.micronaut.http.multipart.CompletedFileUpload
-import io.micronaut.http.multipart.StreamingFileUpload
+
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 
-// tag::imports[]
-
 // end::imports[]
-
 // tag::multipartBodyImports[]
-
-// end::multipartBodyImports[]
-
-// tag::controllerImports[]
-
+import io.micronaut.http.multipart.CompletedFileUpload
+import io.micronaut.http.multipart.StreamingFileUpload
+import io.micronaut.http.client.multipart.MultipartBody
 import org.reactivestreams.Publisher
-import spock.lang.AutoCleanup
-
+// end::multipartBodyImports[]
+// tag::controllerImports[]
+import io.micronaut.http.annotation.Controller
 // end::controllerImports[]
 
 // tag::spockImports[]
-
+import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 

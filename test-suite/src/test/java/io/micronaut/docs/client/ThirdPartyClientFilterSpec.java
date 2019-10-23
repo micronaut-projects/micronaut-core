@@ -15,9 +15,7 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.web.router.Router;
 import io.reactivex.Flowable;
-import io.reactivex.functions.Consumer;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
