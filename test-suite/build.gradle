@@ -25,6 +25,7 @@ dependencies {
     testCompile project(":management")
     testCompile project(":runtime")
     testCompile project(":inject")
+    testCompile project(":function-client")
     testCompile project(":session")
     testCompile dependencyVersion("reactor")
     testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {

@@ -13,4 +13,5 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
+    testCompile project(":function-client")
 }
