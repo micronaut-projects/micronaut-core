@@ -205,7 +205,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
         io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
         DefaultFullHttpRequest req = content != null ? new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, content) :
             new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
-        req.headers().setAll(headers.getNettyHeaders());
+        req.headers().set(headers.getNettyHeaders());
         return req;
     }
 
@@ -222,7 +222,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
         io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
         HttpRequest req = publisher != null ? new DefaultStreamedHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, publisher) :
             new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
-        req.headers().setAll(headers.getNettyHeaders());
+        req.headers().set(headers.getNettyHeaders());
         return req;
     }
 
