@@ -33,6 +33,7 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
+    testCompile project(":function-client")
     testCompile 'io.kotlintest:kotlintest-runner-junit5:3.3.0'
     testRuntime "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
 }
