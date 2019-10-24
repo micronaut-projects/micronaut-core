@@ -1785,7 +1785,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             io.micronaut.http.HttpRequest<?> request,
             Channel channel,
             ChannelPool channelPool,
-            Emitter<io.micronaut.http.HttpResponse<O>> emitter,
+            FlowableEmitter<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
         final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandler<FullHttpResponse>(false) {
@@ -1804,7 +1804,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         httpStatus = HttpStatus.valueOf(statusCode);
                     } catch (IllegalArgumentException e) {
                         if (complete.compareAndSet(false, true)) {
-                            emitter.onError(e);
+                            emitter.tryOnError(e);
                         } else if (LOG.isWarnEnabled()) {
                             LOG.warn("Unsupported http status after handler completed: " + e.getMessage(), e);
                         }
@@ -1827,7 +1827,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             redirectedRequest.first(io.micronaut.http.HttpResponse.notFound())
                                     .subscribe((oHttpResponse, throwable) -> {
                                         if (throwable != null) {
-                                            emitter.onError(throwable);
+                                            emitter.tryOnError(throwable);
 
                                         } else {
                                             emitter.onNext(oHttpResponse);
@@ -1867,14 +1867,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                         );
                                     }
                                     try {
-                                        emitter.onError(clientError);
+                                        emitter.tryOnError(clientError);
                                     } finally {
                                         response.onComplete();
                                     }
                                 } catch (Throwable t) {
                                     if (t instanceof HttpClientResponseException) {
                                         try {
-                                            emitter.onError(t);
+                                            emitter.tryOnError(t);
                                         } finally {
                                             response.onComplete();
                                         }
@@ -1895,7 +1895,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                                 errorResponse,
                                                 null
                                         );
-                                        emitter.onError(clientResponseError);
+                                        emitter.tryOnError(clientResponseError);
                                     }
                                 }
                             } else {
@@ -1907,7 +1907,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     } catch (Throwable t) {
                         if (complete.compareAndSet(false, true)) {
                             if (t instanceof HttpClientResponseException) {
-                                emitter.onError(t);
+                                emitter.tryOnError(t);
                             } else {
                                 FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, null, true);
                                 HttpClientResponseException clientResponseError = new HttpClientResponseException(
@@ -1922,7 +1922,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                         }
                                 );
                                 try {
-                                    emitter.onError(clientResponseError);
+                                    emitter.tryOnError(clientResponseError);
                                 } finally {
                                     response.onComplete();
                                 }
@@ -1979,11 +1979,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         }
 
                         if (cause instanceof TooLongFrameException) {
-                            emitter.onError(new ContentLengthExceededException(configuration.getMaxContentLength()));
+                            emitter.tryOnError(new ContentLengthExceededException(configuration.getMaxContentLength()));
                         } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
-                            emitter.onError(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                            emitter.tryOnError(ReadTimeoutException.TIMEOUT_EXCEPTION);
                         } else {
-                            emitter.onError(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
+                            emitter.tryOnError(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
                         }
                     }
                 } finally {
