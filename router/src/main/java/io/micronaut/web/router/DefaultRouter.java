@@ -184,13 +184,6 @@ public class DefaultRouter implements Router {
             uriRoutes = explicitAcceptRoutes.isEmpty() ? acceptRoutes : explicitAcceptRoutes;
         }
 
-        if (uriRoutes.size() > 1) {
-            uriRoutes = uriRoutes.stream().collect(
-                    StreamUtils.maxAll(Comparator.comparingInt((match) ->
-                                    match.getRoute().getUriMatchTemplate().getRawSegmentLength()),
-                            Collectors.toList()));
-        }
-
         /**
          * Any changes to the logic below may also need changes to {@link io.micronaut.http.uri.UriTemplate#compareTo(UriTemplate)}
          */
@@ -215,6 +208,13 @@ public class DefaultRouter implements Router {
                 closestMatches.add(match);
             }
             uriRoutes = closestMatches;
+        }
+
+        if (uriRoutes.size() > 1) {
+            uriRoutes = uriRoutes.stream().collect(
+                    StreamUtils.maxAll(Comparator.comparingInt((match) ->
+                                    match.getRoute().getUriMatchTemplate().getRawSegmentLength()),
+                            Collectors.toList()));
         }
 
         return uriRoutes;

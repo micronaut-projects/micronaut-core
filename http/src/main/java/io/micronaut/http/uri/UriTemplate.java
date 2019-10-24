@@ -283,11 +283,12 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
         }
 
-        int variableCompare = thisVariableCount.compareTo(thatVariableCount);
-        if (variableCompare == 0) {
-            return thatRawCount.compareTo(thisRawCount);
+        //using that.compareTo because more raw segments should have higher precedence
+        int rawCompare = thatRawCount.compareTo(thisRawCount);
+        if (rawCompare == 0) {
+            return thisVariableCount.compareTo(thatVariableCount);
         } else {
-            return variableCompare;
+            return rawCompare;
         }
     }
 

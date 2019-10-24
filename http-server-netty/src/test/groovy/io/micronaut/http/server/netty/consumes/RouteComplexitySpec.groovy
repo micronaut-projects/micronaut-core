@@ -34,6 +34,13 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
         body == "ab/c"
 
         when:
+        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/other2/a/b/c")).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        body == "ab/c"
+
+        when:
         body = rxClient.retrieve(HttpRequest.GET("/test-complexity/list")).blockingFirst()
 
         then:
@@ -63,6 +70,16 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
         @Get("/other{/a}/{b}{/c}/d")
         HttpResponse threeVariablesTwoRaw() {
             HttpResponse.ok("three variables")
+        }
+
+        @Get("/other2{/a}/{+b}")
+        HttpResponse twoVariables2(String a, String b) {
+            HttpResponse.ok(a + b)
+        }
+
+        @Get("/other2{/a}/{b}{/c}")
+        HttpResponse threeVariablesOneRaw() {
+            HttpResponse.ok("three variables one raw")
         }
 
         @Get("/list{?full}")
