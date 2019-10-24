@@ -66,15 +66,12 @@ import javax.inject.Singleton
 class ThirdPartyClientFilterSpec extends Specification {
     private static String token = 'XXXX'
     private static String username = 'john'
-    @Shared int port = SocketUtils.findAvailableTcpPort()
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
-            'micronaut.server.port':port,
-            'micronaut.http.clients.myService.url': "http://localhost:$port",
+            EmbeddedServer, [
             'bintray.username': username,
             'bintray.token': token,
-            'bintray.organization': 'grails',
-    )
-    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+            'bintray.organization': 'grails']
+    ).applicationContext
 
     def "a client filter is applied to the request and adds the authorization header"() {
         given:
