@@ -171,6 +171,17 @@ public class UriTemplate implements Comparable<UriTemplate> {
     }
 
     /**
+     * @return The number of segments that are raw
+     */
+    public int getRawSegmentLength() {
+        return segments.stream()
+                .filter(segment -> !segment.isVariable())
+                .map(CharSequence::length)
+                .reduce(Integer::sum)
+                .orElse(0);
+    }
+
+    /**
      * Nests another URI template with this template.
      *
      * @param uriTemplate The URI template. If it does not begin with forward slash it will automatically be appended with forward slash
