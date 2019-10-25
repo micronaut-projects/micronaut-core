@@ -26,4 +26,5 @@ import java.lang.annotation.*;
 @HttpFilterQualifier
 public @interface MarkerStereotypeAnnotation {
 
+    String value() default "";
 }

@@ -38,56 +38,60 @@ class ClientFilterStereotypeSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    ApplicationContext ctx = ApplicationContext.run(EmbeddedServer).applicationContext
 
-    @Shared
-    MarkedClient markedClient = embeddedServer.applicationContext.getBean(MarkedClient)
+    void "test declarative client matching"() {
+        when:
+        MarkedClient markedClient = ctx.getBean(MarkedClient)
 
-    @Shared
-    UnmarkedClient unmarkedClient = embeddedServer.applicationContext.getBean(UnmarkedClient)
-
-    @Shared
-    MatchedBean matchedBean = embeddedServer.applicationContext.getBean(MatchedBean)
-
-    @Shared
-    UnmatchedBean unmatchedBean = embeddedServer.applicationContext.getBean(UnmatchedBean);
-
-    void "filter should be applied only to annotated declarative clients"() {
-        expect:
+        then:
         markedClient.echo() == "Intercepted"
-    }
 
-    void "filter should not be applied because declarative client has no annotation"() {
-        expect:
+        when:
+        MarkedValueClient markedValueClient = ctx.getBean(MarkedValueClient)
+
+        then:
+        markedValueClient.echo() == "Intercepted Marked"
+
+        when:
+        UnmarkedClient unmarkedClient = ctx.getBean(UnmarkedClient)
+
+        then:
         unmarkedClient.echo() == "echo"
     }
 
-    void "low-level annotated client and injected in constructor intercepted by http filter"() {
-        expect:
-        matchedBean.httpClient.toBlocking().retrieve('/') == "Intercepted"
-    }
+    void "low-level client filter matching"() {
+        given:
+        ClientBeans clientBeans = ctx.getBean(ClientBeans)
 
-    void "low-level not annotated client not intercepted by http filter"() {
         expect:
-        unmatchedBean.httpClient.toBlocking().retrieve('/') == "echo"
+        clientBeans.annotatedClient.toBlocking().retrieve('/') == "Intercepted"
+        clientBeans.annotatedNameClient.toBlocking().retrieve('/') == "Intercepted Marked"
+        clientBeans.client.toBlocking().retrieve('/') == "echo"
     }
 
     @Singleton
-    static class MatchedBean {
-        HttpClient httpClient
+    static class ClientBeans {
+        HttpClient annotatedClient
+        HttpClient annotatedNameClient
+        HttpClient client
 
-        MatchedBean(@MarkerStereotypeAnnotation @Client('/filters/marked') HttpClient httpClient) {
-            this.httpClient = httpClient
+        ClientBeans(
+                @MarkerStereotypeAnnotation @Client('/filters/marked') HttpClient annotatedClient,
+                @MarkerStereotypeAnnotation("marked") @Client('/filters/marked') HttpClient annotatedNameClient,
+                @Client('/filters/marked') HttpClient client
+        ) {
+            this.client = client
+            this.annotatedNameClient = annotatedNameClient
+            this.annotatedClient = annotatedClient
         }
     }
 
-    @Singleton
-    static class UnmatchedBean {
-        HttpClient httpClient
-
-        UnmatchedBean(@Client('/filters/marked') HttpClient httpClient) {
-            this.httpClient = httpClient
-        }
+    @Client("/filters/marked")
+    @MarkerStereotypeAnnotation("marked")
+    static interface MarkedValueClient {
+        @Get("/")
+        String echo()
     }
 
     @Client("/filters/marked")
@@ -120,6 +124,19 @@ class ClientFilterStereotypeSpec extends Specification {
             return Single.fromPublisher(chain.proceed(request))
                     .map({ response ->
                         HttpResponse.ok("Intercepted")
+                    }).toFlowable()
+        }
+    }
+
+    @MarkerStereotypeAnnotation("marked")
+    @Singleton
+    static class MarkerValueFilter implements HttpClientFilter {
+
+        @Override
+        Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
+            return Single.fromPublisher(chain.proceed(request))
+                    .map({ response ->
+                        HttpResponse.ok("Intercepted Marked")
                     }).toFlowable()
         }
     }
