@@ -864,6 +864,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                             getBeanWriter().visitSetterValue(
                                     AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                    AstGenericUtils.resolveTypeReference(methodNode.returnType),
                                     methodAnnotationMetadata,
                                     false,
                                     resolveParameterType(parameter),
@@ -882,7 +883,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 } else if (isPublic) {
                     def sourceUnit = sourceUnit
-                    final boolean isConstrained =
+                    final boolean isConstrained = isDeclaredBean &&
                             methodNode.getParameters()
                                     .any { Parameter p ->
                                 AstAnnotationUtils.hasStereotype(sourceUnit, p, InjectTransform.ANN_CONSTRAINT) ||
@@ -1309,6 +1310,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                         getBeanWriter().visitSetterValue(
                                 AstGenericUtils.resolveTypeReference(declaringClass),
+                                void.class,
                                 fieldAnnotationMetadata,
                                 false,
                                 fieldTypeReference,

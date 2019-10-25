@@ -67,6 +67,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
 
     /**
      * @param fullHttpResponse       The full Http response
+     * @param httpStatus             The Http status
      * @param mediaTypeCodecRegistry The media type codec registry
      * @param byteBufferFactory      The byte buffer factory
      * @param bodyType               The body type
@@ -74,12 +75,13 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
      */
     FullNettyClientHttpResponse(
             FullHttpResponse fullHttpResponse,
+            HttpStatus httpStatus,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             ByteBufferFactory<ByteBufAllocator,
             ByteBuf> byteBufferFactory,
             Argument<B> bodyType, boolean errorStatus) {
 
-        this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
+        this.status = httpStatus;
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
         this.attributes = new MutableConvertibleValuesMap<>();
         this.nettyHttpResponse = fullHttpResponse;

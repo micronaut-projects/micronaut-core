@@ -16,6 +16,7 @@
 package io.micronaut.tracing.instrument.util;
 
 import io.opentracing.Scope;
+import io.opentracing.ScopeManager;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
 
@@ -45,16 +46,17 @@ public class TracingRunnable implements Runnable {
 
     @Override
     public void run() {
-        Scope scope = null;
         if (span != null) {
-            scope = tracer.scopeManager().activate(span);
-        }
-        try {
-            runnable.run();
-        } finally {
-            if (scope != null) {
-                scope.close();
+            final ScopeManager scopeManager = tracer.scopeManager();
+            if (scopeManager.activeSpan() != span) {
+                try (Scope ignored = scopeManager.activate(span)) {
+                    runnable.run();
+                }
+            } else {
+                runnable.run();
             }
+        } else {
+            runnable.run();
         }
     }
 

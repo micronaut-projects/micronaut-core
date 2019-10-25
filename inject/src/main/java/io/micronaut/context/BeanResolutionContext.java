@@ -34,7 +34,12 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public interface BeanResolutionContext extends ValueResolver<CharSequence> {
+public interface BeanResolutionContext extends ValueResolver<CharSequence>, AutoCloseable {
+
+    @Override
+    default void close() {
+        // no-op
+    }
 
     /**
      * @return The context
@@ -80,12 +85,33 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence> {
     <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance);
 
     /**
-     * Obtains an inflight bean for the given identifier.
+     * Removes a bean that is in the process of being created. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
+     * @param beanIdentifier The bean identifier
+     * @param <T> THe instance type
+     */
+    <T> void removeInFlightBean(BeanIdentifier beanIdentifier);
+
+    /**
+     * Obtains an inflight bean for the given identifier. An "In Flight" bean is one that is currently being
+     * created but has not finished construction and been registered as a singleton just yet. For example
+     * in the case whereby a bean as a {@code PostConstruct} method that also triggers bean resolution of the same bean.
+     *
      * @param beanIdentifier The bean identifier
      * @param <T> The bean type
      * @return The bean
      */
     @Nullable <T> T getInFlightBean(BeanIdentifier beanIdentifier);
+
+    /**
+     * @return The current bean identifier
+     */
+    @Nullable Qualifier<?> getCurrentQualifier();
+
+    /**
+     * Sets the current qualifier.
+     * @param qualifier The qualifier
+     */
+    void setCurrentQualifier(@Nullable Qualifier<?> qualifier);
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies.

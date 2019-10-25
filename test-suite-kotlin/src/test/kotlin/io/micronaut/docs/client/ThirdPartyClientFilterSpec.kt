@@ -1,13 +1,10 @@
 package io.micronaut.docs.client
 
-import io.kotlintest.eventually
-import io.kotlintest.seconds
 import io.kotlintest.shouldBe
-import io.kotlintest.shouldNotBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Value
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
@@ -21,20 +18,11 @@ import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
-import org.junit.AfterClass
-import org.junit.BeforeClass
-import org.junit.Test
 import org.reactivestreams.Publisher
-import spock.lang.Retry
 
 import javax.inject.Singleton
 import java.util.Base64
-import java.util.HashMap
 
-import org.junit.Assert.assertEquals
-import org.opentest4j.AssertionFailedError
-
-@Retry
 class ThirdPartyClientFilterSpec: StringSpec() {
     private var result: String? = null
     private val token = "XXXX"
@@ -42,9 +30,7 @@ class ThirdPartyClientFilterSpec: StringSpec() {
 
     val embeddedServer = autoClose(
             ApplicationContext.run(EmbeddedServer::class.java,
-                    mapOf("micronaut.server.port" to SocketUtils.findAvailableTcpPort(),
-                            "micronaut.http.clients.myService.url" to "http://localhost:\$port",
-                            "bintray.username" to username, "bintray.token" to token, "bintray.organization" to "grails"))
+                    mapOf("bintray.username" to username, "bintray.token" to token, "bintray.organization" to "grails", "spec.name" to ThirdPartyClientFilterSpec::class.simpleName))
     )
 
     val client = autoClose(
@@ -55,16 +41,10 @@ class ThirdPartyClientFilterSpec: StringSpec() {
         "a client filter is applied to the request and adds the authorization header" {
             val bintrayService = embeddedServer.applicationContext.getBean(BintrayService::class.java)
 
-//            bintrayService.fetchRepositories()
-//                    .subscribe { str -> result = str.body() }
             result = bintrayService.fetchRepositories().blockingFirst().body()
 
             val encoded = Base64.getEncoder().encodeToString("$username:$token".toByteArray())
             val expected = "Basic $encoded"
-
-//            eventually(10.seconds) {
-//                result shouldNotBe null
-//            }
 
             result shouldBe expected
         }
@@ -96,6 +76,7 @@ internal class BintrayService(
 }
 //end::bintrayService[]
 
+@Requires(property = "spec.name", value = "ThirdPartyClientFilterSpec")
 //tag::bintrayFilter[]
 @Filter("/repos/**") // <1>
 internal class BintrayFilter(

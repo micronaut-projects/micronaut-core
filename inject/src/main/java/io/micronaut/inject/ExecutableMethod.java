@@ -27,4 +27,13 @@ import io.micronaut.core.type.Executable;
  * @since 1.0
  */
 public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReference<T, R> {
+    /**
+     * Defines whether the method is abstract.
+     *
+     * @return Is the method abstract.
+     * @since 1.2.3
+     */
+    default boolean isAbstract() {
+        return false;
+    }
 }

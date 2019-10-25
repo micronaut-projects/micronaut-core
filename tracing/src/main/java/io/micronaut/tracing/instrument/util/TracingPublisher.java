@@ -18,8 +18,10 @@ package io.micronaut.tracing.instrument.util;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.MutableHttpResponse;
 import io.opentracing.Scope;
+import io.opentracing.ScopeManager;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
+import io.opentracing.noop.NoopScopeManager;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -112,13 +114,19 @@ public class TracingPublisher<T> implements Publisher<T> {
             finishOnClose = false;
         }
         if (span != null) {
-            try (Scope ignored = tracer.scopeManager().activate(span)) {
+            final ScopeManager scopeManager = tracer.scopeManager();
+            try (Scope ignored = scopeManager.activeSpan() != span ? scopeManager.activate(span) : NoopScopeManager.NoopScope.INSTANCE) {
                 //noinspection SubscriberImplementation
                 publisher.subscribe(new Subscriber<T>() {
                     boolean finished = false;
                     @Override
                     public void onSubscribe(Subscription s) {
-                        try (Scope ignored = tracer.scopeManager().activate(span)) {
+                        if (scopeManager.activeSpan() != span) {
+                            try (Scope ignored = scopeManager.activate(span)) {
+                                TracingPublisher.this.doOnSubscribe(span);
+                                actual.onSubscribe(s);
+                            }
+                        } else {
                             TracingPublisher.this.doOnSubscribe(span);
                             actual.onSubscribe(s);
                         }
@@ -127,7 +135,7 @@ public class TracingPublisher<T> implements Publisher<T> {
                     @Override
                     public void onNext(T object) {
                         boolean finishAfterNext = isSingle && finishOnClose;
-                        try (Scope ignored = tracer.scopeManager().activate(span)) {
+                        try (Scope ignored = scopeManager.activeSpan() != span ? scopeManager.activate(span) : NoopScopeManager.NoopScope.INSTANCE) {
                             if (object instanceof MutableHttpResponse) {
                                 MutableHttpResponse response = (MutableHttpResponse) object;
                                 Optional<?> body = response.getBody();
@@ -157,7 +165,7 @@ public class TracingPublisher<T> implements Publisher<T> {
 
                     @Override
                     public void onError(Throwable t) {
-                        try (Scope ignored = tracer.scopeManager().activate(span)) {
+                        try (Scope ignored = scopeManager.activeSpan() != span ? scopeManager.activate(span) : NoopScopeManager.NoopScope.INSTANCE) {
                             TracingPublisher.this.onError(t, span);
                             actual.onError(t);
                             finished = true;
@@ -171,7 +179,7 @@ public class TracingPublisher<T> implements Publisher<T> {
                     @Override
                     public void onComplete() {
                         if (!finished) {
-                            try (Scope ignored = tracer.scopeManager().activate(span)) {
+                            try (Scope ignored = scopeManager.activeSpan() != span ? scopeManager.activate(span) : NoopScopeManager.NoopScope.INSTANCE) {
                                 actual.onComplete();
                                 TracingPublisher.this.doOnFinish(span);
                             } finally {
