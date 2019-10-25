@@ -1,6 +1,7 @@
 package io.micronaut.docs.client;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.http.HttpRequest;
@@ -44,18 +45,14 @@ public class ThirdPartyClientFilterSpec {
 
     @BeforeClass
     public static void setupServer() {
-        int port = SocketUtils.findAvailableTcpPort();
         Map<String, Object> map = new HashMap<>();
-        map.put("micronaut.server.port", port);
-        map.put("micronaut.http.clients.myService.url", "http://localhost:$port");
+        map.put("spec.name", ThirdPartyClientFilterSpec.class.getSimpleName());
         map.put("bintray.username", username);
         map.put("bintray.token", token);
         map.put("bintray.organization", "grails");
-        context = ApplicationContext.run(map);
         server = ApplicationContext.run(EmbeddedServer.class, map);
-        client = server
-                .getApplicationContext()
-                .createBean(RxHttpClient.class, server.getURL());
+        context = server.getApplicationContext();
+        client = context.createBean(RxHttpClient.class, server.getURL());
     }
 
     @AfterClass
@@ -119,6 +116,7 @@ class BintrayService {
 }
 //end::bintrayService[]
 
+@Requires(property = "spec.name", value = "ThirdPartyClientFilterSpec")
 //tag::bintrayFilter[]
 @Filter("/repos/**") // <1>
 class BintrayFilter implements HttpClientFilter {
