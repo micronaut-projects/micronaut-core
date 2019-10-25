@@ -28,3 +28,6 @@ include::{testsdir}/client/ThirdPartyClientFilterSpec.groovy[tags=bintrayFilter,
 
 Now, whenever you invoke the `bintrayService.fetchRepositories()` method, the `Authorization` HTTP header is included in the request.
 
+=== Filter Matching By Annotation
+
+For cases where a filter should be applied to a client, regardless of the URL, filters can be matched by the equality of an annotation applied to both the filter and the client.

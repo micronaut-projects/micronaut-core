@@ -29,7 +29,8 @@ class MessageEndpointSpec extends Specification {
     void "test read message endpoint"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
-                ['endpoints.message.enabled': true])
+                ['spec.name': MessageEndpointSpec.simpleName,
+                 'endpoints.message.enabled': true])
         RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
         when:
@@ -46,7 +47,8 @@ class MessageEndpointSpec extends Specification {
     void "test write message endpoint"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
-                ['endpoints.message.enabled': true])
+                ['spec.name': MessageEndpointSpec.simpleName,
+                 'endpoints.message.enabled': true])
         RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
         when:
@@ -72,7 +74,8 @@ class MessageEndpointSpec extends Specification {
     void "test delete message endpoint"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
-                ['endpoints.message.enabled': true])
+                ['spec.name': MessageEndpointSpec.simpleName,
+                 'endpoints.message.enabled': true])
         RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
         when:
