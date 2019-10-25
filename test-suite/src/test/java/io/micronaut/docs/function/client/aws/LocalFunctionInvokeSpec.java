@@ -13,6 +13,8 @@ import static org.junit.Assert.assertEquals;
 
 //tag::rxImport[]
 import io.reactivex.Single;
+
+import java.util.Collections;
 //end::rxImport[]
 
 public class LocalFunctionInvokeSpec {
