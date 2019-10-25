@@ -184,8 +184,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitions.forEach(className -> {
                 if (processed.add(className)) {
                     final TypeElement refreshedClassElement = elementUtils.getTypeElement(className);
-                    final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(refreshedClassElement);
                     try {
+                        final AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(refreshedClassElement);
                         refreshedClassElement.accept(visitor, className);
                         visitor.getBeanDefinitionWriters().forEach((name, writer) -> {
                             String beanDefinitionName = writer.getBeanDefinitionName();
@@ -752,6 +752,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     writer.visitSetterValue(
                             modelUtils.resolveTypeReference(declaringClass),
+                            modelUtils.resolveTypeReference(method.getReturnType()),
                             annotationMetadata,
                             requiresReflection,
                             fieldType,

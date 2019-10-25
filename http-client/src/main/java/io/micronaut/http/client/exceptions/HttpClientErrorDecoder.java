@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.client.exceptions;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.Described;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.VndError;
@@ -28,6 +30,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 public interface HttpClientErrorDecoder {
 
     /**
@@ -62,13 +65,13 @@ public interface HttpClientErrorDecoder {
      * @param mediaType The media type
      * @return The error type
      */
-    default Class<?> getErrorType(MediaType mediaType) {
+    default Argument<?> getErrorType(MediaType mediaType) {
         if (mediaType.equals(MediaType.APPLICATION_JSON_TYPE)) {
-            return JsonError.class;
+            return Argument.of(JsonError.class);
         } else if (mediaType.equals(MediaType.APPLICATION_VND_ERROR_TYPE)) {
-            return VndError.class;
+            return Argument.of(VndError.class);
         } else {
-            return String.class;
+            return Argument.of(String.class);
         }
     }
 }

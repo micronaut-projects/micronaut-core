@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.exceptions;
 
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -64,7 +65,7 @@ public class HttpClientResponseException extends HttpClientException implements 
 
     @Override
     public String getMessage() {
-        Optional<Class<?>> errorType = Optional.ofNullable(getErrorType(response));
+        Optional<Argument<?>> errorType = Optional.ofNullable(getErrorType(response));
         if (errorType.isPresent()) {
             return getResponse().getBody(errorType.get()).flatMap(errorDecoder::getMessage).orElse(super.getMessage());
         } else {
@@ -88,7 +89,7 @@ public class HttpClientResponseException extends HttpClientException implements 
 
     @SuppressWarnings("MagicNumber")
     private void initResponse(HttpResponse<?> response) {
-        Class<?> errorType = getErrorType(response);
+        Argument<?> errorType = getErrorType(response);
         if (errorType != null) {
             response.getBody(errorType);
         } else {
@@ -96,9 +97,9 @@ public class HttpClientResponseException extends HttpClientException implements 
         }
     }
 
-    private Class<?> getErrorType(HttpResponse<?> response) {
+    private Argument<?> getErrorType(HttpResponse<?> response) {
         Optional<MediaType> contentType = response.getContentType();
-        Class<?> errorType = null;
+        Argument<?> errorType = null;
         if (contentType.isPresent() && response.getStatus().getCode() > 399) {
             MediaType mediaType = contentType.get();
             if (errorDecoder != null) {

@@ -596,4 +596,30 @@ public class FooConfigurationProperties {
         beanDefinition.injectedMethods[1].name == "setEnabled"
         beanDefinition.injectedFields[0].name == "isOther"
     }
+
+    void "test configuration properties returns self"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@ConfigurationProperties("my")
+class MyConfig {
+    String host;
+    public String getHost() {
+        return host;
+    }
+    public MyConfig setHost(String host) {
+        this.host = host;
+        return this;
+    }
+}''')
+        BeanFactory factory = beanDefinition
+        ApplicationContext applicationContext = ApplicationContext.build(["my.host": "abc"]).start()
+        def bean = factory.build(applicationContext, beanDefinition)
+
+        then:
+        bean.getHost() == "abc"
+    }
 }

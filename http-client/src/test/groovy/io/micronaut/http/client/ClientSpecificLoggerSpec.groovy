@@ -21,12 +21,18 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.ApplicationConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Inject
 import javax.inject.Singleton
 
+// sometimes fails due to a port bind issue on Travis
+// this is because there is a timing issue between when an available port
+// is found and when the server is run with this port where within this window
+// the port could become available. To workaround this we add @Retry.
+@Retry
 class ClientSpecificLoggerSpec extends Specification {
 
     @Shared

@@ -15,6 +15,7 @@ dependencies {
     compileOnly project(":inject-java")
     compile project(":inject")
 
+    testCompileOnly project(":test-suite-helper")
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
     testCompile project(":validation")

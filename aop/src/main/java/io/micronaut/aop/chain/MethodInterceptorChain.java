@@ -15,8 +15,8 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.aop.*;
+import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.ExecutableMethod;
@@ -48,6 +48,29 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      */
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);
+    }
+
+    @Override
+    public R proceed() throws RuntimeException {
+        Interceptor<T, R> interceptor;
+        if (interceptorCount == 0 || index == interceptorCount) {
+            if (target instanceof Introduced && executionHandle.isAbstract()) {
+                throw new UnimplementedAdviceException(executionHandle);
+            } else {
+                return executionHandle.invoke(target, getParameterValues());
+            }
+        } else {
+            interceptor = this.interceptors[index++];
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Proceeded to next interceptor [{}] in chain for method invocation: {}", interceptor, executionHandle);
+            }
+
+            if (interceptor instanceof MethodInterceptor) {
+                return ((MethodInterceptor<T, R>) interceptor).intercept(this);
+            } else {
+                return interceptor.intercept(this);
+            }
+        }
     }
 
     @Override

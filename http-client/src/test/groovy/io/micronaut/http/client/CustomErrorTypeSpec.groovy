@@ -16,6 +16,8 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.type.Argument
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -31,7 +33,6 @@ class CustomErrorTypeSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
     void "test custom error type"() {
-
         given:
         CustomErrorClient client = embeddedServer.getApplicationContext().getBean(CustomErrorClient)
 
@@ -41,7 +42,18 @@ class CustomErrorTypeSpec extends Specification {
         then:
         def e = thrown(HttpClientResponseException)
         e.response.getBody(MyError).get().reason == 'bad things'
+    }
 
+    void "test custom error type with generic"() {
+        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())
+        Argument<OtherError> errorType = Argument.of(OtherError, String)
+
+        when:
+        client.toBlocking().exchange(HttpRequest.GET("/test/custom-errors/other"), Argument.of(String), errorType)
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(errorType).get().reason == 'bad things'
     }
 
     @Controller('/test/custom-errors')
@@ -50,6 +62,11 @@ class CustomErrorTypeSpec extends Specification {
         @Get("/")
         HttpResponse index() {
             HttpResponse.serverError().body(new MyError(reason: "bad things"))
+        }
+
+        @Get("/other")
+        HttpResponse index2() {
+            HttpResponse.serverError().body(new OtherError(reason: "bad things"))
         }
     }
 
@@ -61,5 +78,9 @@ class CustomErrorTypeSpec extends Specification {
 
     static class MyError {
         String reason
+    }
+
+    static class OtherError<T> {
+        T reason
     }
 }

@@ -26,7 +26,7 @@ snippet::io.micronaut.docs.aop.introduction.StubIntroduction[tags="imports,class
 
 To now use this introduction advice in an application you simply annotate your abstract classes or interfaces with `@Stub`:
 
-snippet::io.micronaut.docs.aop.introduction.StubIntroduction[tags="class", indent=0, title="StubExample"]
+snippet::io.micronaut.docs.aop.introduction.StubExample[tags="class", indent=0, title="StubExample"]
 
 All abstract methods will delegate to the `StubIntroduction` class to be implemented.
 
