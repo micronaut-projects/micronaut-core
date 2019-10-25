@@ -47,6 +47,7 @@ import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.filter.HttpClientFilterResolver;
 import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.sse.SseClient;
@@ -157,11 +158,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context)
         );
 
-        HttpClient httpClient = getClient(context, clientAnnotation);
+        AnnotationValue filterAnnotation = context
+                .getAnnotationNameByStereotype(HttpFilterQualifier.class)
+                .map(context::getAnnotation)
+                .orElse(null);
+
+        HttpClient httpClient = getClient(context, clientAnnotation, filterAnnotation);
 
         Class<?> declaringType = context.getDeclaringType();
         if (Closeable.class == declaringType || AutoCloseable.class == declaringType) {
-            ClientKey clientKey = new ClientKey(clientAnnotation, context);
+            ClientKey clientKey = new ClientKey(clientAnnotation, context, filterAnnotation);
             clients.remove(clientKey);
             httpClient.close();
             return null;
@@ -633,10 +639,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @param clientAnn client annotation
      * @return client registration
      */
-    private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn) {
+    private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn, AnnotationValue filterAnnotation) {
         String clientId = getClientId(clientAnn);
         String path = clientAnn.stringValue("path").orElse(null);
-        ClientKey clientKey = new ClientKey(clientAnn, context);
+        ClientKey clientKey = new ClientKey(clientAnn, context, filterAnnotation);
 
         return clients.computeIfAbsent(clientKey, integer -> {
             HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(NameUtils.hyphenate(clientId))).orElse(null);
@@ -644,7 +650,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Optional<Class<?>> configurationClass = clientAnn.classValue("configuration");
 
             if (null != clientBean) {
-                if (path == null && jacksonFeatures == null && !configurationClass.isPresent()) {
+                if (path == null && jacksonFeatures == null && !configurationClass.isPresent() && filterAnnotation == null) {
                     return clientBean;
                 }
             }
@@ -672,7 +678,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             );
             Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>) configurationClass.orElse(HttpClientConfiguration.class);
             configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
-            FilterResolver filterResolver = beanContext.createBean(FilterResolver.class, context, Collections.singleton(clientId));
+            HttpClientFilterResolver filterResolver = beanContext.createBean(HttpClientFilterResolver.class, Collections.singleton(clientId), filterAnnotation);
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath, filterResolver);
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
@@ -768,13 +774,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private class ClientKey {
         final String clientId;
         final String path;
-        final Set<Class> filterAnnotations;
+        final AnnotationValue filterAnnotation;
 
-        public ClientKey(AnnotationValue<Client> clientAnn, MethodInvocationContext<Object, Object> context) {
+        public ClientKey(AnnotationValue<Client> clientAnn,
+                         MethodInvocationContext<Object, Object> context,
+                         AnnotationValue filterAnnotation) {
             this.clientId = getClientId(clientAnn);
             this.path = clientAnn.stringValue("path").orElse(null);
-            this.filterAnnotations = new HashSet<>(context.getAnnotationMetadata().getAnnotationTypesByStereotype(
-                    HttpFilterQualifier.class));
+            this.filterAnnotation = filterAnnotation;
         }
 
         @Override
@@ -787,13 +794,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
             ClientKey clientKey = (ClientKey) o;
             return Objects.equals(clientId, clientKey.clientId) &&
-                    Objects.equals(filterAnnotations, clientKey.filterAnnotations) &&
+                    Objects.equals(filterAnnotation, clientKey.filterAnnotation) &&
                     Objects.equals(path, clientKey.path);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(clientId, path, filterAnnotations);
+            return Objects.hash(clientId, path, filterAnnotation);
         }
     }
 }

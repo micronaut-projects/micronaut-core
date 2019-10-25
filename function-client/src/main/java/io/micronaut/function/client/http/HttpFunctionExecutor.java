@@ -15,6 +15,7 @@
  */
 package io.micronaut.function.client.http;
 
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
@@ -28,11 +29,12 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.DefaultHttpClient;
-import io.micronaut.http.client.FilterResolver;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.filter.HttpClientFilterResolver;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import org.reactivestreams.Publisher;
 
@@ -42,6 +44,7 @@ import javax.inject.Singleton;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 
@@ -64,20 +67,22 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
      * @param threadFactory threadFactory
      * @param nettyClientSslBuilder nettyClientSslBuilder
      * @param codecRegistry codecRegistry
-     * @param filterResolver filter resolver
+     * @param annotationMetadataResolver annotationMetadataResolver
+     * @param filters filters
      */
     public HttpFunctionExecutor(
             HttpClientConfiguration configuration,
             @Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
             NettyClientSslBuilder nettyClientSslBuilder,
             MediaTypeCodecRegistry codecRegistry,
-            FilterResolver filterResolver) {
+            AnnotationMetadataResolver annotationMetadataResolver,
+            HttpClientFilter... filters) {
         super();
         this.httpClient = new DefaultHttpClient(
             LoadBalancer.empty(),
             configuration,
             null,
-            filterResolver,
+            new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)),
             threadFactory,
             nettyClientSslBuilder,
             codecRegistry

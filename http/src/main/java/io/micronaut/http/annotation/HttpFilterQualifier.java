@@ -26,7 +26,7 @@ import java.lang.annotation.*;
  *  <pre>{@code
  *  Example:
  *
- *  @FilterAnnotation
+ *  @HttpFilterQualifier
  *  public @interface Metered {
  *      ...
  *  }
@@ -42,7 +42,7 @@ import java.lang.annotation.*;
  *
  *  In the example above only clients annotated with {@code @Metered} annotations are going to be filtered by MeteredHttpFilter
  *
- *  @since 1.2.4
+ *  @since 1.3.0
  *  @author svishnyakoff
  */
 @Documented
