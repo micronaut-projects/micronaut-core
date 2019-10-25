@@ -19,7 +19,6 @@ import javax.inject.Named
 @IgnoreIf({
     return !new File("${System.getProperty("user.home")}/.aws/credentials").exists()
 })
-//@Ignore
 class AwsLambdaInvokeSpec extends Specification {
 
 

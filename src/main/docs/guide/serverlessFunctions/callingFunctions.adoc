@@ -17,11 +17,7 @@ In addition, the `function-client` works together with Micronaut's <<serviceDisc
 
 The ann:function.client.FunctionClient[] annotation makes it very straightforward to invoke local or remotely deployed functions. For example, the following Groovy function can be accessed using the `MathClient` interface listed below it.
 
-.MaxFunction.groovy
-[source,groovy]
-----
-include::{testsfunctionclient}/MaxFunction.groovy[tags=maxFunction, indent=0]
-----
+snippet::io.micronaut.docs.function.client.aws.MaxFunction[indent=0,title="Max Function"]
 
 snippet::io.micronaut.docs.function.client.aws.LocalFunctionInvokeSpec[tags="import, beginFunctionClient, functionMax, endFunctionClient", indent=0, title="Using @FunctionClient to Discover Function"]
 
@@ -30,11 +26,7 @@ snippet::io.micronaut.docs.function.client.aws.LocalFunctionInvokeSpec[tags="imp
 
 If you would like the names of the client interface and target function to be different, you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation to specify the target method name.
 
-.RoundFunction.groovy
-[source,groovy]
-----
-include::{testsfunctionclient}/RoundFunction.groovy[tags=rndFunction, indent=0]
-----
+snippet::io.micronaut.docs.function.client.aws.RoundFunction[indent=0, title="Round Function"]
 
 snippet::io.micronaut.docs.function.client.aws.LocalFunctionInvokeSpec[tags="import, beginFunctionClient, functionRnd, endFunctionClient", indent=0, title="Using @Named to customize target method"]
 

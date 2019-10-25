@@ -1,5 +1,6 @@
 package io.micronaut.docs.client
 
+import io.micronaut.context.annotation.Requires
 import io.reactivex.Flowable
 import io.reactivex.functions.Consumer
 import io.micronaut.context.ApplicationContext
@@ -32,6 +33,7 @@ class ThirdPartyClientFilterSpec extends Specification {
     private static String username = 'john'
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
             EmbeddedServer, [
+            'spec.name': ThirdPartyClientFilterSpec.simpleName,
             'bintray.username': username,
             'bintray.token': token,
             'bintray.organization': 'grails']
@@ -93,6 +95,7 @@ class BintrayService {
 }
 //end::bintrayService[]
 
+@Requires(property = "spec.name", value = "ThirdPartyClientFilterSpec")
 //tag::bintrayFilter[]
 @Filter('/repos/**') // <1>
 class BintrayFilter implements HttpClientFilter {
