@@ -15,4 +15,11 @@ dependencies {
     }
     testCompile project(":function-client")
     testCompile project(":function-web")
+    testCompile dependencyModuleVersion("micronaut.groovy","micronaut-function-groovy"), {
+        exclude module:'micronaut-function'
+        exclude module:'micronaut-runtime-groovy'
+    }
+    testCompile dependencyModuleVersion("micronaut.groovy","micronaut-runtime-groovy"), {
+        exclude module:'micronaut-inject'
+    }
 }
