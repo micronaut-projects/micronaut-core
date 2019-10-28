@@ -129,6 +129,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             if(value == null){
                 return true;
             }
+            if( value instanceof  BigDecimal){
+                return ((BigDecimal) value).signum() < 0;
+            }
             if(value instanceof Double ||
                value instanceof Float  ||
                value instanceof DoubleAdder ||
@@ -143,6 +146,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             // null is allowed according to spec
             if(value == null){
                 return true;
+            }
+            if( value instanceof  BigDecimal){
+                return ((BigDecimal) value).signum() <= 0;
             }
             if(value instanceof Double ||
                value instanceof Float  ||
@@ -159,6 +165,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             if(value == null){
                 return true;
             }
+            if( value instanceof  BigDecimal){
+                return ((BigDecimal) value).signum() > 0;
+            }
             if( value instanceof Double ||
                 value instanceof Float  ||
                 value instanceof DoubleAdder ||
@@ -173,6 +182,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             // null is allowed according to spec
             if(value == null){
                 return true;
+            }
+            if( value instanceof  BigDecimal){
+                return ((BigDecimal) value).signum() >= 0;
             }
             if( value instanceof Double ||
                 value instanceof Float  ||
