@@ -15,9 +15,11 @@ In addition, the `function-client` works together with Micronaut's <<serviceDisc
 
 == FunctionClient
 
-The ann:function.client.FunctionClient[] annotation makes it very straightforward to invoke local or remotely deployed functions. For example, the following Groovy function can be accessed using the `MathClient` interface listed below it.
+The ann:function.client.FunctionClient[] annotation makes it very straightforward to invoke local or remotely deployed functions. For example, given the following function:
 
 snippet::io.micronaut.docs.function.client.aws.MaxFunction[indent=0,title="Max Function"]
+
+The following client can be used to execute it.
 
 snippet::io.micronaut.docs.function.client.aws.LocalFunctionInvokeSpec[tags="import, beginFunctionClient, functionMax, endFunctionClient", indent=0, title="Using @FunctionClient to Discover Function"]
 
@@ -28,20 +30,21 @@ If you would like the names of the client interface and target function to be di
 
 snippet::io.micronaut.docs.function.client.aws.RoundFunction[indent=0, title="Round Function"]
 
+The named annotation can be placed on the client as well.
+
 snippet::io.micronaut.docs.function.client.aws.LocalFunctionInvokeSpec[tags="import, beginFunctionClient, functionRnd, endFunctionClient", indent=0, title="Using @Named to customize target method"]
 
 Functions that only return a value are mapped to HTTP `GET` requests, whilst functions that accept an input require an HTTP `POST`.
 
-For a example, the following function can be accessed using the `IsbnValidatorClient` interface listed below.
+For a example, given the following function:
 
 snippet::io.micronaut.docs.function.client.aws.IsbnValidatorFunction[tags="imports, clazz", indent=0]
 
-''''
+The function can be accessed using the `IsbnValidatorClient` interface listed below.
 
 snippet::io.micronaut.docs.function.client.aws.IsbnValidatorClient[tags="imports, clazz", indent=0]
 
 <1> Please, note the `@Body` annotation in the method parameter.
-
 
 == Reactive FunctionClients
 
