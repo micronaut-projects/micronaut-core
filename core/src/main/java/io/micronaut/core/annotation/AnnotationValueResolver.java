@@ -50,6 +50,26 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
     }
 
     /**
+     * Return the enum value of the given member of the given enum type.
+     *
+     * @param member The annotation member
+     * @param enumType The required type
+     * @return An {@link Optional} of the enum value
+     * @param <E> The enum type
+     */
+    <E extends Enum> E[] enumValues(@Nonnull String member, @Nonnull Class<E> enumType);
+
+    /**
+     * Return the enum value of the given member of the given enum type.
+     *
+     * @param enumType The required type
+     * @return An {@link Optional} of the enum value
+     * @param <E> The enum type
+     */
+    default <E extends Enum> E[] enumValues(@Nonnull Class<E> enumType) {
+        return enumValues(AnnotationMetadata.VALUE_MEMBER, enumType);
+    }
+    /**
      * The value of the annotation as a Class.
      *
      * @return An {@link Optional} class

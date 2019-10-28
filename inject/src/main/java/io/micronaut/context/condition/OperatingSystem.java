@@ -15,12 +15,14 @@
  */
 package io.micronaut.context.condition;
 
+import io.micronaut.context.annotation.Requires.Family;
+
 import java.util.Locale;
 
 /**
  * Details of the current operating system.
  */
-final class OperatingSystem {
+public final class OperatingSystem {
 
     private static OperatingSystem instance;
     private final Family family;
@@ -34,12 +36,11 @@ final class OperatingSystem {
      *
      * @return the current operating system.
      */
-    static OperatingSystem getCurrent() {
-        if (instance == null)
-        {
+    public static OperatingSystem getCurrent() {
+        if (instance == null) {
             synchronized(OperatingSystem.class) {
                 if (instance == null) {
-                    String osName = System.getenv("os.name").toLowerCase(Locale.ENGLISH);
+                    String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
                     Family osFamily;
                     if (osName.contains("linux")) {
                         osFamily = Family.LINUX;
@@ -62,35 +63,36 @@ final class OperatingSystem {
     /**
      * @return <code>true</code> if the current operating system is in the Linux family.
      */
-    boolean isLinux() {
+    public boolean isLinux() {
         return family == Family.LINUX;
     }
 
     /**
      * @return <code>true</code> if the current operating system is in the Windows family.
      */
-    boolean isWindows() {
+    public boolean isWindows() {
         return family == Family.WINDOWS;
     }
 
     /**
      * @return <code>true</code> if the current operating system is in the Mac OS family.
      */
-    boolean isMacOs() {
+    public boolean isMacOs() {
         return family == Family.MAC_OS;
     }
 
     /**
      * @return <code>true</code> if the current operating system is in the Solaris family.
      */
-    boolean isSolaris() {
+    public boolean isSolaris() {
         return family == Family.SOLARIS;
     }
 
     /**
-     * An operating system family.
+     * @return The OS family
      */
-    enum Family {
-        LINUX, MAC_OS, WINDOWS, SOLARIS, OTHER
+    public Family getFamily() {
+        return family;
     }
+
 }
