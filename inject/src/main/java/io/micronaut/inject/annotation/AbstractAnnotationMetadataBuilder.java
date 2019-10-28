@@ -984,6 +984,27 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             annotationValue.getAnnotationName()
                     )
             );
+        } else if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
+            final Optional<T> annotationMirror = getAnnotationMirror(annotationValue.getAnnotationName());
+            final Map<CharSequence, Object> values = annotationValue.getValues();
+            final Map<String, Map<CharSequence, Object>> declared =
+                    Collections.singletonMap(annotationValue.getAnnotationName(), values);
+            final DefaultAnnotationMetadata newMetadata = new DefaultAnnotationMetadata(
+                    declared,
+                    null,
+                    null,
+                    null,
+                    null
+            );
+            annotationMirror.ifPresent(annotationType ->
+                    processAnnotationStereotypes(
+                            newMetadata,
+                            true,
+                            annotationType,
+                            annotationValue.getAnnotationName()
+                    )
+            );
+            return newMetadata;
         }
         return annotationMetadata;
     }
