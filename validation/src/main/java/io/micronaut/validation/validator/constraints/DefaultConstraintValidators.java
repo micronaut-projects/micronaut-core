@@ -126,16 +126,16 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     private final ConstraintValidator<Negative, Number> negativeNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            if(value == null){
+            if (value == null) {
                 return true;
             }
-            if( value instanceof  BigDecimal){
+            if (value instanceof  BigDecimal) {
                 return ((BigDecimal) value).signum() < 0;
             }
-            if(value instanceof Double ||
-               value instanceof Float  ||
-               value instanceof DoubleAdder ||
-               value instanceof DoubleAccumulator){
+            if (value instanceof Double ||
+                value instanceof Float  ||
+                value instanceof DoubleAdder ||
+                value instanceof DoubleAccumulator) {
                 return value.doubleValue() < 0;
             }
             return value.longValue() < 0;
@@ -144,16 +144,16 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     private final ConstraintValidator<NegativeOrZero, Number> negativeOrZeroNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            if(value == null){
+            if (value == null) {
                 return true;
             }
-            if( value instanceof  BigDecimal){
+            if (value instanceof  BigDecimal) {
                 return ((BigDecimal) value).signum() <= 0;
             }
-            if(value instanceof Double ||
-               value instanceof Float  ||
-               value instanceof DoubleAdder ||
-               value instanceof DoubleAccumulator){
+            if (value instanceof Double ||
+                value instanceof Float  ||
+                value instanceof DoubleAdder ||
+                value instanceof DoubleAccumulator) {
                 return value.doubleValue() <= 0;
             }
             return value.longValue() <= 0;
@@ -162,16 +162,16 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     private final ConstraintValidator<Positive, Number> positiveNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            if(value == null){
+            if (value == null) {
                 return true;
             }
-            if( value instanceof  BigDecimal){
+            if (value instanceof  BigDecimal) {
                 return ((BigDecimal) value).signum() > 0;
             }
-            if( value instanceof Double ||
+            if (value instanceof Double ||
                 value instanceof Float  ||
                 value instanceof DoubleAdder ||
-                value instanceof DoubleAccumulator){
+                value instanceof DoubleAccumulator) {
                 return value.doubleValue() > 0;
             }
             return value.longValue() > 0;
@@ -180,16 +180,16 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     private final ConstraintValidator<PositiveOrZero, Number> positiveOrZeroNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            if(value == null){
+            if (value == null) {
                 return true;
             }
-            if( value instanceof  BigDecimal){
+            if (value instanceof  BigDecimal) {
                 return ((BigDecimal) value).signum() >= 0;
             }
-            if( value instanceof Double ||
+            if (value instanceof Double ||
                 value instanceof Float  ||
                 value instanceof DoubleAdder ||
-                value instanceof DoubleAccumulator){
+                value instanceof DoubleAccumulator) {
                 return value.doubleValue() >= 0;
             }
             return value.longValue() >= 0;
