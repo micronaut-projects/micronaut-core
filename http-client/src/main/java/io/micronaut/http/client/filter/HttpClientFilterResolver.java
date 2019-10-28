@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2019 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.http.client.filter;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
@@ -21,6 +36,12 @@ import io.micronaut.http.filter.HttpFilterResolver;
 import javax.annotation.Nullable;
 import java.util.*;
 
+/**
+ * Resolves filters for http clients.
+ *
+ * @author James Kleeh
+ * @since 1.3.0
+ */
 @Internal
 @Prototype
 @BootstrapContextCompatible
@@ -31,6 +52,14 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
     private final Collection<String> clientIdentifiers;
     private final AnnotationValue annotationValue;
 
+    /**
+     * Default constructor.
+     *
+     * @param clientIdentifiers          The client identifiers
+     * @param annotationValue            The filter annotation
+     * @param annotationMetadataResolver The annotation metadata resolver
+     * @param clientFilters              All client filters
+     */
     public HttpClientFilterResolver(
             @Parameter @Nullable Collection<String> clientIdentifiers,
             @Parameter @Nullable AnnotationValue annotationValue,

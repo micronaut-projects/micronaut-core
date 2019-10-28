@@ -197,6 +197,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param threadFactory              The thread factory to use for client threads
      * @param nettyClientSslBuilder      The SSL builder
      * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param annotationMetadataResolver The annotation metadata resolver
      * @param filters                    The filters to use
      */
     public DefaultHttpClient(@Parameter LoadBalancer loadBalancer,
@@ -216,7 +217,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
      * @param configuration              The {@link HttpClientConfiguration} object
      * @param contextPath                The base URI to prepend to request uris
-     * @param filterResolver             The resolver to get filters applicable to request
+     * @param filterResolver             The http client filter resolver
      * @param threadFactory              The thread factory to use for client threads
      * @param nettyClientSslBuilder      The SSL builder
      * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects

@@ -17,7 +17,6 @@ package io.micronaut.http.client;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.*;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
