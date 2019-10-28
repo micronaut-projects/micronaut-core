@@ -15,10 +15,14 @@
  */
 package io.micronaut.context.condition;
 
+import java.util.Locale;
+
 /**
  * Details of the current operating system.
  */
 final class OperatingSystem {
+
+    private static OperatingSystem instance;
     private final Family family;
 
     private OperatingSystem(Family family) {
@@ -31,20 +35,28 @@ final class OperatingSystem {
      * @return the current operating system.
      */
     static OperatingSystem getCurrent() {
-        String osName = System.getenv("os.name").toLowerCase();
-        Family osFamily;
-        if (osName.contains("linux")) {
-            osFamily = Family.LINUX;
-        } else if (osName.contains("mac os")) {
-            osFamily = Family.MAC_OS;
-        } else if (osName.contains("windows")) {
-            osFamily = Family.WINDOWS;
-        } else if (osName.contains("sunos")) {
-            osFamily = Family.SOLARIS;
-        } else {
-            osFamily = Family.OTHER;
+        if (instance == null)
+        {
+            synchronized(OperatingSystem.class) {
+                if (instance == null) {
+                    String osName = System.getenv("os.name").toLowerCase(Locale.ENGLISH);
+                    Family osFamily;
+                    if (osName.contains("linux")) {
+                        osFamily = Family.LINUX;
+                    } else if (osName.startsWith("mac") || osName.startsWith("darwin")) {
+                        osFamily = Family.MAC_OS;
+                    } else if (osName.contains("windows")) {
+                        osFamily = Family.WINDOWS;
+                    } else if (osName.contains("sunos")) {
+                        osFamily = Family.SOLARIS;
+                    } else {
+                        osFamily = Family.OTHER;
+                    }
+                    instance = new OperatingSystem(osFamily);
+                }
+            }
         }
-        return new OperatingSystem(osFamily);
+        return instance;
     }
 
     /**
@@ -55,21 +67,21 @@ final class OperatingSystem {
     }
 
     /**
-     * @return <code>true</code> if the current operating system is in the Linux family.
+     * @return <code>true</code> if the current operating system is in the Windows family.
      */
     boolean isWindows() {
         return family == Family.WINDOWS;
     }
 
     /**
-     * @return <code>true</code> if the current operating system is in the Linux family.
+     * @return <code>true</code> if the current operating system is in the Mac OS family.
      */
     boolean isMacOs() {
         return family == Family.MAC_OS;
     }
 
     /**
-     * @return <code>true</code> if the current operating system is in the Linux family.
+     * @return <code>true</code> if the current operating system is in the Solaris family.
      */
     boolean isSolaris() {
         return family == Family.SOLARIS;
