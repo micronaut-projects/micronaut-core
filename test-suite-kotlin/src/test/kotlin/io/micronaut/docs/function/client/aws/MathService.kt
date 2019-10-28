@@ -13,7 +13,7 @@ class MathService {
         return Math.round(value) * multiplier
     }
 
-    fun max(): Int? {
+    fun max(): Int {
         return Integer.MAX_VALUE
     }
 
