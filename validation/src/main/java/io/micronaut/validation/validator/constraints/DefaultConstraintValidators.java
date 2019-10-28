@@ -124,25 +124,25 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     private final ConstraintValidator<Negative, Number> negativeNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() < 0;
+            return value == null || value.longValue() < 0;
         };
 
     private final ConstraintValidator<NegativeOrZero, Number> negativeOrZeroNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() <= 0;
+            return value == null || value.longValue() <= 0;
         };
 
     private final ConstraintValidator<Positive, Number> positiveNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() > 0;
+            return value == null || value.longValue() > 0;
         };
 
     private final ConstraintValidator<PositiveOrZero, Number> positiveOrZeroNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() >= 0;
+            return value == null || value.longValue() >= 0;
         };
 
     private final ConstraintValidator<NotBlank, CharSequence> notBlankValidator =
