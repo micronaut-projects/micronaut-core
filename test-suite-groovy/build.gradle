@@ -5,6 +5,7 @@ dependencies {
     testCompile project(":runtime")
     testCompile project(":validation")
     testCompile project(":inject")
+    testCompile project(":management")
     testCompile project(":session")
     testCompile dependencyVersion("jcache")
     testCompile dependencyVersion("reactor")
@@ -12,4 +13,15 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
+    testCompile project(":function-client")
+    testCompile project(":function-web")
+    testCompile dependencyModuleVersion("micronaut.groovy","micronaut-function-groovy"), {
+        exclude module:'micronaut-function'
+        exclude module:'micronaut-runtime-groovy'
+    }
+    testCompile dependencyModuleVersion("micronaut.groovy","micronaut-runtime-groovy"), {
+        exclude module:'micronaut-inject'
+    }
+    testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
+
 }

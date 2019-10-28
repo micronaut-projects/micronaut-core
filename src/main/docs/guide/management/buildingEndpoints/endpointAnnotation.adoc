@@ -1,4 +1,4 @@
-An Endpoint can be created by annotating a class with the link:{api}/io/micronaut/management/endpoint/annotation/Endpoint.html[Endpoint] annotation, and supplying it with (at minimum) an endpoint id.
+An Endpoint can be created by annotating a class with the link:{api}/io/micronaut/management/endpoint/Endpoint.html[Endpoint] annotation, and supplying it with (at minimum) an endpoint id.
 
 [source,java]
 .FooEndpoint.java
@@ -40,12 +40,4 @@ It is possible to supply additional (named) arguments to the annotation. Other p
 
 The following example `Endpoint` class will create an endpoint accessible at `/date`:
 
-[source,groovy]
-.CurrentDateEndpoint.groovy
-----
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointImport, indent=0]
-
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassBegin, indent=0]
-  //.. endpoint methods
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassEnd, indent=0]
-----
+snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, endpointClassBegin, methodSummary, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
