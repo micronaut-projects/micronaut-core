@@ -1,12 +1,14 @@
 package io.micronaut.docs.client.filter;
 
-import io.micronaut.http.annotation.HttpFilterQualifier;
+//tag::class[]
+import io.micronaut.http.annotation.HttpFilterStereotype;
 
 import java.lang.annotation.*;
 
-@HttpFilterQualifier
+@HttpFilterStereotype // <1>
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.PARAMETER})
 public @interface BasicAuth {
 }
+//end::class[]

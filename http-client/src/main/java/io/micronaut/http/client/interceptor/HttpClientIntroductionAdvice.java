@@ -159,7 +159,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         );
 
         AnnotationValue filterAnnotation = context
-                .getAnnotationNameByStereotype(HttpFilterQualifier.class)
+                .getAnnotationNameByStereotype(HttpFilterStereotype.class)
                 .map(context::getAnnotation)
                 .orElse(null);
 

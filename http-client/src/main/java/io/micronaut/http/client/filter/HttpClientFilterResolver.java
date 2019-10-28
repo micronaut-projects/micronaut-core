@@ -11,14 +11,14 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.annotation.HttpFilterQualifier;
+import io.micronaut.http.annotation.HttpFilterStereotype;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpFilterResolver;
 
 import javax.annotation.Nullable;
-import java.lang.annotation.Annotation;
 import java.util.*;
 
 @Internal
@@ -62,53 +62,67 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
             AnnotationMetadata annotationMetadata = annotationMetadataResolver.resolveMetadata(filter);
             Optional<AnnotationValue<Filter>> filterOpt = annotationMetadata.findAnnotation(Filter.class);
 
+            boolean matches = false;
+
             if (annotationValue != null) {
-                Optional<AnnotationValue<Annotation>> metaAnn = annotationMetadata.findAnnotation(annotationValue.getAnnotationName());
-                if (metaAnn.isPresent()) {
-                    if (metaAnn.get().equals(annotationValue)) {
-                        filterList.add(filter);
-                        continue;
+                matches = annotationMetadata.hasAnnotation(annotationValue.getAnnotationName());
+
+                HttpMethod[] methods = annotationMetadata.findAnnotation(HttpFilterStereotype.class)
+                        .flatMap(ann -> ann.get("methods", HttpMethod[].class))
+                        .orElse(null);
+
+                if (ArrayUtils.isNotEmpty(methods)) {
+                    matches = matches && anyMethodMatches(method, methods);
+                }
+            }
+
+            if (!matches && filterOpt.isPresent()) {
+                AnnotationValue<Filter> filterAnn = filterOpt.get();
+
+                String[] clients = filterAnn.get("serviceId", String[].class).orElse(null);
+                HttpMethod[] methods = filterAnn.get("methods", HttpMethod[].class, null);
+                String[] patterns = filterAnn.stringValues();
+
+                boolean hasClients = ArrayUtils.isNotEmpty(clients);
+                boolean hasMethods = ArrayUtils.isNotEmpty(methods);
+                boolean hasPatterns = ArrayUtils.isNotEmpty(patterns);
+
+                if (hasClients) {
+                    matches = containsIndentifier(clients);
+                    if (hasMethods) {
+                        matches = matches && anyMethodMatches(method, methods);
+                    }
+                    if (hasPatterns) {
+                        matches = matches && anyPatternMatches(requestPath, patterns);
+                    }
+                } else if (hasPatterns) {
+                    matches = anyPatternMatches(requestPath, patterns);
+                    if (hasMethods) {
+                        matches = matches && anyMethodMatches(method, methods);
                     }
                 }
             }
 
-            if (filterOpt.isPresent()) {
-                AnnotationValue<Filter> filterAnn = filterOpt.get();
-                String[] clients = filterAnn.get("serviceId", String[].class).orElse(null);
-                if (ArrayUtils.isNotEmpty(clients)) {
-                    if (!clientIdentifiers.isEmpty()) {
-                        if (Arrays.stream(clients).noneMatch(id -> clientIdentifiers.contains(id))) {
-                            // no matching clients
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
-                }
-                io.micronaut.http.HttpMethod[] methods = filterAnn.get("methods", io.micronaut.http.HttpMethod[].class, null);
-                if (ArrayUtils.isNotEmpty(methods)) {
-                    if (!Arrays.asList(methods).contains(method)) {
-                        continue;
-                    }
-                }
+            if (!annotationMetadata.hasStereotype(HttpFilterStereotype.class) && !filterOpt.isPresent()) {
+                matches = true;
+            }
 
-                String[] patterns = filterAnn.stringValues();
-                if (patterns.length == 0) {
-                    filterList.add(filter);
-                } else {
-                    for (String pathPattern : patterns) {
-                        if (PathMatcher.ANT.matches(pathPattern, requestPath)) {
-                            filterList.add(filter);
-                        }
-                    }
-                }
-            } else {
-                if (annotationMetadata.hasStereotype(HttpFilterQualifier.class)) {
-                    continue;
-                }
+            if (matches) {
                 filterList.add(filter);
             }
         }
         return filterList;
+    }
+
+    private boolean containsIndentifier(String[] clients) {
+        return Arrays.stream(clients).anyMatch(clientIdentifiers::contains);
+    }
+
+    private boolean anyPatternMatches(String requestPath, String[] patterns) {
+        return Arrays.stream(patterns).anyMatch(pattern -> PathMatcher.ANT.matches(pattern, requestPath));
+    }
+
+    private boolean anyMethodMatches(HttpMethod requestMethod, HttpMethod[] methods) {
+        return Arrays.asList(methods).contains(requestMethod);
     }
 }

@@ -17,15 +17,20 @@
 package io.micronaut.http.client.filter
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
 import io.reactivex.Single
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
@@ -43,15 +48,12 @@ class ClientFilterStereotypeSpec extends Specification {
     void "test declarative client matching"() {
         when:
         MarkedClient markedClient = ctx.getBean(MarkedClient)
+        HttpResponse<String> echo = markedClient.echo()
 
         then:
-        markedClient.echo() == "Intercepted"
-
-        when:
-        MarkedValueClient markedValueClient = ctx.getBean(MarkedValueClient)
-
-        then:
-        markedValueClient.echo() == "Intercepted Marked"
+        echo.body() == "Intercepted"
+        !echo.getHeaders().contains("X-Intercepted")
+        markedClient.echoPost().header("X-Intercepted") == "Post"
 
         when:
         UnmarkedClient unmarkedClient = ctx.getBean(UnmarkedClient)
@@ -66,39 +68,32 @@ class ClientFilterStereotypeSpec extends Specification {
 
         expect:
         clientBeans.annotatedClient.toBlocking().retrieve('/') == "Intercepted"
-        clientBeans.annotatedNameClient.toBlocking().retrieve('/') == "Intercepted Marked"
         clientBeans.client.toBlocking().retrieve('/') == "echo"
+        clientBeans.annotatedClient.toBlocking().exchange(HttpRequest.POST('/', '')).header("X-Intercepted") == "Post"
     }
 
     @Singleton
     static class ClientBeans {
         HttpClient annotatedClient
-        HttpClient annotatedNameClient
         HttpClient client
 
         ClientBeans(
                 @MarkerStereotypeAnnotation @Client('/filters/marked') HttpClient annotatedClient,
-                @MarkerStereotypeAnnotation("marked") @Client('/filters/marked') HttpClient annotatedNameClient,
                 @Client('/filters/marked') HttpClient client
         ) {
             this.client = client
-            this.annotatedNameClient = annotatedNameClient
             this.annotatedClient = annotatedClient
         }
-    }
-
-    @Client("/filters/marked")
-    @MarkerStereotypeAnnotation("marked")
-    static interface MarkedValueClient {
-        @Get("/")
-        String echo()
     }
 
     @Client("/filters/marked")
     @MarkerStereotypeAnnotation
     static interface MarkedClient {
         @Get("/")
-        String echo()
+        HttpResponse<String> echo()
+
+        @Post("/")
+        HttpResponse<String> echoPost()
     }
 
     @Client("/filters/marked")
@@ -109,9 +104,15 @@ class ClientFilterStereotypeSpec extends Specification {
 
     @Controller('/filters/')
     static class UriController {
+
         @Get('/marked')
         String marked() {
             return "echo"
+        }
+
+        @Post('/marked')
+        HttpResponse<String> post(@Header("X-Intercepted") String header) {
+            return HttpResponse.ok("echo").header("X-Intercepted", header)
         }
     }
 
@@ -122,22 +123,19 @@ class ClientFilterStereotypeSpec extends Specification {
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
             return Single.fromPublisher(chain.proceed(request))
-                    .map({ response ->
-                        HttpResponse.ok("Intercepted")
+                    .map({ HttpResponse response ->
+                        HttpResponse.ok("Intercepted").headers(response.getHeaders().asMap(CharSequence, CharSequence))
                     }).toFlowable()
         }
     }
 
-    @MarkerStereotypeAnnotation("marked")
+    @MarkerStereotypeAnnotation(methods = HttpMethod.POST)
     @Singleton
-    static class MarkerValueFilter implements HttpClientFilter {
+    static class MarkerPostFilter implements HttpClientFilter {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Single.fromPublisher(chain.proceed(request))
-                    .map({ response ->
-                        HttpResponse.ok("Intercepted Marked")
-                    }).toFlowable()
+            return chain.proceed(request.header("X-Intercepted", "Post"))
         }
     }
 

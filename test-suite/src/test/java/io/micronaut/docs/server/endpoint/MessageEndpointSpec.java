@@ -22,6 +22,7 @@ public class MessageEndpointSpec {
     public void testReadMessageEndpoint() {
         Map<String, Object> map = new HashMap<>();
         map.put("endpoints.message.enabled", true);
+        map.put("spec.name", MessageEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
         RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
         HttpResponse<String> response = rxClient.exchange("/message", String.class).blockingFirst();
@@ -34,6 +35,7 @@ public class MessageEndpointSpec {
     public void testWriteMessageEndpoint() {
         Map<String, Object> map = new HashMap<>();
         map.put("endpoints.message.enabled", true);
+        map.put("spec.name", MessageEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
         RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
         Map<String, Object> map2 = new HashMap<>();
@@ -54,6 +56,7 @@ public class MessageEndpointSpec {
     public void testDeleteMessageEndpoint() {
         Map<String, Object> map = new HashMap<>();
         map.put("endpoints.message.enabled", true);
+        map.put("spec.name", MessageEndpointSpec.class.getSimpleName());
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map);
         RxHttpClient rxClient = server.getApplicationContext().createBean(RxHttpClient.class, server.getURL());
         HttpResponse<String> response = rxClient.exchange(HttpRequest.DELETE("/message"), String.class).blockingFirst();
