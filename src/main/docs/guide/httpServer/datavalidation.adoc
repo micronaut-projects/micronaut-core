@@ -32,9 +32,6 @@ snippet::io.micronaut.docs.datavalidation.pogo.EmailController[tags="imports,cla
 
 The validation of POJOs is shown in the following test:
 
-[source,groovy]
-----
-include::{testsuitegroovy}/datavalidation/pogo/EmailControllerSpec.groovy[tag=pojovalidated,indent=0]
-----
+snippet::io.micronaut.docs.datavalidation.pogo.EmailControllerSpec[tags="pojovalidated",indent=0]
 
 NOTE: Bean injection is supported in custom constraints with the hibernate validator configuration.
