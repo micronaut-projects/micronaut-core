@@ -1,7 +1,6 @@
 package io.micronaut.docs.basics;
 
 // tag::imports[]
-
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
