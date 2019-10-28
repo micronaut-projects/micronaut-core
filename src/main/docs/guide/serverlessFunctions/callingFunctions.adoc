@@ -15,79 +15,42 @@ In addition, the `function-client` works together with Micronaut's <<serviceDisc
 
 == FunctionClient
 
-The ann:function.client.FunctionClient[] annotation makes it very straightforward to invoke local or remotely deployed functions. For example, the following Groovy function can be accessed using the `MathClient` interface listed below it.
+The ann:function.client.FunctionClient[] annotation makes it very straightforward to invoke local or remotely deployed functions. For example, given the following function:
 
-.MaxFunction.groovy
-[source,groovy]
-----
-include::{testsfunctionclient}/MaxFunction.groovy[tags=maxFunction, indent=0]
-----
+snippet::io.micronaut.docs.function.client.aws.MaxFunction[indent=0,title="Max Function"]
 
-.Using @FunctionClient to Discover Function
-[source,groovy]
-----
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=import, indent=0]
+The following client can be used to execute it.
 
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=beginFunctionClient, indent=0]
+snippet::io.micronaut.docs.function.client.aws.LocalFunctionInvokeSpec[tags="import, beginFunctionClient, functionMax, endFunctionClient", indent=0, title="Using @FunctionClient to Discover Function"]
 
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=functionMax, indent=4]
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=endFunctionClient, indent=0]
-----
 <1> Method names in the interface will be mapped to methods on the target function, in this case `Long max()`
 
 
 If you would like the names of the client interface and target function to be different, you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation to specify the target method name.
 
-.RoundFunction.groovy
-[source,groovy]
-----
-include::{testsfunctionclient}/RoundFunction.groovy[tags=rndFunction, indent=0]
-----
+snippet::io.micronaut.docs.function.client.aws.RoundFunction[indent=0, title="Round Function"]
 
-.Using @Named to customize target method
-[source,groovy]
-----
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=import, indent=0]
+The named annotation can be placed on the client as well.
 
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=beginFunctionClient, indent=0]
-
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=functionRnd, indent=4]
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=endFunctionClient, indent=0]
-----
+snippet::io.micronaut.docs.function.client.aws.LocalFunctionInvokeSpec[tags="import, beginFunctionClient, functionRnd, endFunctionClient", indent=0, title="Using @Named to customize target method"]
 
 Functions that only return a value are mapped to HTTP `GET` requests, whilst functions that accept an input require an HTTP `POST`.
 
-For a example, the following function can be accessed using the `IsbnValidatorClient` interface listed below.
+For a example, given the following function:
 
-[source,java]
-----
-include::{testsfunctionclient}/IsbnValidatorFunction.java[tags=imports]
+snippet::io.micronaut.docs.function.client.aws.IsbnValidatorFunction[tags="imports, clazz", indent=0]
 
-include::{testsfunctionclient}/IsbnValidatorFunction.java[tags=clazz]
-----
+The function can be accessed using the `IsbnValidatorClient` interface listed below.
 
-[source,java]
-----
-include::{testsfunctionclient}/IsbnValidatorClient.java[tags=imports]
-
-include::{testsfunctionclient}/IsbnValidatorClient.java[tags=clazz]
-----
+snippet::io.micronaut.docs.function.client.aws.IsbnValidatorClient[tags="imports, clazz", indent=0]
 
 <1> Please, note the `@Body` annotation in the method parameter.
-
 
 == Reactive FunctionClients
 
 `@FunctionClient` interfaces support RxJava constructs, so the above interfaces could be implemented as shown below:
 
-.RxMathClient.groovy
-[source,groovy]
-----
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=import, indent=0]
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=rxImport, indent=0]
-
-include::{testsfunctionclient}/LocalFunctionInvokeSpec.groovy[tags=rxFunctionClient, indent=0]
-----
+snippet::io.micronaut.docs.function.client.aws.LocalFunctionInvokeSpec[tags="import, rxImport, rxFunctionClient", indent=0, title="RxMathClient"]
 
 == Remote Functions
 

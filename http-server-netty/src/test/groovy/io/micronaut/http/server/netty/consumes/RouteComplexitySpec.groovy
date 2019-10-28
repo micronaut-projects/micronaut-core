@@ -13,14 +13,14 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
 
     void "test route complexity"() {
         when:
-        String body = rxClient.retrieve(HttpRequest.GET("/test-complexity/somefile.xls")).blockingFirst()
+        String body = rxClient.retrieve(HttpRequest.GET("/test-complexity/id/somefile.xls")).blockingFirst()
 
         then:
         noExceptionThrown()
         body == "fallback"
 
         when:
-        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/somefile.csv")).blockingFirst()
+        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/id/somefile.csv")).blockingFirst()
 
         then:
         noExceptionThrown()
@@ -31,7 +31,14 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
 
         then:
         noExceptionThrown()
-        body == "ab/c/d"
+        body == "ab/c"
+
+        when:
+        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/other2/a/b/c")).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        body == "ab/c"
 
         when:
         body = rxClient.retrieve(HttpRequest.GET("/test-complexity/list")).blockingFirst()
@@ -45,29 +52,45 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
     @Controller("/test-complexity")
     static class MyController  {
 
-        @Get("/{id}")
+        @Get("/id/{id}")
         HttpResponse oneVariable() {
             HttpResponse.ok("fallback")
         }
 
-        @Get("/{id}.csv")
+        @Get("/id/{id}.csv")
         HttpResponse twoRaw() {
             HttpResponse.ok("csv")
         }
 
-        @Get("/other{/a}/{+b}")
+        @Get("/other{/a}/{+b}/d")
         HttpResponse twoVariables(String a, String b) {
             HttpResponse.ok(a + b)
         }
 
         @Get("/other{/a}/{b}{/c}/d")
         HttpResponse threeVariablesTwoRaw() {
-            HttpResponse.ok("two variables")
+            HttpResponse.ok("three variables")
+        }
+
+        @Get("/other2{/a}/{+b}")
+        HttpResponse twoVariables2(String a, String b) {
+            HttpResponse.ok(a + b)
+        }
+
+        @Get("/other2{/a}/{b}{/c}")
+        HttpResponse threeVariablesOneRaw() {
+            HttpResponse.ok("three variables one raw")
         }
 
         @Get("/list{?full}")
         String getFull(@Nullable Boolean full) {
-            return "list"
+            "list"
         }
+
+        @Get("/{+path}")
+        String pathPlus(String path) {
+            path
+        }
+
     }
 }

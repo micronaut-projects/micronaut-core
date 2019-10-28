@@ -35,10 +35,6 @@ import static io.micronaut.http.HttpRequest.POST;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/**
- * @author graemerocher
- * @since 1.0
- */
 public class HelloControllerSpec {
 
     @Test

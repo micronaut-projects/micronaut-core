@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.StreamUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -120,8 +121,8 @@ public class DefaultRouter implements Router {
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
         List<UriRouteMatch<T, R>> uriRoutes = this.<T, R>find(request).collect(Collectors.toList());
-        boolean hasMultipleMatches = uriRoutes.size() > 1;
-        if (hasMultipleMatches && HttpMethod.permitsRequestBody(request.getMethod())) {
+
+        if (uriRoutes.size() > 1 && HttpMethod.permitsRequestBody(request.getMethod())) {
 
             List<UriRouteMatch<T, R>> explicitAcceptRoutes = new ArrayList<>(uriRoutes.size());
             List<UriRouteMatch<T, R>> acceptRoutes = new ArrayList<>(uriRoutes.size());
@@ -138,13 +139,12 @@ public class DefaultRouter implements Router {
             }
 
             uriRoutes = explicitAcceptRoutes.isEmpty() ? acceptRoutes : explicitAcceptRoutes;
-            hasMultipleMatches = uriRoutes.size() > 1;
         }
 
         /**
-         * Any changes to the logic below may also need changes to {@link io.micronaut.http.uri.UriTemplate#compareTo(UriTemplate)} 
+         * Any changes to the logic below may also need changes to {@link io.micronaut.http.uri.UriTemplate#compareTo(UriTemplate)}
          */
-        if (hasMultipleMatches) {
+        if (uriRoutes.size() > 1) {
             long variableCount = 0;
             long rawCount = 0;
 
@@ -166,6 +166,14 @@ public class DefaultRouter implements Router {
             }
             uriRoutes = closestMatches;
         }
+
+        if (uriRoutes.size() > 1) {
+            uriRoutes = uriRoutes.stream().collect(
+                    StreamUtils.maxAll(Comparator.comparingInt((match) ->
+                                    match.getRoute().getUriMatchTemplate().getRawSegmentLength()),
+                            Collectors.toList()));
+        }
+
         return uriRoutes;
     }
 
