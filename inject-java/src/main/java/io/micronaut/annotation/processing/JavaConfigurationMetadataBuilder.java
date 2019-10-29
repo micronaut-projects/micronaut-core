@@ -39,6 +39,7 @@ import java.util.function.Function;
  * @since 1.0
  */
 public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<TypeElement> {
+
     private final AnnotationUtils annotationUtils;
     private final ModelUtils modelUtils;
     private final Elements elements;
@@ -55,11 +56,11 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
         // ensure initialization
         final TypeElement crte = elements.getTypeElement(ConfigurationReader.class.getName());
         if (crte != null) {
-            this.annotationUtils.getAnnotationMetadata(crte);
+            getAnnotationMetadata(crte);
         }
         final TypeElement epte = elements.getTypeElement(EachProperty.class.getName());
         if (epte != null) {
-            this.annotationUtils.getAnnotationMetadata(epte);
+            getAnnotationMetadata(epte);
         }
     }
 
@@ -88,7 +89,7 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
             if (enclosingElement instanceof TypeElement) {
                 TypeElement enclosingType = (TypeElement) enclosingElement;
                 while (true) {
-                    AnnotationMetadata enclosingTypeMetadata = annotationUtils.getAnnotationMetadata(enclosingType);
+                    AnnotationMetadata enclosingTypeMetadata = getAnnotationMetadata(enclosingType);
                     Optional<String> parentConfig = enclosingTypeMetadata.getValue(ConfigurationReader.class, String.class);
                     if (parentConfig.isPresent()) {
                         String parentPath = pathEvaluationFunctionForMetadata(enclosingTypeMetadata).apply(parentConfig.get());
@@ -114,12 +115,12 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
     }
 
     private String calculateInitialPath(TypeElement owningType, TypeElement declaringType) {
-        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(declaringType);
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata(declaringType);
         Function<String, String> evaluatePathFunction = pathEvaluationFunctionForMetadata(annotationMetadata);
         return annotationMetadata.getValue(ConfigurationReader.class, String.class)
             .map(evaluatePathFunction)
             .orElseGet(() -> {
-                    AnnotationMetadata ownerMetadata = annotationUtils.getAnnotationMetadata(owningType);
+                    AnnotationMetadata ownerMetadata = getAnnotationMetadata(owningType);
                     return ownerMetadata
                         .getValue(ConfigurationReader.class, String.class)
                         .map(pathEvaluationFunctionForMetadata(ownerMetadata))
@@ -153,6 +154,11 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
     @Override
     protected String getTypeString(TypeElement type) {
         return modelUtils.resolveTypeReference(type).toString();
+    }
+
+    @Override
+    protected AnnotationMetadata getAnnotationMetadata(TypeElement type) {
+        return annotationUtils.getAnnotationMetadata(type);
     }
 
     private void prependSuperclasses(TypeElement declaringType, StringBuilder path) {

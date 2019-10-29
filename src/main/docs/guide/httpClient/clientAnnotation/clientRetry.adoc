@@ -2,11 +2,7 @@ Being able to recover from failure is critical for HTTP clients, and that is whe
 
 You can declare the ann:retry.annotation.Retryable[] or ann:retry.annotation.CircuitBreaker[] annotations on any ann:http.client.annotation.Client[] interface and the retry policy will be applied, for example:
 
-.Declaring @Retryable
-[source,java]
-----
-include::{testsclient}/annotation/retry/PetClient.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.annotation.retry.PetClient[tags="class", indent=0, title="Declaring @Retryable"]
 
 
 For more information on customizing retry, see the section on <<retry, Retry Advice>>.

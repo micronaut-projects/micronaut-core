@@ -247,6 +247,18 @@ public class JaegerConfiguration implements Toggleable  {
                 configuration.withSender(senderConfiguration);
             }
         }
+
+        /**
+         * Sets the sender configuration.
+         *
+         * @param senderConfiguration The sender configuration
+         */
+        @Inject
+        public void setSenderConfiguration(@Nullable JaegerSenderConfiguration senderConfiguration) {
+            if (senderConfiguration != null) {
+                configuration.withSender(senderConfiguration.configuration);
+            }
+        }
     }
 
     /**

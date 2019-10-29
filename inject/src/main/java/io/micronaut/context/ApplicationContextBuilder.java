@@ -142,6 +142,16 @@ public interface ApplicationContextBuilder {
     @Nonnull ApplicationContextBuilder exclude(@Nullable String... configurations);
 
     /**
+     * Set the command line arguments.
+     *
+     * @param args The arguments
+     * @return This application
+     */
+    default  @Nonnull ApplicationContextBuilder args(@Nullable String... args) {
+        return this;
+    }
+
+    /**
      * Starts the {@link ApplicationContext}.
      *
      * @return The running {@link ApplicationContext}

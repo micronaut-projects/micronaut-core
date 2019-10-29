@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Property(name = "spec.name", value = "HelloControllerSpec")
 // tag::class[]
 @MicronautTest
-class HelloControllerSpec {
+public class HelloControllerSpec {
     @Inject
     EmbeddedServer server; // <1>
 

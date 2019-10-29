@@ -63,17 +63,7 @@ The above configuration enables header resolution, but disables cookie resolutio
 
 A api:session.Session[] object can be retrieved simply by declaring the api:session.Session[] in a controller method signature. For example consider the following controller:
 
-.ShoppingController.java
-[source,java]
-----
-include::{testssession}/ShoppingController.java[tags=imports, indent=0]
-
-include::{testssession}/ShoppingController.java[tags=class, indent=0]
-
-include::{testssession}/ShoppingController.java[tags=add, indent=4]
-
-}
-----
+snippet::io.micronaut.docs.session.ShoppingController[tags="imports,class,add,endclass", indent=0]
 
 <1> The `ShoppingController` declares a api:session.Session[] attribute called `cart`
 <2> The api:session.Session[] is declared as a parameter to the method
@@ -84,11 +74,7 @@ Note that because the api:session.Session[] is declared as a required parameter 
 
 If you don't want to create unnecessary sessions then you can declare the api:session.Session[] as `@Nullable` in which case a session will not be created and saved unnecessarily. For example:
 
-.Using @Nullable with Sessions
-[source,java]
-----
-include::{testssession}/ShoppingController.java[tags=clear, indent=0]
-----
+snippet::io.micronaut.docs.session.ShoppingController[tags="clear", indent=0,title="Using @Nullable with Sessions"]
 
 The above method will only create and inject a new api:session.Session[] if one already exists.
 
@@ -99,10 +85,7 @@ If the client is a web browser then sessions should just work if you have cookie
 For example, when invoking the `viewCart` method of the `StoreController` in the previous example the HTTP client will receive by default a `AUTHORIZATION_INFO` header. The following example, using a Spock test, demonstrates this:
 
 .Retrieving the AUTHORIZATION_INFO header
-[source,groovy]
-----
-include::{testssession}/ShoppingControllerSpec.groovy[tags=view, indent=0]
-----
+snippet::io.micronaut.docs.session.ShoppingControllerSpec[tags="view", indent=0]
 
 <1> A request is made to `/shopping/cart`
 <2> The `AUTHORIZATION_INFO` header is present in the response
@@ -110,10 +93,7 @@ include::{testssession}/ShoppingControllerSpec.groovy[tags=view, indent=0]
 You can then pass this `AUTHORIZATION_INFO` in subsequent requests to re-use the existing api:session.Session[]:
 
 .Sending the AUTHORIZATION_INFO header
-[source,groovy]
-----
-include::{testssession}/ShoppingControllerSpec.groovy[tags=add, indent=0]
-----
+snippet::io.micronaut.docs.session.ShoppingControllerSpec[tags="add", indent=0]
 
 <1> The `AUTHORIZATION_INFO` is retrieved from the response
 <2> And then sent as a header in the subsequent request
@@ -122,11 +102,7 @@ include::{testssession}/ShoppingControllerSpec.groovy[tags=add, indent=0]
 
 Rather than explicitly injecting the api:session.Session[] into a controller method you can instead use ann:session.annotation.SessionValue[]. For example:
 
-.Using @SessionValue
-[source,java]
-----
-include::{testssession}/ShoppingController.java[tags=view, indent=0]
-----
+snippet::io.micronaut.docs.session.ShoppingController[tags="view", indent=0,title="Using @SessionValue"]
 
 <1> ann:session.annotation.SessionValue[] is declared on the method resulting in the return value being stored in the api:session.Session[]. Note that you must specify the attribute name when used on a return value
 <2> ann:session.annotation.SessionValue[] is used on a `@Nullable` parameter which results in looking up the value from the api:session.Session[] in a non-blocking way and supplying it if present. In the case a value is not specified to ann:session.annotation.SessionValue[] resulting in the parameter name being used to lookup the attribute.

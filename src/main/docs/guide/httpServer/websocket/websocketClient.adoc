@@ -15,14 +15,7 @@ Once you have a reference to the api:websocket.WebSocketClient[] interface you c
 
 For example consider the following implementation:
 
-.WebSocket Chat Example
-[source,java]
-----
-include::{testswebsocket}/ChatClientWebSocket.java[tag=imports]
-
-include::{testswebsocket}/ChatClientWebSocket.java[tag=class]
-}
-----
+snippet::io.micronaut.docs.http.server.netty.websocket.ChatClientWebSocket[tags="imports,class", indent=0,title="WebSocket Chat Example"]
 
 <1> The class is abstract (more on that later) and is annotated with ann:websocket.annotation.ClientWebSocket[]
 <2> The client must implement `AutoCloseable` and you should ensure that the connection is closed at some point.

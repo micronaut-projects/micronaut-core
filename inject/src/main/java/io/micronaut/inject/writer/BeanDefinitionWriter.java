@@ -587,6 +587,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitSetterValue(Object declaringType,
+                                 Object returnType,
                                  AnnotationMetadata annotationMetadata,
                                  boolean requiresReflection,
                                  Object fieldType,
@@ -599,7 +600,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         addInjectionPointForSetterInternal(annotationMetadata, requiresReflection, fieldType, fieldName, setterName, genericTypes, declaringTypeRef);
 
         if (!requiresReflection) {
-            resolveBeanOrValueForSetter(declaringTypeRef, setterName, fieldType, GET_VALUE_FOR_METHOD_ARGUMENT, isOptional);
+            resolveBeanOrValueForSetter(declaringTypeRef, returnType, setterName, fieldType, GET_VALUE_FOR_METHOD_ARGUMENT, isOptional);
         }
         currentMethodIndex++;
     }
@@ -607,6 +608,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void visitSetterValue(
             Object declaringType,
+            Object returnType,
             AnnotationMetadata annotationMetadata,
             boolean requiresReflection,
             Object valueType,
@@ -658,7 +660,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         pushInvokeMethodOnSuperClass(constructorVisitor, ADD_METHOD_INJECTION_POINT_METHOD);
 
         if (!requiresReflection) {
-            resolveBeanOrValueForSetter(declaringTypeRef, setterName, valueType, GET_VALUE_FOR_METHOD_ARGUMENT, isOptional);
+            resolveBeanOrValueForSetter(declaringTypeRef, returnType, setterName, valueType, GET_VALUE_FOR_METHOD_ARGUMENT, isOptional);
         }
         currentMethodIndex++;
 
@@ -1536,7 +1538,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 false);
     }
 
-    private void resolveBeanOrValueForSetter(Type declaringTypeRef, String setterName, Object fieldType, Method resolveMethod, boolean isValueOptional) {
+    private void resolveBeanOrValueForSetter(Type declaringTypeRef, Object returnType, String setterName, Object fieldType, Method resolveMethod, boolean isValueOptional) {
         GeneratorAdapter injectVisitor = this.injectMethodVisitor;
 
         Label falseCondition = null;
@@ -1562,7 +1564,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
         // invoke the method on this injected instance
         injectVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
-        String methodDescriptor = getMethodDescriptor("void", Collections.singletonList(fieldType));
+        String methodDescriptor = getMethodDescriptor(returnType, Collections.singletonList(fieldType));
         // first get the value of the field by calling AbstractBeanDefinition.getBeanForField(..)
         // load 'this'
         injectMethodVisitor.visitVarInsn(ALOAD, 0);
@@ -1582,6 +1584,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         injectVisitor.visitMethodInsn(INVOKEVIRTUAL,
                 declaringTypeRef.getInternalName(), setterName,
                 methodDescriptor, false);
+        if (returnType != void.class) {
+            injectVisitor.pop();
+        }
         if (falseCondition != null) {
             injectVisitor.visitLabel(falseCondition);
         }

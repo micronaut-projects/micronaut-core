@@ -17,11 +17,7 @@ package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
@@ -66,6 +62,9 @@ public class ObjectMapperFactory {
 
     @Inject
     protected BeanDeserializerModifier[] beanDeserializerModifiers = new BeanDeserializerModifier[0];
+
+    @Inject
+    protected KeyDeserializer[] keyDeserializers = new KeyDeserializer[0];
 
     /**
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
@@ -117,6 +116,17 @@ public class ObjectMapperFactory {
             } else {
                 Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
                 targetType.ifPresent(aClass -> module.addDeserializer(aClass, deserializer));
+            }
+        }
+
+        for (KeyDeserializer keyDeserializer : keyDeserializers) {
+            Class<? extends KeyDeserializer> type = keyDeserializer.getClass();
+            Type annotation = type.getAnnotation(Type.class);
+            if (annotation != null) {
+                Class[] value = annotation.value();
+                for (Class clazz : value) {
+                    module.addKeyDeserializer(clazz, keyDeserializer);
+                }
             }
         }
         objectMapper.registerModule(module);

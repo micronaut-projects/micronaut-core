@@ -23,12 +23,14 @@ class ValueSpec extends Specification {
     void "test configuration injection with @Value"() {
         given:
         ApplicationContext context = ApplicationContext.run(
-                "foo.bar":"8080"
+                "foo.bar":"8080",
+                "camelCase.URL":"http://localhost"
         )
         A a = context.getBean(A)
         B b = context.getBean(B)
 
         expect:
+        a.url == new URL("http://localhost")
         a.port == 8080
         a.optionalPort.get() == 8080
         !a.optionalPort2.isPresent()
@@ -38,5 +40,7 @@ class ValueSpec extends Specification {
         b.fromConstructor == 8080
         b.a != null
 
+        cleanup:
+        context.close()
     }
 }
