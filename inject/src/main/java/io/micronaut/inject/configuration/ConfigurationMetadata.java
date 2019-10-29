@@ -19,6 +19,7 @@ import io.micronaut.core.io.Writable;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Set;
 
 /**
  * Metadata about a configuration group.
@@ -30,6 +31,8 @@ public class ConfigurationMetadata implements Writable {
     String type;
     String name;
     String description;
+    Set<String> includes;
+    Set<String> excludes;
 
     /**
      * @return The type
@@ -50,6 +53,20 @@ public class ConfigurationMetadata implements Writable {
      */
     public String getDescription() {
         return description;
+    }
+
+    /**
+     * @return The properties to include
+     */
+    public Set<String> getIncludes() {
+        return includes;
+    }
+
+    /**
+     * @return The properties to exclude
+     */
+    public Set<String> getExcludes() {
+        return excludes;
     }
 
     @Override

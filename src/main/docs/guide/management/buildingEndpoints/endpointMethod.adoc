@@ -17,20 +17,10 @@ Endpoints respond to `GET` ("read"), `POST` ("write") and `DELETE` ("delete") re
 
 == Read Methods
 
-Annotating a method with the api:management.endpoint.Read[] annotation will cause it to respond to `GET` requests.
-[source,groovy]
-.CurrentDateEndpoint.groovy
-----
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointImport, indent=0]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=readImport, indent=0]
+Annotating a method with the api:management.endpoint.annotation.Read[] annotation will cause it to respond to `GET` requests.
 
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassBegin, indent=0]
+snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, readImport, endpointClassBegin, currentDate, simpleRead, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=currentDate, indent=4]
-
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=simpleRead, indent=4]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassEnd, indent=0]
-----
 
 The above method responds to the following request:
 

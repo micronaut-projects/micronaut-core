@@ -76,7 +76,7 @@ $ gu install native-image
 [source,bash]
 ----
 $ ./gradlew assemble
-$ native-image --no-server -cp build/libs/hello-world-0.1.jar
+$ native-image --no-server -cp build/libs/hello-world-0.1-all.jar
 ----
 
 .Creating native image with Maven
@@ -84,6 +84,12 @@ $ native-image --no-server -cp build/libs/hello-world-0.1.jar
 ----
 $ ./mvnw package
 $ native-image --no-server -cp target/hello-world-0.1.jar
+----
+
+.Run native image
+[source,bash]
+----
+$ ./hello-world
 ----
 
 

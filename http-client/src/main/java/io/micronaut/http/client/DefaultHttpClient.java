@@ -62,7 +62,6 @@ import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.sse.Event;
-import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -241,7 +240,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.contextPath = contextPath;
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
-        this.sslContext = nettyClientSslBuilder.build().orElse(null);
+        this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration()).orElse(null);
         this.group = createEventLoopGroup(configuration, threadFactory);
         this.scheduler = Schedulers.from(group);
         this.threadFactory = threadFactory;
@@ -341,7 +340,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 new DefaultHttpClientConfiguration(),
                 null,
                 new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
+                new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -359,7 +358,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
                 LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                createSslBuilder(configuration), createDefaultMediaTypeRegistry(),
+                new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT
         );
     }
@@ -372,7 +371,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration, String contextPath) {
         this(
                 LoadBalancer.fixed(url), configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                createSslBuilder(configuration), createDefaultMediaTypeRegistry(),
+                new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT
         );
     }
@@ -384,7 +383,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
         this(loadBalancer,
                 configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
+                new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -396,7 +395,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration, String contextPath) {
         this(loadBalancer,
                 configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver()),
+                new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
@@ -1183,8 +1182,30 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             @Nullable SslContext sslCtx,
             boolean isStream) {
         String host = uri.getHost();
+        int port;
+        if (host == null) {
+            host = uri.getAuthority();
+            if (host == null) {
+                throw new HttpClientException("URI specifies no host to connect to");
+            }
 
-        int port = uri.getPort() > -1 ? uri.getPort() : sslCtx != null ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+            final int i = host.indexOf(':');
+            if (i > -1) {
+                final String portStr = host.substring(i + 1);
+                host = host.substring(0, i);
+                try {
+                    port = Integer.parseInt(portStr);
+                } catch (NumberFormatException e) {
+                    throw new HttpClientException("URI specifies an invalid port: " + portStr);
+                }
+            } else {
+                port = uri.getPort() > -1 ? uri.getPort() : sslCtx != null ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+            }
+        } else {
+            port = uri.getPort() > -1 ? uri.getPort() : sslCtx != null ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+        }
+
+
         return doConnect(request, host, port, sslCtx, isStream);
     }
 
@@ -1629,14 +1650,23 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, StreamedHttpResponse msg) {
                 if (received.compareAndSet(false, true)) {
-                    NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg);
+                    HttpResponseStatus status = msg.status();
+                    int statusCode = status.code();
+                    HttpStatus httpStatus;
+                    try {
+                        httpStatus = HttpStatus.valueOf(statusCode);
+                    } catch (IllegalArgumentException e) {
+                        emitter.onError(e);
+                        return;
+                    }
+
+                    NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg, httpStatus);
                     HttpHeaders headers = msg.headers();
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Streaming Response Received ({}) for Request: {} {}", msg.status(), nettyRequest.method().name(), nettyRequest.uri());
                         traceHeaders(headers);
                     }
 
-                    int statusCode = response.getStatus().getCode();
                     if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
                         String location = headers.get(HttpHeaderNames.LOCATION);
                         Flowable<io.micronaut.http.HttpResponse<Object>> redirectedExchange;
@@ -1757,7 +1787,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             io.micronaut.http.HttpRequest<?> request,
             Channel channel,
             ChannelPool channelPool,
-            Emitter<io.micronaut.http.HttpResponse<O>> emitter,
+            FlowableEmitter<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
         final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandler<FullHttpResponse>(false) {
@@ -1767,127 +1797,142 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
             @Override
             protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullResponse) {
-
                 try {
-                    HttpResponseStatus status = fullResponse.status();
-                    HttpHeaders headers = fullResponse.headers();
-                    if (log.isTraceEnabled()) {
-                        log.trace("HTTP Client Response Received for Request: {} {}",
-                                request.getMethodName(), request.getUri());
-                        log.trace("Status Code: {}", status);
-                        traceHeaders(headers);
-                        traceBody("Response", fullResponse.content());
-                    }
-                    int statusCode = status.code();
-                    // it is a redirect
-                    if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
-                        String location = headers.get(HttpHeaderNames.LOCATION);
-                        Flowable<io.micronaut.http.HttpResponse<O>> redirectedRequest = exchange(io.micronaut.http.HttpRequest.GET(location), bodyType);
-                        redirectedRequest.first(io.micronaut.http.HttpResponse.notFound())
-                                .subscribe((oHttpResponse, throwable) -> {
-                                    if (throwable != null) {
-                                        emitter.onError(throwable);
 
-                                    } else {
-                                        emitter.onNext(oHttpResponse);
-                                        emitter.onComplete();
-                                    }
-                                });
+                    HttpResponseStatus status = fullResponse.status();
+                    int statusCode = status.code();
+                    HttpStatus httpStatus;
+                    try {
+                        httpStatus = HttpStatus.valueOf(statusCode);
+                    } catch (IllegalArgumentException e) {
+                        if (complete.compareAndSet(false, true)) {
+                            emitter.tryOnError(e);
+                        } else if (LOG.isWarnEnabled()) {
+                            LOG.warn("Unsupported http status after handler completed: " + e.getMessage(), e);
+                        }
                         return;
                     }
-                    if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
-                        // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
-                        headers.remove(HttpHeaderNames.CONTENT_LENGTH);
-                    }
-                    boolean errorStatus = statusCode >= 400;
-                    FullNettyClientHttpResponse<O> response
-                            = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, bodyType, errorStatus);
 
-                    if (complete.compareAndSet(false, true)) {
-                        if (errorStatus) {
-                            try {
-                                HttpClientResponseException clientError;
-                                if (errorType != HttpClient.DEFAULT_ERROR_TYPE) {
-                                    clientError = new HttpClientResponseException(
-                                            status.reasonPhrase(),
-                                            null,
-                                            response,
-                                            new HttpClientErrorDecoder() {
-                                                @Override
-                                                public Class<?> getErrorType(MediaType mediaType) {
-                                                    return errorType.getType();
-                                                }
-                                            }
-                                    );
-                                } else {
-                                    clientError = new HttpClientResponseException(
-                                            status.reasonPhrase(),
-                                            response
-                                    );
-                                }
+                    try {
+                        HttpHeaders headers = fullResponse.headers();
+                        if (log.isTraceEnabled()) {
+                            log.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
+                            log.trace("Status Code: {}", status);
+                            traceHeaders(headers);
+                            traceBody("Response", fullResponse.content());
+                        }
+
+                        // it is a redirect
+                        if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
+                            String location = headers.get(HttpHeaderNames.LOCATION);
+                            Flowable<io.micronaut.http.HttpResponse<O>> redirectedRequest = exchange(io.micronaut.http.HttpRequest.GET(location), bodyType);
+                            redirectedRequest.first(io.micronaut.http.HttpResponse.notFound())
+                                    .subscribe((oHttpResponse, throwable) -> {
+                                        if (throwable != null) {
+                                            emitter.tryOnError(throwable);
+
+                                        } else {
+                                            emitter.onNext(oHttpResponse);
+                                            emitter.onComplete();
+                                        }
+                                    });
+                            return;
+                        }
+                        if (statusCode == HttpStatus.NO_CONTENT.getCode()) {
+                            // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
+                            headers.remove(HttpHeaderNames.CONTENT_LENGTH);
+                        }
+                        boolean errorStatus = statusCode >= 400;
+                        FullNettyClientHttpResponse<O> response
+                                = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, errorStatus);
+
+                        if (complete.compareAndSet(false, true)) {
+                            if (errorStatus) {
                                 try {
-                                    emitter.onError(clientError);
-                                } finally {
-                                    response.onComplete();
-                                }
-                            } catch (Throwable t) {
-                                if (t instanceof HttpClientResponseException) {
+                                    HttpClientResponseException clientError;
+                                    if (errorType != HttpClient.DEFAULT_ERROR_TYPE) {
+                                        clientError = new HttpClientResponseException(
+                                                status.reasonPhrase(),
+                                                null,
+                                                response,
+                                                new HttpClientErrorDecoder() {
+                                                    @Override
+                                                    public Argument<?> getErrorType(MediaType mediaType) {
+                                                        return errorType;
+                                                    }
+                                                }
+                                        );
+                                    } else {
+                                        clientError = new HttpClientResponseException(
+                                                status.reasonPhrase(),
+                                                response
+                                        );
+                                    }
                                     try {
-                                        emitter.onError(t);
+                                        emitter.tryOnError(clientError);
                                     } finally {
                                         response.onComplete();
                                     }
-                                } else {
+                                } catch (Throwable t) {
+                                    if (t instanceof HttpClientResponseException) {
+                                        try {
+                                            emitter.tryOnError(t);
+                                        } finally {
+                                            response.onComplete();
+                                        }
+                                    } else {
+                                        response.onComplete();
+                                        FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
+                                                fullResponse,
+                                                httpStatus,
+                                                mediaTypeCodecRegistry,
+                                                byteBufferFactory,
+                                                null,
+                                                true
+                                        );
+                                        errorResponse.onComplete();
+                                        HttpClientResponseException clientResponseError = new HttpClientResponseException(
+                                                "Error decoding HTTP error response body: " + t.getMessage(),
+                                                t,
+                                                errorResponse,
+                                                null
+                                        );
+                                        emitter.tryOnError(clientResponseError);
+                                    }
+                                }
+                            } else {
+                                emitter.onNext(response);
+                                response.onComplete();
+                                emitter.onComplete();
+                            }
+                        }
+                    } catch (Throwable t) {
+                        if (complete.compareAndSet(false, true)) {
+                            if (t instanceof HttpClientResponseException) {
+                                emitter.tryOnError(t);
+                            } else {
+                                FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, null, true);
+                                HttpClientResponseException clientResponseError = new HttpClientResponseException(
+                                        "Error decoding HTTP response body: " + t.getMessage(),
+                                        t,
+                                        response,
+                                        new HttpClientErrorDecoder() {
+                                            @Override
+                                            public Argument<?> getErrorType(MediaType mediaType) {
+                                                return errorType;
+                                            }
+                                        }
+                                );
+                                try {
+                                    emitter.tryOnError(clientResponseError);
+                                } finally {
                                     response.onComplete();
-                                    FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
-                                            fullResponse,
-                                            mediaTypeCodecRegistry,
-                                            byteBufferFactory,
-                                            null,
-                                            true
-                                    );
-                                    errorResponse.onComplete();
-                                    HttpClientResponseException clientResponseError = new HttpClientResponseException(
-                                            "Error decoding HTTP error response body: " + t.getMessage(),
-                                            t,
-                                            errorResponse,
-                                            null
-                                    );
-                                    emitter.onError(clientResponseError);
                                 }
                             }
                         } else {
-                            emitter.onNext(response);
-                            response.onComplete();
-                            emitter.onComplete();
-                        }
-                    }
-                } catch (Throwable t) {
-                    if (complete.compareAndSet(false, true)) {
-                        if (t instanceof HttpClientResponseException) {
-                            emitter.onError(t);
-                        } else {
-                            FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, mediaTypeCodecRegistry, byteBufferFactory, null, true);
-                            HttpClientResponseException clientResponseError = new HttpClientResponseException(
-                                    "Error decoding HTTP response body: " + t.getMessage(),
-                                    t,
-                                    response,
-                                    new HttpClientErrorDecoder() {
-                                        @Override
-                                        public Class<?> getErrorType(MediaType mediaType) {
-                                            return errorType.getType();
-                                        }
-                                    }
-                            );
-                            try {
-                                emitter.onError(clientResponseError);
-                            } finally {
-                                response.onComplete();
+                            if (LOG.isWarnEnabled()) {
+                                LOG.warn("Exception fired after handler completed: " + t.getMessage(), t);
                             }
-                        }
-                    } else {
-                        if (LOG.isWarnEnabled()) {
-                            LOG.warn("Exception fired after handler completed: " + t.getMessage(), t);
                         }
                     }
                 } finally {
@@ -1937,11 +1982,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         }
 
                         if (cause instanceof TooLongFrameException) {
-                            emitter.onError(new ContentLengthExceededException(configuration.getMaxContentLength()));
+                            emitter.tryOnError(new ContentLengthExceededException(configuration.getMaxContentLength()));
                         } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
-                            emitter.onError(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                            emitter.tryOnError(ReadTimeoutException.TIMEOUT_EXCEPTION);
                         } else {
-                            emitter.onError(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
+                            emitter.tryOnError(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
                         }
                     }
                 } finally {
@@ -2069,10 +2114,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return MediaTypeCodecRegistry.of(
                 new JsonMediaTypeCodec(objectMapper, applicationConfiguration, null), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration, null)
         );
-    }
-
-    private static NettyClientSslBuilder createSslBuilder(HttpClientConfiguration configuration) {
-        return new NettyClientSslBuilder(configuration.getSslConfiguration());
     }
 
     private <I> NettyRequestWriter prepareRequest(io.micronaut.http.HttpRequest<I> request, URI requestURI) throws HttpPostRequestEncoder.ErrorDataEncoderException {

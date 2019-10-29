@@ -456,7 +456,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             return
         }
 
-        Map tokens = buildTokens.getTokens(profile, features)
+        Map tokens = buildTokens.getTokens(profileRepository, profile, features)
 
         if (tokens == null) {
             return

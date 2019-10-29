@@ -19,6 +19,7 @@ dependencies {
     testCompile "org.jetbrains.kotlin:kotlin-test:$kotlinVersion"
 
     testCompile project(":validation")
+    testCompile project(":management")
     testCompile project(":inject")
     testCompile dependencyVersion("jcache")
     testCompile project(':validation')
@@ -26,12 +27,21 @@ dependencies {
     kaptTest project(':inject-java')
     kaptTest project(':validation')
     testCompile project(":http-client")
+    testCompile project(":session")
+    testCompile dependencyVersion("reactor")
     testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
+    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-kotlintest"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
+    testCompile project(":function-client")
+    testCompile project(":function-web")
     testCompile 'io.kotlintest:kotlintest-runner-junit5:3.3.0'
     testRuntime "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
+    testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }
 
 compileTestKotlin {

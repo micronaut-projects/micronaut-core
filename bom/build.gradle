@@ -12,7 +12,6 @@ publishing {
                 xml.children().last() + {
                     def mkp = delegate
 
-                    mkp.packaging "pom"
                     mkp.properties {
                         for(dep in dependencyVersions) {
                             def v = dep.value.version
