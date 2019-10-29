@@ -46,6 +46,8 @@ import java.time.chrono.MinguoDate;
 import java.time.chrono.ThaiBuddhistDate;
 import java.time.temporal.TemporalAccessor;
 import java.util.*;
+import java.util.concurrent.atomic.DoubleAccumulator;
+import java.util.concurrent.atomic.DoubleAdder;
 
 /**
  * A factory bean that contains implementation for many of the default validations.
@@ -124,25 +126,85 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     private final ConstraintValidator<Negative, Number> negativeNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() < 0;
+            if (value == null) {
+                return true;
+            }
+            if (value instanceof  BigDecimal) {
+                return ((BigDecimal) value).signum() < 0;
+            }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() < 0;
+            }
+            if (value instanceof Double ||
+                value instanceof Float  ||
+                value instanceof DoubleAdder ||
+                value instanceof DoubleAccumulator) {
+                return value.doubleValue() < 0;
+            }
+            return value.longValue() < 0;
         };
 
     private final ConstraintValidator<NegativeOrZero, Number> negativeOrZeroNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() <= 0;
+            if (value == null) {
+                return true;
+            }
+            if (value instanceof  BigDecimal) {
+                return ((BigDecimal) value).signum() <= 0;
+            }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() <= 0;
+            }
+            if (value instanceof Double ||
+                value instanceof Float  ||
+                value instanceof DoubleAdder ||
+                value instanceof DoubleAccumulator) {
+                return value.doubleValue() <= 0;
+            }
+            return value.longValue() <= 0;
         };
 
     private final ConstraintValidator<Positive, Number> positiveNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() > 0;
+            if (value == null) {
+                return true;
+            }
+            if (value instanceof  BigDecimal) {
+                return ((BigDecimal) value).signum() > 0;
+            }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() > 0;
+            }
+            if (value instanceof Double ||
+                value instanceof Float  ||
+                value instanceof DoubleAdder ||
+                value instanceof DoubleAccumulator) {
+                return value.doubleValue() > 0;
+            }
+            return value.longValue() > 0;
         };
 
     private final ConstraintValidator<PositiveOrZero, Number> positiveOrZeroNumberValidator =
             (value, annotationMetadata, context) -> {
             // null is allowed according to spec
-            return value == null || value.intValue() >= 0;
+            if (value == null) {
+                return true;
+            }
+            if (value instanceof  BigDecimal) {
+                return ((BigDecimal) value).signum() >= 0;
+            }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() >= 0;
+            }
+            if (value instanceof Double ||
+                value instanceof Float  ||
+                value instanceof DoubleAdder ||
+                value instanceof DoubleAccumulator) {
+                return value.doubleValue() >= 0;
+            }
+            return value.longValue() >= 0;
         };
 
     private final ConstraintValidator<NotBlank, CharSequence> notBlankValidator =
