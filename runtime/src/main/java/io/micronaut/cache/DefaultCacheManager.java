@@ -66,7 +66,7 @@ public class DefaultCacheManager<C> implements CacheManager<C> {
     @Inject public DefaultCacheManager(List<SyncCache<C>> caches, @Nullable Provider<DynamicCacheManager<C>> dynamicCacheManager) {
         this.dynamicCacheManager = dynamicCacheManager;
         if (CollectionUtils.isEmpty(caches)) {
-            this.cacheMap = Collections.emptyMap();
+            this.cacheMap = new LinkedHashMap<>();
         } else {
             this.cacheMap = new LinkedHashMap<>(caches.size());
             for (SyncCache<C> cache : caches) {
