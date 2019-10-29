@@ -18,6 +18,7 @@ package io.micronaut.http.client
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceList
+import io.micronaut.http.BasicAuth
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -76,6 +77,23 @@ class ClientIntroductionAdviceSpec extends Specification {
         ctx.close()
     }
 
+    void "test a client that auto encodes basic auth header"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.registerSingleton(new TestServiceInstanceList(server.getURI()))
+
+        when:
+        BasicAuthHeaderAutoEncodingClient client = ctx.getBean(BasicAuthHeaderAutoEncodingClient)
+
+        then:
+        client.post('abc', new BasicAuth("username", "password")) == 'abc basic-auth-header=Basic dXNlcm5hbWU6cGFzc3dvcmQ='
+
+        cleanup:
+        server.close()
+        ctx.close()
+    }
+
     void "test non body params have preference for uri templates"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
@@ -100,7 +118,7 @@ class ClientIntroductionAdviceSpec extends Specification {
         BasicAuthClient client = ctx.getBean(BasicAuthClient)
 
         then:
-        client.get() == 'Basic Y29uZmlnOnNlY3JldA=='
+        client.get() == 'config:secret'
 
         cleanup:
         server.close()
@@ -141,6 +159,14 @@ class ClientIntroductionAdviceSpec extends Specification {
         }
     }
 
+    @Controller('/encoded-basic-auth')
+    static class EncodedBasicAuthController {
+        @Post(produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
+        String post(@Body String data, @Header String authorization)  {
+            return data + " basic-auth-header=${authorization}"
+        }
+    }
+
     /**
      * Also used by {@link BasicAuthSpec}
      */
@@ -148,8 +174,8 @@ class ClientIntroductionAdviceSpec extends Specification {
     static class BasicAuthController {
 
         @Get
-        String index(@Header String authorization) {
-            authorization
+        String index(BasicAuth basicAuth) {
+            basicAuth.getUsername() + ":" + basicAuth.getPassword()
         }
     }
 
@@ -189,6 +215,12 @@ class ClientIntroductionAdviceSpec extends Specification {
 
         @Get
         String get()
+    }
+
+    @Client(id="test-service", path="/encoded-basic-auth")
+    static interface BasicAuthHeaderAutoEncodingClient {
+        @Post(produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
+        String post(@Body String data, BasicAuth basicAuth)
     }
 
     class MyObject {

@@ -70,7 +70,17 @@ class DependencyVersions implements DependencyManagement {
     @CompileDynamic
     void addDependencyManagement(GPathResult pom) {
         pom.dependencyManagement.dependencies.dependency.each { dep ->
-            addDependency(dep.groupId.text(), dep.artifactId.text(), dep.version.text())
+            String version = dep.version.text()
+            if (version.startsWith('${')) {
+               String property = version[2..-2]
+               def child = pom.getProperty("properties").children().find {
+                   it.name() == property
+               }
+               if (child) {
+                   version = child.text()
+               }
+            }
+            addDependency(dep.groupId.text(), dep.artifactId.text(), version)
         }
     }
 

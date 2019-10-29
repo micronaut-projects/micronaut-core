@@ -28,7 +28,9 @@ import java.util.Map;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use {@link io.micronaut.context.env.CommandLinePropertySource} instead
  */
+@Deprecated
 public class CommandLinePropertySource extends MapPropertySource {
 
     /**

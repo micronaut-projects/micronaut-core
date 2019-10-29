@@ -440,6 +440,22 @@ class HttpHeadSpec extends Specification {
         client.close()
     }
 
+    void "test multiple uris"() {
+        def client = embeddedServer.applicationContext.getBean(MyGetClient)
+
+        when:
+        String val = client.multiple().header("X-Test")
+
+        then:
+        val == "multiple mappings"
+
+        when:
+        val = client.multipleMappings().header("X-Test")
+
+        then:
+        val == "multiple mappings"
+    }
+
     @Controller("/head")
     static class GetController {
 
@@ -517,6 +533,11 @@ class HttpHeadSpec extends Specification {
         String noHead() {
             return "success"
         }
+
+        @Head(uris = ["/multiple", "/multiple/mappings"])
+        HttpResponse multipleMappings() {
+            return HttpResponse.ok().header("X-Test", "multiple mappings")
+        }
     }
 
     static class Book {
@@ -564,6 +585,12 @@ class HttpHeadSpec extends Specification {
 
         @Head("/no-head")
         String noHead()
+
+        @Head("/multiple")
+        HttpResponse multiple()
+
+        @Head("/multiple/mappings")
+        HttpResponse multipleMappings()
     }
 
     @javax.inject.Singleton

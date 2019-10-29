@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Value;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.net.URL;
 import java.util.Optional;
 
 @Singleton
@@ -29,6 +30,9 @@ public class A {
         @Value("${foo.bar}") int port) {
         this.fromConstructor = port;
     }
+
+    @Value("${camelCase.URL}")
+    URL url;
 
     @Value("${foo.bar}")
     Optional<Integer> optionalPort;

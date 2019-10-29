@@ -78,6 +78,12 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotati
 
 |Requires the presence of one of more classpath resources
 |`@Requires(resources="classpath:myFile.properties")`
+
+|Requires the current operating system to be in the list
+|`@Requires(os={Requires.Family.WINDOWS})`
+
+|Requires the current operating system to *not* be in the list
+|`@Requires(notOs={Requires.Family.WINDOWS})`
 |===
 
 === Additional Notes on Property Requirements.

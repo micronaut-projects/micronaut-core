@@ -29,6 +29,7 @@ import javax.inject.Inject
 // tag::class[]
 @MicronautTest
 class HelloControllerSpec {
+
     @Inject
     lateinit var server: EmbeddedServer // <1>
 

@@ -1,12 +1,10 @@
-A Micronaut's controller action consumes `application/json` by default. Nonetheless, you can support other `Content-Type` with the `@Consumes` annotation.
+A Micronaut's controller action consumes `application/json` by default. Consuming other content types is supported with the `@Consumes` annotation, or the `consumes` member of any HTTP method annotation.
 
-[source,java]
-----
-include::{testshttpservernetty}/consumes/TestController.groovy[tags=clazz, indent=0]
-----
+snippet::io.micronaut.docs.server.consumes.ConsumesController[tags="imports,clazz", indent=0]
 
-<1> `@Consumes` annotation takes a `String[]` of supported media types for an incoming request.
-<2> By default, a controller's action consumes request with `Content-Type` of type `application/json`.
+<1> By default, a controller's action consumes request with `Content-Type` of type `application/json`.
+<2> `@Consumes` annotation takes a `String[]` of supported media types for an incoming request.
+<3> The consumes can also be specified with the `consumes` member of the method annotation.
 
 === Customizing Processed Content Types
 

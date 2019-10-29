@@ -39,13 +39,7 @@ TIP: See the section on configuring <<threadPools, Server Thread Pools>> for det
 
 The following example demonstrates how to use this API with Groovy's `SimpleTemplateEngine` to write a server side template:
 
-.Performing Blocking I/O
-[source,java]
-----
-include::{testshttpservernetty}/writable/TemplateController.java[tags=imports, indent=0]
-
-include::{testshttpservernetty}/writable/TemplateController.java[tags=clazz, indent=0]
-----
+snippet::io.micronaut.docs.writable.TemplateController[tags="imports,clazz", indent=0, title="Performing Blocking I/O"]
 
 <1> The controller creates a simple template
 <2> The controller method returns a api:core.io.Writable[]
@@ -57,10 +51,7 @@ Often, you want to respond 404 (Not Found) when you don't find an item in your p
 
 See the following example:
 
-[source,java]
-----
-include::{testshttpservernetty}/respondingnotfound/BooksController.java[tags=clazz]
-----
+snippet::io.micronaut.docs.respondingnotfound.BooksController[tags="clazz", indent=0]
 
 <1> Returning `null` triggers a 404 (Not Found) response.
 <2> Returning an empty `Maybe` triggers a 404 (Not Found) response.

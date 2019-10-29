@@ -18,6 +18,7 @@ package io.micronaut.cli.io.support
 import groovy.transform.InheritConstructors
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
+import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.repository.MavenProfileRepository
 import io.micronaut.cli.util.VersionInfo
 import org.eclipse.aether.graph.Dependency
@@ -29,7 +30,7 @@ import org.eclipse.aether.graph.Dependency
 @InheritConstructors
 class GradleBuildTokens extends BuildTokens {
 
-    Map getTokens(Profile profile, List<Feature> features) {
+    Map getTokens(ProfileRepository profileRepository, Profile profile, List<Feature> features) {
         Map tokens = [:]
         tokens.put("testFramework", testFramework)
         tokens.put("sourceLanguage", sourceLanguage)

@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
@@ -557,6 +558,13 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
             Object[] getValues() {
                 if (arrayType != null) {
+                    for (Object value : values) {
+                        if (value != null) {
+                            if (!arrayType.isInstance(value)) {
+                                return ArrayUtils.EMPTY_OBJECT_ARRAY;
+                            }
+                        }
+                    }
                     return values.toArray((Object[]) Array.newInstance(arrayType, values.size()));
                 } else {
                     return values.toArray(new Object[0]);
