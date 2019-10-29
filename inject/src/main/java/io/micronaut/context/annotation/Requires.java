@@ -16,7 +16,6 @@
 package io.micronaut.context.annotation;
 
 import io.micronaut.context.condition.Condition;
-import io.micronaut.context.condition.OperatingSystem;
 import io.micronaut.context.condition.TrueCondition;
 import io.micronaut.core.annotation.InstantiatedMember;
 
@@ -215,6 +214,9 @@ public @interface Requires {
         MICRONAUT
     }
 
+    /**
+     * Used to express an operation system family.
+     */
     enum Family {
         LINUX, MAC_OS, WINDOWS, SOLARIS, OTHER
     }

@@ -38,7 +38,7 @@ public final class OperatingSystem {
      */
     public static OperatingSystem getCurrent() {
         if (instance == null) {
-            synchronized(OperatingSystem.class) {
+            synchronized (OperatingSystem.class) {
                 if (instance == null) {
                     String osName = System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
                     Family osFamily;

@@ -69,6 +69,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
     default <E extends Enum> E[] enumValues(@Nonnull Class<E> enumType) {
         return enumValues(AnnotationMetadata.VALUE_MEMBER, enumType);
     }
+
     /**
      * The value of the annotation as a Class.
      *
