@@ -1,5 +1,9 @@
 Micronaut {version} includes the following changes:
 
+=== Client Filter Matching By Annotation
+
+Micronaut HTTP clients and client filters can now be matched by the presence of an annotation. Previously only URL matching was supported. See <<_filter_matching_by_annotation,the documentation>> to get started.
+
 === @Requires OS
 
 The ann:context.annotation.Requires[] annotation now has support for disabling beans based on the current operating system.

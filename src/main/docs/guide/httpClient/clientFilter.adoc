@@ -23,7 +23,7 @@ Now, whenever you invoke the `bintrayService.fetchRepositories()` method, the `A
 
 === Filter Matching By Annotation
 
-For cases where a filter should be applied to a client, regardless of the URL, filters can be matched by the presence of an annotation applied to both the filter and the client. Given the following filter:
+For cases where a filter should be applied to a client, regardless of the URL, filters can be matched by the presence of an annotation applied to both the filter and the client. Given the following client:
 
 snippet::io.micronaut.docs.client.filter.BasicAuthClient[tags="class"]
 
