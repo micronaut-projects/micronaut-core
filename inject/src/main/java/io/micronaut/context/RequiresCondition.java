@@ -19,6 +19,7 @@ import groovy.lang.GroovySystem;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
+import io.micronaut.context.condition.OperatingSystem;
 import io.micronaut.context.condition.TrueCondition;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationClassValue;
@@ -70,6 +71,8 @@ public class RequiresCondition implements Condition {
     public static final String MEMBER_ENTITIES = "entities";
     public static final String MEMBER_BEANS = "beans";
     public static final String MEMBER_MISSING_BEANS = "missingBeans";
+    public static final String MEMBER_OS = "os";
+    public static final String MEMBER_NOT_OS = "notOs";
 
     private final AnnotationMetadata annotationMetadata;
 
@@ -176,6 +179,10 @@ public class RequiresCondition implements Condition {
         }
 
         if (!matchesPresenceOfResources(context, requirements)) {
+            return;
+        }
+
+        if (!matchesCurrentOs(context, requirements)) {
             return;
         }
 
@@ -582,6 +589,26 @@ public class RequiresCondition implements Condition {
                     context.fail("Resource [" + resourcePath + "] does not exist");
                     return false;
                 }
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesCurrentOs(ConditionContext context, AnnotationValue<Requires> requirements) {
+        final List<Requires.Family> os = Arrays.asList(requirements.enumValues(MEMBER_OS, Requires.Family.class));
+        Requires.Family currentOs = OperatingSystem.getCurrent().getFamily();
+        if (!os.isEmpty()) {
+            if (!os.contains(currentOs)) {
+                context.fail("The current operating system [" + currentOs.name() + "] is not one of the required systems [" + os + "]");
+                return false;
+            }
+        }
+
+        final List<Requires.Family> notOs = Arrays.asList(requirements.enumValues(MEMBER_NOT_OS, Requires.Family.class));
+        if (!notOs.isEmpty()) {
+            if (notOs.contains(currentOs)) {
+                context.fail("The current operating system [" + currentOs.name() + "] is one of the disallowed systems [" + notOs + "]");
+                return false;
             }
         }
         return true;
