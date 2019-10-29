@@ -132,6 +132,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             if (value instanceof  BigDecimal) {
                 return ((BigDecimal) value).signum() < 0;
             }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() < 0;
+            }
             if (value instanceof Double ||
                 value instanceof Float  ||
                 value instanceof DoubleAdder ||
@@ -149,6 +152,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             }
             if (value instanceof  BigDecimal) {
                 return ((BigDecimal) value).signum() <= 0;
+            }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() <= 0;
             }
             if (value instanceof Double ||
                 value instanceof Float  ||
@@ -168,6 +174,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             if (value instanceof  BigDecimal) {
                 return ((BigDecimal) value).signum() > 0;
             }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() > 0;
+            }
             if (value instanceof Double ||
                 value instanceof Float  ||
                 value instanceof DoubleAdder ||
@@ -185,6 +194,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
             }
             if (value instanceof  BigDecimal) {
                 return ((BigDecimal) value).signum() >= 0;
+            }
+            if (value instanceof BigInteger) {
+                return ((BigInteger) value).signum() >= 0;
             }
             if (value instanceof Double ||
                 value instanceof Float  ||
