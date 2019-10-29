@@ -8,7 +8,8 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 
 import java.security.cert.X509Certificate
 
-class SslTestHandlerSpec extends AbstractMicronautSpec {
+class RequestCertificateSpec extends AbstractMicronautSpec {
+
     void "test certificate extraction"() {
         when:
         def response = rxClient
@@ -36,6 +37,7 @@ class SslTestHandlerSpec extends AbstractMicronautSpec {
 
     @Controller
     static class TestController {
+
         @Get('/ssl')
         String html(HttpRequest<?> request) {
             def cert = request.getCertificate().get() as X509Certificate

@@ -37,7 +37,7 @@ import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
-import io.micronaut.http.server.netty.ssl.SSLCertificateProviderHandler;
+import io.micronaut.http.server.netty.ssl.HttpRequestCertificateHandler;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
@@ -269,6 +269,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 .channel(eventLoopGroupFactory.serverSocketChannelClass())
                 .childHandler(new ChannelInitializer() {
                     final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
+                    final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
                     final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
                     final RoutingInBoundHandler routingHandler = new RoutingInBoundHandler(
                         applicationContext,
@@ -288,9 +289,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         ChannelPipeline pipeline = ch.pipeline();
 
                         int port = ((InetSocketAddress) ch.localAddress()).getPort();
-                        if (sslContext != null && sslConfiguration != null && port == sslConfiguration.getPort()) {
+                        boolean ssl = sslContext != null && sslConfiguration != null && port == sslConfiguration.getPort();
+                        if (ssl) {
                             pipeline.addLast(sslContext.newHandler(ch.alloc()));
-                            pipeline.addLast(new SSLCertificateProviderHandler());
                         }
 
                         if (loggingHandler != null) {
@@ -320,6 +321,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                         pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
                         pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
+                        if (ssl) {
+                            pipeline.addLast(requestCertificateHandler);
+                        }
                         pipeline.addLast(HttpResponseEncoder.ID, responseDecoder);
                         pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
                                 getWebSocketSessionRepository(),
