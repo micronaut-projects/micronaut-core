@@ -12,14 +12,7 @@ In order to do so in a non-blocking manner Micronaut builds on the https://githu
 
 From a developer perspective however, you can generally just work with Plain Old Java Objects (POJOs) and can optionally use a Reactive framework such as RxJava or Reactor. The following is an example of a controller that reads and saves an incoming POJO in a non-blocking way from JSON:
 
-.Using RxJava 2 to Read the JSON
-[source,java]
-----
-include::{testsuite}/server/json/PersonController.java[tags=class, indent=0]
-
-include::{testsuite}/server/json/PersonController.java[tags=single, indent=4]
-}
-----
+snippet::io.micronaut.docs.server.json.PersonController[tags="class,single,endclass", indent=0, title="Using RxJava 2 to Read the JSON"]
 
 <1> The method receives a RxJava rx:Single[] which emits the POJO once the JSON has been read
 <2> The `map` method is used to store the instance in `Map`
@@ -36,24 +29,15 @@ $ curl -X POST localhost:8080/people -d '{"firstName":"Fred","lastName":"Flintst
 
 The same method as the previous example can also be written with the jdk:java.util.concurrent.CompletableFuture[] API instead:
 
-.Using CompletableFuture to Read the JSON
-[source,java]
-----
-include::{testsuite}/server/json/PersonController.java[tags=future, indent=0]
-----
+snippet::io.micronaut.docs.server.json.PersonController[tags="class,future,endclass", indent=0, title="Using CompletableFuture to Read the JSON"]
 
 The above example uses the `thenApply` method to achieve the same as the previous example.
-
 
 == Binding using POJOs
 
 Note however, that if your method does not do any blocking I/O then you can just as easily write:
 
-.Binding JSON POJOs
-[source,java]
-----
-include::{testsuite}/server/json/PersonController.java[tags=regular, indent=0]
-----
+snippet::io.micronaut.docs.server.json.PersonController[tags="class,regular,endclass", indent=0, title="Binding JSON POJOs"]
 
 Micronaut will still using non-blocking I/O to read the JSON and only execute your method once the data has been read.
 
@@ -124,6 +108,7 @@ In addition to configuration, beans can be registered to customize Jackson. All 
 * link:{jackson-databind}com/fasterxml/jackson/databind/Module.html[Module]
 * link:{jackson-databind}com/fasterxml/jackson/databind/JsonDeserializer.html[JsonDeserializer]
 * link:{jackson-databind}com/fasterxml/jackson/databind/JsonSerializer.html[JsonSerializer]
+* link:{jackson-databind}com/fasterxml/jackson/databind/KeyDeserializer.html[KeyDeserializer]
 * link:{jackson-databind}com/fasterxml/jackson/databind/deser/BeanDeserializerModifier.html[BeanDeserializerModifier]
 * link:{jackson-databind}com/fasterxml/jackson/databind/ser/BeanSerializerModifier.html[BeanSerializerModifier]
 

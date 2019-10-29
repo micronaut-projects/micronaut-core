@@ -630,7 +630,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             // this is to ensure that if the post construct method does anything funky to
             // cause recreation of this bean then we don't have a circular problem
             key = new DefaultBeanContext.BeanKey(this, resolutionContext.getCurrentQualifier());
-            defaultContext.singlesInCreation.put(key, bean);
+            resolutionContext.addInFlightBean(key, bean);
         }
         Collection<BeanRegistration<BeanInitializedEventListener>> beanInitializedEventListeners = ((DefaultBeanContext) context).beanInitializedEventListeners;
         if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
@@ -663,7 +663,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 // ensure registration as an inflight bean if a post construct is present
                 // this is to ensure that if the post construct method does anything funky to
                 // cause recreation of this bean then we don't have a circular problem
-                defaultContext.singlesInCreation.remove(key);
+                resolutionContext.removeInFlightBean(key);
             }
         }
     }
@@ -1806,7 +1806,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 return Qualifiers.byType(byType);
             } else {
                 Qualifier qualifier = null;
-                boolean isIterable = isIterable();
+                boolean isIterable = isIterable() || resolutionContext.get(EachProperty.class.getName(), Class.class).map(getBeanType()::equals).orElse(false);
                 if (isIterable) {
                     Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
                             .map(map -> (Qualifier) map.get(argument));

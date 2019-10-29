@@ -189,7 +189,7 @@ public class CollectionUtils {
      */
     public static <T> Set<T> setOf(T... objects) {
         if (objects == null || objects.length == 0) {
-            return Collections.emptySet();
+            return new HashSet<>(0);
         }
         return new HashSet<>(Arrays.asList(objects));
     }

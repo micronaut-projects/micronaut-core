@@ -171,6 +171,17 @@ public class UriTemplate implements Comparable<UriTemplate> {
     }
 
     /**
+     * @return The number of segments that are raw
+     */
+    public int getRawSegmentLength() {
+        return segments.stream()
+                .filter(segment -> !segment.isVariable())
+                .map(CharSequence::length)
+                .reduce(Integer::sum)
+                .orElse(0);
+    }
+
+    /**
      * Nests another URI template with this template.
      *
      * @param uriTemplate The URI template. If it does not begin with forward slash it will automatically be appended with forward slash
@@ -272,11 +283,12 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
         }
 
-        int variableCompare = thisVariableCount.compareTo(thatVariableCount);
-        if (variableCompare == 0) {
-            return thatRawCount.compareTo(thisRawCount);
+        //using that.compareTo because more raw segments should have higher precedence
+        int rawCompare = thatRawCount.compareTo(thisRawCount);
+        if (rawCompare == 0) {
+            return thisVariableCount.compareTo(thatVariableCount);
         } else {
-            return variableCompare;
+            return rawCompare;
         }
     }
 

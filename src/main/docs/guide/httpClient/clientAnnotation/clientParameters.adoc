@@ -6,12 +6,24 @@ The previous example presented a trivial example that uses the parameters of a m
 include::{testsclient}/annotation/PetOperations.java[tags=save, indent=0]
 ----
 
+////
+NOTE: for some weird reason every time I try to replace this with a snippet it creates the following error
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':publishGuide'.
+> org.jruby.exceptions.RaiseException: (TypeError) cannot convert instance of class org.jruby.RubyObject to interface org.asciidoctor.ast.DocumentRuby
+
+I found a closed issue on github that sounds similar https://github.com/asciidoctor/asciidoctorj/issues/267 but not really certain
+////
+
 The `save` method when called will perform an HTTP `POST` with the following JSON by default:
 
 .Example Produced JSON
 [source,json]
 ----
-{"name":"Dino", age:10}
+{"name":"Dino", "age":10}
 ----
 
 You may however want to customize what is sent as the body, the parameters, URI variables and so on. The ann:http.client.annotation.Client[] annotation is very flexible in this regard and supports the same pkg:http.annotation[HTTP Annotations] as Micronaut's HTTP server.
@@ -30,8 +42,7 @@ Single<Pet> save(
 <1> The name parameter, included as part of the URI, and declared `@NotBlank`
 <2> The `pet` parameter, used to encode the body and declared `@Valid`
 
-The following table summarizes the parameter annotations, their purpose and provides an example:
-
+The following table summarizes the parameter annotations, their purpose, and provides an example:
 
 .Parameter Binding Annotations
 |===
@@ -60,5 +71,18 @@ The following table summarizes the parameter annotations, their purpose and prov
 |ann:http.annotation.RequestAttribute[]
 |Allows specifying parameters that should be set as request attributes
 |`@RequestAttribute Integer locationId`
+
+|===
+
+==== Type Based Binding Parameters
+
+Some parameters are recognized by their type instead of their annotation. he following table summarizes the parameter types, their purpose, and provides an example:
+
+|===
+|Type |Description |Example
+
+|api:http.BasicAuth[]
+|Allows binding of basic authorization credentials
+|`BasicAuth basicAuth`
 
 |===
