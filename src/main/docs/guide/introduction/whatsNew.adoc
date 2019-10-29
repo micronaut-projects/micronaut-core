@@ -7,3 +7,7 @@ The ann:context.annotation.Requires[] annotation now has support for disabling b
 === Basic Auth binding support
 
 In the client and server, an argument of type api:http.BasicAuth[] can be used to generate or parse a basic authorization header.
+
+=== Request Certificate
+
+For SSL requests, the certificate is now available as a request attribute. See api:http.HttpRequest#getCertificate--[HttpRequest#getCertificate]
