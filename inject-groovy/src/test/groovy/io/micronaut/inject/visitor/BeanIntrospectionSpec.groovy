@@ -84,6 +84,12 @@ class Test {
 
         then:
         prop.get(test) == 'Fred'
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
     }
 
     void "test write bean introspection with builder style properties"() {
