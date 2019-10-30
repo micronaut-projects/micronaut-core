@@ -229,6 +229,10 @@ public class ModelUtils {
         return element.orElse(null);
     }
 
+    /**
+     * @param classElement The class element
+     * @return True if the element has a non private 0 arg constructor
+     */
     public boolean hasDefaultConstructor(TypeElement classElement) {
         List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
         if (constructors.isEmpty()) {
