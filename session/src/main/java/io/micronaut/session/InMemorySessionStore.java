@@ -15,10 +15,7 @@
  */
 package io.micronaut.session;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Expiry;
-import com.github.benmanes.caffeine.cache.RemovalListener;
+import com.github.benmanes.caffeine.cache.*;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
@@ -31,6 +28,9 @@ import javax.inject.Singleton;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  * Default implementation that stores sessions in-memory.
@@ -118,11 +118,20 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
      * @return The new cache
      */
     protected Cache<String, InMemorySession> newSessionCache(SessionConfiguration configuration) {
-        Caffeine<String, InMemorySession> builder = Caffeine
-            .newBuilder()
-            .removalListener(newRemovalListener())
-            .expireAfter(newExpiry());
+        Caffeine<String, InMemorySession> builder = Caffeine.newBuilder().removalListener(newRemovalListener());
+
+        if (configuration.isPromptExpiration()) {
+            if (configuration.isJdk9plus()) {
+                builder.scheduler(Scheduler.systemScheduler());
+            } else {
+                builder.scheduler(Scheduler.forScheduledExecutorService(configuration.getScheduledExecutorService()));
+            }
+            builder.expireAfterWrite(configuration.getExpiryWait(), MILLISECONDS);
+        } else {
+            builder.expireAfter(newExpiry());
+        }
         configuration.getMaxActiveSessions().ifPresent(builder::maximumSize);
+
         return builder.build();
     }
 

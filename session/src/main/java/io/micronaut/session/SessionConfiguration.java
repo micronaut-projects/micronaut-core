@@ -16,9 +16,13 @@
 package io.micronaut.session;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.scheduling.TaskExecutors;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import java.time.Duration;
 import java.util.OptionalInt;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * <p>Base configuration properties for session handling.</p>
@@ -30,6 +34,11 @@ import java.util.OptionalInt;
 public class SessionConfiguration {
 
     /**
+     * Injected Executor Service to enable scheduled expiration of session
+     */
+    @Inject @Named(TaskExecutors.SCHEDULED) private ScheduledExecutorService scheduledExecutorService;
+
+    /**
      * The default max inactive interval in seconds.
      */
     @SuppressWarnings("WeakerAccess")
@@ -37,6 +46,9 @@ public class SessionConfiguration {
 
     private Duration maxInactiveInterval = Duration.ofMinutes(DEFAULT_MAXINACTIVEINTERVAL_SECONDS);
     private Integer maxActiveSessions;
+    private Integer expiryWait = 0;
+    private boolean promptExpiration = false;
+    private boolean jdk9plus = false;
 
     /**
      * @return The maximum number of active sessions
@@ -70,5 +82,37 @@ public class SessionConfiguration {
         if (maxInactiveInterval != null) {
             this.maxInactiveInterval = maxInactiveInterval;
         }
+    }
+
+    public boolean isPromptExpiration() {
+        return promptExpiration;
+    }
+
+    public void setPromptExpiration(boolean promptExpiration) {
+        this.promptExpiration = promptExpiration;
+    }
+
+    public boolean isJdk9plus() {
+        return jdk9plus;
+    }
+
+    public void setJdk9plus(boolean jdk9plus) {
+        this.jdk9plus = jdk9plus;
+    }
+
+    public Integer getExpiryWait() {
+        return expiryWait;
+    }
+
+    public void setExpiryWait(Integer expiryWait) {
+        this.expiryWait = expiryWait;
+    }
+
+    public ScheduledExecutorService getScheduledExecutorService() {
+        return scheduledExecutorService;
+    }
+
+    public void setScheduledExecutorService(ScheduledExecutorService scheduledExecutorService) {
+        this.scheduledExecutorService = scheduledExecutorService;
     }
 }
