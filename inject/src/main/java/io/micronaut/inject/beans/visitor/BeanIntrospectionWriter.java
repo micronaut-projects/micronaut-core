@@ -16,8 +16,6 @@
 
 package io.micronaut.inject.beans.visitor;
 
-import io.micronaut.context.ExecutionHandleLocator;
-import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -80,6 +78,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * Default constructor.
      * @param className The class name
      * @param beanAnnotationMetadata The bean annotation metadata
+     * @param hasDefaultConstructor Whether the class has a default constructor
      */
     BeanIntrospectionWriter(String className, AnnotationMetadata beanAnnotationMetadata, boolean hasDefaultConstructor) {
         super(computeReferenceName(className), beanAnnotationMetadata, true);
@@ -97,6 +96,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param index A unique index
      * @param className The class name
      * @param beanAnnotationMetadata The bean annotation metadata
+     * @param hasDefaultConstructor Whether the class has a default constructor
      */
     BeanIntrospectionWriter(String generatingType, int index, String className, AnnotationMetadata beanAnnotationMetadata, boolean hasDefaultConstructor) {
         super(computeReferenceName(generatingType) + index, beanAnnotationMetadata, true);
