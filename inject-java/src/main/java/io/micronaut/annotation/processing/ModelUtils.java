@@ -229,6 +229,14 @@ public class ModelUtils {
         return element.orElse(null);
     }
 
+    public boolean hasDefaultConstructor(TypeElement classElement) {
+        List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
+        if (constructors.isEmpty()) {
+            return false;
+        }
+        return constructors.stream().anyMatch(ctor -> ctor.getParameters().isEmpty());
+    }
+
     /**
      * @param classElement The {@link TypeElement}
      * @return A list of {@link ExecutableElement}

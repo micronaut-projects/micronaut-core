@@ -66,7 +66,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
      * Instantiates an instance of the bean, throwing an exception is instantiation is not possible.
      *
      * @return An instance
-     * @throws InstantiationException If the bean cannot be insantiated or the arguments are not satisfied.
+     * @throws InstantiationException If the bean cannot be instantiated or the arguments are not satisfied.
      */
     @Nonnull T instantiate() throws InstantiationException;
 
