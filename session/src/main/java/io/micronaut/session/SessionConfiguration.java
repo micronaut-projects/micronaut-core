@@ -44,10 +44,10 @@ public class SessionConfiguration {
     private boolean promptExpiration = false;
     private ExecutorService executorService;
 
-    public void SessionConfiguration() { }
-
     /**
-     * Injected Executor Service to enable scheduled expiration of session
+     * Injected Executor Service to enable scheduled expiration of session.
+     *
+     * @param executorService inject the executorService
      */
     @Inject
     public void SessionConfiguration(@Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
@@ -89,14 +89,14 @@ public class SessionConfiguration {
     }
 
     /**
-     * @return if prompt expiration is enabled
+     * @return if prompt expiration is enabled.
      */
     public boolean isPromptExpiration() {
         return promptExpiration;
     }
 
     /**
-     * Set if prompt expiration is enabled
+     * Set if prompt expiration is enabled.
      *
      * @param promptExpiration if prompt expiration is enabled / disabled
      */
@@ -112,7 +112,7 @@ public class SessionConfiguration {
     }
 
     /**
-     * Set the executor service
+     * Set the executor service.
      *
      * @param executorService The executorService
      */
