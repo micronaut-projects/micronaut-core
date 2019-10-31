@@ -28,6 +28,7 @@ import javax.inject.Singleton;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -121,15 +122,10 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
         Caffeine<String, InMemorySession> builder = Caffeine.newBuilder().removalListener(newRemovalListener());
 
         if (configuration.isPromptExpiration()) {
-            if (configuration.isJdk9plus()) {
-                builder.scheduler(Scheduler.systemScheduler());
-            } else {
-                builder.scheduler(Scheduler.forScheduledExecutorService(configuration.getScheduledExecutorService()));
-            }
-            builder.expireAfterWrite(configuration.getExpiryWait(), MILLISECONDS);
-        } else {
-            builder.expireAfter(newExpiry());
+            builder.scheduler(Scheduler.forScheduledExecutorService((ScheduledExecutorService) configuration.getExecutorService()));
         }
+
+        builder.expireAfter(newExpiry());
         configuration.getMaxActiveSessions().ifPresent(builder::maximumSize);
 
         return builder.build();
