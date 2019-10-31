@@ -35,7 +35,11 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.*;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.PathMatcher;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -43,7 +47,11 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.client.exceptions.*;
+import io.micronaut.http.client.exceptions.ContentLengthExceededException;
+import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
+import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.filters.ClientServerContextFilter;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.sse.RxSseClient;
@@ -118,8 +126,14 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.*;
+import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.Proxy;
 import java.net.Proxy.Type;
+import java.net.SocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -1739,15 +1753,41 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         ).asNativeBuffer();
     }
 
-    private String getHostHeader(URI requestURI) {
-        StringBuilder host = new StringBuilder(requestURI.getHost());
-        int port = requestURI.getPort();
+    private String getHostHeader(URI uri) {
+        String hostOrAuthority = getHostOrAuthority(uri);
+        int port;
+        if (hostOrAuthority == null) {
+            throw new HttpClientException("URI specifies no host to connect to");
+        }
+        final int i = hostOrAuthority.indexOf(':');
+        if (i > -1) {
+            final String portStr = hostOrAuthority.substring(i + 1);
+            hostOrAuthority = hostOrAuthority.substring(0, i);
+            try {
+                port = Integer.parseInt(portStr);
+            } catch (NumberFormatException e) {
+                throw new HttpClientException("URI specifies an invalid port: " + portStr);
+            }
+        } else {
+            port = uri.getPort() > -1 ? uri.getPort() : DEFAULT_HTTP_PORT;
+        }
+        StringBuilder host = new StringBuilder(hostOrAuthority);
         if (port > -1) {
             if (port != 80 && port != 443) {
                 host.append(":").append(port);
             }
         }
         return host.toString();
+    }
+
+    private String getHostOrAuthority(URI requestURI) {
+        String host = null;
+        if (requestURI != null && StringUtils.isNotEmpty(requestURI.getHost())) {
+            host = requestURI.getHost();
+        } else if (requestURI != null && StringUtils.isNotEmpty(requestURI.getAuthority())) {
+            host = requestURI.getAuthority();
+        }
+        return host;
     }
 
     private <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody, boolean closeConnection) {
