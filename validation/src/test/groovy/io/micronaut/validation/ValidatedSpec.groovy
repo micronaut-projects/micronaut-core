@@ -225,6 +225,36 @@ class ValidatedSpec extends Specification {
         server.close()
     }
 
+    void "test validated controller with non introspected pojo"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'spec.name': getClass().simpleName
+        ])
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(
+                HttpRequest.POST("/validated/no-introspection", '{"email":"a@a.com","name":"Micronaut"}')
+                        .contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE),
+                String
+        )
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
+
+        when:
+        def result = new JsonSlurper().parseText((String) e.response.getBody().get())
+
+        then:
+        result.message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present'
+
+        cleanup:
+        server.close()
+    }
+
     @Client("/validated/tests")
     static interface TestClient {
         @Get(value = "/test1/{value}", produces = MediaType.TEXT_PLAIN)

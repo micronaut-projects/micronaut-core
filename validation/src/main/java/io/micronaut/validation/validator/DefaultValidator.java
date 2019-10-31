@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -908,6 +909,17 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
                     validatePojoInternal(rootClass, object, argumentValues, context, overallViolations, parameterType, parameterValue, pojoConstraint, introspection.getAnnotation(pojoConstraint));
                 }
+            } else {
+                String messageTemplate = "{" + Introspected.class.getName() + ".message}";
+                overallViolations.add(new DefaultConstraintViolation(
+                        object,
+                        rootClass,
+                        null,
+                        parameterValue,
+                        messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
+                        messageTemplate,
+                        new PathImpl(context.currentPath),
+                        argumentValues));
             }
         } finally {
             context.removeLast();
