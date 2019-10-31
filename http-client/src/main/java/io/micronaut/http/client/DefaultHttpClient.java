@@ -1781,13 +1781,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     private String getHostOrAuthority(URI requestURI) {
-        String host = null;
-        if (requestURI != null && StringUtils.isNotEmpty(requestURI.getHost())) {
-            host = requestURI.getHost();
-        } else if (requestURI != null && StringUtils.isNotEmpty(requestURI.getAuthority())) {
-            host = requestURI.getAuthority();
-        }
-        return host;
+        return requestURI != null ? Optional.ofNullable(requestURI.getHost()).orElse(requestURI.getAuthority()) : null;
     }
 
     private <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody, boolean closeConnection) {
