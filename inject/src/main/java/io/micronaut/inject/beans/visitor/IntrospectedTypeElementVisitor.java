@@ -109,7 +109,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                                     element.getName(),
                                     index.getAndIncrement(),
                                     ce.getName(),
-                                    metadata ? element.getAnnotationMetadata() : null
+                                    metadata ? element.getAnnotationMetadata() : null,
+                                    ce.hasDefaultConstructor()
                             );
 
                             processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, ce, writer);
@@ -133,7 +134,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                                     element.getName(),
                                     j++,
                                     classElement.getName(),
-                                    metadata ? element.getAnnotationMetadata() : null
+                                    metadata ? element.getAnnotationMetadata() : null,
+                                    classElement.hasDefaultConstructor()
                             );
 
                             processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, classElement, writer);
@@ -144,7 +146,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
 
                 final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                         element.getName(),
-                        metadata ? element.getAnnotationMetadata() : null
+                        metadata ? element.getAnnotationMetadata() : null,
+                        element.hasDefaultConstructor()
                 );
 
                 processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, element, writer);
@@ -182,7 +185,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
     }
 
     private void process(
-            ConstructorElement constructorElement, 
+            ConstructorElement constructorElement,
             BeanIntrospectionWriter writer,
             List<PropertyElement> beanProperties,
             Set<String> includes,

@@ -21,6 +21,7 @@ import io.micronaut.ast.groovy.utils.AstClassUtils;
 import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -97,6 +98,16 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
             final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, constructorNode);
             return new GroovyConstructorElement(this, sourceUnit, constructorNode, annotationMetadata);
         });
+    }
+
+    @Override
+    public boolean hasDefaultConstructor() {
+        List<ConstructorNode> constructors = classNode.getDeclaredConstructors();
+        if (CollectionUtils.isEmpty(constructors)) {
+            return true; // Groovy has implicit default constructor
+        }
+        List<ConstructorNode> nonPrivateConstructors = findNonPrivateConstructors(constructors);
+        return nonPrivateConstructors.stream().anyMatch(ctor -> ctor.getParameters().length == 0);
     }
 
     /**
@@ -430,7 +441,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         if (nonPrivateConstructors.size() == 1) {
             constructorNode = nonPrivateConstructors.get(0);
         } else {
-            constructorNode = nonPrivateConstructors.stream().filter(cn -> !cn.getAnnotations(makeCached(Inject.class)).isEmpty()).findFirst().orElse(null);
+            constructorNode = nonPrivateConstructors.stream().filter(cn ->
+                    !cn.getAnnotations(makeCached(Inject.class)).isEmpty() ||
+                            !cn.getAnnotations(makeCached(Creator.class)).isEmpty()).findFirst().orElse(null);
             if (constructorNode == null) {
                 constructorNode = nonPrivateConstructors.stream().filter(cn -> Modifier.isPublic(cn.getModifiers())).findFirst().orElse(null);
             }

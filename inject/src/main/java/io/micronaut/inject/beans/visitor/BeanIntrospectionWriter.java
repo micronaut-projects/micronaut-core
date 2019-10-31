@@ -24,6 +24,7 @@ import io.micronaut.core.beans.BeanIntrospectionReference;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -68,6 +69,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final ClassWriter introspectionWriter;
     private final List<BeanPropertyWriter> propertyDefinitions = new ArrayList<>();
     private final Map<String, Collection<AnnotationValueIndex>> indexes = new HashMap<>(2);
+    private final boolean hasDefaultConstructor;
     private int propertyIndex = 0;
     private ParameterElement[] constructorArguments;
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
@@ -76,9 +78,11 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * Default constructor.
      * @param className The class name
      * @param beanAnnotationMetadata The bean annotation metadata
+     * @param hasDefaultConstructor Whether the class has a default constructor
      */
-    BeanIntrospectionWriter(String className, AnnotationMetadata beanAnnotationMetadata) {
+    BeanIntrospectionWriter(String className, AnnotationMetadata beanAnnotationMetadata, boolean hasDefaultConstructor) {
         super(computeReferenceName(className), beanAnnotationMetadata, true);
+        this.hasDefaultConstructor = hasDefaultConstructor;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         this.introspectionWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         this.introspectionName = computeIntrospectionName(className);
@@ -92,9 +96,11 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param index A unique index
      * @param className The class name
      * @param beanAnnotationMetadata The bean annotation metadata
+     * @param hasDefaultConstructor Whether the class has a default constructor
      */
-    BeanIntrospectionWriter(String generatingType, int index, String className, AnnotationMetadata beanAnnotationMetadata) {
+    BeanIntrospectionWriter(String generatingType, int index, String className, AnnotationMetadata beanAnnotationMetadata, boolean hasDefaultConstructor) {
         super(computeReferenceName(generatingType) + index, beanAnnotationMetadata, true);
+        this.hasDefaultConstructor = hasDefaultConstructor;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         this.introspectionWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         this.introspectionName = computeIntrospectionName(className);
@@ -321,10 +327,26 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     private void writeInstantiateMethod() {
         final GeneratorAdapter instantiateMethod = startPublicMethod(introspectionWriter, "instantiate", Object.class.getName());
-        pushNewInstance(instantiateMethod, beanType);
-        instantiateMethod.visitInsn(ARETURN);
-        instantiateMethod.visitMaxs(2, 1);
-        instantiateMethod.visitEnd();
+        if (hasDefaultConstructor) {
+            pushNewInstance(instantiateMethod, beanType);
+            instantiateMethod.visitInsn(ARETURN);
+            instantiateMethod.visitMaxs(2, 1);
+            instantiateMethod.visitEnd();
+        } else {
+            Type exceptionType = Type.getType(InstantiationException.class);
+            instantiateMethod.newInstance(exceptionType);
+            instantiateMethod.dup();
+            instantiateMethod.visitLdcInsn("No default constructor exists");
+            instantiateMethod.invokeConstructor(exceptionType, Method.getMethod(
+                    ReflectionUtils.getRequiredInternalConstructor(
+                            InstantiationException.class,
+                            String.class
+                    )
+            ));
+            instantiateMethod.throwException();
+            instantiateMethod.visitMaxs(3, 1);
+            instantiateMethod.visitEnd();
+        }
     }
 
     private void writeIntrospectionReference(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {

@@ -57,6 +57,13 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * @return True if the class has a non private constructor with no arguments.
+     */
+    default boolean hasDefaultConstructor() {
+        return false;
+    }
+
+    /**
      * Returns the super type of this element or empty if the element has no super type.
      *
      * @return An optional of the super type
