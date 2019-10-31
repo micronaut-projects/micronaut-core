@@ -371,6 +371,11 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
+    public boolean hasDefaultConstructor() {
+        return visitorContext.getModelUtils().hasDefaultConstructor(classElement);
+    }
+
+    @Override
     public @Nonnull
     Map<String, ClassElement> getTypeArguments() {
         List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();

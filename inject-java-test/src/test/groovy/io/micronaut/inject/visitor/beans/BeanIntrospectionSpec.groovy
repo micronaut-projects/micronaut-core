@@ -212,6 +212,12 @@ class Book {
         introspection.hasAnnotation(Introspected)
         introspection.propertyNames.length == 1
 
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+
         when: "update introspectionMap"
         BeanIntrospector introspector = BeanIntrospector.SHARED
         Field introspectionMapField = introspector.getClass().getDeclaredField("introspectionMap")

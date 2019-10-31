@@ -47,7 +47,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     @Override
     public Optional<byte[]> serialize(Object object) throws SerializationException {
         try {
-            return Optional.of(objectMapper.writeValueAsBytes(object));
+            return Optional.ofNullable(objectMapper.writeValueAsBytes(object));
         } catch (JsonProcessingException e) {
             throw new SerializationException("Error serializing object to JSON: " + e.getMessage(), e);
         }
@@ -65,7 +65,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     @Override
     public <T> Optional<T> deserialize(byte[] bytes, Class<T> requiredType) throws SerializationException {
         try {
-            return Optional.of(objectMapper.readValue(bytes, requiredType));
+            return Optional.ofNullable(objectMapper.readValue(bytes, requiredType));
         } catch (IOException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
@@ -74,7 +74,7 @@ public class JacksonObjectSerializer implements ObjectSerializer {
     @Override
     public <T> Optional<T> deserialize(InputStream inputStream, Class<T> requiredType) throws SerializationException {
         try {
-            return Optional.of(objectMapper.readValue(inputStream, requiredType));
+            return Optional.ofNullable(objectMapper.readValue(inputStream, requiredType));
         } catch (IOException e) {
             throw new SerializationException("Error deserializing object from JSON: " + e.getMessage(), e);
         }
