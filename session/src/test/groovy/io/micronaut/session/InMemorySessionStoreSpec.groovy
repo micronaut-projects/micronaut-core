@@ -16,6 +16,7 @@
 package io.micronaut.session
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.session.event.AbstractSessionEvent
 import io.micronaut.session.event.SessionCreatedEvent
@@ -95,6 +96,53 @@ class InMemorySessionStoreSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 5, initialDelay: 2)
 
         then:
+        conditions.eventually {
+            !sessionStore.findSession(id).get().isPresent()
+            listener.events.any { it instanceof SessionExpiredEvent }
+        }
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test session prompt expiration"() {
+        when:
+        //expire in 1 second
+        ApplicationContext applicationContext = ApplicationContext.run(['micronaut.session.promptExpiration': true])
+        SessionStore sessionStore = applicationContext.getBean(SessionStore)
+        TestListener listener = applicationContext.getBean(TestListener)
+        Session session = sessionStore.newSession()
+
+        session.put("foo", "bar")
+        sessionStore.save(session)
+        String id = session.id
+
+        then:
+        session != null
+        session.id
+        !session.expired
+        session.creationTime
+        session.lastAccessedTime
+
+        when:
+        sessionStore.save(session)
+        def lastAccessedTime = session.lastAccessedTime
+
+        then:
+        listener.events.size() == 1
+        listener.events[0] instanceof SessionCreatedEvent
+
+        when:
+        session == sessionStore.findSession(session.id).get().get()
+        def conditions = new PollingConditions(timeout: 10)
+
+        then:
+        conditions.eventually {
+            session.lastAccessedTime > lastAccessedTime
+            session.get("foo").isPresent()
+            session.get("foo").get() == "bar"
+        }
+
         conditions.eventually {
             !sessionStore.findSession(id).get().isPresent()
             listener.events.any { it instanceof SessionExpiredEvent }
