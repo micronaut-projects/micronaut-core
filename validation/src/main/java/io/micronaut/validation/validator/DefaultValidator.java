@@ -722,6 +722,19 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                 } finally {
                                     context.removeLast();
                                 }
+                            } else {
+                                context.addParameterNode(argument.getName(), i);
+                                String messageTemplate = "{" + Introspected.class.getName() + ".message}";
+                                overallViolations.add(new DefaultConstraintViolation(
+                                        object,
+                                        rootClass,
+                                        null,
+                                        parameterValue,
+                                        messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
+                                        messageTemplate,
+                                        new PathImpl(context.currentPath),
+                                        argumentValues));
+                                context.removeLast();
                             }
                         }
                     }
@@ -909,17 +922,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 for (Class<? extends Annotation> pojoConstraint : pojoConstraints) {
                     validatePojoInternal(rootClass, object, argumentValues, context, overallViolations, parameterType, parameterValue, pojoConstraint, introspection.getAnnotation(pojoConstraint));
                 }
-            } else {
-                String messageTemplate = "{" + Introspected.class.getName() + ".message}";
-                overallViolations.add(new DefaultConstraintViolation(
-                        object,
-                        rootClass,
-                        null,
-                        parameterValue,
-                        messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
-                        messageTemplate,
-                        new PathImpl(context.currentPath),
-                        argumentValues));
             }
         } finally {
             context.removeLast();
