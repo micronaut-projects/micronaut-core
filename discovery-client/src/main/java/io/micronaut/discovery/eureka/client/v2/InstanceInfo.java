@@ -16,7 +16,6 @@
 package io.micronaut.discovery.eureka.client.v2;
 
 import com.fasterxml.jackson.annotation.*;
-import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.StringUtils;
 
