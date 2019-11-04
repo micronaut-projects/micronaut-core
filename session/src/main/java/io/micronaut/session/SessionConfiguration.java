@@ -18,11 +18,15 @@ package io.micronaut.session;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.scheduling.TaskExecutors;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Provider;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * <p>Base configuration properties for session handling.</p>
@@ -48,17 +52,7 @@ public class SessionConfiguration {
     private Duration maxInactiveInterval = Duration.ofMinutes(DEFAULT_MAXINACTIVEINTERVAL_MINUTES);
     private Integer maxActiveSessions;
     private boolean promptExpiration = false;
-    private ExecutorService executorService;
-
-    /**
-     * Injected Executor Service to enable scheduled expiration of session.
-     *
-     * @param executorService inject the executorService
-     */
-    @Inject
-    public void SessionConfiguration(@Named(TaskExecutors.SCHEDULED) ExecutorService executorService) {
-        this.executorService = executorService;
-    }
+    private Provider<ExecutorService> executorService;
 
     /**
      * @return The maximum number of active sessions
@@ -113,8 +107,11 @@ public class SessionConfiguration {
     /**
      * @return The injected executor service
      */
-    public ExecutorService getExecutorService() {
-        return executorService;
+    public Optional<ScheduledExecutorService> getExecutorService() {
+        return Optional.ofNullable(executorService)
+                .map(Provider::get)
+                .filter(ScheduledExecutorService.class::isInstance)
+                .map(ScheduledExecutorService.class::cast);
     }
 
     /**
@@ -122,7 +119,8 @@ public class SessionConfiguration {
      *
      * @param executorService The executorService
      */
-    public void setExecutorService(ExecutorService executorService) {
+    @Inject
+    public void setExecutorService(@Nullable @Named(TaskExecutors.SCHEDULED) Provider<ExecutorService> executorService) {
         this.executorService = executorService;
     }
 }
