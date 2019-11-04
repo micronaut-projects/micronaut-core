@@ -120,7 +120,7 @@ In previous versions of Micronaut, the property sources for an active environmen
 
 This version includes a new `/env` endpoint with information about the environment and its property sources See the <<environmentEndpoint, documentation>> for more information.
 
-== RSS 2.0 Module Included in BOM
+=== RSS 2.0 Module Included in BOM
 
 This version references the https://micronaut-projects.github.io/micronaut-rss/latest/guide/index.html[RSS configuration] which eases the generation of a RSS 2.0 feeds in a Micronaut app.
 
