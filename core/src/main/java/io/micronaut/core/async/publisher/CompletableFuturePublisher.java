@@ -72,23 +72,27 @@ class CompletableFuturePublisher<T> implements Publisher<T> {
                     IllegalArgumentException ex = new IllegalArgumentException("Cannot request a negative number");
                     subscriber.onError(ex);
                 } else {
-                    CompletableFuture<T> future = futureSupplier.get();
-                    if (future == null) {
-                        subscriber.onComplete();
-                    } else {
-                        this.future = future;
-                        future.whenComplete((s, throwable) -> {
-                            if (completed.compareAndSet(false, true)) {
-                                if (throwable != null) {
-                                    subscriber.onError(throwable);
-                                } else {
-                                    if (s != null) {
-                                        subscriber.onNext(s);
+                    try {
+                        CompletableFuture<T> future = futureSupplier.get();
+                        if (future == null) {
+                            subscriber.onComplete();
+                        } else {
+                            this.future = future;
+                            future.whenComplete((s, throwable) -> {
+                                if (completed.compareAndSet(false, true)) {
+                                    if (throwable != null) {
+                                        subscriber.onError(throwable);
+                                    } else {
+                                        if (s != null) {
+                                            subscriber.onNext(s);
+                                        }
+                                        subscriber.onComplete();
                                     }
-                                    subscriber.onComplete();
                                 }
-                            }
-                        });
+                            });
+                        }
+                    } catch (Throwable e) {
+                        subscriber.onError(e);
                     }
                 }
             }

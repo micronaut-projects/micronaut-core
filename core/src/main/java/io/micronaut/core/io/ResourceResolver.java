@@ -39,14 +39,14 @@ public class ResourceResolver {
     private final List<ResourceLoader> resourceLoaders;
 
     /**
-     * @param resourceLoaders The resouce loaders
+     * @param resourceLoaders The resource loaders
      */
     public ResourceResolver(@Nonnull ResourceLoader[] resourceLoaders) {
         this(Arrays.asList(resourceLoaders));
     }
 
     /**
-     * @param resourceLoaders The resouce loaders
+     * @param resourceLoaders The resource loaders
      */
     public ResourceResolver(@Nonnull List<ResourceLoader> resourceLoaders) {
         ArgumentUtils.requireNonNull("resourceLoaders", resourceLoaders);

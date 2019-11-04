@@ -78,6 +78,12 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotati
 
 |Requires the presence of one of more classpath resources
 |`@Requires(resources="classpath:myFile.properties")`
+
+|Requires the current operating system to be in the list
+|`@Requires(os={Requires.Family.WINDOWS})`
+
+|Requires the current operating system to *not* be in the list
+|`@Requires(notOs={Requires.Family.WINDOWS})`
 |===
 
 === Additional Notes on Property Requirements.
@@ -92,7 +98,7 @@ Adding a requirement on a property has some additional functionality. You can re
 @Requires(property="foo", notEquals="Sally") //<4>
 ----
 
-<1> Requires the property to be "yes", "YES", "true", "TRUE", "y" or "Y"
+<1> Requires the property to be set
 <2> Requires the property to be "John"
 <3> Requires the property to be "John" or not set
 <4> Requires the property to not be "Sally" or not set

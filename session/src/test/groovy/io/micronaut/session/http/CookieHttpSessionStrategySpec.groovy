@@ -55,12 +55,12 @@ class CookieHttpSessionStrategySpec extends Specification {
     }
 
     void "test encode default cookie config"() {
-
         given:
         def configuration = new HttpSessionConfiguration()
         if (domain) configuration.domainName = domain
         if (path) configuration.cookiePath = path
         if (prefix) configuration.prefix = prefix
+        configuration.cookieSecure = configSecure
         CookieHttpSessionStrategy strategy = new CookieHttpSessionStrategy(configuration)
 
         def request = Mock(HttpRequest)
@@ -78,15 +78,17 @@ class CookieHttpSessionStrategySpec extends Specification {
         expected instanceof Pattern ? expected.matcher(header).find() : header == expected
 
 
-
         where:
-        id     | prefix | path   | domain        | encoded             | expired | secure | expected
-        "1234" | null   | null   | null          | encode(id)          | false   | false  | "SESSION=$encoded; Path=/; HTTPOnly"
-        "1234" | "foo-" | null   | null          | encode(prefix + id) | false   | false  | "SESSION=$encoded; Path=/; HTTPOnly"
-        "1234" | null   | "/foo" | null          | encode(id)          | false   | false  | "SESSION=$encoded; Path=/foo; HTTPOnly"
-        "1234" | null   | null   | "example.com" | encode(id)          | false   | false  | "SESSION=$encoded; Path=/; Domain=example.com; HTTPOnly"
-        "1234" | null   | null   | null          | encode(id)          | true    | false  | ~/SESSION=; Max-Age=0; Expires=.*; Path=\/; HTTPOnly/
-        "1234" | null   | null   | null          | encode(id)          | false   | true   | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
+        id     | prefix | path   | domain        | encoded             | expired | secure | configSecure | expected
+        "1234" | null   | null   | null          | encode(id)          | false   | false  | true         | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | false   | false  | false        | "SESSION=$encoded; Path=/; HTTPOnly"
+        "1234" | "foo-" | null   | null          | encode(prefix + id) | false   | false  | false        | "SESSION=$encoded; Path=/; HTTPOnly"
+        "1234" | null   | "/foo" | null          | encode(id)          | false   | false  | false        | "SESSION=$encoded; Path=/foo; HTTPOnly"
+        "1234" | null   | null   | "example.com" | encode(id)          | false   | false  | false        | "SESSION=$encoded; Path=/; Domain=example.com; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | true    | false  | false        | ~/SESSION=; Max-Age=0; Expires=.*; Path=\/; HTTPOnly/
+        "1234" | null   | null   | null          | encode(id)          | false   | true   | false        | "SESSION=$encoded; Path=/; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | false   | true   | true         | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | false   | true   | null         | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
 
     }
 

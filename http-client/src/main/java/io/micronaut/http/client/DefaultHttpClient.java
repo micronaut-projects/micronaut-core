@@ -844,7 +844,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         .map((Function<HttpContent, io.micronaut.http.HttpResponse<ByteBuffer<?>>>) message -> {
                     ByteBuf byteBuf = message.content();
                     if (log.isTraceEnabled()) {
-                        log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}", byteBuf.readableBytes(), request.getMethod(), request.getUri());
+                        log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
+                                byteBuf.readableBytes(), request.getMethodName(), request.getUri());
                         traceBody("Response", byteBuf);
                     }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
@@ -889,7 +890,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         httpContentFlowable.map(content -> {
                             ByteBuf chunk = content.content();
                             if (log.isTraceEnabled()) {
-                                log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}", chunk.readableBytes(), request.getMethod(), request.getUri());
+                                log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
+                                        chunk.readableBytes(), request.getMethodName(), request.getUri());
                                 traceBody("Chunk", chunk);
                             }
                             try {
@@ -1975,7 +1977,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             message = cause.getClass().getSimpleName();
                         }
                         if (log.isTraceEnabled()) {
-                            log.trace("HTTP Client exception ({}) occurred for request : {} {}", message, request.getMethod(), request.getUri());
+                            log.trace("HTTP Client exception ({}) occurred for request : {} {}",
+                                    message, request.getMethodName(), request.getUri());
                         }
 
                         if (cause instanceof TooLongFrameException) {

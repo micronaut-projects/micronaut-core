@@ -1,7 +1,8 @@
 package io.micronaut.docs.basics
 
-// tag::imports[]
+import io.micronaut.context.annotation.Requires
 
+// tag::imports[]
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.*
@@ -10,9 +11,9 @@ import io.micronaut.http.client.annotation.Client
 import io.reactivex.Maybe
 
 import io.micronaut.http.HttpRequest.GET
-
 // end::imports[]
 
+@Requires(property = "spec.name", value = "HelloControllerSpec")
 @Controller("/")
 class HelloController(@param:Client("/endpoint") private val httpClient: RxHttpClient) {
 

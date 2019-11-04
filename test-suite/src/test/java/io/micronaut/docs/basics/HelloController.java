@@ -1,5 +1,6 @@
 package io.micronaut.docs.basics;
 
+import io.micronaut.context.annotation.Requires;
 // tag::imports[]
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -11,6 +12,7 @@ import io.reactivex.Maybe;
 import static io.micronaut.http.HttpRequest.GET;
 // end::imports[]
 
+@Requires(property = "spec.name", value = "HelloControllerSpec")
 @Controller("/")
 public class HelloController {
 

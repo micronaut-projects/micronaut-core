@@ -30,6 +30,12 @@ Note for more complex configurations you can structure ann:context.annotation.Co
 
 For example creating a subclass of `EngineConfig` with `@ConfigurationProperties('bar')` will resolve all properties under the path `my.engine.bar`.
 
+== Includes / Excludes
+
+For the cases where the configuration properties class is inheriting properties from a parent class, it may be desirable to exclude properties from the parent class. The `includes` and `excludes` members of the ann:io.micronaut.context.annotation.ConfigurationProperties[] annotation allow for that functionality. The list applies to both local properties and inherited properties.
+
+The names supplied to the includes/excludes list should be the "property" name. For example if a setter method is injected, the property name is the de-capitalized setter name (`setConnectionTimeout` -> `connectionTimeout`).
+
 == Property Type Conversion
 
 When resolving properties Micronaut will use the api:io.micronaut.core.convert.ConversionService[] bean to convert properties. You can register additional converters for types not supported by micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
@@ -149,7 +155,7 @@ The ann:io.micronaut.core.convert.format.Format[] annotation can be used on any 
 .Using `@Format` for Dates
 [source,java]
 ----
-public void setMyDate(@Format("yy-mm-dd") LocalDate date) {
+public void setMyDate(@Format("yyyy-MM-dd") LocalDate date) {
     this.myDate = date;
 }
 ----

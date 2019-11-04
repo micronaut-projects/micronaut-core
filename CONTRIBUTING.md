@@ -2,7 +2,7 @@
 
 ## Finding Issues to Work on
 
-If you are interested in contributing to Micronaut and are looking for issues to work on, take a look at the issues tagged with [help wanted](https://github.com/micronaut-projects/micronaut-core/issues?q=is%3Aopen+is%3Aissue+label%3A%22status%3A+help+wanted%22).
+If you are interested in contributing to Micronaut and are looking for issues to work on, take a look at the issues tagged with [help wanted](https://github.com/micronaut-projects/micronaut-core/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22).
 
 ## JDK Setup
 
@@ -47,10 +47,10 @@ To also build the javadocs instead run `./gradlew docs`.
 
 If you are working with the IntelliJ IDEA development environment, you can import the project using the Intellij Gradle Tooling ( "File / Import Project" and select the "settings.gradle" file).
 
-To get a local development version of Micronaut working, first run the `publishToMavenLocal` task.
+To get a local development version of Micronaut working, first run the `cliZip` task.
 
 ```
-./gradlew pTML
+./gradlew cliZip
 ```
 
 Then install SDKman, which is the quickest way to set up a development environment.
@@ -58,7 +58,7 @@ Then install SDKman, which is the quickest way to set up a development environme
 Once you have SDKman installed, point SDKman to your local development version of Micronaut.
 
 ```
-sdk install micronaut dev /path/to/checkout
+sdk install micronaut dev /path/to/checkout/cli/build
 sdk use micronaut dev
 ```
 

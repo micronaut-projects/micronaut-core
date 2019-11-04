@@ -435,6 +435,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        @CompileStatic
         protected void visitIntroductionTypePublicMethods(AopProxyWriter aopProxyWriter, ClassNode node) {
             AnnotationMetadata typeAnnotationMetadata = aopProxyWriter.getAnnotationMetadata()
             SourceUnit source = this.sourceUnit
@@ -480,6 +481,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
                                 typeAnnotationMetadata
                         )
+                    }
+
+                    if (!annotationMetadata.hasStereotype("io.micronaut.validation.Validated") &&
+                            isDeclaredBean) {
+                        boolean hasConstraint
+                        for (Parameter p: methodNode.getParameters()) {
+                            AnnotationMetadata parameterMetadata = AstAnnotationUtils.getAnnotationMetadata(source, p)
+                            if (parameterMetadata.hasStereotype(InjectTransform.ANN_CONSTRAINT) ||
+                                    parameterMetadata.hasStereotype(InjectTransform.ANN_VALID)) {
+                                hasConstraint = true
+                                break
+                            }
+                        }
+                        if (hasConstraint) {
+                            annotationMetadata = addValidated(annotationMetadata)
+                        }
                     }
 
                     if (AstAnnotationUtils.hasStereotype(source, methodNode, AROUND_TYPE)) {
@@ -838,6 +855,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 getBeanWriter().visitConfigBuilderEnd()
                             }
                         } else if (declaringClass.getField(propertyName) == null) {
+                            if (shouldExclude(configurationMetadata, propertyName)) {
+                                return
+                            }
                             PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
                                     concreteClass,
                                     declaringClass,
@@ -1135,7 +1155,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                             if(requiresReflection) {
                                 // Using the field would throw a IllegalAccessError, use the method instead
-                                String fieldGetterName = NameUtils.getterNameFor(fieldNode.name)
+                                String fieldGetterName = NameUtils.getterNameFor(fieldName)
                                 MethodNode getterMethod = declaringClass.methods?.find { it.name == fieldGetterName}
                                 if(getterMethod != null) {
                                     getBeanWriter().visitConfigBuilderMethod(fieldType, getterMethod.name, fieldAnnotationMetadata, configurationMetadataBuilder)
@@ -1152,6 +1172,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             }
                         } else {
                             if (isConfigurationProperties) {
+                                if (shouldExclude(configurationMetadata, fieldName)) {
+                                    return
+                                }
                                 PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
                                         concreteClass,
                                         declaringClass,
@@ -1285,6 +1308,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                     } else {
                         if (isConfigurationProperties) {
+                            if (shouldExclude(configurationMetadata, propertyName)) {
+                                return
+                            }
                             PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
                                     concreteClass,
                                     declaringClass,
@@ -1758,11 +1784,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     ClassNode returnType = method.getReturnType()
                     Parameter[] params = method.getParameters()
                     String prefix = getMethodPrefix(name)
-                    String propertyName = NameUtils.decapitalize(name.substring(prefix.length()));
-                    if (!includes.isEmpty() && !includes.contains(propertyName)) {
-                        return
-                    }
-                    if (!excludes.isEmpty() && excludes.contains(propertyName)) {
+                    String propertyName = NameUtils.decapitalize(name.substring(prefix.length()))
+                    if (shouldExclude(includes, excludes, propertyName)) {
                         return
                     }
 
@@ -1844,6 +1867,20 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
 
             visitor.accept(classNode)
+        }
+
+        private boolean shouldExclude(Set<String> includes, Set<String> excludes, String propertyName) {
+            if (!includes.isEmpty() && !includes.contains(propertyName)) {
+                return true;
+            }
+            if (!excludes.isEmpty() && excludes.contains(propertyName)) {
+                return true;
+            }
+            return false;
+        }
+
+        private boolean shouldExclude(ConfigurationMetadata configurationMetadata, String propertyName) {
+            return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
     }
 }

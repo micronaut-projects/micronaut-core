@@ -15,6 +15,11 @@
  */
 package io.micronaut.http.client;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.util.Optional;
+
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -22,6 +27,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
@@ -41,11 +47,6 @@ import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import org.reactivestreams.Publisher;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.Charset;
-import java.util.Optional;
-
 /**
  * Default implementation of {@link MutableHttpRequest} for the {@link HttpClient}.
  *
@@ -58,7 +59,8 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
     private final NettyHttpHeaders headers = new NettyHttpHeaders();
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
-    private final io.micronaut.http.HttpMethod httpMethod;
+    private final HttpMethod httpMethod;
+    private final String httpMethodName;
     private URI uri;
     private B body;
     private NettyHttpParameters httpParameters;
@@ -67,18 +69,38 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
      * @param httpMethod The Http method
      * @param uri        The URI
      */
-    NettyClientHttpRequest(io.micronaut.http.HttpMethod httpMethod, URI uri) {
+    NettyClientHttpRequest(HttpMethod httpMethod, URI uri) {
+        this(httpMethod, uri, httpMethod.name());
+    }
+
+    /**
+     * This constructor is actually required for the case of non-standard http methods.
+     * @param httpMethod The http method. CUSTOM value is used for non-standard
+     * @param uri The uri
+     * @param httpMethodName Method name. Is the same as httpMethod.name() value for standard http methods.
+     */
+    NettyClientHttpRequest(HttpMethod httpMethod, URI uri, String httpMethodName) {
         this.httpMethod = httpMethod;
         this.uri = uri;
+        this.httpMethodName = httpMethodName;
     }
 
     /**
      * @param httpMethod The Http method
      * @param uri        The URI
      */
-    NettyClientHttpRequest(io.micronaut.http.HttpMethod httpMethod, String uri) {
-        this.httpMethod = httpMethod;
-        this.uri = URI.create(uri);
+    NettyClientHttpRequest(HttpMethod httpMethod, String uri) {
+        this(httpMethod, uri, httpMethod.name());
+    }
+
+    /**
+     * This constructor is actually required for the case of non-standard http methods.
+     * @param httpMethod The http method. CUSTOM value is used for non-standard
+     * @param uri The uri
+     * @param httpMethodName Method name. Is the same as httpMethod.name() value for standard http methods.
+     */
+    NettyClientHttpRequest(HttpMethod httpMethod, String uri, String httpMethodName) {
+        this(httpMethod, URI.create(uri), httpMethodName);
     }
 
     @Override
@@ -180,11 +202,15 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
      */
     HttpRequest getFullRequest(ByteBuf content) {
         String uriStr = resolveUriPath();
-        io.netty.handler.codec.http.HttpMethod method = io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name());
+        io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
         DefaultFullHttpRequest req = content != null ? new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, content) :
             new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
         req.headers().set(headers.getNettyHeaders());
         return req;
+    }
+
+    private static io.netty.handler.codec.http.HttpMethod getMethod(String httpMethodName) {
+        return io.netty.handler.codec.http.HttpMethod.valueOf(httpMethodName);
     }
 
     /**
@@ -193,7 +219,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
      */
     HttpRequest getStreamedRequest(Publisher<HttpContent> publisher) {
         String uriStr = resolveUriPath();
-        io.netty.handler.codec.http.HttpMethod method = io.netty.handler.codec.http.HttpMethod.valueOf(httpMethod.name());
+        io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
         HttpRequest req = publisher != null ? new DefaultStreamedHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, publisher) :
             new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
         req.headers().set(headers.getNettyHeaders());
@@ -215,6 +241,11 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
     @Override
     public String toString() {
-        return getMethod() + " " + uri;
+        return getMethodName() + " " + uri;
+    }
+
+    @Override
+    public String getMethodName() {
+        return httpMethodName;
     }
 }

@@ -34,12 +34,18 @@ import java.util.concurrent.ExecutorService;
 public class SessionConfiguration {
 
     /**
-     * The default max inactive interval in seconds.
+     * @deprecated Use {@link #DEFAULT_MAXINACTIVEINTERVAL_MINUTES} instead.
      */
-    @SuppressWarnings("WeakerAccess")
+    @Deprecated
     public static final int DEFAULT_MAXINACTIVEINTERVAL_SECONDS = 30;
 
-    private Duration maxInactiveInterval = Duration.ofMinutes(DEFAULT_MAXINACTIVEINTERVAL_SECONDS);
+    /**
+     * The default max inactive interval in minutes.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAXINACTIVEINTERVAL_MINUTES = 30;
+
+    private Duration maxInactiveInterval = Duration.ofMinutes(DEFAULT_MAXINACTIVEINTERVAL_MINUTES);
     private Integer maxActiveSessions;
     private boolean promptExpiration = false;
     private ExecutorService executorService;
@@ -62,7 +68,7 @@ public class SessionConfiguration {
     }
 
     /**
-     * Sets the maximum number of active sessions. Default value ({@value #DEFAULT_MAXINACTIVEINTERVAL_SECONDS} seconds).
+     * Sets the maximum number of active sessions.
      *
      * @param maxActiveSessions The max active sessions
      */
@@ -71,14 +77,14 @@ public class SessionConfiguration {
     }
 
     /**
-     * @return The default max inactive interval
+     * @return The maximum inactive interval
      */
     public Duration getMaxInactiveInterval() {
         return maxInactiveInterval;
     }
 
     /**
-     * Set the max active sessions.
+     * Set the maximum inactive interval. Default value ({@value #DEFAULT_MAXINACTIVEINTERVAL_MINUTES} minutes).
      *
      * @param maxInactiveInterval The max inactive interval
      */
