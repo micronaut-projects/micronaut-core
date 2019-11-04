@@ -24,7 +24,7 @@ Route arguments of type rs:Publisher[Publisher<PartData>] will be treated as onl
 
 If requirements dictate you must have knowledge about the metadata of the file being received, a special class called api:http.multipart.StreamingFileUpload[] has been created that is a rs:Publisher[Publisher<PartData>], but also has file information like the content type and file name.
 
-snippet::io.micronaut.docs.server.upload.UploadController[tags="imports,class,upload,endclass", indent=0]
+snippet::io.micronaut.docs.server.upload.UploadController[tags="class", indent=0, title="Streaming file upload"]
 
 <1> The method is set to consume api:http.MediaType#MULTIPART_FORM_DATA[]
 <2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
@@ -35,9 +35,11 @@ snippet::io.micronaut.docs.server.upload.UploadController[tags="imports,class,up
 
 Route arguments that are not publishers will cause the route execution to be delayed until the upload has finished. The received data will attempt to be converted to the requested type. Conversions to a `String` or `byte[]` are supported by default. In addition, the file can be converted to a POJO if a media type codec has been registered that supports the media type of the file. A media type codec is included by default that allows conversion of JSON files to POJOs.
 
+snippet::io.micronaut.docs.server.upload.BytesUploadController[tags="class", indent=0, title="Receiving a byte array"]
+
 If requirements dictate you must have knowledge about the metadata of the file being received, a special class called api:http.multipart.CompletedFileUpload[] has been created that has methods to retrieve the data of the file, but also has file information like the content type and file name.
 
-snippet::io.micronaut.docs.server.upload.UploadController[tags="class,completedUpload,endclass", indent=0]
+snippet::io.micronaut.docs.server.upload.CompletedUploadController[tags="class", indent=0, title="File upload with metadata"]
 
 <1> The method is set to consume api:http.MediaType#MULTIPART_FORM_DATA[]
 <2> The method parameters match form attribute names. In this case the `file` will match for example an `<input type="file" name="file">`
@@ -73,3 +75,13 @@ HttpResponse upload(Publisher<CompletedFileUpload> files)
 HttpResponse upload(Publisher<MyObject> files)
 HttpResponse upload(Publisher<Publisher<PartData>> files)
 ----
+
+== Whole Body Binding
+
+For the cases where the names of the parts of the request cannot be known ahead of time, or the entire body should be read, a special type can be used to indicate the entire body is desired.
+
+If a route has an argument of type api:io.micronaut.http.server.multipart.MultipartBody[] (not to be confused with the class for the client) annotated with ann:http.annotation.Body[], then each part of the request will be emitted through the argument. A api:io.micronaut.http.server.multipart.MultipartBody[] is a publisher of api:io.micronaut.http.multipart.CompletedPart[] instances.
+
+For example:
+
+snippet::io.micronaut.docs.server.upload.WholeBodyUploadController[tags="class", indent=0, title="Binding to the entire multipart body"]

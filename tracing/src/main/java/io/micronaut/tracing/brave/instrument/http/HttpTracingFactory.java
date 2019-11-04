@@ -63,7 +63,7 @@ public class HttpTracingFactory {
         return HttpClientHandler.create(httpTracing, new HttpClientAdapter<HttpRequest<?>, HttpResponse<?>>() {
             @Override
             public String method(HttpRequest<?> request) {
-                return request.getMethod().name();
+                return request.getMethodName();
             }
 
             @Override
@@ -112,7 +112,7 @@ public class HttpTracingFactory {
         return HttpServerHandler.create(httpTracing, new HttpServerAdapter<HttpRequest<?>, HttpResponse<?>>() {
             @Override
             public String method(HttpRequest<?> request) {
-                return request.getMethod().name();
+                return request.getMethodName();
             }
 
             @Override

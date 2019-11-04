@@ -77,9 +77,11 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                         TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
                         Argument argumentType = typedRequestArgumentBinder.argumentType();
                         byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), binder);
-                        Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType.getType());
-                        for (Class<?> itfce : allInterfaces) {
-                            byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), binder);
+                        if (((TypedRequestArgumentBinder) binder).supportsSuperTypes()) {
+                            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType.getType());
+                            for (Class<?> itfce : allInterfaces) {
+                                byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), binder);
+                            }
                         }
                     } else {
                         byAnnotation.put(annotationType, annotatedRequestArgumentBinder);

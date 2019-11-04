@@ -70,17 +70,19 @@ class ConnectionTTLSpec extends Specification {
 
     when:"make first request"
     httpClient.retrieve(HttpRequest.GET('/connectTTL/'),String).blockingFirst()
-    Channel ch = getQueuedChannels(httpClient).first
+    Deque<Channel> deque = getQueuedChannels(httpClient)
 
     then:"ensure that connection is open as connect-ttl is not reached"
-    ch.isOpen()
+    new PollingConditions().eventually {
+      deque.first.isOpen()
+    }
 
     when:"make another request "
     httpClient.retrieve(HttpRequest.GET('/connectTTL/slow'),String).blockingFirst()
 
     then:"ensure channel is closed"
     new PollingConditions().eventually {
-      ch.isOpen()
+      deque.first.isOpen()
     }
 
     cleanup:

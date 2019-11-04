@@ -124,7 +124,7 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
 
     private void configureSpan(Span span) {
         span.kind(Span.Kind.CLIENT);
-        span.tag(AbstractOpenTracingFilter.TAG_METHOD, request.getMethod().name());
+        span.tag(AbstractOpenTracingFilter.TAG_METHOD, request.getMethodName());
         String path = request.getPath();
         span.tag(AbstractOpenTracingFilter.TAG_PATH, path);
     }
@@ -132,6 +132,6 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
     private void configureAttributes(HttpResponse<?> response) {
         Optional<Object> routeTemplate = request.getAttribute(HttpAttributes.URI_TEMPLATE);
         routeTemplate.ifPresent(o -> response.setAttribute(HttpAttributes.URI_TEMPLATE, o));
-        response.setAttribute(HttpAttributes.METHOD_NAME, request.getMethod().name());
+        response.setAttribute(HttpAttributes.METHOD_NAME, request.getMethodName());
     }
 }

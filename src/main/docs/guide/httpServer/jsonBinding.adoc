@@ -108,6 +108,7 @@ In addition to configuration, beans can be registered to customize Jackson. All 
 * link:{jackson-databind}com/fasterxml/jackson/databind/Module.html[Module]
 * link:{jackson-databind}com/fasterxml/jackson/databind/JsonDeserializer.html[JsonDeserializer]
 * link:{jackson-databind}com/fasterxml/jackson/databind/JsonSerializer.html[JsonSerializer]
+* link:{jackson-databind}com/fasterxml/jackson/databind/KeyDeserializer.html[KeyDeserializer]
 * link:{jackson-databind}com/fasterxml/jackson/databind/deser/BeanDeserializerModifier.html[BeanDeserializerModifier]
 * link:{jackson-databind}com/fasterxml/jackson/databind/ser/BeanSerializerModifier.html[BeanSerializerModifier]
 

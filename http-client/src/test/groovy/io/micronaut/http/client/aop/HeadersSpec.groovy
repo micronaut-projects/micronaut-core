@@ -57,11 +57,18 @@ class HeadersSpec extends Specification {
 
     @Headers([
         @Header(name="X-Username",value='Freddy'),
-        @Header(name="X-MyParam",value='${foo.bar}'),
-        @Header(name="Content-length",value="2048")
+        @Header(name="X-MyParam",value='test')
     ])
     @Client('/headersTest')
-    static interface UserClient extends MyApi {
+    static interface UserClient {
+
+        @Headers([
+                @Header(name="X-Username",value='Freddy'),
+                @Header(name="X-MyParam",value='${foo.bar}'),
+                @Header(name="X-Age",value="10")
+        ])
+        @Get("/user")
+        User get(@Header('X-Username') String username)
 
     }
 
@@ -69,15 +76,11 @@ class HeadersSpec extends Specification {
     static class UserController {
 
         @Get('/user')
-        User get(@Header('X-Username') String username, @Header('X-MyParam') String myparam) {
-            return new User(username:username, age: 10, myparam:myparam)
+        User get(@Header('X-Username') String username,
+                 @Header('X-MyParam') String myparam,
+                 @Header('X-Age') Integer age) {
+            return new User(username:username, age: age, myparam:myparam)
         }
-    }
-
-    static interface MyApi {
-
-        @Get('/user')
-        User get(@Header('X-Username') String username)
     }
 
     static class User {

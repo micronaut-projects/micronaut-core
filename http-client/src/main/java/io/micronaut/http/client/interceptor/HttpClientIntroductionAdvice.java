@@ -180,7 +180,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
 
-            HttpMethod httpMethod = HttpMethod.valueOf(annotationType.getSimpleName().toUpperCase());
+            HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase());
+            String httpMethodName = context.getValue(CustomHttpMethod.class, "method", String.class).orElse(httpMethod.name());
 
             ReturnType returnType = context.getReturnType();
             Class<?> javaReturnType = returnType.getType();
@@ -207,7 +208,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 String headerName = headerAnnotation.stringValue("name").orElse(null);
                 String headerValue = headerAnnotation.stringValue().orElse(null);
                 if (StringUtils.isNotEmpty(headerName) && StringUtils.isNotEmpty(headerValue)) {
-                    headers.put(headerName, headerValue);
+                    headers.putIfAbsent(headerName, headerValue);
                 }
             }
 
@@ -239,6 +240,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             List<NettyCookie> cookies = new ArrayList<>();
             List<Argument> bodyArguments = new ArrayList<>();
             ConversionService<?> conversionService = ConversionService.SHARED;
+            BasicAuth basicAuth = null;
+
             for (Argument argument : arguments) {
                 String argumentName = argument.getName();
                 AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
@@ -309,6 +312,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             paramMap.put(parameterName, o);
                         }
                     });
+                } else if (argument.getType() == BasicAuth.class) {
+                    basicAuth = (BasicAuth) paramMap.get(argument.getName());
                 } else if (!uriVariables.contains(argumentName)) {
                     bodyArguments.add(argument);
                 }
@@ -354,7 +359,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             uri = uriTemplate.expand(paramMap);
             uriVariables.forEach(queryParams::remove);
 
-            request = HttpRequest.create(httpMethod, appendQuery(uri, queryParams));
+            request = HttpRequest.create(httpMethod, appendQuery(uri, queryParams), httpMethodName);
+
             if (body != null) {
                 request.body(body);
 
@@ -392,6 +398,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             MediaType[] acceptTypes = MediaType.of(context.stringValues(Consumes.class));
             if (ArrayUtils.isEmpty(acceptTypes)) {
                 acceptTypes = DEFAULT_ACCEPT_TYPES;
+            }
+
+            if (basicAuth != null) {
+                request.basicAuth(basicAuth.getUsername(), basicAuth.getPassword());
             }
 
             boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);

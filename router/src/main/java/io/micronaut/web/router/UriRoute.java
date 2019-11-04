@@ -86,4 +86,11 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
     @Override
     UriRoute body(String argument);
 
+    /**
+     *
+     * @return The http method. Is equal to {@link #getHttpMethod()} value for standard http methods.
+     */
+    default String getHttpMethodName() {
+        return getHttpMethod().name();
+    }
 }

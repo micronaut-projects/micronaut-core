@@ -161,7 +161,9 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      *
      * @param maxAge The max age
      * @return This cookie
+     * @deprecated Use {@link #maxAge(Duration)} instead
      */
+    @Deprecated
     default @Nonnull Cookie maxAge(@Nonnull TemporalAmount maxAge) {
         ArgumentUtils.requireNonNull("maxAge", maxAge);
         return maxAge(maxAge.get(ChronoUnit.SECONDS));

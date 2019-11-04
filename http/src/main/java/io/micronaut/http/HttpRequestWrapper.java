@@ -57,6 +57,11 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
     }
 
     @Override
+    public String getMethodName() {
+        return getDelegate().getMethodName();
+    }
+
+    @Override
     public URI getUri() {
         return getDelegate().getUri();
     }

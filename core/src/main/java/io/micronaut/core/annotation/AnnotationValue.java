@@ -204,21 +204,44 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (StringUtils.isNotEmpty(member)) {
             Object o = getRawSingleValue(member, valueMapper);
             if (o != null) {
-                if (enumType.isInstance(o)) {
-                    return Optional.of((E) o);
-                } else {
-                    try {
-                        E e = (E) Enum.valueOf(enumType, o.toString());
-                        return Optional.of(e);
-                    } catch (IllegalArgumentException ex) {
-                        return Optional.empty();
-                    }
-                }
+                return convertToEnum(enumType, o);
             }
         }
         return Optional.empty();
     }
 
+    /**
+     * Return the enum values of the given member of the given enum type.
+     *
+     * @param member The annotation member
+     * @param enumType The required type
+     * @return An array of enum values
+     * @param <E> The enum type
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public <E extends Enum> E[] enumValues(@Nonnull String member, @Nonnull Class<E> enumType) {
+        ArgumentUtils.requireNonNull("enumType", enumType);
+        List<E> list = new ArrayList<>();
+        if (StringUtils.isNotEmpty(member)) {
+            Object rawValue = values.get(member);
+            if (rawValue != null) {
+                if (rawValue.getClass().isArray()) {
+                    int len = Array.getLength(rawValue);
+                    for (int i = 0; i < len; i++) {
+                        convertToEnum(enumType, Array.get(rawValue, i)).ifPresent(list::add);
+                    }
+                } else if (rawValue instanceof Iterable) {
+                    for (Object o : (Iterable) rawValue) {
+                        convertToEnum(enumType, o).ifPresent(list::add);
+                    }
+                } else if (enumType.isAssignableFrom(rawValue.getClass())) {
+                    list.add((E) rawValue);
+                }
+            }
+        }
+        return list.toArray((E[]) Array.newInstance(enumType, 0));
+    }
 
     /**
      * The value of the annotation as a Class.
@@ -957,5 +980,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return valueMapper.apply(rawValue);
         }
         return rawValue;
+    }
+
+    private <T extends Enum> Optional<T> convertToEnum(Class<T> enumType, Object o) {
+        if (enumType.isInstance(o)) {
+            return Optional.of((T) o);
+        } else {
+            try {
+                T t = (T) Enum.valueOf(enumType, o.toString());
+                return Optional.of(t);
+            } catch (IllegalArgumentException ex) {
+                return Optional.empty();
+            }
+        }
     }
 }

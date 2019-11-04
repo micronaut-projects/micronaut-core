@@ -874,6 +874,10 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 if (ArrayUtils.isNotEmpty(names)) {
                     this.cacheableCacheName = names[0];
                     this.cacheable = cacheable;
+                } else {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("No cache names defined for invocation [{}]. Skipping cache read operations.", context);
+                    }
                 }
             }
         }

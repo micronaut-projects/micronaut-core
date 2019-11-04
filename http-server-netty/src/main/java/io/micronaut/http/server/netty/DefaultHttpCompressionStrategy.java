@@ -37,6 +37,7 @@ import javax.inject.Singleton;
 class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
 
     private final int compressionThreshold;
+    private final int compressionLevel;
 
     /**
      * @param serverConfiguration The netty server configuration
@@ -44,13 +45,16 @@ class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
     @Inject
     DefaultHttpCompressionStrategy(NettyHttpServerConfiguration serverConfiguration) {
         this.compressionThreshold = serverConfiguration.getCompressionThreshold();
+        this.compressionLevel = serverConfiguration.getCompressionLevel();
     }
 
     /**
      * @param compressionThreshold The compression threshold
+     * @param compressionLevel The compression level (0-9)
      */
-    DefaultHttpCompressionStrategy(int compressionThreshold) {
+    DefaultHttpCompressionStrategy(int compressionThreshold, int compressionLevel) {
         this.compressionThreshold = compressionThreshold;
+        this.compressionLevel = compressionLevel;
     }
 
     @Override
@@ -62,5 +66,10 @@ class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
         return contentType != null &&
                 (contentLength == null || contentLength >= compressionThreshold) &&
                 MediaType.isTextBased(contentType);
+    }
+
+    @Override
+    public int getCompressionLevel() {
+        return compressionLevel;
     }
 }

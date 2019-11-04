@@ -16,6 +16,8 @@
 
 package io.micronaut.context.annotation;
 
+import io.micronaut.core.annotation.Experimental;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -57,6 +59,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target(ElementType.TYPE)
+@Experimental
 public @interface DefaultImplementation {
 
     /**

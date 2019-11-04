@@ -18,12 +18,9 @@ package io.micronaut.http.server.netty.binding
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.event.StartupEvent
 import io.micronaut.core.io.socket.SocketUtils
-import io.micronaut.http.HttpHeaders
-import io.micronaut.http.HttpMethod
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
+import io.micronaut.http.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Put
@@ -32,13 +29,16 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.exceptions.ServerStartupException
 import io.micronaut.runtime.Micronaut
+import io.micronaut.runtime.event.annotation.EventListener
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.lang.Stepwise
 
+import javax.inject.Singleton
 import java.time.Duration
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * @author Graeme Rocher
@@ -194,6 +194,99 @@ class NettyHttpServerSpec extends Specification {
         cleanup:
         client.stop()
         applicationContext.stop()
+    }
+
+    void "test run Micronaut server when enabling both http and https"() {
+        when:
+        int httpPort = SocketUtils.findAvailableTcpPort()
+        PropertySource propertySource = PropertySource.of(
+                'micronaut.server.port':httpPort,
+                'micronaut.ssl.enabled': true,
+                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.dualProtocol':true
+        )
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
+
+        def secureUrl = embeddedServer.getURL()
+        RxHttpClient httpsClient = embeddedServer.applicationContext.createBean(RxHttpClient, secureUrl)
+        RxHttpClient httpClient = embeddedServer.applicationContext.createBean(RxHttpClient, new URL("http://localhost:$httpPort"))
+        HttpResponse httpsResponse = httpsClient.exchange('/person/Fred', String).blockingFirst()
+        HttpResponse httpResponse = httpClient.exchange('/person/Fred', String).blockingFirst()
+
+        then:
+        httpsResponse.body() == "Person Named Fred"
+        httpResponse.body() == "Person Named Fred"
+
+        cleanup:
+        httpsClient.stop()
+        embeddedServer.applicationContext.stop()
+    }
+
+    void "test dual protocol is using https by default when grabbing values from server"() {
+        def securePort = SocketUtils.findAvailableTcpPort()
+        def unsecurePort = SocketUtils.findAvailableTcpPort()
+        when:
+        PropertySource propertySource = PropertySource.of(
+                'micronaut.server.port': unsecurePort,
+                'micronaut.ssl.port': securePort,
+                'micronaut.ssl.enabled': true,
+                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.dualProtocol':true
+        )
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
+
+        then:
+        embeddedServer.getPort() == securePort
+        embeddedServer.getScheme() == "https"
+        embeddedServer.getURL().toString() == "https://localhost:$securePort"
+
+        cleanup:
+        embeddedServer.applicationContext.stop()
+    }
+
+    void "test non dual protocol Micronaut server only fires startup event once"() {
+        when:
+        PropertySource propertySource = PropertySource.of(
+                'micronaut.server.port': SocketUtils.findAvailableTcpPort(),
+                'micronaut.server.dualProtocol':false
+        )
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource)
+
+        then:
+        EventCounter eventCounter = embeddedServer.applicationContext.getBean(EventCounter)
+        eventCounter.count as Integer == 1
+
+        cleanup:
+        embeddedServer.applicationContext.stop()
+    }
+
+    void "test dual protocol only fires startup event once"() {
+        when:
+        PropertySource propertySource = PropertySource.of(
+                'micronaut.server.port': SocketUtils.findAvailableTcpPort(),
+                'micronaut.ssl.port': SocketUtils.findAvailableTcpPort(),
+                'micronaut.ssl.enabled': true,
+                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.server.dualProtocol':true
+        )
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource)
+
+        then:
+        EventCounter eventCounter = embeddedServer.applicationContext.getBean(EventCounter)
+        eventCounter.count as Integer == 1
+
+        cleanup:
+        embeddedServer.applicationContext.stop()
+    }
+
+    @Singleton
+    static class EventCounter {
+        AtomicInteger count = new AtomicInteger(0)
+
+        @EventListener
+        void receive(StartupEvent event) {
+            count.incrementAndGet()
+        }
     }
 
     @Controller("/person")
