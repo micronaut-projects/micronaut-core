@@ -28,7 +28,6 @@ import javax.inject.Singleton;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Default implementation that stores sessions in-memory.
