@@ -119,7 +119,9 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
         Caffeine<String, InMemorySession> builder = Caffeine.newBuilder().removalListener(newRemovalListener());
 
         if (configuration.isPromptExpiration()) {
-            builder.scheduler(Scheduler.forScheduledExecutorService((ScheduledExecutorService) configuration.getExecutorService()));
+            configuration.getExecutorService()
+                    .map(Scheduler::forScheduledExecutorService)
+                    .ifPresent(builder::scheduler);
         }
 
         builder.expireAfter(newExpiry());
