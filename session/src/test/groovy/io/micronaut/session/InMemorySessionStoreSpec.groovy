@@ -77,8 +77,8 @@ class InMemorySessionStoreSpec extends Specification {
 
         then:
         conditions.eventually {
-            !sessionStore.findSession(id).get().isPresent()
-            listener.events.any { it instanceof SessionExpiredEvent }
+            assert !sessionStore.findSession(id).get().isPresent()
+            assert listener.events.any { it instanceof SessionExpiredEvent }
         }
 
         cleanup:
@@ -87,14 +87,16 @@ class InMemorySessionStoreSpec extends Specification {
 
     void "test session prompt expiration"() {
         when:
-        ApplicationContext applicationContext = ApplicationContext.run(['micronaut.session.promptExpiration': true])
+        ApplicationContext applicationContext = ApplicationContext.run([
+                'micronaut.session.prompt-expiration': true,
+                'micronaut.session.max-inactive-interval': 'PT1S'
+        ])
         SessionStore sessionStore = applicationContext.getBean(SessionStore)
         TestListener listener = applicationContext.getBean(TestListener)
         Session session = sessionStore.newSession()
 
         session.put("foo", "bar")
         sessionStore.save(session)
-        String id = session.id
 
         then:
         session != null
@@ -117,14 +119,10 @@ class InMemorySessionStoreSpec extends Specification {
 
         then:
         conditions.eventually {
-            session.lastAccessedTime > lastAccessedTime
-            session.get("foo").isPresent()
-            session.get("foo").get() == "bar"
-        }
-
-        conditions.eventually {
-            !sessionStore.findSession(id).get().isPresent()
-            listener.events.any { it instanceof SessionExpiredEvent }
+            assert session.lastAccessedTime > lastAccessedTime
+            assert session.get("foo").isPresent()
+            assert session.get("foo").get() == "bar"
+            assert listener.events.any { it instanceof SessionExpiredEvent }
         }
 
         cleanup:
