@@ -249,7 +249,7 @@ class ValidatedSpec extends Specification {
         def result = new JsonSlurper().parseText((String) e.response.getBody().get())
 
         then:
-        result.message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present'
+        result.message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled'
 
         cleanup:
         server.close()
