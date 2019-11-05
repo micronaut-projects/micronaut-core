@@ -17,10 +17,12 @@ package io.micronaut.discovery.eureka.client.v2;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
 
 /**
  * @author Tomasz Bak
  */
+@Introspected
 public class MyDataCenterInfo implements DataCenterInfo {
 
     private final Name name;
