@@ -1189,6 +1189,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param uri      The URI to connect to
      * @param sslCtx   The SslContext instance
      * @param isStream Is the connection a stream connection
+     * @throws HttpClientException If the URI is invalid
      * @return A ChannelFuture
      */
     protected ChannelFuture doConnect(
