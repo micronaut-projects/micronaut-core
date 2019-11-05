@@ -77,7 +77,19 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
      * @return An instance
      * @throws InstantiationException If the bean cannot be instantiated.
      */
-    @Nonnull T instantiate(Object... arguments) throws InstantiationException;
+    default @Nonnull T instantiate(Object... arguments) throws InstantiationException {
+        return instantiate(true, arguments);
+    }
+
+    /**
+     * Instantiates an instance of the bean, throwing an exception is instantiation is not possible.
+     *
+     * @param strictNullable If true, require null parameters to be annotated with a nullable annotation
+     * @param arguments The arguments required to instantiate bean. Should match the types returned by {@link #getConstructorArguments()}
+     * @return An instance
+     * @throws InstantiationException If the bean cannot be instantiated.
+     */
+    @Nonnull T instantiate(boolean strictNullable, Object... arguments) throws InstantiationException;
 
     /**
      * The bean type.

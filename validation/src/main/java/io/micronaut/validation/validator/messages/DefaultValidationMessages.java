@@ -17,6 +17,7 @@
 package io.micronaut.validation.validator.messages;
 
 import io.micronaut.context.StaticMessageSource;
+import io.micronaut.core.annotation.Introspected;
 
 import javax.inject.Singleton;
 import javax.validation.constraints.*;
@@ -60,5 +61,7 @@ public class DefaultValidationMessages extends StaticMessageSource {
         addMessage(Positive.class.getName() + MESSAGE_SUFFIX, "must be greater than 0");
         addMessage(PositiveOrZero.class.getName() + MESSAGE_SUFFIX, "must be greater than or equal to 0");
         addMessage(Size.class.getName() + MESSAGE_SUFFIX, "size must be between {min} and {max}");
+
+        addMessage(Introspected.class.getName() + MESSAGE_SUFFIX, "Cannot validate {type}. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled");
     }
 }
