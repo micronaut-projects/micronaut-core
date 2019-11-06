@@ -152,7 +152,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
             parameterFlowable.subscribe(
                     parametersWithBasePath -> {
                         if (parametersWithBasePath.parameters.isEmpty()) {
-                            if(LOG.isTraceEnabled()) {
+                            if (LOG.isTraceEnabled()) {
                                 LOG.trace("parameterBasePath={} no parameters found", parametersWithBasePath.basePath);
                             }
                             return;
@@ -165,7 +165,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                             String fullName = key.substring(pathPrefix.length() + 1);
                             Set<String> propertySourceNames = calcPropertySourceNames(fullName, activeNames);
                             Map<String, Object> properties = convertParametersToMap(parametersWithBasePath);
-                            if(LOG.isTraceEnabled()) {
+                            if (LOG.isTraceEnabled()) {
                                 properties.keySet().iterator().forEachRemaining(param -> LOG.trace("param found: parameterBasePath={} parameter={}", parametersWithBasePath.basePath, param));
                             }
                             for (String propertySourceName : propertySourceNames) {
@@ -187,7 +187,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                             if (localSource.appSpecific) {
                                 priority++;
                             }
-                            if(LOG.isTraceEnabled()) {
+                            if (LOG.isTraceEnabled()) {
                                 LOG.trace("source={} got priority={}", localSource.name, priority);
                             }
                             emitter.onNext(PropertySource.of(Route53ClientDiscoveryConfiguration.SERVICE_ID + '-' + localSource.name, localSource.values, priority));
