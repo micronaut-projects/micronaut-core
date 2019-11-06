@@ -17,7 +17,6 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.util.StreamUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
