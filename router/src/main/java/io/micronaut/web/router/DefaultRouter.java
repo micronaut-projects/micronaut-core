@@ -189,7 +189,7 @@ public class DefaultRouter implements Router {
          */
         if (uriRoutes.size() > 1) {
             long variableCount = 0;
-            long rawCount = 0;
+            long rawLength = 0;
 
             List<UriRouteMatch<T, R>> closestMatches = new ArrayList<>(uriRoutes.size());
 
@@ -197,24 +197,17 @@ public class DefaultRouter implements Router {
                 UriRouteMatch<T, R> match = uriRoutes.get(i);
                 UriMatchTemplate template = match.getRoute().getUriMatchTemplate();
                 long variable = template.getPathVariableSegmentCount();
-                long raw = template.getRawSegmentCount();
+                long raw = template.getRawSegmentLength();
                 if (i == 0) {
                     variableCount = variable;
-                    rawCount = raw;
+                    rawLength = raw;
                 }
-                if (variable > variableCount || raw < rawCount) {
+                if (variable > variableCount || raw < rawLength) {
                     break;
                 }
                 closestMatches.add(match);
             }
             uriRoutes = closestMatches;
-        }
-
-        if (uriRoutes.size() > 1) {
-            uriRoutes = uriRoutes.stream().collect(
-                    StreamUtils.maxAll(Comparator.comparingInt((match) ->
-                                    match.getRoute().getUriMatchTemplate().getRawSegmentLength()),
-                            Collectors.toList()));
         }
 
         return uriRoutes;
