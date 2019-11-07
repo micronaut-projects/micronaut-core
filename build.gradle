@@ -307,6 +307,11 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-neo4j-bolt'
             ],
+            'micronaut.data': [
+                    version:micronautDataVersion,
+                    group:'io.micronaut.data',
+                    modules:['micronaut-data-processor', 'micronaut-data-hibernate-jpa', 'micronaut-data-jdbc']
+            ],
             'mongo' : [
                     version: mongoVersion,
                     group  : 'org.mongodb',

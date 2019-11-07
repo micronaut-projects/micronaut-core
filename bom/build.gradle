@@ -20,12 +20,14 @@ publishing {
                             }
                         }
                     }
+                    //println mkp.properties
 
                     mkp.dependencyManagement {
                         mkp.dependencies {
 
                             for (profile in profiles) {
                                 mkp.dependency {
+                                    //println profile
                                     mkp.groupId 'io.micronaut.profiles'
                                     mkp.artifactId profile.key
                                     def version = profile.value
@@ -42,6 +44,7 @@ publishing {
                                 if (p.hasProperty("bomExclude") && p.property("bomExclude") == true) continue
                                 
                                 mkp.dependency {
+                                    //println p
                                     mkp.groupId p.group
                                     mkp.artifactId "micronaut-$p.name"
                                     mkp.version p.version
@@ -49,6 +52,7 @@ publishing {
                             }
 
                             for (dep in dependencyVersions) {
+                                //println dep
                                 def info = dep.value
                                 // don't include snapshots
                                 if(info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
