@@ -17,10 +17,10 @@ package io.micronaut.tracing.brave.instrument.http;
 
 import brave.Span;
 import brave.http.HttpServerHandler;
+import brave.http.HttpServerRequest;
+import brave.http.HttpServerResponse;
 import brave.http.HttpTracing;
-import brave.propagation.TraceContext;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
@@ -38,8 +38,7 @@ import org.reactivestreams.Publisher;
 @Requires(beans = HttpServerHandler.class)
 public class BraveTracingServerFilter extends AbstractBraveTracingFilter implements HttpServerFilter {
 
-    private final HttpServerHandler<HttpRequest<?>, MutableHttpResponse<?>> serverHandler;
-    private final TraceContext.Extractor<HttpHeaders> extractor;
+    private final HttpServerHandler<HttpServerRequest, HttpServerResponse> serverHandler;
     private final io.opentracing.Tracer openTracer;
 
     /**
@@ -50,16 +49,16 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
     public BraveTracingServerFilter(
             HttpTracing httpTracing,
             io.opentracing.Tracer openTracer,
-            HttpServerHandler<HttpRequest<?>, MutableHttpResponse<?>> serverHandler) {
+            HttpServerHandler<HttpServerRequest, HttpServerResponse> serverHandler) {
         super(httpTracing);
         this.openTracer = openTracer;
         this.serverHandler = serverHandler;
-        this.extractor = httpTracing.tracing().propagation().extractor(ConvertibleMultiValues::get);
     }
 
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        Span span = serverHandler.handleReceive(extractor, request.getHeaders(), request);
+        HttpServerRequest httpServerRequest = mapRequest(request);
+        Span span = serverHandler.handleReceive(httpServerRequest);
         return new HttpServerTracingPublisher(
                 chain.proceed(request),
                 request,
@@ -68,6 +67,36 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
                 openTracer,
                 span
         );
+    }
+
+    private HttpServerRequest mapRequest(HttpRequest<?> request) {
+        return new HttpServerRequest() {
+                @Override
+                public String method() {
+                    return request.getMethodName();
+                }
+
+                @Override
+                public String path() {
+                    return request.getPath();
+                }
+
+                @Override
+                public String url() {
+                    return request.getUri().toString();
+                }
+
+                @Override
+                public String header(String name) {
+                    return request.getHeaders().get(name);
+                }
+
+                @Override
+                public Object unwrap() {
+                    return request;
+                }
+
+            };
     }
 
 }
