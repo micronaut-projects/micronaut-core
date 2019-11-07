@@ -108,6 +108,7 @@ httpServer:
     title: Server Side View Rendering
   openapi: OpenAPI / Swagger Support
   graphql: GraphQL Support
+  coroutines: Coroutines Support
 httpClient:
   title: The HTTP Client
   lowLevelHttpClient:
