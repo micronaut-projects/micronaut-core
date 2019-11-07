@@ -1,3 +1,7 @@
+plugins {
+    id "org.jetbrains.kotlin.jvm" version "1.3.50"
+}
+
 shadowJar.enabled = true
 shadowJar {
     exclude "module-info.class"
@@ -7,7 +11,9 @@ dependencies {
     compile dependencyVersion("slf4j")
     compile dependencyVersion("reactive.streams")
     compile dependencyVersion("jsr305")
-    
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
+    compileOnly "org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion"
+
     compileOnly "org.ow2.asm:asm-tree:$asmVersion"
     shadowCompile "org.ow2.asm:asm:$asmVersion"
     shadowCompile "org.ow2.asm:asm-commons:$asmVersion"
