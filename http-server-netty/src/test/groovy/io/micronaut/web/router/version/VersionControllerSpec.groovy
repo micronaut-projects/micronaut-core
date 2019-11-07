@@ -22,7 +22,6 @@ import io.micronaut.http.server.netty.converters.DuplicateRouteHandler
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.UriRouteMatch
 import io.micronaut.web.router.exceptions.DuplicateRouteException
-
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -33,8 +32,9 @@ class VersionControllerSpec extends Specification {
     @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.name'                          : 'VersionControllerSpec',
-            "micronaut.router.versioning.enabled": "true"
+            'spec.name'                                 : 'VersionControllerSpec',
+            "micronaut.router.versioning.enabled"       : "true",
+            "micronaut.router.versioning.header.enabled": "true"
     ])
 
 
@@ -44,6 +44,22 @@ class VersionControllerSpec extends Specification {
 
     BlockingHttpClient getClient() {
         httpClient.toBlocking()
+    }
+
+    void "if I supply a wrong version, then response status should be BAD_REQUEST"() {
+        given:
+        HttpRequest request = HttpRequest.GET("/versioned/hello").header("X-API-VERSION", "4")
+
+        expect:
+        embeddedServer.applicationContext.containsBean(VersionedController)
+        embeddedServer.applicationContext.containsBean(DuplicateRouteWithVersionExceptionHandler)
+
+        when:
+        client.exchange(request, String)
+
+        then:
+        HttpClientResponseException e = thrown()
+        e.response.status() == HttpStatus.BAD_REQUEST
     }
 
     void "if I do not supply a version, and there are multiple versioned routes a DuplicateRouteException is thrown"() {
@@ -101,12 +117,12 @@ class VersionControllerSpec extends Specification {
         private boolean areAllUriRoutesAnnotatedWith(List<UriRouteMatch<Object, Object>> uriRoutes,
                                                      Class annotationClass,
                                                      Class annotationValue) {
-            uriRoutes.every {uriRoute ->
-                    AnnotationValue versionAnnotationValue = uriRoute.getAnnotation(annotationClass)
-                    if (versionAnnotationValue == null) {
-                        return false
-                    }
-                    versionAnnotationValue.getValue(annotationValue).isPresent()
+            uriRoutes.every { uriRoute ->
+                AnnotationValue versionAnnotationValue = uriRoute.getAnnotation(annotationClass)
+                if (versionAnnotationValue == null) {
+                    return false
+                }
+                versionAnnotationValue.getValue(annotationValue).isPresent()
             }
         }
     }
