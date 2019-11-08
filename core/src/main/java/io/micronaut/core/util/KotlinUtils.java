@@ -36,7 +36,6 @@ public class KotlinUtils {
 
         try {
             Class.forName("kotlin.coroutines.Continuation"); // kotlin-stdlib
-            Class.forName("kotlin.reflect.jvm.ReflectJvmMapping"); // kotlin-reflect
             areKotlinCoroutinesSupportedCandidate = true;
         } catch (Exception | NoClassDefFoundError e) {
             areKotlinCoroutinesSupportedCandidate = false;
