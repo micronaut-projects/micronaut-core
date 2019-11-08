@@ -11,3 +11,4 @@ In the client and server, an argument of type api:http.BasicAuth[] can be used t
 === Request Certificate
 
 For SSL requests, the certificate is now available as a request attribute. See api:http.HttpRequest#getCertificate--[HttpRequest#getCertificate]
+
