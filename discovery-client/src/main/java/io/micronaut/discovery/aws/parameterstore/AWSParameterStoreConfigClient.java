@@ -58,7 +58,7 @@ import java.util.concurrent.Future;
 @Requires(beans = AWSParameterStoreConfiguration.class)
 @BootstrapContextCompatible
 public class AWSParameterStoreConfigClient implements ConfigurationClient {
-    
+
     private static final Logger LOG = LoggerFactory.getLogger(AWSParameterStoreConfiguration.class);
     private final AWSClientConfiguration awsConfiguration;
     private final AWSParameterStoreConfiguration awsParameterStoreConfiguration;
@@ -152,6 +152,9 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
             parameterFlowable.subscribe(
                     parametersWithBasePath -> {
                         if (parametersWithBasePath.parameters.isEmpty()) {
+                            if (LOG.isTraceEnabled()) {
+                                LOG.trace("parameterBasePath={} no parameters found", parametersWithBasePath.basePath);
+                            }
                             return;
                         }
                         String key = parametersWithBasePath.basePath;
@@ -162,7 +165,9 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                             String fullName = key.substring(pathPrefix.length() + 1);
                             Set<String> propertySourceNames = calcPropertySourceNames(fullName, activeNames);
                             Map<String, Object> properties = convertParametersToMap(parametersWithBasePath);
-
+                            if (LOG.isTraceEnabled()) {
+                                properties.keySet().iterator().forEachRemaining(param -> LOG.trace("param found: parameterBasePath={} parameter={}", parametersWithBasePath.basePath, param));
+                            }
                             for (String propertySourceName : propertySourceNames) {
                                 String envName = ClientUtil.resolveEnvironment(propertySourceName, activeNames);
                                 LocalSource localSource = propertySources.computeIfAbsent(propertySourceName, s -> new LocalSource(isApplicationSpecificConfigKey, envName, propertySourceName));
@@ -181,6 +186,9 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                             }
                             if (localSource.appSpecific) {
                                 priority++;
+                            }
+                            if (LOG.isTraceEnabled()) {
+                                LOG.trace("source={} got priority={}", localSource.name, priority);
                             }
                             emitter.onNext(PropertySource.of(Route53ClientDiscoveryConfiguration.SERVICE_ID + '-' + localSource.name, localSource.values, priority));
                         }
@@ -229,20 +237,46 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
     private Publisher<ParametersWithBasePath> getParametersRecursive(String path) {
         return Flowable.concat(
                 Flowable.fromPublisher(getParameters(path)).map(r -> new ParametersWithBasePath(path, r.getParameters())),
-                Flowable.fromPublisher(getHierarchy(path)).map(r -> new ParametersWithBasePath(path, r.getParameters()))
+                Flowable.fromPublisher(getHierarchy(path, new ArrayList<>(), null)).map(r -> new ParametersWithBasePath(path, r))
         );
+    }
+
+    private Flowable<List<Parameter>> getHierarchy(final String path, final List<Parameter> parameters, final String nextToken) {
+        Flowable<GetParametersByPathResult> paramPage = Flowable.fromPublisher(getHierarchy(path, nextToken));
+
+        return paramPage.flatMap(getParametersByPathResult -> {
+            List<Parameter> params = getParametersByPathResult.getParameters();
+
+            if (getParametersByPathResult.getNextToken() != null) {
+                return Flowable.merge(
+                        Flowable.just(parameters),
+                        getHierarchy(path, params, getParametersByPathResult.getNextToken())
+                    );
+            } else {
+                return Flowable.merge(
+                        Flowable.just(parameters),
+                        Flowable.just(params)
+                );
+            }
+        });
     }
 
     /**
      * Gets the Parameter hierarchy from AWS parameter store.
      * Please note this only returns something if the current node has children and will not return itself.
      *
+     *
      * @param path path based on the parameter names PRIORITY_TOP.e. /config/application/.*
+     * @param nextToken token to paginate in the resultset from AWS
      * @return Publisher for GetParametersByPathResult
      */
-    private Publisher<GetParametersByPathResult> getHierarchy(String path) {
-
-        GetParametersByPathRequest getRequest = new GetParametersByPathRequest().withWithDecryption(awsParameterStoreConfiguration.getUseSecureParameters()).withPath(path).withRecursive(true);
+    private Publisher<GetParametersByPathResult> getHierarchy(String path, String nextToken) {
+        LOG.trace("Retrieving parameters by path {}, pagination requested: {}", path, nextToken != null);
+        GetParametersByPathRequest getRequest = new GetParametersByPathRequest()
+                .withWithDecryption(awsParameterStoreConfiguration.getUseSecureParameters())
+                .withPath(path)
+                .withRecursive(true)
+                .withNextToken(nextToken);
 
         Future<GetParametersByPathResult> future = client.getParametersByPathAsync(getRequest);
 
