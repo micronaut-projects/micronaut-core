@@ -21,9 +21,7 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
 import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
-import io.micronaut.tracing.instrument.util.TracingCallable;
-import io.micronaut.tracing.instrument.util.TracingRunnable;
-import io.opentracing.Tracer;
+import io.micronaut.tracing.instrument.TracingWrapper;
 
 import javax.inject.Singleton;
 import java.util.concurrent.Callable;
@@ -31,13 +29,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
- * Instruments runnable threads with {@link Tracer}.
+ * Instruments runnable threads with {@link TracingWrapper}.
  *
  * @author graemerocher
  * @since 1.0
  */
 @Singleton
-@Requires(beans = Tracer.class)
+@Requires(beans = TracingWrapper.class)
 @Requires(property = ExecutorServiceInstrumenter.PROPERTY_INSTRUMENT_THREADS,
           value = StringUtils.TRUE,
           defaultValue = StringUtils.FALSE)
@@ -48,15 +46,15 @@ public class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exe
      */
     public static final String PROPERTY_INSTRUMENT_THREADS = "tracing.instrument-threads";
 
-    private final Tracer tracer;
+    private final TracingWrapper tracingWrapper;
 
     /**
      * Creates a new {@link ExecutorServiceInstrumenter}.
      *
-     * @param tracer The tracer
+     * @param tracingWrapper The tracingWrapper
      */
-    public ExecutorServiceInstrumenter(Tracer tracer) {
-        this.tracer = tracer;
+    public ExecutorServiceInstrumenter(TracingWrapper tracingWrapper) {
+        this.tracingWrapper = tracingWrapper;
     }
 
     @Override
@@ -71,12 +69,12 @@ public class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exe
 
                 @Override
                 public <T> Callable<T> instrument(Callable<T> task) {
-                    return new TracingCallable<>(task, tracer);
+                    return tracingWrapper.wrap(task);
                 }
 
                 @Override
                 public Runnable instrument(Runnable command) {
-                    return new TracingRunnable(command, tracer);
+                    return tracingWrapper.wrap(command);
                 }
             };
         } else {
@@ -88,12 +86,12 @@ public class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exe
 
                 @Override
                 public <T> Callable<T> instrument(Callable<T> task) {
-                    return new TracingCallable<>(task, tracer);
+                    return tracingWrapper.wrap(task);
                 }
 
                 @Override
                 public Runnable instrument(Runnable command) {
-                    return new TracingRunnable(command, tracer);
+                    return tracingWrapper.wrap(command);
                 }
             };
         }
