@@ -923,6 +923,195 @@ class ParentBean {
         context?.close()
     }
 
+    void "test static creator"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+    private String name;
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    @Creator
+    public static Test forName(String name) {
+        return new Test(name);
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Sally"
+
+        when:
+        introspection.instantiate(new Object[0])
+
+        then:
+        thrown(InstantiationException)
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "test static creator with no args"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+    private String name;
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    @Creator
+    public static Test forName() {
+        return new Test("default");
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        thrown(InstantiationException)
+
+        when:
+        instance = introspection.instantiate(new Object[0])
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+
+        when:
+        instance = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+    }
+
+    void "test static creator multiple"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+    private String name;
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    @Creator
+    public static Test forName() {
+        return new Test("default");
+    }
+    
+    @Creator
+    public static Test forName(String name) {
+        return new Test(name);
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Sally"
+
+        when:
+        instance = introspection.instantiate(new Object[0])
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+
+        when:
+        instance = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+    }
+
+    void "test kotlin static creator"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+
+    private final String name;
+    public static final Companion Companion = new Companion();
+    
+    public final String getName() {
+        return name;
+    }
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    public static final class Companion {
+        
+        @Creator
+        public final Test forName(String name) {
+            return new Test(name);
+        }
+        
+        private Companion() {
+        }
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Apple")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Apple"
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {

@@ -26,6 +26,7 @@ import static javax.lang.model.type.TypeKind.ERROR;
 import static javax.lang.model.type.TypeKind.NONE;
 import static javax.lang.model.type.TypeKind.VOID;
 
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
@@ -229,16 +230,61 @@ public class ModelUtils {
         return element.orElse(null);
     }
 
+    public ExecutableElement staticCreatorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
+         List<ExecutableElement> creators = findNonPrivateStaticCreators(classElement, annotationUtils);
+
+        if (creators.isEmpty()) {
+            return null;
+        }
+        if (creators.size() == 1) {
+            return creators.get(0);
+        }
+
+        //Can be multiple static @Creator methods. Prefer one with args here. The no arg method (if present) will
+        //be picked up by staticDefaultCreatorFor
+        List<ExecutableElement> withArgs = creators.stream().filter(method -> !method.getParameters().isEmpty()).collect(Collectors.toList());
+
+        if (withArgs.size() == 1) {
+            return withArgs.get(0);
+        } else {
+            creators = withArgs;
+        }
+
+        return creators.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
+    }
+
     /**
      * @param classElement The class element
      * @return True if the element has a non private 0 arg constructor
      */
-    public boolean hasDefaultConstructor(TypeElement classElement) {
-        List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
+    public ExecutableElement defaultConstructorFor(TypeElement classElement) {
+        List<ExecutableElement> constructors = findNonPrivateConstructors(classElement)
+                .stream().filter(ctor -> ctor.getParameters().isEmpty()).collect(Collectors.toList());
+
         if (constructors.isEmpty()) {
-            return false;
+            return null;
         }
-        return constructors.stream().anyMatch(ctor -> ctor.getParameters().isEmpty());
+
+        if (constructors.size() == 1) {
+            return constructors.get(0);
+        }
+
+        return constructors.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
+    }
+
+    public ExecutableElement defaultStaticCreatorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
+        List<ExecutableElement> creators = findNonPrivateStaticCreators(classElement, annotationUtils)
+                .stream().filter(ctor -> ctor.getParameters().isEmpty()).collect(Collectors.toList());
+
+        if (creators.isEmpty()) {
+            return null;
+        }
+
+        if (creators.size() == 1) {
+            return creators.get(0);
+        }
+
+        return creators.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
     }
 
     /**
@@ -251,6 +297,42 @@ public class ModelUtils {
         return ctors.stream()
             .filter(ctor -> !ctor.getModifiers().contains(PRIVATE))
             .collect(Collectors.toList());
+    }
+
+    List<ExecutableElement> findNonPrivateStaticCreators(TypeElement classElement, AnnotationUtils annotationUtils) {
+        List<? extends Element> enclosedElements = classElement.getEnclosedElements();
+        List<ExecutableElement> staticCreators = ElementFilter.methodsIn(enclosedElements)
+                .stream()
+                .filter(method -> method.getModifiers().contains(STATIC))
+                .filter(method -> !method.getModifiers().contains(PRIVATE))
+                .filter(method -> method.getReturnType().equals(classElement.asType()))
+                .filter(method -> {
+                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
+                    return annotationMetadata.hasStereotype(Creator.class);
+                })
+                .collect(Collectors.toList());
+
+        if (staticCreators.isEmpty()) {
+            TypeElement companionClass = ElementFilter.typesIn(enclosedElements)
+                    .stream()
+                    .filter(type -> type.getSimpleName().toString().equals("Companion"))
+                    .filter(type -> type.getModifiers().contains(STATIC))
+                    .findFirst().orElse(null);
+
+            if (companionClass != null) {
+                staticCreators = ElementFilter.methodsIn(companionClass.getEnclosedElements())
+                        .stream()
+                        .filter(method -> !method.getModifiers().contains(PRIVATE))
+                        .filter(method -> method.getReturnType().equals(classElement.asType()))
+                        .filter(method -> {
+                            final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
+                            return annotationMetadata.hasStereotype(Creator.class);
+                        })
+                        .collect(Collectors.toList());
+            }
+        }
+
+        return staticCreators;
     }
 
     /**

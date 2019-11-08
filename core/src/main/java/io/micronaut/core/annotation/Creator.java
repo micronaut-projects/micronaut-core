@@ -31,6 +31,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.CONSTRUCTOR, ElementType.ANNOTATION_TYPE})
+@Target({ElementType.CONSTRUCTOR, ElementType.ANNOTATION_TYPE, ElementType.METHOD})
 public @interface Creator {
 }
