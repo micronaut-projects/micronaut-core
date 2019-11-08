@@ -31,17 +31,22 @@ public class KotlinUtils {
      */
     public static final boolean KOTLIN_COROUTINES_SUPPORTED;
 
+    private static final Object COROUTINE_SUSPENDED;
+
     static {
         boolean areKotlinCoroutinesSupportedCandidate;
+        Object coroutineSuspendedCandidate;
 
         try {
-            Class.forName("kotlin.coroutines.Continuation"); // kotlin-stdlib
+            coroutineSuspendedCandidate = IntrinsicsKt.getCOROUTINE_SUSPENDED();
             areKotlinCoroutinesSupportedCandidate = true;
-        } catch (Exception | NoClassDefFoundError e) {
+        } catch (NoClassDefFoundError e) {
+            coroutineSuspendedCandidate = null;
             areKotlinCoroutinesSupportedCandidate = false;
         }
 
         KOTLIN_COROUTINES_SUPPORTED = areKotlinCoroutinesSupportedCandidate;
+        COROUTINE_SUSPENDED = coroutineSuspendedCandidate;
     }
 
     /**
@@ -51,6 +56,6 @@ public class KotlinUtils {
      * @return True if given object is an indicating that a  <code>suspend</code> function suspended.
      */
     public static boolean isKotlinCoroutineSuspended(@Nullable Object obj) {
-        return KOTLIN_COROUTINES_SUPPORTED && obj == IntrinsicsKt.getCOROUTINE_SUSPENDED();
+        return KOTLIN_COROUTINES_SUPPORTED && obj == COROUTINE_SUSPENDED;
     }
 }
