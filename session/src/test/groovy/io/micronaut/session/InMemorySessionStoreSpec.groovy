@@ -89,7 +89,7 @@ class InMemorySessionStoreSpec extends Specification {
         when:
         ApplicationContext applicationContext = ApplicationContext.run([
                 'micronaut.session.prompt-expiration': true,
-                'micronaut.session.max-inactive-interval': 'PT1S'
+                'micronaut.session.max-inactive-interval': 'PT3S'
         ])
         SessionStore sessionStore = applicationContext.getBean(SessionStore)
         TestListener listener = applicationContext.getBean(TestListener)
@@ -114,6 +114,7 @@ class InMemorySessionStoreSpec extends Specification {
         listener.events[0] instanceof SessionCreatedEvent
 
         when:
+        Thread.sleep(10)
         session == sessionStore.findSession(session.id).get().get()
         def conditions = new PollingConditions(timeout: 10)
 
