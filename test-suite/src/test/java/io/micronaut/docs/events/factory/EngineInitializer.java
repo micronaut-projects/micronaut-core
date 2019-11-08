@@ -12,7 +12,7 @@ public class EngineInitializer implements BeanInitializedEventListener<EngineFac
     public EngineFactory onInitialized(BeanInitializingEvent<EngineFactory> event) {
         EngineFactory engineFactory = event.getBean();
         engineFactory.setRodLength(6.6);// <5>
-        return ((EngineFactory) (event.getBean()));
+        return engineFactory;
     }
 }
 // tag::class[]
