@@ -78,7 +78,7 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
             futureTask.isDone() >> { return true }
             futureTask.get() >> {
                 GetParametersByPathResult result = new GetParametersByPathResult()
-/*                ArrayList<Parameter> parameters = new ArrayList<Parameter>()
+                ArrayList<Parameter> parameters = new ArrayList<Parameter>()
                 if (getRequest.path == "/config/application") {
                     Parameter parameter = new Parameter()
                     parameter.name = "/config/application"
@@ -86,11 +86,10 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
                     parameter.type = "StringList"
                     parameters.add(parameter)
                 }
-                result.setParameters(parameters)*/
+                result.setParameters(parameters)
                 result;
             }
             return futureTask;
-
         }
 
         client.client.getParametersAsync(_) >> { GetParametersRequest getRequest->
@@ -187,17 +186,42 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
             }
             return futureTask;
 
+
+            when:
+            def env = Mock(Environment)
+            env.getActiveNames() >> (['test'] as Set)
+            List<PropertySource> propertySources = Flowable.fromPublisher(client.getPropertySources(env)).toList().blockingGet()
+
+            then: "verify property source characteristics"
+            propertySources.size() == 2
+            propertySources[0].order > EnvironmentPropertySource.POSITION
+            propertySources[0].name == 'route53-application'
+            propertySources[0].get('datasource.url') == "mysql://blah"
+            propertySources[0].size() == 21
+            propertySources[1].name == 'route53-application[test]'
+            propertySources[1].get("foo") == "bar"
+            propertySources[1].order > propertySources[0].order
+            propertySources[1].toList().size() == 1
+        }
+    }
+
+    void "given a nextToken from AWS, client should paginate to retrieve all properties"() {
+        given:
+        String paramPath = "/config/application"
+        client.client.getParametersByPathAsync({ req -> req.nextToken == null} as GetParametersByPathRequest) >> { GetParametersByPathRequest req ->
+            setupParamByPathResultMock(paramPath, req, 1..10)
+        }
+        client.client.getParametersByPathAsync({ req -> req.nextToken != null} as GetParametersByPathRequest) >> { GetParametersByPathRequest req ->
+            setupParamByPathResultMock(paramPath, req, 11..20)
         }
 
         client.client.getParametersAsync(_) >> {  GetParametersRequest getRequest->
-
             FutureTask<GetParametersResult> futureTask = Mock(FutureTask)
             futureTask.isDone() >> { return true }
             futureTask.get() >> {
                 GetParametersResult result = new GetParametersResult()
                 ArrayList<Parameter> parameters = new ArrayList<Parameter>()
-                if (getRequest.names.contains("/config/application")) {
-
+                if (getRequest.names.contains(paramPath)) {
                     Parameter parameter = new Parameter()
                     parameter.name = "/config/application/datasource/url"
                     parameter.value = "mysql://blah"
@@ -230,11 +254,38 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
         propertySources[0].order > EnvironmentPropertySource.POSITION
         propertySources[0].name == 'route53-application'
         propertySources[0].get('datasource.url') == "mysql://blah"
-        propertySources[0].size() == 2
+        propertySources[0].get('parameter-1') == "parameter-value-1"
+        propertySources[0].get('parameter-15') == "parameter-value-15"
+        propertySources[0].size() == 21
         propertySources[1].name == 'route53-application[test]'
         propertySources[1].get("foo") == "bar"
         propertySources[1].order > propertySources[0].order
         propertySources[1].toList().size() == 1
+
+    }
+
+    FutureTask setupParamByPathResultMock(String paramPath, GetParametersByPathRequest req, IntRange paramRange) {
+        FutureTask<GetParametersByPathResult> futureTask = Mock(FutureTask)
+        futureTask.isDone() >> { return true }
+        futureTask.get() >> {
+            GetParametersByPathResult result = new GetParametersByPathResult()
+            ArrayList<Parameter> parameters = new ArrayList<Parameter>()
+            if(req.path == paramPath) {
+                (paramRange).each {
+                    Parameter parameter = new Parameter()
+                    parameter.name = "${paramPath}/parameter-${it}"
+                    parameter.value = "parameter-value-${it}"
+                    parameter.type = "String"
+                    parameters.add(parameter)
+                }
+
+                result.nextToken = req.nextToken == null ? "nextPage" : null
+            }
+
+            result.setParameters(parameters)
+            result
+        }
+        return futureTask
     }
 
 

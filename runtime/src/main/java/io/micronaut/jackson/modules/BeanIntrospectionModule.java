@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import com.fasterxml.jackson.databind.introspect.VirtualAnnotatedMember;
+import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
 import com.fasterxml.jackson.databind.ser.BeanSerializerBuilder;
@@ -268,7 +269,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                 final Argument<?>[] constructorArguments = introspection.getConstructorArguments();
                 final TypeFactory typeFactory = config.getTypeFactory();
-                builder.setValueInstantiator(new StdValueInstantiator(config, config.getTypeFactory().constructType(beanClass)) {
+                builder.setValueInstantiator(new StdValueInstantiator(config, typeFactory.constructType(beanClass)) {
 
                     @Override
                     public SettableBeanProperty[] getFromObjectArguments(DeserializationConfig config) {
@@ -281,11 +282,17 @@ public class BeanIntrospectionModule extends SimpleModule {
                             final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
                             PropertyMetadata propertyMetadata = newPropertyMetadata(argument, annotationMetadata);
                             final String simpleName = annotationMetadata.stringValue(JsonProperty.class).orElse(argument.getName());
+                            TypeDeserializer typeDeserializer;
+                            try {
+                                typeDeserializer = config.findTypeDeserializer(javaType);
+                            } catch (JsonMappingException e) {
+                                typeDeserializer = null;
+                            }
                             props[i] = new CreatorProperty(
                                     PropertyName.construct(simpleName),
                                     javaType,
                                     null,
-                                    null,
+                                    typeDeserializer,
                                     null,
                                     null,
                                     i,
@@ -371,7 +378,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                     @Override
                     public Object createFromObjectWith(DeserializationContext ctxt, Object[] args) throws IOException {
-                        return introspection.instantiate(args);
+                        return introspection.instantiate(false, args);
                     }
                 });
                 return builder;
