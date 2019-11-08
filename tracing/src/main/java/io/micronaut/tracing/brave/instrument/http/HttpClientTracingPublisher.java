@@ -21,6 +21,7 @@ import brave.Tracing;
 import brave.http.HttpClientHandler;
 import brave.http.HttpTracing;
 import brave.propagation.TraceContext;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
@@ -72,6 +73,7 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
     public void subscribe(Subscriber<? super HttpResponse<?>> actual) {
         brave.Span span = clientHandler.handleSend(injector, request.getHeaders(), request);
         request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
+        String serviceName = request.getAttribute(HttpAttributes.SERVICE_ID, String.class).orElse(null);
         try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
             publisher.subscribe(new Subscriber<HttpResponse<?>>() {
                 @Override
@@ -85,7 +87,7 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
                 public void onNext(HttpResponse<?> response) {
                     try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
                         configureAttributes(response);
-                        configureSpan(span);
+                        configureSpan(span, serviceName);
                         HttpStatus status = response.getStatus();
                         if (status.getCode() > HTTP_SUCCESS_CODE_UPPER_LIMIT) {
                             span.tag(AbstractOpenTracingFilter.TAG_HTTP_STATUS_CODE, String.valueOf(status.getCode()));
@@ -98,7 +100,7 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
                 @Override
                 public void onError(Throwable error) {
                     try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
-                        configureSpan(span);
+                        configureSpan(span, serviceName);
                         if (error instanceof HttpClientResponseException) {
                             HttpClientResponseException e = (HttpClientResponseException) error;
                             HttpResponse<?> response = e.getResponse();
@@ -122,8 +124,11 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
         }
     }
 
-    private void configureSpan(Span span) {
+    private void configureSpan(Span span, String serviceName) {
         span.kind(Span.Kind.CLIENT);
+        if (StringUtils.isNotEmpty(serviceName)) {
+            span.remoteServiceName(serviceName);
+        }
         span.tag(AbstractOpenTracingFilter.TAG_METHOD, request.getMethod().name());
         String path = request.getPath();
         span.tag(AbstractOpenTracingFilter.TAG_PATH, path);
