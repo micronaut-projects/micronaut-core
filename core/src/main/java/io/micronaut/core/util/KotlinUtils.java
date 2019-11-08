@@ -15,9 +15,9 @@
  */
 package io.micronaut.core.util;
 
-import javax.annotation.Nonnull;
+import kotlin.coroutines.intrinsics.IntrinsicsKt;
+
 import javax.annotation.Nullable;
-import java.lang.reflect.Method;
 
 /**
  * <p>Utility methods for working with Kotlin <code>suspend</code> functions</p>.
@@ -46,32 +46,12 @@ public class KotlinUtils {
     }
 
     /**
-     * Kotlin <code>suspend</code> function check.
-     *
-     * @param method method to be checked
-     * @return True if given method is a <code>suspend</code> function.
-     */
-    public static boolean isKotlinSuspendingFunction(@Nonnull Method method) {
-        return KOTLIN_COROUTINES_SUPPORTED && KotlinUtilsNative.isKotlinSuspendingFunction(method);
-    }
-
-    /**
      * Kotlin <code>suspend</code> function result check.
      *
      * @param obj object to be checked
      * @return True if given object is an indicating that a  <code>suspend</code> function suspended.
      */
     public static boolean isKotlinCoroutineSuspended(@Nullable Object obj) {
-        return KOTLIN_COROUTINES_SUPPORTED && KotlinUtilsNative.isKotlinCoroutineSuspended(obj);
-    }
-
-    /**
-     * Kotlin <code>suspend</code> function return type check.
-     *
-     * @param method method to be checked
-     * @return True if given <code>suspend</code> function's return type is <code>Unit</code>.
-     */
-    public static boolean isKotlinFunctionReturnTypeUnit(@Nonnull Method method) {
-        return KOTLIN_COROUTINES_SUPPORTED && KotlinUtilsNative.isKotlinFunctionReturnTypeUnit(method);
+        return KOTLIN_COROUTINES_SUPPORTED && obj == IntrinsicsKt.getCOROUTINE_SUSPENDED();
     }
 }

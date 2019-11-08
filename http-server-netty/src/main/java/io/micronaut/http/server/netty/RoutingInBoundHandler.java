@@ -149,8 +149,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
-import static io.micronaut.core.util.KotlinUtils.isKotlinFunctionReturnTypeUnit;
-import static io.micronaut.core.util.KotlinUtils.isKotlinSuspendingFunction;
+import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
+import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinSuspendingFunction;
 
 /**
  * Internal implementation of the {@link io.netty.channel.ChannelInboundHandler} for Micronaut.
@@ -332,9 +332,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Class<?> javaReturnType = errorRoute.getReturnType().getType();
                 boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
                 boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
-                boolean isKotlinSuspendingFunction = isKotlinSuspendingFunction(methodBasedRoute.getTargetMethod());
+                boolean isKotlinSuspendingFunction = isKotlinSuspendingFunction(methodBasedRoute.getExecutableMethod());
                 boolean isKotlinFunctionReturnTypeUnit = isKotlinSuspendingFunction &&
-                        isKotlinFunctionReturnTypeUnit(methodBasedRoute.getTargetMethod());
+                        isKotlinFunctionReturnTypeUnit(methodBasedRoute.getExecutableMethod());
                 Flowable resultFlowable = Flowable.defer(() -> {
                       Object result = methodBasedRoute.execute();
                       MutableHttpResponse<?> response = errorResultToResponse(result, methodBasedRoute);
@@ -1006,9 +1006,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
             boolean isKotlinSuspendingFunction =
                     finalRoute instanceof MethodBasedRouteMatch &&
-                    isKotlinSuspendingFunction(((MethodBasedRouteMatch) finalRoute).getTargetMethod());
+                    isKotlinSuspendingFunction(((MethodBasedRouteMatch) finalRoute).getExecutableMethod());
             boolean isKotlinFunctionReturnTypeUnit = isKotlinSuspendingFunction &&
-                    isKotlinFunctionReturnTypeUnit(((MethodBasedRouteMatch) finalRoute).getTargetMethod());
+                    isKotlinFunctionReturnTypeUnit(((MethodBasedRouteMatch) finalRoute).getExecutableMethod());
             boolean isSingle =
                     isReactiveReturnType && Publishers.isSingle(javaReturnType) ||
                             isResponsePublisher(genericReturnType, javaReturnType) ||
