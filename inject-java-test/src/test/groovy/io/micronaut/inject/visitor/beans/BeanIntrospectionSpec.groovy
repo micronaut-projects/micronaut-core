@@ -923,6 +923,41 @@ class ParentBean {
         context?.close()
     }
 
+    void "test constructor argument generics"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+import com.fasterxml.jackson.annotation.*;
+
+@Introspected
+class Test {
+    private Map<String, String> properties;
+    
+    @Creator
+    Test(Map<String, String> properties) {
+        this.properties = properties;
+    }
+    
+    public Map<String, String> getProperties() {
+        return properties;
+    }
+    public void setProperties(Map<String, String> properties) {
+        this.properties = properties;
+    }
+}
+
+''')
+
+        expect:
+        introspection != null
+        introspection.constructorArguments[0].getTypeVariable("K").get().getType() == String
+        introspection.constructorArguments[0].getTypeVariable("V").get().getType() == String
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {

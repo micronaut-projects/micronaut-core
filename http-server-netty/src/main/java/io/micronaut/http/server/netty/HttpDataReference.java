@@ -23,7 +23,7 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
-import io.reactivex.subjects.ReplaySubject;
+import io.reactivex.processors.UnicastProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +49,7 @@ public class HttpDataReference {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpDataReference.class);
 
-    final AtomicReference<ReplaySubject> subject = new AtomicReference<>();
+    final AtomicReference<UnicastProcessor> subject = new AtomicReference<>();
     final AtomicReference<StreamingFileUpload> upload = new AtomicReference<>();
 
     private final HttpData data;

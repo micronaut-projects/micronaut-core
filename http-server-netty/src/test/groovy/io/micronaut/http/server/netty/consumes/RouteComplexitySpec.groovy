@@ -46,6 +46,13 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
         then:
         noExceptionThrown()
         body == "list"
+
+        when:
+        body = rxClient.retrieve(HttpRequest.GET("/test-complexity/length/abc")).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        body == "abc"
     }
 
     @Requires(property = "spec.name", value = "RouteComplexitySpec")
@@ -92,5 +99,14 @@ class RouteComplexitySpec extends AbstractMicronautSpec {
             path
         }
 
+        @Get("/length/{level1}") // only 1 raw segment, but raw segment length has priority
+        String lengthCompare(String level1) {
+            level1
+        }
+
+        @Get("/{level1}/{level2}") // 2 raw segments
+        String lengthCompare2(String level1, String level2) {
+            level1
+        }
     }
 }
