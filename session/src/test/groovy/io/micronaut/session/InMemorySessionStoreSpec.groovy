@@ -31,7 +31,7 @@ class InMemorySessionStoreSpec extends Specification {
         session.lastAccessedTime
 
         when:
-        sessionStore.save(session)
+        sessionStore.save(session).get()
         def lastAccessedTime = session.lastAccessedTime
 
         then:
@@ -106,7 +106,7 @@ class InMemorySessionStoreSpec extends Specification {
         session.lastAccessedTime
 
         when:
-        sessionStore.save(session)
+        sessionStore.save(session).get()
         def lastAccessedTime = session.lastAccessedTime
 
         then:
@@ -114,7 +114,6 @@ class InMemorySessionStoreSpec extends Specification {
         listener.events[0] instanceof SessionCreatedEvent
 
         when:
-        Thread.sleep(10)
         session == sessionStore.findSession(session.id).get().get()
         def conditions = new PollingConditions(timeout: 10)
 
