@@ -149,6 +149,48 @@ class HttpTracingSpec extends Specification {
         context.close()
     }
 
+    void "tested nested http tracing with server without tracing"() {
+        given:
+        ApplicationContext appWithoutTracing = ApplicationContext.build().start()
+        EmbeddedServer embeddedServerWithoutTracing = appWithoutTracing.getBean(EmbeddedServer).start()
+
+        ApplicationContext context = ApplicationContext.build(
+                'tracing.zipkin.enabled':true,
+                'tracing.zipkin.sampler.probability':1,
+                'micronaut.http.services.not-traced-client.urls[0]':"http://localhost:${embeddedServerWithoutTracing.port}",
+        )
+        .singletons(new StrictCurrentTraceContext(), new TestReporter())
+        .start()
+
+        TestReporter reporter = context.getBean(TestReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/nested-not-traced/John', String)
+
+        then:
+        response
+        reporter.spans.size() == 3
+        reporter.spans[0].tags().get('http.path') == '/not-traced/hello/John'
+        reporter.spans[0].name() == 'get /not-traced/hello/{name}'
+        reporter.spans[0].kind() == zipkin2.Span.Kind.CLIENT
+        reporter.spans[0].remoteEndpoint().serviceName() == "not-traced-client"
+        reporter.spans[1].name() == 'get /traced/nested-not-traced/{name}'
+        reporter.spans[1].kind() == zipkin2.Span.Kind.SERVER
+        reporter.spans[1].tags().get('http.method') == 'GET'
+        reporter.spans[1].tags().get('http.path') == '/traced/nested-not-traced/John'
+        reporter.spans[2].tags().get("foo") == null
+        reporter.spans[2].tags().get('http.path') == '/traced/nested-not-traced/John'
+        reporter.spans[2].name() == 'get'
+        reporter.spans[2].kind() == zipkin2.Span.Kind.CLIENT
+
+        cleanup:
+        client.close()
+        context.close()
+        appWithoutTracing.close()
+    }
+
     void "tested nested http error tracing"() {
         given:
         ApplicationContext context = buildContext()
@@ -214,6 +256,7 @@ class HttpTracingSpec extends Specification {
     static class TracedController {
         @Inject SpanCustomizer spanCustomizer
         @Inject TracedClient tracedClient
+        @Inject NotTracedEndpointClient notTracedEndpointClient
 
         @Get("/hello/{name}")
         String hello(String name) {
@@ -239,6 +282,11 @@ class HttpTracingSpec extends Specification {
             tracedClient.hello(name)
         }
 
+        @Get("/nested-not-traced/{name}")
+        String nestedNotTraced(String name) {
+            notTracedEndpointClient.hello(name)
+        }
+
         @Get("/nestedError/{name}")
         String nestedError(String name) {
             tracedClient.error(name)
@@ -252,5 +300,20 @@ class HttpTracingSpec extends Specification {
 
         @Get("/error/{name}")
         String error(String name)
+    }
+
+    @Controller('/not-traced')
+    static class NotTracedController {
+
+        @Get("/hello/{name}")
+        String hello(String name) {
+            return name
+        }
+    }
+
+    @Client(id = "not-traced-client")
+    static interface NotTracedEndpointClient {
+        @Get("/not-traced/hello/{name}")
+        String hello(String name)
     }
 }

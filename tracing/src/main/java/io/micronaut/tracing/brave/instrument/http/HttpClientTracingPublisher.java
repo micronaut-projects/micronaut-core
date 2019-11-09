@@ -20,6 +20,7 @@ import brave.http.HttpClientHandler;
 import brave.http.HttpClientRequest;
 import brave.http.HttpClientResponse;
 import brave.http.HttpTracing;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -67,6 +68,9 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
     public void subscribe(Subscriber<? super HttpResponse<?>> actual) {
         HttpClientRequest httpClientRequest = mapRequest(request);
         brave.Span span = clientHandler.handleSend(httpClientRequest);
+        request.getAttribute(HttpAttributes.SERVICE_ID, String.class)
+                .filter(StringUtils::isNotEmpty)
+                .ifPresent(span::remoteServiceName);
         request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
         try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
             publisher.subscribe(new Subscriber<HttpResponse<?>>() {
