@@ -18,8 +18,7 @@ package io.micronaut.tracing.instrument.util;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
 import io.micronaut.scheduling.instrument.RunnableInstrumenter;
-import io.opentracing.Scope;
-import io.opentracing.ScopeManager;
+import io.micronaut.tracing.instrument.TracingWrapper;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
 
@@ -28,54 +27,49 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * A function that instruments an existing Runnable with {@link TracingRunnable}.
+ * A function that instruments an existing {@link Runnable} and {@link java.util.concurrent.Callable} with {@link TracingWrapper}.
  *
  * @author graemerocher
+ * @author dstepanov
  * @since 1.0
  */
 @Singleton
 @Requires(beans = Tracer.class)
+@Requires(beans = TracingWrapper.class)
 public class TracingRunnableInstrumenter implements Function<Runnable, Runnable>, RunnableInstrumenter, ReactiveInstrumenter {
 
     private final Tracer tracer;
+    private final TracingWrapper tracingWrapper;
 
     /**
-     * Create a function that instrument an existing Runnable.
+     * Create a function that wraps an existing Runnable.
      *
-     * @param tracer For span creation and propagation across arbitrary transports
+     * @param tracer For detecting tracing
+     * @param tracingWrapper For wrapping runnable
      */
-    public TracingRunnableInstrumenter(Tracer tracer) {
+    public TracingRunnableInstrumenter(Tracer tracer, TracingWrapper tracingWrapper) {
         this.tracer = tracer;
+        this.tracingWrapper = tracingWrapper;
     }
 
     @Override
     public Runnable apply(Runnable runnable) {
-        return new TracingRunnable(runnable, tracer);
+        return tracingWrapper.wrap(runnable);
     }
 
     @Override
     public Runnable instrument(Runnable command) {
-        return apply(command);
+        return tracingWrapper.wrap(command);
     }
 
     @Override
     public Optional<RunnableInstrumenter> newInstrumentation() {
-        final ScopeManager scopeManager = tracer.scopeManager();
-        Span activeSpan = scopeManager.activeSpan();
+        Span activeSpan = tracer.activeSpan();
         if (activeSpan != null) {
             return Optional.of(new RunnableInstrumenter() {
                 @Override
                 public Runnable instrument(Runnable command) {
-                    return () -> {
-                        final Span currentSpan = scopeManager.activeSpan();
-                        if (currentSpan != activeSpan) {
-                            try (Scope ignored = scopeManager.activate(activeSpan)) {
-                                command.run();
-                            }
-                        } else {
-                            command.run();
-                        }
-                    };
+                    return () -> tracingWrapper.wrap(command).run();
                 }
             });
         }

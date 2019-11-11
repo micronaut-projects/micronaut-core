@@ -16,9 +16,10 @@
 package io.micronaut.tracing.brave.instrument.http;
 
 import brave.http.HttpClientHandler;
+import brave.http.HttpClientRequest;
+import brave.http.HttpClientResponse;
 import brave.http.HttpTracing;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
@@ -37,15 +38,15 @@ import org.reactivestreams.Publisher;
 @Requires(beans = HttpClientHandler.class)
 public class BraveTracingClientFilter extends AbstractBraveTracingFilter implements HttpClientFilter {
 
-    private final HttpClientHandler<HttpRequest<?>, HttpResponse<?>> clientHandler;
+    private final HttpClientHandler<HttpClientRequest, HttpClientResponse> clientHandler;
 
     /**
      * Initialize tracing filter with clientHandler and httpTracing.
      *
      * @param clientHandler The standardize way to instrument http client
-     * @param httpTracing  The tracer for creation of span
+     * @param httpTracing   The tracer for creation of span
      */
-    public BraveTracingClientFilter(HttpClientHandler<HttpRequest<?>, HttpResponse<?>> clientHandler, HttpTracing httpTracing) {
+    public BraveTracingClientFilter(HttpClientHandler<HttpClientRequest, HttpClientResponse> clientHandler, HttpTracing httpTracing) {
         super(httpTracing);
         this.clientHandler = clientHandler;
     }

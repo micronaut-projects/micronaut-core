@@ -16,18 +16,17 @@
 package io.micronaut.tracing.brave.instrument.http;
 
 import brave.Tracing;
-import brave.http.*;
+import brave.http.HttpClientHandler;
+import brave.http.HttpClientRequest;
+import brave.http.HttpClientResponse;
+import brave.http.HttpServerHandler;
+import brave.http.HttpServerRequest;
+import brave.http.HttpServerResponse;
+import brave.http.HttpTracing;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import zipkin2.Endpoint;
 
 import javax.inject.Singleton;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.util.Optional;
 
 /**
  * Adds HTTP tracing for Micronaut using Brave.
@@ -59,46 +58,8 @@ public class HttpTracingFactory {
      * @return The {@link HttpClientHandler} bean
      */
     @Singleton
-    HttpClientHandler<HttpRequest<?>, HttpResponse<?>> httpClientHandler(HttpTracing httpTracing) {
-        return HttpClientHandler.create(httpTracing, new HttpClientAdapter<HttpRequest<?>, HttpResponse<?>>() {
-            @Override
-            public String method(HttpRequest<?> request) {
-                return request.getMethodName();
-            }
-
-            @Override
-            public String url(HttpRequest<?> request) {
-                return request.getUri().toString();
-            }
-
-            @Override
-            public String requestHeader(HttpRequest<?> request, String name) {
-                return request.getHeaders().get(name);
-            }
-
-            @Override
-            public Integer statusCode(HttpResponse<?> response) {
-                return response.getStatus().getCode();
-            }
-
-            @Override
-            public boolean parseServerIpAndPort(HttpRequest<?> request, Endpoint.Builder builder) {
-                InetAddress address = request.getServerAddress().getAddress();
-                return builder.parseIp(address);
-            }
-
-            @Override
-            public String methodFromResponse(HttpResponse<?> httpResponse) {
-                return httpResponse.getAttribute(HttpAttributes.METHOD_NAME, String.class)
-                                   .orElseGet(() -> super.methodFromResponse(httpResponse));
-            }
-
-            @Override
-            public String route(HttpResponse<?> response) {
-                Optional<String> value = response.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
-                return value.orElseGet(() -> super.route(response));
-            }
-        });
+    HttpClientHandler<HttpClientRequest, HttpClientResponse> httpClientHandler(HttpTracing httpTracing) {
+        return HttpClientHandler.create(httpTracing);
     }
 
     /**
@@ -108,44 +69,7 @@ public class HttpTracingFactory {
      * @return The {@link HttpServerHandler} bean
      */
     @Singleton
-    HttpServerHandler<HttpRequest<?>, HttpResponse<?>> httpServerHandler(HttpTracing httpTracing) {
-        return HttpServerHandler.create(httpTracing, new HttpServerAdapter<HttpRequest<?>, HttpResponse<?>>() {
-            @Override
-            public String method(HttpRequest<?> request) {
-                return request.getMethodName();
-            }
-
-            @Override
-            public String url(HttpRequest<?> request) {
-                return request.getUri().toString();
-            }
-
-            @Override
-            public String requestHeader(HttpRequest<?> request, String name) {
-                return request.getHeaders().get(name);
-            }
-
-            @Override
-            public Integer statusCode(HttpResponse<?> response) {
-                return response.getStatus().getCode();
-            }
-
-            @Override
-            public String route(HttpResponse<?> response) {
-                Optional<String> value = response.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
-                return value.orElseGet(() -> super.route(response));
-            }
-
-            @Override
-            public String methodFromResponse(HttpResponse<?> httpResponse) {
-                return httpResponse.getAttribute(HttpAttributes.METHOD_NAME, String.class).orElse(null);
-            }
-
-            @Override
-            public boolean parseClientAddress(HttpRequest<?> httpRequest, Endpoint.Builder builder) {
-                InetSocketAddress remoteAddress = httpRequest.getRemoteAddress();
-                return builder.parseIp(remoteAddress.getAddress());
-            }
-        });
+    HttpServerHandler<HttpServerRequest, HttpServerResponse> httpServerHandler(HttpTracing httpTracing) {
+        return HttpServerHandler.create(httpTracing);
     }
 }
