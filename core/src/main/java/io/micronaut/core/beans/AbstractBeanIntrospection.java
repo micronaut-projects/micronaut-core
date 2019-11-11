@@ -82,7 +82,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
 
     @Nonnull
     @Override
-    public T instantiate(Object... arguments) throws InstantiationException {
+    public T instantiate(boolean strictNullable, Object... arguments) throws InstantiationException {
         ArgumentUtils.requireNonNull("arguments", arguments);
 
         if (arguments.length == 0) {
@@ -98,7 +98,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
             Argument<?> constructorArgument = constructorArguments[i];
             final Object specified = arguments[i];
             if (specified == null) {
-                if (constructorArgument.isDeclaredNullable()) {
+                if (constructorArgument.isDeclaredNullable() || !strictNullable) {
                     continue;
                 } else {
                     throw new InstantiationException("Null argument specified for [" + constructorArgument.getName() + "]. If this argument is allowed to be null annotate it with @Nullable");

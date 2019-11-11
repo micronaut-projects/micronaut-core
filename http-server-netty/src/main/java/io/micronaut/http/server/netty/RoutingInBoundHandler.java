@@ -139,9 +139,8 @@ import io.reactivex.BackpressureStrategy;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.functions.LongConsumer;
-import io.reactivex.internal.operators.flowable.FlowableReplay;
+import io.reactivex.processors.UnicastProcessor;
 import io.reactivex.schedulers.Schedulers;
-import io.reactivex.subjects.ReplaySubject;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -733,7 +732,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             RouteMatch<?> routeMatch = finalRoute;
             AtomicBoolean executed = new AtomicBoolean(false);
             AtomicLong pressureRequested = new AtomicLong(0);
-            ConcurrentHashMap<String, ReplaySubject> subjects = new ConcurrentHashMap<>();
+            ConcurrentHashMap<String, UnicastProcessor> subjects = new ConcurrentHashMap<>();
             ConcurrentHashMap<Integer, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
             ConversionService conversionService = ConversionService.SHARED;
             Subscription s;
@@ -747,8 +746,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
             });
 
-            Flowable buildFlowable(ReplaySubject subject, Integer dataKey, boolean controlsFlow) {
-                Flowable flowable = FlowableReplay.createFrom(subject.toFlowable(BackpressureStrategy.BUFFER)).refCount();
+            Flowable processFlowable(Flowable flowable, Integer dataKey, boolean controlsFlow) {
                 if (controlsFlow) {
                     flowable = flowable.doOnRequest(onRequest);
                 }
@@ -801,7 +799,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 }
                                 Class typeVariableType = typeVariable.getType();
 
-                                ReplaySubject namedSubject = subjects.computeIfAbsent(name, (key) -> ReplaySubject.create());
+                                UnicastProcessor namedSubject = subjects.computeIfAbsent(name, (key) -> UnicastProcessor.create());
 
                                 chunkedProcessing = PartData.class.equals(typeVariableType) ||
                                         Publishers.isConvertibleToPublisher(typeVariableType) ||
@@ -816,8 +814,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     }
                                     dataReference.subject.getAndUpdate(subject -> {
                                         if (subject == null) {
-                                            ReplaySubject childSubject = ReplaySubject.create();
-                                            Flowable flowable = buildFlowable(childSubject, dataKey, true);
+                                            UnicastProcessor childSubject = UnicastProcessor.create();
+                                            Flowable flowable = processFlowable(childSubject, dataKey, true);
                                             if (streamingFileUpload && data instanceof FileUpload) {
                                                 namedSubject.onNext(new NettyStreamingFileUpload(
                                                         (FileUpload) data,
@@ -835,7 +833,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                                 }
 
-                                ReplaySubject subject = Optional.ofNullable(dataReference.subject.get()).orElse(namedSubject);
+                                UnicastProcessor subject = Optional.ofNullable(dataReference.subject.get()).orElse(namedSubject);
 
                                 Object part = data;
 
@@ -858,7 +856,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                     (FileUpload) data,
                                                     serverConfiguration.getMultipart(),
                                                     ioExecutor,
-                                                    buildFlowable(subject, dataKey, true));
+                                                    processFlowable(subject, dataKey, true));
                                         }
                                         return upload;
                                     });
@@ -877,7 +875,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     if (upload != null) {
                                         return upload;
                                     } else {
-                                        return buildFlowable(namedSubject, dataKey, dataReference.subject.get() == null);
+                                        return processFlowable(namedSubject, dataKey, dataReference.subject.get() == null);
                                     }
                                 };
 
@@ -947,7 +945,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnComplete() {
-                for (ReplaySubject subject: subjects.values()) {
+                for (UnicastProcessor subject: subjects.values()) {
                     if (!subject.hasComplete()) {
                         subject.onComplete();
                     }

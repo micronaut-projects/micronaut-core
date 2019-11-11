@@ -448,8 +448,8 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
             final ClassElement ce = entry.getValue();
             String className = ce.getName();
-            if (!visitedTypes.contains(className)) {
-                visitedTypes.add(className);
+            if (!visitedTypes.contains(entry.getKey())) {
+                visitedTypes.add(entry.getKey());
                 final Map<String, ClassElement> subArgs = ce.getTypeArguments();
                 if (CollectionUtils.isNotEmpty(subArgs)) {
                     Map<String, Object> m = toTypeArguments(subArgs, visitedTypes);

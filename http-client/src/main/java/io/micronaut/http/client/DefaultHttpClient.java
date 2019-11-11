@@ -766,11 +766,19 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             WebSocketVersion protocolVersion = finalWebSocketBean.getBeanDefinition().enumValue(ClientWebSocket.class, "version", WebSocketVersion.class).orElse(WebSocketVersion.V13);
             int maxFramePayloadLength = finalWebSocketBean.messageMethod().flatMap(m -> m.getValue(OnMessage.class, "maxPayloadLength", Integer.class)).orElse(65536);
 
-            bootstrap.remoteAddress(uri.getHost(), uri.getPort());
+            RequestKey requestKey;
+            try {
+                requestKey = new RequestKey(uri);
+            } catch (HttpClientException e) {
+                emitter.onError(e);
+                return;
+            }
+
+            bootstrap.remoteAddress(requestKey.getHost(), requestKey.getPort());
             bootstrap.handler(new HttpClientInitializer(
                     sslContext,
-                    uri.getHost(),
-                    uri.getPort(),
+                    requestKey.getHost(),
+                    requestKey.getPort(),
                     false,
                     false
             ) {
@@ -792,7 +800,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                     final NettyWebSocketClientHandler webSocketHandler;
                     try {
-                        URI webSocketURL = URI.create("ws://" + uri.getHost() + ":" + uri.getPort() + uri.getPath());
+                        URI webSocketURL = URI.create("ws://" + host + ":" + port + uri.getPath());
 
                         MutableHttpHeaders headers = request.getHeaders();
                         HttpHeaders customHeaders = EmptyHttpHeaders.INSTANCE;
@@ -950,28 +958,33 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
         AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
         Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = Flowable.create(emitter -> {
-                    ChannelFuture channelFuture = doConnect(request, requestURI, sslContext, true);
 
-                    Disposable disposable = buildDisposableChannel(channelFuture);
-                    emitter.setDisposable(disposable);
-                    emitter.setCancellable(disposable::dispose);
+            ChannelFuture channelFuture;
+            try {
+                channelFuture = doConnect(request, requestURI, sslContext, true);
+            } catch (HttpClientException e) {
+                emitter.onError(e);
+                return;
+            }
 
+            Disposable disposable = buildDisposableChannel(channelFuture);
+            emitter.setDisposable(disposable);
+            emitter.setCancellable(disposable::dispose);
 
-                    channelFuture
-                            .addListener((ChannelFutureListener) f -> {
-                                if (f.isSuccess()) {
-                                    Channel channel = f.channel();
+            channelFuture
+                    .addListener((ChannelFutureListener) f -> {
+                        if (f.isSuccess()) {
+                            Channel channel = f.channel();
 
-                                    streamRequestThroughChannel(parentRequest, requestURI, requestWrapper, emitter, channel);
-                                } else {
-                                    Throwable cause = f.cause();
-                                    emitter.onError(
-                                            new HttpClientException("Connect error:" + cause.getMessage(), cause)
-                                    );
-                                }
-                            });
-                }, BackpressureStrategy.BUFFER
-        );
+                            streamRequestThroughChannel(parentRequest, requestURI, requestWrapper, emitter, channel);
+                        } else {
+                            Throwable cause = f.cause();
+                            emitter.onError(
+                                    new HttpClientException("Connect error:" + cause.getMessage(), cause)
+                            );
+                        }
+                    });
+            }, BackpressureStrategy.BUFFER);
 
         // apply filters
         streamResponsePublisher = Flowable.fromPublisher(
@@ -1000,33 +1013,37 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return requestURI -> {
             Flowable<io.micronaut.http.HttpResponse<O>> responsePublisher = Flowable.create(emitter -> {
 
+                boolean multipart = MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null));
+                if (poolMap != null && !multipart) {
+                    try {
+                        ChannelPool channelPool = poolMap.get(new RequestKey(requestURI));
+                        Future<Channel> channelFuture = channelPool.acquire();
+                        channelFuture.addListener(future -> {
+                            if (future.isSuccess()) {
+                                Channel channel = (Channel) future.get();
+                                try {
+                                    sendRequestThroughChannel(
+                                            requestWrapper,
+                                            bodyType,
+                                            errorType,
+                                            emitter,
+                                            channel,
+                                            channelPool
+                                    );
+                                } catch (Exception e) {
+                                    emitter.onError(e);
+                                }
 
-                if (poolMap != null && !MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null))) {
-                    ChannelPool channelPool = poolMap.get(new RequestKey(requestURI));
-                    Future<Channel> channelFuture = channelPool.acquire();
-                    channelFuture.addListener(future -> {
-                        if (future.isSuccess()) {
-                            Channel channel = (Channel) future.get();
-                            try {
-                                sendRequestThroughChannel(
-                                        requestWrapper,
-                                        bodyType,
-                                        errorType,
-                                        emitter,
-                                        channel,
-                                        channelPool
+                            } else {
+                                Throwable cause = future.cause();
+                                emitter.onError(
+                                        new HttpClientException("Connect Error: " + cause.getMessage(), cause)
                                 );
-                            } catch (Exception e) {
-                                emitter.onError(e);
                             }
-
-                        } else {
-                            Throwable cause = future.cause();
-                            emitter.onError(
-                                    new HttpClientException("Connect Error: " + cause.getMessage(), cause)
-                            );
-                        }
-                    });
+                        });
+                    } catch (HttpClientException e) {
+                        emitter.onError(e);
+                    }
                 } else {
                     SslContext sslContext = buildSslContext(requestURI);
                     ChannelFuture connectionFuture = doConnect(request, requestURI, sslContext, false);
@@ -1174,39 +1191,17 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param uri      The URI to connect to
      * @param sslCtx   The SslContext instance
      * @param isStream Is the connection a stream connection
+     * @throws HttpClientException If the URI is invalid
      * @return A ChannelFuture
      */
     protected ChannelFuture doConnect(
             io.micronaut.http.HttpRequest<?> request,
             URI uri,
             @Nullable SslContext sslCtx,
-            boolean isStream) {
-        String host = uri.getHost();
-        int port;
-        if (host == null) {
-            host = uri.getAuthority();
-            if (host == null) {
-                throw new HttpClientException("URI specifies no host to connect to");
-            }
+            boolean isStream) throws HttpClientException {
 
-            final int i = host.indexOf(':');
-            if (i > -1) {
-                final String portStr = host.substring(i + 1);
-                host = host.substring(0, i);
-                try {
-                    port = Integer.parseInt(portStr);
-                } catch (NumberFormatException e) {
-                    throw new HttpClientException("URI specifies an invalid port: " + portStr);
-                }
-            } else {
-                port = uri.getPort() > -1 ? uri.getPort() : sslCtx != null ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
-            }
-        } else {
-            port = uri.getPort() > -1 ? uri.getPort() : sslCtx != null ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
-        }
-
-
-        return doConnect(request, host, port, sslCtx, isStream);
+        RequestKey requestKey = new RequestKey(uri);
+        return doConnect(request, requestKey.getHost(), requestKey.getPort(), sslCtx, isStream);
     }
 
     /**
@@ -1740,8 +1735,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     private String getHostHeader(URI requestURI) {
-        StringBuilder host = new StringBuilder(requestURI.getHost());
-        int port = requestURI.getPort();
+        RequestKey requestKey = new RequestKey(requestURI);
+        StringBuilder host = new StringBuilder(requestKey.getHost());
+        int port = requestKey.getPort();
         if (port > -1) {
             if (port != 80 && port != 443) {
                 host.append(":").append(port);
@@ -2350,7 +2346,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     /**
-     * Key used for connection pooling.
+     * Key used for connection pooling and determining host/port.
      */
     private final class RequestKey {
         private final String host;
@@ -2359,9 +2355,32 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
         public RequestKey(URI requestURI) {
             this.secure = "https".equalsIgnoreCase(requestURI.getScheme());
-            this.host = requestURI.getHost();
-            this.port = requestURI.getPort() > -1 ? requestURI.getPort() : this.secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+            String host = requestURI.getHost();
+            int port;
+            if (host == null) {
+                host = requestURI.getAuthority();
+                if (host == null) {
+                    throw new HttpClientException("URI specifies no host to connect to");
+                }
 
+                final int i = host.indexOf(':');
+                if (i > -1) {
+                    final String portStr = host.substring(i + 1);
+                    host = host.substring(0, i);
+                    try {
+                        port = Integer.parseInt(portStr);
+                    } catch (NumberFormatException e) {
+                        throw new HttpClientException("URI specifies an invalid port: " + portStr);
+                    }
+                } else {
+                    port = requestURI.getPort() > -1 ? requestURI.getPort() : secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+                }
+            } else {
+                port = requestURI.getPort() > -1 ? requestURI.getPort() : secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+            }
+
+            this.host = host;
+            this.port = port;
         }
 
         public InetSocketAddress getRemoteAddress() {
