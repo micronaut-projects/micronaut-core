@@ -26,6 +26,7 @@ import io.opentracing.Tracer;
  * @author graemerocher
  * @since 1.0
  */
+@Deprecated
 public class TracingRunnable implements Runnable {
 
     private final Runnable runnable;

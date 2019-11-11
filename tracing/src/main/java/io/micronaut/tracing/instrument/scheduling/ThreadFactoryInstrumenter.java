@@ -19,8 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.tracing.instrument.util.TracingRunnable;
-import io.opentracing.Tracer;
+import io.micronaut.tracing.instrument.TracingWrapper;
 
 import javax.inject.Singleton;
 import java.util.concurrent.ThreadFactory;
@@ -32,25 +31,25 @@ import java.util.concurrent.ThreadFactory;
  * @since 1.0
  */
 @Singleton
-@Requires(beans = Tracer.class)
+@Requires(beans = TracingWrapper.class)
 @Requires(property = ExecutorServiceInstrumenter.PROPERTY_INSTRUMENT_THREADS,
           value = StringUtils.TRUE,
           defaultValue = StringUtils.FALSE)
 public class ThreadFactoryInstrumenter implements BeanCreatedEventListener<ThreadFactory> {
-    private final Tracer tracer;
+    private final TracingWrapper tracingWrapper;
 
     /**
      * Default constructor.
      *
-     * @param tracer The tracer
+     * @param tracingWrapper The tracingWrapper
      */
-    public ThreadFactoryInstrumenter(Tracer tracer) {
-        this.tracer = tracer;
+    public ThreadFactoryInstrumenter(TracingWrapper tracingWrapper) {
+        this.tracingWrapper = tracingWrapper;
     }
 
     @Override
     public ThreadFactory onCreated(BeanCreatedEvent<ThreadFactory> event) {
         ThreadFactory original = event.getBean();
-        return r -> original.newThread(new TracingRunnable(r, tracer));
+        return r -> original.newThread(tracingWrapper.wrap(r));
     }
 }
