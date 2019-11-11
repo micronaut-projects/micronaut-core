@@ -69,11 +69,17 @@ public final class MdcInstrumenter implements Function<Runnable, Runnable>, Runn
 
     private Runnable passMdcTo(Runnable runnable, Map<String, String> contextMap) {
         return () -> {
+            Map<String, String> oldContextMap = MDC.getCopyOfContextMap();
+
             try {
                 MDC.setContextMap(contextMap);
                 runnable.run();
             } finally {
-                MDC.clear();
+                if (oldContextMap != null && !oldContextMap.isEmpty()) {
+                    MDC.setContextMap(oldContextMap);
+                } else {
+                    MDC.clear();
+                }
             }
         };
     }
