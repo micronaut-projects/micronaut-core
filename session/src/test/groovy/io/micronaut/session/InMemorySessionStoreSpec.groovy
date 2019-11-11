@@ -39,6 +39,7 @@ class InMemorySessionStoreSpec extends Specification {
         listener.events[0] instanceof SessionCreatedEvent
 
         when:
+        Thread.sleep(50)
         session == sessionStore.findSession(session.id).get().get()
         def conditions = new PollingConditions(timeout: 10)
 
@@ -114,6 +115,7 @@ class InMemorySessionStoreSpec extends Specification {
         listener.events[0] instanceof SessionCreatedEvent
 
         when:
+        Thread.sleep(50)
         session == sessionStore.findSession(session.id).get().get()
         def conditions = new PollingConditions(timeout: 10)
 
