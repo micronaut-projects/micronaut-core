@@ -1,4 +1,4 @@
-package io.micronaut.inject.visitor.beans
+package io.micronaut.docs.ioc.beans
 
 // tag::class[]
 import io.micronaut.core.annotation.Creator
