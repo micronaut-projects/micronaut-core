@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.RxWebSocketClient
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -27,6 +28,7 @@ import javax.inject.Singleton
 
 class SimpleTextWebSocketSpec extends Specification {
 
+    @Retry
     void "test simple text websocket exchange"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.build('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
