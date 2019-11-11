@@ -13,30 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.discovery.eureka.client.v2;
+package io.micronaut.tracing.instrument;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import io.micronaut.core.annotation.Introspected;
+import java.util.concurrent.Callable;
 
 /**
- * @author Tomasz Bak
+ * The tracing wrapper of {@link Runnable} and {@link Callable}.
+ *
+ * @author dstepanov
+ * @since 1.3
  */
-@Introspected
-public class MyDataCenterInfo implements DataCenterInfo {
-
-    private final Name name;
+public interface TracingWrapper {
 
     /**
-     * @param name The name
+     * Wraps {@link Runnable} for tracing.
+     * @param runnable instance to be wrapped
+     * @return wrapped instance
      */
-    @JsonCreator
-    public MyDataCenterInfo(@JsonProperty("name") Name name) {
-        this.name = name;
-    }
+    Runnable wrap(Runnable runnable);
 
-    @Override
-    public Name getName() {
-        return name;
-    }
+    /**
+     * Wraps {@link Callable} for tracing.
+     * @param callable instance to be wrapped
+     * @param <V> callable generic param
+     * @return wrapped instance
+     */
+    <V> Callable<V> wrap(Callable<V> callable);
 }

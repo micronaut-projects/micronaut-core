@@ -243,6 +243,12 @@ ext {
                     name   : 'micronaut-test-core',
                     modules: ['micronaut-test-spock', 'micronaut-test-junit5', 'micronaut-test-kotlintest']
             ],
+            'micronaut.data'           : [
+                                version: micronautDataVersion,
+                                group  : 'io.micronaut.data',
+                                name   : 'micronaut-data-model',
+                                modules: ['micronaut-data-hibernate-jpa', 'micronaut-data-jdbc', 'micronaut-data-processor', 'micronaut-data-runtime', 'micronaut-data-spring', 'micronaut-data-rx', 'micronaut-data-rx-hibernate']
+                        ],
             'micrometer'               : [
                     version: micrometerVersion,
                     group  : 'io.micrometer',
@@ -604,7 +610,7 @@ subprojects { Project subproject ->
 
 
     repositories {
-        maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
+        maven { url "https://oss.jfrog.org/artifactory/oss-snapshot-local/" }
         maven { url "https://repo.grails.org/grails/core" }
     }
 

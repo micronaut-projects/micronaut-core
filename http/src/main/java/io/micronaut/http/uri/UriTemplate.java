@@ -260,8 +260,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
         Integer thisVariableCount = 0;
         Integer thatVariableCount = 0;
-        Integer thisRawCount = 0;
-        Integer thatRawCount = 0;
+        Integer thisRawLength = 0;
+        Integer thatRawLength = 0;
 
         for (PathSegment segment: this.segments) {
             if (segment.isVariable()) {
@@ -269,7 +269,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     thisVariableCount++;
                 }
             } else {
-                thisRawCount++;
+                thisRawLength += segment.length();
             }
         }
 
@@ -279,12 +279,12 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     thatVariableCount++;
                 }
             } else {
-                thatRawCount++;
+                thatRawLength += segment.length();
             }
         }
 
-        //using that.compareTo because more raw segments should have higher precedence
-        int rawCompare = thatRawCount.compareTo(thisRawCount);
+        //using that.compareTo because more raw length should have higher precedence
+        int rawCompare = thatRawLength.compareTo(thisRawLength);
         if (rawCompare == 0) {
             return thisVariableCount.compareTo(thatVariableCount);
         } else {

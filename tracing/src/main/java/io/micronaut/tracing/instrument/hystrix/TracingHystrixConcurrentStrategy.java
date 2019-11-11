@@ -23,9 +23,7 @@ import com.netflix.hystrix.strategy.concurrency.HystrixRequestVariable;
 import com.netflix.hystrix.strategy.concurrency.HystrixRequestVariableLifecycle;
 import com.netflix.hystrix.strategy.properties.HystrixProperty;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.tracing.instrument.util.TracingCallable;
-import io.opentracing.Tracer;
-import io.opentracing.noop.NoopTracer;
+import io.micronaut.tracing.instrument.TracingWrapper;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -42,24 +40,23 @@ import java.util.concurrent.TimeUnit;
  * @since 1.0
  */
 @Requires(classes = HystrixConcurrencyStrategy.class)
-@Requires(beans = Tracer.class)
-@Requires(missingBeans = NoopTracer.class)
+@Requires(beans = TracingWrapper.class)
 @Singleton
 public class TracingHystrixConcurrentStrategy extends HystrixConcurrencyStrategy {
 
     private final HystrixConcurrencyStrategy delegate;
-    private final Tracer tracer;
+    private final TracingWrapper tracingWrapper;
 
     /**
      * Creates enhanced {@link HystrixConcurrencyStrategy} for tracing.
      *
-     * @param tracer For span creation and propagation across arbitrary transports
+     * @param tracingWrapper For wrapping callable
      * @param hystrixConcurrencyStrategy Different behavior or implementations for concurrency related aspects of the system with default implementations
      */
     @Inject
-    public TracingHystrixConcurrentStrategy(Tracer tracer, @Nullable HystrixConcurrencyStrategy hystrixConcurrencyStrategy) {
+    public TracingHystrixConcurrentStrategy(TracingWrapper tracingWrapper, @Nullable HystrixConcurrencyStrategy hystrixConcurrencyStrategy) {
         this.delegate = hystrixConcurrencyStrategy != null ? hystrixConcurrencyStrategy : HystrixConcurrencyStrategyDefault.getInstance();
-        this.tracer = tracer;
+        this.tracingWrapper = tracingWrapper;
     }
 
     @Override
@@ -88,15 +85,32 @@ public class TracingHystrixConcurrentStrategy extends HystrixConcurrencyStrategy
     @Override
     public <T> Callable<T> wrapCallable(Callable<T> callable) {
         Callable<T> wrapped = super.wrapCallable(callable);
-        if (callable instanceof TracingCallable) {
+        if (callable instanceof ZipkinContextCallable) {
             return callable;
         } else {
-            return new TracingCallable<>(wrapped, tracer);
+            return new ZipkinContextCallable<>(wrapped);
         }
     }
 
     @Override
     public <T> HystrixRequestVariable<T> getRequestVariable(HystrixRequestVariableLifecycle<T> rv) {
         return delegate.getRequestVariable(rv);
+    }
+
+    /**
+     * Internal wrapper.
+     * @param <K> callable generic param
+     */
+    private class ZipkinContextCallable<K> implements Callable<K> {
+        private final Callable<K> zipkinWrappedCallable;
+
+        ZipkinContextCallable(Callable<K> actual) {
+            zipkinWrappedCallable = tracingWrapper.wrap(actual);
+        }
+
+        @Override
+        public K call() throws Exception {
+            return zipkinWrappedCallable.call();
+        }
     }
 }

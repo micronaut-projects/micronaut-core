@@ -15,10 +15,8 @@
  */
 package io.micronaut.discovery.eureka.client.v2;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonRootName;
+import com.fasterxml.jackson.annotation.*;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.StringUtils;
 
 import javax.validation.constraints.Min;
@@ -40,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 @JsonRootName("instance")
+@Introspected
 public class InstanceInfo implements ConfigurableInstanceInfo {
 
     /**
@@ -83,7 +82,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
      * @param instanceId           The instance id
      * @param appName              The application name
      * @param appGroupName         The application group name
-     * @param ipAddr               The IP addres
+     * @param ipAddr               The IP address
      * @param port                 The port
      * @param securePort           The secure port
      * @param homePageUrl          The homepage URL
@@ -272,7 +271,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
      * @return The port
      */
     @JsonProperty("port")
-    PortWrapper getPortWrapper() {
+    public PortWrapper getPortWrapper() {
         if (port < 1) {
             return new PortWrapper(false, 0);
         }
@@ -283,7 +282,7 @@ public class InstanceInfo implements ConfigurableInstanceInfo {
      * @return The secure port
      */
     @JsonProperty("securePort")
-    PortWrapper getSecurePortWrapper() {
+    public PortWrapper getSecurePortWrapper() {
         if (securePort < 1) {
             return new PortWrapper(false, 0);
         }
