@@ -29,6 +29,7 @@ Third Party Dependencies:
 
 Modules:
 
+* Micronaut GRPC `1.0.1` -> `1.1.0`
 * Micronaut Micrometer `1.2.1` -> `1.3.0`
 * Micronaut MongoDB `1.1.0` -> `1.2.0`
 * Micronaut Neo4j `1.1.0` -> `1.2.0`
