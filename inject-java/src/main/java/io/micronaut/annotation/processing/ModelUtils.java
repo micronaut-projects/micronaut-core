@@ -26,7 +26,6 @@ import static javax.lang.model.type.TypeKind.ERROR;
 import static javax.lang.model.type.TypeKind.NONE;
 import static javax.lang.model.type.TypeKind.VOID;
 
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
@@ -230,6 +229,15 @@ public class ModelUtils {
         return element.orElse(null);
     }
 
+    /**
+     * The static method or Kotlin companion method to execute to
+     * construct the given class element.
+     *
+     * @param classElement The class element
+     * @param annotationUtils The annotation utilities
+     * @return The creator method
+     */
+    @Nullable
     public ExecutableElement staticCreatorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
          List<ExecutableElement> creators = findNonPrivateStaticCreators(classElement, annotationUtils);
 
@@ -272,6 +280,11 @@ public class ModelUtils {
         return constructors.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
     }
 
+    /**
+     * @param classElement The class element
+     * @param annotationUtils The annotation utils
+     * @return A static creator with no args, or null
+     */
     public ExecutableElement defaultStaticCreatorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
         List<ExecutableElement> creators = findNonPrivateStaticCreators(classElement, annotationUtils)
                 .stream().filter(ctor -> ctor.getParameters().isEmpty()).collect(Collectors.toList());
@@ -291,7 +304,7 @@ public class ModelUtils {
      * @param classElement The {@link TypeElement}
      * @return A list of {@link ExecutableElement}
      */
-    List<ExecutableElement> findNonPrivateConstructors(TypeElement classElement) {
+    private List<ExecutableElement> findNonPrivateConstructors(TypeElement classElement) {
         List<ExecutableElement> ctors =
             ElementFilter.constructorsIn(classElement.getEnclosedElements());
         return ctors.stream()
@@ -299,7 +312,7 @@ public class ModelUtils {
             .collect(Collectors.toList());
     }
 
-    List<ExecutableElement> findNonPrivateStaticCreators(TypeElement classElement, AnnotationUtils annotationUtils) {
+    private List<ExecutableElement> findNonPrivateStaticCreators(TypeElement classElement, AnnotationUtils annotationUtils) {
         List<? extends Element> enclosedElements = classElement.getEnclosedElements();
         List<ExecutableElement> staticCreators = ElementFilter.methodsIn(enclosedElements)
                 .stream()

@@ -102,6 +102,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         return createMethodElement(method);
     }
 
+    @Nonnull
     @Override
     public Optional<MethodElement> getDefaultConstructor() {
         MethodNode method = findDefaultStaticCreator();
@@ -516,7 +517,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                 .findFirst().orElse(null);
     }
 
-    public MethodNode findDefaultStaticCreator() {
+    private MethodNode findDefaultStaticCreator() {
         List<MethodNode> creators = findNonPrivateStaticCreators().stream()
                 .filter(ctor -> ctor.getParameters().length == 0)
                 .collect(Collectors.toList());
@@ -544,7 +545,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         return nonPrivateMethods;
     }
 
-    List<MethodNode> findNonPrivateStaticCreators() {
+    private List<MethodNode> findNonPrivateStaticCreators() {
         return classNode.getAllDeclaredMethods().stream()
                 .filter(method -> Modifier.isStatic(method.getModifiers()))
                 .filter(method -> !Modifier.isPrivate(method.getModifiers()))
