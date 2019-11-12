@@ -2,5 +2,6 @@ ext {
     shadowJarEnabled = true
 }
 dependencies {
-    api project(":inject")
+    api project(':inject')
+    implementation project(path: ':core', configuration: 'shadow')
 }
