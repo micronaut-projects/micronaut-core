@@ -4,7 +4,7 @@ dependencies {
     api dependencyModuleVersion('opentracing', 'opentracing-util')
     api project(":runtime")
     api project(":http-client")
-    api project(":core")
+    implementation project(":core")
 
     // the following are Tracing implementations and instrumentations which
     // are optionally loaded and not required
