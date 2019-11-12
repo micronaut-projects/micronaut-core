@@ -1,4 +1,6 @@
+ext {
+    shadowJarEnabled = true
+}
 dependencies {
     api project(":inject")
 }
-shadowJar.enabled = true

@@ -35,39 +35,38 @@ publishing {
             artifactId "micronaut-${project.name}"
             from components.java
 
-            afterEvaluate {
-                artifact sourcesJar
-                artifact javadocJar
-            }
+                    artifact sourcesJar
+                    artifact javadocJar
 
-            pom {
-                name = project.title
-                description = project.projectDesc
-                url = projectUrl
-                licenses {
-                    license {
-                        name = 'The Apache License, Version 2.0'
-                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                        distribution = 'repo'
-                    }
-                }
-                scm {
-                    url = "scm:git@github.com:${githubSlug}.git"
-                    connection = "scm:git@github.com:${githubSlug}.git"
-                    developerConnection = "scm:git@github.com:${githubSlug}.git"
-                }
-                if(project.developers) {
-                    developers {
-                        for(dev in project.developers.split(',')) {
-                            developer {
-                                id = dev.toLowerCase().replace(' ', '').toString()
-                                name = dev.toString()
+                    pom {
+                        name = project.title
+                        description = project.projectDesc
+                        url = projectUrl
+                        licenses {
+                            license {
+                                name = 'The Apache Software License, Version 2.0'
+                                url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                                distribution = 'repo'
+                            }
+                        }
+                        scm {
+                            url = "scm:git@github.com:${githubSlug}.git"
+                            connection = "scm:git@github.com:${githubSlug}.git"
+                            developerConnection = "scm:git@github.com:${githubSlug}.git"
+                        }
+                        if (project.developers) {
+                            developers {
+                                for (dev in project.developers.split(',')) {
+                                    developer {
+                                        id = dev.toLowerCase().replace(' ', '').toString()
+                                        name = dev.toString()
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-
         }
     }
 }
@@ -119,12 +118,12 @@ and progress through process manually -> Close -> Publish ... under staging repo
 """
         List<String> versions = [projectVersion]
 
-        for(v in versions) {
+        for (v in versions) {
             try {
                 try {
                     def mavenClent = new RESTClient("https://repo.maven.apache.org/maven2/")
-                    mavenClent.get(path:"${project.group.replace('.','/')}/micronaut-$project.name/$v/micronaut-$project.name-${v}.jar")
-                } catch(groovyx.net.http.HttpResponseException e) {
+                    mavenClent.get(path: "${project.group.replace('.', '/')}/micronaut-$project.name/$v/micronaut-$project.name-${v}.jar")
+                } catch (groovyx.net.http.HttpResponseException e) {
                     // doesn't exist.. try sync
                     def client = new RESTClient('https://api.bintray.com/maven_central_sync/micronaut/core-releases-local/')
                     client.headers['Authorization'] = 'Basic ' + "$bintrayUser:$bintrayKey".getBytes('iso-8859-1').encodeBase64()
