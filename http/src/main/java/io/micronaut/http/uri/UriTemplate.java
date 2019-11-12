@@ -198,7 +198,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * @return The expanded URI
      */
     public String expand(Map<String, Object> parameters) {
-        StringBuilder builder = new StringBuilder();
+        StringBuilder builder = new StringBuilder(templateString.length());
         boolean anyPreviousHasContent = false;
         boolean anyPreviousHasOperator = false;
         boolean queryParameter = false;
@@ -456,7 +456,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * @return The template as a string
      */
     protected String toString(Predicate<PathSegment> filter) {
-        StringBuilder builder = new StringBuilder();
+        StringBuilder builder = new StringBuilder(templateString.length());
         UriTemplateParser.VariablePathSegment previousVariable = null;
         for (PathSegment segment : segments) {
             if (!filter.test(segment)) {
