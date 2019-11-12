@@ -79,7 +79,7 @@ snippet::io.micronaut.docs.server.binding.BindingController[tags="format1,format
 
 == Type Based Binding Parameters
 
-Some parameters are recognized by their type instead of their annotation. he following table summarizes the parameter types, their purpose, and provides an example:
+Some parameters are recognized by their type instead of their annotation. The following table summarizes the parameter types, their purpose, and provides an example:
 
 |===
 |Type |Description |Example

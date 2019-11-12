@@ -11,7 +11,7 @@ You start off by defining an annotation that will power the introduction advice.
 snippet::io.micronaut.docs.aop.introduction.Stub[tags="imports,class", indent=0, title="Introduction Advice Annotation Example"]
 
 <1> The introduction advice is annotated with api:aop.Introduction[]
-<2> The api:context.annotation.Type[] annotation is used to refer to the implementor of the advise. In this case `StubIntroduction`
+<2> The api:context.annotation.Type[] annotation is used to refer to the implementor of the advice. In this case `StubIntroduction`
 <3> The api:context.annotation.Bean[] annotation is added so that all types annotated with `@Stub` become beans
 
 The `StubIntroduction` class referred to in the previous example must then implement the api:aop.MethodInterceptor[] interface, just like around advice.
