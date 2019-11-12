@@ -1,6 +1,6 @@
 dependencies {
     api project(":inject")
-    api project(":aop")
+    api project(path: ':aop', configuration: 'shadow')
     api dependencyVersion("groovy")
 
     testImplementation "junit:junit:4.12"
