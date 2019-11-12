@@ -197,6 +197,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 if (keyFormat == null) {
                     keyFormat = StringConvention.RAW;
                 }
+                if (entries == null) {
+                    return Collections.emptyMap();
+                }
                 return resolveSubMap(
                         name,
                         entries,
