@@ -29,41 +29,166 @@ apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
 apply plugin: 'com.bmuschko.nexus'
 
+ext.extraPomInfo = {}
+ext.pomInfo = {
+    delegate.name project.title
+    delegate.description project.projectDesc
+    delegate.url projectUrl
+
+    delegate.licenses {
+        delegate.license {
+            delegate.name 'The Apache Software License, Version 2.0'
+            delegate.url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+            delegate.distribution 'repo'
+        }
+    }
+
+    delegate.scm {
+        delegate.url "scm:git@github.com:${githubSlug}.git"
+        delegate.connection "scm:git@github.com:${githubSlug}.git"
+        delegate.developerConnection "scm:git@github.com:${githubSlug}.git"
+    }
+
+    if(developers) {
+        delegate.developers {
+            for(dev in developers.split(',')) {
+                delegate.developer {
+                    delegate.id dev.toLowerCase().replace(' ', '')
+                    delegate.name dev
+                }
+            }
+        }
+    }
+    ext.extraPomInfo.delegate = delegate
+    ext.extraPomInfo.call()
+}
+
+
+
+modifyPom {
+    project(pomInfo)
+}
+
 publishing {
+<<<<<<< HEAD
     publications {
         mavenJava(MavenPublication) {
             artifactId "micronaut-${project.name}"
             from components.java
+=======
+    repositories {
+        maven {
+            credentials {
+                def ossUser = System.getenv("SONATYPE_USERNAME") ?: project.hasProperty("sonatypeOssUsername") ? project.sonatypeOssUsername : ''
+                def ossPass = System.getenv("SONATYPE_PASSWORD") ?: project.hasProperty("sonatypeOssPassword") ? project.sonatypeOssPassword : ''
+
+                username = ossUser
+                password = ossPass
+            }
+            if (isBuildSnapshot) {
+                url "https://oss.sonatype.org/content/repositories/snapshots"
+            } else {
+                url "https://repo.micronaut.io/artifactory/libs-releases-local"
+            }
+        }
+    }
+
+    afterEvaluate {
+        if (project.name == "cli") {
+            publications {
+                mavenJava(MavenPublication) {
+                    artifactId "micronaut-${project.name}"
+                    artifact cliZip {
+                        classifier "dist"
+                    }
+
+                    pom.withXml {
+                        def xml = asNode()
+
+                        xml.children().last() + pomInfo
+                    }
+                }
+            }
+        } else if (project.shadowJarEnabled == true) {
+            publications {
+                mavenJava(MavenPublication) {
+                    artifactId("micronaut-" + project.name.substring(project.name.indexOf('/') + 1))
+                    def shadowJar = tasks.findByName("shadowJar")
+                    artifact(project.tasks.shadowJar) {
+                        classifier = null
+                    }
+                    pom.withXml { xml ->
+                        def xmlNode = xml.asNode()
+                        def dependenciesNode = xmlNode.appendNode('dependencies')
+                        Set<Dependency> visited = new HashSet<>()
+
+                        project.configurations.api.allDependencies.each {
+                            if (!(it instanceof SelfResolvingDependency)) {
+                                def dependencyNode = dependenciesNode.appendNode('dependency')
+                                dependencyNode.appendNode('groupId', it.group)
+                                dependencyNode.appendNode('artifactId', it.name)
+                                dependencyNode.appendNode('version', it.version)
+                                dependencyNode.appendNode('scope', 'compile')
+                            } else if (it instanceof ProjectDependency) {
+                                def dependencyNode = dependenciesNode.appendNode('dependency')
+                                dependencyNode.appendNode('groupId', project.group)
+                                dependencyNode.appendNode('artifactId', "micronaut-$it.name")
+                                dependencyNode.appendNode('version', project.version)
+                                dependencyNode.appendNode('scope', 'compile')
+                            }
+                            visited.add(it)
+                        }
+                        project.configurations.runtime.allDependencies.each {
+                            if (visited.contains(it)) {
+                                return
+                            }
+                            if (!(it instanceof SelfResolvingDependency)) {
+                                def dependencyNode = dependenciesNode.appendNode('dependency')
+                                dependencyNode.appendNode('groupId', it.group)
+                                dependencyNode.appendNode('artifactId', it.name)
+                                dependencyNode.appendNode('version', it.version)
+                                dependencyNode.appendNode('scope', 'runtime')
+                            } else if (it instanceof ProjectDependency) {
+                                def dependencyNode = dependenciesNode.appendNode('dependency')
+                                dependencyNode.appendNode('groupId', project.group)
+                                dependencyNode.appendNode('artifactId', "micronaut-$it.name")
+                                dependencyNode.appendNode('version', project.version)
+                                dependencyNode.appendNode('scope', 'runtime')
+
+                            }
+                            visited.add(it)
+                        }
+                    }
+
+                    pom.withXml {
+                        def xml = asNode()
+
+                        xml.children().last() + pomInfo
+                    }
+
+                    artifact sourcesJar {
+                        classifier "sources"
+                    }
+                    artifact javadocJar {
+                        classifier "javadoc"
+                    }
+                }
+            }
+        } else {
+            publications {
+                mavenJava(MavenPublication) {
+                    artifactId "micronaut-${project.name}"
+
+                    from components.java
+>>>>>>> Cleanup publishing so that we reuse pom parts again
 
                     artifact sourcesJar
                     artifact javadocJar
 
-                    pom {
-                        name = project.title
-                        description = project.projectDesc
-                        url = projectUrl
-                        licenses {
-                            license {
-                                name = 'The Apache Software License, Version 2.0'
-                                url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                                distribution = 'repo'
-                            }
-                        }
-                        scm {
-                            url = "scm:git@github.com:${githubSlug}.git"
-                            connection = "scm:git@github.com:${githubSlug}.git"
-                            developerConnection = "scm:git@github.com:${githubSlug}.git"
-                        }
-                        if (project.developers) {
-                            developers {
-                                for (dev in project.developers.split(',')) {
-                                    developer {
-                                        id = dev.toLowerCase().replace(' ', '').toString()
-                                        name = dev.toString()
-                                    }
-                                }
-                            }
-                        }
+                    pom.withXml {
+                        def xml = asNode()
+
+                        xml.children().last() + pomInfo
                     }
                 }
             }
