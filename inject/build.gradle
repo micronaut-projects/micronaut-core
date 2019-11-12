@@ -1,4 +1,6 @@
-shadowJar.enabled = true
+ext {
+    shadowJarEnabled = true
+}
 dependencies {
     api dependencyVersion("javax.annotation-api")
     api group: 'javax.inject', name: 'javax.inject', version: '1'

@@ -1,8 +1,10 @@
-shadowJar.enabled = true
+ext {
+    shadowJarEnabled = true
+}
 dependencies {
     api project(":runtime")
     api project(":http")
-    
+
     annotationProcessor project(":inject-java")
     compileOnly project(":http-server")
 
