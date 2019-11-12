@@ -92,14 +92,3 @@ task cliZip(type: Zip, dependsOn: ['fatJar']) {
         from('../LICENSE')
     }
 }
-
-publishing {
-    publications {
-        maven(MavenPublication) {
-            artifactId "micronaut-${project.name}"
-            artifact cliZip {
-                classifier "dist"
-            }
-        }
-    }
-}
