@@ -809,7 +809,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
             if (modifierChar == ':' && modifierStr.length() > 0) {
                 if (Character.isDigit(modifierStr.charAt(0))) {
                     try {
-                        Integer subResult = Integer.valueOf(modifierStr.trim());
+                        int subResult = Integer.parseInt(modifierStr.trim(), 10);
                         if (subResult < len) {
                             result = result.substring(0, subResult);
                         }
