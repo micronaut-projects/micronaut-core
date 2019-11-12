@@ -468,9 +468,15 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             @Nonnull Object[] parameterValues,
             @Nullable Class<?>... groups) {
         ArgumentUtils.requireNonNull("introspection", introspection);
+        final Class<? extends T> beanType = introspection.getBeanType();
+        final Argument<?>[] constructorArguments = introspection.getConstructorArguments();
+        return validateConstructorParameters(beanType, constructorArguments, parameterValues, groups);
+    }
+
+    @Override
+    public <T> Set<ConstraintViolation<T>> validateConstructorParameters(Class<? extends T> beanType, Argument<?>[] constructorArguments, @Nonnull Object[] parameterValues, @Nullable Class<?>[] groups) {
         //noinspection ConstantConditions
         parameterValues = parameterValues != null ? parameterValues : ArrayUtils.EMPTY_OBJECT_ARRAY;
-        final Argument<?>[] constructorArguments = introspection.getConstructorArguments();
         final int argLength = constructorArguments.length;
         if (parameterValues.length != argLength) {
             throw new IllegalArgumentException("Expected exactly [" + argLength + "] constructor arguments");
@@ -480,10 +486,10 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(groups);
         Set overallViolations = new HashSet<>(5);
 
-        final Path.Node node = context.addConstructorNode(introspection.getBeanType().getSimpleName(), constructorArguments);
+        final Path.Node node = context.addConstructorNode(beanType.getSimpleName(), constructorArguments);
         try {
             validateParametersInternal(
-                    introspection.getBeanType(),
+                    beanType,
                     null,
                     argumentValues,
                     constructorArguments,
