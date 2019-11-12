@@ -6,7 +6,7 @@ dependencies {
     compileOnly dependencyVersion("validation")
 
     testImplementation 'com.github.spotbugs:spotbugs-annotations:3.1.12'
-    testImplementation project(":aop")
+    testImplementation project(path: ':aop', configuration: 'shadow')
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":runtime")
     testImplementation dependencyVersion("rxjava2")
