@@ -5,7 +5,7 @@ dependencies {
     api project(":inject")
     annotationProcessor project(":inject-java")
     compileOnly dependencyModuleVersion("spring", "spring-jdbc")
-    api project(":aop")
+    api project(path: ':aop', configuration: 'shadow')
 
     testImplementation project(':runtime')
     testImplementation project(':inject-groovy')

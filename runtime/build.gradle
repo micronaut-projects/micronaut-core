@@ -1,8 +1,12 @@
-shadowJar.enabled = true
+ext {
+    shadowJarEnabled = true
+}
 dependencies {
-    for(proj in ['inject', 'http', 'aop']) {
+    for(proj in ['http']) {
         api project(":$proj")
     }
+    api project(path: ':inject', configuration: 'shadow')
+    api project(path: ':aop', configuration: 'shadow')
     compileOnly "com.oracle.substratevm:svm:$graalVersion"
     compileOnly project(":graal")
     compileOnly dependencyVersion("jcache")
