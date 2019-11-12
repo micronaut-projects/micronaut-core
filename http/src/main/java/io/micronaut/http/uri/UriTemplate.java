@@ -201,13 +201,20 @@ public class UriTemplate implements Comparable<UriTemplate> {
         StringBuilder builder = new StringBuilder();
         boolean anyPreviousHasContent = false;
         boolean anyPreviousHasOperator = false;
+        boolean queryParameter = false;
         for (PathSegment segment : segments) {
             String result = segment.expand(parameters, anyPreviousHasContent, anyPreviousHasOperator);
             if (result == null) {
                 break;
             }
             if (segment instanceof UriTemplateParser.VariablePathSegment) {
-                if (result.contains(String.valueOf(((UriTemplateParser.VariablePathSegment) segment).getOperator()))) {
+                UriTemplateParser.VariablePathSegment varPathSegment = (UriTemplateParser.VariablePathSegment) segment;
+                if (varPathSegment.isQuerySegment && ! queryParameter) {
+                    // reset anyPreviousHasContent when we reach query parameters
+                    queryParameter = true;
+                    anyPreviousHasContent = false;
+                }
+                if (result.contains(String.valueOf(varPathSegment.getOperator()))) {
                     anyPreviousHasOperator = true;
                 }
                 anyPreviousHasContent = anyPreviousHasContent || result.length() > 0;
