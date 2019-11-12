@@ -40,10 +40,13 @@ public class KotlinExecutableMethodUtils {
     public static boolean isKotlinSuspendingFunction(@Nonnull ExecutableMethod method) {
         if (KOTLIN_COROUTINES_SUPPORTED) {
             final Argument[] arguments = method.getArguments();
-            return arguments[arguments.length - 1].getType() == Continuation.class;
-        } else {
-            return false;
+            final int argumentsLength = arguments.length;
+            if (argumentsLength > 0) {
+                return arguments[argumentsLength - 1].getType() == Continuation.class;
+            }
         }
+
+        return false;
     }
 
     /**
@@ -55,10 +58,13 @@ public class KotlinExecutableMethodUtils {
     public static boolean isKotlinFunctionReturnTypeUnit(@Nonnull ExecutableMethod method) {
         if (KOTLIN_COROUTINES_SUPPORTED) {
             final Argument[] arguments = method.getArguments();
-            final Argument[] params = arguments[arguments.length - 1].getTypeParameters();
-            return params.length == 1 && params[0].getType() == Unit.class;
-        } else {
-            return false;
+            final int argumentsLength = arguments.length;
+            if (argumentsLength > 0) {
+                final Argument[] params = arguments[argumentsLength - 1].getTypeParameters();
+                return params.length == 1 && params[0].getType() == Unit.class;
+            }
         }
+
+        return false;
     }
 }

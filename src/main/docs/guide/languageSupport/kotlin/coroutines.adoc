@@ -15,3 +15,5 @@ snippet::io.micronaut.docs.server.suspend.SuspendController[tags="suspendStatus"
 <1> `suspend` function also works when all we want is to return a status.
 
 snippet::io.micronaut.docs.server.suspend.SuspendController[tags="suspendStatusDelayed", indent=0, title="Controller suspend function example"]
+
+NOTE: Due to the way Kotlin compiler generates bytecode for coroutines they are currently https://github.com/oracle/graal/issues/366[unsuppoprted] out-of-the-box in GraalVM. There is, however, a https://github.com/HewlettPackard/kraal[workaround] for this problem.
