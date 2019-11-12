@@ -802,7 +802,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
         }
 
         private String escape(String v) {
-            return v.replaceAll("%", "%25").replaceAll("\\s", "%20");
+            return v.replace("%", "%25").replaceAll("\\s", "%20");
         }
 
         private String applyModifier(String modifierStr, char modifierChar, String result, int len) {
