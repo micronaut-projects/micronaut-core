@@ -53,7 +53,12 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
 
     @Override
     protected String buildTypePath(ClassNode owningType, ClassNode declaringType) {
-        StringBuilder path = new StringBuilder(calculateInitialPath(owningType, declaringType))
+        return buildTypePath(owningType, declaringType, getAnnotationMetadata(declaringType))
+    }
+
+    @Override
+    protected String buildTypePath(ClassNode owningType, ClassNode declaringType, AnnotationMetadata annotationMetadata) {
+        StringBuilder path = new StringBuilder(calculateInitialPath(owningType, annotationMetadata))
 
         prependSuperclasses(declaringType, path)
         while (declaringType != null && declaringType instanceof InnerClassNode) {
@@ -83,8 +88,7 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
         return path.toString()
     }
 
-    private String calculateInitialPath(ClassNode owningType, ClassNode declaringType) {
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata(declaringType)
+    private String calculateInitialPath(ClassNode owningType, AnnotationMetadata annotationMetadata) {
         return annotationMetadata.stringValue(ConfigurationReader.class)
                 .map(pathEvaluationFunction(annotationMetadata)).orElseGet( {->
             AnnotationMetadata ownerMetadata = getAnnotationMetadata(owningType)

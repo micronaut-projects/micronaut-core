@@ -10,7 +10,6 @@ dependencies {
     testCompile project(":runtime")
     testCompile dependencyVersion("rxjava2")
     testCompile "org.hibernate:hibernate-core:5.3.6.Final"
-    testCompile 'org.hibernate:hibernate-validator:6.0.13.Final'
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
     testCompile "junit:junit:4.7"
     testCompile "com.google.testing.compile:compile-testing:0.12"
@@ -20,6 +19,7 @@ dependencies {
     testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     testRuntime 'org.glassfish:javax.el:3.0.1-b08'
     testCompile dependencyVersion("micrometer")
+    testCompile project(":validation")
 }
 
 

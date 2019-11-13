@@ -47,6 +47,7 @@ config:
   customTypeConverter: Custom Type Converters
   eachProperty: Using @EachProperty to Drive Configuration
   eachBean: Using @EachBean to Drive Configuration
+  immutableConfig: Immutable Configuration
   # validation: Validating Configuration
   jmx:
     title: JMX Support

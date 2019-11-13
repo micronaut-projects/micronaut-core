@@ -16,6 +16,7 @@
 
 package io.micronaut.inject.beans.visitor;
 
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -40,7 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @since 1.1
  */
 @Internal
-public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Introspected, Object> {
+public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object, Object> {
 
     /**
      * The position of the visitor.
@@ -57,6 +58,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
             .build();
 
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
+    private ClassElement lastConfigurationReader;
 
     @Override
     public int getOrder() {
@@ -66,87 +68,143 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
-        if (introspected != null && !writers.containsKey(element.getName()) && !element.isAbstract()) {
+        if (!element.isPrivate()) {
+            if (element.hasStereotype(Introspected.class)) {
+                final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
+                if (introspected != null && !writers.containsKey(element.getName()) && !element.isAbstract()) {
+                    processIntrospected(element, context, introspected);
+                }
+            } else if (element.hasStereotype(ConfigurationReader.class)) {
+                this.lastConfigurationReader = element;
+            } else {
+                this.lastConfigurationReader = null;
+            }
+        }
+    }
 
-            final String[] packages = introspected.get("packages", String[].class, StringUtils.EMPTY_STRING_ARRAY);
-            final AnnotationClassValue[] classes = introspected.get("classes", AnnotationClassValue[].class, new AnnotationClassValue[0]);
-            final boolean metadata = introspected.get("annotationMetadata", boolean.class, true);
+    @Override
+    public void visitConstructor(ConstructorElement element, VisitorContext context) {
+        final ClassElement declaringType = element.getDeclaringType();
+        if (lastConfigurationReader != null && lastConfigurationReader.getName().equals(declaringType.getName())) {
+            final ParameterElement[] parameters = element.getParameters();
+            introspectIfValidated(context, declaringType, parameters);
+        }
+    }
 
-            final Set<String> includes = CollectionUtils.setOf(introspected.get("includes", String[].class, StringUtils.EMPTY_STRING_ARRAY));
-            final Set<String> excludes = CollectionUtils.setOf(introspected.get("excludes", String[].class, StringUtils.EMPTY_STRING_ARRAY));
-            final Set<String> excludedAnnotations = CollectionUtils.setOf(introspected.get("excludedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
-            final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.get("includedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
-            final Set<AnnotationValue> indexedAnnotations;
+    @Override
+    public void visitMethod(MethodElement element, VisitorContext context) {
+        final ClassElement declaringType = element.getDeclaringType();
+        if (lastConfigurationReader != null && lastConfigurationReader.getName().equals(declaringType.getName())) {
+            if (element.getName().startsWith("get")) {
+                final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
+                if (hasConstraints) {
+                    processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
+                }
+            }
+        }
+    }
 
-            final Set<AnnotationValue> toIndex = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
+    @Override
+    public void visitField(FieldElement element, VisitorContext context) {
+        final ClassElement declaringType = element.getDeclaringType();
+        if (lastConfigurationReader != null && lastConfigurationReader.getName().equals(declaringType.getName())) {
+            if (!writers.containsKey(declaringType.getName())) {
+                final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
+                if (hasConstraints) {
+                    processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
+                }
+            }
+        }
+    }
 
-            if (CollectionUtils.isEmpty(toIndex)) {
-                indexedAnnotations = CollectionUtils.setOf(
+    private void introspectIfValidated(VisitorContext context, ClassElement declaringType, ParameterElement[] parameters) {
+        if (!writers.containsKey(declaringType.getName())) {
+            final boolean hasConstraints = Arrays.stream(parameters).anyMatch(e ->
+                    e.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || e.hasStereotype(JAVAX_VALIDATION_VALID)
+            );
+            if (hasConstraints) {
+                processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
+            }
+        }
+    }
+
+    private void processIntrospected(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected) {
+        final String[] packages = introspected.get("packages", String[].class, StringUtils.EMPTY_STRING_ARRAY);
+        final AnnotationClassValue[] classes = introspected.get("classes", AnnotationClassValue[].class, new AnnotationClassValue[0]);
+        final boolean metadata = introspected.get("annotationMetadata", boolean.class, true);
+
+        final Set<String> includes = CollectionUtils.setOf(introspected.get("includes", String[].class, StringUtils.EMPTY_STRING_ARRAY));
+        final Set<String> excludes = CollectionUtils.setOf(introspected.get("excludes", String[].class, StringUtils.EMPTY_STRING_ARRAY));
+        final Set<String> excludedAnnotations = CollectionUtils.setOf(introspected.get("excludedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
+        final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.get("includedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
+        final Set<AnnotationValue> indexedAnnotations;
+
+        final Set<AnnotationValue> toIndex = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
+
+        if (CollectionUtils.isEmpty(toIndex)) {
+            indexedAnnotations = CollectionUtils.setOf(
+                    ANN_CONSTRAINT,
+                    ANN_VALID
+            );
+        } else {
+            toIndex.addAll(
+                CollectionUtils.setOf(
                         ANN_CONSTRAINT,
                         ANN_VALID
-                );
-            } else {
-                toIndex.addAll(
-                    CollectionUtils.setOf(
-                            ANN_CONSTRAINT,
-                            ANN_VALID
-                    )
-                );
-                indexedAnnotations = toIndex;
+                )
+            );
+            indexedAnnotations = toIndex;
+        }
+
+        if (ArrayUtils.isNotEmpty(classes)) {
+            AtomicInteger index = new AtomicInteger(0);
+            for (AnnotationClassValue aClass : classes) {
+                final Optional<ClassElement> classElement = context.getClassElement(aClass.getName());
+                classElement.ifPresent(ce -> {
+                    if (!ce.isAbstract() && ce.isPublic()) {
+                        final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                                element.getName(),
+                                index.getAndIncrement(),
+                                ce.getName(),
+                                metadata ? element.getAnnotationMetadata() : null
+                        );
+
+                        processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, ce, writer);
+
+                    }
+                });
             }
+        } else if (ArrayUtils.isNotEmpty(packages)) {
 
-            if (ArrayUtils.isNotEmpty(classes)) {
-                AtomicInteger index = new AtomicInteger(0);
-                for (AnnotationClassValue aClass : classes) {
-                    final Optional<ClassElement> classElement = context.getClassElement(aClass.getName());
-                    classElement.ifPresent(ce -> {
-                        if (!ce.isAbstract() && ce.isPublic()) {
-                            final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
-                                    element.getName(),
-                                    index.getAndIncrement(),
-                                    ce.getName(),
-                                    metadata ? element.getAnnotationMetadata() : null
-                            );
-
-                            processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, ce, writer);
-
+            if (includedAnnotations.isEmpty()) {
+                context.fail("When specifying 'packages' you must also specify 'includedAnnotations' to limit scanning", element);
+            } else {
+                for (String aPackage : packages) {
+                    ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(new String[0]));
+                    int j = 0;
+                    for (ClassElement classElement : elements) {
+                        if (classElement.isAbstract() || !classElement.isPublic()) {
+                            continue;
                         }
-                    });
-                }
-            } else if (ArrayUtils.isNotEmpty(packages)) {
+                        final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                                element.getName(),
+                                j++,
+                                classElement.getName(),
+                                metadata ? element.getAnnotationMetadata() : null
+                        );
 
-                if (includedAnnotations.isEmpty()) {
-                    context.fail("When specifying 'packages' you must also specify 'includedAnnotations' to limit scanning", element);
-                } else {
-                    for (String aPackage : packages) {
-                        ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(new String[0]));
-                        int j = 0;
-                        for (ClassElement classElement : elements) {
-                            if (classElement.isAbstract() || !classElement.isPublic()) {
-                                continue;
-                            }
-                            final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
-                                    element.getName(),
-                                    j++,
-                                    classElement.getName(),
-                                    metadata ? element.getAnnotationMetadata() : null
-                            );
-
-                            processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, classElement, writer);
-                        }
+                        processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, classElement, writer);
                     }
                 }
-            } else {
-
-                final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
-                        element.getName(),
-                        metadata ? element.getAnnotationMetadata() : null
-                );
-
-                processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, element, writer);
             }
+        } else {
 
+            final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                    element.getName(),
+                    metadata ? element.getAnnotationMetadata() : null
+            );
+
+            processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, element, writer);
         }
     }
 
@@ -170,11 +228,17 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
             context.fail("Introspected types must have a single public constructor or static @Creator method", ce);
         } else {
             final MethodElement constructor = constructorElement.get();
-            if (Arrays.stream(constructor.getParameters()).anyMatch(p -> p.getType() == null)) {
-                context.fail("Introspected constructor includes unsupported argument types", ce);
-            } else {
-                process(constructor, ce.getDefaultConstructor().orElse(null), writer, beanProperties, includes, excludes, excludedAnnotations, indexedAnnotations, metadata);
-            }
+            process(
+                    constructor,
+                    ce.getDefaultConstructor().orElse(null),
+                    writer,
+                    beanProperties,
+                    includes,
+                    excludes,
+                    excludedAnnotations,
+                    indexedAnnotations,
+                    metadata
+            );
         }
     }
 
@@ -199,43 +263,41 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
 
         for (PropertyElement beanProperty : beanProperties) {
             final ClassElement type = beanProperty.getType();
-            if (type != null) {
 
-                final String name = beanProperty.getName();
-                if (!includes.isEmpty() && !includes.contains(name)) {
-                    continue;
-                }
-                if (!excludes.isEmpty() && excludes.contains(name)) {
-                    continue;
-                }
+            final String name = beanProperty.getName();
+            if (!includes.isEmpty() && !includes.contains(name)) {
+                continue;
+            }
+            if (!excludes.isEmpty() && excludes.contains(name)) {
+                continue;
+            }
 
-                if (!ignored.isEmpty() && ignored.stream().anyMatch(beanProperty::hasAnnotation)) {
-                    continue;
-                }
+            if (!ignored.isEmpty() && ignored.stream().anyMatch(beanProperty::hasAnnotation)) {
+                continue;
+            }
 
-                writer.visitProperty(
-                        type,
-                        name,
-                        beanProperty.getReadMethod().orElse(null),
-                        beanProperty.getWriteMethod().orElse(null),
-                        beanProperty.isReadOnly(),
-                        metadata ? beanProperty.getAnnotationMetadata() : null,
-                        beanProperty.getType().getTypeArguments()
-                );
+            writer.visitProperty(
+                    type,
+                    name,
+                    beanProperty.getReadMethod().orElse(null),
+                    beanProperty.getWriteMethod().orElse(null),
+                    beanProperty.isReadOnly(),
+                    metadata ? beanProperty.getAnnotationMetadata() : null,
+                    beanProperty.getType().getTypeArguments()
+            );
 
-                for (AnnotationValue<?> indexedAnnotation : indexedAnnotations) {
-                    indexedAnnotation.get("annotation", String.class).ifPresent(annotationName -> {
-                        if (beanProperty.hasStereotype(annotationName)) {
-                            writer.indexProperty(
-                                    new AnnotationValue<>(annotationName),
-                                    name,
-                                    indexedAnnotation.get("member", String.class)
-                                            .flatMap(m -> beanProperty.getValue(annotationName, m, String.class)).orElse(null)
-                            );
-                        }
-                    });
+            for (AnnotationValue<?> indexedAnnotation : indexedAnnotations) {
+                indexedAnnotation.get("annotation", String.class).ifPresent(annotationName -> {
+                    if (beanProperty.hasStereotype(annotationName)) {
+                        writer.indexProperty(
+                                new AnnotationValue<>(annotationName),
+                                name,
+                                indexedAnnotation.get("member", String.class)
+                                        .flatMap(m -> beanProperty.getValue(annotationName, m, String.class)).orElse(null)
+                        );
+                    }
+                });
 
-                }
             }
         }
         writers.put(writer.getBeanType().getClassName(), writer);

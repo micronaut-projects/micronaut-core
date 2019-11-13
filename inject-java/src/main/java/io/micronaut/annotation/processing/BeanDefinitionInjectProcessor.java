@@ -46,10 +46,7 @@ import javax.annotation.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Provider;
-import javax.inject.Scope;
+import javax.inject.*;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
@@ -75,6 +72,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * <p>The core annotation processor used to generate bean definitions and power AOP for Micronaut.</p>
@@ -301,6 +299,31 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         } else {
             return modelUtils.resolveTypeName(valueType);
         }
+    }
+
+    private AnnotationMetadata addPropertyMetadata(AnnotationMetadata annotationMetadata, VariableElement element, String propertyName) {
+        final PropertyMetadata pm = metadataBuilder.visitProperty(
+                getPropertyMetadataTypeReference(element.asType()),
+                propertyName, null, null
+        );
+        return addPropertyMetadata(annotationMetadata, pm);
+    }
+
+    private AnnotationMetadata addPropertyMetadata(AnnotationMetadata annotationMetadata, PropertyMetadata propertyMetadata) {
+        return DefaultAnnotationMetadata.mutateMember(
+                annotationMetadata,
+                PropertySource.class.getName(),
+                AnnotationMetadata.VALUE_MEMBER,
+                Collections.singletonList(
+                        new io.micronaut.core.annotation.AnnotationValue(
+                                Property.class.getName(),
+                                Collections.singletonMap(
+                                        "name",
+                                        propertyMetadata.getPath()
+                                )
+                        )
+                )
+        );
     }
 
     /**
@@ -530,6 +553,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         constructorParameterInfo.getParameters(),
                         constructorParameterInfo.getParameterMetadata(),
                         constructorParameterInfo.getGenericTypes());
+
+                if (constructorParameterInfo.isValidated()) {
+                    beanDefinitionWriter.setValidated(true);
+                }
             }
             return beanDefinitionWriter;
         }
@@ -654,7 +681,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             boolean injected = methodAnnotationMetadata.hasDeclaredStereotype(Inject.class);
             boolean postConstruct = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT);
             boolean preDestroy = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY);
-            if (injected || postConstruct || preDestroy) {
+            if (injected || postConstruct || preDestroy || methodAnnotationMetadata.hasDeclaredStereotype(ConfigurationInject.class)) {
                 if (isDeclaredBean) {
                     visitAnnotatedMethod(method, o);
                 } else if (injected) {
@@ -740,20 +767,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             null
                     );
 
-                    AnnotationMetadata annotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                            AnnotationMetadata.EMPTY_METADATA,
-                            PropertySource.class.getName(),
-                            AnnotationMetadata.VALUE_MEMBER,
-                            Collections.singletonList(
-                                    new io.micronaut.core.annotation.AnnotationValue(
-                                            Property.class.getName(),
-                                            Collections.singletonMap(
-                                                    "name",
-                                                    propertyMetadata.getPath()
-                                            )
-                                    )
-                            )
-                    );
+                    AnnotationMetadata annotationMetadata = addPropertyMetadata(AnnotationMetadata.EMPTY_METADATA, propertyMetadata);
 
                     boolean requiresReflection = true;
                     if (modelUtils.isPublic(method)) {
@@ -1484,7 +1498,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         params.getGenericTypes(),
                         annotationMetadata
                 );
-            } else if (annotationMetadata.hasDeclaredStereotype(Inject.class)) {
+            } else if (annotationMetadata.hasDeclaredStereotype(Inject.class) || annotationMetadata.hasDeclaredStereotype(ConfigurationInject.class)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
                 writer.visitMethodInjectionPoint(
                         modelUtils.resolveTypeReference(declaringClass),
@@ -1679,20 +1693,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     null
                             );
 
-                            fieldAnnotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                                    fieldAnnotationMetadata,
-                                    PropertySource.class.getName(),
-                                    AnnotationMetadata.VALUE_MEMBER,
-                                    Collections.singletonList(
-                                            new io.micronaut.core.annotation.AnnotationValue(
-                                                    Property.class.getName(),
-                                                    Collections.singletonMap(
-                                                            "name",
-                                                            propertyMetadata.getPath()
-                                                    )
-                                            )
-                                    )
-                            );
+                            fieldAnnotationMetadata = addPropertyMetadata(fieldAnnotationMetadata, propertyMetadata);
                             writer.visitFieldValue(
                                     declaringType,
                                     fieldType,
@@ -2013,6 +2014,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     modelUtils.isPrivate(element),
                     elementMetadata
             );
+            final boolean isConstructBinding = elementMetadata.hasDeclaredStereotype(ConfigurationInject.class);
+            if (isConstructBinding) {
+                    this.configurationMetadata = metadataBuilder.visitProperties(
+                            concreteClass,
+                            null);
+
+            }
 
             element.getParameters().forEach(paramElement -> {
 
@@ -2022,9 +2030,24 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
                     annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, "javax.annotation.Nullable", Collections.emptyMap());
                 }
-                params.addAnnotationMetadata(argName, annotationMetadata);
+
+                if (annotationMetadata.hasStereotype(ANN_CONSTRAINT)) {
+                    params.setValidated(true);
+                }
 
                 TypeMirror typeMirror = paramElement.asType();
+                if (isConstructBinding) {
+                    if (Stream.of(Property.class, Value.class, Parameter.class).noneMatch(annotationMetadata::hasAnnotation)) {
+                        final Element parameterElement = typeUtils.asElement(typeMirror);
+                        final AnnotationMetadata parameterTypeMetadata = parameterElement != null ? annotationUtils.getAnnotationMetadata(parameterElement) : AnnotationMetadata.EMPTY_METADATA;
+                        if (!parameterTypeMetadata.hasStereotype(Scope.class)) {
+                            annotationMetadata = addPropertyMetadata(annotationMetadata, paramElement, argName);
+                        }
+                    }
+                }
+                params.addAnnotationMetadata(argName, annotationMetadata);
+
+
                 TypeKind kind = typeMirror.getKind();
                 if ((kind == TypeKind.ERROR) && !processingOver) {
                     throw new PostponeToNextRoundException();    
