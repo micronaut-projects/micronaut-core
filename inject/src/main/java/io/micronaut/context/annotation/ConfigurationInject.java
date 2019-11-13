@@ -33,7 +33,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>An additional prefix can be attached using the {@link #value()} member.</p>
  *
  * @author Graeme Rocher
- * @since 1.0
+ * @since 1.3.0
  */
 @Documented
 @Retention(RUNTIME)
