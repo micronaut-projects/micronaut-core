@@ -21,10 +21,10 @@ dependencies {
 
         for (Project p : rootProject.subprojects) {
             if (!p.subprojects.empty) continue
-            if (p.name == "bom") continue
+            if (p.name == "bom" || p.name.contains("test-suite") || p.name == "test-utils") continue
             if (p.hasProperty("bomExclude") && p.property("bomExclude") == true) continue
 
-            api project(":$p.name")
+            api "$p.group:micronaut-$p.name:$p.version"
         }
 
         for (dep in dependencyVersions) {
