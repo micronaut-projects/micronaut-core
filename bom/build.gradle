@@ -10,6 +10,8 @@ def profiles = new Properties()
 profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
 boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
 
+apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
+
 dependencies {
     constraints {
         for (profile in profiles) {
@@ -44,15 +46,6 @@ dependencies {
                     api "$info.group:$m:$versionExpr"
                 }
             }
-        }
-    }
-}
-
-publishing {
-    publications {
-        myPlatform(MavenPublication) {
-            artifactId "micronaut-${project.name}"
-            from components.javaPlatform
         }
     }
 }
