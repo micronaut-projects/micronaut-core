@@ -69,32 +69,22 @@ modifyPom {
 }
 
 publishing {
-<<<<<<< HEAD
-    publications {
-        mavenJava(MavenPublication) {
-            artifactId "micronaut-${project.name}"
-            from components.java
-=======
-    repositories {
-        maven {
-            credentials {
-                def ossUser = System.getenv("SONATYPE_USERNAME") ?: project.hasProperty("sonatypeOssUsername") ? project.sonatypeOssUsername : ''
-                def ossPass = System.getenv("SONATYPE_PASSWORD") ?: project.hasProperty("sonatypeOssPassword") ? project.sonatypeOssPassword : ''
+    afterEvaluate {
+        repositories {
+            maven {
+                credentials {
+                    def bintrayUser = System.getenv("BINTRAY_USER") ?: project.hasProperty("bintrayUser") ? project.bintrayUser : ''
+                    def bintrayKey = System.getenv("BINTRAY_KEY") ?: project.hasProperty("bintrayKey") ? project.bintrayKey : ''
 
-                username = ossUser
-                password = ossPass
-            }
-            if (isBuildSnapshot) {
-                url "https://oss.sonatype.org/content/repositories/snapshots"
-            } else {
-                url "https://repo.micronaut.io/artifactory/libs-releases-local"
+                    username = bintrayUser
+                    password = bintrayKey
+                }
+                url  "https://oss.jfrog.org/oss-snapshot-local"
             }
         }
-    }
 
-    afterEvaluate {
         publications {
-            mavenJava(MavenPublication) {
+            maven(MavenPublication) {
                 artifactId("micronaut-" + project.name.substring(project.name.indexOf('/') + 1))
                 if (project.name == "bom") {
                     from components.javaPlatform
@@ -177,8 +167,6 @@ publishing {
                     }
                 } else {
                     from components.java
->>>>>>> Cleanup publishing so that we reuse pom parts again
-
                     artifact sourcesJar
                     artifact javadocJar
 
