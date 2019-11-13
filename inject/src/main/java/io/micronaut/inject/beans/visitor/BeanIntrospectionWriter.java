@@ -27,10 +27,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.*;
 import io.micronaut.core.beans.AbstractBeanIntrospection;
 import io.micronaut.core.beans.AbstractBeanIntrospectionReference;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
@@ -69,20 +66,18 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final ClassWriter introspectionWriter;
     private final List<BeanPropertyWriter> propertyDefinitions = new ArrayList<>();
     private final Map<String, Collection<AnnotationValueIndex>> indexes = new HashMap<>(2);
-    private final boolean hasDefaultConstructor;
     private int propertyIndex = 0;
-    private ParameterElement[] constructorArguments;
+    private MethodElement constructor;
+    private MethodElement defaultConstructor;
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
 
     /**
      * Default constructor.
      * @param className The class name
      * @param beanAnnotationMetadata The bean annotation metadata
-     * @param hasDefaultConstructor Whether the class has a default constructor
      */
-    BeanIntrospectionWriter(String className, AnnotationMetadata beanAnnotationMetadata, boolean hasDefaultConstructor) {
+    BeanIntrospectionWriter(String className, AnnotationMetadata beanAnnotationMetadata) {
         super(computeReferenceName(className), beanAnnotationMetadata, true);
-        this.hasDefaultConstructor = hasDefaultConstructor;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         this.introspectionWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         this.introspectionName = computeIntrospectionName(className);
@@ -96,11 +91,9 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param index A unique index
      * @param className The class name
      * @param beanAnnotationMetadata The bean annotation metadata
-     * @param hasDefaultConstructor Whether the class has a default constructor
      */
-    BeanIntrospectionWriter(String generatingType, int index, String className, AnnotationMetadata beanAnnotationMetadata, boolean hasDefaultConstructor) {
+    BeanIntrospectionWriter(String generatingType, int index, String className, AnnotationMetadata beanAnnotationMetadata) {
         super(computeReferenceName(generatingType) + index, beanAnnotationMetadata, true);
-        this.hasDefaultConstructor = hasDefaultConstructor;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         this.introspectionWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         this.introspectionName = computeIntrospectionName(className);
@@ -262,7 +255,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             writeInstantiateMethod();
 
             // write constructor arguments
-            if (ArrayUtils.isNotEmpty(constructorArguments)) {
+            if (constructor != null && ArrayUtils.isNotEmpty(constructor.getParameters())) {
                 writeConstructorArguments();
             }
             for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
@@ -275,6 +268,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     private void writeConstructorArguments() {
         final GeneratorAdapter getConstructorArguments = startPublicMethodZeroArgs(introspectionWriter, Argument[].class, "getConstructorArguments");
+        ParameterElement[] constructorArguments = constructor.getParameters();
         final Map<String, Object> args = toParameterTypes(constructorArguments);
         Map<String, AnnotationMetadata> annotationMetadataMap = new LinkedHashMap<>(args.size());
         for (ParameterElement constructorArgument : constructorArguments) {
@@ -308,8 +302,16 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             getTypeForElement(pe.getType())
         ).collect(Collectors.toList());
 
-        instantiateInternal.newInstance(beanType);
-        instantiateInternal.dup();
+        boolean isConstructor = constructor instanceof ConstructorElement;
+        boolean isCompanion = constructor.getDeclaringType().getSimpleName().endsWith("$Companion");
+
+        if (isConstructor) {
+            instantiateInternal.newInstance(beanType);
+            instantiateInternal.dup();
+        } else if (isCompanion) {
+            instantiateInternal.getStatic(beanType, "Companion", getTypeReference(constructor.getDeclaringType().getName()));
+        }
+
         int i = 0;
         for (Type argumentType : argumentTypes) {
             instantiateInternal.loadArg(0);
@@ -317,8 +319,17 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             instantiateInternal.arrayLoad(TYPE_OBJECT);
             pushCastToType(instantiateInternal, argumentType);
         }
-        final String constructorDescriptor = getConstructorDescriptor((Collection) argumentTypes);
-        instantiateInternal.invokeConstructor(beanType, new Method("<init>", constructorDescriptor));
+
+        if (isConstructor) {
+            final String constructorDescriptor = getConstructorDescriptor((Collection) argumentTypes);
+            instantiateInternal.invokeConstructor(beanType, new Method("<init>", constructorDescriptor));
+        } else if (constructor.isStatic()) {
+            final String methodDescriptor = getMethodDescriptor(beanType, (Collection) argumentTypes);
+            instantiateInternal.invokeStatic(beanType, new Method(constructor.getName(), methodDescriptor));
+        } else if (isCompanion) {
+            instantiateInternal.invokeVirtual(getTypeReference(constructor.getDeclaringType().getName()), new Method(constructor.getName(), getMethodDescriptor(beanType, (Collection) argumentTypes)));
+        }
+
         instantiateInternal.visitInsn(ARETURN);
         instantiateInternal.visitMaxs(2, 1);
         instantiateInternal.visitEnd();
@@ -327,8 +338,17 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     private void writeInstantiateMethod() {
         final GeneratorAdapter instantiateMethod = startPublicMethod(introspectionWriter, "instantiate", Object.class.getName());
-        if (hasDefaultConstructor) {
-            pushNewInstance(instantiateMethod, beanType);
+        if (defaultConstructor != null) {
+            if (defaultConstructor instanceof ConstructorElement) {
+                pushNewInstance(instantiateMethod, beanType);
+            } else if (defaultConstructor.isStatic()) {
+                final String methodDescriptor = getMethodDescriptor(beanType, Collections.emptyList());
+                instantiateMethod.invokeStatic(beanType, new Method(defaultConstructor.getName(), methodDescriptor));
+            } else if (constructor.getDeclaringType().getSimpleName().endsWith("$Companion")) {
+                instantiateMethod.getStatic(beanType, "Companion", getTypeReference(constructor.getDeclaringType().getName()));
+                instantiateMethod.invokeVirtual(getTypeReference(constructor.getDeclaringType().getName()), new Method(constructor.getName(), getMethodDescriptor(beanType, Collections.emptyList())));
+            }
+
             instantiateMethod.visitInsn(ARETURN);
             instantiateMethod.visitMaxs(2, 1);
             instantiateMethod.visitEnd();
@@ -423,11 +443,19 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     /**
-     * Visit the constructor arguments. If any.
-     * @param parameters The parameters
+     * Visit the constructor. If any.
+     * @param constructor The constructor method
      */
-    void visitConstructorArguments(ParameterElement... parameters) {
-        this.constructorArguments = parameters;
+    void visitConstructor(MethodElement constructor) {
+        this.constructor = constructor;
+    }
+
+    /**
+     * Visit the default constructor. If any.
+     * @param constructor The constructor method
+     */
+    void visitDefaultConstructor(MethodElement constructor) {
+        this.defaultConstructor = constructor;
     }
 
     /**

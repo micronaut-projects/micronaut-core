@@ -30,6 +30,30 @@ snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="usage", indent=0]
 <4> .. and the `set` method used to set the property value
 <5> .. and the `get` method used to retrieve the property value
 
+==== Constructor Methods
+
+For classes with multiple constructors, it is possible to inform Micronaut which constructor should be used to instantiate the class. Apply the ann:core.annotation.Creator[] annotation to which constructor to be used.
+
+snippet::io.micronaut.docs.ioc.beans.Vehicle[tags="class"]
+
+<1> The ann:core.annotation.Creator[] annotation is used to denote which constructor should be used
+
+NOTE: This class has no default constructor so calls to instantiate without arguments will throw an api:core.reflect.exception.InstantiationException[].
+
+==== Static Creator Methods
+
+For the use case of static methods being used to instantiate the class, the ann:core.annotation.Creator[] annotation can be applied to those methods to allow for the introspection to execute the method.
+
+snippet::io.micronaut.docs.ioc.beans.Business[tags="class"]
+
+<1> The ann:core.annotation.Creator[] annotation is applied to the static method which will be used to instantiate the class
+
+TIP: There can be multiple "creator" methods annotated. If one exists without arguments, that will be used as the default construction method. The first method with arguments will be used as the primary construction method.
+
+==== Enums
+
+It is possible to introspect enums as well. Simply add the annotation to the enum and it can be constructed through the standard `valueOf` method.
+
 ==== Use the `@Introspected` Annotation on a Configuration Class
 
 If the class you wish to introspect is already compiled and not under your control an alternative option is to define a configuration class with the `classes` member of the ann:core.annotation.Introspected[] annotation set.

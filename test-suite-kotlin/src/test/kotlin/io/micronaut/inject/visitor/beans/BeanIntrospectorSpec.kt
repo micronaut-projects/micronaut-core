@@ -1,7 +1,6 @@
 package io.micronaut.inject.visitor.beans
 
 import io.micronaut.core.beans.BeanIntrospector
-import junit.framework.TestCase
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
@@ -34,4 +33,6 @@ class BeanIntrospectorSpec {
 
         assertEquals("newvalue", testBean.stuff)
     }
+
+
 }

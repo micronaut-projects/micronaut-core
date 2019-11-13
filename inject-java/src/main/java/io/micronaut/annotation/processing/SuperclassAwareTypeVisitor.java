@@ -52,7 +52,9 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
     public R visitDeclared(DeclaredType type, P p) {
         Element element = type.asElement();
 
-        while ((JavaModelUtils.isClassOrInterface(element)) && !element.toString().equals(Object.class.getName())) {
+        while ((JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element)) &&
+                !element.toString().equals(Object.class.getName()) &&
+                !element.toString().equals(Enum.class.getName())) {
             TypeElement typeElement = (TypeElement) element;
             List<? extends Element> enclosedElements = typeElement.getEnclosedElements();
             for (Element enclosedElement : enclosedElements) {

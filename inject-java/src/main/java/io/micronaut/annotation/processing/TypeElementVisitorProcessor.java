@@ -96,7 +96,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         roundEnv.getRootElements()
                 .stream()
-                .filter(JavaModelUtils::isClassOrInterface)
+                .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
                 .map(modelUtils::classElementFor)
                 .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
                 .forEach((typeElement) -> {

@@ -23,10 +23,7 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ConstructorElement;
-import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.*;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
@@ -109,8 +106,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                                     element.getName(),
                                     index.getAndIncrement(),
                                     ce.getName(),
-                                    metadata ? element.getAnnotationMetadata() : null,
-                                    ce.hasDefaultConstructor()
+                                    metadata ? element.getAnnotationMetadata() : null
                             );
 
                             processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, ce, writer);
@@ -134,8 +130,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                                     element.getName(),
                                     j++,
                                     classElement.getName(),
-                                    metadata ? element.getAnnotationMetadata() : null,
-                                    classElement.hasDefaultConstructor()
+                                    metadata ? element.getAnnotationMetadata() : null
                             );
 
                             processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, classElement, writer);
@@ -146,8 +141,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
 
                 final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                         element.getName(),
-                        metadata ? element.getAnnotationMetadata() : null,
-                        element.hasDefaultConstructor()
+                        metadata ? element.getAnnotationMetadata() : null
                 );
 
                 processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, element, writer);
@@ -170,22 +164,23 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
 
     private void processElement(VisitorContext context, boolean metadata, Set<String> includes, Set<String> excludes, Set<String> excludedAnnotations, Set<AnnotationValue> indexedAnnotations, ClassElement ce, BeanIntrospectionWriter writer) {
         final List<PropertyElement> beanProperties = ce.getBeanProperties();
-        Optional<ConstructorElement> constructorElement = ce.getPrimaryConstructor();
+        Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
 
         if (!constructorElement.isPresent()) {
-            context.fail("Introspected types must have a single public constructor", ce);
+            context.fail("Introspected types must have a single public constructor or static @Creator method", ce);
         } else {
-            final ConstructorElement constructor = constructorElement.get();
+            final MethodElement constructor = constructorElement.get();
             if (Arrays.stream(constructor.getParameters()).anyMatch(p -> p.getType() == null)) {
                 context.fail("Introspected constructor includes unsupported argument types", ce);
             } else {
-                process(constructor, writer, beanProperties, includes, excludes, excludedAnnotations, indexedAnnotations, metadata);
+                process(constructor, ce.getDefaultConstructor().orElse(null), writer, beanProperties, includes, excludes, excludedAnnotations, indexedAnnotations, metadata);
             }
         }
     }
 
     private void process(
-            ConstructorElement constructorElement,
+            MethodElement constructorElement,
+            MethodElement defaultConstructor,
             BeanIntrospectionWriter writer,
             List<PropertyElement> beanProperties,
             Set<String> includes,
@@ -196,8 +191,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
 
         final ParameterElement[] parameters = constructorElement.getParameters();
         if (ArrayUtils.isNotEmpty(parameters)) {
-
-            writer.visitConstructorArguments(parameters);
+            writer.visitConstructor(constructorElement);
+        }
+        if (defaultConstructor != null) {
+            writer.visitDefaultConstructor(defaultConstructor);
         }
 
         for (PropertyElement beanProperty : beanProperties) {
