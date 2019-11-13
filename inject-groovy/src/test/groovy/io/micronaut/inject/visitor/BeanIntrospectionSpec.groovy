@@ -678,7 +678,7 @@ enum Test {
 
         then:
         instance.name() == "A"
-        introspection.getRequiredProperty("number", Integer).get(instance) == 0
+        introspection.getRequiredProperty("number", int).get(instance) == 0
 
         when:
         introspection.instantiate()

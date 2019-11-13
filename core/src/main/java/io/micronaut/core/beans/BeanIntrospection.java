@@ -164,7 +164,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
         ArgumentUtils.requireNonNull("type", type);
 
         final BeanProperty<T, ?> prop = getProperty(name).orElse(null);
-        if (prop != null && ReflectionUtils.getWrapperType(type).isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
+        if (prop != null && type.isAssignableFrom(prop.getType())) {
             //noinspection unchecked
             return Optional.of((BeanProperty<T, P>) prop);
         }
