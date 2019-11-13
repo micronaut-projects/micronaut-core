@@ -84,6 +84,11 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
     @Override
     public T instantiate(boolean strictNullable, Object... arguments) throws InstantiationException {
         ArgumentUtils.requireNonNull("arguments", arguments);
+
+        if (arguments.length == 0) {
+            return instantiate();
+        }
+
         final Argument<?>[] constructorArguments = getConstructorArguments();
         if (constructorArguments.length != arguments.length) {
             throw new InstantiationException("Argument count [" + arguments.length + "] doesn't match required argument count: " + constructorArguments.length);

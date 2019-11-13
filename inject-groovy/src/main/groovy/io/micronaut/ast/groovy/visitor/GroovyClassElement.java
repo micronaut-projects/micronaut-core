@@ -25,7 +25,6 @@ import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.*;
@@ -36,6 +35,7 @@ import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 
@@ -93,21 +93,35 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     @Nonnull
     @Override
-    public Optional<ConstructorElement> getPrimaryConstructor() {
-        return Optional.ofNullable(findConcreteConstructor(classNode.getDeclaredConstructors())).map(constructorNode -> {
-            final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, constructorNode);
-            return new GroovyConstructorElement(this, sourceUnit, constructorNode, annotationMetadata);
-        });
+    public Optional<MethodElement> getPrimaryConstructor() {
+        MethodNode method = findStaticCreator();
+        if (method == null) {
+            method = findConcreteConstructor();
+        }
+
+        return createMethodElement(method);
     }
 
+    @Nonnull
     @Override
-    public boolean hasDefaultConstructor() {
-        List<ConstructorNode> constructors = classNode.getDeclaredConstructors();
-        if (CollectionUtils.isEmpty(constructors)) {
-            return true; // Groovy has implicit default constructor
+    public Optional<MethodElement> getDefaultConstructor() {
+        MethodNode method = findDefaultStaticCreator();
+        if (method == null) {
+            method = findDefaultConstructor();
         }
-        List<ConstructorNode> nonPrivateConstructors = findNonPrivateConstructors(constructors);
-        return nonPrivateConstructors.stream().anyMatch(ctor -> ctor.getParameters().length == 0);
+        return createMethodElement(method);
+    }
+
+    private Optional<MethodElement> createMethodElement(MethodNode method) {
+        return Optional.ofNullable(method).map(executableElement -> {
+
+            final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, executableElement);
+            if (executableElement instanceof ConstructorNode) {
+                return new GroovyConstructorElement(this, sourceUnit, (ConstructorNode) executableElement, annotationMetadata);
+            } else {
+                return new GroovyMethodElement(this, sourceUnit, executableElement, annotationMetadata);
+            }
+        });
     }
 
     /**
@@ -228,7 +242,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         }
         Map<String, GetterAndSetter> props = new LinkedHashMap<>();
         ClassNode classNode = this.classNode;
-        while (classNode != null && !classNode.equals(ClassHelper.OBJECT_TYPE)) {
+        while (classNode != null && !classNode.equals(ClassHelper.OBJECT_TYPE) && !classNode.equals(ClassHelper.Enum_Type)) {
 
             classNode.visitContents(
                     new PublicMethodVisitor(null) {
@@ -431,34 +445,123 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         return AstClassUtils.isSubclassOfOrImplementsInterface(classNode, type);
     }
 
-    private ConstructorNode findConcreteConstructor(List<ConstructorNode> constructors) {
+    private MethodNode findConcreteConstructor() {
+        List<ConstructorNode> constructors = classNode.getDeclaredConstructors();
         if (CollectionUtils.isEmpty(constructors)) {
             return new ConstructorNode(Modifier.PUBLIC, new BlockStatement()); // empty default constructor
         }
-        List<ConstructorNode> nonPrivateConstructors = findNonPrivateConstructors(constructors);
 
-        ConstructorNode constructorNode;
+        List<ConstructorNode> nonPrivateConstructors = findNonPrivateMethods(constructors);
+
+        MethodNode methodNode;
         if (nonPrivateConstructors.size() == 1) {
-            constructorNode = nonPrivateConstructors.get(0);
+            methodNode = nonPrivateConstructors.get(0);
         } else {
-            constructorNode = nonPrivateConstructors.stream().filter(cn ->
+            methodNode = nonPrivateConstructors.stream().filter(cn ->
                     !cn.getAnnotations(makeCached(Inject.class)).isEmpty() ||
                             !cn.getAnnotations(makeCached(Creator.class)).isEmpty()).findFirst().orElse(null);
-            if (constructorNode == null) {
-                constructorNode = nonPrivateConstructors.stream().filter(cn -> Modifier.isPublic(cn.getModifiers())).findFirst().orElse(null);
+            if (methodNode == null) {
+                methodNode = nonPrivateConstructors.stream().filter(cn -> Modifier.isPublic(cn.getModifiers())).findFirst().orElse(null);
             }
         }
-        return constructorNode;
+        return methodNode;
     }
 
-    private List<ConstructorNode> findNonPrivateConstructors(List<ConstructorNode> constructorNodes) {
-        List<ConstructorNode> nonPrivateConstructors = new ArrayList<>(2);
-        for (ConstructorNode node : constructorNodes) {
+    private MethodNode findDefaultConstructor() {
+        List<ConstructorNode> constructors = classNode.getDeclaredConstructors();
+        if (CollectionUtils.isEmpty(constructors) && !classNode.isEnum()) {
+            return new ConstructorNode(Modifier.PUBLIC, new BlockStatement()); // empty default constructor
+        }
+
+        constructors = findNonPrivateMethods(constructors).stream()
+                .filter(ctor -> ctor.getParameters().length == 0)
+                .collect(Collectors.toList());
+
+        if (constructors.isEmpty()) {
+            return null;
+        }
+
+        if (constructors.size() == 1) {
+            return constructors.get(0);
+        }
+
+        return constructors.stream()
+                .filter(method -> Modifier.isPublic(method.getModifiers()))
+                .findFirst().orElse(null);
+    }
+
+    private MethodNode findStaticCreator() {
+        List<MethodNode> creators = findNonPrivateStaticCreators();
+
+        if (creators.isEmpty()) {
+            return null;
+        }
+        if (creators.size() == 1) {
+            return creators.get(0);
+        }
+
+        //Can be multiple static @Creator methods. Prefer one with args here. The no arg method (if present) will
+        //be picked up by staticDefaultCreatorFor
+        List<MethodNode> withArgs = creators.stream()
+                .filter(method -> method.getParameters().length > 0)
+                .collect(Collectors.toList());
+
+        if (withArgs.size() == 1) {
+            return withArgs.get(0);
+        } else {
+            creators = withArgs;
+        }
+
+        return creators.stream()
+                .filter(method -> Modifier.isPublic(method.getModifiers()))
+                .findFirst().orElse(null);
+    }
+
+    private MethodNode findDefaultStaticCreator() {
+        List<MethodNode> creators = findNonPrivateStaticCreators().stream()
+                .filter(ctor -> ctor.getParameters().length == 0)
+                .collect(Collectors.toList());
+
+        if (creators.isEmpty()) {
+            return null;
+        }
+
+        if (creators.size() == 1) {
+            return creators.get(0);
+        }
+
+        return creators.stream()
+                .filter(method -> Modifier.isPublic(method.getModifiers()))
+                .findFirst().orElse(null);
+    }
+
+    private <T extends MethodNode> List<T> findNonPrivateMethods(List<T> methodNodes) {
+        List<T> nonPrivateMethods = new ArrayList<>(2);
+        for (MethodNode node : methodNodes) {
             if (!Modifier.isPrivate(node.getModifiers())) {
-                nonPrivateConstructors.add(node);
+                nonPrivateMethods.add((T) node);
             }
         }
-        return nonPrivateConstructors;
+        return nonPrivateMethods;
+    }
+
+    private List<MethodNode> findNonPrivateStaticCreators() {
+        List<MethodNode> creators = classNode.getAllDeclaredMethods().stream()
+                .filter(method -> Modifier.isStatic(method.getModifiers()))
+                .filter(method -> !Modifier.isPrivate(method.getModifiers()))
+                .filter(method -> method.getReturnType().equals(classNode))
+                .filter(method -> method.getAnnotations(makeCached(Creator.class)).size() > 0)
+                .collect(Collectors.toList());
+
+        if (creators.isEmpty() && classNode.isEnum()) {
+            creators = classNode.getAllDeclaredMethods().stream()
+                    .filter(method -> Modifier.isStatic(method.getModifiers()))
+                    .filter(method -> !Modifier.isPrivate(method.getModifiers()))
+                    .filter(method -> method.getReturnType().equals(classNode))
+                    .filter(method -> method.getName().equals("valueOf"))
+                    .collect(Collectors.toList());
+        }
+        return creators;
     }
 
     /**

@@ -949,13 +949,269 @@ class Test {
         this.properties = properties;
     }
 }
+''')
+        expect:
+        introspection.constructorArguments[0].getTypeVariable("K").get().getType() == String
+        introspection.constructorArguments[0].getTypeVariable("V").get().getType() == String
+    }
 
+    void "test static creator"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+    private String name;
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    @Creator
+    public static Test forName(String name) {
+        return new Test(name);
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
 ''')
 
         expect:
         introspection != null
-        introspection.constructorArguments[0].getTypeVariable("K").get().getType() == String
-        introspection.constructorArguments[0].getTypeVariable("V").get().getType() == String
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Sally"
+
+        when:
+        introspection.instantiate(new Object[0])
+
+        then:
+        thrown(InstantiationException)
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "test static creator with no args"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+    private String name;
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    @Creator
+    public static Test forName() {
+        return new Test("default");
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        thrown(InstantiationException)
+
+        when:
+        instance = introspection.instantiate(new Object[0])
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+
+        when:
+        instance = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+    }
+
+    void "test static creator multiple"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+    private String name;
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    @Creator
+    public static Test forName() {
+        return new Test("default");
+    }
+    
+    @Creator
+    public static Test forName(String name) {
+        return new Test(name);
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Sally"
+
+        when:
+        instance = introspection.instantiate(new Object[0])
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+
+        when:
+        instance = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+    }
+
+    void "test kotlin static creator"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+
+    private final String name;
+    public static final Companion Companion = new Companion();
+    
+    public final String getName() {
+        return name;
+    }
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    public static final class Companion {
+        
+        @Creator
+        public final Test forName(String name) {
+            return new Test(name);
+        }
+        
+        private Companion() {
+        }
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Apple")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Apple"
+    }
+
+    void "test instantiating an enum"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+enum Test {
+    A, B, C
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "test enum bean properties"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+public enum Test {
+
+    A(0), B(1), C(2);
+
+    private final int number;
+
+    Test(int number) {
+        this.number = number;
+    }
+    
+    public int getNumber() {
+        return number;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+        introspection.beanProperties.size() == 1
+        introspection.getProperty("number").isPresent()
+
+        when:
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+        introspection.getRequiredProperty("number", int).get(instance) == 0
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
     }
 
     @Override

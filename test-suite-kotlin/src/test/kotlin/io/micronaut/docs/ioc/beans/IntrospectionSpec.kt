@@ -38,6 +38,7 @@ class IntrospectionSpec {
         assertEquals(20, newAge)
     }
 
+    @Test
     fun testNullable() {
         val introspection = BeanIntrospection.getIntrospection(Manufacturer::class.java)
         val manufacturer: Manufacturer = introspection.instantiate(null, "John")
@@ -47,5 +48,21 @@ class IntrospectionSpec {
         val name = property.get(manufacturer)
 
         assertEquals("Jane", name)
+    }
+
+    @Test
+    fun testVehicle() {
+        val introspection = BeanIntrospection.getIntrospection(Vehicle::class.java)
+        val vehicle = introspection.instantiate("Subaru", "WRX", 2)
+        assertEquals("Subaru", vehicle.make)
+        assertEquals("WRX", vehicle.model)
+        assertEquals(2, vehicle.axels)
+    }
+
+    @Test
+    fun testBusiness() {
+        val introspection = BeanIntrospection.getIntrospection(Business::class.java)
+        val business = introspection.instantiate("Apple")
+        assertEquals("Apple", business.name)
     }
 }
