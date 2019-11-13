@@ -253,7 +253,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected Object readAnnotationValue(Element originatingElement, String memberName, Object annotationValue) {
+    protected Object readAnnotationValue(Element originatingElement, Element member, String memberName, Object annotationValue) {
         if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue) {
             final MetadataAnnotationValueVisitor visitor = new MetadataAnnotationValueVisitor(originatingElement);
             ((javax.lang.model.element.AnnotationValue) annotationValue).accept(visitor, this);
