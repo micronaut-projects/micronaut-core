@@ -49,9 +49,9 @@ ext.pomInfo = {
         delegate.developerConnection "scm:git@github.com:${githubSlug}.git"
     }
 
-    if(developers) {
+    if (developers) {
         delegate.developers {
-            for(dev in developers.split(',')) {
+            for (dev in developers.split(',')) {
                 delegate.developer {
                     delegate.id dev.toLowerCase().replace(' ', '')
                     delegate.name dev
@@ -62,7 +62,6 @@ ext.pomInfo = {
     ext.extraPomInfo.delegate = delegate
     ext.extraPomInfo.call()
 }
-
 
 
 modifyPom {
@@ -94,10 +93,10 @@ publishing {
     }
 
     afterEvaluate {
-        if (project.name == "bom") {
-            publications {
-                mavenJava(MavenPublication) {
-                    artifactId "micronaut-${project.name}"
+        publications {
+            mavenJava(MavenPublication) {
+                artifactId("micronaut-" + project.name.substring(project.name.indexOf('/') + 1))
+                if (project.name == "bom") {
                     from components.javaPlatform
 
                     pom.withXml {
@@ -105,12 +104,8 @@ publishing {
 
                         xml.children().last() + pomInfo
                     }
-                }
-            }
-        } else if (project.name == "cli") {
-            publications {
-                mavenJava(MavenPublication) {
-                    artifactId "micronaut-${project.name}"
+
+                } else if (project.name == "cli") {
                     artifact cliZip {
                         classifier "dist"
                     }
@@ -120,12 +115,7 @@ publishing {
 
                         xml.children().last() + pomInfo
                     }
-                }
-            }
-        } else if (project.shadowJarEnabled == true) {
-            publications {
-                mavenJava(MavenPublication) {
-                    artifactId("micronaut-" + project.name.substring(project.name.indexOf('/') + 1))
+                } else if (project.shadowJarEnabled == true) {
                     def shadowJar = tasks.findByName("shadowJar")
                     artifact(project.tasks.shadowJar) {
                         classifier = null
@@ -185,13 +175,7 @@ publishing {
                     artifact javadocJar {
                         classifier "javadoc"
                     }
-                }
-            }
-        } else {
-            publications {
-                mavenJava(MavenPublication) {
-                    artifactId "micronaut-${project.name}"
-
+                } else {
                     from components.java
 >>>>>>> Cleanup publishing so that we reuse pom parts again
 
