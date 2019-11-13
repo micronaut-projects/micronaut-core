@@ -11,6 +11,15 @@ snippet::io.micronaut.docs.config.immutable.EngineConfig[tags="imports,class",in
 <5> You can nest immutable configuration
 <6> Optional configuration can be indicated with `@Nullable`
 
+The ann:context.annotation.ConfigurationInject[] annotation provides a hint to Micronaut to prioritize binding values from configuration instead of injecting beans.
+
+There are a few exceptions to this rule. Micronaut will not perform configuration binding for a parameter if one of these conditions is met:
+
+* The parameter is annotated with `@Value` (explicit binding)
+* The parameter is annotated with `@Property` (explicit binding)
+* The parameter is annotated with `@Parameter` (parameterized bean handling)
+* The type of the parameter is annotated with a bean scope (such as `@Singleton`)
+
 Once you have prepared a type safe configuration it can simply be injected into your objects like any other bean:
 
 snippet::io.micronaut.docs.config.immutable.EngineImpl[tags="class",indent=0,title="@ConfigurationProperties Dependency Injection"]
