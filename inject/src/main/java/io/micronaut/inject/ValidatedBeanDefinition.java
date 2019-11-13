@@ -61,7 +61,7 @@ public interface ValidatedBeanDefinition<T> extends BeanDefinition<T> {
             @Nonnull InjectionPoint injectionPoint,
             @Nonnull Argument<V> argument,
             int index,
-            @Nullable V value) {
+            @Nullable V value) throws BeanInstantiationException {
         BeanDefinitionValidator validator = resolutionContext.getContext().getBeanValidator();
         validator.validateBeanArgument(resolutionContext, injectionPoint, argument, index, value);
     }
