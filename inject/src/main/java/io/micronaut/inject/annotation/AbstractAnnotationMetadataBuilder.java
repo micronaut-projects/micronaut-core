@@ -381,11 +381,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Read the given member and value, applying conversions if necessary, and place the data in the given map.
      *
      * @param originatingElement The originating element
-     * @param memberName         The member
+     * @param member             The member
+     * @param memberName         The member name
      * @param annotationValue    The value
      * @return The object
      */
-    protected abstract Object readAnnotationValue(T originatingElement, String memberName, Object annotationValue);
+    protected abstract Object readAnnotationValue(T originatingElement, T member, String memberName, Object annotationValue);
 
 
     /**
@@ -527,7 +528,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 Object annotationValue = entry.getValue();
                 if (isInstantiatedMember) {
                     final String memberName = getAnnotationMemberName(member);
-                    final Object rawValue = readAnnotationValue(originatingElement, memberName, annotationValue);
+                    final Object rawValue = readAnnotationValue(originatingElement, member, memberName, annotationValue);
                     if (rawValue instanceof AnnotationClassValue) {
                         AnnotationClassValue acv = (AnnotationClassValue) rawValue;
                         annotationValues.put(memberName, new AnnotationClassValue(acv.getName(), true));
@@ -695,7 +696,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     aliasedAnnotationName = aliasAnnotationName.get().toString();
                 }
                 String aliasedMemberName = aliasMember.get().toString();
-                Object v = readAnnotationValue(originatingElement, aliasedMemberName, annotationValue);
+                Object v = readAnnotationValue(originatingElement, member, aliasedMemberName, annotationValue);
                 if (v != null) {
                     Optional<T> annotationMirror = getAnnotationMirror(aliasedAnnotationName);
                     if (annotationMirror.isPresent()) {
@@ -728,7 +729,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         } else if (aliasMember.isPresent()) {
             String aliasedNamed = aliasMember.get().toString();
-            Object v = readAnnotationValue(originatingElement, aliasedNamed, annotationValue);
+            Object v = readAnnotationValue(originatingElement, member, aliasedNamed, annotationValue);
             if (v != null) {
                 annotationValues.put(aliasedNamed, v);
             }
