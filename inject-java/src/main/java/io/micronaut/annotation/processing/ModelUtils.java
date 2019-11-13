@@ -342,6 +342,14 @@ public class ModelUtils {
                             return annotationMetadata.hasStereotype(Creator.class);
                         })
                         .collect(Collectors.toList());
+            } else if (classElement.getKind() == ElementKind.ENUM) {
+                staticCreators = ElementFilter.methodsIn(classElement.getEnclosedElements())
+                        .stream()
+                        .filter(method -> method.getModifiers().contains(STATIC))
+                        .filter(method -> !method.getModifiers().contains(PRIVATE))
+                        .filter(method -> method.getReturnType().equals(classElement.asType()))
+                        .filter(method -> method.getSimpleName().toString().equals("valueOf"))
+                        .collect(Collectors.toList());
             }
         }
 

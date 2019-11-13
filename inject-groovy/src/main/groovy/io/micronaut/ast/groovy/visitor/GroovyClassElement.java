@@ -242,7 +242,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         }
         Map<String, GetterAndSetter> props = new LinkedHashMap<>();
         ClassNode classNode = this.classNode;
-        while (classNode != null && !classNode.equals(ClassHelper.OBJECT_TYPE)) {
+        while (classNode != null && !classNode.equals(ClassHelper.OBJECT_TYPE) && !classNode.equals(ClassHelper.Enum_Type)) {
 
             classNode.visitContents(
                     new PublicMethodVisitor(null) {
@@ -469,7 +469,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     private MethodNode findDefaultConstructor() {
         List<ConstructorNode> constructors = classNode.getDeclaredConstructors();
-        if (CollectionUtils.isEmpty(constructors)) {
+        if (CollectionUtils.isEmpty(constructors) && !classNode.isEnum()) {
             return new ConstructorNode(Modifier.PUBLIC, new BlockStatement()); // empty default constructor
         }
 
@@ -546,12 +546,22 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     }
 
     private List<MethodNode> findNonPrivateStaticCreators() {
-        return classNode.getAllDeclaredMethods().stream()
+        List<MethodNode> creators = classNode.getAllDeclaredMethods().stream()
                 .filter(method -> Modifier.isStatic(method.getModifiers()))
                 .filter(method -> !Modifier.isPrivate(method.getModifiers()))
                 .filter(method -> method.getReturnType().equals(classNode))
                 .filter(method -> method.getAnnotations(makeCached(Creator.class)).size() > 0)
                 .collect(Collectors.toList());
+
+        if (creators.isEmpty() && classNode.isEnum()) {
+            creators = classNode.getAllDeclaredMethods().stream()
+                    .filter(method -> Modifier.isStatic(method.getModifiers()))
+                    .filter(method -> !Modifier.isPrivate(method.getModifiers()))
+                    .filter(method -> method.getReturnType().equals(classNode))
+                    .filter(method -> method.getName().equals("valueOf"))
+                    .collect(Collectors.toList());
+        }
+        return creators;
     }
 
     /**

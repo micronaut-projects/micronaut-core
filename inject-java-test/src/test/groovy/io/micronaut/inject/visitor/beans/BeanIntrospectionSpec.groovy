@@ -1144,6 +1144,76 @@ class Test {
         introspection.getRequiredProperty("name", String).get(instance) == "Apple"
     }
 
+    void "test instantiating an enum"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+enum Test {
+    A, B, C
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "test enum bean properties"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+public enum Test {
+
+    A(0), B(1), C(2);
+
+    private final int number;
+
+    Test(int number) {
+        this.number = number;
+    }
+    
+    public int getNumber() {
+        return number;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+        introspection.beanProperties.size() == 1
+        introspection.getProperty("number").isPresent()
+
+        when:
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+        introspection.getRequiredProperty("number", Integer).get(instance) == 0
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {

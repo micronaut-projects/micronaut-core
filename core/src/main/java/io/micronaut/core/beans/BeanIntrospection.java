@@ -18,6 +18,8 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
+import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -162,7 +164,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
         ArgumentUtils.requireNonNull("type", type);
 
         final BeanProperty<T, ?> prop = getProperty(name).orElse(null);
-        if (prop != null && type.isAssignableFrom(prop.getType())) {
+        if (prop != null && ReflectionUtils.getWrapperType(type).isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
             //noinspection unchecked
             return Optional.of((BeanProperty<T, P>) prop);
         }

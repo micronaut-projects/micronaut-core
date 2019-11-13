@@ -50,6 +50,10 @@ snippet::io.micronaut.docs.ioc.beans.Business[tags="class"]
 
 TIP: There can be multiple "creator" methods annotated. If one exists without arguments, that will be used as the default construction method. The first method with arguments will be used as the primary construction method.
 
+==== Enums
+
+It is possible to introspect enums as well. Simply add the annotation to the enum and it can be constructed through the standard `valueOf` method.
+
 ==== Use the `@Introspected` Annotation on a Configuration Class
 
 If the class you wish to introspect is already compiled and not under your control an alternative option is to define a configuration class with the `classes` member of the ann:core.annotation.Introspected[] annotation set.
