@@ -94,7 +94,20 @@ publishing {
     }
 
     afterEvaluate {
-        if (project.name == "cli") {
+        if (project.name == "bom") {
+            publications {
+                mavenJava(MavenPublication) {
+                    artifactId "micronaut-${project.name}"
+                    from components.javaPlatform
+
+                    pom.withXml {
+                        def xml = asNode()
+
+                        xml.children().last() + pomInfo
+                    }
+                }
+            }
+        } else if (project.name == "cli") {
             publications {
                 mavenJava(MavenPublication) {
                     artifactId "micronaut-${project.name}"
