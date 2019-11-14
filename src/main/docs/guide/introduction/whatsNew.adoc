@@ -4,6 +4,10 @@ Micronaut {version} includes the following changes:
 
 Support for immutable ann:context.annotation.ConfigurationProperties[] has been added by annotating the constructor of any configuration class with ann:context.annotation.ConfigurationInject[]. See the docummentation on <<immutableConfig, Immutable Configuration>> for more information.
 
+=== Kotlin Coroutine Support in Controller Methods
+
+Support for <<coroutines, Kotlin Coroutines>> has been added such that you can define functions that use the `suspend` keyword in Kotlin controllers.
+
 === @Requires OS
 
 The ann:context.annotation.Requires[] annotation now has support for disabling beans based on the current operating system.
