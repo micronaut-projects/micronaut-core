@@ -2045,7 +2045,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     params.setValidated(true);
                 }
 
-                TypeMirror typeMirror = paramElement.asType();
                 if (isConstructBinding) {
                     if (Stream.of(Property.class, Value.class, Parameter.class).noneMatch(annotationMetadata::hasAnnotation)) {
                         final Element parameterElement = typeUtils.asElement(typeMirror);
