@@ -15,13 +15,13 @@
  */
 package io.micronaut.context.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>Defines a singleton bean whose property values are resolved from a {@link io.micronaut.core.value.PropertyResolver}.</p>
@@ -41,7 +41,7 @@ import java.lang.annotation.Target;
 @Singleton
 @Documented
 @Retention(RUNTIME)
-@Target(ElementType.TYPE)
+@Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.METHOD, ElementType.CONSTRUCTOR})
 @ConfigurationReader
 public @interface ConfigurationProperties {
 

@@ -116,7 +116,7 @@ public class ValidatingInterceptor implements MethodInterceptor {
             Set<ConstraintViolation<Object>> constraintViolations = this.micronautValidator.validateParameters(
                     target,
                     executableMethod,
-                    context.getParameters().values());
+                    context.getParameterValues());
             final boolean supportsReactive = micronautValidator instanceof ReactiveValidator;
             if (constraintViolations.isEmpty()) {
                 final Object result = context.proceed();

@@ -28,6 +28,7 @@ import java.util.Map;
 @Internal
 class ExecutableElementParamInfo {
 
+    private boolean validated = false;
     private boolean requiresReflection;
     private AnnotationMetadata metadata;
     private Map<String, Object> parameters = new LinkedHashMap<>();
@@ -116,5 +117,19 @@ class ExecutableElementParamInfo {
      */
     public AnnotationMetadata getAnnotationMetadata() {
         return metadata;
+    }
+
+    /**
+     * @return Is the executable validated
+     */
+    public boolean isValidated() {
+        return validated;
+    }
+
+    /**
+     * @param validated True if it is validated
+     */
+    public void setValidated(boolean validated) {
+        this.validated = validated;
     }
 }

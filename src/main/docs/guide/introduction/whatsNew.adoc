@@ -1,5 +1,9 @@
 Micronaut {version} includes the following changes:
 
+=== Immutable `@ConfigurationProperties` and `@EachProperty`
+
+Support for immutable ann:context.annotation.ConfigurationProperties[] has been added by annotating the constructor of any configuration class with ann:context.annotation.ConfigurationInject[]. See the docummentation on <<immutableConfig, Immutable Configuration>> for more information.
+
 === @Requires OS
 
 The ann:context.annotation.Requires[] annotation now has support for disabling beans based on the current operating system.
