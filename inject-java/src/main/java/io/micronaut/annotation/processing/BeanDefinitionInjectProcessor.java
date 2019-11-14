@@ -113,12 +113,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     private Set<String> beanDefinitions;
     private Set<String> processed = new HashSet<>();
     private boolean processingOver;
+    private TypeMirror kotlinContinuationType;
 
     @Override
     public final synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils, annotationUtils);
         this.beanDefinitions = new LinkedHashSet<>();
+
+        TypeElement kotlinContinuation = elementUtils.getTypeElement("kotlin.coroutines.Continuation");
+        this.kotlinContinuationType = kotlinContinuation != null ? kotlinContinuation.asType() : null;
     }
 
     @Override
@@ -2014,17 +2018,23 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     elementMetadata
             );
 
+
             element.getParameters().forEach(paramElement -> {
 
                 String argName = paramElement.getSimpleName().toString();
-                
+                TypeMirror typeMirror = paramElement.asType();
                 AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(paramElement);
-                if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
-                    annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, "javax.annotation.Nullable", Collections.emptyMap());
+                if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")
+                        || (kotlinContinuationType != null && typeUtils.isAssignable(typeUtils.erasure(typeMirror), kotlinContinuationType))) {
+                    annotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                            annotationMetadata,
+                            "javax.annotation.Nullable",
+                            Collections.emptyMap()
+                    );
                 }
                 params.addAnnotationMetadata(argName, annotationMetadata);
 
-                TypeMirror typeMirror = paramElement.asType();
+
                 TypeKind kind = typeMirror.getKind();
                 if ((kind == TypeKind.ERROR) && !processingOver) {
                     throw new PostponeToNextRoundException();    

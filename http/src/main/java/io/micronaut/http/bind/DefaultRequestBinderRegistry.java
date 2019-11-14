@@ -35,8 +35,6 @@ import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.*;
 
-import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
-
 /**
  * Default implementation of the {@link RequestBinderRegistry} interface.
  *
@@ -228,10 +226,6 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         PathVariableAnnotationBinder<Object> pathVariableAnnotationBinder = new PathVariableAnnotationBinder<>(conversionService);
         byAnnotation.put(pathVariableAnnotationBinder.getAnnotationType(), pathVariableAnnotationBinder);
 
-        if (KOTLIN_COROUTINES_SUPPORTED) {
-            ContinuationArgumentBinder continuationArgumentBinder = new ContinuationArgumentBinder();
-            byType.put(continuationArgumentBinder.argumentType().typeHashCode(), continuationArgumentBinder);
-        }
     }
 
     /**

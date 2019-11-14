@@ -7,18 +7,18 @@ import io.micronaut.http.annotation.Status
 import kotlinx.coroutines.delay
 
 @Controller("/suspend")
-class SuspendController {
+open class SuspendController {
 
     // tag::suspend[]
     @Get("/simple")
-    suspend fun simple(): String { // <1>
+    open suspend fun simple(): String { // <1>
         return "Hello"
     }
     // end::suspend[]
 
     // tag::suspendDelayed[]
     @Get("/delayed")
-    suspend fun delayed(): String { // <1>
+    open suspend fun delayed(): String { // <1>
         delay(1) // <2>
         return "Delayed"
     }
@@ -27,14 +27,14 @@ class SuspendController {
     // tag::suspendStatus[]
     @Status(HttpStatus.CREATED) // <1>
     @Get("/status")
-    suspend fun status(): Unit {
+    open suspend fun status(): Unit {
     }
     // end::suspendStatus[]
 
     // tag::suspendStatusDelayed[]
     @Status(HttpStatus.CREATED)
     @Get("/statusDelayed")
-    suspend fun statusDelayed(): Unit {
+    open suspend fun statusDelayed(): Unit {
         delay(1)
     }
     // end::suspendStatusDelayed[]
