@@ -719,7 +719,7 @@ subprojects { Project subproject ->
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testImplementation "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testImplementation dependencyVersion("groovy")
-        testCompile(dependencyVersion("spock")) {
+        testImplementation(dependencyVersion("spock")) {
             exclude module: 'groovy-all'
         }
         testImplementation "cglib:cglib-nodep:2.2.2"
