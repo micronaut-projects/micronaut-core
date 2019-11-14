@@ -24,6 +24,7 @@ import io.micronaut.ast.groovy.utils.PublicAbstractMethodVisitor
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.order.OrderUtil
@@ -79,7 +80,7 @@ class TypeElementVisitorTransform implements ASTTransformation {
                 def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, classNode)
                 def isIntroduction = annotationMetadata.hasStereotype(Introduction.class)
                 def visitor = new ElementVisitor(source, classNode, values, visitorContext, !isIntroduction)
-                if (isIntroduction) {
+                if (isIntroduction || (annotationMetadata.hasStereotype(Introspected.class) && classNode.isAbstract())) {
                     visitor.visitClass(classNode)
                     new PublicAbstractMethodVisitor(source) {
                         @Override

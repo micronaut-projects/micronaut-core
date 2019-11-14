@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -29,6 +30,8 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,7 +61,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             .build();
 
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
+    private List<AbstractIntrospection> abstractIntrospections = new ArrayList<>();
     private ClassElement lastConfigurationReader;
+    private AbstractIntrospection currentAbstractIntrospection;
 
     @Override
     public int getOrder() {
@@ -68,10 +73,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
+        currentAbstractIntrospection = null;
         if (!element.isPrivate()) {
             if (element.hasStereotype(Introspected.class)) {
                 final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
-                if (introspected != null && !writers.containsKey(element.getName()) && !element.isAbstract()) {
+                if (introspected != null && !writers.containsKey(element.getName())) {
                     processIntrospected(element, context, introspected);
                 }
             } else if (element.hasStereotype(ConfigurationReader.class)) {
@@ -94,12 +100,31 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         final ClassElement declaringType = element.getDeclaringType();
+        final String methodName = element.getName();
         if (lastConfigurationReader != null && lastConfigurationReader.getName().equals(declaringType.getName())) {
-            if (element.getName().startsWith("get")) {
+            if (methodName.startsWith("get")) {
                 final boolean hasConstraints = element.hasStereotype(JAVAX_VALIDATION_CONSTRAINT) || element.hasStereotype(JAVAX_VALIDATION_VALID);
                 if (hasConstraints) {
                     processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
                 }
+            }
+        } else if (currentAbstractIntrospection != null) {
+            if (NameUtils.isGetterName(methodName) && element.getParameters().length == 0) {
+                final String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+                final AbstractPropertyElement propertyElement = currentAbstractIntrospection.properties.computeIfAbsent(propertyName, s -> new AbstractPropertyElement(
+                        element.getDeclaringType(),
+                        element.getReturnType(),
+                        propertyName
+                ));
+                propertyElement.readMethod = element;
+            } else if (NameUtils.isSetterName(methodName) && element.getParameters().length == 1) {
+                final String propertyName = NameUtils.getPropertyNameForSetter(methodName);
+                final AbstractPropertyElement propertyElement = currentAbstractIntrospection.properties.computeIfAbsent(propertyName, s -> new AbstractPropertyElement(
+                        element.getDeclaringType(),
+                        element.getParameters()[0].getType(),
+                        propertyName
+                ));
+                propertyElement.writeMethod = element;
             }
         }
     }
@@ -169,7 +194,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 metadata ? element.getAnnotationMetadata() : null
                         );
 
-                        processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, ce, writer);
+                        processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, ce, writer);
 
                     }
                 });
@@ -193,7 +218,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 metadata ? element.getAnnotationMetadata() : null
                         );
 
-                        processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, classElement, writer);
+                        processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, classElement, writer);
                     }
                 }
             }
@@ -204,12 +229,29 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     metadata ? element.getAnnotationMetadata() : null
             );
 
-            processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, element, writer);
+            processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, element, writer);
         }
     }
 
     @Override
     public void finish(VisitorContext visitorContext) {
+
+        for (AbstractIntrospection abstractIntrospection : abstractIntrospections) {
+            final Collection<? extends PropertyElement> properties = abstractIntrospection.properties.values();
+            if (CollectionUtils.isNotEmpty(properties)) {
+                processBeanProperties(
+                        abstractIntrospection.writer,
+                        properties,
+                        abstractIntrospection.includes,
+                        abstractIntrospection.excludes,
+                        abstractIntrospection.ignored,
+                        abstractIntrospection.indexedAnnotations,
+                        abstractIntrospection.metadata
+                );
+                writers.put(abstractIntrospection.writer.getBeanType().getClassName(), abstractIntrospection.writer);
+            }
+
+        }
 
         for (BeanIntrospectionWriter writer : writers.values()) {
             try {
@@ -218,16 +260,32 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
             }
         }
+
     }
 
-    private void processElement(VisitorContext context, boolean metadata, Set<String> includes, Set<String> excludes, Set<String> excludedAnnotations, Set<AnnotationValue> indexedAnnotations, ClassElement ce, BeanIntrospectionWriter writer) {
-        final List<PropertyElement> beanProperties = ce.getBeanProperties();
-        Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
-
-        if (!constructorElement.isPresent()) {
-            context.fail("Introspected types must have a single public constructor or static @Creator method", ce);
+    private void processElement(
+            boolean metadata,
+            Set<String> includes,
+            Set<String> excludes,
+            Set<String> excludedAnnotations,
+            Set<AnnotationValue> indexedAnnotations,
+            ClassElement ce,
+            BeanIntrospectionWriter writer) {
+        if (ce.isAbstract()) {
+            currentAbstractIntrospection = new AbstractIntrospection(
+                    writer,
+                    includes,
+                    excludes,
+                    excludedAnnotations,
+                    indexedAnnotations,
+                    metadata
+            );
+            abstractIntrospections.add(currentAbstractIntrospection);
         } else {
-            final MethodElement constructor = constructorElement.get();
+            final List<PropertyElement> beanProperties = ce.getBeanProperties();
+            Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
+
+            final MethodElement constructor = constructorElement.orElse(null);
             process(
                     constructor,
                     ce.getDefaultConstructor().orElse(null),
@@ -243,8 +301,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     private void process(
-            MethodElement constructorElement,
-            MethodElement defaultConstructor,
+            @Nullable MethodElement constructorElement,
+            @Nullable MethodElement defaultConstructor,
             BeanIntrospectionWriter writer,
             List<PropertyElement> beanProperties,
             Set<String> includes,
@@ -253,14 +311,21 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             Set<AnnotationValue> indexedAnnotations,
             boolean metadata) {
 
-        final ParameterElement[] parameters = constructorElement.getParameters();
-        if (ArrayUtils.isNotEmpty(parameters)) {
-            writer.visitConstructor(constructorElement);
+        if (constructorElement != null) {
+            final ParameterElement[] parameters = constructorElement.getParameters();
+            if (ArrayUtils.isNotEmpty(parameters)) {
+                writer.visitConstructor(constructorElement);
+            }
         }
         if (defaultConstructor != null) {
             writer.visitDefaultConstructor(defaultConstructor);
         }
 
+        processBeanProperties(writer, beanProperties, includes, excludes, ignored, indexedAnnotations, metadata);
+        writers.put(writer.getBeanType().getClassName(), writer);
+    }
+
+    private void processBeanProperties(BeanIntrospectionWriter writer, Collection<? extends PropertyElement> beanProperties, Set<String> includes, Set<String> excludes, Set<String> ignored, Set<AnnotationValue> indexedAnnotations, boolean metadata) {
         for (PropertyElement beanProperty : beanProperties) {
             final ClassElement type = beanProperty.getType();
 
@@ -300,7 +365,97 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
             }
         }
-        writers.put(writer.getBeanType().getClassName(), writer);
+    }
+
+    /**
+     * Holder for an abstract introspection.
+     */
+    private class AbstractIntrospection {
+        final BeanIntrospectionWriter writer;
+        final Set<String> includes;
+        final Set<String> excludes;
+        final Set<String> ignored;
+        final Set<AnnotationValue> indexedAnnotations;
+        final boolean metadata;
+        final Map<String, AbstractPropertyElement> properties = new LinkedHashMap<>();
+
+        public AbstractIntrospection(
+                BeanIntrospectionWriter writer,
+                Set<String> includes,
+                Set<String> excludes,
+                Set<String> ignored,
+                Set<AnnotationValue> indexedAnnotations,
+                boolean metadata) {
+            this.writer = writer;
+            this.includes = includes;
+            this.excludes = excludes;
+            this.ignored = ignored;
+            this.indexedAnnotations = indexedAnnotations;
+            this.metadata = metadata;
+        }
+    }
+
+    /**
+     * Used to accumulate property elements for abstract types.
+     */
+    private class AbstractPropertyElement implements PropertyElement {
+
+        private final ClassElement declaringType;
+        private final ClassElement type;
+        private final String name;
+
+        private MethodElement writeMethod;
+        private MethodElement readMethod;
+
+        AbstractPropertyElement(ClassElement declaringType, ClassElement type, String name) {
+            this.declaringType = declaringType;
+            this.type = type;
+            this.name = name;
+        }
+
+        @Override
+        public Optional<MethodElement> getWriteMethod() {
+            return Optional.ofNullable(writeMethod);
+        }
+
+        @Override
+        public Optional<MethodElement> getReadMethod() {
+            return Optional.ofNullable(readMethod);
+        }
+
+        @Nonnull
+        @Override
+        public ClassElement getType() {
+            return type;
+        }
+
+        @Override
+        public ClassElement getDeclaringType() {
+            return declaringType;
+        }
+
+        @Nonnull
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public boolean isProtected() {
+            return false;
+        }
+
+        @Override
+        public boolean isPublic() {
+            return true;
+        }
+
+        @SuppressWarnings("ConstantConditions")
+        @Nonnull
+        @Override
+        public Object getNativeType() {
+            throw null;
+        }
     }
 
 }

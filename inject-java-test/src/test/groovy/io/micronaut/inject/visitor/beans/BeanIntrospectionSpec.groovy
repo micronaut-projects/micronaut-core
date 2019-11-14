@@ -11,6 +11,7 @@ import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.TypeConverter
+import io.micronaut.core.naming.Named
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
@@ -30,6 +31,54 @@ import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test generate bean introspection for interface"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+@io.micronaut.core.annotation.Introspected
+interface Test extends io.micronaut.core.naming.Named {
+    void setName(String name);
+}
+''')
+        then:
+        introspection != null
+        introspection.propertyNames.length == 1
+        introspection.propertyNames[0] == 'name'
+
+        when:
+        introspection.instantiate()
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'No default constructor exists'
+
+        when:
+        def property = introspection.getRequiredProperty("name", String)
+        String setNameValue
+        def named = [getName:{-> "test"}, setName:{String n -> setNameValue= n }].asType(introspection.beanType)
+
+        property.set(named, "test")
+
+        then:
+        property.get(named) == 'test'
+        setNameValue == 'test'
+
+    }
+
+    void "test compiled introspection for interface"() {
+        when:
+        def introspection = BeanIntrospection.getIntrospection(TestNamed.class)
+        def property = introspection.getRequiredProperty("name", String)
+        String setNameValue
+        def named = [getName:{-> "test"}, setName:{String n -> setNameValue= n }].asType(introspection.beanType)
+
+        then:
+        property.get(named) == 'test'
+
+    }
+
     void "test generate bean introspection for @ConfigurationProperties with validation rules on getters"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
 package test;
