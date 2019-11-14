@@ -80,19 +80,7 @@ Message updated
 
 Annotating a method with the api:management.endpoint.Delete[] annotation will cause it to respond to `DELETE` requests.
 
-[source,groovy]
-.MessageEndpoint.groovy
-----
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointImport, indent=0]
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=deleteImport, indent=0]
-
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointClassBegin, indent=0]
-
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=message, indent=4]
-
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=simpleDelete, indent=4]
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointClassEnd, indent=0]
-----
+snippet::io.micronaut.docs.server.endpoint.MessageEndpoint[tags="endpointImport, deleteImport, endpointClassBegin, message, simpleDelete, endpointClassEnd", indent=0, title="MessageEndpoint"]
 
 The above method responds to the following request:
 
