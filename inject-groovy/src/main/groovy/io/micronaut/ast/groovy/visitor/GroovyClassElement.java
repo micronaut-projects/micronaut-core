@@ -72,6 +72,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     }
 
     @Override
+    public boolean isInterface() {
+        return classNode.isInterface();
+    }
+
+    @Override
     public boolean isPrimitive() {
         return ClassHelper.isPrimitiveType(classNode) || (classNode.isArray() && ClassHelper.isPrimitiveType(classNode.getComponentType()));
     }
