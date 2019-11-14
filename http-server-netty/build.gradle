@@ -5,7 +5,6 @@ dependencies {
     compileOnly project(":inject-java")
     compileOnly dependencyModuleVersion("netty", "netty-transport-native-epoll")
     compileOnly dependencyModuleVersion("netty", "netty-transport-native-kqueue")
-    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
