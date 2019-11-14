@@ -166,11 +166,11 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
             if (writeMethod != null && readMethod == null) {
                 // override isReadOnly method
-                final GeneratorAdapter isReadOnly = startPublicMethodZeroArgs(classWriter, boolean.class, "isWriteOnly");
-                isReadOnly.push(true);
-                isReadOnly.returnValue();
-                isReadOnly.visitMaxs(1, 1);
-                isReadOnly.endMethod();
+                final GeneratorAdapter isWriteOnly = startPublicMethodZeroArgs(classWriter, boolean.class, "isWriteOnly");
+                isWriteOnly.push(true);
+                isWriteOnly.returnValue();
+                isWriteOnly.visitMaxs(1, 1);
+                isWriteOnly.endMethod();
             }
 
             for (GeneratorAdapter generator : loadTypeMethods.values()) {

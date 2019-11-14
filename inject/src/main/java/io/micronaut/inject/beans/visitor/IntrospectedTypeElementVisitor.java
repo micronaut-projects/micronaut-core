@@ -29,7 +29,6 @@ import io.micronaut.inject.ast.*;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
-import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -425,7 +424,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
 
         @Nonnull
-        @NotNull
         @Override
         public ClassElement getType() {
             return type;
