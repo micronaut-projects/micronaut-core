@@ -33,19 +33,8 @@ $ curl -X GET localhost:55838/date
 
 The api:management.endpoint.Read[] annotation accepts an optional `produces` argument, which sets the media type returned from the method (default is `application/json`):
 
-[source,groovy]
-.CurrentDateEndpoint.groovy
-----
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointImport, indent=0]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=readImport, indent=0]
+snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, readImport, endpointClassBegin, currentDate, readArg, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassBegin, indent=0]
-
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=currentDate, indent=4]
-
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=readArg, indent=4]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassEnd, indent=0]
-----
 <1> Supported media types are represented by api:http.MediaType[]
 
 The above method responds to the following request:
