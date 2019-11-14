@@ -235,6 +235,7 @@ class UriTemplateSpec extends Specification {
         '{/list}'             | [list: ['red', 'green', 'blue']]                   | '/red,green,blue'
         '{/list*}'            | [list: ['red', 'green', 'blue']]                   | '/red/green/blue'
         '{/list*,path:4}'     | [list: ['red', 'green', 'blue'], path: "/foo/bar"] | '/red/green/blue/%2Ffoo'
+        '/files/content{/path*}{/name}' | [name: "value"]                                                 | '/files/content/value'
         '{/keys}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '/semi,%3B,dot,.,comma,%2C'
         '{/keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '/semi=%3B/dot=./comma=%2C'
         '{;who}'              | [who: 'fred']                                      | ';who=fred' // Section 3.2.7 - Level 3 - Path-Style Parameter Expansion: {;var}
