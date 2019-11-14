@@ -11,7 +11,6 @@ import io.micronaut.management.endpoint.annotation.Read;
 //tag::mediaTypeImport[]
 import io.micronaut.http.MediaType;
 import io.micronaut.management.endpoint.annotation.Selector;
-
 //end::mediaTypeImport[]
 
 //tag::writeImport[]
