@@ -235,6 +235,7 @@ class UriTemplateSpec extends Specification {
         '{/list}'             | [list: ['red', 'green', 'blue']]                   | '/red,green,blue'
         '{/list*}'            | [list: ['red', 'green', 'blue']]                   | '/red/green/blue'
         '{/list*,path:4}'     | [list: ['red', 'green', 'blue'], path: "/foo/bar"] | '/red/green/blue/%2Ffoo'
+        '/files/content{/path*}{/name}' | [name: "value"]                                                 | '/files/content/value'
         '{/keys}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '/semi,%3B,dot,.,comma,%2C'
         '{/keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '/semi=%3B/dot=./comma=%2C'
         '{;who}'              | [who: 'fred']                                      | ';who=fred' // Section 3.2.7 - Level 3 - Path-Style Parameter Expansion: {;var}
@@ -284,6 +285,14 @@ class UriTemplateSpec extends Specification {
 
         where:
         template                                 | arguments                                          | result
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value']                                       | 'http://example.com/v/value/p'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val']                             | 'http://example.com/v/value/p?o=val'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', m: 'val']                             | 'http://example.com/v/value/p?m=val'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', s: 'val']                             | 'http://example.com/v/value/p?s=val'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', m: 'val2', s: 'val3']      | 'http://example.com/v/value/p?o=val1&m=val2&s=val3'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', m: 'val2', s: 'val3']                 | 'http://example.com/v/value/p?m=val2&s=val3'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', s: 'val3']                 | 'http://example.com/v/value/p?o=val1&s=val3'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', m: 'val2'           ]      | 'http://example.com/v/value/p?o=val1&m=val2'
         'http://example.com/{var}'               | [var: 'value']                                     | 'http://example.com/value' // Section 2.4.1 - Prefix Values
         'http://example.com/{var:20}'            | [var: 'value']                                     | 'http://example.com/value'
         'http://example.com/{var:3}'             | [var: 'value']                                     | 'http://example.com/val'
@@ -424,6 +433,14 @@ class UriTemplateSpec extends Specification {
 
         where:
         template                                      | arguments                                          | result
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value']                                       | 'http://example.com:8080/v/value/p'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val']                             | 'http://example.com:8080/v/value/p?o=val'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', m: 'val']                             | 'http://example.com:8080/v/value/p?m=val'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', s: 'val']                             | 'http://example.com:8080/v/value/p?s=val'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', m: 'val2', s: 'val3']      | 'http://example.com:8080/v/value/p?o=val1&m=val2&s=val3'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', m: 'val2', s: 'val3']                 | 'http://example.com:8080/v/value/p?m=val2&s=val3'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', s: 'val3']                 | 'http://example.com:8080/v/value/p?o=val1&s=val3'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', m: 'val2'           ]      | 'http://example.com:8080/v/value/p?o=val1&m=val2'
         'http://example.com:8080{+path,x}/here'       | [path: "/foo/bar", x: 1024]                        | 'http://example.com:8080/foo/bar,1024/here'
         'http://example.com:8080/{var}'               | [var: 'value']                                     | 'http://example.com:8080/value' // Section 2.4.1 - Prefix Values
         'http://example.com:8080/{var:20}'            | [var: 'value']                                     | 'http://example.com:8080/value'
@@ -549,4 +566,5 @@ class UriTemplateSpec extends Specification {
         'http://example.com:8080/{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com:8080/&semi=%3B&dot=.&comma=%2C'
         'http://example.com:8080/{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: null]]     | 'http://example.com:8080/&semi=%3B&dot=.'
     }
+
 }
