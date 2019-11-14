@@ -51,7 +51,7 @@ public class TestController {
     /**
      * The age
      */
-    @Get("/getMethod/{person}")
+    @Get("/getMethod/{age}")
     public int getAge( @javax.validation.constraints.NotBlank int age) {
         return age;
     }

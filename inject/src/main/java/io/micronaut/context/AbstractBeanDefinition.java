@@ -42,6 +42,7 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.naming.Named;
@@ -1043,10 +1044,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 ApplicationContext propertyResolver = (ApplicationContext) context;
                 AnnotationMetadata argMetadata = argument.getAnnotationMetadata();
                 Optional<String> valAnn = argMetadata.stringValue(Value.class);
-                String prop = valAnn.orElseGet(() ->
-                        argMetadata.stringValue(Property.class, "name")
-                                .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."))
-                );
+                String prop = resolvePropertyValueName(resolutionContext, argMetadata, argument, valAnn.orElse(null));
                 ArgumentConversionContext<?> conversionContext = ConversionContext.of(argument);
                 Optional<?> value = resolveValue(propertyResolver, conversionContext, valAnn.isPresent(), prop);
                 if (argument.getType() == Optional.class) {
@@ -1059,13 +1057,25 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         if (argument.isDeclaredNullable()) {
                             result = null;
                         } else {
-                            throw new DependencyInjectionException(resolutionContext, conversionContext, prop);
+                            result = argMetadata.getValue(Bindable.class, "defaultValue", argument)
+                                    .orElseThrow(() -> new DependencyInjectionException(resolutionContext, conversionContext, prop));
                         }
                     }
                 }
             } else {
                 throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
             }
+
+            if (this instanceof ValidatedBeanDefinition) {
+                ((ValidatedBeanDefinition) this).validateBeanArgument(
+                        resolutionContext,
+                        constructorInjectionPoint,
+                        argument,
+                        argIndex,
+                        result
+                );
+            }
+
             path.pop();
             return result;
         } catch (NoSuchBeanException | BeanInstantiationException e) {

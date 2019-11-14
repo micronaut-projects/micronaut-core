@@ -15,39 +15,33 @@
  */
 package io.micronaut.context.annotation;
 
-import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.annotation.Creator;
 
 import java.lang.annotation.Documented;
-import java.lang.annotation.Repeatable;
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * A property that can be contained within a {@link PropertySource} or used generally throughout the system.
+ * Allows injecting configuration values into a constructor or method based
+ * on the parameter names.
  *
- * @author graemerocher
- * @since 1.0
+ * <p>By default inherits the configuration prefix from any {@link ConfigurationProperties} or {@link EachProperty} definitions present at the class level.</p>
+ *
+ * <p>An additional prefix can be attached using the {@link #value()} member.</p>
+ *
+ * @author Graeme Rocher
+ * @since 1.3.0
  */
-@Retention(RetentionPolicy.RUNTIME)
 @Documented
-@Repeatable(PropertySource.class)
-public @interface Property {
-
+@Retention(RUNTIME)
+@Target({ElementType.CONSTRUCTOR, ElementType.METHOD})
+@Creator
+public @interface ConfigurationInject {
     /**
-     * The name of the property in kebab case. Example: my-app.bar.
-     *
-     * @return The name of the property
-     */
-    String name();
-
-    /**
-     * @return The value of the property
+     * @return THe configuration prefix to use.
      */
     String value() default "";
-
-    /**
-     * @return The default value if none is specified
-     */
-    @AliasFor(annotation = Bindable.class, member = "defaultValue")
-    String defaultValue() default "";
 }

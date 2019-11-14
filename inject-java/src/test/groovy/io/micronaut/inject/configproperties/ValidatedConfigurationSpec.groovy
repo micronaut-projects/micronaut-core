@@ -28,9 +28,6 @@ class ValidatedConfigurationSpec extends Specification {
     void "test validated config with invalid config"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.registerSingleton(
-                Validation.buildDefaultValidatorFactory()
-        )
         applicationContext.start()
 
         when:
@@ -52,10 +49,6 @@ class ValidatedConfigurationSpec extends Specification {
                 'foo.bar.url':'http://localhost',
                 'foo.bar.name':'test'
         ))
-
-        applicationContext.registerSingleton(
-                Validation.buildDefaultValidatorFactory()
-        )
 
         applicationContext.start()
 
