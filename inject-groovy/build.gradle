@@ -6,7 +6,6 @@ dependencies {
     testCompile "junit:junit:4.7"
 //    testCompile 'javax.validation:validation-api:1.1.0.Final'
     testCompile "org.hibernate:hibernate-core:5.3.6.Final"
-    testCompile 'org.hibernate:hibernate-validator:6.0.13.Final'
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
     testRuntime 'org.glassfish:javax.el:3.0.1-b08'
     testCompile project(":http-server-netty")
@@ -14,6 +13,7 @@ dependencies {
     testCompile project(":validation")
     testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testCompile dependencyModuleVersion("groovy", "groovy-json")
+    testCompile project(":validation")
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

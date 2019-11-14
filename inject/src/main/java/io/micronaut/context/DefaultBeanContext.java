@@ -43,6 +43,7 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.inject.validation.BeanDefinitionValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,6 +124,7 @@ public class DefaultBeanContext implements BeanContext {
     );
     private final CustomScopeRegistry customScopeRegistry;
     private Collection<BeanRegistration<BeanCreatedEventListener>> beanCreationEventListeners;
+    private BeanDefinitionValidator beanValidator;
 
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class.
@@ -530,6 +532,14 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public ClassLoader getClassLoader() {
         return classLoader;
+    }
+
+    @Override
+    public BeanDefinitionValidator getBeanValidator() {
+        if (beanValidator == null) {
+            this.beanValidator = findBean(BeanDefinitionValidator.class).orElse(BeanDefinitionValidator.DEFAULT);
+        }
+        return beanValidator;
     }
 
     @Override
