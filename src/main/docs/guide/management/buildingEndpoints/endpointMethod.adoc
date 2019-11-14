@@ -50,20 +50,8 @@ the_date_is: Fri May 11 19:24:21 CDT
 == Write Methods
 
 Annotating a method with the api:management.endpoint.Write[] annotation will cause it to respond to `POST` requests.
-[source,groovy]
-.CurrentDateEndpoint.groovy
-----
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointImport, indent=0]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=writeImport, indent=0]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=mediaTypeImport, indent=0]
 
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassBegin, indent=0]
-
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=currentDate, indent=4]
-
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=simpleWrite, indent=4]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassEnd, indent=0]
-----
+snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, writeImport, mediaTypeImport, endpointClassBegin, currentDate, simpleWrite, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
 The above method responds to the following request:
 
