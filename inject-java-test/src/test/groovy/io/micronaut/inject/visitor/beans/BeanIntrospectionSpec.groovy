@@ -30,6 +30,120 @@ import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on getters"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+public class ValidatedConfig {
+
+    private URL url;
+    private String name;
+
+    @NotNull
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+
+    @NotBlank
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on fields"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+public class ValidatedConfig {
+
+    @NotNull
+    URL url;
+
+    @NotBlank
+    protected String name;
+
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.MyConfig','''\
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("foo.bar")
+class MyConfig {
+    private String host;
+    private int serverPort;
+    
+    @ConfigurationInject
+    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+        this.host = host;
+        this.serverPort = serverPort;
+    }
+    
+    public String getHost() {
+        return host;
+    }
+    
+    public int getServerPort() {
+        return serverPort;
+    }
+}
+
+''')
+        expect:
+        introspection != null
+    }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2059')
     void "test annotation metadata doesn't cause stackoverflow"() {

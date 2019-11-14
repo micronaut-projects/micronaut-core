@@ -78,8 +78,8 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
     }
 
     @Override
-    protected String buildTypePath(TypeElement owningType, TypeElement declaringType) {
-        String initialPath = calculateInitialPath(owningType, declaringType);
+    protected String buildTypePath(TypeElement owningType, TypeElement declaringType, AnnotationMetadata annotationMetadata) {
+        String initialPath = calculateInitialPath(owningType, annotationMetadata);
         StringBuilder path = new StringBuilder(initialPath);
 
         prependSuperclasses(declaringType, path);
@@ -114,8 +114,14 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
         return path.toString();
     }
 
-    private String calculateInitialPath(TypeElement owningType, TypeElement declaringType) {
+    @Override
+    protected String buildTypePath(TypeElement owningType, TypeElement declaringType) {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata(declaringType);
+        return buildTypePath(owningType, declaringType, annotationMetadata);
+    }
+
+    private String calculateInitialPath(TypeElement owningType, AnnotationMetadata annotationMetadata) {
+
         Function<String, String> evaluatePathFunction = pathEvaluationFunctionForMetadata(annotationMetadata);
         return annotationMetadata.getValue(ConfigurationReader.class, String.class)
             .map(evaluatePathFunction)
