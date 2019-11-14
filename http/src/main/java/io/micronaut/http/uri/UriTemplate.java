@@ -205,7 +205,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
         for (PathSegment segment : segments) {
             String result = segment.expand(parameters, anyPreviousHasContent, anyPreviousHasOperator);
             if (result == null) {
-                break;
+                continue;
             }
             if (segment instanceof UriTemplateParser.VariablePathSegment) {
                 UriTemplateParser.VariablePathSegment varPathSegment = (UriTemplateParser.VariablePathSegment) segment;
