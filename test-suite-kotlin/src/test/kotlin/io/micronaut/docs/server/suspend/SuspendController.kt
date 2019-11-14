@@ -5,6 +5,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Status
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.rx2.await
+import javax.inject.Inject
 
 @Controller("/suspend")
 open class SuspendController {
@@ -38,4 +40,14 @@ open class SuspendController {
         delay(1)
     }
     // end::suspendStatusDelayed[]
+
+    // tag::suspendClient[]
+    @Inject lateinit var client: SimpleClient
+
+    @Get("/client")
+    open suspend fun client(): String { // <1>
+        return client.simple().await()
+    }
+    // end::suspendClient[]
+
 }

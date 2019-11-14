@@ -61,5 +61,14 @@ class SuspendControllerSpec: StringSpec() {
 
             response.status shouldBe HttpStatus.CREATED
         }
+
+        "test suspend with HTTP client"() {
+            val response = client.exchange(HttpRequest.GET<Any>("/suspend/client"), String::class.java).blockingFirst()
+
+            val body = response.body.get()
+
+            body shouldBe "Hello"
+            response.status shouldBe HttpStatus.OK
+        }
     }
 }
