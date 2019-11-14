@@ -198,16 +198,23 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * @return The expanded URI
      */
     public String expand(Map<String, Object> parameters) {
-        StringBuilder builder = new StringBuilder();
+        StringBuilder builder = new StringBuilder(templateString.length());
         boolean anyPreviousHasContent = false;
         boolean anyPreviousHasOperator = false;
+        boolean queryParameter = false;
         for (PathSegment segment : segments) {
             String result = segment.expand(parameters, anyPreviousHasContent, anyPreviousHasOperator);
             if (result == null) {
                 break;
             }
             if (segment instanceof UriTemplateParser.VariablePathSegment) {
-                if (result.contains(String.valueOf(((UriTemplateParser.VariablePathSegment) segment).getOperator()))) {
+                UriTemplateParser.VariablePathSegment varPathSegment = (UriTemplateParser.VariablePathSegment) segment;
+                if (varPathSegment.isQuerySegment && ! queryParameter) {
+                    // reset anyPreviousHasContent when we reach query parameters
+                    queryParameter = true;
+                    anyPreviousHasContent = false;
+                }
+                if (result.contains(String.valueOf(varPathSegment.getOperator()))) {
                     anyPreviousHasOperator = true;
                 }
                 anyPreviousHasContent = anyPreviousHasContent || result.length() > 0;
@@ -449,7 +456,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * @return The template as a string
      */
     protected String toString(Predicate<PathSegment> filter) {
-        StringBuilder builder = new StringBuilder();
+        StringBuilder builder = new StringBuilder(templateString.length());
         UriTemplateParser.VariablePathSegment previousVariable = null;
         for (PathSegment segment : segments) {
             if (!filter.test(segment)) {
@@ -802,14 +809,14 @@ public class UriTemplate implements Comparable<UriTemplate> {
         }
 
         private String escape(String v) {
-            return v.replaceAll("%", "%25").replaceAll("\\s", "%20");
+            return v.replace("%", "%25").replaceAll("\\s", "%20");
         }
 
         private String applyModifier(String modifierStr, char modifierChar, String result, int len) {
             if (modifierChar == ':' && modifierStr.length() > 0) {
                 if (Character.isDigit(modifierStr.charAt(0))) {
                     try {
-                        Integer subResult = Integer.valueOf(modifierStr.trim());
+                        int subResult = Integer.parseInt(modifierStr.trim(), 10);
                         if (subResult < len) {
                             result = result.substring(0, subResult);
                         }
