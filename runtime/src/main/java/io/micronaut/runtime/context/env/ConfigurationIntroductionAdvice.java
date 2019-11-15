@@ -17,7 +17,8 @@ package io.micronaut.runtime.context.env;
 
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.context.BeanLocator;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
@@ -40,16 +41,16 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
     private static final String MEMBER_BEAN = "bean";
     private static final String MEMBER_NAME = "name";
     private final Environment environment;
-    private final BeanLocator beanLocator;
+    private final BeanContext beanContext;
 
     /**
      * Default constructor.
      * @param environment The environment
-     * @param beanLocator  The bean locator
+     * @param beanContext  The bean locator
      */
-    ConfigurationIntroductionAdvice(Environment environment, BeanLocator beanLocator) {
+    ConfigurationIntroductionAdvice(Environment environment, BeanContext beanContext) {
         this.environment = environment;
-        this.beanLocator = beanLocator;
+        this.beanContext = beanContext;
     }
 
     @Override
@@ -58,7 +59,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         final Class<Object> returnType = rt.getType();
         if (context.isTrue(ConfigurationAdvice.class, MEMBER_BEAN)) {
             if (context.isNullable()) {
-                final Object v = beanLocator.findBean(returnType).orElse(null);
+                final Object v = beanContext.findBean(returnType).orElse(null);
                 if (v != null) {
                     return environment.convertRequired(v, returnType);
                 } else {
@@ -66,14 +67,22 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
                 }
             } else {
                 return environment.convertRequired(
-                        beanLocator.getBean(returnType),
+                        beanContext.getBean(returnType),
                         returnType
                 );
             }
         } else {
-            final String property = context.stringValue(Property.class, MEMBER_NAME).orElse(null);
+            String property = context.stringValue(Property.class, MEMBER_NAME).orElse(null);
             if (property == null) {
                 throw new IllegalStateException("No property name available to resolve");
+            }
+            boolean iterable = property.indexOf('*') > -1;
+            if (iterable) {
+                final BeanRegistration<Object> registration = beanContext.findBeanRegistration(context.getTarget()).orElse(null);
+                if (registration != null) {
+                    final String name = registration.getIdentifier().getName();
+                    property = property.replace("*", name);
+                }
             }
             final String defaultValue = context.stringValue(Bindable.class, "defaultValue").orElse(null);
             if (defaultValue != null) {

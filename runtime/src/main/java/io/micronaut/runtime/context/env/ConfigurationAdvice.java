@@ -40,6 +40,11 @@ public @interface ConfigurationAdvice {
     boolean bean() default false;
 
     /**
+     * @return Is it annotated with {@link io.micronaut.context.annotation.EachProperty}
+     */
+    boolean iterable() default false;
+
+    /**
      * @return The property to lookup
      */
     String value() default "";

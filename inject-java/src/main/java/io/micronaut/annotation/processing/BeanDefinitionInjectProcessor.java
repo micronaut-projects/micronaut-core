@@ -68,6 +68,7 @@ import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -674,14 +675,18 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             );
 
                             final TypeElement typeElement = !ClassUtils.isJavaBasicType(propertyType) ? resolveTypeElement(returnTypeMirror) : null;
+                            final AnnotationValueBuilder<Annotation> builder = io.micronaut.core.annotation.AnnotationValue.builder(ANN_CONFIGURATION_ADVICE);
                             if (typeElement != null && annotationUtils.hasStereotype(typeElement, Scope.class)) {
-                                final JavaAnnotationMetadataBuilder metadataBuilder = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder();
-                                annotationMetadata = metadataBuilder.annotate(
-                                        annotationMetadata,
-                                        io.micronaut.core.annotation.AnnotationValue.builder(ANN_CONFIGURATION_ADVICE).member("bean", true).build());
-                            } else {
-                                annotationMetadata = addAnnotation(annotationMetadata, ANN_CONFIGURATION_ADVICE);
+                                builder.member("bean", true);
                             }
+                            if (typeAnnotationMetadata.hasStereotype(EachProperty.class)) {
+                                builder.member("iterable", true);
+                            }
+
+                            final JavaAnnotationMetadataBuilder metadataBuilder = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder();
+                            annotationMetadata = metadataBuilder.annotate(
+                                    annotationMetadata,
+                                    builder.build());
                         }
                     }
 
