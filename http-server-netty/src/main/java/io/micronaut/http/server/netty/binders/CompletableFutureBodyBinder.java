@@ -17,21 +17,14 @@ package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.context.BeanLocator;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
-import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
+import io.micronaut.http.server.netty.*;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
@@ -49,18 +42,15 @@ import java.util.concurrent.CompletableFuture;
 public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<CompletableFuture>
     implements NonBlockingBodyArgumentBinder<CompletableFuture> {
 
-    private final BeanLocator beanLocator;
-    private final HttpServerConfiguration httpServerConfiguration;
+    private final HttpContentProcessorResolver httpContentProcessorResolver;
 
     /**
-     * @param beanLocator             The bean locator
-     * @param httpServerConfiguration The Http server configuration
-     * @param conversionService       The conversion service
+     * @param httpContentProcessorResolver The http content processor resolver
+     * @param conversionService            The conversion service
      */
-    public CompletableFutureBodyBinder(BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration, ConversionService conversionService) {
+    public CompletableFutureBodyBinder(HttpContentProcessorResolver httpContentProcessorResolver, ConversionService conversionService) {
         super(conversionService);
-        this.beanLocator = beanLocator;
-        this.httpServerConfiguration = httpServerConfiguration;
+        this.httpContentProcessorResolver = httpContentProcessorResolver;
     }
 
     @Override
@@ -76,11 +66,9 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
             if (nativeRequest instanceof StreamedHttpRequest) {
 
                 CompletableFuture future = new CompletableFuture();
-                Optional<MediaType> contentType = source.getContentType();
-                HttpContentProcessor<?> processor = contentType
-                    .flatMap(type -> beanLocator.findBean(HttpContentSubscriberFactory.class, new ConsumesMediaTypeQualifier<>(type)))
-                    .map(factory -> factory.build(nettyHttpRequest))
-                    .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
+                Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+
+                HttpContentProcessor<?> processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
 
                 processor.subscribe(new CompletionAwareSubscriber<Object>() {
                     @Override
@@ -112,7 +100,7 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                                 if (converted.isPresent()) {
                                     future.complete(converted.get());
                                 } else {
-                                    future.completeExceptionally(new IllegalArgumentException("Cannot bind JSON to argument type: " + targetType.getName()));
+                                    future.completeExceptionally(new IllegalArgumentException("Cannot bind body to argument type: " + targetType.getName()));
                                 }
                             } else {
                                 future.complete(body.get());
