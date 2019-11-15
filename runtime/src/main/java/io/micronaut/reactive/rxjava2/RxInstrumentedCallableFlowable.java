@@ -16,14 +16,11 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
-import java.util.Collection;
-import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
@@ -37,35 +34,34 @@ import java.util.concurrent.Callable;
 @Internal
 final class RxInstrumentedCallableFlowable<T> extends Flowable<T> implements Callable<T>, RxInstrumentedComponent {
     private final Publisher<T> source;
-    private final List<RunnableInstrumenter> instrumentations;
+    private final RxInstrumenterFactory instrumenterFactory;
+    private final Optional<RxInstrumenter> instrumenter;
 
     /**
      * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
+     *
+     * @param source              The source
+     * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedCallableFlowable(
-            Publisher<T> source, List<RunnableInstrumenter> instrumentations) {
+    RxInstrumentedCallableFlowable(Publisher<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumentations = instrumentations;
+        this.instrumenterFactory = instrumenterFactory;
+        this.instrumenter = instrumenterFactory.create();
     }
 
-    /**
-     * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedCallableFlowable(
-            Publisher<T> source, Collection<ReactiveInstrumenter> instrumentations) {
-        this.source = source;
-        this.instrumentations = toRunnableInstrumenters(instrumentations);
+    @Override
+    protected void subscribeActual(Subscriber<? super T> s) {
+        Subscriber wrap = RxInstrumentedWrappers.wrap(s, instrumenterFactory);
+        if (instrumenter.isPresent()) {
+            instrumenter.get().subscribe(source, wrap);
+        } else {
+            source.subscribe(wrap);
+        }
     }
 
-    @Override protected void subscribeActual(Subscriber<? super T> s) {
-        source.subscribe(RxInstrumentedWrappers.wrap(s, instrumentations));
-    }
-
-    @Override @SuppressWarnings("unchecked") public T call() throws Exception {
+    @Override
+    @SuppressWarnings("unchecked")
+    public T call() throws Exception {
         return ((Callable<T>) source).call();
     }
 }
