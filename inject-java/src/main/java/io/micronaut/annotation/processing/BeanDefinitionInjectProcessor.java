@@ -563,6 +563,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         private void visitIntroductionAdviceInterface(TypeElement classElement, AnnotationMetadata typeAnnotationMetadata, AopProxyWriter aopProxyWriter) {
             String introductionTypeName = classElement.getQualifiedName().toString();
+            final boolean isConfigProps = typeAnnotationMetadata.hasAnnotation("io.micronaut.runtime.context.env.ConfigurationAdvice");
+            if (isConfigProps) {
+                metadataBuilder.visitProperties(
+                        classElement,
+                        null
+                );
+            }
             classElement.asType().accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(classElement, modelUtils, elementUtils) {
 
                 @Override
