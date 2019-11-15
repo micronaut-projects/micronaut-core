@@ -42,6 +42,20 @@ class SuspendControllerSpec: StringSpec() {
             response.status shouldBe HttpStatus.OK
         }
 
+        "test invoke suspend directly"() {
+            val controller = embeddedServer.applicationContext.getBean(SuspendController::class.java)
+            val body = controller.simple()
+
+            body shouldBe "Hello"
+        }
+
+        "test invoke suspend delayed directly"() {
+            val controller = embeddedServer.applicationContext.getBean(SuspendController::class.java)
+            val body = controller.delayed()
+
+            body shouldBe "Delayed"
+        }
+
         "test suspend delayed"() {
             val response = client.exchange(HttpRequest.GET<Any>("/suspend/delayed"), String::class.java).blockingFirst()
             val body = response.body.get()

@@ -34,17 +34,22 @@ class KotlinCoroutineAroundInterceptor : MethodInterceptor<Any, Any> {
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any {
         val isUnit = context.isTrue(KotlinCoroutineAroundAdvice::class.java, "unit")
         val parameterValues = context.parameterValues
-        val continuation = CustomContinuation()
-        parameterValues[parameterValues.size - 1] = continuation
-        val result = context.proceed()
-        return if (KotlinUtils.isKotlinCoroutineSuspended(result)) {
-            Publishers.fromCompletableFuture(continuation)
-        } else {
-            if (isUnit) {
-                Completable.complete().toFlowable<Any>()
+        val continuationIndex = parameterValues.size - 1
+        if (parameterValues[continuationIndex] == null) {
+            val continuation = CustomContinuation()
+            parameterValues[continuationIndex] = continuation
+            val result = context.proceed()
+            return if (KotlinUtils.isKotlinCoroutineSuspended(result)) {
+                Publishers.fromCompletableFuture(continuation)
             } else {
-                Publishers.just(result)
+                if (isUnit) {
+                    Completable.complete().toFlowable<Any>()
+                } else {
+                    Publishers.just(result)
+                }
             }
+        } else {
+            return context.proceed()
         }
     }
 }
