@@ -151,7 +151,6 @@ import org.slf4j.LoggerFactory;
 
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
 import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
-import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinSuspendingFunction;
 
 /**
  * Internal implementation of the {@link io.netty.channel.ChannelInboundHandler} for Micronaut.
@@ -333,7 +332,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Class<?> javaReturnType = errorRoute.getReturnType().getType();
                 boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
                 boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
-                boolean isKotlinSuspendingFunction = isKotlinSuspendingFunction(methodBasedRoute.getExecutableMethod());
+                boolean isKotlinSuspendingFunction = methodBasedRoute.getExecutableMethod().isSuspend();
                 boolean isKotlinFunctionReturnTypeUnit = isKotlinSuspendingFunction &&
                         isKotlinFunctionReturnTypeUnit(methodBasedRoute.getExecutableMethod());
                 Flowable resultFlowable = Flowable.defer(() -> {
@@ -1008,7 +1007,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
             boolean isKotlinSuspendingFunction =
                     finalRoute instanceof MethodBasedRouteMatch &&
-                    isKotlinSuspendingFunction(((MethodBasedRouteMatch) finalRoute).getExecutableMethod());
+                    ((MethodBasedRouteMatch) finalRoute).getExecutableMethod().isSuspend();
             boolean isKotlinFunctionReturnTypeUnit = isKotlinSuspendingFunction &&
                     isKotlinFunctionReturnTypeUnit(((MethodBasedRouteMatch) finalRoute).getExecutableMethod());
             boolean isSingle =

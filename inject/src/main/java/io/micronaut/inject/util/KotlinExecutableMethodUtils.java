@@ -18,7 +18,6 @@ package io.micronaut.inject.util;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import kotlin.Unit;
-import kotlin.coroutines.Continuation;
 
 import javax.annotation.Nonnull;
 
@@ -31,24 +30,6 @@ import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
  * @since 1.3.0
  */
 public class KotlinExecutableMethodUtils {
-    /**
-     * Kotlin <code>suspend</code> function check.
-     *
-     * @param method method to be checked
-     * @return True if given method is a <code>suspend</code> function.
-     */
-    public static boolean isKotlinSuspendingFunction(@Nonnull ExecutableMethod method) {
-        if (KOTLIN_COROUTINES_SUPPORTED) {
-            final Argument[] arguments = method.getArguments();
-            final int argumentsLength = arguments.length;
-            if (argumentsLength > 0) {
-                return arguments[argumentsLength - 1].getType() == Continuation.class;
-            }
-        }
-
-        return false;
-    }
-
     /**
      * Kotlin <code>suspend</code> function return type check.
      *
