@@ -16,13 +16,8 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 import io.reactivex.SingleObserver;
 import io.reactivex.disposables.Disposable;
-
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -35,32 +30,22 @@ import java.util.List;
 @Internal
 final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, Disposable, RxInstrumentedComponent {
     protected final SingleObserver<T> downstream;
+    private final RxInstrumenter instrumenter;
     private Disposable upstream;
-    private final List<RunnableInstrumenter> instrumentations;
 
     /**
      * Default constructor.
-     * @param downstream The downstream observer
-     * @param instrumentations The instrumentations
+     *
+     * @param downstream   The downstream observer
+     * @param instrumenter The instrumenter
      */
-    RxInstrumentedSingleObserver(
-            SingleObserver<T> downstream, List<RunnableInstrumenter> instrumentations) {
+    RxInstrumentedSingleObserver(SingleObserver<T> downstream, RxInstrumenter instrumenter) {
         this.downstream = downstream;
-        this.instrumentations = instrumentations;
+        this.instrumenter = instrumenter;
     }
 
-    /**
-     * Default constructor.
-     * @param downstream The downstream observer
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedSingleObserver(
-            SingleObserver<T> downstream, Collection<ReactiveInstrumenter> instrumentations) {
-        this.downstream = downstream;
-        this.instrumentations = toRunnableInstrumenters(instrumentations);
-    }
-
-    @Override public void onSubscribe(Disposable d) {
+    @Override
+    public void onSubscribe(Disposable d) {
         if (!validate(upstream, d)) {
             return;
         }
@@ -68,27 +53,23 @@ final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, Dispos
         downstream.onSubscribe(this);
     }
 
-    @Override public void onError(Throwable t) {
-        Runnable onError = () -> downstream.onError(t);
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onError = instrumentation.instrument(onError);
-        }
-        onError.run();
+    @Override
+    public void onError(Throwable t) {
+        instrumenter.onError(downstream, t);
     }
 
-    @Override public void onSuccess(T value) {
-        Runnable onSuccess = () -> downstream.onSuccess(value);
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onSuccess = instrumentation.instrument(onSuccess);
-        }
-        onSuccess.run();
+    @Override
+    public void onSuccess(T value) {
+        instrumenter.onSuccess(downstream, value);
     }
 
-    @Override public boolean isDisposed() {
+    @Override
+    public boolean isDisposed() {
         return upstream.isDisposed();
     }
 
-    @Override public void dispose() {
+    @Override
+    public void dispose() {
         upstream.dispose();
     }
 }

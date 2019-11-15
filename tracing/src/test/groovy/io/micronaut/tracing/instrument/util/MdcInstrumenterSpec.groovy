@@ -1,6 +1,6 @@
 package io.micronaut.tracing.instrument.util
 
-import io.micronaut.scheduling.instrument.RunnableInstrumenter
+import io.micronaut.scheduling.instrument.InvocationInstrumenter
 import org.slf4j.MDC
 import spock.lang.Specification
 import spock.util.concurrent.AsyncConditions
@@ -26,7 +26,7 @@ class MdcInstrumenterSpec extends Specification {
                 assert MDC.get(key) == value
             }
         }
-        runnable = mdcInstrumenter.apply(runnable)
+        runnable = InvocationInstrumenter.instrument(runnable, mdcInstrumenter.newInvocationInstrumenter().get())
         def thread = new Thread(runnable)
 
         when:
@@ -45,7 +45,7 @@ class MdcInstrumenterSpec extends Specification {
         MDC.put(key, value)
 
         and:
-        RunnableInstrumenter instrumenter = mdcInstrumenter.newInstrumentation().get()
+        def instrumenter = mdcInstrumenter.newInvocationInstrumenter().get()
 
         and:
         Runnable runnable = {
@@ -53,7 +53,7 @@ class MdcInstrumenterSpec extends Specification {
                 assert MDC.get(key) == value
             }
         }
-        runnable = instrumenter.instrument(runnable)
+        runnable = InvocationInstrumenter.instrument(runnable, instrumenter)
 
         when:
         runnable.run()
@@ -66,24 +66,22 @@ class MdcInstrumenterSpec extends Specification {
     def "old context map is preserved after instrumented execution"() {
         given:
         MDC.put(key, value)
-        RunnableInstrumenter instrumenter1 = mdcInstrumenter.newInstrumentation().get()
-        Runnable runnable1 = instrumenter1.instrument({
+        def instrumenter1 = mdcInstrumenter.newInvocationInstrumenter().get()
+        Runnable runnable1 = InvocationInstrumenter.instrument({
             conds.evaluate {
                 assert MDC.get(key) == value
             }
-        } as Runnable)
-
+        } as Runnable, instrumenter1)
 
         and:
         String value2 = 'baz'
         MDC.put(key, value2)
-        RunnableInstrumenter instrumenter2 = mdcInstrumenter.newInstrumentation().get()
-        Runnable runnable2 = instrumenter2.instrument({
+        def instrumenter2 = mdcInstrumenter.newInvocationInstrumenter().get()
+        Runnable runnable2 = InvocationInstrumenter.instrument({
             conds.evaluate {
                 assert MDC.get(key) == value2
             }
-        } as Runnable)
-
+        } as Runnable, instrumenter2)
         when:
         runnable1.run()
 

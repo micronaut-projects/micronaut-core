@@ -13,12 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.scheduling.instrument;
+
+import java.util.Optional;
+
 /**
- * Instruments thread creation.
+ * An factory interface for reactive invocation instrumentation, factory method decides if instrumentation is needed.
  *
- * @author graemerocher
- * @since 1.0
+ * @author Denis Stepanov
+ * @since 1.3
  */
-package io.micronaut.tracing.instrument.scheduling;
+public interface ReactiveInvocationInstrumenterFactory {
 
+    /**
+     * An optional invocation instrumentation.
+     * @return An optional invocation instrumentation.
+     */
+    Optional<InvocationInstrumenter> newReactiveInvocationInstrumenter();
 
+}

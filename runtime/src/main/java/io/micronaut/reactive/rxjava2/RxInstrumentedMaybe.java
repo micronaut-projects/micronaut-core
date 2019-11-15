@@ -16,14 +16,11 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 import io.reactivex.Maybe;
 import io.reactivex.MaybeObserver;
 import io.reactivex.MaybeSource;
 
-import java.util.Collection;
-import java.util.List;
+import java.util.Optional;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -36,31 +33,28 @@ import java.util.List;
 @Internal
 final class RxInstrumentedMaybe<T> extends Maybe<T> implements RxInstrumentedComponent {
     private final MaybeSource<T> source;
-    private final List<RunnableInstrumenter> instrumentations;
+    private final RxInstrumenterFactory instrumenterFactory;
+    private final Optional<RxInstrumenter> instrumenter;
 
     /**
      * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
+     *
+     * @param source              The source
+     * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedMaybe(
-            MaybeSource<T> source, List<RunnableInstrumenter> instrumentations) {
+    RxInstrumentedMaybe(MaybeSource<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumentations = instrumentations;
+        this.instrumenterFactory = instrumenterFactory;
+        this.instrumenter = instrumenterFactory.create();
     }
 
-    /**
-     * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedMaybe(
-            MaybeSource<T> source, Collection<ReactiveInstrumenter> instrumentations) {
-        this.source = source;
-        this.instrumentations = toRunnableInstrumenters(instrumentations);
-    }
-
-    @Override protected void subscribeActual(MaybeObserver<? super T> o) {
-        source.subscribe(new RxInstrumentedMaybeObserver<>(o, instrumentations));
+    @Override
+    protected void subscribeActual(MaybeObserver<? super T> o) {
+        MaybeObserver<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
+        if (instrumenter.isPresent()) {
+            instrumenter.get().subscribe(source, wrap);
+        } else {
+            source.subscribe(wrap);
+        }
     }
 }

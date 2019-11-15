@@ -16,14 +16,9 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 import io.reactivex.FlowableSubscriber;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -39,27 +34,21 @@ final class RxInstrumentedFlowableSubscriber<T> extends RxInstrumentedSubscriber
 
     /**
      * Default constructor.
-     * @param downstream the downstream subscriber
-     * @param instrumentations The instrumentations
+     *
+     * @param downstream   the downstream subscriber
+     * @param instrumenter The instrumenter
      */
-    RxInstrumentedFlowableSubscriber(Subscriber<T> downstream, Collection<ReactiveInstrumenter> instrumentations) {
-        super(downstream, instrumentations);
+    RxInstrumentedFlowableSubscriber(Subscriber<T> downstream, RxInstrumenter instrumenter) {
+        super(downstream, instrumenter);
     }
 
-    /**
-     * Default constructor.
-     * @param downstream the downstream subscriber
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedFlowableSubscriber(Subscriber<T> downstream, List<RunnableInstrumenter> instrumentations) {
-        super(downstream, instrumentations);
-    }
-
-    @Override public void request(long n) {
+    @Override
+    public void request(long n) {
         upstream.request(n);
     }
 
-    @Override public void cancel() {
+    @Override
+    public void cancel() {
         upstream.cancel();
     }
 }
