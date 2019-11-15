@@ -33,7 +33,7 @@ import java.lang.annotation.RetentionPolicy;
 @Introduction
 @Type(ConfigurationIntroductionAdvice.class)
 @Internal
-@interface ConfigurationAdvice {
+public @interface ConfigurationAdvice {
     /**
      * @return Is the method call a bean lookup
      */

@@ -15,10 +15,13 @@
  */
 package io.micronaut.validation.validator;
 
+import io.micronaut.aop.Intercepted;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.MessageSource;
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotatedElement;
@@ -1376,9 +1379,16 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         Set<AnnotationValue<? extends Annotation>> constraints = new HashSet<>(3);
         for (Class<?> group : context.groups) {
             for (AnnotationValue<? extends Annotation> annotationValue : annotationValues) {
-                final List<Class> constraintGroups = annotationValue.get("groups", Class[].class).map(Arrays::asList).orElse(DEFAULT_GROUPS);
-                if (constraintGroups.contains(group)) {
-                    constraints.add(annotationValue);
+                final Class<?>[] classValues = annotationValue.classValues("groups");
+                if (ArrayUtils.isEmpty(classValues)) {
+                    if (context.groups == DEFAULT_GROUPS) {
+                        constraints.add(annotationValue);
+                    }
+                } else {
+                    final List<Class> constraintGroups = Arrays.asList(classValues);
+                    if (constraintGroups.contains(group)) {
+                        constraints.add(annotationValue);
+                    }
                 }
             }
         }
@@ -1585,9 +1595,47 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
     @Override
     public <T> void validateBean(@Nonnull BeanResolutionContext resolutionContext, @Nonnull BeanDefinition<T> definition, @Nonnull T bean) throws BeanInstantiationException {
-        Set<ConstraintViolation<T>> errors = validate(bean);
-        final Class<?> beanType = bean.getClass();
-        failOnError(resolutionContext, errors, beanType);
+        final BeanIntrospection<T> introspection = (BeanIntrospection<T>) getBeanIntrospection(bean);
+        if (introspection != null) {
+            Set<ConstraintViolation<T>> errors = validate(introspection, bean);
+            final Class<?> beanType = bean.getClass();
+            failOnError(resolutionContext, errors, beanType);
+        } else if (bean instanceof Intercepted && definition.hasStereotype(ConfigurationReader.class)) {
+            final Collection<ExecutableMethod<T, ?>> executableMethods = definition.getExecutableMethods();
+            if (CollectionUtils.isNotEmpty(executableMethods)) {
+                Set<ConstraintViolation<Object>> errors = new HashSet<>();
+                final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(bean);
+                final Class<T> beanType = definition.getBeanType();
+                final Class<?>[] interfaces = beanType.getInterfaces();
+                if (ArrayUtils.isNotEmpty(interfaces)) {
+                    context.addConstructorNode(interfaces[0].getSimpleName());
+                } else {
+                    context.addConstructorNode(beanType.getSimpleName());
+                }
+                for (ExecutableMethod executableMethod : executableMethods) {
+                    if (executableMethod.hasAnnotation(Property.class)) {
+                        final boolean hasConstraint = executableMethod.hasStereotype(Constraint.class);
+                        final boolean isValid = executableMethod.hasStereotype(Valid.class);
+                        if (hasConstraint || isValid) {
+                            final Object value = executableMethod.invoke(bean);
+                            validateConstrainedPropertyInternal(
+                                    beanType,
+                                    bean,
+                                    bean,
+                                    executableMethod,
+                                    executableMethod.getReturnType().getType(),
+                                    value,
+                                    context,
+                                    errors,
+                                    null
+                            );
+                        }
+                    }
+                }
+
+                failOnError(resolutionContext, errors, beanType);
+            }
+        }
     }
 
     private <T> void failOnError(@Nonnull BeanResolutionContext resolutionContext, Set<ConstraintViolation<T>> errors, Class<?> beanType) {

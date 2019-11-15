@@ -84,10 +84,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 }
             } else if (element.hasStereotype(ConfigurationReader.class)) {
                 this.lastConfigurationReader = element;
-                if (element.isAbstract()) {
-                    // add configuration advice
-                    element.annotate("io.micronaut.runtime.context.env.ConfigurationAdvice");
-                }
             }
         }
     }
@@ -112,7 +108,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
                 }
             }
-        } else if (currentAbstractIntrospection != null) {
+        }
+
+        if (currentAbstractIntrospection != null) {
             if (NameUtils.isGetterName(methodName) && element.getParameters().length == 0) {
                 final String propertyName = NameUtils.getPropertyNameForGetter(methodName);
                 final AbstractPropertyElement propertyElement = currentAbstractIntrospection.properties.computeIfAbsent(propertyName, s -> new AbstractPropertyElement(

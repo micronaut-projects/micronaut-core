@@ -1,15 +1,15 @@
 package io.micronaut.inject.configproperties
 
+import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.exceptions.NoSuchBeanException
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.runtime.context.env.ConfigurationAdvice
 
-class InterfaceConfigurationPropertiesSpec extends AbstractTypeElementSpec {
+class InterfaceConfigurationPropertiesSpec extends AbstractBeanDefinitionSpec {
 
 
     void "test simple interface config props"() {
@@ -34,7 +34,7 @@ interface MyConfig {
         then:
         beanDefinition instanceof ValidatedBeanDefinition
         beanDefinition.getRequiredMethod("getHost")
-            .stringValue(Property, "name").get() == 'foo.bar.host'
+                .stringValue(Property, "name").get() == 'foo.bar.host'
         beanDefinition.getRequiredMethod("getServerPort")
                 .stringValue(Property, "name").get() == 'foo.bar.server-port'
 
@@ -160,7 +160,7 @@ interface MyConfig {
 ''')
         then:
         def e = thrown(RuntimeException)
-        e.message.contains('Only getter methods are allowed on @ConfigurationProperties interfaces: junk(java.lang.String)')
+        e.message.contains('Only getter methods are allowed on @ConfigurationProperties interfaces: junk')
     }
 
     void "test getter that returns void method"() {

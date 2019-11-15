@@ -3,7 +3,6 @@ package io.micronaut.docs.config.immutable
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.docs.config.properties.Vehicle
 
 class VehicleSpec: StringSpec({
 
