@@ -1381,7 +1381,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             for (AnnotationValue<? extends Annotation> annotationValue : annotationValues) {
                 final Class<?>[] classValues = annotationValue.classValues("groups");
                 if (ArrayUtils.isEmpty(classValues)) {
-                    if (context.groups == DEFAULT_GROUPS) {
+                    if (context.groups == DEFAULT_GROUPS || group == Default.class) {
                         constraints.add(annotationValue);
                     }
                 } else {
