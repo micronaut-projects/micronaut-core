@@ -6,6 +6,8 @@ The following changes could potentially be considered to be breaking changes, ho
 
 * The order of the configuration files provided by `MICRONAUT_CONFIG_FILES` or `micronaut.config.files` was overriding system properties and environment variables. The files are now ordered between the environment and configuration files which means they will no longer override environment variables or system properties. In addition which file within the list had priority was non deterministic. Later files now have precedence over earlier files in the list.
 
+* Routes that are binding to a body type that is a String, byte[], or ByteBuffer will no longer be decoded and the raw body will be bound directly to the argument. Because decoding is no longer happening, if a body is sent that is considered invalid according to the content type of the request, it will be bound to the body argument anyway. This is different than previous behavior where an exception would be thrown if the body was invalid.
+
 ==== 1.2.0
 
 The following changes could potentially be considered to be breaking changes, however the likelihood of any negative impact is low.
