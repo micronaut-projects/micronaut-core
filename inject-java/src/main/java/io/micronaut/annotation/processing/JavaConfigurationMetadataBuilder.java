@@ -18,7 +18,6 @@ package io.micronaut.annotation.processing;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 
@@ -30,10 +29,7 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 
 /**
