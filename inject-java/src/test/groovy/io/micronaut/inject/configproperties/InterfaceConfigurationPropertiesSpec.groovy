@@ -51,6 +51,49 @@ interface MyConfig {
 
     }
 
+    void "test inheritance interface config props"() {
+
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig$Intercepted', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("bar")
+interface MyConfig extends ParentConfig {
+    
+    @javax.validation.constraints.Min(10L)
+    int getServerPort();
+}
+
+@ConfigurationProperties("foo")
+interface ParentConfig {
+    @javax.validation.constraints.NotBlank
+    String getHost();
+}
+
+''')
+        then:
+        beanDefinition instanceof ValidatedBeanDefinition
+        beanDefinition.getRequiredMethod("getHost")
+                .stringValue(Property, "name").get() == 'foo.bar.host'
+        beanDefinition.getRequiredMethod("getServerPort")
+                .stringValue(Property, "name").get() == 'foo.bar.server-port'
+
+        when:
+        def context = ApplicationContext.run('foo.bar.host': 'test', 'foo.bar.server-port': '9999')
+        def config = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+
+        then:
+        config.host == 'test'
+        config.serverPort == 9999
+
+        cleanup:
+        context.close()
+
+    }
+
     void "test nested interface config props"() {
 
         when:

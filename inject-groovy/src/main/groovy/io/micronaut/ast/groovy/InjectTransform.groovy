@@ -536,7 +536,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
 
                         final PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
-                                classNode,
+                                current.isInterface() ? current : classNode,
                                 classNode,
                                 propertyType,
                                 propertyName,

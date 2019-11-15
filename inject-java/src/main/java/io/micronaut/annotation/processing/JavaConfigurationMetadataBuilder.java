@@ -18,17 +18,22 @@ package io.micronaut.annotation.processing;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -168,20 +173,43 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
     }
 
     private void prependSuperclasses(TypeElement declaringType, StringBuilder path) {
-        TypeMirror superclass = declaringType.getSuperclass();
-        while (superclass instanceof DeclaredType) {
-            DeclaredType declaredType = (DeclaredType) superclass;
-            Element element = declaredType.asElement();
-            AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(element);
-            Optional<String> parentConfig = annotationMetadata.getValue(ConfigurationReader.class, String.class);
-            if (parentConfig.isPresent()) {
-                String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply(parentConfig.get());
-                path.insert(0, parentPath + '.');
-                superclass = ((TypeElement) element).getSuperclass();
-            } else {
-                break;
+        if (declaringType.getKind() == ElementKind.INTERFACE) {
+            DeclaredType superInterface = resolveSuperInterface(declaringType);
+            while (superInterface instanceof DeclaredType) {
+                final TypeElement element = (TypeElement) superInterface.asElement();
+                AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(element);
+                Optional<String> parentConfig = annotationMetadata.getValue(ConfigurationReader.class, String.class);
+                if (parentConfig.isPresent()) {
+                    String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply(parentConfig.get());
+                    path.insert(0, parentPath + '.');
+                    superInterface = resolveSuperInterface(element);
+                } else {
+                    break;
+                }
+            }
+        } else {
+            TypeMirror superclass = declaringType.getSuperclass();
+            while (superclass instanceof DeclaredType) {
+                DeclaredType declaredType = (DeclaredType) superclass;
+                Element element = declaredType.asElement();
+                AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(element);
+                Optional<String> parentConfig = annotationMetadata.getValue(ConfigurationReader.class, String.class);
+                if (parentConfig.isPresent()) {
+                    String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply(parentConfig.get());
+                    path.insert(0, parentPath + '.');
+                    superclass = ((TypeElement) element).getSuperclass();
+                } else {
+                    break;
+                }
             }
         }
+    }
+
+    private DeclaredType resolveSuperInterface(TypeElement declaringType) {
+        return declaringType.getInterfaces().stream().filter(tm ->
+            tm instanceof DeclaredType &&
+                    annotationUtils.getAnnotationMetadata(((DeclaredType) tm).asElement()).hasStereotype(ConfigurationReader.class)
+        ).map(dt -> (DeclaredType) dt).findFirst().orElse(null);
     }
 
 }
