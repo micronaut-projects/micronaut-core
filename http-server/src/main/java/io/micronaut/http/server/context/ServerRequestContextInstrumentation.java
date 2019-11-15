@@ -39,17 +39,24 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
     public Optional<InvocationInstrumenter> newInvocationInstrumenter() {
         return ServerRequestContext.currentRequest().map(invocationRequest -> new InvocationInstrumenter() {
 
-            private Optional<HttpRequest<Object>> currentRequest;
+            private HttpRequest<Object> currentRequest;
+            boolean isSet = false;
 
             @Override
             public void beforeInvocation() {
-                currentRequest = ServerRequestContext.currentRequest();
-                ServerRequestContext.set(invocationRequest);
+                currentRequest = ServerRequestContext.currentRequest().orElse(null);
+                if (invocationRequest != currentRequest) {
+                    isSet = true;
+                    ServerRequestContext.set(invocationRequest);
+                }
             }
 
             @Override
             public void afterInvocation() {
-                ServerRequestContext.set(currentRequest.orElse(null));
+                if (isSet) {
+                    ServerRequestContext.set(currentRequest);
+                    isSet = false;
+                }
             }
 
         });
