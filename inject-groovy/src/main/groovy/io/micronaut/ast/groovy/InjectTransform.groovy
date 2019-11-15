@@ -27,6 +27,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.PropertySource
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.bind.annotation.Bindable
 import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.core.util.StringUtils
@@ -128,7 +129,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     public static final String ANN_VALID = "javax.validation.Valid"
     public static final String ANN_CONSTRAINT = "javax.validation.Constraint"
-
+    public static final String ANN_CONFIGURATION_ADVICE = "io.micronaut.runtime.context.env.ConfigurationAdvice";
+    public static final String ANN_VALIDATED = "io.micronaut.validation.Validated";
     CompilationUnit unit
     ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder
 
@@ -165,7 +167,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 continue
             } else {
                 if (classNode.isInterface()) {
-                    if (AstAnnotationUtils.hasStereotype(source, classNode, InjectVisitor.INTRODUCTION_TYPE)) {
+                    if (AstAnnotationUtils.hasStereotype(source, classNode, InjectVisitor.INTRODUCTION_TYPE) ||
+                            AstAnnotationUtils.hasStereotype(source, classNode, ConfigurationReader.class)) {
                         InjectVisitor injectVisitor = new InjectVisitor(source, classNode, configurationMetadataBuilder)
                         injectVisitor.visitClass(classNode)
                         beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
@@ -359,6 +362,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         @Override
         void visitClass(ClassNode node) {
             AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, node)
+            boolean isInterface = node.isInterface()
+            if (isConfigurationProperties && isInterface) {
+                annotationMetadata = addAnnotation(
+                        annotationMetadata,
+                        InjectTransform.ANN_CONFIGURATION_ADVICE
+                )
+            }
             if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
                 String packageName = node.packageName
                 String beanClassName = node.nameWithoutPackage
@@ -373,7 +383,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 Object[] interceptorTypes = ArrayUtils.concat(aroundInterceptors, introductionInterceptors)
                 String[] interfaceTypes = annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0])
 
-                boolean isInterface = node.isInterface()
+
                 AopProxyWriter aopProxyWriter = new AopProxyWriter(
                         packageName,
                         beanClassName,
@@ -502,6 +512,51 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                     }
 
+                    if (isConfigurationProperties && methodNode.isAbstract()) {
+                        if (!aopProxyWriter.isValidated()) {
+                            aopProxyWriter.setValidated(annotationMetadata.hasStereotype(InjectTransform.ANN_CONSTRAINT) ||
+                                    annotationMetadata.hasStereotype(InjectTransform.ANN_VALID));
+                        }
+
+                        if (!NameUtils.isGetterName(methodNode.name)) {
+                            error("Only getter methods are allowed on @ConfigurationProperties interfaces: " + methodNode.name, classNode)
+                            return
+                        }
+
+                        if (targetMethodParamsToType) {
+                            error("Only zero argument getter methods are allowed on @ConfigurationProperties interfaces: " + methodNode.name, classNode)
+                            return
+                        }
+                        String propertyName = NameUtils.getPropertyNameForGetter(methodNode.name)
+                        String propertyType = methodNode.returnType.name
+
+                        if ("void".equals(propertyType)) {
+                            error("Getter methods must return a value @ConfigurationProperties interfaces: " + methodNode.name, classNode)
+                            return
+                        }
+
+                        final PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
+                                current.isInterface() ? current : classNode,
+                                classNode,
+                                propertyType,
+                                propertyName,
+                                null,
+                                annotationMetadata.stringValue(Bindable.class, "defaultValue").orElse(null)
+                        );
+
+                        annotationMetadata = addPropertyMetadata(
+                                annotationMetadata,
+                                propertyMetadata
+                        )
+
+                        final ClassNode typeElement = !ClassUtils.isJavaBasicType(propertyType) ? methodNode.returnType : null;
+                        if (typeElement != null && AstAnnotationUtils.hasStereotype(source, typeElement, Scope.class)) {
+                            annotationMetadata = addBeanConfigAdvise(annotationMetadata)
+                        } else {
+                            annotationMetadata = addAnnotation(annotationMetadata, ANN_CONFIGURATION_ADVICE);
+                        }
+                    }
+
                     if (AstAnnotationUtils.hasStereotype(source, methodNode, AROUND_TYPE)) {
                         Object[] interceptorTypeReferences = annotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                         aopProxyWriter.visitInterceptorTypes(interceptorTypeReferences)
@@ -535,6 +590,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         )
                     }
 
+                }
+
+                @CompileDynamic
+                private void error(String msg, ClassNode classNode) {
+                    addError(msg, (ASTNode) classNode)
+                }
+
+                @CompileDynamic
+                private AnnotationMetadata addBeanConfigAdvise(AnnotationMetadata annotationMetadata) {
+                    new GroovyAnnotationMetadataBuilder(sourceUnit).annotate(
+                            annotationMetadata,
+                            AnnotationValue.builder(ANN_CONFIGURATION_ADVICE).member("bean", true).build()
+                    )
                 }
 
 
@@ -1057,11 +1125,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @CompileDynamic
         private AnnotationMetadata addValidated(AnnotationMetadata methodAnnotationMetadata) {
+            return addAnnotation(methodAnnotationMetadata, "io.micronaut.validation.Validated")
+        }
+
+        @CompileDynamic
+        private AnnotationMetadata addAnnotation(AnnotationMetadata methodAnnotationMetadata, String annotationName) {
             methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit).annotate(
                     methodAnnotationMetadata,
-                    AnnotationValue.<Object> builder("io.micronaut.validation.Validated").build()
+                    AnnotationValue.builder(annotationName).build()
             )
-            methodAnnotationMetadata
+            return methodAnnotationMetadata
         }
 
         private AopProxyWriter resolveProxyWriter(

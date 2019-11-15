@@ -32,6 +32,30 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test generate bean introspection for @ConfigurationProperties interface"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+public interface ValidatedConfig {
+
+    @NotNull
+    public URL getUrl();
+
+}
+
+
+''')
+        expect:
+        introspection != null
+    }
+
     void "test generate bean introspection for interface"() {
         when:
         BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
