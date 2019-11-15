@@ -316,38 +316,41 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 } else {
                     if (candidate.hasStereotype(ConfigurationReader.class)) {
 
-                        candidate.stringValue(ConfigurationReader.class, "prefix")
-                                .ifPresent(prefix -> {
-                                    int starIndex = prefix.indexOf("*");
-                                    if (starIndex > -1) {
-                                        String eachProperty = prefix.substring(0, starIndex);
-                                        if (eachProperty.endsWith(".")) {
-                                            eachProperty = eachProperty.substring(0, eachProperty.length() - 1);
-                                        }
+                        final String prefix = candidate.stringValue(ConfigurationReader.class, "prefix").orElse(null);
+                        if (prefix != null) {
 
-                                        if (StringUtils.isNotEmpty(eachProperty)) {
-                                            Map entries = getProperty(eachProperty, Map.class, Collections.emptyMap());
-                                            if (!entries.isEmpty()) {
-                                                for (Object key : entries.keySet()) {
+                            int starIndex = prefix.indexOf("*");
+                            if (starIndex > -1) {
+                                String eachProperty = prefix.substring(0, starIndex);
+                                if (eachProperty.endsWith(".")) {
+                                    eachProperty = eachProperty.substring(0, eachProperty.length() - 1);
+                                }
 
-                                                    BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
-                                                    delegate.put(EachProperty.class.getName(), delegate.getBeanType());
-                                                    delegate.put(Named.class.getName(), key.toString());
+                                if (StringUtils.isNotEmpty(eachProperty)) {
+                                    Map entries = getProperty(eachProperty, Map.class, Collections.emptyMap());
+                                    if (!entries.isEmpty()) {
+                                        for (Object key : entries.keySet()) {
 
-                                                    if (delegate.isEnabled(this) &&
-                                                            containsProperties(prefix.replace("*", key.toString()))) {
-                                                        transformedCandidates.add(delegate);
-                                                    }
-                                                }
+                                            BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                            delegate.put(EachProperty.class.getName(), delegate.getBeanType());
+                                            delegate.put(Named.class.getName(), key.toString());
+
+                                            if (delegate.isEnabled(this) &&
+                                                    containsProperties(prefix.replace("*", key.toString()))) {
+                                                transformedCandidates.add(delegate);
                                             }
-                                        } else {
-                                            throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
                                         }
-
-                                    } else {
-                                        transformedCandidates.add(candidate);
                                     }
-                                });
+                                } else {
+                                    throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
+                                }
+
+                            } else {
+                                transformedCandidates.add(candidate);
+                            }
+                        } else {
+                            transformedCandidates.add(candidate);
+                        }
                     } else {
                         transformedCandidates.add(candidate);
                     }

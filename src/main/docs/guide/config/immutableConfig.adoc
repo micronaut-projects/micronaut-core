@@ -1,4 +1,23 @@
-Since 1.3, Micronaut supports the definition of immutable configuration by specifying the ann:context.annotation.ConfigurationInject[] annotation on a constructor of a ann:context.annotation.ConfigurationProperties[] or ann.context.annotation.EachProperty[] bean.
+Since 1.3, Micronaut supports the definition of immutable configuration.
+
+There are two ways to define immutable configuration. The preferred way is to define an interface that is annotated with ann:context.annotation.ConfigurationProperties[]. For example:
+
+snippet::io.micronaut.docs.config.itfce.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
+
+<1> The ann:context.annotation.ConfigurationProperties[] annotation takes the configuration prefix and is declared on an interface
+<2> You can use ann:core.bind.annotation.Bindable[] to set a default value if you want
+<3> Validation annotations can be used too
+<4> You can also specify references to other ann:context.annotation.ConfigurationProperties[] beans.
+<5> You can nest immutable configuration
+<6> Optional configuration can be indicated by returning an `Optional` or specifying `@Nullable`
+
+In this case what Micronaut does is provide a compilation time produced implementation that delegates all getters to call the `getProperty(..)` method of the api:context.env.Environment[] interface.
+
+This has the advantage that is the configuration is refreshed then the injected interface will automatically see the new values.
+
+Note that if you try to specify any other method other than a getter a compilation error will occur.
+
+An alternative way to implement immutable configuration is to define a class and use the ann:context.annotation.ConfigurationInject[] annotation on a constructor of a ann:context.annotation.ConfigurationProperties[] or ann:context.annotation.EachProperty[] bean.
 
 An example of an immutable configuration class can be seen below:
 

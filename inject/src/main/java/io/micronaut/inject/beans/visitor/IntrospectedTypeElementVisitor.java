@@ -73,7 +73,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
+        // reset
         currentAbstractIntrospection = null;
+        lastConfigurationReader = null;
         if (!element.isPrivate()) {
             if (element.hasStereotype(Introspected.class)) {
                 final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
@@ -82,8 +84,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 }
             } else if (element.hasStereotype(ConfigurationReader.class)) {
                 this.lastConfigurationReader = element;
-            } else {
-                this.lastConfigurationReader = null;
             }
         }
     }
@@ -108,7 +108,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     processIntrospected(declaringType, context, AnnotationValue.builder(Introspected.class).build());
                 }
             }
-        } else if (currentAbstractIntrospection != null) {
+        }
+
+        if (currentAbstractIntrospection != null) {
             if (NameUtils.isGetterName(methodName) && element.getParameters().length == 0) {
                 final String propertyName = NameUtils.getPropertyNameForGetter(methodName);
                 final AbstractPropertyElement propertyElement = currentAbstractIntrospection.properties.computeIfAbsent(propertyName, s -> new AbstractPropertyElement(
