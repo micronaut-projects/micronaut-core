@@ -23,7 +23,9 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.value.PropertyNotFoundException;
 
 import javax.inject.Singleton;
 
@@ -85,24 +87,27 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
                 }
             }
             final String defaultValue = context.stringValue(Bindable.class, "defaultValue").orElse(null);
+            final Argument<Object> argument = rt.asArgument();
             if (defaultValue != null) {
                 return environment.getProperty(
                         property,
-                        returnType,
-                        defaultValue
-                );
+                        argument
+                ).orElseGet(() -> environment.convertRequired(
+                        defaultValue,
+                        argument
+                ));
             } else {
                 if (context.isNullable()) {
                     return environment.getProperty(
                             property,
-                            returnType
+                            argument
                     ).orElse(null);
                 } else {
-
-                    return environment.getRequiredProperty(
+                    String finalProperty = property;
+                    return environment.getProperty(
                             property,
-                            returnType
-                    );
+                            argument
+                    ).orElseThrow(() -> new PropertyNotFoundException(finalProperty, argument.getType()));
                 }
             }
         }

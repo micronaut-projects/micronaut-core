@@ -24,7 +24,7 @@ interface EngineConfig {
 
     @ConfigurationProperties("crank-shaft")
     interface CrankShaft { // <5>
-        val rodLength: Optional<Double> // <6>
+        val rodLength: Double? // <6>
     }
 }
 // end::class[]

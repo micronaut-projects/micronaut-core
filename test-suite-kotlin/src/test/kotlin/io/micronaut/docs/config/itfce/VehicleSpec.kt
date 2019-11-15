@@ -6,6 +6,7 @@ import io.kotlintest.shouldBe
 import io.kotlintest.shouldThrow
 import io.kotlintest.specs.StringSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.DependencyInjectionException
 
 class VehicleSpec: StringSpec({
@@ -31,11 +32,10 @@ class VehicleSpec: StringSpec({
                 "my.engine.crank-shaft.rod-length" to "7.0"
         )
         val applicationContext = ApplicationContext.run(map)
-        val exception = shouldThrow<DependencyInjectionException> {
+        val exception = shouldThrow<BeanInstantiationException> {
             applicationContext.getBean(Vehicle::class.java)
         }
-        exception.cause.shouldNotBeNull()
-        exception.cause?.message.shouldContain("EngineConfig.getCylinders - must be greater than or equal to 1")
+        exception.message.shouldContain("EngineConfig.getCylinders - must be greater than or equal to 1")
 
     }
 })
