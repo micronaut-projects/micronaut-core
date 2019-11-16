@@ -7,10 +7,6 @@ buildscript {
     }
 }
 
-ext {
-    bomExclude = true
-}
-
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
 apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
 
