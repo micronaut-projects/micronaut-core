@@ -15,9 +15,13 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.annotation.Produces;
@@ -317,6 +321,12 @@ public class MediaType implements CharSequence {
      * Parameter {@code "v"}.
      */
     public static final String V_PARAMETER = "v";
+
+    @Internal
+    static final Argument<MediaType> ARGUMENT = Argument.of(MediaType.class);
+
+    @Internal
+    static final ArgumentConversionContext<MediaType> CONVERSION_CONTEXT = ConversionContext.of(ARGUMENT);
 
     private static final BigDecimal QUALITY_RATING_NUMBER = new BigDecimal("1.0");
     private static final String QUALITY_RATING = "1.0";
