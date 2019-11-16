@@ -10,8 +10,15 @@ def profiles = new Properties()
 profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
 boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
 
-apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
+def excludedProjects = [
+        "test-suite",
+        "test-suite-groovy",
+        "test-suite-helper",
+        "test-suite-kotlin",
+        "test-utils"
+]
 
+apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
 dependencies {
     constraints {
         for (profile in profiles) {
@@ -23,8 +30,8 @@ dependencies {
 
         for (Project p : rootProject.subprojects) {
             if (!p.subprojects.empty) continue
-            if (p.name == "bom" || p.name.contains("test-suite") || p.name == "test-utils") continue
-            if (p.hasProperty("bomExclude") && p.property("bomExclude") == true) continue
+            if (p.name == "bom") continue
+            if (excludedProjects.contains(p.name)) continue
 
             api "$p.group:micronaut-$p.name:$p.version"
         }
