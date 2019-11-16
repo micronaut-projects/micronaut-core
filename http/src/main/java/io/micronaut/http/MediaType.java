@@ -334,6 +334,7 @@ public class MediaType implements CharSequence {
     protected final String type;
     protected final String extension;
     protected final Map<CharSequence, String> parameters;
+    private final String strRepr;
 
     private BigDecimal qualityNumberField;
 
@@ -430,6 +431,8 @@ public class MediaType implements CharSequence {
         if (params != null) {
             parameters.putAll(params);
         }
+
+        this.strRepr = toString0();
     }
 
     /**
@@ -500,17 +503,17 @@ public class MediaType implements CharSequence {
 
     @Override
     public int length() {
-        return toString().length();
+        return strRepr.length();
     }
 
     @Override
     public char charAt(int index) {
-        return toString().charAt(index);
+        return strRepr.charAt(index);
     }
 
     @Override
     public CharSequence subSequence(int start, int end) {
-        return toString().subSequence(start, end);
+        return strRepr.subSequence(start, end);
     }
 
     /**
@@ -538,6 +541,10 @@ public class MediaType implements CharSequence {
 
     @Override
     public String toString() {
+        return strRepr;
+    }
+
+    private String toString0() {
         if (parameters.isEmpty()) {
             return name;
         } else {
