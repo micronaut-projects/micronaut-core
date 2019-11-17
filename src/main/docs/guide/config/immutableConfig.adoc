@@ -11,11 +11,11 @@ snippet::io.micronaut.docs.config.itfce.EngineConfig[tags="imports,class",indent
 <5> You can nest immutable configuration
 <6> Optional configuration can be indicated by returning an `Optional` or specifying `@Nullable`
 
-In this case what Micronaut does is provide a compilation time produced implementation that delegates all getters to call the `getProperty(..)` method of the api:context.env.Environment[] interface.
+In this case what Micronaut does is provide a compilation time implementation that delegates all getters to call the `getProperty(..)` method of the api:context.env.Environment[] interface.
 
-This has the advantage that is the configuration is refreshed then the injected interface will automatically see the new values.
+This has the advantage that if the application's configuration is <<refreshable, refreshed>> (for example by invoking the `/refresh` endpoint) then the injected interface will automatically see the new values.
 
-Note that if you try to specify any other method other than a getter a compilation error will occur.
+NOTE: If you try to specify any other abstract method other than a getter a compilation error will occur (default methods are supported).
 
 An alternative way to implement immutable configuration is to define a class and use the ann:context.annotation.ConfigurationInject[] annotation on a constructor of a ann:context.annotation.ConfigurationProperties[] or ann:context.annotation.EachProperty[] bean.
 
@@ -31,6 +31,8 @@ snippet::io.micronaut.docs.config.immutable.EngineConfig[tags="imports,class",in
 <6> Optional configuration can be indicated with `@Nullable`
 
 The ann:context.annotation.ConfigurationInject[] annotation provides a hint to Micronaut to prioritize binding values from configuration instead of injecting beans.
+
+NOTE: Using this approach if you want the configuration to be refreshable then you must add the ann:runtime.context.scope.Refreshable[] annotation to the class as well. This allows the bean to be re-created in the case of a <<refreshable,runtime configuration refresh event>>.
 
 There are a few exceptions to this rule. Micronaut will not perform configuration binding for a parameter if one of these conditions is met:
 
