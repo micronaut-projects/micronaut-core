@@ -35,7 +35,7 @@ class ClosestTypeArgumentSpec extends Specification {
         beanDefinitions[0] == b
     }
 
-    void "test concrete is preferred over interface"() {
+    void "test interface is preferred over concrete "() {
         given:
         BeanDefinition a = stubFor(D)
         BeanDefinition b = stubFor(D2)
@@ -43,9 +43,9 @@ class ClosestTypeArgumentSpec extends Specification {
         when: "looking for G"
         List<BeanDefinition> beanDefinitions = Qualifiers.byTypeArgumentsClosest(G).reduce(BeanType, Stream.of(a, b)).collect(Collectors.toList())
 
-        then: "D is returned"
+        then: "D2 is returned"
         beanDefinitions.size() == 1
-        beanDefinitions[0] == a
+        beanDefinitions[0] == b
     }
 
     void "test different hierarchies"() {

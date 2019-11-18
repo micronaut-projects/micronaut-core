@@ -321,21 +321,14 @@ public class ClassUtils {
     public static List<Class> resolveHierarchy(Class<?> type) {
         Class<?> superclass = type.getSuperclass();
         List<Class> hierarchy = new ArrayList<>();
-        List<Class> interfaces = new ArrayList<>();
         if (superclass != null) {
-            hierarchy.add(type);
-            populateHierarchyInterfaces(type, interfaces);
+            populateHierarchyInterfaces(type, hierarchy);
 
             while (superclass != Object.class) {
-                if (!hierarchy.contains(superclass)) {
-                    hierarchy.add(superclass);
-                }
-                populateHierarchyInterfaces(superclass, interfaces);
+                populateHierarchyInterfaces(superclass, hierarchy);
                 superclass = superclass.getSuperclass();
             }
-            hierarchy.addAll(interfaces);
         } else if (type.isInterface()) {
-            hierarchy.add(type);
             populateHierarchyInterfaces(type, hierarchy);
         }
 
@@ -351,6 +344,9 @@ public class ClassUtils {
     }
 
     private static void populateHierarchyInterfaces(Class<?> superclass, List<Class> hierarchy) {
+        if (!hierarchy.contains(superclass)) {
+            hierarchy.add(superclass);
+        }
         for (Class<?> aClass : superclass.getInterfaces()) {
             if (!hierarchy.contains(aClass)) {
                 hierarchy.add(aClass);
