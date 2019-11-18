@@ -19,13 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Default implementation of the {@link ConversionContext} interface.
@@ -112,6 +106,25 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     @Override
     public Argument<T> getArgument() {
         return argument;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        DefaultArgumentConversionContext<?> that = (DefaultArgumentConversionContext<?>) o;
+        return Objects.equals(getArgument(), that.getArgument()) &&
+            Objects.equals(finalLocale, that.finalLocale) &&
+            Objects.equals(finalCharset, that.finalCharset);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(argument, finalLocale, finalCharset);
     }
 
     @Override
