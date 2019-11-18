@@ -160,6 +160,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
             "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
+    private static final Argument ARGUMENT_PART_DATA = Argument.of(PartData.class);
 
     private final Router router;
     private final ExecutorSelector executorSelector;
@@ -793,7 +794,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 Argument typeVariable;
 
                                 if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                                    typeVariable = Argument.of(PartData.class);
+                                    typeVariable = ARGUMENT_PART_DATA;
                                 } else {
                                     typeVariable = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                                 }
@@ -808,7 +809,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (Publishers.isConvertibleToPublisher(typeVariableType)) {
                                     boolean streamingFileUpload = StreamingFileUpload.class.isAssignableFrom(typeVariableType);
                                     if (streamingFileUpload) {
-                                        typeVariable = Argument.of(PartData.class);
+                                        typeVariable = ARGUMENT_PART_DATA;
                                     } else {
                                         typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                                     }

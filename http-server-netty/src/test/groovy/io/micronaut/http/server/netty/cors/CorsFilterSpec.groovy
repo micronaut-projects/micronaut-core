@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.cors
 
+import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod
@@ -146,7 +147,7 @@ class CorsFilterSpec extends Specification {
         2 * headers.getOrigin() >> Optional.of('http://www.foo.com')
         1 * request.getMethod() >> HttpMethod.GET
         !result.isPresent()
-        0 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.of(List,String))
+        0 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.of(Argument.of(List,String)))
     }
 
     void "test preflight handleRequest with disallowed header"() {
@@ -170,8 +171,8 @@ class CorsFilterSpec extends Specification {
 
         then: "the request is rejected because bar is not allowed"
         2 * headers.getOrigin() >> Optional.of('http://www.foo.com')
-        1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.class) >> Optional.of(HttpMethod.GET)
-        1 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.of(List,String)) >> ['foo', 'bar']
+        1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, ConversionContext.of(HttpMethod.class)) >> Optional.of(HttpMethod.GET)
+        1 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.of(Argument.of(List,String))) >> ['foo', 'bar']
         result.get().status == HttpStatus.FORBIDDEN
     }
 
@@ -196,8 +197,8 @@ class CorsFilterSpec extends Specification {
 
         then: "the request is successful"
         4 * headers.getOrigin() >> Optional.of('http://www.foo.com')
-        2 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.class) >> Optional.of(HttpMethod.GET)
-        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.of(List,String)) >> Optional.of(['foo'])
+        2 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, ConversionContext.of(HttpMethod.class)) >> Optional.of(HttpMethod.GET)
+        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.of(Argument.of(List,String))) >> Optional.of(['foo'])
         result.get().status == HttpStatus.OK
     }
 
@@ -274,8 +275,8 @@ class CorsFilterSpec extends Specification {
         HttpResponse response = corsHandler.handleRequest(request).get()
 
         then: "the response is not modified"
-        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.of(List,String)) >> Optional.of(['X-Header', 'Y-Header'])
-        1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.class) >> Optional.of(HttpMethod.GET)
+        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.of(Argument.of(List,String))) >> Optional.of(['X-Header', 'Y-Header'])
+        1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, ConversionContext.of(HttpMethod.class)) >> Optional.of(HttpMethod.GET)
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
         response.getHeaders().get(VARY) == 'Origin' // The vary header is set
@@ -305,8 +306,8 @@ class CorsFilterSpec extends Specification {
         HttpResponse response = corsHandler.handleRequest(request).get()
 
         then: "the response is not modified"
-        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.of(List,String)) >> Optional.of(['X-Header', 'Y-Header'])
-        1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.class) >> Optional.of(HttpMethod.GET)
+        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.of(Argument.of(List,String))) >> Optional.of(['X-Header', 'Y-Header'])
+        1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, ConversionContext.of(HttpMethod.class)) >> Optional.of(HttpMethod.GET)
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
         response.getHeaders().get(VARY) == 'Origin' // The vary header is set

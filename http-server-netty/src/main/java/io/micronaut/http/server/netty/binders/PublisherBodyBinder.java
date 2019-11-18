@@ -54,6 +54,7 @@ import java.util.Optional;
 public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> implements NonBlockingBodyArgumentBinder<Publisher> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
+    private static final Argument<Publisher> TYPE = Argument.of(Publisher.class);
 
     private final BeanLocator beanLocator;
     private final HttpServerConfiguration httpServerConfiguration;
@@ -71,7 +72,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
 
     @Override
     public Argument<Publisher> argumentType() {
-        return Argument.of(Publisher.class);
+        return TYPE;
     }
 
     @Override
