@@ -3,20 +3,9 @@
 The problem we want to solve is detect regressions in both Micronaut and GraalVM as soon as they are introduced and 
 before a new version is released.
 
-This document describes how we test Micronaut and GraalVM integration because we don't use the same approach that we
-use for Micronaut, i.e. Travis. There are a few reasons why we don't use it:
-
-- Creating a native-image needs a lot of RAM, at least 7-8 GB, so during the creation we reach that limit.
-- Travis doesn't allo to create flexible pipelines in which we build an artifact in one stage and that artifact is 
-available for next stages in the pipeline. If you want to do it you need to do it manually, for example uploading the 
-artifacts to S3 in one stage and them downloading them in the next stage. 
-- Travis is not really flexible to create different test stages and running parallel jobs in every stage.
-
-
 ## Gitlab CI
 
-We use [Gitlab CI](https://about.gitlab.com/product/continuous-integration/) for running the tests because it doesn't
-have all the issues mentioned before.
+We use [Gitlab CI](https://about.gitlab.com/product/continuous-integration/) for running the tests. Travis is not used because of the limitations it creates on memory usage and the lack of functionality for pipeline-like flows.
 
 We could configure the CI pipeline to run the tests for every commit in Micronaut (configuring a webhook), but we don't
 have permissions to configure the webhook in GraalVM repository. So, instead of running all the tests for every commit
