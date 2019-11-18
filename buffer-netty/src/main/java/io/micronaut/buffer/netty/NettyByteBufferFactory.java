@@ -22,6 +22,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 
 import javax.inject.Singleton;
@@ -53,6 +54,7 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
             }
             throw new IllegalArgumentException("Unconvertible buffer type " + byteBuffer);
         });
+        ConversionService.SHARED.addConverter(CompositeByteBuf.class, ByteBuffer.class, (Function<CompositeByteBuf, ByteBuffer>) DEFAULT::wrap);
     }
 
     /**
