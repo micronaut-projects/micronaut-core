@@ -46,7 +46,7 @@ class VersionControllerSpec extends Specification {
         httpClient.toBlocking()
     }
 
-    void "if I supply a wrong version, then response status should be BAD_REQUEST"() {
+    void "if I supply a wrong version, then response status should be NOT_FOUND"() {
         given:
         HttpRequest request = HttpRequest.GET("/versioned/hello").header("X-API-VERSION", "4")
 
@@ -59,7 +59,7 @@ class VersionControllerSpec extends Specification {
 
         then:
         HttpClientResponseException e = thrown()
-        e.response.status() == HttpStatus.BAD_REQUEST
+        e.response.status() == HttpStatus.NOT_FOUND
     }
 
     void "if I do not supply a version, and there are multiple versioned routes a DuplicateRouteException is thrown"() {
