@@ -259,7 +259,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             Object[] params = resolveParams(context, cacheable.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY));
             Object key = keyGenerator.generateKey(context, params);
             CompletableFuture<Object> thisFuture = new CompletableFuture<>();
-            Argument<?> firstTypeVariable = returnTypeObject.getFirstTypeVariable().orElse(Argument.of(Object.class));
+            Argument<?> firstTypeVariable = returnTypeObject.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             asyncCache.get(key, firstTypeVariable).whenComplete((BiConsumer<Optional<?>, Throwable>) (o, throwable) -> {
                 if (throwable == null && o.isPresent()) {
                     // cache hit, return result
@@ -503,7 +503,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
         CacheKeyGenerator keyGenerator = resolveKeyGenerator(cacheOperation.defaultKeyGenerator, cacheable);
         Object[] params = resolveParams(context, cacheable.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY));
         Object key = keyGenerator.generateKey(context, params);
-        Argument<?> firstTypeVariable = returnTypeObject.getFirstTypeVariable().orElse(Argument.of(Object.class));
+        Argument<?> firstTypeVariable = returnTypeObject.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
         Maybe<Object> maybe = Maybe.create(emitter -> {
             asyncCache.get(key, firstTypeVariable).whenComplete((opt, throwable) -> {

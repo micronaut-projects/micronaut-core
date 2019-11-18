@@ -285,8 +285,8 @@ public class Publishers {
      * @return The Resulting in publisher
      */
     public static <T> T convertPublisher(Object object, Class<T> publisherType) {
-        Objects.requireNonNull(object, "Invalid argument [object]: " + object);
-        Objects.requireNonNull(object, "Invalid argument [publisherType]: " + publisherType);
+        Objects.requireNonNull(object, "Argument [object] cannot be null");
+        Objects.requireNonNull(publisherType, "Argument [publisherType] cannot be null");
         if (object instanceof CompletableFuture) {
             @SuppressWarnings("unchecked") Publisher<T> futurePublisher = (Publisher<T>) Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
             return ConversionService.SHARED.convert(futurePublisher, publisherType)

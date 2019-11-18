@@ -15,9 +15,13 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.annotation.Produces;
@@ -318,6 +322,12 @@ public class MediaType implements CharSequence {
      */
     public static final String V_PARAMETER = "v";
 
+    @Internal
+    static final Argument<MediaType> ARGUMENT = Argument.of(MediaType.class);
+
+    @Internal
+    static final ArgumentConversionContext<MediaType> CONVERSION_CONTEXT = ConversionContext.of(ARGUMENT);
+
     private static final BigDecimal QUALITY_RATING_NUMBER = new BigDecimal("1.0");
     private static final String QUALITY_RATING = "1.0";
     private static final String SEMICOLON = ";";
@@ -334,6 +344,7 @@ public class MediaType implements CharSequence {
     protected final String type;
     protected final String extension;
     protected final Map<CharSequence, String> parameters;
+    private final String strRepr;
 
     private BigDecimal qualityNumberField;
 
@@ -430,6 +441,8 @@ public class MediaType implements CharSequence {
         if (params != null) {
             parameters.putAll(params);
         }
+
+        this.strRepr = toString0();
     }
 
     /**
@@ -500,17 +513,17 @@ public class MediaType implements CharSequence {
 
     @Override
     public int length() {
-        return toString().length();
+        return strRepr.length();
     }
 
     @Override
     public char charAt(int index) {
-        return toString().charAt(index);
+        return strRepr.charAt(index);
     }
 
     @Override
     public CharSequence subSequence(int start, int end) {
-        return toString().subSequence(start, end);
+        return strRepr.subSequence(start, end);
     }
 
     /**
@@ -538,6 +551,10 @@ public class MediaType implements CharSequence {
 
     @Override
     public String toString() {
+        return strRepr;
+    }
+
+    private String toString0() {
         if (parameters.isEmpty()) {
             return name;
         } else {

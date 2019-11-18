@@ -42,6 +42,8 @@ import java.util.Optional;
 @Requires(classes = HttpServerConfiguration.class)
 public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session> {
 
+    private static final Argument<Session> TYPE = Argument.of(Session.class);
+
     private final SessionStore<Session> sessionStore;
 
     /**
@@ -55,7 +57,7 @@ public class SessionArgumentBinder implements TypedRequestArgumentBinder<Session
 
     @Override
     public Argument<Session> argumentType() {
-        return Argument.of(Session.class);
+        return TYPE;
     }
 
     @Override
