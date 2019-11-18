@@ -22,6 +22,7 @@ class SimpleTextWebSocketSpec extends Specification {
         when: "a websocket connection is established"
         RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
         ChatClientWebSocket fred = wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred").blockingFirst()
+        Thread.sleep(50)
         ChatClientWebSocket bob = wsClient.connect(ChatClientWebSocket, [topic:"stuff", username:"bob"]).blockingFirst()
 
         then:"The connection is valid"
