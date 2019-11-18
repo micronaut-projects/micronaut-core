@@ -334,7 +334,6 @@ public class NameUtils {
      * @return The decapitalized version of the String
      */
     public static String decapitalize(String name) {
-
         if (name == null) {
             return null;
         }
@@ -343,13 +342,19 @@ public class NameUtils {
         // If the first letter of the string is Upper Case, make it lower case
         // UNLESS the second letter of the string is also Upper Case, in which case no
         // changes are made.
-        if (name.length() == 0 || (name.length() > 1 && Character.isUpperCase(name.charAt(1)))) {
-            return name;
+        switch (name.length()) {
+            case 0:
+                return name;
+            case 1:
+                return Character.isUpperCase(name.charAt(0)) ? Character.toString(Character.toLowerCase(name.charAt(0))) : name;
+            default:
+                if (!Character.isUpperCase(name.charAt(0)) || Character.isUpperCase(name.charAt(1))) {
+                    return name;
+                }
+                char[] chars = name.toCharArray();
+                chars[0] = Character.toLowerCase(chars[0]);
+                return new String(chars);
         }
-
-        char[] chars = name.toCharArray();
-        chars[0] = Character.toLowerCase(chars[0]);
-        return new String(chars);
     }
 
     private static String separateCamelCase(String name, boolean lowerCase, char separatorChar) {
