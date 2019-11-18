@@ -32,6 +32,7 @@ import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
+import io.netty.buffer.ByteBufHolder;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
@@ -92,7 +93,11 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
 
                     @Override
                     protected void doOnNext(Object message) {
-                        nettyHttpRequest.setBody(message);
+                        if (message instanceof ByteBufHolder) {
+                            nettyHttpRequest.addContent((ByteBufHolder) message);
+                        } else {
+                            nettyHttpRequest.setBody(message);
+                        }
                         subscription.request(1);
                     }
 
@@ -104,23 +109,16 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                     @Override
                     protected void doOnComplete() {
                         Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
-                        Optional body = nettyHttpRequest.getBody();
-                        if (body.isPresent()) {
-
-                            if (firstTypeParameter.isPresent()) {
-                                Argument<?> arg = firstTypeParameter.get();
-                                Class targetType = arg.getType();
-                                Optional converted = conversionService.convert(body.get(), context.with(arg));
-                                if (converted.isPresent()) {
-                                    future.complete(converted.get());
-                                } else {
-                                    future.completeExceptionally(new IllegalArgumentException("Cannot bind JSON to argument type: " + targetType.getName()));
-                                }
+                        if (firstTypeParameter.isPresent()) {
+                            Argument<?> arg = firstTypeParameter.get();
+                            Optional converted = nettyHttpRequest.getBody(arg);
+                            if (converted.isPresent()) {
+                                future.complete(converted.get());
                             } else {
-                                future.complete(body.get());
+                                future.completeExceptionally(new IllegalArgumentException("Cannot bind body to argument type: " + arg.getType().getName()));
                             }
                         } else {
-                            future.complete(null);
+                            future.complete(nettyHttpRequest.getBody().orElse(null));
                         }
                     }
                 });

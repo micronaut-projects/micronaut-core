@@ -17,7 +17,9 @@ package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
@@ -75,6 +77,16 @@ public class ByteBufConverters {
     @Singleton
     TypeConverter<CompositeByteBuf, byte[]> compositeByteBufTypeConverter() {
         return (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object));
+    }
+
+    /**
+     * @return A converter that converts composite bytebufs to object
+     */
+    @Singleton
+    TypeConverter<CompositeByteBuf, Object> compositeByteBufToObjectTypeConverter(ConversionService conversionService) {
+        return (object, targetType, context) -> conversionService
+                    .convert(object, String.class, context)
+                    .flatMap(val -> conversionService.convert(val, targetType, context));
     }
 
 }
