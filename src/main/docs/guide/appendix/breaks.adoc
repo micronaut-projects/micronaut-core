@@ -8,6 +8,8 @@ The following changes could potentially be considered to be breaking changes, ho
 
 * Routes that are binding to a body type that is a String, byte[], or ByteBuffer will no longer be decoded and the raw body will be bound directly to the argument. Because decoding is no longer happening, if a body is sent that is considered invalid according to the content type of the request, it will be bound to the body argument anyway. This is different than previous behavior where an exception would be thrown if the body was invalid.
 
+* Concrete types are now preferred when creating a class hierarchy. The most common case where this will have an impact is converters. Converters that match super classes of the target type will be preferred over converters that match an interface that the target type implements.
+
 ==== 1.2.0
 
 The following changes could potentially be considered to be breaking changes, however the likelihood of any negative impact is low.

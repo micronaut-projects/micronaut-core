@@ -54,7 +54,6 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
             }
             throw new IllegalArgumentException("Unconvertible buffer type " + byteBuffer);
         });
-        ConversionService.SHARED.addConverter(CompositeByteBuf.class, ByteBuffer.class, (Function<CompositeByteBuf, ByteBuffer>) DEFAULT::wrap);
     }
 
     /**

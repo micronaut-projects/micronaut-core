@@ -70,23 +70,4 @@ public class ByteBufConverters {
         return (object, targetType, context) -> Optional.of(Unpooled.wrappedBuffer(object));
     }
 
-    /**
-     * @return A converter that converts composite bytebufs to byte arrays
-     */
-    @Singleton
-    TypeConverter<CompositeByteBuf, byte[]> compositeByteBufTypeConverter() {
-        return (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object));
-    }
-
-    /**
-     * @param conversionService The conversion service
-     * @return A converter that converts composite bytebufs to object
-     */
-    @Singleton
-    TypeConverter<CompositeByteBuf, Object> compositeByteBufToObjectTypeConverter(ConversionService conversionService) {
-        return (object, targetType, context) -> conversionService
-                    .convert(object, String.class, context)
-                    .flatMap(val -> conversionService.convert(val, targetType, context));
-    }
-
 }
