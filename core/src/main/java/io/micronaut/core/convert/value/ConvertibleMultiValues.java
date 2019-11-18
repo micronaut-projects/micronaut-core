@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.convert.value;
 
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.GenericTypeUtils;
@@ -166,6 +167,22 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
         V v = get(name);
         if (v != null) {
             return ConversionService.SHARED.convert(v, ConversionContext.of(requiredType));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Find a header and convert it to the given type.
+     *
+     * @param name              The name of the header
+     * @param conversionContext The conversion context
+     * @param <T>               The generic type
+     * @return If the header is presented and can be converted an optional of the value otherwise {@link Optional#empty()}
+     */
+    default <T> Optional<T> getFirst(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+        V v = get(name);
+        if (v != null) {
+            return ConversionService.SHARED.convert(v, conversionContext);
         }
         return Optional.empty();
     }

@@ -70,7 +70,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      * @return True if it is
      */
     default boolean contains(String name) {
-        return get(name, Object.class).isPresent();
+        return get(name, Argument.OBJECT_ARGUMENT).isPresent();
     }
 
     /**

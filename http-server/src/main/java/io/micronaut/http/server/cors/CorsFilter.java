@@ -27,8 +27,9 @@ import static io.micronaut.http.HttpHeaders.ORIGIN;
 import static io.micronaut.http.HttpHeaders.VARY;
 
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -58,6 +59,8 @@ import java.util.stream.Collectors;
  */
 @Filter("/**")
 public class CorsFilter implements HttpServerFilter {
+
+    private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ConversionContext.of(HttpMethod.class);
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
@@ -108,9 +111,9 @@ public class CorsFilter implements HttpServerFilter {
                 CorsOriginConfiguration config = optionalConfig.get();
 
                 if (CorsUtil.isPreflightRequest(request)) {
-                    Optional<HttpMethod> result = headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.class);
+                    Optional<HttpMethod> result = headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD);
                     setAllowMethods(result.get(), response);
-                    Optional<List> allowedHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.of(List.class, String.class));
+                    Optional<List<String>> allowedHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING);
                     allowedHeaders.ifPresent(val ->
                         setAllowHeaders(val, response)
                     );
@@ -150,14 +153,14 @@ public class CorsFilter implements HttpServerFilter {
                 List<HttpMethod> allowedMethods = config.getAllowedMethods();
 
                 if (!isAnyMethod(allowedMethods)) {
-                    HttpMethod methodToMatch = preflight ? headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.class).orElse(requestMethod) : requestMethod;
+                    HttpMethod methodToMatch = preflight ? headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD).orElse(requestMethod) : requestMethod;
                     if (allowedMethods.stream().noneMatch(method -> method.equals(methodToMatch))) {
                         return Optional.of(HttpResponse.status(HttpStatus.FORBIDDEN));
                     }
                 }
 
                 if (preflight) {
-                    Optional<List<String>> accessControlHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, Argument.listOf(String.class));
+                    Optional<List<String>> accessControlHeaders = headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING);
 
                     List<String> allowedHeaders = config.getAllowedHeaders();
 

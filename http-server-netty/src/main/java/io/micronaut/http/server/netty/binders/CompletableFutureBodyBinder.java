@@ -49,6 +49,8 @@ import java.util.concurrent.CompletableFuture;
 public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<CompletableFuture>
     implements NonBlockingBodyArgumentBinder<CompletableFuture> {
 
+    private static final Argument<CompletableFuture> TYPE = Argument.of(CompletableFuture.class);
+
     private final BeanLocator beanLocator;
     private final HttpServerConfiguration httpServerConfiguration;
 
@@ -65,7 +67,7 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
 
     @Override
     public Argument<CompletableFuture> argumentType() {
-        return Argument.of(CompletableFuture.class);
+        return TYPE;
     }
 
     @Override

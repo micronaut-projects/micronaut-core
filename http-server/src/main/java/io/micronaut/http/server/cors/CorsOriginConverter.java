@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -23,6 +24,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 
 import javax.inject.Singleton;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -43,6 +45,8 @@ public class CorsOriginConverter implements TypeConverter<Object, CorsOriginConf
     private static final String ALLOW_CREDENTIALS = "allowCredentials";
     private static final String MAX_AGE = "maxAge";
 
+    private static final ArgumentConversionContext<List<HttpMethod>> CONVERSION_CONTEXT_LIST_OF_HTTP_METHOD = ConversionContext.of(Argument.listOf(HttpMethod.class));
+
     @Override
     public Optional<CorsOriginConfiguration> convert(Object object, Class<CorsOriginConfiguration> targetType, ConversionContext context) {
         CorsOriginConfiguration configuration = new CorsOriginConfiguration();
@@ -51,27 +55,27 @@ public class CorsOriginConverter implements TypeConverter<Object, CorsOriginConf
             ConvertibleValues<Object> convertibleValues = new ConvertibleValuesMap<>(mapConfig);
 
             convertibleValues
-                .get(ALLOWED_ORIGINS, Argument.listOf(String.class))
+                .get(ALLOWED_ORIGINS, ConversionContext.LIST_OF_STRING)
                 .ifPresent(configuration::setAllowedOrigins);
 
             convertibleValues
-                .get(ALLOWED_METHODS, Argument.listOf(HttpMethod.class))
+                .get(ALLOWED_METHODS, CONVERSION_CONTEXT_LIST_OF_HTTP_METHOD)
                 .ifPresent(configuration::setAllowedMethods);
 
             convertibleValues
-                .get(ALLOWED_HEADERS, Argument.listOf(String.class))
+                .get(ALLOWED_HEADERS, ConversionContext.LIST_OF_STRING)
                 .ifPresent(configuration::setAllowedHeaders);
 
             convertibleValues
-                .get(EXPOSED_HEADERS, Argument.listOf(String.class))
+                .get(EXPOSED_HEADERS, ConversionContext.LIST_OF_STRING)
                 .ifPresent(configuration::setExposedHeaders);
 
             convertibleValues
-                .get(ALLOW_CREDENTIALS, Boolean.class)
+                .get(ALLOW_CREDENTIALS, ConversionContext.BOOLEAN)
                 .ifPresent(configuration::setAllowCredentials);
 
             convertibleValues
-                .get(MAX_AGE, Long.class)
+                .get(MAX_AGE, ConversionContext.LONG)
                 .ifPresent(configuration::setMaxAge);
         }
         return Optional.of(configuration);

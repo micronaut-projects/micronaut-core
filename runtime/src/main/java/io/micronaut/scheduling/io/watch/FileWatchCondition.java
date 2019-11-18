@@ -20,7 +20,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.type.Argument;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.util.CollectionUtils;
 
 import java.io.File;
@@ -40,7 +40,7 @@ public class FileWatchCondition implements Condition {
         if (beanContext instanceof ApplicationContext) {
             List<String> paths = ((ApplicationContext) beanContext)
                     .getEnvironment()
-                    .getProperty(FileWatchConfiguration.PATHS, Argument.listOf(String.class))
+                    .getProperty(FileWatchConfiguration.PATHS, ConversionContext.LIST_OF_STRING)
                     .orElse(null);
 
             if (CollectionUtils.isNotEmpty(paths)) {
