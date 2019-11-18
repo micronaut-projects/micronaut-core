@@ -124,6 +124,33 @@ class NameUtilsSpec extends Specification {
         "fooBBar"           | 'FOO_BBAR'
     }
 
+    void "test decapitalize"() {
+        expect:
+        NameUtils.decapitalize(name) == result
+
+        where:
+        name    | result
+        "Title" | "title"
+        "T"     | "t"
+        "TiTLE" | "tiTLE"
+    }
+
+    void "test decapitalize returns same ref"() {
+        expect:
+        NameUtils.decapitalize(name).is(name)
+
+        where:
+        name      | _
+        ""        | _
+        "a"       | _
+        "aa"      | _
+        "aB"      | _
+        "AA"      | _
+        "ABCD"    | _
+        "a a"     | _
+        "abcd ef" | _
+    }
+
     @Unroll
     void "test hyphenate #value - no lower case"() {
         expect:
