@@ -25,6 +25,7 @@ import io.micronaut.web.router.UriRoute;
 import io.micronaut.web.router.UriRouteMatch;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
@@ -66,9 +67,29 @@ public class FilteredRouter implements Router {
         return router.findAny(uri);
     }
 
+    @Nonnull
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
+        final Stream<UriRouteMatch<T, R>> matchStream = router.findAny(uri);
+        if (context != null) {
+            return matchStream.filter(routeFilter.filter(context));
+        }
+        return matchStream;
+    }
+
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, CharSequence uri) {
         return router.find(httpMethod, uri);
+    }
+
+    @Nonnull
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
+        final Stream<UriRouteMatch<T, R>> matchStream = router.find(httpMethod, uri);
+        if (context != null) {
+            return matchStream.filter(routeFilter.filter(context));
+        }
+        return matchStream;
     }
 
     @Nonnull
