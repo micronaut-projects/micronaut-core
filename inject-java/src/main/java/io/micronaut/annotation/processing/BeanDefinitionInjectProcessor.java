@@ -1197,16 +1197,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 );
             }
 
-            ExecutableMethodWriter executableMethodWriter = beanWriter.visitExecutableMethod(
-                    typeRef,
-                    resolvedReturnType,
-                    resolvedReturnType,
-                    returnTypeGenerics,
-                    method.getSimpleName().toString(),
-                    params.getParameters(),
-                    params.getGenericParameters(),
-                    params.getParameterMetadata(),
-                    params.getGenericTypes(), methodAnnotationMetadata);
+            final AopProxyWriter proxyWriter = resolveAopWriter(beanWriter);
+            ExecutableMethodWriter executableMethodWriter = null;
+            if (proxyWriter == null || proxyWriter.isProxyTarget()) {
+                executableMethodWriter = beanWriter.visitExecutableMethod(
+                        typeRef,
+                        resolvedReturnType,
+                        resolvedReturnType,
+                        returnTypeGenerics,
+                        method.getSimpleName().toString(),
+                        params.getParameters(),
+                        params.getGenericParameters(),
+                        params.getParameterMetadata(),
+                        params.getGenericTypes(), methodAnnotationMetadata);
+            }
+
 
             if (methodAnnotationMetadata.hasStereotype(Adapter.class)) {
                 visitAdaptedMethod(method, methodAnnotationMetadata);
