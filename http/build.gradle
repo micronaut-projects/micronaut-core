@@ -1,9 +1,9 @@
 dependencies {
-    compile project(":inject")
+    implementation project(":inject")
     compileOnly project(":inject-java")
     compileOnly project(":graal")
 
-    testCompile project(":inject-groovy")
+    testImplementation project(":inject-groovy")
 }
 
 //compileJava.options.fork = true

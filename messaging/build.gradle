@@ -1,5 +1,5 @@
 dependencies {
     compileOnly project(":inject-java")
-    compile project(":inject")
-    compile project(":runtime")
+    implementation project(":inject")
+    implementation project(":runtime")
 }

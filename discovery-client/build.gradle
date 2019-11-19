@@ -3,8 +3,8 @@ dependencies {
     compileOnly project(":graal")
     compileOnly project(":management")
 
-    compile project(":http-client")
-    compile project(":validation")
+    implementation project(":http-client")
+    implementation project(":validation")
 
     compileOnly dependencyVersion("micronaut.aws"), {
         exclude module:'micronaut-http-client'
@@ -18,24 +18,24 @@ dependencies {
     // used by AWSParameterStoreConfigClient
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
 
-    testCompile "org.testcontainers:spock:1.10.1"
+    testImplementation "org.testcontainers:spock:1.10.1"
 
-    testCompile dependencyVersion("micronaut.aws"), {
+    testImplementation dependencyVersion("micronaut.aws"), {
         exclude module:'micronaut-http-client'
         exclude module:'micronaut-inject'
     }
-    testCompile group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
-    testCompile group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
-    testCompile group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
-    testCompile group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
-    testCompile group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
+    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
+    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
+    testImplementation group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
+    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
+    testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
 
-    testCompile project(":management")
-    testCompile project(":http-server-netty")
-    testCompile project(":inject-java")
-    testCompile project(":inject-groovy")
-    testCompile "com.amazonaws:aws-java-sdk-ec2:1.11.297"
-    testCompile dependencyVersion("reactor")
-    testRuntime dependencyVersion("snakeyaml")
+    testImplementation project(":management")
+    testImplementation project(":http-server-netty")
+    testImplementation project(":inject-java")
+    testImplementation project(":inject-groovy")
+    testImplementation "com.amazonaws:aws-java-sdk-ec2:1.11.297"
+    testImplementation dependencyVersion("reactor")
+    testRuntimeOnly dependencyVersion("snakeyaml")
 
 }

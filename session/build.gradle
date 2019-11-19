@@ -1,15 +1,15 @@
 shadowJar.enabled = true
 dependencies {
-    compile project(":runtime")
-    compile project(":http")
+    implementation project(":runtime")
+    implementation project(":http")
     
     compileOnly project(":inject-java")
     compileOnly project(":http-server")
 
-    testCompile project(":inject-groovy")
-    testCompile project(":inject-java")
-    testCompile project(":http-server-netty")
-    testCompile project(":http-client")
+    testImplementation project(":inject-groovy")
+    testImplementation project(":inject-java")
+    testImplementation project(":http-server-netty")
+    testImplementation project(":http-client")
 }
 
 

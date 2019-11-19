@@ -1,11 +1,11 @@
 dependencies {
     compileOnly "com.oracle.substratevm:svm:$graalVersion"
     compileOnly project(":graal")
-    compile project(":buffer-netty")
-    compile project(":http")
-    compile project(":websocket")
+    implementation project(":buffer-netty")
+    implementation project(":http")
+    implementation project(":websocket")
     compileOnly project(":inject-java")
-    compile dependencyVersion("netty")
-    compile dependencyVersion("rxjava2")
-    compile dependencyModuleVersion("netty", "netty-handler")
+    implementation dependencyVersion("netty")
+    implementation dependencyVersion("rxjava2")
+    implementation dependencyModuleVersion("netty", "netty-handler")
 }

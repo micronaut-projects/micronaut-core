@@ -1,16 +1,16 @@
 dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":http-server")
-    compile project(":inject")
-    compile project(":http")
-    compile dependencyVersion("validation")
+    implementation project(":inject")
+    implementation project(":http")
+    implementation dependencyVersion("validation")
     compileOnly dependencyVersion("gorm")
-    
-    testCompile project(":http-server-netty")
-    testCompile project(":websocket")
-    testCompile project(":http-client")
-    testCompile project(":inject-groovy")
-    testCompile dependencyModuleVersion("groovy", "groovy-json")
-    testCompile project(":inject-java-test")
+
+    testImplementation project(":http-server-netty")
+    testImplementation project(":websocket")
+    testImplementation project(":http-client")
+    testImplementation project(":inject-groovy")
+    testImplementation dependencyModuleVersion("groovy", "groovy-json")
+    testImplementation project(":inject-java-test")
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

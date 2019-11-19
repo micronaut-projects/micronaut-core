@@ -4,22 +4,22 @@ repositories {
 }
 
 dependencies {
-    compile "info.picocli:picocli-groovy:$picocliVersion"
-    compile "org.apache.ant:ant:1.9.7"
-    compile dependencyModuleVersion("groovy", "groovy-ant")
-    compile dependencyModuleVersion("groovy", "groovy-json")
-    compile dependencyModuleVersion("groovy", "groovy-jmx")
-    compile dependencyModuleVersion("groovy", "groovy-xml")
-    compile dependencyModuleVersion("groovy", "groovy-templates")
-    compile "org.fusesource.jansi:jansi:1.14"
-    compile "jline:jline:2.12"
-    compile "org.springframework.boot:spring-boot-cli:1.5.10.RELEASE"
-    compile dependencyVersion("snakeyaml")
-    runtime dependencyModuleVersion("slf4j", "slf4j-simple")
-    runtime "org.codehaus.plexus:plexus-component-api:1.0-alpha-33"
+    implementation "info.picocli:picocli-groovy:$picocliVersion"
+    implementation "org.apache.ant:ant:1.9.7"
+    implementation dependencyModuleVersion("groovy", "groovy-ant")
+    implementation dependencyModuleVersion("groovy", "groovy-json")
+    implementation dependencyModuleVersion("groovy", "groovy-jmx")
+    implementation dependencyModuleVersion("groovy", "groovy-xml")
+    implementation dependencyModuleVersion("groovy", "groovy-templates")
+    implementation "org.fusesource.jansi:jansi:1.14"
+    implementation "jline:jline:2.12"
+    implementation "org.springframework.boot:spring-boot-cli:1.5.10.RELEASE"
+    implementation dependencyVersion("snakeyaml")
+    runtimeOnly dependencyModuleVersion("slf4j", "slf4j-simple")
+    runtimeOnly "org.codehaus.plexus:plexus-component-api:1.0-alpha-33"
 
-    testCompile "net.sf.expectit:expectit-core:0.5.0"
-    testCompile "com.github.jnr:jnr-posix:3.0.6"
+    testImplementation "net.sf.expectit:expectit-core:0.5.0"
+    testImplementation "com.github.jnr:jnr-posix:3.0.6"
 }
 
 File outDir = new File(project.buildDir, 'bin')
@@ -75,11 +75,11 @@ task fatJar(type: Jar, dependsOn: ['createStartScripts']) {
         configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) }
     }
     with jar
-    destinationDir = project.buildDir
+    destinationDirectory = project.buildDir
 }
 
 task cliZip(type: Zip, dependsOn: ['fatJar']) {
-    archiveName = "micronaut-${project.version}.zip"
+    archiveFileName = "micronaut-${project.version}.zip"
     into("micronaut-${project.version}") {
         from('build/bin') {
             into('bin')

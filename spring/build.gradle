@@ -1,11 +1,11 @@
 dependencies {
-    compile dependencyVersion("spring")
-    compile dependencyModuleVersion("spring", "spring-tx")
-    compile dependencyModuleVersion("spring", "spring-context")
-    compile project(":inject")
+    implementation dependencyVersion("spring")
+    implementation dependencyModuleVersion("spring", "spring-tx")
+    implementation dependencyModuleVersion("spring", "spring-context")
+    implementation project(":inject")
     compileOnly project(":inject-java")
     compileOnly dependencyModuleVersion("spring", "spring-jdbc")
-    compile project(":aop")
+    implementation project(":aop")
 
     testImplementation project(':runtime')
     testImplementation project(':inject-groovy')

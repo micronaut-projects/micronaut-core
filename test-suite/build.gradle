@@ -13,46 +13,46 @@ ext {
 
 dependencies {
     compileOnly project(":inject-java")
-    compile project(":inject")
+    implementation project(":inject")
 
     testCompileOnly project(":test-suite-helper")
-    testCompile project(":http-server-netty")
-    testCompile project(":http-client")
-    testCompile project(":validation")
-    testCompile project(":inject-groovy")
-    testCompile project(":inject-java")
-    testCompile project(":inject-java-test")
-    testCompile project(":tracing")
-    testCompile project(":management")
-    testCompile project(":runtime")
-    testCompile project(":inject")
-    testCompile project(":function-client")
-    testCompile project(":function-web")
-    testCompile project(":session")
-    testCompile dependencyVersion("reactor")
-    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
+    testImplementation project(":http-server-netty")
+    testImplementation project(":http-client")
+    testImplementation project(":validation")
+    testImplementation project(":inject-groovy")
+    testImplementation project(":inject-java")
+    testImplementation project(":inject-java-test")
+    testImplementation project(":tracing")
+    testImplementation project(":management")
+    testImplementation project(":runtime")
+    testImplementation project(":inject")
+    testImplementation project(":function-client")
+    testImplementation project(":function-web")
+    testImplementation project(":session")
+    testImplementation dependencyVersion("reactor")
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-junit5"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
 
-    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
 
-    testCompile dependencyVersion("jcache")
-    testCompile dependencyVersion("jaeger")
-    testCompile dependencyModuleVersion("groovy", "groovy-json")
+    testImplementation dependencyVersion("jcache")
+    testImplementation dependencyVersion("jaeger")
+    testImplementation dependencyModuleVersion("groovy", "groovy-json")
     // tag::testcontainers-dependencies[]
-    testCompile "org.testcontainers:spock:1.10.1"
+    testImplementation "org.testcontainers:spock:1.10.1"
     // end::testcontainers-dependencies[]
-    testCompile 'org.awaitility:awaitility:3.1.6'
+    testImplementation 'org.awaitility:awaitility:3.1.6'
 
-    testRuntime dependencyVersion("tomcatJdbc")
-    testRuntime dependencyVersion("h2")
-    testRuntime "org.junit.vintage:junit-vintage-engine:$junit5Version"
-    testRuntime "ch.qos.logback:logback-classic:1.2.3"
-    testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
+    testRuntimeOnly dependencyVersion("tomcatJdbc")
+    testRuntimeOnly dependencyVersion("h2")
+    testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junit5Version"
+    testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
+    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }
 
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"

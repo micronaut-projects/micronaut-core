@@ -1,10 +1,10 @@
 dependencies {
-    compile project(":http")
-    compile project(":inject")
-    compile project(":aop")
+    implementation project(":http")
+    implementation project(":inject")
+    implementation project(":aop")
 
-    compile dependencyVersion("rxjava2")
+    implementation dependencyVersion("rxjava2")
     compileOnly project(":inject-java")
 
-    testCompile project(":inject-groovy")
+    testImplementation project(":inject-groovy")
 }

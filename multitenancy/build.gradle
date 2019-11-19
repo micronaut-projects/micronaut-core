@@ -1,14 +1,14 @@
 dependencies {
     compileOnly project(":inject-java")
 
-    compile project(":runtime")
-    compile project(":http")
-    compile project(":http-server")
+    implementation project(":runtime")
+    implementation project(":http")
+    implementation project(":http-server")
     compileOnly project(":session")
 
-    testCompile project(":http-client")
-    testCompile project(":inject-groovy")
-    testCompile project(":http-server-netty")
-    testCompile project(":session")
-    testCompile project(":test-utils")
+    testImplementation project(":http-client")
+    testImplementation project(":inject-groovy")
+    testImplementation project(":http-server-netty")
+    testImplementation project(":session")
+    testImplementation project(":test-utils")
 }
