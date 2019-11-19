@@ -165,7 +165,7 @@ class AnnotationMetadataSupport {
      */
     static void registerDefaultValues(String annotation, Map<String, Object> defaultValues) {
         if (StringUtils.isNotEmpty(annotation)) {
-            ANNOTATION_DEFAULTS.put(annotation, defaultValues);
+            ANNOTATION_DEFAULTS.putIfAbsent(annotation, defaultValues);
         }
     }
 

@@ -19,6 +19,7 @@ import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -172,15 +173,17 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         private final TypeElement concreteClass;
         private final List<LoadedVisitor> visitors;
+        private AnnotationMetadata typeAnnotationMetadata;
 
         ElementVisitor(TypeElement concreteClass, List<LoadedVisitor> visitors) {
             this.concreteClass = concreteClass;
             this.visitors = visitors;
+            this.typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
         }
 
         @Override
         public Object visitType(TypeElement classElement, Object o) {
-            AnnotationMetadata typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(classElement);
+
 
             for (LoadedVisitor visitor : visitors) {
                 final io.micronaut.inject.ast.Element resultingElement = visitor.visit(classElement, typeAnnotationMetadata);
@@ -223,7 +226,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         @Override
         public Object visitExecutable(ExecutableElement executableElement, Object o) {
-            AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(executableElement);
+            AnnotationMetadata methodAnnotationMetadata = new AnnotationMetadataHierarchy(
+                    typeAnnotationMetadata,
+                    annotationUtils.getAnnotationMetadata(executableElement)
+            );
             if (executableElement.getSimpleName().toString().equals("<init>")) {
                 for (LoadedVisitor visitor : visitors) {
                     final io.micronaut.inject.ast.Element resultingElement = visitor.visit(executableElement, methodAnnotationMetadata);

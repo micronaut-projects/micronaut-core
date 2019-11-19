@@ -8,6 +8,7 @@ dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":validation")
     compile project(":inject")
+    compile project(":inject-java-test")
     compile project(":validation")
     compile project(":runtime")
 
@@ -16,8 +17,10 @@ dependencies {
     jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.21'
 }
 jmh {
+    include =['io.micronaut.aop.around.AroundCompileBenchmark']
     duplicateClassesStrategy = 'warn'
     warmupIterations = 2
     iterations = 4
     fork = 1
+//    jvmArgs = ["-agentpath:/Applications/YourKit-Java-Profiler-2018.04.app/Contents/Resources/bin/mac/libyjpagent.jnilib"]
 }

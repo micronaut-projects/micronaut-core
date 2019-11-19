@@ -32,6 +32,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
@@ -690,7 +691,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         }
                     }
 
-                    if (annotationUtils.hasStereotype(method, AROUND_TYPE)) {
+                    if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
                         Object[] interceptorTypes = annotationMetadata
                                 .getAnnotationNamesByStereotype(AROUND_TYPE)
                                 .toArray();
@@ -757,7 +758,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
 
-            AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
+            AnnotationMetadata methodAnnotationMetadata = new AnnotationMetadataHierarchy(
+                    concreteClassMetadata,
+                    annotationUtils.getAnnotationMetadata(method)
+            );
 
             TypeKind returnKind = method.getReturnType().getKind();
             if ((returnKind == TypeKind.ERROR) && !processingOver) {
@@ -1182,6 +1186,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 typeRef = modelUtils.resolveTypeReference(concreteClass);
             }
 
+            boolean hasConstraints = false;
+            if (!methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
+                    isDeclaredBean &&
+                    params.getParameterMetadata().values().stream().anyMatch(IS_CONSTRAINT)) {
+                hasConstraints = true;
+                methodAnnotationMetadata = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder().annotate(
+                        methodAnnotationMetadata,
+                        io.micronaut.core.annotation.AnnotationValue.builder(ANN_VALIDATED).build()
+                );
+            }
+
             ExecutableMethodWriter executableMethodWriter = beanWriter.visitExecutableMethod(
                     typeRef,
                     resolvedReturnType,
@@ -1197,16 +1212,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 visitAdaptedMethod(method, methodAnnotationMetadata);
             }
 
-            boolean hasConstraints = false;
-            if (!methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
-                    isDeclaredBean &&
-                    params.getParameterMetadata().values().stream().anyMatch(IS_CONSTRAINT)) {
-                hasConstraints = true;
-                methodAnnotationMetadata = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder().annotate(
-                        methodAnnotationMetadata,
-                        io.micronaut.core.annotation.AnnotationValue.builder(ANN_VALIDATED).build()
-                );
-            }
+
             // shouldn't visit around advice on an introduction advice instance
             if (!(beanWriter instanceof AopProxyWriter)) {
                 boolean hasAround = hasConstraints || methodAnnotationMetadata.hasStereotype(AROUND_TYPE);

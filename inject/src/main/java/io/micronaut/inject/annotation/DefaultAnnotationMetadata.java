@@ -47,7 +47,7 @@ import java.util.function.Function;
  * @since 1.0
  */
 @Internal
-public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implements AnnotationMetadata, Cloneable {
+public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implements AnnotationMetadata, Cloneable, EnvironmentAnnotationMetadata {
 
     static {
         ConversionService.SHARED.addConverter(io.micronaut.core.annotation.AnnotationValue.class, Annotation.class, (TypeConverter<io.micronaut.core.annotation.AnnotationValue, Annotation>) (object, targetType, context) -> {
@@ -187,8 +187,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param <E> The enum type
      * @return The class value
      */
+    @Override
     @Internal
-    <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+    public <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
@@ -212,8 +213,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param <E> The enum type
      * @return The class value
      */
+    @Override
     @Internal
-    <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+    public <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         return enumValueOf(enumType, rawValue);
     }
@@ -278,7 +280,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The class value
      */
-    Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
+    @Override
+    public Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
@@ -310,8 +313,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The class value
      */
+    @Override
     @Internal
-    Optional<Class> classValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+    public Optional<Class> classValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
 
         if (rawValue instanceof AnnotationClassValue) {
@@ -347,8 +351,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The int value
      */
+    @Override
     @Internal
-    OptionalInt intValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+    public OptionalInt intValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
@@ -383,7 +388,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The boolean value
      */
-    Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
+     @Override
+     public Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
@@ -405,8 +411,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The boolean value
      */
+    @Override
     @Nonnull
-    Optional<Boolean> booleanValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+    public Optional<Boolean> booleanValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         if (rawValue instanceof Boolean) {
             return Optional.of((Boolean) rawValue);
@@ -438,8 +445,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The long value
      */
+    @Override
     @Internal
-    OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+    public OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
@@ -461,8 +469,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The long value
      */
+    @Override
     @Nonnull
-    OptionalLong longValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+    public OptionalLong longValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         if (rawValue instanceof Number) {
             return OptionalLong.of(((Number) rawValue).longValue());
@@ -477,8 +486,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The int value
      */
+    @Override
     @Nonnull
-    OptionalInt intValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+    public OptionalInt intValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         if (rawValue instanceof Number) {
             return OptionalInt.of(((Number) rawValue).intValue());
@@ -499,7 +509,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The int value
      */
-    Optional<String> stringValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
+    @Override
+    public Optional<String> stringValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
         if (repeatable != null) {
@@ -526,7 +537,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The int value
      */
-    @Nonnull String[] stringValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
+    @Override
+    @Nonnull
+    public String[] stringValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
         if (repeatable != null) {
@@ -557,8 +570,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The string value
      */
+    @Override
     @Nonnull
-    Optional<String> stringValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+    public Optional<String> stringValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         if (rawValue instanceof CharSequence) {
             return Optional.of(rawValue.toString());
@@ -583,7 +597,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The boolean value
      */
-    boolean isTrue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
+    @Override
+    public boolean isTrue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
@@ -613,7 +628,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The boolean value
      */
-    boolean isTrue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+    @Override
+    public boolean isTrue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
 
         if (rawValue instanceof Boolean) {
@@ -651,8 +667,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The double value
      */
+    @Override
     @Internal
-    OptionalDouble doubleValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+    public OptionalDouble doubleValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
@@ -674,9 +691,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param valueMapper The value mapper
      * @return The double value
      */
+    @Override
     @Nonnull
     @Internal
-    OptionalDouble doubleValue(@Nonnull String annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
+    public OptionalDouble doubleValue(@Nonnull String annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         if (rawValue instanceof Number) {
             return OptionalDouble.of(((Number) rawValue).doubleValue());
@@ -720,8 +738,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param <T> The generic type
      * @return The resolved value
      */
+    @Override
     @Nonnull
-    <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType, @Nullable Function<Object, Object> valueMapper) {
+    public <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
@@ -1055,7 +1074,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public AnnotationMetadata clone() {
+    public DefaultAnnotationMetadata clone() {
         return new DefaultAnnotationMetadata(
                 declaredAnnotations != null ? new HashMap<>(declaredAnnotations) : null,
                 declaredStereotypes != null ? new HashMap<>(declaredStereotypes) : null,
@@ -1600,6 +1619,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Internal
     public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadata source) {
+        if (source instanceof AnnotationMetadataHierarchy) {
+            source = ((AnnotationMetadataHierarchy) source).getDeclaredMetadata();
+        }
         if (target instanceof DefaultAnnotationMetadata && source instanceof DefaultAnnotationMetadata) {
             final Map<String, Map<CharSequence, Object>> existingDefaults = ((DefaultAnnotationMetadata) target).annotationDefaultValues;
             if (existingDefaults != null) {
