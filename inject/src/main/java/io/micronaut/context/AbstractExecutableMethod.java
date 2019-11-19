@@ -24,7 +24,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
