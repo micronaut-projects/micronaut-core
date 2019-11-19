@@ -27,6 +27,8 @@ import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
+import io.reactivex.Flowable
+import io.reactivex.Maybe
 import spock.lang.Issue
 
 /**
@@ -36,7 +38,6 @@ import spock.lang.Issue
 class FormDataBindingSpec extends AbstractMicronautSpec {
 
     void "test simple string-based body parsing"() {
-
         when:
         def response = rxClient.exchange(HttpRequest.POST('/form/simple', [
                 name:"Fred",
@@ -125,9 +126,47 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         then:
         response == 'ABC    DEF    '
     }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2263")
+    void "test binding directly to a string"() {
+        when:
+        def response = rxClient.exchange(HttpRequest.POST('/form/string', [
+                name:"Fred",
+                age:"10"
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+
+        then:
+        response.status == HttpStatus.OK
+        response.body.isPresent()
+        response.body.get() == "name=Fred&age=10"
+    }
+
+    void "test binding directly to a reactive string"() {
+        when:
+        def response = rxClient.exchange(HttpRequest.POST('/form/maybe-string', [
+                name:"Fred",
+                age:"10"
+        ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
+
+        then:
+        response.status == HttpStatus.OK
+        response.body.isPresent()
+        response.body.get() == "name=Fred&age=10"
+    }
     
     @Controller(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
     static class FormController {
+
+        @Post('/string')
+        String string(@Body String string) {
+            string
+        }
+
+        @Post('/maybe-string')
+        Maybe<String> string(@Body Flowable<String> string) {
+            string.reduce({ a, b -> a + b })
+        }
+
         @Post('/simple')
         String simple(String name, Integer age) {
             "name: $name, age: $age"
