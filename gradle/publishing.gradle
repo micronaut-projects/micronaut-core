@@ -138,25 +138,25 @@ publishing {
                     }
                     xmlNode.children().last() + pomInfo
                 }
-                artifact sourcesJar {
-                    classifier "sources"
-                }
-                artifact javadocJar {
-                    classifier "javadoc"
-                }
+//                artifact sourcesJar {
+//                    classifier "sources"
+//                }
+//                artifact javadocJar {
+//                    classifier "javadoc"
+//                }
 
             }
             else {
 
-                if (project.name != 'bom') {
-                    from components.java
-                    artifact sourcesJar {
-                        classifier "sources"
-                    }
-                    artifact javadocJar {
-                        classifier "javadoc"
-                    }
-                }
+//                if (project.name != 'bom') {
+//                    from components.java
+//                    artifact sourcesJar {
+//                        classifier "sources"
+//                    }
+//                    artifact javadocJar {
+//                        classifier "javadoc"
+//                    }
+//                }
 
                 pom.withXml {
                     def xml = asNode()
