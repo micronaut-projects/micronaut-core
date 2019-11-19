@@ -20,4 +20,4 @@ snippet::io.micronaut.docs.server.body.MessageController[tags="echoReactive", in
 <2> A rx:Single[] is returned so that Micronaut will only emit the response once the operation completes without blocking.
 <3> The `collect` method is used to accumulate the data in this simulated example, but it could for example write the data to logging service, database or whatever chunk by chunk
 
-
+IMPORTANT: Body arguments of types that do not require conversion will cause Micronaut to skip decoding of the request!

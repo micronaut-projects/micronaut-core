@@ -130,6 +130,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final WebSocketBeanRegistry webSocketBeanRegistry;
     private final int specifiedPort;
     private final HttpCompressionStrategy httpCompressionStrategy;
+    private final HttpContentProcessorResolver httpContentProcessorResolver;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final SslContext sslContext;
@@ -155,6 +156,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param outboundHandlers                        The outbound handlers
      * @param eventLoopGroupFactory                   The EventLoopGroupFactory
      * @param httpCompressionStrategy                 The http compression strategy
+     * @param httpContentProcessorResolver            The http content processor resolver
      */
     @SuppressWarnings("ParameterNumber")
     @Inject
@@ -169,12 +171,14 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         @javax.inject.Named(TaskExecutors.IO) ExecutorService ioExecutor,
         @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
         ExecutorSelector executorSelector,
-        Optional<ServerSslBuilder> serverSslBuilder,
+        @Nullable ServerSslBuilder serverSslBuilder,
         List<ChannelOutboundHandler> outboundHandlers,
         EventLoopGroupFactory eventLoopGroupFactory,
-        HttpCompressionStrategy httpCompressionStrategy
+        HttpCompressionStrategy httpCompressionStrategy,
+        HttpContentProcessorResolver httpContentProcessorResolver
     ) {
         this.httpCompressionStrategy = httpCompressionStrategy;
+        this.httpContentProcessorResolver = httpContentProcessorResolver;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());
         this.applicationContext = applicationContext;
@@ -188,10 +192,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.specifiedPort = getHttpPort(serverConfiguration);
 
         int port = specifiedPort;
-        if (serverSslBuilder.isPresent()) {
-            ServerSslBuilder sslBuilder = serverSslBuilder.get();
-            this.sslConfiguration = sslBuilder.getSslConfiguration();
-            this.sslContext = sslBuilder.build().orElse(null);
+        if (serverSslBuilder != null) {
+            this.sslConfiguration = serverSslBuilder.getSslConfiguration();
+            this.sslContext = serverSslBuilder.build().orElse(null);
             if (this.sslConfiguration.isEnabled()) {
                 port = sslConfiguration.getPort();
             }
@@ -280,7 +283,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         serverConfiguration,
                         requestArgumentSatisfier,
                         executorSelector,
-                        ioExecutor
+                        ioExecutor,
+                            httpContentProcessorResolver
                     );
                     final LoggingHandler loggingHandler = serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(serverConfiguration.getLogLevel().get()) : null;
 
