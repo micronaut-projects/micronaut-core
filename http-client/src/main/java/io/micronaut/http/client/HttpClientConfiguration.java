@@ -61,16 +61,22 @@ public abstract class HttpClientConfiguration {
     public static final long DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS = 100;
 
     /**
-     * The default shutdown timeout in millis.
+     * The default max content length in bytes.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final int DEFAULT_MAX_CONTENT_LENGTH = 1024 * 1024 * 10; // 10MB;
+    public static final int DEFAULT_MAX_CONTENT_LENGTH = 1024 * 1024 * 10; // 10MiB;
 
     /**
      * The default follow redirects value.
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_FOLLOW_REDIRECTS = true;
+
+    /**
+     * The default value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
 
     private Map<ChannelOption, Object> channelOptions = Collections.emptyMap();
 
@@ -106,6 +112,8 @@ public abstract class HttpClientConfiguration {
     private Charset defaultCharset = StandardCharsets.UTF_8;
 
     private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
+
+    private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
 
@@ -154,6 +162,23 @@ public abstract class HttpClientConfiguration {
      */
     public boolean isFollowRedirects() {
         return followRedirects;
+    }
+
+    /**
+     *
+     * @return Whether throwing an exception upon HTTP error status (>= 400) is preferred.
+     */
+    public boolean isExceptionOnErrorStatus() {
+        return exceptionOnErrorStatus;
+    }
+
+    /**
+     * Sets whether throwing an exception upon HTTP error status (>= 400) is preferred. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_EXCEPTION_ON_ERROR_STATUS})
+     *
+     * @param exceptionOnErrorStatus Whether
+     */
+    public void setExceptionOnErrorStatus(boolean exceptionOnErrorStatus) {
+        this.exceptionOnErrorStatus = exceptionOnErrorStatus;
     }
 
     /**
