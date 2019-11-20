@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy
 
+import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
@@ -29,6 +30,7 @@ import io.micronaut.core.version.VersionUtils
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ModuleNode
+import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
@@ -42,9 +44,10 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
  */
 @CompileStatic
 @GroovyASTTransformation(phase = CompilePhase.INITIALIZATION)
-class TypeElementVisitorStart implements ASTTransformation {
+class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware {
 
     public static final String ELEMENT_VISITORS_PROPERTY = "micronaut.element.visitors"
+    private CompilationUnit compilationUnit
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
@@ -77,7 +80,7 @@ class TypeElementVisitorStart implements ASTTransformation {
                         }
                     }
                     try {
-                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, visitor)
+                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, compilationUnit, visitor)
                         loadedVisitors.put(definition.getName(), newLoadedVisitor)
                     } catch (TypeNotPresentException e) {
                         // skip, all classes not on classpath
@@ -90,7 +93,7 @@ class TypeElementVisitorStart implements ASTTransformation {
             }
 
 
-            def visitorContext = new GroovyVisitorContext(source)
+            def visitorContext = new GroovyVisitorContext(source, compilationUnit)
             List<LoadedVisitor> values = new ArrayList<>(loadedVisitors.values())
             OrderUtil.reverseSort(values)
             for(loadedVisitor in (values)) {
@@ -110,12 +113,17 @@ class TypeElementVisitorStart implements ASTTransformation {
             for (v in val.split(",")) {
                 def visitor = InstantiationUtils.tryInstantiate(v, source.classLoader).orElse(null)
                 if (visitor instanceof TypeElementVisitor) {
-                    LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, visitor)
+                    LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, compilationUnit, visitor)
                     loadedVisitors.put(visitor.getClass().getName(), newLoadedVisitor)
                 }
             }
         }
 
         TypeElementVisitorTransform.loadedVisitors = loadedVisitors
+    }
+
+    @Override
+    void setCompilationUnit(CompilationUnit unit) {
+        this.compilationUnit = unit
     }
 }

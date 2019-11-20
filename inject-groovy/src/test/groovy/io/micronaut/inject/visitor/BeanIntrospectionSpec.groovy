@@ -9,6 +9,8 @@ import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
+import io.micronaut.inject.visitor.introspections.Person
+import io.micronaut.inject.visitor.introspections.packages.Author
 
 import javax.persistence.Id
 import javax.validation.constraints.Size
@@ -468,5 +470,15 @@ class Test {
 
         then:
         thrown(UnsupportedOperationException)
+    }
+
+    void "test introspection class member configuration works"() {
+        when:
+        BeanIntrospection introspection = BeanIntrospection.getIntrospection(Person)
+
+        then:
+        noExceptionThrown()
+        introspection != null
+        introspection.getProperty("name", String).get().get(new Person(name: "Sally")) == "Sally"
     }
 }

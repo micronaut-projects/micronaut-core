@@ -34,6 +34,7 @@ import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ModuleNode;
+import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
@@ -61,15 +62,18 @@ import java.util.*;
 public class GroovyVisitorContext implements VisitorContext {
     private static final MutableConvertibleValues<Object> VISITOR_ATTRIBUTES = new MutableConvertibleValuesMap<>();
     private final ErrorCollector errorCollector;
+    private final CompilationUnit compilationUnit;
     private final SourceUnit sourceUnit;
     private final MutableConvertibleValues<Object> attributes;
 
     /**
-     * @param sourceUnit The {@link SourceUnit}
+     * @param sourceUnit      The source unit
+     * @param compilationUnit The compilation unit
      */
-    public GroovyVisitorContext(SourceUnit sourceUnit) {
+    public GroovyVisitorContext(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit) {
         this.sourceUnit = sourceUnit;
         this.errorCollector = sourceUnit.getErrorCollector();
+        this.compilationUnit = compilationUnit;
         this.attributes = VISITOR_ATTRIBUTES;
     }
 
@@ -77,7 +81,7 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public Iterable<URL> getClasspathResources(@Nonnull String path) {
         try {
-            final Enumeration<URL> resources = sourceUnit.getClassLoader().getResources(path);
+            final Enumeration<URL> resources = compilationUnit.getClassLoader().getResources(path);
             return CollectionUtils.enumerationToIterable(resources);
         } catch (IOException e) {
             return Collections.emptyList();
@@ -86,30 +90,11 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public Optional<ClassElement> getClassElement(String name) {
-        if (name == null) {
+        if (name == null || compilationUnit == null) {
             return Optional.empty();
         }
-
-        if (sourceUnit != null) {
-            ModuleNode ast = sourceUnit.getAST();
-            if (ast != null) {
-                List<ClassNode> classes = ast.getClasses();
-                for (ClassNode aClass : classes) {
-                    if (name.equals(aClass.getName())) {
-                        return Optional.of(new GroovyClassElement(sourceUnit, aClass, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, aClass)));
-                    }
-                }
-            }
-
-            GroovyClassLoader classLoader = sourceUnit.getClassLoader();
-            if (classLoader != null) {
-                return ClassUtils.forName(name, classLoader).map(aClass -> {
-                    ClassNode cn = ClassHelper.make(aClass);
-                    return new GroovyClassElement(sourceUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, cn));
-                });
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(compilationUnit.getClassNode(name))
+                .map(cn -> new GroovyClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)));
     }
 
     @Nonnull
@@ -118,12 +103,16 @@ public class GroovyVisitorContext implements VisitorContext {
         ArgumentUtils.requireNonNull("aPackage", aPackage);
         ArgumentUtils.requireNonNull("stereotypes", stereotypes);
 
-        ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(sourceUnit.getClassLoader());
+        if (compilationUnit == null) {
+            return new ClassElement[0];
+        }
+
+        ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(compilationUnit.getClassLoader());
         List<ClassElement> classElements = new ArrayList<>();
         for (String s : stereotypes) {
             scanner.scan(s, aPackage).forEach(aClass -> {
                 final ClassNode classNode = ClassHelper.make(aClass);
-                classElements.add(new GroovyClassElement(sourceUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, classNode)));
+                classElements.add(new GroovyClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)));
             });
         }
         return classElements.toArray(new ClassElement[0]);
@@ -170,16 +159,15 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public OutputStream visitClass(String classname) throws IOException {
-        File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
+        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
-
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                     classesDir
             );
             return outputVisitor.visitClass(classname);
         } else {
             // should only arrive here in testing scenarios
-            if (sourceUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader) {
+            if (compilationUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader) {
                 return new OutputStream() {
                     @Override
                     public void write(int b) {
@@ -188,7 +176,7 @@ public class GroovyVisitorContext implements VisitorContext {
 
                     @Override
                     public void write(byte[] b) {
-                        ((InMemoryByteCodeGroovyClassLoader) sourceUnit.getClassLoader()).addClass(classname, b);
+                        ((InMemoryByteCodeGroovyClassLoader) compilationUnit.getClassLoader()).addClass(classname, b);
                     }
                 };
             } else {
@@ -200,7 +188,7 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public void visitServiceDescriptor(String type, String classname) {
-        File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
+        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
 
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
@@ -213,7 +201,7 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path) {
-        File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
+        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
 
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
@@ -227,7 +215,7 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
-        File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
+        File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
 
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(

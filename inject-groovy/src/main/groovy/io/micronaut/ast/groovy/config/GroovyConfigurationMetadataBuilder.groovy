@@ -26,6 +26,7 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.InnerClassNode
+import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
 import java.util.function.Function
@@ -40,8 +41,10 @@ import java.util.function.Function
 class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<ClassNode> {
 
     final SourceUnit sourceUnit
+    final CompilationUnit compilationUnit
 
-    GroovyConfigurationMetadataBuilder(SourceUnit sourceUnit) {
+    GroovyConfigurationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
+        this.compilationUnit = compilationUnit
         this.sourceUnit = sourceUnit
     }
 
@@ -61,7 +64,7 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
             declaringType = ((InnerClassNode) declaringType).getOuterClass()
             if (declaringType != null) {
 
-                AnnotationMetadata parentMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, declaringType)
+                AnnotationMetadata parentMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, declaringType)
                 Optional<String> parentConfig = parentMetadata.getValue(ConfigurationReader.class, String.class)
                 if (parentConfig.isPresent()) {
                     String parentPath = parentConfig.get()
@@ -84,10 +87,10 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
     }
 
     private String calculateInitialPath(ClassNode owningType, ClassNode declaringType) {
-        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, declaringType)
+        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, declaringType)
         return annotationMetadata.stringValue(ConfigurationReader.class)
                 .map(pathEvaluationFunction(annotationMetadata)).orElseGet( {->
-            AnnotationMetadata ownerMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, owningType)
+            AnnotationMetadata ownerMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, owningType)
             return ownerMetadata.stringValue(ConfigurationReader.class)
                                 .map(pathEvaluationFunction(ownerMetadata)).orElseThrow({ ->
                 new IllegalStateException("Non @ConfigurationProperties type visited")
@@ -122,7 +125,7 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
     private void prependSuperclasses(ClassNode declaringType, StringBuilder path) {
         ClassNode superclass = declaringType.getSuperClass()
         while (superclass != ClassHelper.OBJECT_TYPE) {
-            Optional<String> parentConfig = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, superclass).stringValue(ConfigurationReader.class)
+            Optional<String> parentConfig = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, superclass).stringValue(ConfigurationReader.class)
             if (parentConfig.isPresent()) {
                 path.insert(0, parentConfig.get() + '.')
                 superclass = superclass.getSuperClass()
