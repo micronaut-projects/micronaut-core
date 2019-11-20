@@ -8,6 +8,12 @@ Support for immutable ann:context.annotation.ConfigurationProperties[] has been 
 
 https://micronaut-projects.github.io/micronaut-cache/snapshot/guide/#introduction[Micronaut Cache] has been updated to support https://micronaut-projects.github.io/micronaut-cache/snapshot/guide/#hazelcast[Hazelcast] and https://micronaut-projects.github.io/micronaut-cache/snapshot/guide/#ehcache[Ehcache] as additional Cache providers.
 
+=== Micronaut OpenAPI (Swagger) 1.3 Update
+
+Micronaut OpenAPI has been updated with loads of improvements including the ability to https://micronaut-projects.github.io/micronaut-openapi/1.3.x/guide/index.html#openApiViews[automatically generate UIs for Swagger output] as part of your application. Thanks to https://github.com/croudet[croudet] for this contribution awesome contribution.
+
+The module is also no longer regarded as experimental.
+
 === Micronaut SQL 1.3 Update
 
 Micronaut SQL includes the latest versions of Hibernate and adds support for the Vert.x MySQL and Postgres Clients. Thank you to https://github.com/shenzhou-6[shenzhou-6] for this contribution.
@@ -38,16 +44,19 @@ For SSL requests, the certificate is now available as a request attribute. See a
 
 === Dependency Upgrades
 
-Third Party Dependencies:
+Required Third Party Dependencies:
 
 * ASM `7.0` -> `7.2`
 * Caffeine `2.5.6` -> `2.8.0`
+* Jackson `2.9.9` -> `2.10.1`
+* Reactive Streams `1.0.2` -> `1.0.3`
+
+Optional Third Party Dependencies:
+
 * Micrometer `1.2.1` -> `1.3.1`
 * Mongo Reactive Driver `1.11.0` -> `1.12.0`
 * Neo4j Java Driver `1.7.2` -> `1.7.5`
-* Jackson `2.9.9` -> `2.10.1`
 * Jaeger `0.35.5` -> `1.0.0`
-* Reactive Streams `1.0.2` -> `1.0.3`
 * Spring `5.1.8` -> `5.2.1`
 * Zipkin/Brave `5.6.5` -> `5.9.0`
 
