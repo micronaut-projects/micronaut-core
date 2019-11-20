@@ -29,6 +29,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
+import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import javax.annotation.Nonnull;
@@ -52,21 +53,23 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     /**
      * @param sourceUnit         The source unit
+     * @param compilationUnit    The compilation unit
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyClassElement(SourceUnit sourceUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
-        this(sourceUnit, classNode, annotationMetadata, null);
+    GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
+        this(sourceUnit, compilationUnit, classNode, annotationMetadata, null);
     }
 
     /**
      * @param sourceUnit         The source unit
+     * @param compilationUnit    The compilation unit
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      * @param genericInfo        The generic info
      */
-    GroovyClassElement(SourceUnit sourceUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, Map<String, Map<String, ClassNode>> genericInfo) {
-        super(sourceUnit, classNode, annotationMetadata);
+    GroovyClassElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata, Map<String, Map<String, ClassNode>> genericInfo) {
+        super(sourceUnit, compilationUnit, classNode, annotationMetadata);
         this.classNode = classNode;
         this.genericInfo = genericInfo;
     }
@@ -88,8 +91,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
             return Optional.of(
                     new GroovyClassElement(
                             sourceUnit,
+                            compilationUnit,
                             superClass,
-                            AstAnnotationUtils.getAnnotationMetadata(sourceUnit, superClass)
+                            AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, superClass)
                     )
             );
         }
@@ -120,11 +124,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     private Optional<MethodElement> createMethodElement(MethodNode method) {
         return Optional.ofNullable(method).map(executableElement -> {
 
-            final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, executableElement);
+            final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, executableElement);
             if (executableElement instanceof ConstructorNode) {
-                return new GroovyConstructorElement(this, sourceUnit, (ConstructorNode) executableElement, annotationMetadata);
+                return new GroovyConstructorElement(this, sourceUnit, compilationUnit, (ConstructorNode) executableElement, annotationMetadata);
             } else {
-                return new GroovyMethodElement(this, sourceUnit, executableElement, annotationMetadata);
+                return new GroovyMethodElement(this, sourceUnit, compilationUnit, executableElement, annotationMetadata);
             }
         });
     }
@@ -136,7 +140,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
      */
     public Map<String, Map<String, ClassNode>> getGenericTypeInfo() {
         if (genericInfo == null) {
-            genericInfo = AstGenericUtils.buildAllGenericElementInfo(classNode, new GroovyVisitorContext(sourceUnit));
+            genericInfo = AstGenericUtils.buildAllGenericElementInfo(classNode, new GroovyVisitorContext(sourceUnit, compilationUnit));
         }
         return genericInfo;
     }
@@ -153,8 +157,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
             for (Map.Entry<String, ClassNode> entry : forType.entrySet()) {
                 ClassNode classNode = entry.getValue();
 
-                ClassElement rawElement = new GroovyClassElement(sourceUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
+                ClassElement rawElement = new GroovyClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
                         sourceUnit,
+                        compilationUnit,
                         classNode
                 ));
                 if (thisSpec != null) {
@@ -188,8 +193,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                     if (cn != null) {
                         typeArgumentMap.put(name, new GroovyClassElement(
                                 sourceUnit,
+                                compilationUnit,
                                 cn,
-                                AstAnnotationUtils.getAnnotationMetadata(sourceUnit, cn)
+                                AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
                         ));
                     }
                 }
@@ -205,9 +211,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                 ClassNode cn = entry.getValue();
                 GroovyClassElement classElement;
                 if (cn.isEnum()) {
-                    classElement = new GroovyEnumElement(sourceUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, cn));
+                    classElement = new GroovyEnumElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn));
                 } else {
-                    classElement = new GroovyClassElement(sourceUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, cn));
+                    classElement = new GroovyClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn));
                 }
                 map.put(entry.getKey(), classElement);
             }
@@ -227,9 +233,10 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                 boolean readOnly = propertyNode.getField().isFinal();
                 GroovyPropertyElement groovyPropertyElement = new GroovyPropertyElement(
                         sourceUnit,
+                        compilationUnit,
                         this,
                         propertyNode.getField(),
-                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, propertyNode.getField()),
+                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, propertyNode.getField()),
                         propertyNode.getName(),
                         readOnly,
                         propertyNode
@@ -238,8 +245,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                     @Override
                     public ClassElement getType() {
                         ClassNode type = propertyNode.getType();
-                        return new GroovyClassElement(sourceUnit, type,
-                                AstAnnotationUtils.getAnnotationMetadata(sourceUnit, type));
+                        return new GroovyClassElement(sourceUnit, compilationUnit, type,
+                                AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, type));
                     }
                 };
                 propertyElements.add(groovyPropertyElement);
@@ -287,10 +294,10 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                                     if (classElement != null) {
                                         getterReturnType = classElement;
                                     } else {
-                                        getterReturnType = new GroovyClassElement(sourceUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
+                                        getterReturnType = new GroovyClassElement(sourceUnit, compilationUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
                                     }
                                 } else {
-                                    getterReturnType = new GroovyClassElement(sourceUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
+                                    getterReturnType = new GroovyClassElement(sourceUnit, compilationUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
                                 }
 
                                 GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
@@ -299,7 +306,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                                 getterAndSetter.getter = node;
                                 if (getterAndSetter.setter != null) {
                                     ClassNode typeMirror = getterAndSetter.setter.getParameters()[0].getType();
-                                    ClassElement setterParameterType = new GroovyClassElement(sourceUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
+                                    ClassElement setterParameterType = new GroovyClassElement(sourceUnit, compilationUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
                                     if (!setterParameterType.getName().equals(getterReturnType.getName())) {
                                         getterAndSetter.setter = null; // not a compatible setter
                                     }
@@ -310,7 +317,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                                     return;
                                 }
                                 ClassNode typeMirror = node.getParameters()[0].getType();
-                                ClassElement setterParameterType = new GroovyClassElement(sourceUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
+                                ClassElement setterParameterType = new GroovyClassElement(sourceUnit, compilationUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
 
                                 GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
                                 configureDeclaringType(declaringTypeElement, getterAndSetter);
@@ -329,8 +336,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                             if (beanPropertyData.declaringType == null && !GroovyClassElement.this.classNode.equals(declaringTypeElement)) {
                                 beanPropertyData.declaringType = new GroovyClassElement(
                                         sourceUnit,
+                                        compilationUnit,
                                         declaringTypeElement,
-                                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, declaringTypeElement)
+                                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, declaringTypeElement)
                                 );
                             }
                         }
@@ -345,15 +353,16 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                 if (value.getter != null) {
 
                     final AnnotationMetadata annotationMetadata;
-                    final GroovyAnnotationMetadataBuilder groovyAnnotationMetadataBuilder = new GroovyAnnotationMetadataBuilder(sourceUnit);
+                    final GroovyAnnotationMetadataBuilder groovyAnnotationMetadataBuilder = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit);
                     final FieldNode field = this.classNode.getField(propertyName);
                     if (field != null) {
-                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, field, value.getter);
+                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, field, value.getter);
                     } else {
                         annotationMetadata = groovyAnnotationMetadataBuilder.buildForMethod(value.getter);
                     }
                     GroovyPropertyElement propertyElement = new GroovyPropertyElement(
                             sourceUnit,
+                            compilationUnit,
                             value.declaringType == null ? this : value.declaringType,
                             value.getter,
                             annotationMetadata,
@@ -366,6 +375,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                                 return Optional.of(new GroovyMethodElement(
                                         thisElement,
                                         sourceUnit,
+                                        compilationUnit,
                                         value.setter,
                                         groovyAnnotationMetadataBuilder.buildForMethod(value.setter)
                                 ));
@@ -381,7 +391,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
                         @Override
                         public Optional<MethodElement> getReadMethod() {
-                            return Optional.of(new GroovyMethodElement(thisElement, sourceUnit, value.getter, annotationMetadata));
+                            return Optional.of(new GroovyMethodElement(thisElement, sourceUnit, compilationUnit, value.getter, annotationMetadata));
                         }
                     };
                     propertyElements.add(propertyElement);

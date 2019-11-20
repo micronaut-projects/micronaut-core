@@ -15,9 +15,11 @@
  */
 package io.micronaut.ast.groovy.utils
 
+import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
 /**
@@ -30,9 +32,15 @@ import org.codehaus.groovy.control.SourceUnit
 abstract class PublicAbstractMethodVisitor extends PublicMethodVisitor {
 
     ClassNode current
+    private final CompilationUnit compilationUnit
 
-    PublicAbstractMethodVisitor(SourceUnit sourceUnit) {
+    PublicAbstractMethodVisitor(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
         super(sourceUnit)
+        this.compilationUnit = compilationUnit
+    }
+
+    CompilationUnit getCompilationUnit() {
+        compilationUnit
     }
 
     @Override

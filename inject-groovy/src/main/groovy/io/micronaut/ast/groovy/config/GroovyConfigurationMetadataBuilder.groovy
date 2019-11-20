@@ -26,6 +26,7 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.InnerClassNode
+import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
 import java.util.function.Function
@@ -40,8 +41,10 @@ import java.util.function.Function
 class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<ClassNode> {
 
     final SourceUnit sourceUnit
+    final CompilationUnit compilationUnit
 
-    GroovyConfigurationMetadataBuilder(SourceUnit sourceUnit) {
+    GroovyConfigurationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
+        this.compilationUnit = compilationUnit
         this.sourceUnit = sourceUnit
     }
 
@@ -125,7 +128,7 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
 
     @Override
     protected AnnotationMetadata getAnnotationMetadata(ClassNode type) {
-        return AstAnnotationUtils.getAnnotationMetadata(sourceUnit, type)
+        return AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, type)
     }
 
     private void prependSuperclasses(ClassNode declaringType, StringBuilder path) {

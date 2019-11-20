@@ -21,6 +21,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.HttpFilter;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
@@ -46,6 +47,17 @@ public interface Router {
     @Nonnull <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri);
 
     /**
+     * Find any {@link RouteMatch} regardless of HTTP method.
+     *
+     * @param uri     The URI
+     * @param context The optional {@link HttpRequest} context information to apply {@link io.micronaut.web.router.filter.RouteMatchFilter}.
+     * @param <T>     The target type
+     * @param <R>     The return type
+     * @return A stream of route matches
+     */
+    @Nonnull <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri, @Nullable HttpRequest<?> context);
+
+    /**
      * Finds all of the possible routes for the given HTTP method and URI.
      *
      * @param httpMethod The HTTP method
@@ -55,6 +67,18 @@ public interface Router {
      * @return A {@link Stream} of possible {@link Route} instances.
      */
     @Nonnull <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri);
+
+    /**
+     * Finds all of the possible routes for the given HTTP method and URI.
+     *
+     * @param httpMethod The HTTP method
+     * @param uri        The URI route match
+     * @param context    The optional {@link HttpRequest} context information to apply {@link io.micronaut.web.router.filter.RouteMatchFilter}.
+     * @param <T>        The target type
+     * @param <R>        The type
+     * @return A {@link Stream} of possible {@link Route} instances.
+     */
+    @Nonnull <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri, @Nullable HttpRequest<?> context);
 
     /**
      * Finds the closest match for the given request.
