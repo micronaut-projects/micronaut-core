@@ -2,7 +2,6 @@ package io.micronaut.inject.visitor
 
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
-import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
@@ -10,9 +9,7 @@ import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.introspections.Person
-import io.micronaut.inject.visitor.introspections.packages.Author
 
-import javax.persistence.Id
 import javax.validation.constraints.Size
 
 class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
