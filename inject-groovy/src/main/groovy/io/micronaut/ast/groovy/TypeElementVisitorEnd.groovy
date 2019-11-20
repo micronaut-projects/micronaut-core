@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy
 
+import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
@@ -23,6 +24,7 @@ import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
@@ -36,7 +38,9 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
  */
 @CompileStatic
 @GroovyASTTransformation(phase = CompilePhase.CLASS_GENERATION)
-class TypeElementVisitorEnd implements ASTTransformation {
+class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
+
+    private CompilationUnit compilationUnit
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
@@ -47,7 +51,7 @@ class TypeElementVisitorEnd implements ASTTransformation {
             OrderUtil.reverseSort(values)
             for(loadedVisitor in values) {
                 try {
-                    loadedVisitor.finish(new GroovyVisitorContext(source))
+                    loadedVisitor.finish(new GroovyVisitorContext(source, compilationUnit))
                 } catch (Throwable e) {
                     AstMessageUtils.error(
                             source,
@@ -60,5 +64,10 @@ class TypeElementVisitorEnd implements ASTTransformation {
         TypeElementVisitorTransform.loadedVisitors = null
         AstAnnotationUtils.invalidateCache()
         AbstractAnnotationMetadataBuilder.clearMutated()
+    }
+
+    @Override
+    void setCompilationUnit(CompilationUnit unit) {
+        this.compilationUnit = unit
     }
 }

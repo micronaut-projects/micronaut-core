@@ -496,7 +496,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             // if there is no route present try to locate a route that matches a different content type
             Set<MediaType> existingRouteConsumes = router
-                    .find(request, requestPath)
+                    .find(httpMethod, requestPath, request)
                     .map(UriRouteMatch::getRoute)
                     .flatMap(r -> r.getConsumes().stream())
                     .collect(Collectors.toSet());
@@ -523,7 +523,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             // if there is no route present try to locate a route that matches a different HTTP method
             Set<String> existingRouteMethods = router
-                    .findAny(request.getUri().toString())
+                    .findAny(request.getUri().toString(), request)
                     .map(UriRouteMatch::getRoute)
                     .map(UriRoute::getHttpMethodName)
                     .collect(Collectors.toSet());

@@ -25,6 +25,7 @@ import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;
@@ -115,6 +116,17 @@ public class DefaultRouter implements Router {
     @Override
     public Stream<UriRoute> uriRoutes() {
         return routesByMethod.values().stream().flatMap(List::stream);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nonnull
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
+        List<UriRoute> routes = routesByMethod.get(httpMethod.name());
+        String uriString = uri.toString();
+        return routes.stream()
+                .map((route -> (UriRouteMatch<T, R>) route.match(uriString).orElse(null)))
+                .filter(Objects::nonNull);
     }
 
     @Override
@@ -256,6 +268,17 @@ public class DefaultRouter implements Router {
             .map(route -> route.match(uri.toString()))
             .filter(Optional::isPresent)
             .map(Optional::get);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nonnull
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
+        return routesByMethod.values().stream()
+                .flatMap(List::stream)
+                .map(route -> route.match(uri.toString()))
+                .filter(Optional::isPresent)
+                .map(Optional::get);
     }
 
     private UriRoute[] finalizeRoutes(List<UriRoute> routes) {

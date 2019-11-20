@@ -32,6 +32,7 @@ import io.micronaut.inject.ast.MemberElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
+import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import javax.annotation.Nonnull;
@@ -51,16 +52,19 @@ import java.util.function.Consumer;
 public abstract class AbstractGroovyElement implements AnnotationMetadataDelegate, Element {
 
     protected final SourceUnit sourceUnit;
+    protected final CompilationUnit compilationUnit;
     private final AnnotatedNode annotatedNode;
     private AnnotationMetadata annotationMetadata;
 
     /**
      * Default constructor.
-     * @param sourceUnit The source unit
-     * @param annotatedNode The annotated node
+     * @param sourceUnit         The source unit
+     * @param compilationUnit    The compilation unit
+     * @param annotatedNode      The annotated node
      * @param annotationMetadata The annotation metadata
      */
-    public AbstractGroovyElement(SourceUnit sourceUnit, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
+    public AbstractGroovyElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
+        this.compilationUnit = compilationUnit;
         this.annotatedNode = annotatedNode;
         this.annotationMetadata = annotationMetadata;
         this.sourceUnit = sourceUnit;
@@ -173,9 +177,10 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                     genericsSpec = alignNewGenericsInfo(genericsTypes, redirectTypes, genericsSpec);
                     AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(
                             sourceUnit,
+                            compilationUnit,
                             type
                     );
-                    return new GroovyClassElement(sourceUnit, type, annotationMetadata, Collections.singletonMap(
+                    return new GroovyClassElement(sourceUnit, compilationUnit, type, annotationMetadata, Collections.singletonMap(
                             type.getName(),
                             genericsSpec
                     ));
@@ -193,8 +198,9 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
                 if (classNode.isGenericsPlaceHolder()) {
                     return resolveGenericType(sourceUnit, typeGenericInfo, classNode);
                 } else {
-                    return new GroovyClassElement(sourceUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
+                    return new GroovyClassElement(sourceUnit, compilationUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(
                             sourceUnit,
+                            compilationUnit,
                             classNode
                     ));
                 }

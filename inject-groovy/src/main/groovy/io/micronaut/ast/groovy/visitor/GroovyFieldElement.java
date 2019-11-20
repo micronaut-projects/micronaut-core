@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import org.codehaus.groovy.ast.*;
+import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import javax.annotation.Nonnull;
@@ -39,14 +40,16 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
 
     /**
      * @param sourceUnit         the source unit
+     * @param compilationUnit    The compilation unit
      * @param variable           The {@link Variable}
      * @param annotatedNode       The annotated ndoe
      * @param annotationMetadata The annotation medatada
      */
     GroovyFieldElement(
             SourceUnit sourceUnit,
+            CompilationUnit compilationUnit,
             Variable variable, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, annotatedNode, annotationMetadata);
+        super(sourceUnit, compilationUnit, annotatedNode, annotationMetadata);
         this.variable = variable;
         this.sourceUnit = sourceUnit;
     }
@@ -94,7 +97,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @Nonnull
     @Override
     public ClassElement getType() {
-        return new GroovyClassElement(sourceUnit, variable.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, variable.getType()));
+        return new GroovyClassElement(sourceUnit, compilationUnit, variable.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, variable.getType()));
     }
 
     @Override
@@ -114,9 +117,11 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
 
         return new GroovyClassElement(
                 sourceUnit,
+                compilationUnit,
                 declaringClass,
                 AstAnnotationUtils.getAnnotationMetadata(
                         sourceUnit,
+                        compilationUnit,
                         declaringClass
                 )
         );
