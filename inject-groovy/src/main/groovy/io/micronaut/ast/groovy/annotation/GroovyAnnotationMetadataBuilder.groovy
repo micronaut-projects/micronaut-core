@@ -44,6 +44,7 @@ import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
+import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
 import javax.annotation.Nonnull
@@ -65,8 +66,10 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     final SourceUnit sourceUnit
     final AnnotatedElementValidator elementValidator
+    final CompilationUnit compilationUnit
 
-    GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit) {
+    GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
+        this.compilationUnit = compilationUnit
         this.sourceUnit = sourceUnit
         def ast = sourceUnit?.getAST()
         if (ast != null) {
@@ -123,7 +126,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     @Override
     protected VisitorContext createVisitorContext() {
-        return new GroovyVisitorContext(sourceUnit)
+        return new GroovyVisitorContext(sourceUnit, compilationUnit)
     }
 
     @Override

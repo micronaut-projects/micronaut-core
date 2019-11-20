@@ -47,7 +47,7 @@ class MyProperties {
 ''', "test.MyProperties")
 
         when:
-        GroovyConfigurationMetadataBuilder builder = new GroovyConfigurationMetadataBuilder()
+        GroovyConfigurationMetadataBuilder builder = new GroovyConfigurationMetadataBuilder(null, null)
         def configurationMetadata = builder.visitProperties(element, "some description")
         def propertyMetadata = builder.visitProperty(element, element, "java.lang.String", "setterTest", "some description", null)
 

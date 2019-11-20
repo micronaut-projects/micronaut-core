@@ -26,6 +26,7 @@ import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
+import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import javax.annotation.Nonnull;
@@ -51,11 +52,12 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     /**
      * @param declaringClass     The declaring class
      * @param sourceUnit         The source unit
+     * @param compilationUnit    The compilation unit
      * @param methodNode         The {@link MethodNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyMethodElement(GroovyClassElement declaringClass, SourceUnit sourceUnit, MethodNode methodNode, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, methodNode, annotationMetadata);
+    GroovyMethodElement(GroovyClassElement declaringClass, SourceUnit sourceUnit, CompilationUnit compilationUnit, MethodNode methodNode, AnnotationMetadata annotationMetadata) {
+        super(sourceUnit, compilationUnit, methodNode, annotationMetadata);
         this.methodNode = methodNode;
         this.sourceUnit = sourceUnit;
         this.declaringClass = declaringClass;
@@ -152,9 +154,9 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     public ClassElement getReturnType() {
         ClassNode returnType = methodNode.getReturnType();
         if (returnType.isEnum()) {
-            return new GroovyEnumElement(sourceUnit, returnType, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, returnType));
+            return new GroovyEnumElement(sourceUnit, compilationUnit, returnType, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, returnType));
         } else {
-            return new GroovyClassElement(sourceUnit, returnType, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, returnType));
+            return new GroovyClassElement(sourceUnit, compilationUnit, returnType, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, returnType));
         }
     }
 
@@ -165,8 +167,9 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
                 new GroovyParameterElement(
                         this,
                         sourceUnit,
+                        compilationUnit,
                         parameter,
-                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, new ExtendedParameter(methodNode, parameter))
+                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, new ExtendedParameter(methodNode, parameter))
                 )
         ).toArray(ParameterElement[]::new);
     }
@@ -175,9 +178,11 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     public ClassElement getDeclaringType() {
         return new GroovyClassElement(
                 sourceUnit,
+                compilationUnit,
                 methodNode.getDeclaringClass(),
                 AstAnnotationUtils.getAnnotationMetadata(
                         sourceUnit,
+                        compilationUnit,
                         methodNode.getDeclaringClass()
                 )
         );
