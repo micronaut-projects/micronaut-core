@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.Parameter;
+import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import javax.annotation.Nonnull;
@@ -43,13 +44,14 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     /**
      * Default constructor.
      *
-     * @param methodElement the parent method element
-     * @param sourceUnit The source unit
-     * @param parameter The parameter
+     * @param methodElement      The parent method element
+     * @param sourceUnit         The source unit
+     * @param compilationUnit    The compilation unit
+     * @param parameter          The parameter
      * @param annotationMetadata The annotation metadata
      */
-    GroovyParameterElement(GroovyMethodElement methodElement, SourceUnit sourceUnit, Parameter parameter, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, parameter, annotationMetadata);
+    GroovyParameterElement(GroovyMethodElement methodElement, SourceUnit sourceUnit, CompilationUnit compilationUnit, Parameter parameter, AnnotationMetadata annotationMetadata) {
+        super(sourceUnit, compilationUnit, parameter, annotationMetadata);
         this.parameter = parameter;
         this.sourceUnit = sourceUnit;
         this.methodElement = methodElement;
@@ -87,9 +89,9 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     public ClassElement getType() {
         ClassNode t = parameter.getType();
         if (t.isEnum()) {
-            return new GroovyEnumElement(sourceUnit, t, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, t));
+            return new GroovyEnumElement(sourceUnit, compilationUnit, t, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, t));
         } else {
-            return new GroovyClassElement(sourceUnit, t, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, t));
+            return new GroovyClassElement(sourceUnit, compilationUnit, t, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, t));
         }
     }
 }

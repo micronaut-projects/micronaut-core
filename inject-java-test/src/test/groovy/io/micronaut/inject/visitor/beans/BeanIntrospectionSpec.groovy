@@ -678,7 +678,6 @@ class Test {}
         reference != null
         reference.getBeanType() == TestBean
 
-
         cleanup:
         context?.close()
     }
