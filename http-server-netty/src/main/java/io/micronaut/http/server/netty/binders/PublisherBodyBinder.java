@@ -120,7 +120,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                                     if (LOG.isDebugEnabled()) {
                                         LOG.debug("Cannot convert message for argument [{}] and value: {}", context.getArgument(), message);
                                     }
-                                    subscriber.onError(new UnsatisfiedRouteException(context.getArgument()));
+                                    subscriber.onError(UnsatisfiedRouteException.create(context.getArgument()));
                                 }
                             } finally {
                                 s.cancel();
