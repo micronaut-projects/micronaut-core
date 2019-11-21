@@ -176,7 +176,6 @@ class MavenBuildTokens extends BuildTokens {
         tokens.put("dependencies", prettyPrint(dependenciesWriter.toString(), 4))
         tokens.put("repositories", prettyPrint(repositoriesWriter.toString(), 4))
         tokens.put("jdkversion", VersionInfo.getJdkVersion())
-        println prettyPrint(annotationProcessorsWriter.toString(), 18)
         tokens.put("annotationProcessorPaths", prettyPrint(annotationProcessorsWriter.toString(), 18))
 
         tokens
