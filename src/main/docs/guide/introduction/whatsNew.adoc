@@ -26,7 +26,7 @@ snippet::io.micronaut.docs.config.itfce.EngineConfig[tags="imports,class",indent
 
 === New Micronaut Cache Modules
 
-https://micronaut-projects.github.io/micronaut-cache/snapshot/guide/#introduction[Micronaut Cache] has been updated to support https://micronaut-projects.github.io/micronaut-cache/snapshot/guide/#hazelcast[Hazelcast] and https://micronaut-projects.github.io/micronaut-cache/snapshot/guide/#ehcache[Ehcache] as additional Cache providers.
+https://micronaut-projects.github.io/micronaut-cache/1.0.x/guide/#introduction[Micronaut Cache] has been updated to support https://micronaut-projects.github.io/micronaut-cache/1.0.x/guide/#hazelcast[Hazelcast] and https://micronaut-projects.github.io/micronaut-cache/1.0.x/guide/#ehcache[Ehcache] as additional Cache providers.
 
 === Micronaut OpenAPI (Swagger) 1.3 Update
 
