@@ -42,7 +42,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
     public static final RepositoryConfiguration DEFAULT_REPO
     public static final RepositoryConfiguration SNAPSHOT_REPO = new RepositoryConfiguration(
             "micronautSnapshots",
-            new URI("https://oss.sonatype.org/content/repositories/snapshots"), true
+            new URI("https://oss.jfrog.org/artifactory/oss-snapshot-local"), true
     )
     public static final RepositoryConfiguration RELEASE_REPO = new RepositoryConfiguration(
             "jcenter",
