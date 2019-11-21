@@ -33,19 +33,8 @@ $ curl -X GET localhost:55838/date
 
 The api:management.endpoint.Read[] annotation accepts an optional `produces` argument, which sets the media type returned from the method (default is `application/json`):
 
-[source,groovy]
-.CurrentDateEndpoint.groovy
-----
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointImport, indent=0]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=readImport, indent=0]
+snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, readImport, mediaTypeImport, endpointClassBegin, currentDate, readArg, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassBegin, indent=0]
-
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=currentDate, indent=4]
-
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=readArg, indent=4]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassEnd, indent=0]
-----
 <1> Supported media types are represented by api:http.MediaType[]
 
 The above method responds to the following request:
@@ -61,20 +50,8 @@ the_date_is: Fri May 11 19:24:21 CDT
 == Write Methods
 
 Annotating a method with the api:management.endpoint.Write[] annotation will cause it to respond to `POST` requests.
-[source,groovy]
-.CurrentDateEndpoint.groovy
-----
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointImport, indent=0]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=writeImport, indent=0]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=mediaTypeImport, indent=0]
 
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassBegin, indent=0]
-
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=currentDate, indent=4]
-
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=simpleWrite, indent=4]
-include::{testsuite}/server/endpoints/CurrentDateEndpoint.groovy[tags=endpointClassEnd, indent=0]
-----
+snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, writeImport, mediaTypeImport, endpointClassBegin, currentDate, simpleWrite, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
 The above method responds to the following request:
 
@@ -87,20 +64,7 @@ Current date reset
 
 The api:management.endpoint.Write[] annotation accepts an optional `consumes` argument, which sets the media type accepted by the method (default is `application/json`):
 
-[source,groovy]
-.MessageEndpoint.groovy
-----
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointImport, indent=0]
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=writeImport, indent=0]
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=mediaTypeImport, indent=0]
-
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointClassBegin, indent=0]
-
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=message, indent=4]
-
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=writeArg, indent=4]
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointClassEnd, indent=0]
-----
+snippet::io.micronaut.docs.server.endpoint.MessageEndpoint[tags="endpointImport, writeImport, mediaTypeImport, endpointClassBegin, message, writeArg, endpointClassEnd", indent=0, title="MessageEndpoint"]
 
 The above method responds to the following request:
 
@@ -116,19 +80,7 @@ Message updated
 
 Annotating a method with the api:management.endpoint.Delete[] annotation will cause it to respond to `DELETE` requests.
 
-[source,groovy]
-.MessageEndpoint.groovy
-----
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointImport, indent=0]
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=deleteImport, indent=0]
-
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointClassBegin, indent=0]
-
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=message, indent=4]
-
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=simpleDelete, indent=4]
-include::{testsuite}/server/endpoints/MessageEndpoint.groovy[tags=endpointClassEnd, indent=0]
-----
+snippet::io.micronaut.docs.server.endpoint.MessageEndpoint[tags="endpointImport, deleteImport, endpointClassBegin, message, simpleDelete, endpointClassEnd", indent=0, title="MessageEndpoint"]
 
 The above method responds to the following request:
 
