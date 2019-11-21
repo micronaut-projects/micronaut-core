@@ -275,7 +275,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                                 ConversionError conversionError = conversionErrors.iterator().next();
                                 throw new ConversionErrorException(argument, conversionError);
                             } else {
-                                throw new UnsatisfiedRouteException(argument);
+                                throw UnsatisfiedRouteException.create(argument);
                             }
                         }
 
@@ -283,7 +283,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 } else if (value instanceof ConversionError) {
                     throw new ConversionErrorException(argument, (ConversionError) value);
                 } else if (value == DefaultRouteBuilder.NO_VALUE) {
-                    throw new UnsatisfiedRouteException(argument);
+                    throw UnsatisfiedRouteException.create(argument);
                 } else {
                     ConversionContext conversionContext = ConversionContext.of(argument);
                     Optional<?> result = conversionService.convert(value, argument.getType(), conversionContext);
@@ -355,7 +355,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 return null;
             }
             throw lastError.map(conversionError ->
-                (RuntimeException) new ConversionErrorException(argument, conversionError)).orElseGet(() -> new UnsatisfiedRouteException(argument)
+                (RuntimeException) new ConversionErrorException(argument, conversionError)).orElseGet(() -> UnsatisfiedRouteException.create(argument)
             );
         } else {
             return result.get();
