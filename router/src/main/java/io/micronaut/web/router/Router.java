@@ -55,7 +55,9 @@ public interface Router {
      * @param <R>     The return type
      * @return A stream of route matches
      */
-    @Nonnull <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri, @Nullable HttpRequest<?> context);
+    default @Nonnull <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
+        return findAny(uri);
+    };
 
     /**
      * Finds all of the possible routes for the given HTTP method and URI.
@@ -78,7 +80,9 @@ public interface Router {
      * @param <R>        The type
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    @Nonnull <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri, @Nullable HttpRequest<?> context);
+    default @Nonnull <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
+        return find(httpMethod, uri);
+    }
 
     /**
      * Finds the closest match for the given request.
