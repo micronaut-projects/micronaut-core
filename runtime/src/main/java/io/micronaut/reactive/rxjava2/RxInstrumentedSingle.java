@@ -34,7 +34,7 @@ import java.util.Optional;
 final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedComponent {
     protected final SingleSource<T> source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Optional<RxInstrumenter> instrumenter;
+    private final RxInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -50,11 +50,11 @@ final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedC
 
     @Override
     protected void subscribeActual(SingleObserver<? super T> o) {
-        SingleObserver<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
-        if (instrumenter.isPresent()) {
-            instrumenter.get().subscribe(source, wrap);
+        if (instrumenter != null) {
+            SingleObserver<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
+            instrumenter.subscribe(source, wrap);
         } else {
-            source.subscribe(wrap);
+            source.subscribe(o);
         }
     }
 }

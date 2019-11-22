@@ -21,7 +21,6 @@ import io.reactivex.FlowableSubscriber;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
-import java.util.Optional;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -35,7 +34,7 @@ import java.util.Optional;
 final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumentedComponent {
     private final Publisher<T> source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Optional<RxInstrumenter> instrumenter;
+    private final RxInstrumenter instrumenter;
 
 
     /**
@@ -55,11 +54,11 @@ final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumen
         if (!(s instanceof FlowableSubscriber)) {
             throw new IllegalArgumentException("Subscriber must be an instance of FlowableSubscriber");
         }
-        Subscriber<? super T> wrap = RxInstrumentedWrappers.wrap(s, instrumenterFactory);
-        if (instrumenter.isPresent()) {
-            instrumenter.get().subscribe(source, wrap);
+        if (instrumenter != null) {
+            Subscriber<? super T> wrap = RxInstrumentedWrappers.wrap(s, instrumenterFactory);
+            instrumenter.subscribe(source, wrap);
         } else {
-            source.subscribe(wrap);
+            source.subscribe(s);
         }
     }
 }

@@ -20,7 +20,6 @@ import io.reactivex.Observable;
 import io.reactivex.ObservableSource;
 import io.reactivex.Observer;
 
-import java.util.Optional;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -34,7 +33,7 @@ import java.util.Optional;
 final class RxInstrumentedObservable<T> extends Observable<T> implements RxInstrumentedComponent {
     private final ObservableSource<T> source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Optional<RxInstrumenter> instrumenter;
+    private final RxInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -50,11 +49,11 @@ final class RxInstrumentedObservable<T> extends Observable<T> implements RxInstr
 
     @Override
     protected void subscribeActual(Observer<? super T> o) {
-        Observer<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
-        if (instrumenter.isPresent()) {
-            instrumenter.get().subscribe(source, wrap);
+        if (instrumenter != null) {
+            Observer<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
+            instrumenter.subscribe(source, wrap);
         } else {
-            source.subscribe(wrap);
+            source.subscribe(o);
         }
     }
 }

@@ -21,7 +21,6 @@ import io.reactivex.flowables.ConnectableFlowable;
 import io.reactivex.functions.Consumer;
 import org.reactivestreams.Subscriber;
 
-import java.util.Optional;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -35,7 +34,7 @@ import java.util.Optional;
 final class RxInstrumentedConnectableFlowable<T> extends ConnectableFlowable<T> implements RxInstrumentedComponent {
     private final ConnectableFlowable<T> source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Optional<RxInstrumenter> instrumenter;
+    private final RxInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -51,18 +50,18 @@ final class RxInstrumentedConnectableFlowable<T> extends ConnectableFlowable<T> 
 
     @Override
     protected void subscribeActual(Subscriber<? super T> s) {
-        Subscriber<? super T> wrap = RxInstrumentedWrappers.wrap(s, instrumenterFactory);
-        if (instrumenter.isPresent()) {
-            instrumenter.get().subscribe(source, wrap);
+        if (instrumenter != null) {
+            Subscriber<? super T> wrap = RxInstrumentedWrappers.wrap(s, instrumenterFactory);
+            instrumenter.subscribe(source, wrap);
         } else {
-            source.subscribe(wrap);
+            source.subscribe(s);
         }
     }
 
     @Override
     public void connect(Consumer<? super Disposable> connection) {
-        if (instrumenter.isPresent()) {
-            instrumenter.get().connect(source, connection);
+        if (instrumenter != null) {
+            instrumenter.connect(source, connection);
         } else {
             source.connect(connection);
         }

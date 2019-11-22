@@ -19,8 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.reactivex.parallel.ParallelFlowable;
 import org.reactivestreams.Subscriber;
 
-import java.util.Optional;
-
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
  * See https://github.com/openzipkin/brave/tree/master/context/rxjava2/src/main/java/brave/context/rxjava2/internal.
@@ -33,7 +31,7 @@ import java.util.Optional;
 final class RxInstrumentedParallelFlowable<T> extends ParallelFlowable<T> implements RxInstrumentedComponent {
     protected final ParallelFlowable<T> source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Optional<RxInstrumenter> instrumenter;
+    private final RxInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -57,17 +55,17 @@ final class RxInstrumentedParallelFlowable<T> extends ParallelFlowable<T> implem
         if (!validate(s)) {
             return;
         }
-        int n = s.length;
-        @SuppressWarnings("unchecked")
-        Subscriber<? super T>[] parents = new Subscriber[n];
-        for (int i = 0; i < n; i++) {
-            Subscriber<? super T> z = s[i];
-            parents[i] = RxInstrumentedWrappers.wrap(z, instrumenterFactory);
-        }
-        if (instrumenter.isPresent()) {
-            instrumenter.get().subscribe(source, parents);
+        if (instrumenter != null) {
+            int n = s.length;
+            @SuppressWarnings("unchecked")
+            Subscriber<? super T>[] parents = new Subscriber[n];
+            for (int i = 0; i < n; i++) {
+                Subscriber<? super T> z = s[i];
+                parents[i] = RxInstrumentedWrappers.wrap(z, instrumenterFactory);
+            }
+            instrumenter.subscribe(source, parents);
         } else {
-            source.subscribe(parents);
+            source.subscribe(s);
         }
     }
 }

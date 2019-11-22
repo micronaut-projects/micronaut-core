@@ -15,6 +15,8 @@
  */
 package io.micronaut.scheduling.instrument;
 
+import io.micronaut.core.annotation.Indexed;
+
 import java.util.Optional;
 
 /**
@@ -23,10 +25,12 @@ import java.util.Optional;
  * @author Denis Stepanov
  * @since 1.3
  */
+@Indexed(ReactiveInvocationInstrumenterFactory.class)
 public interface ReactiveInvocationInstrumenterFactory {
 
     /**
      * An optional invocation instrumentation.
+     *
      * @return An optional invocation instrumentation.
      */
     Optional<InvocationInstrumenter> newReactiveInvocationInstrumenter();

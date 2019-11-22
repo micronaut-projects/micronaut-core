@@ -15,6 +15,7 @@
  */
 package io.micronaut.reactive.rxjava2;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 import io.reactivex.CompletableObserver;
@@ -41,6 +42,7 @@ import java.util.List;
  * @author Denis Stepanov
  * @since 1.3
  */
+@Internal
 public class RxInstrumenter {
 
     private final InvocationInstrumenter invocationInstrumenter;

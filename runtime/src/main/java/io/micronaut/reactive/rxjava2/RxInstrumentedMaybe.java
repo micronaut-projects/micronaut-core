@@ -20,7 +20,6 @@ import io.reactivex.Maybe;
 import io.reactivex.MaybeObserver;
 import io.reactivex.MaybeSource;
 
-import java.util.Optional;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -34,7 +33,7 @@ import java.util.Optional;
 final class RxInstrumentedMaybe<T> extends Maybe<T> implements RxInstrumentedComponent {
     private final MaybeSource<T> source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Optional<RxInstrumenter> instrumenter;
+    private final RxInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -50,11 +49,11 @@ final class RxInstrumentedMaybe<T> extends Maybe<T> implements RxInstrumentedCom
 
     @Override
     protected void subscribeActual(MaybeObserver<? super T> o) {
-        MaybeObserver<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
-        if (instrumenter.isPresent()) {
-            instrumenter.get().subscribe(source, wrap);
+        if (instrumenter != null) {
+            MaybeObserver<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
+            instrumenter.subscribe(source, wrap);
         } else {
-            source.subscribe(wrap);
+            source.subscribe(o);
         }
     }
 }

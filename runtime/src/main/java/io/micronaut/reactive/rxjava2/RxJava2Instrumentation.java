@@ -20,13 +20,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.scheduling.instrument.RunnableInstrumenter;
-import io.reactivex.Completable;
-import io.reactivex.Flowable;
-import io.reactivex.Maybe;
-import io.reactivex.Observable;
-import io.reactivex.Single;
+import io.reactivex.*;
 import io.reactivex.flowables.ConnectableFlowable;
 import io.reactivex.functions.Function;
 import io.reactivex.observables.ConnectableObservable;
@@ -38,8 +33,6 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Provides a single point of entry for all instrumentations for RxJava 2.x.
@@ -52,16 +45,15 @@ import java.util.stream.Collectors;
 @Requires(classes = Flowable.class)
 @Internal
 @TypeHint(
-        value = {
-                Completable.class,
-                Single.class,
-                Flowable.class,
-                Maybe.class,
-                Observable.class
-        }
+    value = {
+            Completable.class,
+            Single.class,
+            Flowable.class,
+            Maybe.class,
+            Observable.class
+    }
 )
 class RxJava2Instrumentation implements Function<Runnable, Runnable>, AutoCloseable {
-    private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
     private final List<RunnableInstrumenter> runnableInstrumenters;
     private final RxInstrumenterFactory instrumenterFactory;
     private Function<? super Completable, ? extends Completable> oldCompletableHook;
@@ -76,16 +68,11 @@ class RxJava2Instrumentation implements Function<Runnable, Runnable>, AutoClosea
     /**
      * Creates a new instance.
      *
-     * @param runnableInstrumenters           The instrumenters for the {@link Runnable} interface
-     * @param invocationInstrumenterFactories The invocation instrumenters for the {@link Runnable} interface
      * @param instrumenterFactory             to instrument rx calls
      */
     @Inject
-    public RxJava2Instrumentation(List<RunnableInstrumenter> runnableInstrumenters,
-                                  List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
-                                  RxInstrumenterFactory instrumenterFactory) {
-        this.runnableInstrumenters = runnableInstrumenters;
-        this.invocationInstrumenterFactories = invocationInstrumenterFactories;
+    public RxJava2Instrumentation(RxInstrumenterFactory instrumenterFactory) {
+        this.runnableInstrumenters = instrumenterFactory.getRunnableInstrumenters();
         this.instrumenterFactory = instrumenterFactory;
     }
 
@@ -176,7 +163,7 @@ class RxJava2Instrumentation implements Function<Runnable, Runnable>, AutoClosea
 
         }
 
-        if (!runnableInstrumenters.isEmpty() || !invocationInstrumenterFactories.isEmpty()) {
+        if (!runnableInstrumenters.isEmpty() || instrumenterFactory.hasInstrumenters()) {
             Function<? super Runnable, ? extends Runnable> existing = RxJavaPlugins.getScheduleHandler();
             if (existing != null && !(existing instanceof RxJava2Instrumentation)) {
                 RxJavaPlugins.setScheduleHandler(runnable -> this.apply(existing.apply(runnable)));
@@ -196,11 +183,7 @@ class RxJava2Instrumentation implements Function<Runnable, Runnable>, AutoClosea
     }
 
     private List<InvocationInstrumenter> getInvocationInstrumenter() {
-        return invocationInstrumenterFactories.stream()
-                .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .collect(Collectors.toList());
+        return instrumenterFactory.getInvocationInstrumenters();
     }
 
     @Override

@@ -21,7 +21,6 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Consumer;
 import io.reactivex.observables.ConnectableObservable;
 
-import java.util.Optional;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -35,7 +34,7 @@ import java.util.Optional;
 final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable<T> implements RxInstrumentedComponent {
     private final ConnectableObservable<T> source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Optional<RxInstrumenter> instrumenter;
+    private final RxInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -51,18 +50,18 @@ final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable
 
     @Override
     protected void subscribeActual(Observer<? super T> o) {
-        Observer<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
-        if (instrumenter.isPresent()) {
-            instrumenter.get().subscribe(source, wrap);
+        if (instrumenter != null) {
+            Observer<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
+            instrumenter.subscribe(source, wrap);
         } else {
-            source.subscribe(wrap);
+            source.subscribe(o);
         }
     }
 
     @Override
     public void connect(Consumer<? super Disposable> connection) {
-        if (instrumenter.isPresent()) {
-            instrumenter.get().connect(source, connection);
+        if (instrumenter != null) {
+            instrumenter.connect(source, connection);
         } else {
             source.connect(connection);
         }
