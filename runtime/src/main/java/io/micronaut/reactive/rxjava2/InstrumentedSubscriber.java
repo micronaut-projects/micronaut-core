@@ -17,13 +17,8 @@ package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -38,33 +33,22 @@ abstract class InstrumentedSubscriber<T> implements Subscriber<T>, InstrumentedC
     protected boolean done;
     Subscription upstream;
     private final Subscriber<T> downstream;
-    private final List<RunnableInstrumenter> instrumentations;
+    private final RxInstrumenter instrumenter;
 
     /**
      * Default constructor.
-     * @param downstream The downstream subscriber
-     * @param instrumentations The instrumentations
+     *
+     * @param downstream   The downstream subscriber
+     * @param instrumenter The instrumenter
      */
-    InstrumentedSubscriber(
-            Subscriber<T> downstream, Collection<ReactiveInstrumenter> instrumentations) {
+    InstrumentedSubscriber(Subscriber<T> downstream, RxInstrumenter instrumenter) {
         ArgumentUtils.requireNonNull("downstream", downstream);
         this.downstream = downstream;
-        this.instrumentations = toRunnableInstrumenters(instrumentations);
+        this.instrumenter = instrumenter;
     }
 
-    /**
-     * Default constructor.
-     * @param downstream The downstream subscriber
-     * @param instrumentations The instrumentations
-     */
-    InstrumentedSubscriber(
-            Subscriber<T> downstream, List<RunnableInstrumenter> instrumentations) {
-        ArgumentUtils.requireNonNull("downstream", downstream);
-        this.downstream = downstream;
-        this.instrumentations = instrumentations;
-    }
-
-    @Override public final void onSubscribe(Subscription s) {
+    @Override
+    public final void onSubscribe(Subscription s) {
         if (!validate(upstream, s)) {
             return;
         }
@@ -77,11 +61,7 @@ abstract class InstrumentedSubscriber<T> implements Subscriber<T>, InstrumentedC
 
     @Override
     public void onNext(T t) {
-        Runnable onNextRunnable = () -> downstream.onNext(t);
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onNextRunnable = instrumentation.instrument(onNextRunnable);
-        }
-        onNextRunnable.run();
+        instrumenter.onNext(downstream, t);
     }
 
     @SuppressWarnings("Duplicates")
@@ -92,23 +72,15 @@ abstract class InstrumentedSubscriber<T> implements Subscriber<T>, InstrumentedC
             return;
         }
         done = true;
-
-        Runnable onNextRunnable = () -> downstream.onError(t);
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onNextRunnable = instrumentation.instrument(onNextRunnable);
-        }
-        onNextRunnable.run();
+        instrumenter.onError(downstream, t);
     }
 
-    @Override public void onComplete() {
+    @Override
+    public void onComplete() {
         if (done) {
             return;
         }
         done = true;
-        Runnable onCompleteRunnable = downstream::onComplete;
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onCompleteRunnable = instrumentation.instrument(onCompleteRunnable);
-        }
-        onCompleteRunnable.run();
+        instrumenter.onComplete(downstream);
     }
 }
