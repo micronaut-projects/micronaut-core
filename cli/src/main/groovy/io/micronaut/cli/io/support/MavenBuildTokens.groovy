@@ -91,6 +91,12 @@ class MavenBuildTokens extends BuildTokens {
                 .unique()
                 .findAll( { it.scope == 'annotationProcessor' || it.scope == 'kapt' })
 
+        annotationProcessors.find {
+            if (it.artifact.artifactId == 'micronaut-picocli') {
+                annotationProcessors.swap(annotationProcessors.indexOf(it), annotationProcessors.size() - 1)
+            }
+        }
+
         dependencies = dependencies.unique()
             .findAll { scopeConversions.containsKey(it.scope) }
             .collect { convertScope(it) }
