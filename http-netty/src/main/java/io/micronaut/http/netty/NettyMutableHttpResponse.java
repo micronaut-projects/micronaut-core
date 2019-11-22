@@ -40,6 +40,7 @@ import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -126,6 +127,21 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
         } else {
             throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
         }
+        return this;
+    }
+
+    @Override
+    public MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
+        cookies.forEach(cookie -> {
+            if (cookie instanceof NettyCookie) {
+                NettyCookie nettyCookie = (NettyCookie) cookie;
+                String value = ServerCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+                headers.add(HttpHeaderNames.SET_COOKIE, value);
+            } else {
+                throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+            }
+        });
+
         return this;
     }
 
