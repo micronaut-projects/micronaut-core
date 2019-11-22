@@ -27,6 +27,7 @@ import io.micronaut.http.simple.cookies.SimpleCookies;
 
 import javax.annotation.Nullable;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Simple {@link MutableHttpResponse} implementation.
@@ -47,7 +48,16 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
-        cookies.put(cookie.getName(), cookie);
+        this.cookies.put(cookie.getName(), cookie);
+        return this;
+    }
+
+    @Override
+    public MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
+        cookies.forEach(cookie -> {
+            this.cookies.put(cookie.getName(), cookie);
+        });
+
         return this;
     }
 
