@@ -22,6 +22,7 @@ import io.micronaut.http.cookie.Cookies;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -47,7 +48,7 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
      * @param cookies the Cookies to return to the client
      * @return The http request
      */
-    MutableHttpRequest<B> cookies(Cookies cookies);
+    MutableHttpRequest<B> cookies(Set<Cookie> cookies);
 
 
     /**
