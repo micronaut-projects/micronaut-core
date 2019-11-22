@@ -41,6 +41,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Default implementation of {@link MutableHttpRequest} for the {@link HttpClient}.
@@ -123,8 +124,8 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
     }
 
     @Override
-    public MutableHttpRequest<B> cookies(Cookies cookies) {
-        cookies.getAll().forEach(cookie -> {
+    public MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
+        cookies.forEach(cookie -> {
             if (cookie instanceof NettyCookie) {
                 NettyCookie nettyCookie = (NettyCookie) cookie;
                 String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());

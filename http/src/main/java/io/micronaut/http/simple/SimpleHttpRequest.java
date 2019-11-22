@@ -29,6 +29,7 @@ import io.micronaut.http.simple.cookies.SimpleCookies;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -73,8 +74,8 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
     }
 
     @Override
-    public MutableHttpRequest<B> cookies(Cookies cookies) {
-        this.cookies.putAll(cookies.getAll().stream().collect(Collectors.toMap(Cookie::getName, c -> c)));
+    public MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
+        this.cookies.putAll(cookies.stream().collect(Collectors.toMap(Cookie::getName, c -> c)));
 
         return this;
     }
