@@ -20,7 +20,6 @@ import io.reactivex.Maybe;
 import io.reactivex.MaybeObserver;
 import io.reactivex.MaybeSource;
 
-import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
@@ -35,7 +34,7 @@ import java.util.concurrent.Callable;
 final class RxInstrumentedCallableMaybe<T> extends Maybe<T> implements Callable<T>, RxInstrumentedComponent {
     private final MaybeSource<T> source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Optional<RxInstrumenter> instrumenter;
+    private final RxInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -51,11 +50,11 @@ final class RxInstrumentedCallableMaybe<T> extends Maybe<T> implements Callable<
 
     @Override
     protected void subscribeActual(MaybeObserver<? super T> o) {
-        MaybeObserver wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
-        if (instrumenter.isPresent()) {
-            instrumenter.get().subscribe(source, wrap);
+        if (instrumenter != null) {
+            MaybeObserver wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
+            instrumenter.subscribe(source, wrap);
         } else {
-            source.subscribe(wrap);
+            source.subscribe(o);
         }
     }
 

@@ -20,7 +20,6 @@ import io.reactivex.Single;
 import io.reactivex.SingleObserver;
 import io.reactivex.SingleSource;
 
-import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
@@ -35,7 +34,7 @@ import java.util.concurrent.Callable;
 final class RxInstrumentedCallableSingle<T> extends Single<T> implements Callable<T>, RxInstrumentedComponent {
     private final SingleSource<T> source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Optional<RxInstrumenter> instrumenter;
+    private final RxInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -51,11 +50,11 @@ final class RxInstrumentedCallableSingle<T> extends Single<T> implements Callabl
 
     @Override
     protected void subscribeActual(SingleObserver<? super T> o) {
-        SingleObserver wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
-        if (instrumenter.isPresent()) {
-            instrumenter.get().subscribe(source, wrap);
+        if (instrumenter != null) {
+            SingleObserver wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
+            instrumenter.subscribe(source, wrap);
         } else {
-            source.subscribe(wrap);
+            source.subscribe(o);
         }
     }
 

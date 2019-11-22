@@ -40,7 +40,7 @@ public final class MdcInstrumenter implements InvocationInstrumenterFactory, Rea
 
     /**
      * Creates optional invocation instrumenter.
-     * @return
+     * @return An optional that contains the invocation instrumenter
      */
     @Override
     public Optional<InvocationInstrumenter> newInvocationInstrumenter() {

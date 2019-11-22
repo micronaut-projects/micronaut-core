@@ -55,14 +55,17 @@ final class RxInstrumentedWrappers {
         if (downstream instanceof InstrumentedComponent) {
             return downstream;
         }
-        if (downstream instanceof FlowableSubscriber) {
-            return instrumenterFactory.create()
-                    .<Subscriber<T>>map(instrumenter -> new RxInstrumentedFlowableSubscriber<>(downstream, instrumenter))
-                    .orElse(downstream);
+
+        final RxInstrumenter instumenter = instrumenterFactory.create();
+        if (instumenter != null) {
+            if (downstream instanceof FlowableSubscriber) {
+                return new RxInstrumentedFlowableSubscriber<>(downstream, instumenter);
+            } else {
+                return new RxInstrumentedSubscriber<>(downstream, instumenter);
+            }
+        } else {
+            return downstream;
         }
-        return instrumenterFactory.create()
-                .<Subscriber<T>>map(instumenter -> new RxInstrumentedSubscriber<T>(downstream, instumenter))
-                .orElse(downstream);
     }
 
     /**
@@ -213,9 +216,11 @@ final class RxInstrumentedWrappers {
         if (downstream instanceof InstrumentedComponent) {
             return downstream;
         }
-        return instrumenterFactory.create()
-                .<Observer<T>>map(instrumenter -> new RxInstrumentedObserver<>(downstream, instrumenter))
-                .orElse(downstream);
+        final RxInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter != null) {
+            return new RxInstrumentedObserver<>(downstream, instrumenter);
+        }
+        return downstream;
     }
 
     /**
@@ -230,9 +235,11 @@ final class RxInstrumentedWrappers {
         if (downstream instanceof InstrumentedComponent) {
             return downstream;
         }
-        return instrumenterFactory.create()
-                .<SingleObserver<T>>map(instrumenter -> new RxInstrumentedSingleObserver<>(downstream, instrumenter))
-                .orElse(downstream);
+        final RxInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter != null) {
+            return new RxInstrumentedSingleObserver<>(downstream, instrumenter);
+        }
+        return downstream;
     }
 
     /**
@@ -247,9 +254,11 @@ final class RxInstrumentedWrappers {
         if (downstream instanceof InstrumentedComponent) {
             return downstream;
         }
-        return instrumenterFactory.create()
-                .<MaybeObserver<T>>map(instrumenter -> new RxInstrumentedMaybeObserver<>(downstream, instrumenter))
-                .orElse(downstream);
+        final RxInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter != null) {
+            return new RxInstrumentedMaybeObserver<>(downstream, instrumenter);
+        }
+        return downstream;
     }
 
     /**
@@ -263,9 +272,12 @@ final class RxInstrumentedWrappers {
         if (downstream instanceof InstrumentedComponent) {
             return downstream;
         }
-        return instrumenterFactory.create()
-                .<CompletableObserver>map(instrumenter -> new RxInstrumentedCompletableObserver(downstream, instrumenter))
-                .orElse(downstream);
+        final RxInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter != null) {
+            return new RxInstrumentedCompletableObserver(downstream, instrumenter);
+        } else {
+            return downstream;
+        }
     }
 
 }

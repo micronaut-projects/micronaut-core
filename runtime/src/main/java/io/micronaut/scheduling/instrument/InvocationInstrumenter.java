@@ -113,7 +113,7 @@ public interface InvocationInstrumenter {
         if (callable instanceof InvocationInstrumenterWrappedCallable) {
             return callable;
         }
-        return new InvocationInstrumenterWrappedCallable<V>(invocationInstrumenter, callable);
+        return new InvocationInstrumenterWrappedCallable<>(invocationInstrumenter, callable);
     }
 
 }

@@ -20,7 +20,6 @@ import io.reactivex.Completable;
 import io.reactivex.CompletableObserver;
 import io.reactivex.CompletableSource;
 
-import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
@@ -35,7 +34,7 @@ import java.util.concurrent.Callable;
 final class RxInstrumentedCallableCompletable<T> extends Completable implements Callable<T>, RxInstrumentedComponent {
     private final CompletableSource source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Optional<RxInstrumenter> instrumenter;
+    private final RxInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -51,11 +50,11 @@ final class RxInstrumentedCallableCompletable<T> extends Completable implements 
 
     @Override
     protected void subscribeActual(CompletableObserver s) {
-        CompletableObserver wrap = RxInstrumentedWrappers.wrap(s, instrumenterFactory);
-        if (instrumenter.isPresent()) {
-            instrumenter.get().subscribe(source, wrap);
+        if (instrumenter != null) {
+            CompletableObserver wrap = RxInstrumentedWrappers.wrap(s, instrumenterFactory);
+            instrumenter.subscribe(source, wrap);
         } else {
-            source.subscribe(wrap);
+            source.subscribe(s);
         }
     }
 
