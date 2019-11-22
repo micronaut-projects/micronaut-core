@@ -1,5 +1,6 @@
 package io.micronaut.docs.server.binding;
 
+import com.sun.tools.javac.util.List;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.CookieValue;
@@ -31,6 +32,16 @@ public class BindingController {
     // tag::cookie2[]
     }
     // end::cookie2[]
+
+    // tag::cookieMultiple[]
+    @Get("/cookieMultiple")
+    public List<String> cookieName(@CookieValue("myCookieA") String myCookieA, @CookieValue("myCookieB") String myCookieB) {
+        // ...
+        // end::cookieMultiple[]
+        return List.of(myCookieA, myCookieB);
+        // tag::cookieMultiple[]
+    }
+    // end::cookieMultiple[]
 
     // tag::header1[]
     @Get("/headerName")
