@@ -16,7 +16,7 @@ dependencies {
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
 
     // used by AWSParameterStoreConfigClient
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.680'
 
     testCompile "org.testcontainers:spock:1.10.1"
 
