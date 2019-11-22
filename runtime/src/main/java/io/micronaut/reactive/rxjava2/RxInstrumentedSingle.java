@@ -20,8 +20,6 @@ import io.reactivex.Single;
 import io.reactivex.SingleObserver;
 import io.reactivex.SingleSource;
 
-import java.util.Optional;
-
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
  * See https://github.com/openzipkin/brave/tree/master/context/rxjava2/src/main/java/brave/context/rxjava2/internal.
