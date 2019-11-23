@@ -17,10 +17,8 @@ package io.micronaut.http;
 
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.cookie.Cookie;
-import io.micronaut.http.cookie.Cookies;
 
 import java.net.URI;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
