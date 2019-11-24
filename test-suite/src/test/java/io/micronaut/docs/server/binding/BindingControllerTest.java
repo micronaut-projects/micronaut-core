@@ -66,7 +66,7 @@ public class BindingControllerTest {
         String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/cookieMultiple").cookies(cookies));
 
         assertNotNull(body);
-        assertEquals("cookie value", body);
+        assertEquals("[\"cookie A value\",\"cookie B value\"]", body);
     }
 
     @Test
