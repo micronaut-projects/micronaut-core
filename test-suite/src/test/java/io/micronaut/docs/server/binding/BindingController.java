@@ -35,7 +35,7 @@ public class BindingController {
 
     // tag::cookieMultiple[]
     @Get("/cookieMultiple")
-    public List<String> cookieName(@CookieValue("myCookieA") String myCookieA, @CookieValue("myCookieB") String myCookieB) {
+    public List<String> cookieMultiple(@CookieValue("myCookieA") String myCookieA, @CookieValue("myCookieB") String myCookieB) {
         // ...
         // end::cookieMultiple[]
         return List.of(myCookieA, myCookieB);
