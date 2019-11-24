@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Delegates to Netty's {@link FullHttpResponse}.
@@ -132,15 +133,21 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
+        AtomicReference<String> cookieString = new AtomicReference<>("");
+
         cookies.forEach(cookie -> {
             if (cookie instanceof NettyCookie) {
                 NettyCookie nettyCookie = (NettyCookie) cookie;
                 String value = ServerCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-                headers.add(HttpHeaderNames.SET_COOKIE, value);
+                cookieString.set(cookieString + value + ";");
             } else {
                 throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
             }
         });
+
+        if(cookieString.get().length() > 0) {
+            headers.add(HttpHeaderNames.COOKIE, cookieString.get());
+        }
 
         return this;
     }
