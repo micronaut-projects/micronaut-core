@@ -42,6 +42,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Default implementation of {@link MutableHttpRequest} for the {@link HttpClient}.
@@ -125,15 +126,22 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
     @Override
     public MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
+
+        AtomicReference<String> cookieString = new AtomicReference<>("");
+
         cookies.forEach(cookie -> {
             if (cookie instanceof NettyCookie) {
                 NettyCookie nettyCookie = (NettyCookie) cookie;
                 String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-                headers.add(HttpHeaderNames.COOKIE, value);
+                cookieString.set(cookieString + value + ";");
             } else {
                 throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
             }
         });
+
+        if(cookieString.get().length() > 0) {
+            headers.add(HttpHeaderNames.COOKIE, cookieString.get());
+        }
 
         return this;
     }
