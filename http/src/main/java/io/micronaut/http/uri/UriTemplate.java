@@ -465,7 +465,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
             boolean isVar = segment instanceof UriTemplateParser.VariablePathSegment;
             if (previousVariable != null && isVar) {
                 UriTemplateParser.VariablePathSegment varSeg = (UriTemplateParser.VariablePathSegment) segment;
-                if (varSeg.operator == previousVariable.operator) {
+                if (varSeg.operator == previousVariable.operator && varSeg.modifierChar != EXPAND_MODIFIER) {
                     builder.append(varSeg.delimiter);
                 } else {
                     builder.append(VAR_END);
@@ -1018,6 +1018,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         result = joiner.toString();
                     } else if (found instanceof Map) {
                         Map<Object, Object> map = (Map<Object, Object>) found;
+                        map.values().removeIf(Objects::isNull);
                         if (map.isEmpty()) {
                             return "";
                         }
@@ -1027,7 +1028,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                             switch (operator) {
                                 case AND_OPERATOR:
                                 case QUERY_OPERATOR:
-                                    prefixToUse = String.valueOf(operator);
+                                    prefixToUse = String.valueOf(anyPreviousHasOperator ? AND_OPERATOR : operator);
                                     joiner = new StringJoiner(String.valueOf(AND_OPERATOR));
                                     break;
                                 case ';':
