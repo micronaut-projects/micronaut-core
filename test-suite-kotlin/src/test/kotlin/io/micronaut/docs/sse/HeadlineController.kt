@@ -14,7 +14,7 @@ import java.time.ZonedDateTime
 class HeadlineController {
 
     // tag::streaming[]
-    @Get(value = "/headlines", produces = [MediaType.TEXT_EVENT_STREAM]) // <1>
+    @Get(value = "/headlines", processes = [MediaType.TEXT_EVENT_STREAM]) // <1>
     internal fun streamHeadlines(): Flux<Event<Headline>> {
         return Flux.create<Event<Headline>> {  // <2>
             emitter ->
