@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -62,6 +63,7 @@ class MultipleInvocationInstrumenter implements InvocationInstrumenter {
      */
     @Override
     public void afterInvocation() {
+        Collections.reverse(executedInstrumenters);
         for (InvocationInstrumenter instrumenter : executedInstrumenters) {
             try {
                 instrumenter.afterInvocation();
