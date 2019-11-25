@@ -57,7 +57,7 @@ public interface Router {
      */
     default @Nonnull <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
         return findAny(uri);
-    };
+    }
 
     /**
      * Finds all of the possible routes for the given HTTP method and URI.
