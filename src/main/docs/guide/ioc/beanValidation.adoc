@@ -96,7 +96,7 @@ snippet::io.micronaut.docs.ioc.validation.custom.DurationPattern[tags="imports,c
 
 TIP: You can add messages and message bundles using the api:context.MessageSource[] and api:context.i18n.ResourceBundleMessageSource[] classes.
 
-Once you have defined the annotation you need to implement a api:validation.validator.constraints.ConstraintValidator[] that validates the annotation. You can either implement a bean that implements the interace directly or define a factory that returns one or more validators.
+Once you have defined the annotation you need to implement a api:validation.validator.constraints.ConstraintValidator[] that validates the annotation. You can either implement a bean that implements the interface directly or define a factory that returns one or more validators.
 
 The latter approach is recommended if you plan to define multiple validators:
 
