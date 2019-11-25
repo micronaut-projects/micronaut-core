@@ -30,7 +30,6 @@ import io.reactivex.CompletableSource;
 @Internal
 final class RxInstrumentedCompletable extends Completable implements RxInstrumentedComponent {
     private final CompletableSource source;
-    private final RxInstrumenterFactory instrumenterFactory;
     private final RxInstrumenter instrumenter;
 
     /**
@@ -41,15 +40,13 @@ final class RxInstrumentedCompletable extends Completable implements RxInstrumen
      */
     RxInstrumentedCompletable(CompletableSource source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenterFactory = instrumenterFactory;
         this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
     protected void subscribeActual(CompletableObserver o) {
         if (instrumenter != null) {
-            CompletableObserver wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
-            instrumenter.subscribe(source, wrap);
+            instrumenter.subscribe(source, o);
         } else {
             source.subscribe(o);
         }

@@ -32,7 +32,6 @@ import io.reactivex.MaybeSource;
 @Internal
 final class RxInstrumentedMaybe<T> extends Maybe<T> implements RxInstrumentedComponent {
     private final MaybeSource<T> source;
-    private final RxInstrumenterFactory instrumenterFactory;
     private final RxInstrumenter instrumenter;
 
     /**
@@ -43,15 +42,13 @@ final class RxInstrumentedMaybe<T> extends Maybe<T> implements RxInstrumentedCom
      */
     RxInstrumentedMaybe(MaybeSource<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenterFactory = instrumenterFactory;
         this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
     protected void subscribeActual(MaybeObserver<? super T> o) {
         if (instrumenter != null) {
-            MaybeObserver<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
-            instrumenter.subscribe(source, wrap);
+            instrumenter.subscribe(source, o);
         } else {
             source.subscribe(o);
         }

@@ -26,7 +26,6 @@ import io.reactivex.Flowable;
 
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -43,20 +42,17 @@ import java.util.stream.Collectors;
 @Internal
 class RxInstrumenterFactory {
 
-    private final List<ReactiveInvocationInstrumenterFactory> invocationInstrumenterFactories;
+    private final List<ReactiveInvocationInstrumenterFactory> reactiveInvocationInstrumenterFactories;
     private final List<ReactiveInstrumenter> reactiveInstrumenters;
-    private final RxInstrumenter invocationInstrumenter;
 
     /**
-     * @param invocationInstrumenterFactories invocation instrumenters
-     * @param reactiveInstrumenters           {@link Runnable} instrument wrappers
+     * @param reactiveInvocationInstrumenterFactories invocation instrumenters
+     * @param reactiveInstrumenters                   {@link Runnable} instrument wrappers
      */
-    public RxInstrumenterFactory(List<ReactiveInvocationInstrumenterFactory> invocationInstrumenterFactories,
+    public RxInstrumenterFactory(List<ReactiveInvocationInstrumenterFactory> reactiveInvocationInstrumenterFactories,
                                  List<ReactiveInstrumenter> reactiveInstrumenters) {
-        this.invocationInstrumenterFactories = invocationInstrumenterFactories;
+        this.reactiveInvocationInstrumenterFactories = reactiveInvocationInstrumenterFactories;
         this.reactiveInstrumenters = reactiveInstrumenters;
-        List<InvocationInstrumenter> invocationInstrumenter = getInvocationInstrumenters();
-        this.invocationInstrumenter = reactiveInstrumenters.isEmpty() && !invocationInstrumenter.isEmpty() ? new RxInstrumenter(InvocationInstrumenter.combine(invocationInstrumenter), Collections.emptyList()) : null;
     }
 
     /**
@@ -65,14 +61,7 @@ class RxInstrumenterFactory {
      * @return true if there are any instumenters present
      */
     public boolean hasInstrumenters() {
-        return !invocationInstrumenterFactories.isEmpty() || hasReactiveInstrumenters();
-    }
-
-    /**
-     * @return Whether any reactive instrumenters are configured.
-     */
-    public boolean hasReactiveInstrumenters() {
-        return !reactiveInstrumenters.isEmpty();
+        return !reactiveInvocationInstrumenterFactories.isEmpty() || !reactiveInstrumenters.isEmpty();
     }
 
     /**
@@ -81,24 +70,20 @@ class RxInstrumenterFactory {
      * @return new RxInstrumenter if instrumentation is required
      */
     public @Nullable RxInstrumenter create() {
-        if (hasReactiveInstrumenters()) {
-            List<RunnableInstrumenter> runnableInstrumenters = getRunnableInstrumenters();
-            List<InvocationInstrumenter> invocationInstrumenter = getInvocationInstrumenters();
+        if (hasInstrumenters()) {
+            List<RunnableInstrumenter> runnableInstrumenters = getReactiveRunnableInstrumenters();
+            List<InvocationInstrumenter> invocationInstrumenter = getReactiveInvocationInstrumenters();
             if (!runnableInstrumenters.isEmpty() || !invocationInstrumenter.isEmpty()) {
                 return new RxInstrumenter(InvocationInstrumenter.combine(invocationInstrumenter), runnableInstrumenters);
-            } else {
-                return null;
             }
-        } else {
-            // the singleton instance
-            return invocationInstrumenter;
         }
+        return null;
     }
 
     /**
      * @return The runnable instrumenters
      */
-    public List<RunnableInstrumenter> getRunnableInstrumenters() {
+    private List<RunnableInstrumenter> getReactiveRunnableInstrumenters() {
         return reactiveInstrumenters.stream()
                 .map(ReactiveInstrumenter::newInstrumentation)
                 .filter(Optional::isPresent)
@@ -109,8 +94,8 @@ class RxInstrumenterFactory {
     /**
      * @return The invocation instrumenters
      */
-    public List<InvocationInstrumenter> getInvocationInstrumenters() {
-        return invocationInstrumenterFactories.stream()
+    private List<InvocationInstrumenter> getReactiveInvocationInstrumenters() {
+        return reactiveInvocationInstrumenterFactories.stream()
                 .map(ReactiveInvocationInstrumenterFactory::newReactiveInvocationInstrumenter)
                 .filter(Optional::isPresent)
                 .map(Optional::get)

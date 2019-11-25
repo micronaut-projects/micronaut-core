@@ -33,7 +33,6 @@ import org.reactivestreams.Subscriber;
 @Internal
 final class RxInstrumentedConnectableFlowable<T> extends ConnectableFlowable<T> implements RxInstrumentedComponent {
     private final ConnectableFlowable<T> source;
-    private final RxInstrumenterFactory instrumenterFactory;
     private final RxInstrumenter instrumenter;
 
     /**
@@ -44,15 +43,13 @@ final class RxInstrumentedConnectableFlowable<T> extends ConnectableFlowable<T> 
      */
     RxInstrumentedConnectableFlowable(ConnectableFlowable<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenterFactory = instrumenterFactory;
         this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
     protected void subscribeActual(Subscriber<? super T> s) {
         if (instrumenter != null) {
-            Subscriber<? super T> wrap = RxInstrumentedWrappers.wrap(s, instrumenterFactory);
-            instrumenter.subscribe(source, wrap);
+            instrumenter.subscribe(source, s);
         } else {
             source.subscribe(s);
         }

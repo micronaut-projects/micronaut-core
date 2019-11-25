@@ -31,7 +31,6 @@ import io.reactivex.SingleSource;
 @Internal
 final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedComponent {
     protected final SingleSource<T> source;
-    private final RxInstrumenterFactory instrumenterFactory;
     private final RxInstrumenter instrumenter;
 
     /**
@@ -42,15 +41,13 @@ final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedC
      */
     RxInstrumentedSingle(SingleSource<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenterFactory = instrumenterFactory;
         this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
     protected void subscribeActual(SingleObserver<? super T> o) {
         if (instrumenter != null) {
-            SingleObserver<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
-            instrumenter.subscribe(source, wrap);
+            instrumenter.subscribe(source, o);
         } else {
             source.subscribe(o);
         }

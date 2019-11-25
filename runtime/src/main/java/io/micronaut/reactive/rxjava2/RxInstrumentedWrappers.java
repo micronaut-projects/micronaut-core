@@ -31,8 +31,6 @@ import io.reactivex.observables.ConnectableObservable;
 import io.reactivex.parallel.ParallelFlowable;
 import org.reactivestreams.Subscriber;
 
-import java.util.concurrent.Callable;
-
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
  * See https://github.com/openzipkin/brave/tree/master/context/rxjava2/src/main/java/brave/context/rxjava2/internal.
@@ -79,9 +77,6 @@ final class RxInstrumentedWrappers {
         if (source instanceof InstrumentedComponent) {
             return source;
         }
-        if (source instanceof Callable) {
-            return new RxInstrumentedCallableCompletable<>(source, instrumenterFactory);
-        }
         return new RxInstrumentedCompletable(source, instrumenterFactory);
     }
 
@@ -96,9 +91,6 @@ final class RxInstrumentedWrappers {
     static <T> Maybe<T> wrap(Maybe<T> source, RxInstrumenterFactory instrumenterFactory) {
         if (source instanceof InstrumentedComponent) {
             return source;
-        }
-        if (source instanceof Callable) {
-            return new RxInstrumentedCallableMaybe<>(source, instrumenterFactory);
         }
         return new RxInstrumentedMaybe<>(source, instrumenterFactory);
     }
@@ -115,9 +107,6 @@ final class RxInstrumentedWrappers {
         if (source instanceof InstrumentedComponent) {
             return source;
         }
-        if (source instanceof Callable) {
-            return new RxInstrumentedCallableSingle<>(source, instrumenterFactory);
-        }
         return new RxInstrumentedSingle<>(source, instrumenterFactory);
     }
 
@@ -132,9 +121,6 @@ final class RxInstrumentedWrappers {
     static <T> Observable<T> wrap(Observable<T> source, RxInstrumenterFactory instrumenterFactory) {
         if (source instanceof InstrumentedComponent) {
             return source;
-        }
-        if (source instanceof Callable) {
-            return new RxInstrumentedCallableObservable<>(source, instrumenterFactory);
         }
         return new RxInstrumentedObservable<>(source, instrumenterFactory);
     }
@@ -165,9 +151,6 @@ final class RxInstrumentedWrappers {
     static <T> Flowable<T> wrap(Flowable<T> source, RxInstrumenterFactory instrumenterFactory) {
         if (source instanceof InstrumentedComponent) {
             return source;
-        }
-        if (source instanceof Callable) {
-            return new RxInstrumentedCallableFlowable<>(source, instrumenterFactory);
         }
         return new RxInstrumentedFlowable<>(source, instrumenterFactory);
     }

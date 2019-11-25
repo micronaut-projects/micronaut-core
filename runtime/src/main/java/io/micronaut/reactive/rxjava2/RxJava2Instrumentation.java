@@ -19,20 +19,27 @@ import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.TypeHint;
-import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
-import io.reactivex.*;
+import io.reactivex.Completable;
+import io.reactivex.CompletableObserver;
+import io.reactivex.Flowable;
+import io.reactivex.Maybe;
+import io.reactivex.MaybeObserver;
+import io.reactivex.Observable;
+import io.reactivex.Observer;
+import io.reactivex.Single;
+import io.reactivex.SingleObserver;
 import io.reactivex.flowables.ConnectableFlowable;
+import io.reactivex.functions.BiFunction;
 import io.reactivex.functions.Function;
 import io.reactivex.observables.ConnectableObservable;
 import io.reactivex.parallel.ParallelFlowable;
 import io.reactivex.plugins.RxJavaPlugins;
+import org.reactivestreams.Subscriber;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.util.List;
 
 /**
  * Provides a single point of entry for all instrumentations for RxJava 2.x.
@@ -45,17 +52,22 @@ import java.util.List;
 @Requires(classes = Flowable.class)
 @Internal
 @TypeHint(
-    value = {
-            Completable.class,
-            Single.class,
-            Flowable.class,
-            Maybe.class,
-            Observable.class
-    }
+        value = {
+                Completable.class,
+                Single.class,
+                Flowable.class,
+                Maybe.class,
+                Observable.class
+        }
 )
-class RxJava2Instrumentation implements Function<Runnable, Runnable>, AutoCloseable {
-    private final List<RunnableInstrumenter> runnableInstrumenters;
+class RxJava2Instrumentation implements AutoCloseable {
     private final RxInstrumenterFactory instrumenterFactory;
+    private BiFunction<? super Single, ? super SingleObserver, ? extends SingleObserver> oldSingleSubscribeHook;
+    private BiFunction<? super Completable, ? super CompletableObserver, ? extends CompletableObserver> oldCompletableSubscribeHook;
+    private BiFunction<? super Flowable, ? super Subscriber, ? extends Subscriber> oldFlowableSubscribeHook;
+    private BiFunction<? super Maybe, ? super MaybeObserver, ? extends MaybeObserver> oldMaybeSubscribeHook;
+    private BiFunction<? super Observable, ? super Observer, ? extends Observer> oldObservableSubscribeHook;
+
     private Function<? super Completable, ? extends Completable> oldCompletableHook;
     private Function<? super Maybe, ? extends Maybe> oldMaybeHook;
     private Function<? super Single, ? extends Single> oldSingleHook;
@@ -68,11 +80,10 @@ class RxJava2Instrumentation implements Function<Runnable, Runnable>, AutoClosea
     /**
      * Creates a new instance.
      *
-     * @param instrumenterFactory             to instrument rx calls
+     * @param instrumenterFactory to instrument rx calls
      */
     @Inject
     public RxJava2Instrumentation(RxInstrumenterFactory instrumenterFactory) {
-        this.runnableInstrumenters = instrumenterFactory.getRunnableInstrumenters();
         this.instrumenterFactory = instrumenterFactory;
     }
 
@@ -82,20 +93,59 @@ class RxJava2Instrumentation implements Function<Runnable, Runnable>, AutoClosea
     @PostConstruct
     void init() {
         if (instrumenterFactory.hasInstrumenters()) {
-            oldCompletableHook =
-                    RxJavaPlugins.getOnCompletableAssembly();
+            oldSingleSubscribeHook = RxJavaPlugins.getOnSingleSubscribe();
+            oldCompletableSubscribeHook = RxJavaPlugins.getOnCompletableSubscribe();
+            oldFlowableSubscribeHook = RxJavaPlugins.getOnFlowableSubscribe();
+            oldMaybeSubscribeHook = RxJavaPlugins.getOnMaybeSubscribe();
+            oldObservableSubscribeHook = RxJavaPlugins.getOnObservableSubscribe();
+            oldCompletableHook = RxJavaPlugins.getOnCompletableAssembly();
             oldMaybeHook = RxJavaPlugins.getOnMaybeAssembly();
             oldSingleHook = RxJavaPlugins.getOnSingleAssembly();
-            oldObservableHook =
-                    RxJavaPlugins.getOnObservableAssembly();
-            oldFlowableHook =
-                    RxJavaPlugins.getOnFlowableAssembly();
-            oldConnectableFlowableHook =
-                    RxJavaPlugins.getOnConnectableFlowableAssembly();
-            oldConnectableObservableHook =
-                    RxJavaPlugins.getOnConnectableObservableAssembly();
-            oldParallelFlowableHook =
-                    RxJavaPlugins.getOnParallelAssembly();
+            oldObservableHook = RxJavaPlugins.getOnObservableAssembly();
+            oldFlowableHook = RxJavaPlugins.getOnFlowableAssembly();
+            oldConnectableFlowableHook = RxJavaPlugins.getOnConnectableFlowableAssembly();
+            oldConnectableObservableHook = RxJavaPlugins.getOnConnectableObservableAssembly();
+            oldParallelFlowableHook = RxJavaPlugins.getOnParallelAssembly();
+
+            RxJavaPlugins.setOnSingleSubscribe((single, singleObserver) -> {
+                final SingleObserver wrapped = RxInstrumentedWrappers.wrap(singleObserver, instrumenterFactory);
+                if (oldSingleSubscribeHook != null) {
+                    return oldSingleSubscribeHook.apply(single, wrapped);
+                }
+                return wrapped;
+            });
+
+            RxJavaPlugins.setOnCompletableSubscribe((completable, observer) -> {
+                final CompletableObserver wrapped = RxInstrumentedWrappers.wrap(observer, instrumenterFactory);
+                if (oldCompletableSubscribeHook != null) {
+                    return oldCompletableSubscribeHook.apply(completable, wrapped);
+                }
+                return wrapped;
+            });
+
+            RxJavaPlugins.setOnFlowableSubscribe((flowable, subscriber) -> {
+                final Subscriber wrapped = RxInstrumentedWrappers.wrap(subscriber, instrumenterFactory);
+                if (oldFlowableSubscribeHook != null) {
+                    return oldFlowableSubscribeHook.apply(flowable, wrapped);
+                }
+                return wrapped;
+            });
+
+            RxJavaPlugins.setOnMaybeSubscribe((maybe, maybeObserver) -> {
+                final MaybeObserver wrapped = RxInstrumentedWrappers.wrap(maybeObserver, instrumenterFactory);
+                if (oldMaybeSubscribeHook != null) {
+                    return oldMaybeSubscribeHook.apply(maybe, wrapped);
+                }
+                return wrapped;
+            });
+
+            RxJavaPlugins.setOnObservableSubscribe((observable, observer) -> {
+                final Observer wrapped = RxInstrumentedWrappers.wrap(observer, instrumenterFactory);
+                if (oldObservableSubscribeHook != null) {
+                    return oldObservableSubscribeHook.apply(observable, wrapped);
+                }
+                return wrapped;
+            });
 
             RxJavaPlugins.setOnCompletableAssembly(completable -> {
                 final Completable wrapped = RxInstrumentedWrappers.wrap(completable, instrumenterFactory);
@@ -163,33 +213,17 @@ class RxJava2Instrumentation implements Function<Runnable, Runnable>, AutoClosea
 
         }
 
-        if (!runnableInstrumenters.isEmpty() || instrumenterFactory.hasInstrumenters()) {
-            Function<? super Runnable, ? extends Runnable> existing = RxJavaPlugins.getScheduleHandler();
-            if (existing != null && !(existing instanceof RxJava2Instrumentation)) {
-                RxJavaPlugins.setScheduleHandler(runnable -> this.apply(existing.apply(runnable)));
-            } else {
-                RxJavaPlugins.setScheduleHandler(this);
-            }
-        }
-    }
-
-    @Override
-    public Runnable apply(Runnable runnable) {
-        Runnable newRunnable = InvocationInstrumenter.instrument(runnable, getInvocationInstrumenter());
-        for (RunnableInstrumenter instrumenter : runnableInstrumenters) {
-            newRunnable = instrumenter.instrument(newRunnable);
-        }
-        return newRunnable;
-    }
-
-    private List<InvocationInstrumenter> getInvocationInstrumenter() {
-        return instrumenterFactory.getInvocationInstrumenters();
     }
 
     @Override
     @PreDestroy
     public void close() {
         try {
+            RxJavaPlugins.setOnSingleSubscribe(oldSingleSubscribeHook);
+            RxJavaPlugins.setOnCompletableSubscribe(oldCompletableSubscribeHook);
+            RxJavaPlugins.setOnFlowableSubscribe(oldFlowableSubscribeHook);
+            RxJavaPlugins.setOnMaybeSubscribe((BiFunction<? super Maybe, MaybeObserver, ? extends MaybeObserver>) oldMaybeSubscribeHook);
+            RxJavaPlugins.setOnObservableSubscribe(oldObservableSubscribeHook);
             RxJavaPlugins.setOnCompletableAssembly(oldCompletableHook);
             RxJavaPlugins.setOnSingleAssembly(oldSingleHook);
             RxJavaPlugins.setOnMaybeAssembly(oldMaybeHook);

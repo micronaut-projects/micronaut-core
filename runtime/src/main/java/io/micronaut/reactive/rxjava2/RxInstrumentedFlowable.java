@@ -33,7 +33,6 @@ import org.reactivestreams.Subscriber;
 @Internal
 final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumentedComponent {
     private final Publisher<T> source;
-    private final RxInstrumenterFactory instrumenterFactory;
     private final RxInstrumenter instrumenter;
 
 
@@ -45,7 +44,6 @@ final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumen
      */
     RxInstrumentedFlowable(Publisher<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenterFactory = instrumenterFactory;
         this.instrumenter = instrumenterFactory.create();
     }
 
@@ -55,8 +53,7 @@ final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumen
             throw new IllegalArgumentException("Subscriber must be an instance of FlowableSubscriber");
         }
         if (instrumenter != null) {
-            Subscriber<? super T> wrap = RxInstrumentedWrappers.wrap(s, instrumenterFactory);
-            instrumenter.subscribe(source, wrap);
+            instrumenter.subscribe(source, s);
         } else {
             source.subscribe(s);
         }

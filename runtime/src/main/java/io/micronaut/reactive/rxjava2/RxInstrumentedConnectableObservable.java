@@ -33,7 +33,6 @@ import io.reactivex.observables.ConnectableObservable;
 @Internal
 final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable<T> implements RxInstrumentedComponent {
     private final ConnectableObservable<T> source;
-    private final RxInstrumenterFactory instrumenterFactory;
     private final RxInstrumenter instrumenter;
 
     /**
@@ -44,15 +43,13 @@ final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable
      */
     RxInstrumentedConnectableObservable(ConnectableObservable<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenterFactory = instrumenterFactory;
         this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
     protected void subscribeActual(Observer<? super T> o) {
         if (instrumenter != null) {
-            Observer<? super T> wrap = RxInstrumentedWrappers.wrap(o, instrumenterFactory);
-            instrumenter.subscribe(source, wrap);
+            instrumenter.subscribe(source, o);
         } else {
             source.subscribe(o);
         }
