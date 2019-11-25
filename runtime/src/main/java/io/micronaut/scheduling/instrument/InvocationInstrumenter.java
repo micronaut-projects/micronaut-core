@@ -51,6 +51,7 @@ public interface InvocationInstrumenter {
 
     /**
      * Combines multiple instrumenters into one.
+     *
      * @param invocationInstrumenters instrumenters to combine
      * @return new instrumenter
      */
@@ -58,12 +59,16 @@ public interface InvocationInstrumenter {
         if (invocationInstrumenters.isEmpty()) {
             return NOOP;
         }
+        if (invocationInstrumenters.size() == 1) {
+            return invocationInstrumenters.iterator().next();
+        }
         return new MultipleInvocationInstrumenter(invocationInstrumenters);
     }
 
     /**
      * Wrappers {@link Runnable} with instrumentation invocations.
-     * @param runnable {@link Runnable} to be wrapped
+     *
+     * @param runnable                {@link Runnable} to be wrapped
      * @param invocationInstrumenters instrumenters to be used
      * @return wrapper
      */
@@ -77,9 +82,10 @@ public interface InvocationInstrumenter {
 
     /**
      * Wrappers {@link Callable} with instrumentation invocations.
-     * @param callable {@link Callable} to be wrapped
+     *
+     * @param callable                {@link Callable} to be wrapped
      * @param invocationInstrumenters instrumenters to be used
-     * @param <V> callable generic param
+     * @param <V>                     callable generic param
      * @return wrapper
      */
     static <V> Callable<V> instrument(Callable<V> callable, Collection<InvocationInstrumenter> invocationInstrumenters) {
@@ -91,7 +97,8 @@ public interface InvocationInstrumenter {
 
     /**
      * Wrappers {@link Runnable} with instrumentation invocations.
-     * @param runnable {@link Runnable} to be wrapped
+     *
+     * @param runnable               {@link Runnable} to be wrapped
      * @param invocationInstrumenter instrumenter to be used
      * @return wrapper
      */
@@ -104,9 +111,10 @@ public interface InvocationInstrumenter {
 
     /**
      * Wrappers {@link Callable} with instrumentation invocations.
-     * @param callable {@link Callable} to be wrapped
+     *
+     * @param callable               {@link Callable} to be wrapped
      * @param invocationInstrumenter instrumenter to be used
-     * @param <V> callable generic param
+     * @param <V>                    callable generic param
      * @return wrapper
      */
     static <V> Callable<V> instrument(Callable<V> callable, InvocationInstrumenter invocationInstrumenter) {
