@@ -36,6 +36,18 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == 'Body: {"title":"The Stand"'
     }
 
+    void "test JSON is not parsed when the body is a raw body type in a request argument"() {
+        when:
+        def json = '{"title":"The Stand"'
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/request-string', json), String
+        ).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == 'Body: {"title":"The Stand"'
+    }
+
     void "test parse body into parameters if no @Body specified"() {
         when:
         def json = '{"name":"Fred", "age":10}'
@@ -90,6 +102,17 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def json = '{"title":"The Stand"}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/string', json), String
+        ).blockingFirst()
+
+        then:
+        response.body() == "Body: $json"
+    }
+
+    void  "test simple string-based body parsing with request argument"() {
+        when:
+        def json = '{"title":"The Stand"}'
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/request-string', json), String
         ).blockingFirst()
 
         then:
@@ -276,6 +299,11 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Post("/string")
         String string(@Body String text) {
             "Body: ${text}"
+        }
+
+        @Post("/request-string")
+        String string(HttpRequest<String> req) {
+            "Body: ${req.body.orElse("empty")}"
         }
 
         @Post("/map")
