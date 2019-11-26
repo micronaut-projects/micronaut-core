@@ -21,7 +21,6 @@ Annotating a method with the api:management.endpoint.annotation.Read[] annotatio
 
 snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, readImport, endpointClassBegin, currentDate, simpleRead, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
-
 The above method responds to the following request:
 
 [source,bash]
