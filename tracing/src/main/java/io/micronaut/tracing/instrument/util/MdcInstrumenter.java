@@ -55,6 +55,22 @@ public final class MdcInstrumenter implements Function<Runnable, Runnable>, Runn
         }
     }
 
+    private <T> Callable<T> apply(Callable<T> callable) {
+        final Map<String, String> copyOfContextMap = MDC.getCopyOfContextMap();
+        if (copyOfContextMap != null && !copyOfContextMap.isEmpty()) {
+            return () -> {
+                try {
+                    MDC.setContextMap(copyOfContextMap);
+                    return callable.call();
+                } finally {
+                    MDC.clear();
+                }
+            };
+        } else {
+            return callable;
+        }
+    }
+
     @Override
     public Runnable instrument(Runnable command) {
         return apply(command);
@@ -88,7 +104,6 @@ public final class MdcInstrumenter implements Function<Runnable, Runnable>, Runn
     @Override
     public ExecutorService onCreated(BeanCreatedEvent<ExecutorService> event) {
         ExecutorService executorService = event.getBean();
-        final Map<String, String> copyOfContextMap = MDC.getCopyOfContextMap();
         if (executorService instanceof ScheduledExecutorService) {
             return new InstrumentedScheduledExecutorService() {
                 @Override
@@ -98,10 +113,7 @@ public final class MdcInstrumenter implements Function<Runnable, Runnable>, Runn
 
                 @Override
                 public <T> Callable<T> instrument(Callable<T> task) {
-                    return () -> {
-                        MDC.setContextMap(copyOfContextMap);
-                        return task.call();
-                    };
+                    return apply(task);
                 }
 
                 @Override
@@ -118,10 +130,7 @@ public final class MdcInstrumenter implements Function<Runnable, Runnable>, Runn
 
                 @Override
                 public <T> Callable<T> instrument(Callable<T> task) {
-                    return () -> {
-                        MDC.setContextMap(copyOfContextMap);
-                        return task.call();
-                    };
+                    return apply(task);
                 }
 
                 @Override
