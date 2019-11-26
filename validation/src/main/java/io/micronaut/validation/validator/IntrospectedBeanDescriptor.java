@@ -16,12 +16,10 @@
 
 package io.micronaut.validation.validator;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
-import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
 import javax.validation.*;
@@ -29,8 +27,6 @@ import javax.validation.metadata.*;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -204,89 +200,6 @@ class IntrospectedBeanDescriptor implements BeanDescriptor, ElementDescriptor.Co
         @Override
         public ConstraintFinder findConstraints() {
             return this;
-        }
-    }
-
-    /**
-     * Internal implementation of {@link ConstraintDescriptor}.
-     *
-     * @param <T> The constraint type
-     */
-    private class DefaultConstraintDescriptor<T extends Annotation> implements ConstraintDescriptor<T> {
-
-        private final AnnotationValue<T> annotationValue;
-        private final AnnotationMetadata annotationMetadata;
-        private final Class<T> type;
-
-        DefaultConstraintDescriptor(
-                AnnotationMetadata annotationMetadata,
-                Class<T> type,
-                AnnotationValue<T> annotationValue) {
-            this.annotationValue = annotationValue;
-            this.annotationMetadata = annotationMetadata;
-            this.type = type;
-        }
-
-        @Override
-        public T getAnnotation() {
-            return annotationMetadata.synthesize(type);
-        }
-
-        @Override
-        public String getMessageTemplate() {
-            return annotationValue.get("groups", String.class).orElse(null);
-        }
-
-        @Override
-        public Set<Class<?>> getGroups() {
-            Set groups = annotationValue.get("groups", Argument.setOf(Class.class)).orElse(Collections.emptySet());
-            //noinspection unchecked
-            return groups;
-        }
-
-        @Override
-        public Set<Class<? extends Payload>> getPayload() {
-            Set payload = annotationValue.get("payload", Argument.setOf(Class.class)).orElse(Collections.emptySet());
-            //noinspection unchecked
-            return payload;
-        }
-
-        @Override
-        public ConstraintTarget getValidationAppliesTo() {
-            return ConstraintTarget.IMPLICIT;
-        }
-
-        @Override
-        public List<Class<? extends ConstraintValidator<T, ?>>> getConstraintValidatorClasses() {
-            return Collections.emptyList();
-        }
-
-        @Override
-        public Map<String, Object> getAttributes() {
-            return annotationValue.getValues().entrySet().stream().collect(Collectors.toMap(
-                    (entry) -> entry.getKey().toString(),
-                    Map.Entry::getValue
-            ));
-        }
-
-        @Override
-        public Set<ConstraintDescriptor<?>> getComposingConstraints() {
-            return Collections.emptySet();
-        }
-
-        @Override
-        public boolean isReportAsSingleViolation() {
-            return false;
-        }
-
-        @Override
-        public ValidateUnwrappedValue getValueUnwrapping() {
-            return ValidateUnwrappedValue.DEFAULT;
-        }
-
-        @Override
-        public Object unwrap(Class type) {
-            throw new UnsupportedOperationException("Unwrapping unsupported");
         }
     }
 }
