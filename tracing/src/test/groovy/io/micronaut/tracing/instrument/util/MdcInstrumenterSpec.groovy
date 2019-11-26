@@ -47,8 +47,6 @@ class MdcInstrumenterSpec extends Specification {
         when:
         CompletableFuture.supplyAsync({ ->
             val = MDC.get("foo")
-            assert val == "bar"
-            return "hello"
         }, executor).get()
 
         then:
