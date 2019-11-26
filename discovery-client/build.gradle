@@ -34,7 +34,7 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":inject-java")
     testCompile project(":inject-groovy")
-    testCompile "com.amazonaws:aws-java-sdk-ec2:1.11.297"
+    testCompile "com.amazonaws:aws-java-sdk-ec2:1.11.682"
     testCompile dependencyVersion("reactor")
     testRuntime dependencyVersion("snakeyaml")
 
