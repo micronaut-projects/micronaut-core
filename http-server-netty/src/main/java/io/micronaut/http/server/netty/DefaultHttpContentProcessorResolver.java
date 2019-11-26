@@ -79,13 +79,13 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
                 .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class))
                 .orElseGet(() -> {
                     if (route instanceof ExecutionHandle) {
-                        return Arrays.stream(((ExecutionHandle) route).getArguments())
-                                .filter(argument -> argument.getType() == HttpRequest.class)
-                                .findFirst()
-                                .orElse(Argument.OBJECT_ARGUMENT);
-                    } else {
-                        return Argument.OBJECT_ARGUMENT;
+                        for (Argument<?> argument: ((ExecutionHandle) route).getArguments()) {
+                            if (argument.getType() == HttpRequest.class) {
+                                return argument;
+                            }
+                        }
                     }
+                    return Argument.OBJECT_ARGUMENT;
                 });
         return resolve(request, bodyType);
     }
