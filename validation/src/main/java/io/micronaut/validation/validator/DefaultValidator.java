@@ -760,6 +760,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                         messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(Collections.singletonMap("type", parameterType.getName()))),
                                         messageTemplate,
                                         new PathImpl(context.currentPath),
+                                        null,
                                         argumentValues));
                                 context.removeLast();
                             }
@@ -1412,8 +1413,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                     messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
                                     messageTemplate,
                                     new PathImpl(context.currentPath),
-                                    null
-                            )
+                                    new DefaultConstraintDescriptor(annotationMetadata, constraintType, annotationValue), null)
                     );
                 }
             }
@@ -1795,6 +1795,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         private final Path path;
         private final Class<T> rootBeanClass;
         private final Object leafBean;
+        private final ConstraintDescriptor<?> constraintDescriptor;
         private final Collection<MutableArgumentValue<?>> executableParams;
 
         private DefaultConstraintViolation(
@@ -1805,6 +1806,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 String message,
                 String messageTemplate,
                 Path path,
+                ConstraintDescriptor<?> constraintDescriptor,
                 @Nullable Collection<MutableArgumentValue<?>> executableParams) {
             this.rootBean = rootBean;
             this.rootBeanClass = rootBeanClass;
