@@ -17,6 +17,7 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 
 import javax.validation.ConstraintTarget;
@@ -38,6 +39,7 @@ import java.util.stream.Collectors;
  * @author graemerocher
  * @since 1.2
  */
+@Internal
 class DefaultConstraintDescriptor<T extends Annotation> implements ConstraintDescriptor<T> {
 
     private final AnnotationValue<T> annotationValue;
