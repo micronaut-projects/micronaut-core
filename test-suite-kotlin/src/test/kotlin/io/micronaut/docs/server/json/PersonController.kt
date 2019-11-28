@@ -89,7 +89,7 @@ class PersonController {
     }
 
     // tag::globalError[]
-    @Error // <1>
+    @Error(global = "true") // <1>
     fun error(request: HttpRequest<*>, e: Throwable): HttpResponse<JsonError> {
         val error = JsonError("Bad Things Happened: " + e.message) // <2>
                 .link(Link.SELF, Link.of(request.uri))
