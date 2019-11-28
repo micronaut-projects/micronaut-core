@@ -94,7 +94,7 @@ public class PersonController {
     }
 
     // tag::globalError[]
-    @Error(global = "true") // <1>
+    @Error(global = true) // <1>
     public HttpResponse<JsonError> error(HttpRequest request, Throwable e) {
         JsonError error = new JsonError("Bad Things Happened: " + e.getMessage()) // <2>
                 .link(Link.SELF, Link.of(request.getUri()));
