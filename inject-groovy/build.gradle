@@ -3,7 +3,7 @@ dependencies {
     compile project(":aop")
     compile dependencyVersion("groovy")
 
-    testCompile "junit:junit:4.7"
+    testCompile "junit:junit:4.12"
 //    testCompile 'javax.validation:validation-api:1.1.0.Final'
     testCompile "org.hibernate:hibernate-core:5.3.6.Final"
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
