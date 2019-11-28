@@ -4,7 +4,7 @@ NOTE: Properties that may contain sensitive data will be masked.
 
 == Configuration
 
-To configure the info endpoint, supply configuration through `endpoints.info`.
+To configure the environment endpoint, supply configuration through `endpoints.env`.
 
 .Environment Endpoint Configuration Example
 [source,yaml]
