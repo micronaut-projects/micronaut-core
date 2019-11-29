@@ -20,14 +20,17 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.inject.ExecutionHandle;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 
 import javax.annotation.Nonnull;
 import javax.inject.Singleton;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -66,7 +69,7 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
     @Override
     @Nonnull
     public HttpContentProcessor<?> resolve(@Nonnull NettyHttpRequest<?> request, @Nonnull RouteMatch<?> route) {
-        boolean isRaw = route.getBodyArgument()
+        Argument<?> bodyType = route.getBodyArgument()
                 /*
                 The getBodyArgument() method returns arguments for functions where it is
                 not possible to dictate whether the argument is supposed to bind the entire
@@ -74,15 +77,25 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
                 annotation to exclude that use case
                 */
                 .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class))
-                .map(Argument::getType)
-                .filter(RAW_BODY_TYPES::contains).isPresent();
-
-        return resolve(request, isRaw);
+                .orElseGet(() -> {
+                    if (route instanceof ExecutionHandle) {
+                        return Arrays.stream(((ExecutionHandle) route).getArguments())
+                                .filter(argument -> argument.getType() == HttpRequest.class)
+                                .findFirst()
+                                .orElse(Argument.OBJECT_ARGUMENT);
+                    } else {
+                        return Argument.OBJECT_ARGUMENT;
+                    }
+                });
+        return resolve(request, bodyType);
     }
 
     @Override
     @Nonnull
     public HttpContentProcessor<?> resolve(@Nonnull NettyHttpRequest<?> request, @Nonnull Argument<?> bodyType) {
+        if (bodyType.getType() == HttpRequest.class) {
+            bodyType = bodyType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        }
         boolean isRaw = RAW_BODY_TYPES.contains(bodyType.getType());
         return resolve(request, isRaw);
     }
