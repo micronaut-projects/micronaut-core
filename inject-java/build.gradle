@@ -14,7 +14,7 @@ dependencies {
     testCompile "junit:junit:4.12"
     testCompile "com.google.testing.compile:compile-testing:0.12"
     testCompile 'org.mongodb:mongo-java-driver:3.7.1'
-    testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
+    testCompile 'org.neo4j.driver:neo4j-java-driver:1.7.5'
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     testRuntime 'org.glassfish:javax.el:3.0.1-b08'

@@ -11,7 +11,7 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
     testCompile project(":validation")
-    testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
+    testCompile 'org.neo4j.driver:neo4j-java-driver:1.7.5'
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     testCompile project(":validation")
 }
