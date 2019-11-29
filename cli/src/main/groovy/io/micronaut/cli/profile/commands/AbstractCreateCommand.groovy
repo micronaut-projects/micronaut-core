@@ -63,6 +63,9 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     @Option(names = ['-i', '--inplace'], description = 'Create a service using the current directory')
     boolean inplace
 
+    @Option(names = ['-m', '--mainClass'], paramLabel = 'MAINCLASS', description = 'The main class to use. Possible values: The full package and class name (ie. io.micronaut.CustomApplication).')
+    String mainClass
+
     @Option(names = ['-p', '--profile'], paramLabel = 'PROFILE', description = 'The profile to use. Possible values: ${COMPLETION-CANDIDATES}.', completionCandidates = ProfileCompletionCandidates)
     String profile
 
@@ -463,6 +466,16 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         }
 
         tokens.put("micronautVersion", cmd.micronautVersion)
+
+        if (profile.name.contains("function")) {
+            if (cmd.lang == "kotlin") {
+                tokens.put("mainClass", mainClass ? "${mainClass}FunctionKt" : "${this.defaultpackagename}.${variables['project.className']}FunctionKt")
+            } else {
+                tokens.put("mainClass", mainClass ? "${mainClass}Function" : "${this.defaultpackagename}.${variables['project.className']}Function")
+            }
+        } else {
+            tokens.put("mainClass", mainClass ? mainClass : "${this.defaultpackagename}.Application")
+        }
 
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->
