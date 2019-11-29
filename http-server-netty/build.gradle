@@ -11,7 +11,7 @@ dependencies {
     testCompile project(":inject-java-test")
     testCompile project(":http-client")
     testCompile group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.4'
-    testCompile group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.2'
+    testCompile group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.4'
 
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     testCompile dependencyModuleVersion("groovy", "groovy-templates")
