@@ -467,6 +467,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
         tokens.put("micronautVersion", cmd.micronautVersion)
 
+        // Allows for a custom mainClassName
         if (profile.name.contains("function")) {
             if (cmd.lang == "kotlin") {
                 tokens.put("mainClass", mainClass ? "${mainClass}FunctionKt" : "${this.defaultpackagename}.${variables['project.className']}FunctionKt")
@@ -475,6 +476,11 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             }
         } else {
             tokens.put("mainClass", mainClass ? mainClass : "${this.defaultpackagename}.Application")
+        }
+
+        // Allows for a separate custom main in native-image.properties
+        if (features.any{ it.name == "graal-native-image"} ) {
+            tokens.put("graalFunctionMainClass", "io.micronaut.function.executor.FunctionApplication")
         }
 
         ant.replace(dir: targetDirectory) {
