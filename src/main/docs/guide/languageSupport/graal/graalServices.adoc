@@ -7,6 +7,7 @@ To get started creating a Microservice that can be compiled into a native image,
 ----
 $ mn create-app hello-world --features graal-native-image
 ----
+NOTE: For Kotlin use `graal-native-image-kotlin` feature.
 
 The `graal-native-image` feature adds three important items:
 
