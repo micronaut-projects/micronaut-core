@@ -10,13 +10,13 @@ dependencies {
         exclude module:'micronaut-http-client'
         exclude module:'micronaut-inject'
     }
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.683'
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.683'
     compileOnly group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
 
     // used by AWSParameterStoreConfigClient
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.683'
 
     testCompile "org.testcontainers:spock:1.10.1"
 
@@ -34,7 +34,7 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":inject-java")
     testCompile project(":inject-groovy")
-    testCompile "com.amazonaws:aws-java-sdk-ec2:1.11.297"
+    testCompile "com.amazonaws:aws-java-sdk-ec2:1.11.683"
     testCompile dependencyVersion("reactor")
     testRuntime dependencyVersion("snakeyaml")
 
