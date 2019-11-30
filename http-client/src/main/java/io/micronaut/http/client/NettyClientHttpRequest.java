@@ -139,7 +139,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
             }
         });
 
-        if(cookieString.get().length() > 0) {
+        if (cookieString.get().length() > 0) {
             headers.add(HttpHeaderNames.COOKIE, cookieString.get());
         }
 

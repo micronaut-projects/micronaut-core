@@ -145,7 +145,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
             }
         });
 
-        if(cookieString.get().length() > 0) {
+        if (cookieString.get().length() > 0) {
             headers.add(HttpHeaderNames.COOKIE, cookieString.get());
         }
 
