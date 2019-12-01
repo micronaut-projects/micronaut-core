@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.resource;
 
+import io.micronaut.context.annotation.Value;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.CollectionUtils;
@@ -45,15 +46,16 @@ public class StaticResourceResolver {
      * Default constructor.
      *
      * @param configurations The static resource configurations
+     * @param serverContextPath The server context path if any.
      */
-    StaticResourceResolver(List<StaticResourceConfiguration> configurations) {
+    StaticResourceResolver(List<StaticResourceConfiguration> configurations, @Value("${micronaut.server.context-path:}") String serverContextPath) {
         this.pathMatcher = PathMatcher.ANT;
-
         if (CollectionUtils.isNotEmpty(configurations)) {
+            serverContextPath = serverContextPath == null || serverContextPath.isEmpty() ? "" : StringUtils.prependUri("", serverContextPath);
 
             for (StaticResourceConfiguration config: configurations) {
                 if (config.isEnabled()) {
-                    this.resourceMappings.put(config.getMapping(), config.getResourceLoaders());
+                    this.resourceMappings.put(serverContextPath + config.getMapping(), config.getResourceLoaders());
                 }
             }
         }
