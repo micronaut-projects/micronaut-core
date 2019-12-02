@@ -479,7 +479,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         }
 
         // Allows for a separate custom main in native-image.properties
-        if (features.any{ it.name == "graal-native-image"} ) {
+        if (features.any{ it.name == "graal-native-image" || it.name == "graal-native-image-kotlin"} ) {
             tokens.put("graalFunctionMainClass", "io.micronaut.function.executor.FunctionApplication")
         }
 
