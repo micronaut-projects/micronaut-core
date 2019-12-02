@@ -30,6 +30,7 @@ import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -147,8 +148,16 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
         cache.invalidateAll();
     }
 
+    /**
+     * <p>Cache the specified value using the specified key. If the value is null, it will call
+     * {@link #invalidate(Object)} passing the key</p>
+     *
+     * @param key   the key with which the specified value is to be associated
+     * @param value the value to be associated with the specified key
+     */
+    @SuppressWarnings("unchecked")
     @Override
-    public void put(Object key, Object value) {
+    public void put(@Nonnull Object key, @Nullable Object value) {
         if (value == null) {
             // null is the same as removal
             cache.invalidate(key);
