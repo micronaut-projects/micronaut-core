@@ -474,13 +474,14 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             } else {
                 tokens.put("mainClass", mainClass ? "${mainClass}Function" : "${this.defaultpackagename}.${variables['project.className']}Function")
             }
+
+            // Allows for a separate custom main in native-image.properties
+            if (features.any{ it.name == "graal-native-image" || it.name == "graal-native-image-kotlin"} ) {
+                tokens.put("graalFunctionMainClass", "io.micronaut.function.executor.FunctionApplication")
+            }
         } else {
             tokens.put("mainClass", mainClass ? mainClass : "${this.defaultpackagename}.Application")
-        }
-
-        // Allows for a separate custom main in native-image.properties
-        if (features.any{ it.name == "graal-native-image" || it.name == "graal-native-image-kotlin"} ) {
-            tokens.put("graalFunctionMainClass", "io.micronaut.function.executor.FunctionApplication")
+            tokens.put("graalFunctionMainClass", mainClass ? mainClass : "${this.defaultpackagename}.Application")
         }
 
         ant.replace(dir: targetDirectory) {
