@@ -31,7 +31,7 @@ class StaticResourceResolverSpec extends Specification {
         StaticResourceConfiguration config2 = new StaticResourceConfiguration(rr)
         config2.setPaths(["classpath:other"])
         config2.setMapping("/other/**")
-        StaticResourceResolver resolver = new StaticResourceResolver([config1, config2], null)
+        StaticResourceResolver resolver = new StaticResourceResolver([config1, config2])
 
         when:
         URL url = resolver.resolve("/").get()
@@ -44,44 +44,5 @@ class StaticResourceResolverSpec extends Specification {
 
         then:
         url.toString().endsWith("other/index.html")
-    }
-
-    void "test server contextpath with static resources"() {
-        given:
-        ResourceResolver rr = new ResourceResolver()
-        StaticResourceConfiguration config1 = new StaticResourceConfiguration(rr)
-        config1.setPaths(["classpath:public"])
-        config1.setMapping("/**")
-        StaticResourceConfiguration config2 = new StaticResourceConfiguration(rr)
-        config2.setPaths(["classpath:other"])
-        config2.setMapping("/other/**")
-        StaticResourceResolver resolver = new StaticResourceResolver([config1, config2], "/context/path")
-
-        when:
-        Optional<URL> url = resolver.resolve("/")
-
-        then:
-        !url.isPresent()
-
-        when:
-        url = resolver.resolve("/other")
-
-        then:
-        !url.isPresent()
-
-        when:
-        url = resolver.resolve("/context/path/")
-
-        then:
-        url.isPresent()
-        url.get().toString().endsWith("public/index.html")
-
-        when:
-        url = resolver.resolve("/context/path/other")
-
-        then:
-        url.isPresent()
-        url.get().toString().endsWith("other/index.html")
-
     }
 }

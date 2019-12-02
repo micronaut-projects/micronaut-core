@@ -46,16 +46,13 @@ public class StaticResourceResolver {
      * Default constructor.
      *
      * @param configurations The static resource configurations
-     * @param serverContextPath The server context path if any.
      */
-    StaticResourceResolver(List<StaticResourceConfiguration> configurations, @Value("${micronaut.server.context-path:}") String serverContextPath) {
+    StaticResourceResolver(List<StaticResourceConfiguration> configurations) {
         this.pathMatcher = PathMatcher.ANT;
         if (CollectionUtils.isNotEmpty(configurations)) {
-            serverContextPath = serverContextPath == null || serverContextPath.isEmpty() ? "" : StringUtils.prependUri("", serverContextPath);
-
             for (StaticResourceConfiguration config: configurations) {
                 if (config.isEnabled()) {
-                    this.resourceMappings.put(serverContextPath + config.getMapping(), config.getResourceLoaders());
+                    this.resourceMappings.put(config.getMapping(), config.getResourceLoaders());
                 }
             }
         }
