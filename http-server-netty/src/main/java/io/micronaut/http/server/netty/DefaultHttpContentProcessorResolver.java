@@ -30,7 +30,6 @@ import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 
 import javax.annotation.Nonnull;
 import javax.inject.Singleton;
-import java.util.Arrays;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
