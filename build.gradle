@@ -430,6 +430,11 @@ ext {
                     name   : 'hystrix-core',
                     modules: ['hystrix-serialization']
             ],
+            graalSubstrate             : [
+                    version: '19.2.1',
+                    group  : 'com.oracle.substratevm',
+                    name   : 'svm'
+            ],
             graal                      : [
                     version: graalVersion,
                     group  : 'org.graalvm.nativeimage',
