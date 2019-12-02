@@ -15,7 +15,6 @@
  */
 package io.micronaut.web.router.resource;
 
-import io.micronaut.context.annotation.Value;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.CollectionUtils;
