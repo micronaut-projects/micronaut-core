@@ -68,7 +68,7 @@ public interface AsyncCache<C> extends Cache<C> {
      *
      * @param key   The key with which the specified value is to be associated
      * @param value The value to be associated with the specified key
-     * @return A future with a boolean indicating whether the operation was succesful or not
+     * @return A future with a boolean indicating whether the operation was successful or not
      */
     CompletableFuture<Boolean> put(Object key, Object value);
 
