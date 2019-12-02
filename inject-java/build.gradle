@@ -11,7 +11,7 @@ dependencies {
     testCompile dependencyVersion("rxjava2")
     testCompile "org.hibernate:hibernate-core:5.3.6.Final"
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
-    testCompile "junit:junit:4.7"
+    testCompile "junit:junit:4.12"
     testCompile "com.google.testing.compile:compile-testing:0.12"
     testCompile 'org.mongodb:mongo-java-driver:3.7.1'
     testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
