@@ -30,6 +30,17 @@ class BindingController {
     }
     // end::cookie2[]
 
+    // tag::cookieMultiple[]
+    @Get("/cookieMultiple")
+    fun cookieMultiple(@CookieValue("myCookieA") myCookieA: String, @CookieValue("myCookieB") myCookieB: String): List<String> {
+        // ...
+        // end::cookieMultiple[]
+        return listOf(myCookieA, myCookieB)
+        // tag::cookieMultiple[]
+    }
+    // end::cookieMultiple[]
+
+
     // tag::header1[]
     @Get("/headerName")
     fun headerName(@Header("Content-Type") contentType: String): String {

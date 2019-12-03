@@ -37,6 +37,18 @@ class BindingControllerTest extends Specification {
         body == "cookie value"
     }
 
+    void "test multiple cookie binding"() {
+        setup:
+        HashSet<Cookie> cookies = [Cookie.of("myCookieA", "cookie A value"), Cookie.of("myCookieB", "cookie B value")] as Set
+
+        when:
+        String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/cookieMultiple").cookies(cookies))
+
+        then:
+        body != null
+        body == "[\"cookie A value\",\"cookie B value\"]"
+    }
+
     void "test header binding"() {
         when:
         String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerName").header("Content-Type", "test"))
