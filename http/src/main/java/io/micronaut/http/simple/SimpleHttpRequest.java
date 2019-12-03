@@ -75,8 +75,9 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
 
     @Override
     public MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
-        this.cookies.putAll(cookies.stream().collect(Collectors.toMap(Cookie::getName, c -> c)));
-
+        for (Cookie cookie: cookies) {
+            cookie(cookie);
+        }
         return this;
     }
 

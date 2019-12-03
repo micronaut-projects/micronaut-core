@@ -40,9 +40,10 @@ import org.reactivestreams.Publisher;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 /**
  * Default implementation of {@link MutableHttpRequest} for the {@link HttpClient}.
@@ -126,23 +127,21 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
     @Override
     public MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
-
-        AtomicReference<String> cookieString = new AtomicReference<>("");
-
-        cookies.forEach(cookie -> {
-            if (cookie instanceof NettyCookie) {
-                NettyCookie nettyCookie = (NettyCookie) cookie;
-                String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-                cookieString.set(cookieString + value + ";");
-            } else {
-                throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+        if (cookies.size() > 1) {
+            Set<String> values = new HashSet<>(cookies.size());
+            for (Cookie cookie: cookies) {
+                if (cookie instanceof NettyCookie) {
+                    NettyCookie nettyCookie = (NettyCookie) cookie;
+                    String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+                    values.add(value);
+                } else {
+                    throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+                }
             }
-        });
-
-        if (cookieString.get().length() > 0) {
-            headers.add(HttpHeaderNames.COOKIE, cookieString.get());
+            headers.add(HttpHeaderNames.COOKIE, String.join(";", values));
+        } else if (!cookies.isEmpty()) {
+            cookie(cookies.iterator().next());
         }
-
         return this;
     }
 

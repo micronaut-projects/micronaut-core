@@ -49,7 +49,12 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @param cookies the Set of Cookies to return to the client
      * @return This response object
      */
-    MutableHttpResponse<B> cookies(Set<Cookie> cookies);
+    default MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
+        for (Cookie cookie: cookies) {
+            cookie(cookie);
+        }
+        return this;
+    }
 
     /**
      * Sets the body.
