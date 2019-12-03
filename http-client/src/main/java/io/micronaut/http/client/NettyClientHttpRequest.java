@@ -15,11 +15,6 @@
  */
 package io.micronaut.http.client;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.Charset;
-import java.util.Optional;
-
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -38,14 +33,17 @@ import io.micronaut.http.netty.NettyHttpParameters;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import org.reactivestreams.Publisher;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.util.HashSet;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Default implementation of {@link MutableHttpRequest} for the {@link HttpClient}.
@@ -75,8 +73,9 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
     /**
      * This constructor is actually required for the case of non-standard http methods.
-     * @param httpMethod The http method. CUSTOM value is used for non-standard
-     * @param uri The uri
+     *
+     * @param httpMethod     The http method. CUSTOM value is used for non-standard
+     * @param uri            The uri
      * @param httpMethodName Method name. Is the same as httpMethod.name() value for standard http methods.
      */
     NettyClientHttpRequest(HttpMethod httpMethod, URI uri, String httpMethodName) {
@@ -95,8 +94,9 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
     /**
      * This constructor is actually required for the case of non-standard http methods.
-     * @param httpMethod The http method. CUSTOM value is used for non-standard
-     * @param uri The uri
+     *
+     * @param httpMethod     The http method. CUSTOM value is used for non-standard
+     * @param uri            The uri
      * @param httpMethodName Method name. Is the same as httpMethod.name() value for standard http methods.
      */
     NettyClientHttpRequest(HttpMethod httpMethod, String uri, String httpMethodName) {
@@ -121,6 +121,26 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
             headers.add(HttpHeaderNames.COOKIE, value);
         } else {
             throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+        }
+        return this;
+    }
+
+    @Override
+    public MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
+        if (cookies.size() > 1) {
+            Set<String> values = new HashSet<>(cookies.size());
+            for (Cookie cookie: cookies) {
+                if (cookie instanceof NettyCookie) {
+                    NettyCookie nettyCookie = (NettyCookie) cookie;
+                    String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+                    values.add(value);
+                } else {
+                    throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+                }
+            }
+            headers.add(HttpHeaderNames.COOKIE, String.join(";", values));
+        } else if (!cookies.isEmpty()) {
+            cookie(cookies.iterator().next());
         }
         return this;
     }
@@ -204,7 +224,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
         String uriStr = resolveUriPath();
         io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
         DefaultFullHttpRequest req = content != null ? new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, content) :
-            new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
         req.headers().set(headers.getNettyHeaders());
         return req;
     }
@@ -221,7 +241,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
         String uriStr = resolveUriPath();
         io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
         HttpRequest req = publisher != null ? new DefaultStreamedHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, publisher) :
-            new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
         req.headers().set(headers.getNettyHeaders());
         return req;
     }
