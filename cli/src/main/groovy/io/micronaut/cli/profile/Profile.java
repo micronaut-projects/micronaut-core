@@ -46,6 +46,13 @@ public interface Profile {
     String getVersion();
 
     /**
+     * @return The main class name of the profile
+     */
+    String getMainClassName();
+
+    void setMainClassName(String mainClassName);
+
+    /**
      * @return The description of the profile
      */
     String getDescription();
