@@ -318,7 +318,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
                         final String prefix = candidate.stringValue(ConfigurationReader.class, "prefix").orElse(null);
                         if (prefix != null) {
-
                             int starIndex = prefix.indexOf("*");
                             if (starIndex > -1) {
                                 String eachProperty = prefix.substring(0, starIndex);
