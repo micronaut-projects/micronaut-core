@@ -41,7 +41,7 @@ dependencies {
     testCompile project(":function-web")
     testCompile 'io.kotlintest:kotlintest-runner-junit5:3.3.0'
     testRuntime "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
-    testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
+    testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.685'
 }
 
 compileTestKotlin {
