@@ -285,13 +285,18 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                                     thisFuture.completeExceptionally(t2);
                                 } else {
                                     // new cacheable result, cache it
-                                    asyncCache.put(key, o1).whenComplete((aBoolean, throwable1) -> {
+                                    BiConsumer<Boolean, Throwable> completionHandler = (aBoolean, throwable1) -> {
                                         if (throwable1 == null) {
                                             thisFuture.complete(o1);
                                         } else {
                                             thisFuture.completeExceptionally(throwable1);
                                         }
-                                    });
+                                    };
+                                    if (o1 != null) {
+                                        asyncCache.put(key, o1).whenComplete(completionHandler);
+                                    } else {
+                                        asyncCache.invalidate(key).whenComplete(completionHandler);
+                                    }
 
                                 }
                             });
@@ -531,7 +536,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                        context.proceed(), Flowable.class)
                        .flatMap(o -> {
                            return Single.create(emitter -> {
-                               asyncCache.put(key, o).whenComplete((aBoolean, throwable1) -> {
+                               BiConsumer<Boolean, Throwable> completionHandler = (aBoolean, throwable1) -> {
                                    if (throwable1 == null) {
                                        emitter.onSuccess(o);
                                    } else {
@@ -542,7 +547,12 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                                            emitter.onSuccess(o);
                                        }
                                    }
-                               });
+                               };
+                               if (o != null) {
+                                   asyncCache.put(key, o).whenComplete(completionHandler);
+                               } else {
+                                   asyncCache.invalidate(key).whenComplete(completionHandler);
+                               }
                            }).toFlowable();
                        });
             } else {
@@ -645,7 +655,11 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
         List<CompletableFuture<Boolean>> futures = new ArrayList<>();
         for (String cacheName : cacheNames) {
             AsyncCache<?> asyncCache = cacheManager.getCache(cacheName).async();
-            futures.add(asyncCache.put(key, result));
+            if (result != null) {
+                futures.add(asyncCache.put(key, result));
+            } else {
+                futures.add(asyncCache.invalidate(key));
+            }
         }
         CompletableFuture[] futureArray = futures.toArray(new CompletableFuture[0]);
         return CompletableFuture.allOf(futureArray);
@@ -731,8 +745,8 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                         for (String cacheName : cacheNames) {
                             SyncCache cache = cacheManager.getCache(cacheName);
                             AsyncCache<?> asyncCache = cache.async();
-                            CompletableFuture<Boolean> putFuture = asyncCache.put(key, v);
-                            putFuture.whenCompleteAsync((aBoolean, throwable) -> {
+                            CompletableFuture<Boolean> putOrInvalidateFuture = v != null ? asyncCache.put(key, v) : asyncCache.invalidate(key);
+                            putOrInvalidateFuture.whenCompleteAsync((aBoolean, throwable) -> {
                                 if (throwable != null) {
                                     asyncCacheErrorHandler.handlePutError(cache, key, v, asRuntimeException(throwable));
                                 }
@@ -753,7 +767,11 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
         for (String cacheName : cacheNames) {
             SyncCache syncCache = cacheManager.getCache(cacheName);
             try {
-                syncCache.put(key, value);
+                if (value != null) {
+                    syncCache.put(key, value);
+                } else {
+                    syncCache.invalidate(key);
+                }
             } catch (RuntimeException e) {
                 if (errorHandler.handlePutError(syncCache, key, value, e)) {
                     throw e;
