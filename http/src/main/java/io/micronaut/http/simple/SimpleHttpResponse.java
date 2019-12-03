@@ -54,10 +54,9 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
-        cookies.forEach(cookie -> {
-            this.cookies.put(cookie.getName(), cookie);
-        });
-
+        for (Cookie cookie: cookies) {
+            cookie(cookie);
+        }
         return this;
     }
 

@@ -46,7 +46,12 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
      * @param cookies the Cookies to return to the client
      * @return The http request
      */
-    MutableHttpRequest<B> cookies(Set<Cookie> cookies);
+    default MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
+        for (Cookie cookie: cookies) {
+            cookie(cookie);
+        }
+        return this;
+    }
 
 
     /**

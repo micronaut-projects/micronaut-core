@@ -35,12 +35,10 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -133,22 +131,21 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
-        AtomicReference<String> cookieString = new AtomicReference<>("");
-
-        cookies.forEach(cookie -> {
-            if (cookie instanceof NettyCookie) {
-                NettyCookie nettyCookie = (NettyCookie) cookie;
-                String value = ServerCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-                cookieString.set(cookieString + value + ";");
-            } else {
-                throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+        if (cookies.size() > 1) {
+            Set<String> values = new HashSet<>(cookies.size());
+            for (Cookie cookie: cookies) {
+                if (cookie instanceof NettyCookie) {
+                    NettyCookie nettyCookie = (NettyCookie) cookie;
+                    String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+                    values.add(value);
+                } else {
+                    throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+                }
             }
-        });
-
-        if (cookieString.get().length() > 0) {
-            headers.add(HttpHeaderNames.COOKIE, cookieString.get());
+            headers.add(HttpHeaderNames.COOKIE, String.join(";", values));
+        } else if (!cookies.isEmpty()) {
+            cookie(cookies.iterator().next());
         }
-
         return this;
     }
 
