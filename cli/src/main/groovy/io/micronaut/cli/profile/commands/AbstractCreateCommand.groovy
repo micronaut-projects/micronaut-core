@@ -270,6 +270,8 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         String profileName = cmd.profileName
 
         Profile profileInstance = profileRepository.getProfile(profileName)
+
+        println "PI " + profileInstance.mainClassName + " " + profileInstance.name
         if (!validateProfile(profileInstance, profileName)) {
             return false
         }
@@ -307,6 +309,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             buildTargetFolders(profileInstance, targetDirs, projectTargetDirectory)
 
             for (Profile p : profiles) {
+                println "PROF " + p.name + " " + p.mainClassName
                 Set<File> ymlFiles = findAllFilesByName(projectTargetDirectory, APPLICATION_YML)
                 Map<File, String> ymlCache = [:]
 
@@ -330,6 +333,10 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             AntBuilder ant = new ConsoleAntBuilder()
 
             for (Feature f in features) {
+                println "FEAT: " + f.name + " "+ f.mainClassName
+                if (f.mainClassName) {
+                    profileInstance.mainClassName = f.mainClassName
+                }
                 def location = f.location
 
                 File skeletonDir
@@ -456,7 +463,10 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             return
         }
 
-        Map tokens = buildTokens.getTokens(profileRepository, profile, features)
+        Map tokens = [:]
+        Map mainClassFirst = ["mainClassName": profile.mainClassName]
+        println "MTOK: " + mainClassFirst
+        tokens = mainClassFirst + buildTokens.getTokens(profileRepository, profile, features)
 
         if (tokens == null) {
             return
