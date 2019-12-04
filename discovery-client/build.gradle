@@ -13,7 +13,7 @@ dependencies {
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.683'
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.683'
     compileOnly group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.687'
 
     // used by AWSParameterStoreConfigClient
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.683'
