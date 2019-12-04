@@ -1,5 +1,9 @@
 Micronaut {version} includes the following changes:
 
+=== Support for GraalVM 19.3.0
+
+Micronaut now supports creating native-images using GraalVM 19.3.0 for both JDK 8 and JDK 11.
+
 === Native Bean Validation Support
 
 Hibernate Validator is no longer a required dependency to activate bean validation, with a new <<beanValidation,native implementation of Bean Validation>> available that is reflection free and supports reactive and AST level validations now available.
@@ -134,7 +138,7 @@ This version references the https://micronaut-projects.github.io/micronaut-rss/l
 - Micronaut Security `1.1.1` -> `1.2.0`
 - Micronaut Views `1.1.3` -> `1.2.0`
 - Micronaut Test `1.0.4` -> `1.1.0`
-- Netty `4.1.30.Final` -> `4.1.38.Final`
+- Netty `4.1.30.Final` -> `4.1.43.Final`
 - Neo4j Driver `1.7.2` -> `1.7.5`
 - Mongo Driver `3.8.0` -> `3.10.1`
 - Mongo Reactive Streams `1.10.0` -> `1.11.0`
