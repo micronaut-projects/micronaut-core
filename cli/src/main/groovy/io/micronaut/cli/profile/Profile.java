@@ -50,6 +50,10 @@ public interface Profile {
      */
     String getMainClassName();
 
+    /**
+     * Set the mainClassName
+     * @param mainClassName
+     */
     void setMainClassName(String mainClassName);
 
     /**
