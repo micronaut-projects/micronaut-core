@@ -16,7 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.type.Argument
+import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -26,7 +26,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.hateoas.JsonError
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import io.reactivex.Single
@@ -112,14 +111,12 @@ class ServerRedirectSpec extends Specification {
         RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
 
         when:
-        HttpResponse<String> response = ((RxHttpClient) client).exchange(
-                HttpRequest.GET("/redirect/stream/title").accept(MediaType.TEXT_EVENT_STREAM_TYPE),
-                Argument.<String> of(String),
-                Argument.<JsonError> of(JsonError)).blockingFirst()
+        HttpResponse<ByteBuffer> response = ((RxStreamingHttpClient) client).exchangeStream(
+                HttpRequest.GET("/redirect/stream/title").accept(MediaType.TEXT_EVENT_STREAM_TYPE)).blockingFirst()
 
         then:
         response.status() == HttpStatus.OK
-        response.body() == "data: The Stand\n\n"
+        new String(response.body().toByteArray()) == "data: The Stand\n\n"
     }
 
     void "test redirect headers"() {
@@ -127,7 +124,7 @@ class ServerRedirectSpec extends Specification {
         HttpClient client = HttpClient.create(embeddedServer.getURL())
 
         when:
-        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/redirect/title").accept(MediaType.TEXT_PLAIN_TYPE), String)
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/redirect/title").accept(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE), String)
 
         then:
         response.status() == HttpStatus.OK
