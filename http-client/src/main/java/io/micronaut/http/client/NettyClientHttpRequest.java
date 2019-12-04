@@ -43,7 +43,6 @@ import java.nio.charset.Charset;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Default implementation of {@link MutableHttpRequest} for the {@link HttpClient}.
