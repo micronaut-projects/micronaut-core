@@ -15,14 +15,13 @@
  *  * limitations under the License.
  *
  */
-package io.micronaut.xml.client.codec;
+package io.micronaut.xml.codec;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.jackson.codec.JsonStreamMediaTypeCodec;
-import io.micronaut.jackson.codec.XmlMediaTypeCodec;
 
 import java.util.HashMap;
 import java.util.Map;

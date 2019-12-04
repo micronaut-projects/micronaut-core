@@ -17,11 +17,12 @@
  */
 package io.micronaut.xml.server.convert;
 
+import com.fasterxml.aalto.stax.InputFactoryImpl;
 import io.micronaut.core.annotation.Internal;
 
+import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.util.StreamReaderDelegate;
-import java.util.function.Supplier;
 
 /**
  * Stream reader that pairs xml stream with underlying byte array.
@@ -30,17 +31,21 @@ import java.util.function.Supplier;
  */
 @Internal
 public final class ByteArrayXmlStreamReader extends StreamReaderDelegate {
+
+    private static final InputFactoryImpl XML_STREAM_FACTORY = new InputFactoryImpl();
+
     private byte[] bytes;
-    private Supplier<XMLStreamReader> cloneAction;
 
     /**
-     * @param reader stream reader we will delegate to
-     * @param bytes  byte array that was fed to the given xml stream
+     * @param bytes raw representation of xml
      */
-    public ByteArrayXmlStreamReader(XMLStreamReader reader, byte[] bytes, Supplier<XMLStreamReader> cloneAction) {
-        super(reader);
+    public ByteArrayXmlStreamReader(byte[] bytes) throws XMLStreamException {
+        super(toReader(bytes));
         this.bytes = bytes;
-        this.cloneAction = cloneAction;
+    }
+
+    private static XMLStreamReader toReader(byte[] bytes) throws XMLStreamException {
+        return XML_STREAM_FACTORY.createAsyncFor(bytes);
     }
 
     /**
@@ -50,7 +55,7 @@ public final class ByteArrayXmlStreamReader extends StreamReaderDelegate {
         return this.bytes;
     }
 
-    public XMLStreamReader copy() {
-        return cloneAction.get();
+    public XMLStreamReader copy() throws XMLStreamException {
+        return new ByteArrayXmlStreamReader(bytes);
     }
 }

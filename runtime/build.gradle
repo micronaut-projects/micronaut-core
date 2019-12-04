@@ -7,7 +7,6 @@ dependencies {
     compileOnly "com.oracle.substratevm:svm:$graalVersion"
     compileOnly project(":graal")
     compileOnly dependencyVersion("jcache")
-    compile dependencyVersion('jackson.dataformat')
     compile dependencyVersion("validation")
     compile dependencyVersion("jackson.databind")
     compile dependencyVersion("rxjava2")

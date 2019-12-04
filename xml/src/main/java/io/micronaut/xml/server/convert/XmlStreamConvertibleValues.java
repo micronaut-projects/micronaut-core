@@ -1,19 +1,17 @@
 /*
+ * Copyright 2017-2019 original authors
  *
- *  * Copyright 2017-2019 original authors
- *  *
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  * http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package io.micronaut.xml.server.convert;
 
@@ -26,16 +24,9 @@ import com.fasterxml.jackson.dataformat.xml.deser.FromXmlParser;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.CollectionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * An implementation of {@link ConvertibleValues} backed by xml stream.
@@ -46,7 +37,7 @@ import java.util.Set;
  */
 public class XmlStreamConvertibleValues<V> implements ConvertibleValues<V> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(XmlStreamConvertibleValues.class);
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(XmlStreamConvertibleValues.class);
 
     private final ByteArrayXmlStreamReader stream;
     private final XmlMapper xmlMapper;
@@ -97,7 +88,7 @@ public class XmlStreamConvertibleValues<V> implements ConvertibleValues<V> {
             return Optional.of(valueHolder.getValue());
 
         } catch (Exception e) {
-            LOG.error("Failed to deserialize value holder", e);
+            LOG.error("Failed to retrieve {} field from xml stream", name, e);
         }
 
         return Optional.empty();
@@ -105,7 +96,7 @@ public class XmlStreamConvertibleValues<V> implements ConvertibleValues<V> {
 
     /**
      * Type that works as a selector for a single field from xml stream. The algorithm works as following: <pre>
-     * 1. Modify xml stream and rename the field we are interested in to  "noWayYouCanNameFieldLikeThis"
+     * 1. Modify xml stream and rename the field we are interested in to "noWayYouCanNameFieldLikeThis"
      * 2. Parse xml stream as {@link ParsedValueHolder}.
      * 3. {@link ParsedValueHolder} will contain a single field we are interested in and nothing else
      * </pre>

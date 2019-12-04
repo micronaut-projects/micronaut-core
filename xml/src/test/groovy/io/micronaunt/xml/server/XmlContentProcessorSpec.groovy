@@ -16,7 +16,7 @@
  *
  */
 
-package io.micronaunt.xml.client.server
+package io.micronaunt.xml.server
 
 
 import io.micronaut.context.ApplicationContext
@@ -66,34 +66,6 @@ class XmlContentProcessorSpec extends Specification {
         books[1].title == "Second Book"
     }
 
-    void "test streaming books"() {
-        RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxStreamingHttpClient, embeddedServer.getURL())
-
-        when:
-        List<Book> books = client.jsonStream(
-                HttpRequest.POST("/xml/stream", '<books><book><title>First Book</title></book><book><title>Second Book</title></book></books>')
-                        .contentType(MediaType.TEXT_XML_TYPE), Book.class).toList().blockingGet()
-
-        then:
-        books.size() == 2
-        books[0].title == "First Book"
-        books[1].title == "Second Book"
-    }
-
-    void "test streaming books with self closed elements"() {
-        RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxStreamingHttpClient, embeddedServer.getURL())
-
-        when:
-        List<Book> books = client.jsonStream(
-                HttpRequest.POST("/xml/stream", '<books><book title="First Book"/><book title="Second Book"/></books>')
-                        .contentType(MediaType.TEXT_XML_TYPE), Book.class).toList().blockingGet()
-
-        then:
-        books.size() == 2
-        books[0].title == "First Book"
-        books[1].title == "Second Book"
-    }
-
     void "test sending a blocking author"() {
         RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
@@ -123,7 +95,7 @@ class XmlContentProcessorSpec extends Specification {
         author.name == "Joe"
     }
 
-    void "test mapping xml simple field to controller argument"() {
+    void "test mapping xml single field to controller param"() {
         RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -135,7 +107,7 @@ class XmlContentProcessorSpec extends Specification {
         name == 'Joe'
     }
 
-    void "test mapping xml list to controller argument"() {
+    void "test mapping xml list field to controller param"() {
         RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -149,7 +121,7 @@ class XmlContentProcessorSpec extends Specification {
         books[1].title == "Second Book"
     }
 
-    void "test binding xml set to controller argument"() {
+    void "test binding xml set field to controller param"() {
         RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -168,7 +140,7 @@ class XmlContentProcessorSpec extends Specification {
         books.contains "Second Book"
     }
 
-    void "test binding two fields to controller arguments"() {
+    void "test binding two fields to controller parameters"() {
         RxStreamingHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -225,7 +197,7 @@ class XmlContentProcessorSpec extends Specification {
         }
     }
 
-    public static class Book {
+    static class Book {
         String title
     }
 
