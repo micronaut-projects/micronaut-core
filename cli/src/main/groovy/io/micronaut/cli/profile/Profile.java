@@ -51,8 +51,9 @@ public interface Profile {
     String getMainClassName();
 
     /**
-     * Set the mainClassName
-     * @param mainClassName
+     * Set the mainClassName.
+     *
+     * @param mainClassName the name to set
      */
     void setMainClassName(String mainClassName);
 
