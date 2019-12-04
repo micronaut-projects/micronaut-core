@@ -146,7 +146,7 @@ These are the steps to add a new Micronaut-GraalVM test application to the pipel
 latest Micronaut.
 snapshot and it provides the script `build-native-image.sh` as explained before.
 - Add a README with the curl endpoints needed to test the application.
-- Create a new branch in https://github.com/micronaut-graal-tests and modify `gitlab-ci.yml` file:
+- Create a new branch in https://gitlab.com/micronaut-projects/micronaut-graal-tests and modify `gitlab-ci.yml` file:
     - Add the jobs for the new application in `micronaut` and `test` stages.
     - Create the scripts to build the native-image for the micronaut application and for the tests. If the application
     needs a Docker dependency make sure it is configured properly and there is an specific `application.yml` file with
