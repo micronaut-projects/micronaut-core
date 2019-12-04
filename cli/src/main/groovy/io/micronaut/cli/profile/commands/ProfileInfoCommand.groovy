@@ -27,6 +27,7 @@ import io.micronaut.cli.profile.ProfileRepositoryAware
 import io.micronaut.cli.profile.ProjectContext
 import picocli.CommandLine
 import picocli.CommandLine.Mixin
+import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 import picocli.CommandLine.Spec
 import picocli.CommandLine.Model.CommandSpec
@@ -48,6 +49,9 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
     @Parameters(arity = "1", paramLabel = "PROFILE-NAME", description = "The name or coordinates of the profile",
                 completionCandidates = ProfileCompletionCandidates)
     String profileName
+
+    @Option(names = ['-e', '--enhancedInfo'], paramLabel = 'ENHANCED-INFO', description = 'Display additional information about what is included in a profile.')
+    boolean enhancedInfo
 
     @Mixin
     CommonOptionsMixin commonOptionsMixin
@@ -88,6 +92,24 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
                 console.log('--------------------')
                 console.log(profile.description)
                 console.log('')
+                if (enhancedInfo) {
+                    def defaultFeatures = profile.defaultFeatures
+                    if (defaultFeatures) {
+                        console.log('--------------------')
+                        console.addStatus("Default Features:")
+                        defaultFeatures.each {
+                            console.log("                     ${it.name}")
+                        }
+                    }
+
+                    def requiredFeatures = profile.requiredFeatures
+                    if (requiredFeatures) {
+                        console.addStatus("Required Features:")
+                        requiredFeatures.each {
+                            console.log("                     ${it.name}")
+                        }
+                    }
+                }
                 console.addStatus('Provided Commands:')
                 console.log('--------------------')
                 Iterable<Command> commands = findCommands(profile, console).toUnique { Command c -> c.name }.sort { it.name }
@@ -109,6 +131,35 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
                     int width = Math.min(padding, features.collect { it.name }.sort { it.length() }.last().length())
                     for (feature in features) {
                         console.log("  ${feature.name.padRight(width)}  ${feature.description}")
+
+                        if (enhancedInfo) {
+                            def dependentFeatures = feature.getDependentFeatures(profile)
+                            if (dependentFeatures.size() > 0) {
+                                console.log("       Dependent features:")
+                                dependentFeatures.each {
+                                    console.log("                            ${it.name}")
+                                }
+                                console.log('  ------------------')
+                            }
+
+                            def evictedFeatures = feature.getEvictedFeatureNames()
+                            if (evictedFeatures.size() > 0) {
+                                console.log("       Evicted features:")
+                                evictedFeatures.each {
+                                    console.log("                            ${it}")
+                                }
+                                console.log('  ------------------')
+                            }
+
+                            def defaultFeatures = feature.getDefaultFeatures(profile)
+                            if (defaultFeatures.size() > 0) {
+                                console.log("       Default features:")
+                                defaultFeatures.each {
+                                    console.log("                            ${it.name}")
+                                }
+                                console.log('  ------------------')
+                            }
+                        }
                     }
                 }
             }
