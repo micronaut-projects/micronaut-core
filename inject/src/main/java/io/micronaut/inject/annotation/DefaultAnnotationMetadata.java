@@ -791,7 +791,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
         Map<String, Object> defaultValues = AnnotationMetadataSupport.getDefaultValues(annotation);
         if (defaultValues.containsKey(member)) {
-            return ConversionService.SHARED.convert(defaultValues.get(member), requiredType);
+            final Object v = defaultValues.get(member);
+            if (requiredType.isInstance(v)) {
+                return (Optional<T>) Optional.of(v);
+            } else {
+                return ConversionService.SHARED.convert(v, requiredType);
+            }
         }
         return Optional.empty();
     }

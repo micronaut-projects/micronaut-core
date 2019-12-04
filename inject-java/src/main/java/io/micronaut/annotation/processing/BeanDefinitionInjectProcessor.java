@@ -1267,6 +1267,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 aroundMethodMetadata);
                     }
 
+                } else if (executableMethodWriter == null) {
+                    beanWriter.visitExecutableMethod(
+                            typeRef,
+                            resolvedReturnType,
+                            resolvedReturnType,
+                            returnTypeGenerics,
+                            method.getSimpleName().toString(),
+                            params.getParameters(),
+                            params.getGenericParameters(),
+                            params.getParameterMetadata(),
+                            params.getGenericTypes(), methodAnnotationMetadata);
                 }
             }
         }

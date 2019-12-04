@@ -823,6 +823,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 this.annotationMetadata,
                 annotationMetadata
         );
+        if (argumentAnnotationMetadata != null) {
+            for (AnnotationMetadata metadata : argumentAnnotationMetadata.values()) {
+                DefaultAnnotationMetadata.contributeDefaults(
+                        this.annotationMetadata,
+                        metadata
+                );
+            }
+        }
         String methodProxyShortName = "$exec" + ++methodExecutorIndex;
         String methodExecutorClassName = beanDefinitionName + "$" + methodProxyShortName;
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
