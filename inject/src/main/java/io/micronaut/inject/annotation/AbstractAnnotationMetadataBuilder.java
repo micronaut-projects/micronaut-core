@@ -1035,8 +1035,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         } else if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
             final Optional<T> annotationMirror = getAnnotationMirror(annotationValue.getAnnotationName());
             final Map<CharSequence, Object> values = annotationValue.getValues();
-            final Map<String, Map<CharSequence, Object>> declared =
-                    Collections.singletonMap(annotationValue.getAnnotationName(), values);
+            final Map<String, Map<CharSequence, Object>> declared = new HashMap<>(1);
+            declared.put(annotationValue.getAnnotationName(), values);
             final DefaultAnnotationMetadata newMetadata = new DefaultAnnotationMetadata(
                     declared,
                     null,

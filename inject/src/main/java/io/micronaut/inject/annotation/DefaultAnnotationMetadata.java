@@ -1676,7 +1676,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         } else {
             DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
 
-            defaultMetadata = (DefaultAnnotationMetadata) defaultMetadata.clone();
+            defaultMetadata = defaultMetadata.clone();
 
             defaultMetadata
                     .addDeclaredAnnotation(annotationName, members);
