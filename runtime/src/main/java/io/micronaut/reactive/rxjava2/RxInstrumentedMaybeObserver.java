@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.MaybeObserver;
 import io.reactivex.disposables.Disposable;
 
@@ -30,7 +31,7 @@ import io.reactivex.disposables.Disposable;
 @Internal
 final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, Disposable, RxInstrumentedComponent {
     private final MaybeObserver<T> downstream;
-    private final RxInstrumenter instrumenter;
+    private final InvocationInstrumenter instrumenter;
     private Disposable upstream;
 
     /**
@@ -39,7 +40,7 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, Disposab
      * @param downstream   The downstream observer
      * @param instrumenter The instrumenter
      */
-    RxInstrumentedMaybeObserver(MaybeObserver<T> downstream, RxInstrumenter instrumenter) {
+    RxInstrumentedMaybeObserver(MaybeObserver<T> downstream, InvocationInstrumenter instrumenter) {
         this.downstream = downstream;
         this.instrumenter = instrumenter;
     }
@@ -55,17 +56,32 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, Disposab
 
     @Override
     public void onError(Throwable t) {
-        instrumenter.onError(downstream, t);
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onError(t);
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 
     @Override
     public void onSuccess(T value) {
-        instrumenter.onSuccess(downstream, value);
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onSuccess(value);
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 
     @Override
     public void onComplete() {
-        instrumenter.onComplete(downstream);
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onComplete();
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 
     @Override

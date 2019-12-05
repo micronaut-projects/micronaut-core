@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.SingleObserver;
 import io.reactivex.disposables.Disposable;
 
@@ -30,7 +31,7 @@ import io.reactivex.disposables.Disposable;
 @Internal
 final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, Disposable, RxInstrumentedComponent {
     protected final SingleObserver<T> downstream;
-    private final RxInstrumenter instrumenter;
+    private final InvocationInstrumenter instrumenter;
     private Disposable upstream;
 
     /**
@@ -39,7 +40,7 @@ final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, Dispos
      * @param downstream   The downstream observer
      * @param instrumenter The instrumenter
      */
-    RxInstrumentedSingleObserver(SingleObserver<T> downstream, RxInstrumenter instrumenter) {
+    RxInstrumentedSingleObserver(SingleObserver<T> downstream, InvocationInstrumenter instrumenter) {
         this.downstream = downstream;
         this.instrumenter = instrumenter;
     }
@@ -55,12 +56,22 @@ final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, Dispos
 
     @Override
     public void onError(Throwable t) {
-        instrumenter.onError(downstream, t);
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onError(t);
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 
     @Override
     public void onSuccess(T value) {
-        instrumenter.onSuccess(downstream, value);
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onSuccess(value);
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 
     @Override

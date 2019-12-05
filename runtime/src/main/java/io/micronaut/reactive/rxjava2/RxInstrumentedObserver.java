@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 
@@ -32,7 +33,7 @@ final class RxInstrumentedObserver<T> implements Observer<T>, Disposable, RxInst
     protected boolean done;
     private Disposable upstream;
     private final Observer<T> downstream;
-    private final RxInstrumenter instrumenter;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -40,7 +41,7 @@ final class RxInstrumentedObserver<T> implements Observer<T>, Disposable, RxInst
      * @param downstream   The downstream observer
      * @param instrumenter The instrumenter
      */
-    RxInstrumentedObserver(Observer<T> downstream, RxInstrumenter instrumenter) {
+    RxInstrumentedObserver(Observer<T> downstream, InvocationInstrumenter instrumenter) {
         this.downstream = downstream;
         this.instrumenter = instrumenter;
     }
@@ -59,7 +60,12 @@ final class RxInstrumentedObserver<T> implements Observer<T>, Disposable, RxInst
 
     @Override
     public void onNext(T t) {
-        instrumenter.onNext(downstream, t);
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onNext(t);
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 
     @SuppressWarnings("Duplicates")
@@ -70,7 +76,12 @@ final class RxInstrumentedObserver<T> implements Observer<T>, Disposable, RxInst
             return;
         }
         done = true;
-        instrumenter.onError(downstream, t);
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onError(t);
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 
     @SuppressWarnings("Duplicates")
@@ -80,7 +91,12 @@ final class RxInstrumentedObserver<T> implements Observer<T>, Disposable, RxInst
             return;
         }
         done = true;
-        instrumenter.onComplete(downstream);
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onComplete();
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 
     @Override

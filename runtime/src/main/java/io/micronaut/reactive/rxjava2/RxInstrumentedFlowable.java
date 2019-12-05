@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableSubscriber;
 import org.reactivestreams.Publisher;
@@ -33,7 +34,7 @@ import org.reactivestreams.Subscriber;
 @Internal
 final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumentedComponent {
     private final Publisher<T> source;
-    private final RxInstrumenter instrumenter;
+    private final InvocationInstrumenter instrumenter;
 
 
     /**
@@ -53,7 +54,12 @@ final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumen
             throw new IllegalArgumentException("Subscriber must be an instance of FlowableSubscriber");
         }
         if (instrumenter != null) {
-            instrumenter.subscribe(source, s);
+            try {
+                instrumenter.beforeInvocation();
+                source.subscribe(s);
+            } finally {
+                instrumenter.afterInvocation();
+            }
         } else {
             source.subscribe(s);
         }

@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Completable;
 import io.reactivex.CompletableObserver;
 import io.reactivex.Flowable;
@@ -54,7 +55,7 @@ final class RxInstrumentedWrappers {
             return downstream;
         }
 
-        final RxInstrumenter instumenter = instrumenterFactory.create();
+        final InvocationInstrumenter instumenter = instrumenterFactory.create();
         if (instumenter != null) {
             if (downstream instanceof FlowableSubscriber) {
                 return new RxInstrumentedFlowableSubscriber<>(downstream, instumenter);
@@ -199,7 +200,7 @@ final class RxInstrumentedWrappers {
         if (downstream instanceof InstrumentedComponent) {
             return downstream;
         }
-        final RxInstrumenter instrumenter = instrumenterFactory.create();
+        final InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter != null) {
             return new RxInstrumentedObserver<>(downstream, instrumenter);
         }
@@ -218,7 +219,7 @@ final class RxInstrumentedWrappers {
         if (downstream instanceof InstrumentedComponent) {
             return downstream;
         }
-        final RxInstrumenter instrumenter = instrumenterFactory.create();
+        final InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter != null) {
             return new RxInstrumentedSingleObserver<>(downstream, instrumenter);
         }
@@ -237,7 +238,7 @@ final class RxInstrumentedWrappers {
         if (downstream instanceof InstrumentedComponent) {
             return downstream;
         }
-        final RxInstrumenter instrumenter = instrumenterFactory.create();
+        final InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter != null) {
             return new RxInstrumentedMaybeObserver<>(downstream, instrumenter);
         }
@@ -255,7 +256,7 @@ final class RxInstrumentedWrappers {
         if (downstream instanceof InstrumentedComponent) {
             return downstream;
         }
-        final RxInstrumenter instrumenter = instrumenterFactory.create();
+        final InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter != null) {
             return new RxInstrumentedCompletableObserver(downstream, instrumenter);
         } else {

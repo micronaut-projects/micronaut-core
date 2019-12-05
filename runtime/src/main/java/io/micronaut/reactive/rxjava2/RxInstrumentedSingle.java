@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Single;
 import io.reactivex.SingleObserver;
 import io.reactivex.SingleSource;
@@ -31,7 +32,7 @@ import io.reactivex.SingleSource;
 @Internal
 final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedComponent {
     protected final SingleSource<T> source;
-    private final RxInstrumenter instrumenter;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -47,7 +48,12 @@ final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedC
     @Override
     protected void subscribeActual(SingleObserver<? super T> o) {
         if (instrumenter != null) {
-            instrumenter.subscribe(source, o);
+            try {
+                instrumenter.beforeInvocation();
+                source.subscribe(o);
+            } finally {
+                instrumenter.afterInvocation();
+            }
         } else {
             source.subscribe(o);
         }

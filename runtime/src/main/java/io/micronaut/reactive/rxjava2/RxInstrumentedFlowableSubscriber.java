@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.FlowableSubscriber;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -38,7 +39,7 @@ final class RxInstrumentedFlowableSubscriber<T> extends RxInstrumentedSubscriber
      * @param downstream   the downstream subscriber
      * @param instrumenter The instrumenter
      */
-    RxInstrumentedFlowableSubscriber(Subscriber<T> downstream, RxInstrumenter instrumenter) {
+    RxInstrumentedFlowableSubscriber(Subscriber<T> downstream, InvocationInstrumenter instrumenter) {
         super(downstream, instrumenter);
     }
 

@@ -16,6 +16,7 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Completable;
 import io.reactivex.CompletableObserver;
 import io.reactivex.CompletableSource;
@@ -30,7 +31,7 @@ import io.reactivex.CompletableSource;
 @Internal
 final class RxInstrumentedCompletable extends Completable implements RxInstrumentedComponent {
     private final CompletableSource source;
-    private final RxInstrumenter instrumenter;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -46,7 +47,12 @@ final class RxInstrumentedCompletable extends Completable implements RxInstrumen
     @Override
     protected void subscribeActual(CompletableObserver o) {
         if (instrumenter != null) {
-            instrumenter.subscribe(source, o);
+            try {
+                instrumenter.beforeInvocation();
+                source.subscribe(o);
+            } finally {
+                instrumenter.afterInvocation();
+            }
         } else {
             source.subscribe(o);
         }

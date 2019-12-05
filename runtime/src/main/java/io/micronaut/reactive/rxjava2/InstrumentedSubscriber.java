@@ -17,6 +17,7 @@ package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -33,7 +34,7 @@ abstract class InstrumentedSubscriber<T> implements Subscriber<T>, InstrumentedC
     protected boolean done;
     Subscription upstream;
     private final Subscriber<T> downstream;
-    private final RxInstrumenter instrumenter;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -41,7 +42,7 @@ abstract class InstrumentedSubscriber<T> implements Subscriber<T>, InstrumentedC
      * @param downstream   The downstream subscriber
      * @param instrumenter The instrumenter
      */
-    InstrumentedSubscriber(Subscriber<T> downstream, RxInstrumenter instrumenter) {
+    InstrumentedSubscriber(Subscriber<T> downstream, InvocationInstrumenter instrumenter) {
         ArgumentUtils.requireNonNull("downstream", downstream);
         this.downstream = downstream;
         this.instrumenter = instrumenter;
@@ -61,7 +62,12 @@ abstract class InstrumentedSubscriber<T> implements Subscriber<T>, InstrumentedC
 
     @Override
     public void onNext(T t) {
-        instrumenter.onNext(downstream, t);
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onNext(t);
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 
     @SuppressWarnings("Duplicates")
@@ -72,7 +78,12 @@ abstract class InstrumentedSubscriber<T> implements Subscriber<T>, InstrumentedC
             return;
         }
         done = true;
-        instrumenter.onError(downstream, t);
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onError(t);
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 
     @Override
@@ -81,6 +92,11 @@ abstract class InstrumentedSubscriber<T> implements Subscriber<T>, InstrumentedC
             return;
         }
         done = true;
-        instrumenter.onComplete(downstream);
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onComplete();
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 }
