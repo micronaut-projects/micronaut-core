@@ -9,7 +9,7 @@ dependencies {
     compileOnly dependencyVersion("micronaut.function.aws"), {
         exclude module:"micronaut-function"
     }
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.688'
 
     testCompile project(":http-server-netty")
     testCompile dependencyVersion("micronaut.function-aws"), {
