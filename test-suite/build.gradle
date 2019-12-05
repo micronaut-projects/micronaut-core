@@ -52,7 +52,7 @@ dependencies {
     testRuntime dependencyVersion("h2")
     testRuntime "org.junit.vintage:junit-vintage-engine:$junit5Version"
     testRuntime "ch.qos.logback:logback-classic:1.2.3"
-    testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.688'
+    testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }
 
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
