@@ -53,6 +53,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
@@ -376,6 +377,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.interceptorArgumentIndex = constructorNewArgumentTypes.size();
         constructorNewArgumentTypes.put("interceptors", Interceptor[].class);
 
+    }
+
+    @Nonnull
+    @Override
+    public String getBeanDefinitionReferenceClassName() {
+        return proxyBeanDefinitionWriter.getBeanDefinitionReferenceClassName();
     }
 
     /**

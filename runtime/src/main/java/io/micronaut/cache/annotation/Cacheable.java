@@ -51,6 +51,7 @@ public @interface Cacheable {
      * @return The cache names
      */
     @AliasFor(member = "cacheNames")
+    @AliasFor(annotation = CacheConfig.class, member = "cacheNames")
     String[] value() default {};
 
     /**

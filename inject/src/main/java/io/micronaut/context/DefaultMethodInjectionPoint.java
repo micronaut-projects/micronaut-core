@@ -23,8 +23,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-
 import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -172,10 +170,8 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
     }
 
     private AnnotationMetadata initAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
-        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
-            return new MethodAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
-        } else if (annotationMetadata != null) {
-            return annotationMetadata;
+        if (annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
+            return new MethodAnnotationMetadata(annotationMetadata);
         }
         return AnnotationMetadata.EMPTY_METADATA;
     }
@@ -184,7 +180,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
      * Internal environment aware annotation metadata delegate.
      */
     private final class MethodAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
-        MethodAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
+        MethodAnnotationMetadata(AnnotationMetadata targetMetadata) {
             super(targetMetadata);
         }
 

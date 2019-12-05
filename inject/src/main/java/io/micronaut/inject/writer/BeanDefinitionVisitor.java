@@ -20,6 +20,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
@@ -66,6 +67,12 @@ public interface BeanDefinitionVisitor {
                                         Map<String, Object> argumentTypes,
                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                         Map<String, Map<String, Object>> genericTypes);
+
+    /**
+     * @return The name of the bean definition reference class.
+     */
+    @Nonnull
+    String getBeanDefinitionReferenceClassName();
 
     /**
      * @return Whether the provided type an interface
