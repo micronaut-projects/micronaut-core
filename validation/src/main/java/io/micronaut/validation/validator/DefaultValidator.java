@@ -1386,7 +1386,11 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         Set<AnnotationValue<? extends Annotation>> constraints = new HashSet<>(3);
         for (Class<?> group : context.groups) {
             for (AnnotationValue<? extends Annotation> annotationValue : annotationValues) {
-                final List<Class> constraintGroups = annotationValue.get("groups", Class[].class).map(Arrays::asList).orElse(DEFAULT_GROUPS);
+                //noinspection Convert2MethodRef for Arrays.asList to Arrays::asList because the behavior is not the same
+                final List<Class> constraintGroups = annotationValue.get("groups", Class[].class)
+                        .filter(ArrayUtils::isNotEmpty)
+                        .map((Class[] classes) -> Arrays.asList(classes))
+                        .orElse(DEFAULT_GROUPS);
                 if (constraintGroups.contains(group)) {
                     constraints.add(annotationValue);
                 }
