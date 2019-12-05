@@ -58,7 +58,13 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
 
             @Override
             public void afterInvocation() {
+                if (!inProgress) {
+                    throw new IllegalStateException("Method 'afterInvocation' called without 'beforeInvocation' call");
+                }
                 if (isSet) {
+                    if (invocationRequest != ServerRequestContext.currentRequest().orElse(null)) {
+                        throw new IllegalStateException("Request value doesn't match set value");
+                    }
                     ServerRequestContext.set(currentRequest);
                     isSet = false;
                 }
