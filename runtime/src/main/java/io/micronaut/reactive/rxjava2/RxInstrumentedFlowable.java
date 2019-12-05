@@ -40,12 +40,12 @@ final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumen
     /**
      * Default constructor.
      *
-     * @param source              The source
-     * @param instrumenterFactory The instrumenterFactory
+     * @param source       The source
+     * @param instrumenter The instrumenter
      */
-    RxInstrumentedFlowable(Publisher<T> source, RxInstrumenterFactory instrumenterFactory) {
+    RxInstrumentedFlowable(Publisher<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumenter = instrumenterFactory.create();
+        this.instrumenter = instrumenter;
     }
 
     @Override
@@ -53,15 +53,11 @@ final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumen
         if (!(s instanceof FlowableSubscriber)) {
             throw new IllegalArgumentException("Subscriber must be an instance of FlowableSubscriber");
         }
-        if (instrumenter != null) {
-            try {
-                instrumenter.beforeInvocation();
-                source.subscribe(s);
-            } finally {
-                instrumenter.afterInvocation();
-            }
-        } else {
+        try {
+            instrumenter.beforeInvocation();
             source.subscribe(s);
+        } finally {
+            instrumenter.afterInvocation();
         }
     }
 }

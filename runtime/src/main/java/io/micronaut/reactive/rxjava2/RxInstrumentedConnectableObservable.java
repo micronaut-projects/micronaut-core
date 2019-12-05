@@ -39,39 +39,31 @@ final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable
     /**
      * Default constructor.
      *
-     * @param source              The source
-     * @param instrumenterFactory The instrumenterFactory
+     * @param source       The source
+     * @param instrumenter The instrumenter
      */
-    RxInstrumentedConnectableObservable(ConnectableObservable<T> source, RxInstrumenterFactory instrumenterFactory) {
+    RxInstrumentedConnectableObservable(ConnectableObservable<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumenter = instrumenterFactory.create();
+        this.instrumenter = instrumenter;
     }
 
     @Override
     protected void subscribeActual(Observer<? super T> o) {
-        if (instrumenter != null) {
-            try {
-                instrumenter.beforeInvocation();
-                source.subscribe(o);
-            } finally {
-                instrumenter.afterInvocation();
-            }
-        } else {
+        try {
+            instrumenter.beforeInvocation();
             source.subscribe(o);
+        } finally {
+            instrumenter.afterInvocation();
         }
     }
 
     @Override
     public void connect(Consumer<? super Disposable> connection) {
-        if (instrumenter != null) {
-            try {
-                instrumenter.beforeInvocation();
-                source.connect(connection);
-            } finally {
-                instrumenter.afterInvocation();
-            }
-        } else {
+        try {
+            instrumenter.beforeInvocation();
             source.connect(connection);
+        } finally {
+            instrumenter.afterInvocation();
         }
     }
 }

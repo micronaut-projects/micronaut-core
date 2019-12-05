@@ -78,7 +78,11 @@ final class RxInstrumentedWrappers {
         if (source instanceof InstrumentedComponent) {
             return source;
         }
-        return new RxInstrumentedCompletable(source, instrumenterFactory);
+        final InvocationInstrumenter instumenter = instrumenterFactory.create();
+        if (instumenter == null) {
+            return source;
+        }
+        return new RxInstrumentedCompletable(source, instumenter);
     }
 
     /**
@@ -93,7 +97,11 @@ final class RxInstrumentedWrappers {
         if (source instanceof InstrumentedComponent) {
             return source;
         }
-        return new RxInstrumentedMaybe<>(source, instrumenterFactory);
+        final InvocationInstrumenter instumenter = instrumenterFactory.create();
+        if (instumenter == null) {
+            return source;
+        }
+        return new RxInstrumentedMaybe<>(source, instumenter);
     }
 
     /**
@@ -108,7 +116,11 @@ final class RxInstrumentedWrappers {
         if (source instanceof InstrumentedComponent) {
             return source;
         }
-        return new RxInstrumentedSingle<>(source, instrumenterFactory);
+        final InvocationInstrumenter instumenter = instrumenterFactory.create();
+        if (instumenter == null) {
+            return source;
+        }
+        return new RxInstrumentedSingle<>(source, instumenter);
     }
 
     /**
@@ -123,7 +135,11 @@ final class RxInstrumentedWrappers {
         if (source instanceof InstrumentedComponent) {
             return source;
         }
-        return new RxInstrumentedObservable<>(source, instrumenterFactory);
+        final InvocationInstrumenter instumenter = instrumenterFactory.create();
+        if (instumenter == null) {
+            return source;
+        }
+        return new RxInstrumentedObservable<>(source, instumenter);
     }
 
     /**
@@ -138,7 +154,11 @@ final class RxInstrumentedWrappers {
         if (source instanceof InstrumentedComponent) {
             return source;
         }
-        return new RxInstrumentedConnectableObservable<>(source, instrumenterFactory);
+        final InvocationInstrumenter instumenter = instrumenterFactory.create();
+        if (instumenter == null) {
+            return source;
+        }
+        return new RxInstrumentedConnectableObservable<>(source, instumenter);
     }
 
     /**
@@ -153,7 +173,11 @@ final class RxInstrumentedWrappers {
         if (source instanceof InstrumentedComponent) {
             return source;
         }
-        return new RxInstrumentedFlowable<>(source, instrumenterFactory);
+        final InvocationInstrumenter instumenter = instrumenterFactory.create();
+        if (instumenter == null) {
+            return source;
+        }
+        return new RxInstrumentedFlowable<>(source, instumenter);
     }
 
     /**
@@ -169,7 +193,11 @@ final class RxInstrumentedWrappers {
         if (source instanceof InstrumentedComponent) {
             return source;
         }
-        return new RxInstrumentedConnectableFlowable<>(source, instrumenterFactory);
+        final InvocationInstrumenter instumenter = instrumenterFactory.create();
+        if (instumenter == null) {
+            return source;
+        }
+        return new RxInstrumentedConnectableFlowable<>(source, instumenter);
     }
 
     /**

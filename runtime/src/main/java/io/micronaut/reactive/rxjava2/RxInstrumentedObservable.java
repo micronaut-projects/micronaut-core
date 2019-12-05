@@ -38,25 +38,21 @@ final class RxInstrumentedObservable<T> extends Observable<T> implements RxInstr
     /**
      * Default constructor.
      *
-     * @param source              The source
-     * @param instrumenterFactory The instrumenterFactory
+     * @param source       The source
+     * @param instrumenter The instrumenter
      */
-    RxInstrumentedObservable(ObservableSource<T> source, RxInstrumenterFactory instrumenterFactory) {
+    RxInstrumentedObservable(ObservableSource<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumenter = instrumenterFactory.create();
+        this.instrumenter = instrumenter;
     }
 
     @Override
     protected void subscribeActual(Observer<? super T> o) {
-        if (instrumenter != null) {
-            try {
-                instrumenter.beforeInvocation();
-                source.subscribe(o);
-            } finally {
-                instrumenter.afterInvocation();
-            }
-        } else {
+        try {
+            instrumenter.beforeInvocation();
             source.subscribe(o);
+        } finally {
+            instrumenter.afterInvocation();
         }
     }
 }

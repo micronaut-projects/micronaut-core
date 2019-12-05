@@ -36,25 +36,21 @@ final class RxInstrumentedCompletable extends Completable implements RxInstrumen
     /**
      * Default constructor.
      *
-     * @param source              The source
-     * @param instrumenterFactory The instrumenterFactory
+     * @param source       The source
+     * @param instrumenter The instrumenter
      */
-    RxInstrumentedCompletable(CompletableSource source, RxInstrumenterFactory instrumenterFactory) {
+    RxInstrumentedCompletable(CompletableSource source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumenter = instrumenterFactory.create();
+        this.instrumenter = instrumenter;
     }
 
     @Override
     protected void subscribeActual(CompletableObserver o) {
-        if (instrumenter != null) {
-            try {
-                instrumenter.beforeInvocation();
-                source.subscribe(o);
-            } finally {
-                instrumenter.afterInvocation();
-            }
-        } else {
+        try {
+            instrumenter.beforeInvocation();
             source.subscribe(o);
+        } finally {
+            instrumenter.afterInvocation();
         }
     }
 }

@@ -38,25 +38,21 @@ final class RxInstrumentedMaybe<T> extends Maybe<T> implements RxInstrumentedCom
     /**
      * Default constructor.
      *
-     * @param source              The source
-     * @param instrumenterFactory The instrumenterFactory
+     * @param source       The source
+     * @param instrumenter The instrumenter
      */
-    RxInstrumentedMaybe(MaybeSource<T> source, RxInstrumenterFactory instrumenterFactory) {
+    RxInstrumentedMaybe(MaybeSource<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumenter = instrumenterFactory.create();
+        this.instrumenter = instrumenter;
     }
 
     @Override
     protected void subscribeActual(MaybeObserver<? super T> o) {
-        if (instrumenter != null) {
-            try {
-                instrumenter.beforeInvocation();
-                source.subscribe(o);
-            } finally {
-                instrumenter.afterInvocation();
-            }
-        } else {
+        try {
+            instrumenter.beforeInvocation();
             source.subscribe(o);
+        } finally {
+            instrumenter.afterInvocation();
         }
     }
 }
