@@ -17,7 +17,9 @@ package io.micronaut.validation;
 
 import groovy.lang.Singleton;
 
+import javax.validation.Valid;
 import javax.validation.constraints.Digits;
+import javax.validation.constraints.NotNull;
 
 /**
  * @author Graeme Rocher
@@ -29,5 +31,11 @@ public class Foo {
 
     public String testMe(@Digits(integer = 3, fraction = 2) String number) {
         return '$' + number;
+    }
+
+    @Valid
+    @NotNull
+    public String notNull() {
+        return null;
     }
 }
