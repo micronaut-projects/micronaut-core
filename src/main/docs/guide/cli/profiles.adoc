@@ -6,24 +6,7 @@ Many Micronaut apps will use the `service` profile, which augments the `base` pr
 
 Other Micronaut apps will be better served by the `cli` profile, which adds the `create-command` command and the https://picocli.info/[picocli] library for parsing command line input. This is the default profile used when running the `create-cli-app` command.
 
-You can view allof the built-in profiles using the CLI command `list-profiles`:
-
-[source,bash]
-----
-$ mn list-profiles
-| Available Profiles
---------------------
-  cli                 The cli profile
-  configuration       The profile for creating the configuration
-  federation          The federation profile
-  function-aws        The function profile for AWS Lambda
-  function-aws-alexa  The function profile for AWS Alexa-Lambda
-  grpc                Profile for Creating GRPC Services
-  kafka               The Kafka messaging profile
-  profile             A profile for creating new Micronaut profiles
-  rabbitmq            The RabbitMQ messaging profile
-  service             The service profile
-----
+You can view all of the built-in profiles using the CLI command `list-profiles`.
 
 Profiles can be chosen using the `profile` flag on the `create-app`, `create-cli-app`, and `create-federation` commands.
 
