@@ -1,9 +1,15 @@
 package io.micronaut.tracing.instrument.util
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.scheduling.instrument.InvocationInstrumenter
 import org.slf4j.MDC
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.AsyncConditions
+
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutorService
 
 class MdcInstrumenterSpec extends Specification {
     static final String key = 'foo'
@@ -15,6 +21,10 @@ class MdcInstrumenterSpec extends Specification {
     def cleanup() {
         MDC.clear()
     }
+
+    @Shared
+    @AutoCleanup
+    ApplicationContext applicationContext = ApplicationContext.run()
 
     void "test MDC instrumenter"() {
         given:
@@ -95,5 +105,21 @@ class MdcInstrumenterSpec extends Specification {
         then:
         conds.await()
         MDC.get(key) == value2
+    }
+
+    void "test MDC instrumenter with Executor"() {
+
+        given:
+            MDC.setContextMap(foo:'bar')
+            ExecutorService executor = applicationContext.getBean(ExecutorService)
+            String val = null
+
+        when:
+            CompletableFuture.supplyAsync({ ->
+                val = MDC.get("foo")
+            }, executor).get()
+
+        then:
+            val == "bar"
     }
 }
