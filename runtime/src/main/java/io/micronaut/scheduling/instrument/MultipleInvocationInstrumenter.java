@@ -35,6 +35,7 @@ class MultipleInvocationInstrumenter implements InvocationInstrumenter {
 
     private final Collection<InvocationInstrumenter> invocationInstrumenters;
     private final Deque<InvocationInstrumenter> executedInstrumenters;
+    private boolean inProgress;
 
     /**
      * Creates new instance.
@@ -51,6 +52,10 @@ class MultipleInvocationInstrumenter implements InvocationInstrumenter {
      */
     @Override
     public void beforeInvocation() {
+        if (inProgress) {
+            throw new IllegalStateException("Method 'beforeInvocation' called twice");
+        }
+        inProgress = true;
         for (InvocationInstrumenter instrumenter : invocationInstrumenters) {
             instrumenter.beforeInvocation();
             executedInstrumenters.push(instrumenter);
@@ -69,5 +74,6 @@ class MultipleInvocationInstrumenter implements InvocationInstrumenter {
                 LOG.warn("After instrumentation invocation error: {}", e.getMessage(), e);
             }
         }
+        inProgress = false;
     }
 }

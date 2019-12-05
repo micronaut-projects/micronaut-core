@@ -39,11 +39,16 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
     public Optional<InvocationInstrumenter> newInvocationInstrumenter() {
         return ServerRequestContext.currentRequest().map(invocationRequest -> new InvocationInstrumenter() {
 
+            private boolean inProgress;
             private HttpRequest<Object> currentRequest;
             private boolean isSet = false;
 
             @Override
             public void beforeInvocation() {
+                if (inProgress) {
+                    throw new IllegalStateException("Method 'beforeInvocation' called twice");
+                }
+                inProgress = true;
                 currentRequest = ServerRequestContext.currentRequest().orElse(null);
                 if (invocationRequest != currentRequest) {
                     isSet = true;
@@ -57,6 +62,7 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
                     ServerRequestContext.set(currentRequest);
                     isSet = false;
                 }
+                inProgress = false;
             }
 
         });
