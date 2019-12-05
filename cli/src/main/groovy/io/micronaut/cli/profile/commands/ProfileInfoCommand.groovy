@@ -92,21 +92,21 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
                 console.log('--------------------')
                 console.log(profile.description)
                 console.log('')
+                def defaultFeaturesList = profile.defaultFeatures.toList()
+                def requiredFeaturesList = profile.requiredFeatures.toList()
                 if (enhancedInfo) {
-                    def defaultFeatures = profile.defaultFeatures
-                    if (defaultFeatures) {
+                    if (defaultFeaturesList) {
                         console.log('--------------------')
                         console.addStatus("Default Features:")
-                        defaultFeatures.each {
-                            console.log("                     ${it.name}")
+                        defaultFeaturesList.each {
+                            console.log("  ${it.name}")
                         }
                     }
 
-                    def requiredFeatures = profile.requiredFeatures
-                    if (requiredFeatures) {
+                    if (requiredFeaturesList) {
                         console.addStatus("Required Features:")
-                        requiredFeatures.each {
-                            console.log("                     ${it.name}")
+                        requiredFeaturesList.each {
+                            console.log("  ${it.name}")
                         }
                     }
                 }
@@ -124,13 +124,19 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
                 }
                 console.log('')
                 console.addStatus('Provided Features:')
+                console.addStatus('(+) denotes features included by default.')
                 console.log('--------------------')
                 def features = profile.features.sort { it.name }
                 if (!features.empty) {
                     int padding = features.collect { it.name }.max { it.length() }.length()
                     int width = Math.min(padding, features.collect { it.name }.sort { it.length() }.last().length())
                     for (feature in features) {
-                        console.log("  ${feature.name.padRight(width)}  ${feature.description}")
+                        if (defaultFeaturesList.contains(feature) || requiredFeaturesList.contains(feature)) {
+                            String fname = feature.name + " (+)"
+                            console.log("\033[1m  ${fname.padRight(width)}  ${feature.description}\033[0m")
+                        } else {
+                            console.log("  ${feature.name.padRight(width)}  ${feature.description}")
+                        }
 
                         if (enhancedInfo) {
                             def dependentFeatures = feature.getDependentFeatures(profile)
