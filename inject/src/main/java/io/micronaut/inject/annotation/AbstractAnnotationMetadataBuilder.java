@@ -1041,7 +1041,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     declared,
                     null,
                     null,
-                    null,
+                    declared,
                     null
             );
             annotationMirror.ifPresent(annotationType ->

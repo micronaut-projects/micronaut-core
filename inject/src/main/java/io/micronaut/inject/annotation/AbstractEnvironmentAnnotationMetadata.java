@@ -341,7 +341,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
             List<AnnotationValue<T>> values = environmentAnnotationMetadata.getAnnotationValuesByType(annotationClass);
 
             return values.stream()
-                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, EnvironmentConvertibleValuesMap.of(environment, entries.getValues())))
+                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, new EnvironmentAnnotationValue<>(environment, entries)))
                     .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
         } else {
             return environmentAnnotationMetadata.synthesizeAnnotationsByType(annotationClass);
@@ -358,7 +358,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
             List<AnnotationValue<T>> values = environmentAnnotationMetadata.getDeclaredAnnotationValuesByType(annotationClass);
 
             return values.stream()
-                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, EnvironmentConvertibleValuesMap.of(environment, entries.getValues())))
+                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, new EnvironmentAnnotationValue<>(environment, entries)))
                     .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
         } else {
             return environmentAnnotationMetadata.synthesizeDeclaredAnnotationsByType(annotationClass);

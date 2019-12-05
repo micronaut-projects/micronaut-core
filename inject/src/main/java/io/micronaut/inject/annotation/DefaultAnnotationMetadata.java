@@ -18,8 +18,6 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -52,7 +50,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     static {
         ConversionService.SHARED.addConverter(io.micronaut.core.annotation.AnnotationValue.class, Annotation.class, (TypeConverter<io.micronaut.core.annotation.AnnotationValue, Annotation>) (object, targetType, context) -> {
             Optional<Class> annotationClass = ClassUtils.forName(object.getAnnotationName(), targetType.getClassLoader());
-            return annotationClass.map(aClass -> AnnotationMetadataSupport.buildAnnotation(aClass, ConvertibleValues.of(object.getValues())));
+            return annotationClass.map(aClass -> AnnotationMetadataSupport.buildAnnotation(aClass, object));
         });
 
         ConversionService.SHARED.addConverter(io.micronaut.core.annotation.AnnotationValue[].class, Object[].class, (TypeConverter<io.micronaut.core.annotation.AnnotationValue[], Object[]>) (object, targetType, context) -> {
@@ -67,7 +65,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                     }
                     annotationClass = aClass.get();
                 }
-                Annotation annotation = AnnotationMetadataSupport.buildAnnotation(annotationClass, ConvertibleValues.of(annotationValue.getValues()));
+                Annotation annotation = AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
                 result.add(annotation);
             }
             if (!result.isEmpty()) {
@@ -125,13 +123,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         this.allStereotypes = allStereotypes;
         this.allAnnotations = allAnnotations;
         this.annotationsByStereotype = annotationsByStereotype;
-        if (ClassLoadingReporter.isReportingEnabled()) {
-            if (allAnnotations != null) {
-                for (String annotationName : allAnnotations.keySet()) {
-                    ClassUtils.forName(annotationName, DefaultAnnotationMetadata.class.getClassLoader()).ifPresent(ClassLoadingReporter::reportPresent);
-                }
-            }
-        }
     }
 
     @Nonnull
@@ -852,7 +843,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
 
             return values.stream()
-                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries.getConvertibleValues()))
+                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
                     .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
         }
 
@@ -866,7 +857,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
 
             return values.stream()
-                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries.getConvertibleValues()))
+                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
                     .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
         }
 
