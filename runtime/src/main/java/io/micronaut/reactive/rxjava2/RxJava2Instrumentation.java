@@ -212,28 +212,29 @@ class RxJava2Instrumentation implements AutoCloseable {
             });
 
         }
-
     }
 
     @Override
     @PreDestroy
     public void close() {
-        try {
-            RxJavaPlugins.setOnSingleSubscribe(oldSingleSubscribeHook);
-            RxJavaPlugins.setOnCompletableSubscribe(oldCompletableSubscribeHook);
-            RxJavaPlugins.setOnFlowableSubscribe(oldFlowableSubscribeHook);
-            RxJavaPlugins.setOnMaybeSubscribe((BiFunction<? super Maybe, MaybeObserver, ? extends MaybeObserver>) oldMaybeSubscribeHook);
-            RxJavaPlugins.setOnObservableSubscribe(oldObservableSubscribeHook);
-            RxJavaPlugins.setOnCompletableAssembly(oldCompletableHook);
-            RxJavaPlugins.setOnSingleAssembly(oldSingleHook);
-            RxJavaPlugins.setOnMaybeAssembly(oldMaybeHook);
-            RxJavaPlugins.setOnObservableAssembly(oldObservableHook);
-            RxJavaPlugins.setOnFlowableAssembly(oldFlowableHook);
-            RxJavaPlugins.setOnConnectableObservableAssembly(oldConnectableObservableHook);
-            RxJavaPlugins.setOnConnectableFlowableAssembly(oldConnectableFlowableHook);
-            RxJavaPlugins.setOnParallelAssembly(oldParallelFlowableHook);
-        } catch (Exception e) {
-            // ignore
+        if (instrumenterFactory.hasInstrumenters()) {
+            try {
+                RxJavaPlugins.setOnSingleSubscribe(oldSingleSubscribeHook);
+                RxJavaPlugins.setOnCompletableSubscribe(oldCompletableSubscribeHook);
+                RxJavaPlugins.setOnFlowableSubscribe(oldFlowableSubscribeHook);
+                RxJavaPlugins.setOnMaybeSubscribe((BiFunction<? super Maybe, MaybeObserver, ? extends MaybeObserver>) oldMaybeSubscribeHook);
+                RxJavaPlugins.setOnObservableSubscribe(oldObservableSubscribeHook);
+                RxJavaPlugins.setOnCompletableAssembly(oldCompletableHook);
+                RxJavaPlugins.setOnSingleAssembly(oldSingleHook);
+                RxJavaPlugins.setOnMaybeAssembly(oldMaybeHook);
+                RxJavaPlugins.setOnObservableAssembly(oldObservableHook);
+                RxJavaPlugins.setOnFlowableAssembly(oldFlowableHook);
+                RxJavaPlugins.setOnConnectableObservableAssembly(oldConnectableObservableHook);
+                RxJavaPlugins.setOnConnectableFlowableAssembly(oldConnectableFlowableHook);
+                RxJavaPlugins.setOnParallelAssembly(oldParallelFlowableHook);
+            } catch (Exception e) {
+                // ignore
+            }
         }
     }
 }
