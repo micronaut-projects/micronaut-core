@@ -559,9 +559,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
 
                 BeanDefinitionVisitor proxyWriter = beanDefinitionWriters.get(proxyKey);
+                final AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
+                        concreteClassMetadata,
+                        constructorParameterInfo.getAnnotationMetadata()
+                );
                 if (proxyWriter != null) {
                     proxyWriter.visitBeanDefinitionConstructor(
-                            constructorParameterInfo.getAnnotationMetadata(),
+                            annotationMetadata,
                             constructorParameterInfo.isRequiresReflection(),
                             constructorParameterInfo.getParameters(),
                             constructorParameterInfo.getParameterMetadata(),
@@ -569,7 +573,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 beanDefinitionWriter.visitBeanDefinitionConstructor(
-                        constructorParameterInfo.getAnnotationMetadata(),
+                        annotationMetadata,
                         constructorParameterInfo.isRequiresReflection(),
                         constructorParameterInfo.getParameters(),
                         constructorParameterInfo.getParameterMetadata(),
