@@ -19,10 +19,9 @@ import io.micronaut.core.annotation.Internal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.Deque;
 
 /**
  * Implementation of {@link InvocationInstrumenter} which invoked multiple instrumenters.
@@ -35,7 +34,7 @@ class MultipleInvocationInstrumenter implements InvocationInstrumenter {
     private static final Logger LOG = LoggerFactory.getLogger(InvocationInstrumenter.class);
 
     private final Collection<InvocationInstrumenter> invocationInstrumenters;
-    private final List<InvocationInstrumenter> executedInstrumenters;
+    private final Deque<InvocationInstrumenter> executedInstrumenters;
 
     /**
      * Creates new instance.
@@ -44,7 +43,7 @@ class MultipleInvocationInstrumenter implements InvocationInstrumenter {
      */
     MultipleInvocationInstrumenter(Collection<InvocationInstrumenter> invocationInstrumenters) {
         this.invocationInstrumenters = invocationInstrumenters;
-        this.executedInstrumenters = new ArrayList<>(invocationInstrumenters.size());
+        this.executedInstrumenters = new ArrayDeque<>(invocationInstrumenters.size());
     }
 
     /**
@@ -54,7 +53,7 @@ class MultipleInvocationInstrumenter implements InvocationInstrumenter {
     public void beforeInvocation() {
         for (InvocationInstrumenter instrumenter : invocationInstrumenters) {
             instrumenter.beforeInvocation();
-            executedInstrumenters.add(instrumenter);
+            executedInstrumenters.push(instrumenter);
         }
     }
 
@@ -63,14 +62,12 @@ class MultipleInvocationInstrumenter implements InvocationInstrumenter {
      */
     @Override
     public void afterInvocation() {
-        Collections.reverse(executedInstrumenters);
-        for (InvocationInstrumenter instrumenter : executedInstrumenters) {
+        while (!executedInstrumenters.isEmpty()) {
             try {
-                instrumenter.afterInvocation();
+                executedInstrumenters.pop().afterInvocation();
             } catch (Exception e) {
                 LOG.warn("After instrumentation invocation error: {}", e.getMessage(), e);
             }
         }
-        executedInstrumenters.clear();
     }
 }
