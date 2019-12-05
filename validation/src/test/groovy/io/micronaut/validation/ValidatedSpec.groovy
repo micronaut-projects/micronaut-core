@@ -36,9 +36,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.Specification
 
-import javax.validation.ConstraintViolation
 import javax.validation.ConstraintViolationException
-import javax.validation.ValidatorFactory
 import javax.validation.constraints.NotNull
 import javax.validation.constraints.Size
 import java.util.concurrent.ExecutorService
@@ -79,6 +77,19 @@ class ValidatedSpec extends Specification {
         result == "\$100.00"
 
     }
+
+    def "test validated return value"() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run()
+        Foo foo = beanContext.getBean(Foo)
+
+        when:
+        foo.notNull()
+
+        then:
+        thrown(ConstraintViolationException)
+    }
+
 
     def "test validated controller validates @Valid classes"() {
         given:
