@@ -361,22 +361,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         return Collections.unmodifiableSet(overallViolations);
     }
 
-    private Collection<MutableArgumentValue<?>> toArgumentValues(@Nonnull Object[] parameterValues, Argument[] arguments) {
-        final int argLen = arguments.length;
-        if (argLen != parameterValues.length) {
-            throw new IllegalArgumentException("The method parameter array must have exactly " + argLen + " elements.");
-        }
-
-        Collection<MutableArgumentValue<?>> argumentValues = new ArrayList<>(parameterValues.length);
-        for (int i = 0; i < arguments.length; i++) {
-            Argument argument = arguments[i];
-            final Object v = parameterValues[i];
-            final MutableArgumentValue<?> av = MutableArgumentValue.create(argument, v);
-            argumentValues.add(av);
-        }
-        return argumentValues;
-    }
-
     @Nonnull
     @Override
     public <T> Set<ConstraintViolation<T>> validateParameters(
@@ -1441,7 +1425,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     }
 
     private String buildMessageTemplate(AnnotationValue<?> annotationValue, AnnotationMetadata annotationMetadata) {
-        return annotationValue.get("message", String.class)
+        return annotationValue.stringValue("message")
                 .orElseGet(() ->
                         annotationMetadata.getDefaultValue(annotationValue.getAnnotationName(), "message", String.class)
                             .orElse("{" + annotationValue.getAnnotationName() + ".message}")

@@ -27,6 +27,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.*;
 import io.micronaut.core.beans.AbstractBeanIntrospection;
 import io.micronaut.core.beans.AbstractBeanIntrospectionReference;
@@ -66,10 +67,10 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final ClassWriter introspectionWriter;
     private final List<BeanPropertyWriter> propertyDefinitions = new ArrayList<>();
     private final Map<String, Collection<AnnotationValueIndex>> indexes = new HashMap<>(2);
+    private final Map<String, GeneratorAdapter> localLoadTypeMethods = new HashMap<>();
     private int propertyIndex = 0;
     private MethodElement constructor;
     private MethodElement defaultConstructor;
-    private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
 
     /**
      * Default constructor.
@@ -139,6 +140,10 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
         final Type propertyType = getTypeForElement(type);
 
+        DefaultAnnotationMetadata.contributeDefaults(
+                this.annotationMetadata,
+                annotationMetadata
+        );
         propertyDefinitions.add(
                 new BeanPropertyWriter(
                         this,
@@ -167,10 +172,6 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        // write the annotation metadata
-        if (annotationMetadataWriter != null) {
-            annotationMetadataWriter.accept(classWriterOutputVisitor);
-        }
         // write the reference
         writeIntrospectionReference(classWriterOutputVisitor);
         // write the introspection
@@ -258,10 +259,11 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             if (constructor != null && ArrayUtils.isNotEmpty(constructor.getParameters())) {
                 writeConstructorArguments();
             }
-            for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
-                generatorAdapter.visitMaxs(3, 1);
-            }
 
+            for (GeneratorAdapter generatorAdapter : localLoadTypeMethods.values()) {
+                generatorAdapter.visitMaxs(1, 1);
+                generatorAdapter.visitEnd();
+            }
             introspectionStream.write(introspectionWriter.toByteArray());
         }
     }
@@ -281,7 +283,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 args,
                 annotationMetadataMap,
                 toTypeArguments(constructorArguments),
-                loadTypeMethods);
+                localLoadTypeMethods);
 
         getConstructorArguments.returnValue();
         getConstructorArguments.visitMaxs(1, 1);
@@ -370,6 +372,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     private void writeIntrospectionReference(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
+
         Type superType = Type.getType(AbstractBeanIntrospectionReference.class);
         final String referenceName = targetClassType.getClassName();
         classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, referenceName);
@@ -377,6 +380,10 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         try (OutputStream referenceStream = classWriterOutputVisitor.visitClass(referenceName)) {
             startPublicFinalClass(referenceWriter, targetClassType.getInternalName(), superType);
             final ClassWriter classWriter = generateClassBytes(referenceWriter);
+            for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
+                generatorAdapter.visitMaxs(1, 1);
+                generatorAdapter.visitEnd();
+            }
             referenceStream.write(classWriter.toByteArray());
         }
     }
@@ -424,7 +431,6 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         getBeanType.endMethod();
 
         writeGetAnnotationMetadataMethod(classWriter);
-
         return classWriter;
     }
 
