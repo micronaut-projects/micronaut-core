@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.jackson.codec
+package io.micronaunt.xml.codec
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.MediaType
+import io.micronaut.jackson.codec.JacksonFeatures
+import io.micronaut.xml.codec.XmlMediaTypeCodec
 import spock.lang.Specification
 
 class XmlMediaTypeCodecSpec extends Specification {

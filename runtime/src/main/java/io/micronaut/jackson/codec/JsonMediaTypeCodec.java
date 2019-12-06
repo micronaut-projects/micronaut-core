@@ -16,10 +16,12 @@
 package io.micronaut.jackson.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nullable;
@@ -34,6 +36,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Named("json")
 @Singleton
 @BootstrapContextCompatible
 public class JsonMediaTypeCodec extends AbstractJacksonMediaTypeCodec {
@@ -41,36 +44,16 @@ public class JsonMediaTypeCodec extends AbstractJacksonMediaTypeCodec {
     public static final String CONFIGURATION_QUALIFIER = "json";
 
     /**
-     * @param jacksonFeatures          Jackson features
-     * @param objectMapper             To read/write JSON
-     * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
-     */
-    public JsonMediaTypeCodec(@Parameter JacksonFeatures jacksonFeatures,
-                              ObjectMapper objectMapper,
-                              ApplicationConfiguration applicationConfiguration,
-                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        super(setupObjectMapper(objectMapper.copy(), Optional.ofNullable(jacksonFeatures).orElse(new JacksonFeatures())),
-              applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
-    }
-
-    /**
      * @param objectMapper             To read/write JSON
      * @param applicationConfiguration The common application configurations
      * @param codecConfiguration       The configuration for the codec
      */
     @Inject
-    public JsonMediaTypeCodec(ObjectMapper objectMapper,
+    public JsonMediaTypeCodec(@Nullable @Parameter ObjectMapper objectMapper,
                               ApplicationConfiguration applicationConfiguration,
+                              BeanContext beanContext,
                               @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        super(setupObjectMapper(objectMapper.copy(), new JacksonFeatures()),
+        super(Optional.ofNullable(objectMapper).orElse(beanContext.getBean(ObjectMapper.class, Qualifiers.byName("json"))),
               applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
-    }
-
-    private static ObjectMapper setupObjectMapper(ObjectMapper objectMapper, JacksonFeatures jacksonFeatures) {
-        jacksonFeatures.getDeserializationFeatures().forEach(objectMapper::configure);
-        jacksonFeatures.getSerializationFeatures().forEach(objectMapper::configure);
-
-        return objectMapper;
     }
 }

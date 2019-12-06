@@ -27,15 +27,15 @@ import io.micronaut.jackson.codec.AbstractJacksonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nullable;
-import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
  * A jackson based {@link io.micronaut.http.codec.MediaTypeCodec} that handles XML requests/responses.
  *
- * @since 1.2
+ * @since 1.3
  */
+@Named("xml")
 @Singleton
 @BootstrapContextCompatible
 @Requires(classes = {XmlMapper.class, JaxbAnnotationModule.class})
@@ -44,34 +44,18 @@ public class XmlMediaTypeCodec extends AbstractJacksonMediaTypeCodec {
     public static final String CONFIGURATION_QUALIFIER = "xml";
 
     /**
-     * @param jacksonFeatures          Additional features that should be configured for jackson
      * @param xmlMapper                Object mapper for xml
      * @param applicationConfiguration The common application configurations
      * @param codecConfiguration       The configuration for the codec
      */
-    public XmlMediaTypeCodec(@Parameter JacksonFeatures jacksonFeatures,
-                             @Named("xml") ObjectMapper xmlMapper,
+    public XmlMediaTypeCodec(@Parameter ObjectMapper xmlMapper,
                              ApplicationConfiguration applicationConfiguration,
                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        super(setupXmlMapper(xmlMapper.copy(), jacksonFeatures), applicationConfiguration, codecConfiguration, MediaType.APPLICATION_XML_TYPE);
+        super(setupXmlMapper(xmlMapper.copy()), applicationConfiguration, codecConfiguration, MediaType.APPLICATION_XML_TYPE);
     }
 
-    /**
-     * @param xmlMapper                Object mapper for xml
-     * @param applicationConfiguration The common application configurations
-     * @param codecConfiguration       The configuration for the codec
-     */
-    @Inject
-    public XmlMediaTypeCodec(@Named("xml") ObjectMapper xmlMapper,
-                             ApplicationConfiguration applicationConfiguration,
-                             @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        super(setupXmlMapper(xmlMapper.copy(), new JacksonFeatures()), applicationConfiguration, codecConfiguration, MediaType.APPLICATION_XML_TYPE);
-    }
-
-    private static ObjectMapper setupXmlMapper(ObjectMapper mapper, JacksonFeatures jacksonFeatures) {
+    private static ObjectMapper setupXmlMapper(ObjectMapper mapper) {
         mapper.registerModule(new JaxbAnnotationModule());
-        jacksonFeatures.getDeserializationFeatures().forEach(mapper::configure);
-        jacksonFeatures.getSerializationFeatures().forEach(mapper::configure);
 
         return mapper;
     }

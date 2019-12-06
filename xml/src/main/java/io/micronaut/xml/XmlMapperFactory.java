@@ -13,42 +13,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.jackson;
+package io.micronaut.xml;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Type;
-import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.jackson.JacksonConfiguration;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.TimeZone;
 
 /**
- * Factory bean for creating the Jackson {@link com.fasterxml.jackson.databind.ObjectMapper}.
+ * Factory bean for creating the Jackson {@link XmlMapper}.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * The factory mostly duplicates {@link io.micronaut.jackson.ObjectMapperFactory} with the only difference that it creates
+ * object mappers dedicated for xml processing and avoid some json specific configuration that might have been done inside
+ * of {@link io.micronaut.jackson.ObjectMapperFactory}.
+ *
+ * @author svishnyakoff
+ * @since 1.3
  */
 @Factory
 @BootstrapContextCompatible
-public class ObjectMapperFactory {
-
-    /**
-     * Name for Micronaut module.
-     */
-    public static final String MICRONAUT_MODULE = "micronaut";
+public class XmlMapperFactory {
 
     @Inject
     // have to be fully qualified due to JDK Module type
@@ -66,79 +64,31 @@ public class ObjectMapperFactory {
     @Inject
     protected BeanDeserializerModifier[] beanDeserializerModifiers = new BeanDeserializerModifier[0];
 
-    @Inject
-    protected KeyDeserializer[] keyDeserializers = new KeyDeserializer[0];
-
     /**
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
      *
      * @param jacksonConfiguration The configuration
-     * @param jsonFactory          The JSON factory
      * @return The {@link ObjectMapper}
      */
     @Singleton
-    @Primary
     @BootstrapContextCompatible
-    public ObjectMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
-                                     @Nullable JsonFactory jsonFactory) {
+    @Named("xml")
+    @Requires(classes = XmlMapper.class)
+    public ObjectMapper xmlMapper(@Nullable JacksonConfiguration jacksonConfiguration) {
 
-        ObjectMapper objectMapper = jsonFactory != null ? new ObjectMapper(jsonFactory) : new ObjectMapper();
+        XmlMapper objectMapper = new XmlMapper();
 
         final boolean hasConfiguration = jacksonConfiguration != null;
         if (!hasConfiguration || jacksonConfiguration.isModuleScan()) {
             objectMapper.findAndRegisterModules();
         }
         objectMapper.registerModules(jacksonModules);
-        SimpleModule module = new SimpleModule(MICRONAUT_MODULE);
-        for (JsonSerializer serializer : serializers) {
-            Class<? extends JsonSerializer> type = serializer.getClass();
-            Type annotation = type.getAnnotation(Type.class);
-            if (annotation != null) {
-                Class[] value = annotation.value();
-                for (Class aClass : value) {
-                    module.addSerializer(aClass, serializer);
-                }
-            } else {
-                Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
-                if (targetType.isPresent()) {
-                    module.addSerializer(targetType.get(), serializer);
-                } else {
-                    module.addSerializer(serializer);
-                }
-            }
-        }
-
-        for (JsonDeserializer deserializer : deserializers) {
-            Class<? extends JsonDeserializer> type = deserializer.getClass();
-            Type annotation = type.getAnnotation(Type.class);
-            if (annotation != null) {
-                Class[] value = annotation.value();
-                for (Class aClass : value) {
-                    module.addDeserializer(aClass, deserializer);
-                }
-            } else {
-                Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
-                targetType.ifPresent(aClass -> module.addDeserializer(aClass, deserializer));
-            }
-        }
-
-        for (KeyDeserializer keyDeserializer : keyDeserializers) {
-            Class<? extends KeyDeserializer> type = keyDeserializer.getClass();
-            Type annotation = type.getAnnotation(Type.class);
-            if (annotation != null) {
-                Class[] value = annotation.value();
-                for (Class clazz : value) {
-                    module.addKeyDeserializer(clazz, keyDeserializer);
-                }
-            }
-        }
-        objectMapper.registerModule(module);
 
         for (BeanSerializerModifier beanSerializerModifier : beanSerializerModifiers) {
             objectMapper.setSerializerFactory(
-                objectMapper.getSerializerFactory().withSerializerModifier(
-                    beanSerializerModifier
-                ));
+                    objectMapper.getSerializerFactory().withSerializerModifier(
+                            beanSerializerModifier
+                    ));
         }
 
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
