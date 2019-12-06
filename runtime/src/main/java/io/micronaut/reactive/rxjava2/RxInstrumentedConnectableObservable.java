@@ -32,7 +32,7 @@ import io.reactivex.observables.ConnectableObservable;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable<T> implements RxInstrumentedComponent {
+final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable<T> implements RxInstrumentedComponent  {
     private final ConnectableObservable<T> source;
     private final InvocationInstrumenter instrumenter;
 

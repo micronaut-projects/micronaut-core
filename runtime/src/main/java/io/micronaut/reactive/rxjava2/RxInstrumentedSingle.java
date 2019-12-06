@@ -30,8 +30,8 @@ import io.reactivex.SingleSource;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedComponent {
-    protected final SingleSource<T> source;
+final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedComponent  {
+    private final SingleSource<T> source;
     private final InvocationInstrumenter instrumenter;
 
     /**

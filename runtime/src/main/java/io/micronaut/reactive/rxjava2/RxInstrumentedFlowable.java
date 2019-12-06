@@ -32,7 +32,7 @@ import org.reactivestreams.Subscriber;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumentedComponent {
+final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumentedComponent  {
     private final Publisher<T> source;
     private final InvocationInstrumenter instrumenter;
 

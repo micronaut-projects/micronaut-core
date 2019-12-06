@@ -31,7 +31,7 @@ import io.reactivex.Observer;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedObservable<T> extends Observable<T> implements RxInstrumentedComponent {
+final class RxInstrumentedObservable<T> extends Observable<T> implements RxInstrumentedComponent  {
     private final ObservableSource<T> source;
     private final InvocationInstrumenter instrumenter;
 

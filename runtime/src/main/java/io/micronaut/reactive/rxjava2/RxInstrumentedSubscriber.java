@@ -16,8 +16,10 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -28,15 +30,61 @@ import org.reactivestreams.Subscriber;
  * @since 1.1
  */
 @Internal
-class RxInstrumentedSubscriber<T> extends InstrumentedSubscriber<T> implements RxInstrumentedComponent {
+class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent  {
+    private final Subscriber<T> source;
+    private final InvocationInstrumenter instrumenter;
+
     /**
      * Default constructor.
      *
-     * @param downstream   The downstream subscriber
+     * @param source       The source subscriber
      * @param instrumenter The instrumenter
      */
-    RxInstrumentedSubscriber(Subscriber<T> downstream, InvocationInstrumenter instrumenter) {
-        super(downstream, instrumenter);
+    RxInstrumentedSubscriber(Subscriber<T> source, InvocationInstrumenter instrumenter) {
+        ArgumentUtils.requireNonNull("source", source);
+        ArgumentUtils.requireNonNull("instrumenter", instrumenter);
+        this.source = source;
+        this.instrumenter = instrumenter;
     }
 
+    @Override
+    public final void onSubscribe(Subscription s) {
+        try {
+            instrumenter.beforeInvocation();
+            source.onSubscribe(s);
+        } finally {
+            instrumenter.afterInvocation();
+        }
+    }
+
+    @Override
+    public void onNext(T t) {
+        try {
+            instrumenter.beforeInvocation();
+            source.onNext(t);
+        } finally {
+            instrumenter.afterInvocation();
+        }
+    }
+
+    @SuppressWarnings("Duplicates")
+    @Override
+    public void onError(Throwable t) {
+        try {
+            instrumenter.beforeInvocation();
+            source.onError(t);
+        } finally {
+            instrumenter.afterInvocation();
+        }
+    }
+
+    @Override
+    public void onComplete() {
+        try {
+            instrumenter.beforeInvocation();
+            source.onComplete();
+        } finally {
+            instrumenter.afterInvocation();
+        }
+    }
 }

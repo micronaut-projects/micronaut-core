@@ -28,10 +28,9 @@ import io.reactivex.disposables.Disposable;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedCompletableObserver implements CompletableObserver, Disposable, RxInstrumentedComponent {
+final class RxInstrumentedCompletableObserver implements CompletableObserver, RxInstrumentedComponent {
     private final CompletableObserver downstream;
     private final InvocationInstrumenter instrumenter;
-    private Disposable upstream;
 
     /**
      * Default constructor.
@@ -46,11 +45,12 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Di
 
     @Override
     public void onSubscribe(Disposable d) {
-        if (!validate(upstream, d)) {
-            return;
+        try {
+            instrumenter.beforeInvocation();
+            downstream.onSubscribe(d);
+        } finally {
+            instrumenter.afterInvocation();
         }
-        upstream = d;
-        downstream.onSubscribe(this);
     }
 
     @Override
@@ -73,13 +73,4 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Di
         }
     }
 
-    @Override
-    public boolean isDisposed() {
-        return upstream.isDisposed();
-    }
-
-    @Override
-    public void dispose() {
-        upstream.dispose();
-    }
 }

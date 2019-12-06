@@ -23,6 +23,8 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 
 import javax.inject.Singleton;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Optional;
 
 /**
@@ -39,36 +41,17 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
     public Optional<InvocationInstrumenter> newInvocationInstrumenter() {
         return ServerRequestContext.currentRequest().map(invocationRequest -> new InvocationInstrumenter() {
 
-            private boolean inProgress;
-            private HttpRequest<Object> currentRequest;
-            private boolean isSet = false;
+            private final Deque<Optional<HttpRequest<Object>>> requests = new ArrayDeque<>(1);
 
             @Override
             public void beforeInvocation() {
-                if (inProgress) {
-                    throw new IllegalStateException("Method 'beforeInvocation' called twice");
-                }
-                inProgress = true;
-                currentRequest = ServerRequestContext.currentRequest().orElse(null);
-                if (invocationRequest != currentRequest) {
-                    isSet = true;
-                    ServerRequestContext.set(invocationRequest);
-                }
+                requests.push(ServerRequestContext.currentRequest());
+                ServerRequestContext.set(invocationRequest);
             }
 
             @Override
             public void afterInvocation() {
-                if (!inProgress) {
-                    throw new IllegalStateException("Method 'afterInvocation' called without 'beforeInvocation' call");
-                }
-                if (isSet) {
-                    if (invocationRequest != ServerRequestContext.currentRequest().orElse(null)) {
-                        throw new IllegalStateException("Request value doesn't match set value");
-                    }
-                    ServerRequestContext.set(currentRequest);
-                    isSet = false;
-                }
-                inProgress = false;
+                ServerRequestContext.set(requests.pop().orElse(null));
             }
 
         });

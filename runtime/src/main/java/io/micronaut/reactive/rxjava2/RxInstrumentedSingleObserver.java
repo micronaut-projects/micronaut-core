@@ -29,36 +29,36 @@ import io.reactivex.disposables.Disposable;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, Disposable, RxInstrumentedComponent {
-    protected final SingleObserver<T> downstream;
+final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, RxInstrumentedComponent  {
+    private final SingleObserver<T> source;
     private final InvocationInstrumenter instrumenter;
-    private Disposable upstream;
 
     /**
      * Default constructor.
      *
-     * @param downstream   The downstream observer
+     * @param source       The source observer
      * @param instrumenter The instrumenter
      */
-    RxInstrumentedSingleObserver(SingleObserver<T> downstream, InvocationInstrumenter instrumenter) {
-        this.downstream = downstream;
+    RxInstrumentedSingleObserver(SingleObserver<T> source, InvocationInstrumenter instrumenter) {
+        this.source = source;
         this.instrumenter = instrumenter;
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        if (!validate(upstream, d)) {
-            return;
+        try {
+            instrumenter.beforeInvocation();
+            source.onSubscribe(d);
+        } finally {
+            instrumenter.afterInvocation();
         }
-        upstream = d;
-        downstream.onSubscribe(this);
     }
 
     @Override
     public void onError(Throwable t) {
         try {
             instrumenter.beforeInvocation();
-            downstream.onError(t);
+            source.onError(t);
         } finally {
             instrumenter.afterInvocation();
         }
@@ -68,19 +68,10 @@ final class RxInstrumentedSingleObserver<T> implements SingleObserver<T>, Dispos
     public void onSuccess(T value) {
         try {
             instrumenter.beforeInvocation();
-            downstream.onSuccess(value);
+            source.onSuccess(value);
         } finally {
             instrumenter.afterInvocation();
         }
     }
 
-    @Override
-    public boolean isDisposed() {
-        return upstream.isDisposed();
-    }
-
-    @Override
-    public void dispose() {
-        upstream.dispose();
-    }
 }

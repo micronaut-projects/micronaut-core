@@ -51,7 +51,7 @@ final class RxInstrumentedWrappers {
      * @return The wrapped subscriber
      */
     static <T> Subscriber<T> wrap(Subscriber<T> downstream, RxInstrumenterFactory instrumenterFactory) {
-        if (downstream instanceof InstrumentedComponent) {
+        if (downstream instanceof RxInstrumentedComponent) {
             return downstream;
         }
 
@@ -75,7 +75,7 @@ final class RxInstrumentedWrappers {
      * @return The wrapped subscriber
      */
     static Completable wrap(Completable source, RxInstrumenterFactory instrumenterFactory) {
-        if (source instanceof InstrumentedComponent) {
+        if (source instanceof RxInstrumentedComponent) {
             return source;
         }
         final InvocationInstrumenter instumenter = instrumenterFactory.create();
@@ -94,7 +94,7 @@ final class RxInstrumentedWrappers {
      * @return The wrapped subscriber
      */
     static <T> Maybe<T> wrap(Maybe<T> source, RxInstrumenterFactory instrumenterFactory) {
-        if (source instanceof InstrumentedComponent) {
+        if (source instanceof RxInstrumentedComponent) {
             return source;
         }
         final InvocationInstrumenter instumenter = instrumenterFactory.create();
@@ -113,7 +113,7 @@ final class RxInstrumentedWrappers {
      * @return The wrapped subscriber
      */
     static <T> Single<T> wrap(Single<T> source, RxInstrumenterFactory instrumenterFactory) {
-        if (source instanceof InstrumentedComponent) {
+        if (source instanceof RxInstrumentedComponent) {
             return source;
         }
         final InvocationInstrumenter instumenter = instrumenterFactory.create();
@@ -132,7 +132,7 @@ final class RxInstrumentedWrappers {
      * @return The wrapped subscriber
      */
     static <T> Observable<T> wrap(Observable<T> source, RxInstrumenterFactory instrumenterFactory) {
-        if (source instanceof InstrumentedComponent) {
+        if (source instanceof RxInstrumentedComponent) {
             return source;
         }
         final InvocationInstrumenter instumenter = instrumenterFactory.create();
@@ -151,7 +151,7 @@ final class RxInstrumentedWrappers {
      * @return The wrapped subscriber
      */
     static <T> ConnectableObservable<T> wrap(ConnectableObservable<T> source, RxInstrumenterFactory instrumenterFactory) {
-        if (source instanceof InstrumentedComponent) {
+        if (source instanceof RxInstrumentedComponent) {
             return source;
         }
         final InvocationInstrumenter instumenter = instrumenterFactory.create();
@@ -170,7 +170,7 @@ final class RxInstrumentedWrappers {
      * @return The wrapped subscriber
      */
     static <T> Flowable<T> wrap(Flowable<T> source, RxInstrumenterFactory instrumenterFactory) {
-        if (source instanceof InstrumentedComponent) {
+        if (source instanceof RxInstrumentedComponent) {
             return source;
         }
         final InvocationInstrumenter instumenter = instrumenterFactory.create();
@@ -190,7 +190,7 @@ final class RxInstrumentedWrappers {
      */
 
     static <T> ConnectableFlowable<T> wrap(ConnectableFlowable<T> source, RxInstrumenterFactory instrumenterFactory) {
-        if (source instanceof InstrumentedComponent) {
+        if (source instanceof RxInstrumentedComponent) {
             return source;
         }
         final InvocationInstrumenter instumenter = instrumenterFactory.create();
@@ -210,7 +210,7 @@ final class RxInstrumentedWrappers {
      */
 
     static <T> ParallelFlowable<T> wrap(ParallelFlowable<T> source, RxInstrumenterFactory instrumenterFactory) {
-        if (source instanceof InstrumentedComponent) {
+        if (source instanceof RxInstrumentedComponent) {
             return source;
         }
         return new RxInstrumentedParallelFlowable<>(source, instrumenterFactory);
@@ -225,7 +225,7 @@ final class RxInstrumentedWrappers {
      * @return The wrapped subscriber
      */
     static <T> Observer<T> wrap(Observer<T> downstream, RxInstrumenterFactory instrumenterFactory) {
-        if (downstream instanceof InstrumentedComponent) {
+        if (downstream instanceof RxInstrumentedComponent) {
             return downstream;
         }
         final InvocationInstrumenter instrumenter = instrumenterFactory.create();
@@ -244,7 +244,7 @@ final class RxInstrumentedWrappers {
      * @return The wrapped subscriber
      */
     static <T> SingleObserver<T> wrap(SingleObserver<T> downstream, RxInstrumenterFactory instrumenterFactory) {
-        if (downstream instanceof InstrumentedComponent) {
+        if (downstream instanceof RxInstrumentedComponent) {
             return downstream;
         }
         final InvocationInstrumenter instrumenter = instrumenterFactory.create();
@@ -263,7 +263,7 @@ final class RxInstrumentedWrappers {
      * @return The wrapped subscriber
      */
     static <T> MaybeObserver<T> wrap(MaybeObserver<T> downstream, RxInstrumenterFactory instrumenterFactory) {
-        if (downstream instanceof InstrumentedComponent) {
+        if (downstream instanceof RxInstrumentedComponent) {
             return downstream;
         }
         final InvocationInstrumenter instrumenter = instrumenterFactory.create();
@@ -281,7 +281,7 @@ final class RxInstrumentedWrappers {
      * @return The wrapped subscriber
      */
     static CompletableObserver wrap(CompletableObserver downstream, RxInstrumenterFactory instrumenterFactory) {
-        if (downstream instanceof InstrumentedComponent) {
+        if (downstream instanceof RxInstrumentedComponent) {
             return downstream;
         }
         final InvocationInstrumenter instrumenter = instrumenterFactory.create();
