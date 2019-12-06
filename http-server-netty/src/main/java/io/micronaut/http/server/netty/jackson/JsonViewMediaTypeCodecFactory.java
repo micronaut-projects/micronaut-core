@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
@@ -29,7 +30,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Named;
 import javax.inject.Singleton;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -54,18 +54,22 @@ public class JsonViewMediaTypeCodecFactory implements JsonViewCodecResolver {
     private final ApplicationConfiguration applicationConfiguration;
     private final CodecConfiguration codecConfiguration;
     private final Map<Class<?>, JsonMediaTypeCodec> jsonViewCodecs = new ConcurrentHashMap<>(5);
+    private final BeanContext beanContext;
 
     /**
      * @param objectMapper             To read/write JSON
      * @param applicationConfiguration The common application configurations
+     * @param beanContext
      * @param codecConfiguration       The configuration for the codec
      */
     protected JsonViewMediaTypeCodecFactory(ObjectMapper objectMapper,
-                              ApplicationConfiguration applicationConfiguration,
-                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
+                                            ApplicationConfiguration applicationConfiguration,
+                                            BeanContext beanContext,
+                                            @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this.objectMapper = objectMapper;
         this.applicationConfiguration = applicationConfiguration;
         this.codecConfiguration = codecConfiguration;
+        this.beanContext = beanContext;
     }
 
     /**
@@ -81,7 +85,7 @@ public class JsonViewMediaTypeCodecFactory implements JsonViewCodecResolver {
 
             ObjectMapper viewMapper = objectMapper.copy();
             viewMapper.setConfig(viewMapper.getSerializationConfig().withView(viewClass));
-            codec = new JsonMediaTypeCodec(viewMapper, applicationConfiguration, codecConfiguration);
+            codec = new JsonMediaTypeCodec(viewMapper, applicationConfiguration, beanContext, codecConfiguration);
             jsonViewCodecs.put(viewClass, codec);
         }
         return codec;

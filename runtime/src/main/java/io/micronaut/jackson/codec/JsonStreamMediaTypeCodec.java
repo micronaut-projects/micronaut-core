@@ -16,7 +16,6 @@
 package io.micronaut.jackson.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
@@ -53,9 +52,8 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
     @Inject
     public JsonStreamMediaTypeCodec(ObjectMapper objectMapper,
                                     ApplicationConfiguration applicationConfiguration,
-                                    BeanContext beanContext,
                                     @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        super(objectMapper, applicationConfiguration, beanContext, null);
+        super(objectMapper, applicationConfiguration, null);
         if (codecConfiguration != null) {
             this.additionalTypes = codecConfiguration.getAdditionalTypes();
         } else {

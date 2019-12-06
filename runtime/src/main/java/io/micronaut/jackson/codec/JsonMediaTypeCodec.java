@@ -56,4 +56,15 @@ public class JsonMediaTypeCodec extends AbstractJacksonMediaTypeCodec {
         super(Optional.ofNullable(objectMapper).orElse(beanContext.getBean(ObjectMapper.class, Qualifiers.byName("json"))),
               applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
     }
+
+    /**
+     * @param objectMapper             To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration       The configuration for the codec
+     */
+    public JsonMediaTypeCodec(ObjectMapper objectMapper,
+                              ApplicationConfiguration applicationConfiguration,
+                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
+        super(objectMapper, applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
+    }
 }

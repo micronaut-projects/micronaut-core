@@ -15,14 +15,12 @@
  */
 package io.micronaut.jackson
 
-
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import com.fasterxml.jackson.databind.SerializationFeature
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
-import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -133,23 +131,5 @@ class JacksonSetupSpec extends Specification {
 
         expect:
         applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy == PropertyNamingStrategy.SNAKE_CASE
-    }
-
-    void 'verify can get xml mapper'() {
-        when:
-        ApplicationContext applicationContext = ApplicationContext.run('test').start()
-
-        then:
-        applicationContext.containsBean(ObjectMapper, Qualifiers.byName('xml'))
-    }
-
-    void 'verify can encode/decode xml'() {
-        when:
-        ApplicationContext applicationContext = ApplicationContext.run('test').start()
-        ObjectMapper mapper = applicationContext.getBean(ObjectMapper, Qualifiers.byName('xml'))
-
-        then:
-        mapper.readTree('<person><name>test</name></person>').get('name').textValue() == 'test'
-        mapper.writeValueAsString(['1', '2', '3']) == '<ArrayList><item>1</item><item>2</item><item>3</item></ArrayList>'
     }
 }

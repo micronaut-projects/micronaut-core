@@ -29,6 +29,7 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
@@ -78,6 +79,7 @@ public class ObjectMapperFactory {
      */
     @Singleton
     @Primary
+    @Named("json")
     @BootstrapContextCompatible
     public ObjectMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
                                      @Nullable JsonFactory jsonFactory) {

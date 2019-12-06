@@ -31,11 +31,22 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.text.SimpleDateFormat;
+import java.util.Locale;
+import java.util.TimeZone;
 
+/**
+ * Factory bean for creating the Jackson {@link XmlMapper}.
+ *
+ * The factory mostly duplicates {@link io.micronaut.jackson.ObjectMapperFactory} with the only difference that it creates
+ * object mappers dedicated for xml processing and avoid some json specific configuration that might have been done inside
+ * of {@link io.micronaut.jackson.ObjectMapperFactory}.
+ *
+ * @author svishnyakoff
+ * @since 1.3
+ */
 @Factory
 @BootstrapContextCompatible
 public class XmlMapperFactory {
-
 
     @Inject
     // have to be fully qualified due to JDK Module type
@@ -52,7 +63,6 @@ public class XmlMapperFactory {
 
     @Inject
     protected BeanDeserializerModifier[] beanDeserializerModifiers = new BeanDeserializerModifier[0];
-
 
     /**
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
@@ -100,11 +110,11 @@ public class XmlMapperFactory {
             if (dateFormat != null) {
                 objectMapper.setDateFormat(new SimpleDateFormat(dateFormat));
             }
-            java.util.Locale locale = jacksonConfiguration.getLocale();
+            Locale locale = jacksonConfiguration.getLocale();
             if (locale != null) {
                 objectMapper.setLocale(locale);
             }
-            java.util.TimeZone timeZone = jacksonConfiguration.getTimeZone();
+            TimeZone timeZone = jacksonConfiguration.getTimeZone();
             if (timeZone != null) {
                 objectMapper.setTimeZone(timeZone);
             }

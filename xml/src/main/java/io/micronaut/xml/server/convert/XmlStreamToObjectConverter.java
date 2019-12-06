@@ -17,7 +17,6 @@ package io.micronaut.xml.server.convert;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -35,7 +34,6 @@ import java.util.Optional;
  */
 @Singleton
 @Internal
-@Requires(classes = XmlMapper.class)
 public class XmlStreamToObjectConverter implements TypeConverter<ByteArrayXmlStreamReader, Object> {
 
     private final XmlMapper xmlMapper;

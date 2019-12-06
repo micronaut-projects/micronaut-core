@@ -15,9 +15,9 @@
  */
 package io.micronaunt.xml.codec
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.MediaType
-import io.micronaut.jackson.codec.JacksonFeatures
 import io.micronaut.xml.codec.XmlMediaTypeCodec
 import spock.lang.Specification
 
@@ -28,7 +28,7 @@ class XmlMediaTypeCodecSpec extends Specification {
         ApplicationContext ctx = ApplicationContext.run()
 
         when:
-        XmlMediaTypeCodec codec = ctx.createBean(XmlMediaTypeCodec, new JacksonFeatures())
+        XmlMediaTypeCodec codec = ctx.createBean(XmlMediaTypeCodec, new ObjectMapper())
 
         then:
         codec.mediaTypes.size() == 1

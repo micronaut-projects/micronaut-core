@@ -16,19 +16,21 @@
 package io.micronaut.xml.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Parameter;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.jackson.codec.AbstractJacksonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
  * A jackson based {@link io.micronaut.http.codec.MediaTypeCodec} that handles XML requests/responses.
@@ -38,7 +40,6 @@ import javax.inject.Singleton;
 @Named("xml")
 @Singleton
 @BootstrapContextCompatible
-@Requires(classes = {XmlMapper.class, JaxbAnnotationModule.class})
 public class XmlMediaTypeCodec extends AbstractJacksonMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "xml";
@@ -48,13 +49,17 @@ public class XmlMediaTypeCodec extends AbstractJacksonMediaTypeCodec {
      * @param applicationConfiguration The common application configurations
      * @param codecConfiguration       The configuration for the codec
      */
-    public XmlMediaTypeCodec(@Parameter ObjectMapper xmlMapper,
+    @Inject
+    public XmlMediaTypeCodec(@Nullable @Parameter ObjectMapper xmlMapper,
                              ApplicationConfiguration applicationConfiguration,
+                             BeanContext beanContext,
                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        super(setupXmlMapper(xmlMapper.copy()), applicationConfiguration, codecConfiguration, MediaType.APPLICATION_XML_TYPE);
+        super(setupXmlMapper(xmlMapper, beanContext), applicationConfiguration, codecConfiguration,
+              MediaType.APPLICATION_XML_TYPE);
     }
 
-    private static ObjectMapper setupXmlMapper(ObjectMapper mapper) {
+    private static ObjectMapper setupXmlMapper(ObjectMapper mapper, BeanContext beanContext) {
+        mapper = Optional.ofNullable(mapper).orElse(beanContext.getBean(ObjectMapper.class, Qualifiers.byName("xml"))).copy();
         mapper.registerModule(new JaxbAnnotationModule());
 
         return mapper;
