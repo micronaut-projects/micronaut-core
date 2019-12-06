@@ -128,7 +128,7 @@ public void setMaxContentLength(@ReadableBytes int maxContentLength) {
 
 With the above in place you can set `micronaut.http.client.max-content-length` using the following values:
 
-.@ReadabyeBytes Conversion
+.@ReadableBytes Conversion
 |===
 |Configuration Value |Resulting Value
 
