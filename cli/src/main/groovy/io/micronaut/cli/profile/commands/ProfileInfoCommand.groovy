@@ -21,6 +21,7 @@ import io.micronaut.cli.config.ConfigMap
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.profile.Command
 import io.micronaut.cli.profile.ExecutionContext
+import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
@@ -96,18 +97,21 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
                 def requiredFeaturesList = profile.requiredFeatures.toList()
                 if (enhancedInfo) {
                     if (defaultFeaturesList) {
-                        console.log('--------------------')
                         console.addStatus("Default Features:")
+                        console.log('--------------------')
                         defaultFeaturesList.each {
                             console.log("  ${it.name}")
                         }
+                        console.log('')
                     }
 
                     if (requiredFeaturesList) {
                         console.addStatus("Required Features:")
+                        console.log('--------------------')
                         requiredFeaturesList.each {
                             console.log("  ${it.name}")
                         }
+                        console.log('')
                     }
                 }
                 console.addStatus('Provided Commands:')
@@ -134,36 +138,65 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
                         if (defaultFeaturesList.contains(feature) || requiredFeaturesList.contains(feature)) {
                             String fname = feature.name + " (+)"
                             console.log("\033[1m  ${fname.padRight(width)}  ${feature.description}\033[0m")
+
+                            if (enhancedInfo) {
+                                def dependentFeatures = feature.getDependentFeatures(profile)
+                                if (dependentFeatures.size() > 0) {
+                                    console.log("\033[1m       Dependent features:")
+                                    dependentFeatures.each {
+                                        console.log("                            ${it.name} (+)")
+                                    }
+                                    console.log('\033[0m  ------------------')
+                                }
+
+                                def evictedFeatures = feature.getEvictedFeatureNames()
+                                if (evictedFeatures.size() > 0) {
+                                    console.log("\033[1m       Evicted features:")
+                                    evictedFeatures.each {
+                                        console.log("                            ${it} (-)")
+                                    }
+                                    console.log('\033[0m  ------------------')
+                                }
+
+                                def defaultFeatures = feature.getDefaultFeatures(profile)
+                                if (defaultFeatures.size() > 0) {
+                                    console.log("\033[1m       Default features:")
+                                    defaultFeatures.each {
+                                        console.log("                            ${it.name} (+)")
+                                    }
+                                    console.log('\033[0m  ------------------')
+                                }
+                            }
                         } else {
                             console.log("  ${feature.name.padRight(width)}  ${feature.description}")
-                        }
 
-                        if (enhancedInfo) {
-                            def dependentFeatures = feature.getDependentFeatures(profile)
-                            if (dependentFeatures.size() > 0) {
-                                console.log("       Dependent features:")
-                                dependentFeatures.each {
-                                    console.log("                            ${it.name}")
+                            if (enhancedInfo) {
+                                def dependentFeatures = feature.getDependentFeatures(profile)
+                                if (dependentFeatures.size() > 0) {
+                                    console.log("       Dependent features:")
+                                    dependentFeatures.each {
+                                        console.log("                            ${it.name}")
+                                    }
+                                    console.log('  ------------------')
                                 }
-                                console.log('  ------------------')
-                            }
 
-                            def evictedFeatures = feature.getEvictedFeatureNames()
-                            if (evictedFeatures.size() > 0) {
-                                console.log("       Evicted features:")
-                                evictedFeatures.each {
-                                    console.log("                            ${it}")
+                                def evictedFeatures = feature.getEvictedFeatureNames()
+                                if (evictedFeatures.size() > 0) {
+                                    console.log("       Evicted features:")
+                                    evictedFeatures.each {
+                                        console.log("                            ${it}")
+                                    }
+                                    console.log('  ------------------')
                                 }
-                                console.log('  ------------------')
-                            }
 
-                            def defaultFeatures = feature.getDefaultFeatures(profile)
-                            if (defaultFeatures.size() > 0) {
-                                console.log("       Default features:")
-                                defaultFeatures.each {
-                                    console.log("                            ${it.name}")
+                                def defaultFeatures = feature.getDefaultFeatures(profile)
+                                if (defaultFeatures.size() > 0) {
+                                    console.log("       Default features:")
+                                    defaultFeatures.each {
+                                        console.log("                            ${it.name}")
+                                    }
+                                    console.log('  ------------------')
                                 }
-                                console.log('  ------------------')
                             }
                         }
                     }
