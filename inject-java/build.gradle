@@ -12,7 +12,7 @@ dependencies {
     testCompile "org.hibernate:hibernate-core:5.3.6.Final"
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
     testCompile "junit:junit:4.12"
-    testCompile "com.google.testing.compile:compile-testing:0.12"
+    testCompile "com.google.testing.compile:compile-testing:0.18"
     testCompile 'org.mongodb:mongo-java-driver:3.7.1'
     testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testCompile dependencyModuleVersion("groovy", "groovy-json")
