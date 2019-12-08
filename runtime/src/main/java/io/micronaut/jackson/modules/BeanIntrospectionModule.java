@@ -487,11 +487,10 @@ public class BeanIntrospectionModule extends SimpleModule {
      * Introspected property writer.
      */
     private class BeanIntrospectionPropertyWriter extends BeanPropertyWriter {
+        protected final Class<?>[] _views;
         final BeanProperty<Object, Object> beanProperty;
         final SerializableString fastName;
         private final JavaType type;
-
-        protected final Class<?>[] _views;
 
         BeanIntrospectionPropertyWriter(BeanPropertyWriter src,
                                         BeanProperty<Object, Object> introspection,
@@ -550,8 +549,8 @@ public class BeanIntrospectionModule extends SimpleModule {
             return type;
         }
 
-        private final boolean _inView(Class<?> activeView) {
-            if (activeView == null || _views==null) {
+        private boolean inView(Class<?> activeView) {
+            if (activeView == null || _views == null) {
                 return true;
             }
             final int len = _views.length;
@@ -565,7 +564,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
         @Override
         public final void serializeAsField(Object bean, JsonGenerator gen, SerializerProvider prov) throws Exception {
-            if (!_inView(prov.getActiveView())) {
+            if (!inView(prov.getActiveView())) {
                 serializeAsOmittedField(bean, gen, prov);
                 return;
             }
@@ -615,7 +614,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
         @Override
         public final void serializeAsElement(Object bean, JsonGenerator gen, SerializerProvider prov) throws Exception {
-            if (!_inView(prov.getActiveView())) {
+            if (!inView(prov.getActiveView())) {
                 serializeAsOmittedField(bean, gen, prov);
                 return;
             }
