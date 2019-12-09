@@ -47,7 +47,10 @@ class StaticResourceContextPathListener implements BeanCreatedEventListener<Stat
             return event.getBean();
         } else {
             StaticResourceConfiguration configuration = event.getBean();
-            configuration.setMapping(StringUtils.prependUri(contextPath, configuration.getMapping()));
+            String mapping = configuration.getMapping();
+            if (!mapping.startsWith(contextPath)) {
+                configuration.setMapping(StringUtils.prependUri(contextPath, configuration.getMapping()));
+            }
             return configuration;
         }
     }
