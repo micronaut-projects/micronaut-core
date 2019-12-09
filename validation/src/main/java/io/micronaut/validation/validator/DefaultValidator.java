@@ -460,6 +460,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         final HashSet overallViolations = new HashSet(3);
         @SuppressWarnings("unchecked")
         final Class<T> rootBeanClass = (Class<T>) object.getClass();
+        final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(object, groups);
         //noinspection unchecked
         validateConstrainedPropertyInternal(
                 rootBeanClass,
@@ -468,12 +469,126 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 returnTypeArgument,
                 returnType.getType(),
                 returnValue,
-                new DefaultConstraintValidatorContext(object, groups),
+                context,
                 overallViolations,
                 null
         );
+
+        final AnnotationMetadata annotationMetadata = returnTypeArgument.getAnnotationMetadata();
+        final boolean hasValid = annotationMetadata.isAnnotationPresent(Valid.class);
+
+        if (hasValid) {
+            validateCascadePropertyInternal(context,
+                    rootBeanClass,
+                    object,
+                    object,
+                    returnTypeArgument,
+                    returnValue,
+                    overallViolations);
+        }
+
         //noinspection unchecked
         return (Set<ConstraintViolation<T>>) overallViolations;
+    }
+
+    private <T> void validateCascadePropertyInternal(DefaultConstraintValidatorContext context,
+                                                     @Nonnull Class<T> rootBeanClass,
+                                                     @Nullable T rootBean,
+                                                     Object object,
+                                                     @Nonnull Argument<?> cascadeProperty,
+                                                     @Nullable Object propertyValue,
+                                                     Set overallViolations) {
+        if (propertyValue != null) {
+            @SuppressWarnings("unchecked") final Optional<? extends ValueExtractor<Object>> opt = valueExtractorRegistry
+                    .findValueExtractor((Class<Object>) cascadeProperty.getType());
+
+            opt.ifPresent(valueExtractor -> valueExtractor.extractValues(propertyValue, new ValueExtractor.ValueReceiver() {
+                @Override
+                public void value(String nodeName, Object object1) {
+
+                }
+
+                @Override
+                public void iterableValue(String nodeName, Object iterableValue) {
+                    if (iterableValue != null && context.validatedObjects.contains(iterableValue)) {
+                        return;
+                    }
+                    cascadeToIterableValue(
+                            context,
+                            rootBeanClass,
+                            rootBean,
+                            object,
+                            null,
+                            cascadeProperty,
+                            iterableValue,
+                            overallViolations,
+                            null,
+                            null,
+                            true);
+                }
+
+                @Override
+                public void indexedValue(String nodeName, int i, Object iterableValue) {
+                    if (iterableValue != null && context.validatedObjects.contains(iterableValue)) {
+                        return;
+                    }
+                    cascadeToIterableValue(
+                            context,
+                            rootBeanClass,
+                            rootBean,
+                            object,
+                            null,
+                            cascadeProperty,
+                            iterableValue,
+                            overallViolations,
+                            i,
+                            null,
+                            true);
+                }
+
+                @Override
+                public void keyedValue(String nodeName, Object key, Object keyedValue) {
+                    if (keyedValue != null && context.validatedObjects.contains(keyedValue)) {
+                        return;
+                    }
+                    cascadeToIterableValue(
+                            context,
+                            rootBeanClass,
+                            rootBean,
+                            object,
+                            null,
+                            cascadeProperty,
+                            keyedValue,
+                            overallViolations,
+                            null,
+                            key,
+                            false
+                    );
+                }
+            }));
+
+            if (!opt.isPresent() && !context.validatedObjects.contains(propertyValue)) {
+                try {
+                    // maybe a bean
+                    final Path.Node node = context.addReturnValueNode(cascadeProperty.getName());
+                    final boolean canCascade = canCascade(rootBeanClass, context, propertyValue, node);
+                    if (canCascade) {
+                        cascadeToOne(
+                                rootBeanClass,
+                                rootBean,
+                                object,
+                                context,
+                                overallViolations,
+                                cascadeProperty,
+                                cascadeProperty.getType(),
+                                propertyValue,
+                                null);
+                    }
+                } finally {
+                    context.removeLast();
+                }
+            }
+        }
     }
 
     @Nonnull
@@ -1528,6 +1643,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             return node;
         }
 
+        Path.Node addReturnValueNode(String name) {
+            final DefaultReturnValueNode returnValueNode;
+            returnValueNode = new DefaultReturnValueNode(name);
+            currentPath.nodes.add(returnValueNode);
+            return returnValueNode;
+        }
+
         void removeLast() {
             currentPath.nodes.removeLast();
         }
@@ -1703,6 +1825,62 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @Override
         public int getParameterIndex() {
             return parameterIndex;
+        }
+    }
+
+    /**
+     * Default Return value node implementation.
+     */
+    private class DefaultReturnValueNode implements Path.ReturnValueNode {
+        private final String name;
+        private final Integer index;
+        private final Object key;
+        private final ElementKind kind;
+        private final boolean isInIterable;
+
+        public DefaultReturnValueNode(String name,
+                                      Integer index,
+                                      Object key,
+                                      ElementKind kind,
+                                      boolean isInIterable) {
+            this.name = name;
+            this.index = index;
+            this.key = key;
+            this.kind = kind;
+            this.isInIterable = isInIterable;
+        }
+
+        public DefaultReturnValueNode(String name) {
+            this(name, null, null, ElementKind.RETURN_VALUE, false);
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Integer getIndex() {
+            return index;
+        }
+
+        @Override
+        public Object getKey() {
+            return key;
+        }
+
+        @Override
+        public ElementKind getKind() {
+            return kind;
+        }
+
+        public boolean isInIterable() {
+            return isInIterable;
+        }
+
+        @Override
+        public <T extends Path.Node> T as(Class<T> nodeType) {
+            throw new UnsupportedOperationException("Unwrapping is unsupported by this implementation");
         }
     }
 
