@@ -11,7 +11,7 @@ $ mn create-app hello-world
 
 TIP: You can supply `--build maven` if you wish to create a Maven based build instead
 
-The previous command will create a new Java application in a directory called `hello-world` featuring a Gradle a build. The application can be run with `./gradlew run`:
+The previous command will create a new Java application in a directory called `hello-world` featuring a Gradle build. The application can be run with `./gradlew run`:
 
 [source,bash]
 ----
