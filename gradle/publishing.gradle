@@ -108,7 +108,7 @@ publishing {
 
                         xml.children().last() + pomInfo
                     }
-                } else if (project.shadowJarEnabled == true) {
+                } else if (project.shadowJarEnabled == true && false) {
                     def shadowJar = tasks.findByName("shadowJar")
                     artifact(project.tasks.shadowJar) {
                         classifier = null
