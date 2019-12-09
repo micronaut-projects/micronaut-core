@@ -32,7 +32,6 @@ apply plugin: 'org.aim42.htmlSanityCheck'
 
 repositories {
     maven { url "https://repo.grails.org/grails/core" }
-    //maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
 }
 
 version project.projectVersion
@@ -589,25 +588,18 @@ subprojects { Project subproject ->
     ext {
         userOrg = "grails"
         isGrailsPlugin = false
-        isConfiguration = subproject.projectDir.parentFile.name == 'configurations'
         isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
         shadowJarEnabled = false
     }
 
-    if (subproject.name == "configurations" || subproject.name.contains("bom")) {
+    if (subproject.name.contains("bom")) {
         return
     }
 
-    if (isConfiguration) {
-        group "io.micronaut.configuration"
-    } else {
-        group projectGroupId
-    }
-
+    group projectGroupId
 
     repositories {
         maven { url "https://repo.grails.org/grails/core" }
-        maven { url "https://oss.jfrog.org/artifactory/oss-snapshot-local/" }
     }
 
     if (subproject.name.startsWith("examples") || subproject.name.contains("bom")) {
@@ -699,7 +691,7 @@ subprojects { Project subproject ->
         configurations = [project.configurations.shadowCompile]
         relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
         relocate "org.objectweb.asm", "io.micronaut.asm"
-        
+
         classifier = null
     }
 
