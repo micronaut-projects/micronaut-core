@@ -155,6 +155,7 @@ abstract class AbstractProfile implements Profile {
             for (fn in featureList) {
                 def featureData = profileDir.createRelative("features/${fn}/feature.yml")
                 if (featureData.exists()) {
+                    //must come after setting mainClassName as it can override
                     def f = new DefaultFeature(this, fn.toString(), profileDir.createRelative("features/$fn/"))
                     features.add f
                 }

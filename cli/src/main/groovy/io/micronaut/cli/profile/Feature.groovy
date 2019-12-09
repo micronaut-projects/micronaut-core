@@ -38,11 +38,6 @@ interface Feature {
     String getName()
 
     /**
-     * @return The mainClassName of the feature
-     */
-    String getMainClassName()
-
-    /**
      * @return The description of the profile
      */
     String getDescription()

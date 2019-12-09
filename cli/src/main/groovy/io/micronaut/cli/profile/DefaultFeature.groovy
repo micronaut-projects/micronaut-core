@@ -39,7 +39,6 @@ import org.yaml.snakeyaml.Yaml
 class DefaultFeature implements Feature {
     final Profile profile
     final String name
-    final String mainClassName
     final Resource location
     final NavigableMap configuration = new NavigableMap()
     final List<Dependency> dependencies = []
@@ -107,12 +106,10 @@ class DefaultFeature implements Feature {
         this.minJava = (Integer) configuration.get("java.min") ?: null
         this.maxJava = (Integer) configuration.get("java.max") ?: null
 
-        this.mainClassName = (String) configuration.get("mainClassName") ?: null
-    }
-
-    @Override
-    String getMainClassName() {
-        mainClassName
+        String mainClassName = (String) configuration.get("mainClassName") ?: null
+        if (mainClassName != null) {
+            profile.setMainClassName(mainClassName)
+        }
     }
 
     @Override

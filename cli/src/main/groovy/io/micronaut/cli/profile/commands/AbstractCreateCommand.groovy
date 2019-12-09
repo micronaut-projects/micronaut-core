@@ -331,9 +331,6 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             AntBuilder ant = new ConsoleAntBuilder()
 
             for (Feature f in features) {
-                if (f.mainClassName) {
-                    profileInstance.mainClassName = f.mainClassName
-                }
                 def location = f.location
 
                 File skeletonDir
