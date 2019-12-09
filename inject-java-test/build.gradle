@@ -1,6 +1,6 @@
 dependencies {
     compile project(":inject-java")
-    compile "com.google.testing.compile:compile-testing:0.12"
+    compile "com.google.testing.compile:compile-testing:0.18"
     compile dependencyVersion("groovy")
     compile(dependencyVersion("spock")) {
         exclude module:'groovy-all'
