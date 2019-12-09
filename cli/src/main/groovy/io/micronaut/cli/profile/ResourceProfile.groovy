@@ -41,6 +41,11 @@ class ResourceProfile extends AbstractProfile implements Profile {
         super.name
     }
 
+    @Override
+    void setMainClassName(String mainClassName) {
+        super.mainClassName = mainClassName
+    }
+
     public static Profile create(ProfileRepository repository, String name, Resource profileDir) {
         Profile profile = new ResourceProfile(repository, name, profileDir)
         return profile
