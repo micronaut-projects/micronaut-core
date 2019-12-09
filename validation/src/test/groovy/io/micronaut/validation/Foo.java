@@ -16,10 +16,14 @@
 package io.micronaut.validation;
 
 import groovy.lang.Singleton;
+import io.micronaut.core.annotation.Introspected;
 
 import javax.validation.Valid;
 import javax.validation.constraints.Digits;
 import javax.validation.constraints.NotNull;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @author Graeme Rocher
@@ -33,9 +37,44 @@ public class Foo {
         return '$' + number;
     }
 
-    @Valid
     @NotNull
     public String notNull() {
         return null;
+    }
+
+    @NotNull
+    public Bar notNullBar() {
+        return null;
+    }
+
+    @Valid
+    public Bar cascadeValidateReturnValue() {
+        return new Bar();
+    }
+
+    @Valid
+    public List<Bar> validateReturnList() {
+        return Collections.singletonList(new Bar());
+    }
+
+    @Valid
+    public Map<String, Bar> validateMap() {
+        return Collections.singletonMap("barObj", new Bar());
+    }
+}
+
+@Introspected
+class Bar {
+
+    @NotNull
+    private String prop;
+
+    @NotNull
+    public String getProp() {
+        return prop;
+    }
+
+    public void setProp(@NotNull String prop) {
+        this.prop = prop;
     }
 }

@@ -87,9 +87,61 @@ class ValidatedSpec extends Specification {
         foo.notNull()
 
         then:
-        thrown(ConstraintViolationException)
+        def e = thrown(ConstraintViolationException)
+        e.message == "string: must not be null"
     }
 
+    def "test validated return value without cascade"() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run()
+        Foo foo = beanContext.getBean(Foo)
+
+        when:
+        foo.notNullBar()
+
+        then:
+        def e = thrown(ConstraintViolationException)
+        e.message == "bar: must not be null"
+    }
+
+    def "test validate return value with cascading"() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run()
+        Foo foo = beanContext.getBean(Foo)
+
+        when:
+        foo.cascadeValidateReturnValue()
+
+        then:
+        def e = thrown(ConstraintViolationException)
+        e.message == "bar.prop: must not be null"
+    }
+
+    def "test validate list return value with cascading"() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run()
+        Foo foo = beanContext.getBean(Foo)
+
+        when:
+        foo.validateReturnList()
+
+        then:
+        def e = thrown(ConstraintViolationException)
+        e.message == "list[0].prop: must not be null"
+    }
+
+    def "test validate map return value with cascading"() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run()
+        Foo foo = beanContext.getBean(Foo)
+
+        when:
+        foo.validateMap()
+
+        then:
+        def e = thrown(ConstraintViolationException)
+        e.message == "map[barObj].prop: must not be null"
+    }
 
     def "test validated controller validates @Valid classes"() {
         given:
