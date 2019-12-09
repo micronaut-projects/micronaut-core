@@ -53,7 +53,7 @@ import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.context.ContextPathProvider;
+import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
@@ -679,8 +679,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>) configurationClass.orElse(HttpClientConfiguration.class);
             configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
 
-            if (contextPath == null && configuration instanceof ContextPathProvider) {
-                contextPath = ((ContextPathProvider) configuration).getContextPath().orElse(null);
+            if (contextPath == null && configuration instanceof ClientContextPathProvider) {
+                contextPath = ((ClientContextPathProvider) configuration).getContextPath().orElse(null);
             }
 
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath);
