@@ -11,6 +11,7 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.reactivex.Flowable
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.CompletableFuture
 
 class ByteBufferSpec extends AbstractMicronautSpec {
 
@@ -24,6 +25,17 @@ class ByteBufferSpec extends AbstractMicronautSpec {
         response == "hello"
     }
 
+    void "test reading a long body with a completable of bytebuffers"() {
+        when:
+        String body = "hello" * 1000
+        String response = rxClient.retrieve(
+                HttpRequest.POST("/buffer-completable", body)
+                        .contentType(MediaType.TEXT_PLAIN), String).blockingFirst()
+
+        then:
+        response == body
+    }
+
     @Requires(property = "spec.name", value = "ByteBufferSpec")
     @Controller
     static class ByteBufferController {
@@ -31,6 +43,11 @@ class ByteBufferSpec extends AbstractMicronautSpec {
         @Post(uri = "/buffer-test", processes = MediaType.TEXT_PLAIN)
         Flowable<String> buffer(@Body Flowable<ByteBuffer> body) {
             return body.map({ buffer -> buffer.toString(StandardCharsets.UTF_8) })
+        }
+
+        @Post(uri = "/buffer-completable", processes = MediaType.TEXT_PLAIN)
+        CompletableFuture<String> buffer(@Body CompletableFuture<ByteBuffer> body) {
+            return body.thenApply({ buffer -> buffer.toString(StandardCharsets.UTF_8) })
         }
     }
 

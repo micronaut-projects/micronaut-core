@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.AnnotatedNode;
+import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 /**
@@ -39,6 +40,7 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
      * Default constructor.
      *
      * @param sourceUnit The source unit
+     * @param compilationUnit    The compilation unit
      * @param declaringElement The declaring element
      * @param annotatedNode    The annotated node
      * @param annotationMetadata the annotation metadata
@@ -48,13 +50,14 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
      */
     GroovyPropertyElement(
             SourceUnit sourceUnit,
+            CompilationUnit compilationUnit,
             GroovyClassElement declaringElement,
             AnnotatedNode annotatedNode,
             AnnotationMetadata annotationMetadata,
             String name,
             boolean readOnly,
             Object nativeType) {
-        super(sourceUnit, annotatedNode, annotationMetadata);
+        super(sourceUnit, compilationUnit, annotatedNode, annotationMetadata);
         this.name = name;
         this.readOnly = readOnly;
         this.nativeType = nativeType;

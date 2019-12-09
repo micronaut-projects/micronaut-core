@@ -1,5 +1,6 @@
 ext {
-    snakeYamlVersion = '1.19'
+    snakeYamlVersion = '1.25'
+    bomExclude = true
 }
 
 dependencies {

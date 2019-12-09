@@ -17,11 +17,18 @@ package io.micronaut.tracing.instrument.util;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 import javax.inject.Singleton;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.event.BeanCreatedEvent;
+import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
+import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
 import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
 import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 import org.slf4j.MDC;
@@ -36,7 +43,7 @@ import org.slf4j.MDC;
 @Singleton
 @Requires(classes = MDC.class)
 @Internal
-public final class MdcInstrumenter implements Function<Runnable, Runnable>, RunnableInstrumenter, ReactiveInstrumenter {
+public final class MdcInstrumenter implements Function<Runnable, Runnable>, RunnableInstrumenter, ReactiveInstrumenter, BeanCreatedEventListener<ExecutorService> {
 
     @Override
     public Runnable apply(Runnable runnable) {
@@ -45,6 +52,22 @@ public final class MdcInstrumenter implements Function<Runnable, Runnable>, Runn
             return passMdcTo(runnable, contextMap);
         } else {
             return runnable;
+        }
+    }
+
+    private <T> Callable<T> apply(Callable<T> callable) {
+        final Map<String, String> copyOfContextMap = MDC.getCopyOfContextMap();
+        if (copyOfContextMap != null && !copyOfContextMap.isEmpty()) {
+            return () -> {
+                try {
+                    MDC.setContextMap(copyOfContextMap);
+                    return callable.call();
+                } finally {
+                    MDC.clear();
+                }
+            };
+        } else {
+            return callable;
         }
     }
 
@@ -82,5 +105,45 @@ public final class MdcInstrumenter implements Function<Runnable, Runnable>, Runn
                 }
             }
         };
+    }
+
+    @Override
+    public ExecutorService onCreated(BeanCreatedEvent<ExecutorService> event) {
+        ExecutorService executorService = event.getBean();
+        if (executorService instanceof ScheduledExecutorService) {
+            return new InstrumentedScheduledExecutorService() {
+                @Override
+                public ScheduledExecutorService getTarget() {
+                    return (ScheduledExecutorService) executorService;
+                }
+
+                @Override
+                public <T> Callable<T> instrument(Callable<T> task) {
+                    return apply(task);
+                }
+
+                @Override
+                public Runnable instrument(Runnable command) {
+                    return apply(command);
+                }
+            };
+        } else {
+            return new InstrumentedExecutorService() {
+                @Override
+                public ExecutorService getTarget() {
+                    return executorService;
+                }
+
+                @Override
+                public <T> Callable<T> instrument(Callable<T> task) {
+                    return apply(task);
+                }
+
+                @Override
+                public Runnable instrument(Runnable command) {
+                    return apply(command);
+                }
+            };
+        }
     }
 }

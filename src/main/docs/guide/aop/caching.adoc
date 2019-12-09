@@ -30,7 +30,7 @@ By default https://github.com/ben-manes/caffeine[Caffeine] is used for cache def
 micronaut:
     caches:
         my-cache:
-            maximumSize: 20
+            maximum-size: 20
 ----
 
 The above example will configure a cache called "my-cache" with a maximum size of 20.

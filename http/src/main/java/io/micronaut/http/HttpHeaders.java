@@ -15,6 +15,7 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Headers;
 
@@ -470,7 +471,7 @@ public interface HttpHeaders extends Headers {
      * @return An {@link Optional} of {@link Integer}
      */
     default Optional<Integer> findInt(CharSequence name) {
-        return get(name, Integer.class);
+        return get(name, ConversionContext.INT);
     }
 
     /**
@@ -480,7 +481,7 @@ public interface HttpHeaders extends Headers {
      * @return The first value or null if it is present
      */
     default Optional<String> findFirst(CharSequence name) {
-        return getFirst(name, String.class);
+        return getFirst(name, ConversionContext.STRING);
     }
 
     /**
@@ -489,7 +490,7 @@ public interface HttpHeaders extends Headers {
      * @return The content type
      */
     default Optional<MediaType> contentType() {
-        return getFirst(HttpHeaders.CONTENT_TYPE, MediaType.class);
+        return getFirst(HttpHeaders.CONTENT_TYPE, MediaType.CONVERSION_CONTEXT);
     }
 
     /**
@@ -498,7 +499,7 @@ public interface HttpHeaders extends Headers {
      * @return The content type
      */
     default OptionalLong contentLength() {
-        Optional<Long> optional = getFirst(HttpHeaders.CONTENT_LENGTH, Long.class);
+        Optional<Long> optional = getFirst(HttpHeaders.CONTENT_LENGTH, ConversionContext.LONG);
         return optional.map(OptionalLong::of).orElseGet(OptionalLong::empty);
     }
 
@@ -511,7 +512,7 @@ public interface HttpHeaders extends Headers {
         return getAll(HttpHeaders.ACCEPT)
             .stream()
             .flatMap(x -> Arrays.stream(x.split(",")))
-            .flatMap(s -> ConversionService.SHARED.convert(s, MediaType.class).map(Stream::of).orElse(Stream.empty()))
+            .flatMap(s -> ConversionService.SHARED.convert(s, MediaType.CONVERSION_CONTEXT).map(Stream::of).orElse(Stream.empty()))
             .distinct()
             .collect(Collectors.toList());
     }
@@ -520,7 +521,7 @@ public interface HttpHeaders extends Headers {
      * @return Whether the {@link HttpHeaders#CONNECTION} header is set to Keep-Alive
      */
     default boolean isKeepAlive() {
-        return getFirst(CONNECTION, String.class).map(val -> val.equalsIgnoreCase("keep-alive")).orElse(false);
+        return getFirst(CONNECTION, ConversionContext.STRING).map(val -> val.equalsIgnoreCase("keep-alive")).orElse(false);
     }
 
     /**

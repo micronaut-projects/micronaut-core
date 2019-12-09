@@ -16,7 +16,6 @@
 
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -26,7 +25,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.reactivex.Maybe;
 import io.reactivex.Single;
 import org.reactivestreams.Publisher;
@@ -51,13 +50,13 @@ public class MaybeBodyBinder extends DefaultBodyAnnotationBinder<Maybe> implemen
     private PublisherBodyBinder publisherBodyBinder;
 
     /**
-     * @param conversionService       The conversion service
-     * @param beanLocator             The bean locator
-     * @param httpServerConfiguration The Http server configuration
+     * @param conversionService            The conversion service
+     * @param httpContentProcessorResolver The http content processor resolver
      */
-    public MaybeBodyBinder(ConversionService conversionService, BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration) {
+    public MaybeBodyBinder(ConversionService conversionService,
+                           HttpContentProcessorResolver httpContentProcessorResolver) {
         super(conversionService);
-        this.publisherBodyBinder = new PublisherBodyBinder(conversionService, beanLocator, httpServerConfiguration);
+        this.publisherBodyBinder = new PublisherBodyBinder(conversionService, httpContentProcessorResolver);
     }
 
     @Override

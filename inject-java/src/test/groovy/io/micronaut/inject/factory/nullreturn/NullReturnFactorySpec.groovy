@@ -8,9 +8,52 @@ import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 
 class NullReturnFactorySpec extends AbstractTypeElementSpec {
+
+    void "test parse factory"() {
+        given:
+        def definition = buildBeanDefinition('test.Test2Processor', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+@EachBean(Test2.class)
+class Test2Processor {
+
+    static AtomicInteger constructed = new AtomicInteger();
+
+    private final Test2 d;
+
+    Test2Processor(Test2 d) {
+        this.d = d;
+        constructed.incrementAndGet();
+    }
+}
+
+@Factory
+class TestFactory {
+    @EachBean(Test1.class)
+    Test2 getD(Test1 c) {
+        if (c.name.equals("two")) {
+            return null;
+        } else {
+            return new Test2();
+        }
+    }
+}
+class Test1 {
+    String name;
+}
+class Test2 {}
+''')
+        expect:
+        definition != null
+    }
 
     void "test factory that returns null"() {
         given:

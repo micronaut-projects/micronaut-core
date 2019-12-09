@@ -48,9 +48,7 @@ public class StaticResourceResolver {
      */
     StaticResourceResolver(List<StaticResourceConfiguration> configurations) {
         this.pathMatcher = PathMatcher.ANT;
-
         if (CollectionUtils.isNotEmpty(configurations)) {
-
             for (StaticResourceConfiguration config: configurations) {
                 if (config.isEnabled()) {
                     this.resourceMappings.put(config.getMapping(), config.getResourceLoaders());

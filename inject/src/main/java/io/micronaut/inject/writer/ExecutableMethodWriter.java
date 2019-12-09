@@ -22,7 +22,6 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
-import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
@@ -70,7 +69,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final boolean isAbstract;
     private String outerClassName = null;
     private boolean isStatic = false;
-    private final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
 
     /**
      * @param beanFullClassName    The bean full class name
@@ -334,10 +332,6 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
-        if (annotationMetadataWriter != null) {
-            annotationMetadataWriter.accept(classWriterOutputVisitor);
-        }
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className)) {
             outputStream.write(classWriter.toByteArray());
         }

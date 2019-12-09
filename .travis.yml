@@ -35,7 +35,7 @@ cache:
 after_failure:
   - cat hs_err_pid*.log
 after_deploy:
-- "./gradlew sdkMajorRelease"
+- "./gradlew sdkMinorRelease"
 deploy:
   provider: releases
   api_key:

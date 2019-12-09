@@ -16,11 +16,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.annotation.*;
-import io.micronaut.core.annotation.AnnotationClassValue;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -165,7 +161,7 @@ class AnnotationMetadataSupport {
      */
     static void registerDefaultValues(String annotation, Map<String, Object> defaultValues) {
         if (StringUtils.isNotEmpty(annotation)) {
-            ANNOTATION_DEFAULTS.put(annotation, defaultValues);
+            ANNOTATION_DEFAULTS.putIfAbsent(annotation, defaultValues);
         }
     }
 
@@ -214,27 +210,21 @@ class AnnotationMetadataSupport {
 
     /**
      * @param annotationClass  The annotation class
-     * @param annotationValues The annotation values
+     * @param annotationValue The annotation value
      * @param <T>              The type
      * @return The annotation
      */
-    static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, ConvertibleValues<Object> annotationValues) {
+    static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
         Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
         if (proxyClass.isPresent()) {
-            Method[] declaredMethods = annotationClass.getDeclaredMethods();
-            Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>(declaredMethods.length);
-            for (Method declaredMethod : declaredMethods) {
-                String name = declaredMethod.getName();
-                if (annotationValues.contains(name)) {
-                    Optional<?> converted = annotationValues.get(name, declaredMethod.getReturnType());
-                    converted.ifPresent(o -> resolvedValues.put(name, o));
-                }
-            }
             Map<String, Object> values = new HashMap<>(getDefaultValues(annotationClass));
-            values.putAll(annotationValues.asMap());
+            if (annotationValue != null) {
+                final Map<CharSequence, Object> annotationValues = annotationValue.getValues();
+                annotationValues.forEach((key, o) -> values.put(key.toString(), o));
+            }
             int hashCode = AnnotationUtil.calculateHashCode(values);
 
-            Optional instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), (InvocationHandler) new AnnotationProxyHandler(hashCode, annotationClass, resolvedValues));
+            Optional instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), (InvocationHandler) new AnnotationProxyHandler(hashCode, annotationClass, annotationValue));
             if (instantiated.isPresent()) {
                 return (T) instantiated.get();
             }
@@ -248,17 +238,12 @@ class AnnotationMetadataSupport {
     private static class AnnotationProxyHandler implements InvocationHandler {
         private final int hashCode;
         private final Class<?> annotationClass;
+        private final AnnotationValue<?> annotationValue;
 
-        private final Map<CharSequence, Object> resolvedValues;
-
-        AnnotationProxyHandler(int hashCode, Class<?> annotationClass, Map<CharSequence, Object> resolvedValues) {
+        AnnotationProxyHandler(int hashCode, Class<?> annotationClass, @Nullable AnnotationValue<?> annotationValue) {
             this.hashCode = hashCode;
             this.annotationClass = annotationClass;
-            this.resolvedValues = resolvedValues;
-        }
-
-        public Map<CharSequence, Object> getValues() {
-            return resolvedValues;
+            this.annotationValue = annotationValue;
         }
 
         @Override
@@ -280,30 +265,22 @@ class AnnotationMetadataSupport {
 
             Annotation other = (Annotation) annotationClass.cast(obj);
 
-            Map<CharSequence, Object> otherValues = getAnnotationValues(other);
+            final AnnotationValue<?> otherValues = getAnnotationValues(other);
 
-            if (resolvedValues.size() != otherValues.size()) {
+            if (this.annotationValue == null && otherValues == null) {
+                return true;
+            } else if (this.annotationValue == null || otherValues == null) {
                 return false;
+            } else {
+                return annotationValue.equals(otherValues);
             }
-
-            // compare annotation member values
-            for (Map.Entry<CharSequence, Object> member : resolvedValues.entrySet()) {
-                Object value = member.getValue();
-                Object otherValue = otherValues.get(member.getKey());
-
-                if (!AnnotationUtil.areEqual(value, otherValue)) {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
-        private Map<CharSequence, Object> getAnnotationValues(Annotation other) {
+        private AnnotationValue<?> getAnnotationValues(Annotation other) {
             if (other instanceof AnnotationProxyHandler) {
-                return ((AnnotationProxyHandler) other).resolvedValues;
+                return ((AnnotationProxyHandler) other).annotationValue;
             }
-            return Collections.emptyMap();
+            return null;
         }
 
         @Override
@@ -315,8 +292,8 @@ class AnnotationMetadataSupport {
                 return equals(args[0]);
             } else if ("annotationType".equals(name)) {
                 return annotationClass;
-            } else if (resolvedValues.containsKey(name)) {
-                return resolvedValues.get(name);
+            } else if (annotationValue != null && annotationValue.contains(name)) {
+                return annotationValue.getRequiredValue(name, method.getReturnType());
             }
             return method.getDefaultValue();
         }

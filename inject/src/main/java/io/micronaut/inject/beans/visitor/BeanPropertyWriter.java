@@ -69,6 +69,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private final MethodElement writeMethod;
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
     private final TypedElement typeElement;
+    private final ClassElement declaringElement;
 
     /**
      * Default constructor.
@@ -96,6 +97,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             @Nullable Map<String, ClassElement> typeArguments) {
 
         Type introspectionType = introspectionWriter.getIntrospectionType();
+        this.declaringElement = introspectionWriter.getClassElement();
         this.typeElement = typeElement;
         this.beanType = introspectionWriter.getBeanType();
         this.propertyType = propertyType;
@@ -148,13 +150,6 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             // the write method
             writeWriteMethod();
 
-            if (annotationMetadata != null && annotationMetadata instanceof DefaultAnnotationMetadata) {
-                final DefaultAnnotationMetadata annotationMetadata = (DefaultAnnotationMetadata) this.annotationMetadata;
-                if (!annotationMetadata.isEmpty()) {
-                    AnnotationMetadataWriter.writeAnnotationDefaults(annotationMetadata, classWriter, type, loadTypeMethods);
-                }
-            }
-
             if (readOnly) {
                 // override isReadOnly method
                 final GeneratorAdapter isReadOnly = startPublicMethodZeroArgs(classWriter, boolean.class, "isReadOnly");
@@ -196,7 +191,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         final boolean hasWriteMethod = this.writeMethod != null;
         final String methodName = hasWriteMethod ? this.writeMethod.getName() : NameUtils.setterNameFor(propertyName);
         final Object returnType = hasWriteMethod ? getTypeForElement(this.writeMethod.getReturnType()) : void.class;
-        if (hasWriteMethod && this.writeMethod.getDeclaringType().isInterface()) {
+        if (declaringElement.isInterface()) {
             writeMethod.invokeInterface(
                     beanType,
                     new Method(methodName,
@@ -226,7 +221,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         pushCastToType(readMethod, beanType.getClassName());
         final boolean isBoolean = propertyType.getClassName().equals("boolean");
         final String methodName = this.readMethod != null ? this.readMethod.getName() : NameUtils.getterNameFor(propertyName, isBoolean);
-        if (this.readMethod != null && this.readMethod.getDeclaringType().isInterface()) {
+        if (declaringElement.isInterface()) {
             readMethod.invokeInterface(beanType, new Method(methodName, getMethodDescriptor(propertyType, Collections.emptyList())));
         } else {
             readMethod.invokeVirtual(beanType, new Method(methodName, getMethodDescriptor(propertyType, Collections.emptyList())));

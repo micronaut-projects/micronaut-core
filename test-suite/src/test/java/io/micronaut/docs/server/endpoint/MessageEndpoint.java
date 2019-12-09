@@ -41,7 +41,7 @@ public class MessageEndpoint {
 
     //tag::writeArg[]
     @Write(consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
-    public String updateMessage(String newMessage) {  //<1>
+    public String updateMessage(String newMessage) {
         this.message = newMessage;
 
         return "Message updated";

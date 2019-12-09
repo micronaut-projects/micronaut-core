@@ -31,6 +31,7 @@ import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.ast.Variable
+import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
 import javax.annotation.Nullable
@@ -52,8 +53,10 @@ class LoadedVisitor implements Ordered {
     private final String classAnnotation
     private final String elementAnnotation
     private GroovyClassElement currentClassElement
+    private final CompilationUnit compilationUnit
 
-    LoadedVisitor( SourceUnit source, TypeElementVisitor visitor) {
+    LoadedVisitor(SourceUnit source, CompilationUnit compilationUnit, TypeElementVisitor visitor) {
+        this.compilationUnit = compilationUnit
         this.sourceUnit = source
         this.visitor = visitor
         ClassNode classNode = ClassHelper.make(visitor.getClass())
@@ -106,7 +109,7 @@ class LoadedVisitor implements Ordered {
         if (classAnnotation == ClassHelper.OBJECT) {
             return true
         }
-        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, classNode)
+        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)
         return annotationMetadata.hasStereotype(classAnnotation)
     }
 
@@ -132,27 +135,27 @@ class LoadedVisitor implements Ordered {
         switch (annotatedNode.getClass()) {
             case FieldNode:
             case PropertyNode:
-                def e = new GroovyFieldElement(sourceUnit, (Variable) annotatedNode,  annotatedNode, annotationMetadata)
+                def e = new GroovyFieldElement(sourceUnit, compilationUnit, (Variable) annotatedNode,  annotatedNode, annotationMetadata)
                 visitor.visitField(e, visitorContext)
                 return e
             case ConstructorNode:
-                def e = new GroovyConstructorElement(currentClassElement, sourceUnit, (ConstructorNode) annotatedNode, annotationMetadata)
+                def e = new GroovyConstructorElement(currentClassElement, sourceUnit, compilationUnit, (ConstructorNode) annotatedNode, annotationMetadata)
                 visitor.visitConstructor(e, visitorContext)
                 return e
             case MethodNode:
                 if (currentClassElement != null) {
-                    def e = new GroovyMethodElement(currentClassElement, sourceUnit, (MethodNode) annotatedNode, annotationMetadata)
+                    def e = new GroovyMethodElement(currentClassElement, sourceUnit, compilationUnit, (MethodNode) annotatedNode, annotationMetadata)
                     visitor.visitMethod(e, visitorContext)
                     return e
                 }
             case ClassNode:
                 ClassNode cn = (ClassNode) annotatedNode
                 if (cn.isEnum()) {
-                    currentClassElement = new GroovyEnumElement(sourceUnit, cn, annotationMetadata)
+                    currentClassElement = new GroovyEnumElement(sourceUnit, compilationUnit, cn, annotationMetadata)
                     visitor.visitClass(currentClassElement, visitorContext)
                     return currentClassElement
                 } else {
-                    currentClassElement = new GroovyClassElement(sourceUnit, cn, annotationMetadata)
+                    currentClassElement = new GroovyClassElement(sourceUnit, compilationUnit, cn, annotationMetadata)
                     visitor.visitClass(currentClassElement, visitorContext)
                     return currentClassElement
                 }

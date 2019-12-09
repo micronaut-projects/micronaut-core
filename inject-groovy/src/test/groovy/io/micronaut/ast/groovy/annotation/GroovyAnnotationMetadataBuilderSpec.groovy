@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.annotation
 
+import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationValue
@@ -41,7 +42,7 @@ import javax.inject.Singleton
  * @author Graeme Rocher
  * @since 1.0
  */
-class GroovyAnnotationMetadataBuilderSpec extends Specification {
+class GroovyAnnotationMetadataBuilderSpec extends AbstractBeanDefinitionSpec {
 
     void "test multiple alias definitions with value"() {
         given:
@@ -485,22 +486,22 @@ interface ITest {
         !metadata.hasStereotype(Singleton)
     }
 
-    private AnnotationMetadata buildTypeAnnotationMetadata(String cls, String source) {
-        ASTNode[] nodes = new AstBuilder().buildFromString(source)
+    void "test array annotation value"() {
+        given:
+        AnnotationMetadata metadata = buildMethodAnnotationMetadata('test.Test', '''\
+package test;
 
-        ClassNode element = nodes ? nodes.find { it instanceof ClassNode && it.name == cls } : null
-        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
-        AnnotationMetadata metadata = element != null ? builder.build(element) : null
-        return metadata
-    }
+import io.micronaut.inject.annotation.*;
+import io.micronaut.ast.groovy.annotation.*;
+class Test {
+    @Parent(child = @Child())
+    void testMethod() {}
+}
+''', 'testMethod')
 
-    private AnnotationMetadata buildMethodAnnotationMetadata(String cls, String source, String methodName) {
-        ASTNode[] nodes = new AstBuilder().buildFromString(source)
-
-        ClassNode element = nodes ? nodes.find { it instanceof ClassNode &&  it.name == cls } : null
-        MethodNode method = element.getMethods(methodName)[0]
-        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
-        AnnotationMetadata metadata = method != null ? builder.build(method) : null
-        return metadata
+        expect:
+        metadata != null
+        metadata.hasDeclaredAnnotation(Parent)
+        metadata.getValue(Parent, "child").get().getClass().isArray()
     }
 }

@@ -1,16 +1,79 @@
 Micronaut {version} includes the following changes:
 
+=== Micronaut Data Integration
+
+Micronaut Data has been added to the `micronaut-bom` and you can now use the CLI to create Micronaut Data projects:
+
+.Setting up Micronaut Data JPA
+[source,bash]
+----
+# add --build maven for maven
+$ mn create-app myapp --features data-hibernate-jpa
+----
+
+.Setting up Micronaut Data JDBC
+[source,bash]
+----
+# add --build maven for maven
+$ mn create-app myapp --features data-jdbc
+----
+
 === Immutable `@ConfigurationProperties` and `@EachProperty`
 
 Support for immutable ann:context.annotation.ConfigurationProperties[] has been added by annotating the constructor of any configuration class with ann:context.annotation.ConfigurationInject[]. See the docummentation on <<immutableConfig, Immutable Configuration>> for more information.
+
+snippet::io.micronaut.docs.config.itfce.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
+
+=== New Micronaut Cache Modules
+
+https://micronaut-projects.github.io/micronaut-cache/1.0.x/guide/#introduction[Micronaut Cache] has been updated to support https://micronaut-projects.github.io/micronaut-cache/1.0.x/guide/#hazelcast[Hazelcast] and https://micronaut-projects.github.io/micronaut-cache/1.0.x/guide/#ehcache[Ehcache] as additional Cache providers.
+
+=== Micronaut OpenAPI (Swagger) 1.3 Update
+
+Micronaut OpenAPI has been updated with loads of improvements including the ability to https://micronaut-projects.github.io/micronaut-openapi/1.3.x/guide/index.html#openApiViews[automatically generate UIs for Swagger output] as part of your application. Thanks to https://github.com/croudet[croudet] for this contribution awesome contribution.
+
+The module is also no longer regarded as experimental.
+
+=== Micronaut Views 1.3 Update
+
+Micronaut Views has been updated to and now features a new https://micronaut-projects.github.io/micronaut-views/1.3.x/guide/#soy[view renderer for Soy (Closure Templates)]. Thanks to https://github.com/sgammon[Sam Gammon] for this contribution.
+
+=== Micronaut SQL 1.3 Update
+
+Micronaut SQL includes the latest versions of Hibernate and adds support for the Vert.x MySQL and Postgres Clients. Thank you to https://github.com/shenzhou-6[shenzhou-6] for this contribution.
+
+=== Micronaut Micrometer 1.3 Update
+
+Micronaut Micrometer has been updated to support Micrometer 1.3.1.
+
+=== Micronaut Kafka 1.3 Update
+
+Micronaut Kafka 1.3 has been updated to support Kafka 2.3.1
+
+=== Micronaut GRPC 1.1 Update
+
+Micronaut GRPC has been updated to the latest versions of GRPC and Protobuf.
 
 === @Requires OS
 
 The ann:context.annotation.Requires[] annotation now has support for disabling beans based on the current operating system.
 
+[source,java]
+----
+@Requires(os=Family.LINUX)
+----
+
 === Basic Auth binding support
 
 In the client and server, an argument of type api:http.BasicAuth[] can be used to generate or parse a basic authorization header.
+
+[source,java]
+----
+@Post("/login")
+String login(BasicAuth basicAuth) {
+    ...
+}
+----
 
 === Request Certificate
 
@@ -18,16 +81,19 @@ For SSL requests, the certificate is now available as a request attribute. See a
 
 === Dependency Upgrades
 
-Third Party Dependencies:
+Required Third Party Dependencies:
 
 * ASM `7.0` -> `7.2`
 * Caffeine `2.5.6` -> `2.8.0`
+* Jackson `2.9.9` -> `2.10.1`
+* Reactive Streams `1.0.2` -> `1.0.3`
+
+Optional Third Party Dependencies:
+
 * Micrometer `1.2.1` -> `1.3.1`
 * Mongo Reactive Driver `1.11.0` -> `1.12.0`
 * Neo4j Java Driver `1.7.2` -> `1.7.5`
-* Jackson `2.9.9` -> `2.10.1`
 * Jaeger `0.35.5` -> `1.0.0`
-* Reactive Streams `1.0.2` -> `1.0.3`
 * Spring `5.1.8` -> `5.2.1`
 * Zipkin/Brave `5.6.5` -> `5.9.0`
 

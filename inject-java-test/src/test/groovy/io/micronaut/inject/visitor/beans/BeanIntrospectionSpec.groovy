@@ -32,6 +32,31 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test bean introspection with property from default interface method"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Test implements Foo {
+
+}
+
+interface Foo {
+    default String getBar() {
+        return "good";
+    }
+}
+
+''')
+        when:
+        def test = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("bar", String)
+                     .get(test) == 'good'
+    }
+
     void "test generate bean introspection for @ConfigurationProperties interface"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
 package test;
@@ -864,7 +889,6 @@ class Test {}
         then:"The reference is valid"
         reference != null
         reference.getBeanType() == TestBean
-
 
         cleanup:
         context?.close()
