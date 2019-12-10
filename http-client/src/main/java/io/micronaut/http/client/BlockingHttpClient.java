@@ -51,6 +51,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param <O>      The response body type
      * @param <E>      The error type
      * @return The full {@link HttpResponse} object
+     * @throws HttpClientResponseException when an error status is returned
      */
     <I, O, E> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType);
 
@@ -70,6 +71,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param <I>      The request body type
      * @param <O>      The response body type
      * @return The full {@link HttpResponse} object
+     * @throws HttpClientResponseException when an error status is returned
      */
     default <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType) {
         return exchange(request, bodyType, HttpClient.DEFAULT_ERROR_TYPE);
@@ -83,6 +85,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param <I>     The request body type
      * @param <O>     The response body type
      * @return The full {@link HttpResponse} object
+     * @throws HttpClientResponseException when an error status is returned
      */
     default <I, O> HttpResponse<O> exchange(HttpRequest<I> request) {
         return exchange(request, (Argument<O>) null);
@@ -97,6 +100,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param <I>      The request body type
      * @param <O>      The response body type
      * @return The full {@link HttpResponse} object
+     * @throws HttpClientResponseException when an error status is returned
      */
     default <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Class<O> bodyType) {
         return exchange(request, Argument.of(bodyType));
@@ -111,7 +115,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param <I>      The request body type
      * @param <O>      The response body type
      * @return A result of the given type or null the URI returns a 404
-     * @throws HttpClientResponseException if an error status is returned
+     * @throws HttpClientResponseException when an error status is returned
      */
     @SuppressWarnings("unchecked")
     default <I, O> O retrieve(HttpRequest<I> request, Argument<O> bodyType) {
@@ -129,7 +133,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param <O>      The response body type
      * @param <E>      The error type
      * @return A result of the given type or null the URI returns a 404
-     * @throws HttpClientResponseException if an error status is returned
+     * @throws HttpClientResponseException when an error status is returned
      */
     @SuppressWarnings("unchecked")
     default <I, O, E> O retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
@@ -155,7 +159,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param <I>      The request body type
      * @param <O>      The response body type
      * @return A result of the given type or null the URI returns a 404
-     * @throws HttpClientResponseException if an error status is returned
+     * @throws HttpClientResponseException when an error status is returned
      */
     default <I, O> O retrieve(HttpRequest<I> request, Class<O> bodyType) {
         return retrieve(request, Argument.of(bodyType));
@@ -168,7 +172,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param request The {@link HttpRequest} to execute
      * @param <I>     The request body type
      * @return A string result or null if a 404 is returned
-     * @throws HttpClientResponseException if an error status is returned
+     * @throws HttpClientResponseException when an error status is returned
      */
     default <I> String retrieve(HttpRequest<I> request) {
         return retrieve(request, String.class);
@@ -180,7 +184,7 @@ public interface BlockingHttpClient extends Closeable {
      *
      * @param uri The URI
      * @return A string result or null if a 404 is returned
-     * @throws HttpClientResponseException if an error status is returned
+     * @throws HttpClientResponseException when an error status is returned
      */
     default String retrieve(String uri) {
         return retrieve(HttpRequest.GET(uri), String.class);
@@ -194,7 +198,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param bodyType The body type
      * @param <O> The body generic type
      * @return A result or null if a 404 is returned
-     * @throws HttpClientResponseException if an error status is returned
+     * @throws HttpClientResponseException when an error status is returned
      */
     default <O> O retrieve(String uri, Class<O> bodyType) {
         return retrieve(HttpRequest.GET(uri), bodyType);
@@ -210,6 +214,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param bodyType The body type
      * @param errorType The error type
      * @return The full {@link HttpResponse} object
+     * @throws HttpClientResponseException when an error status is returned
      */
     default <O, E> O retrieve(String uri, Class<O> bodyType, Class<E> errorType) {
         return retrieve(HttpRequest.GET(uri), Argument.of(bodyType), Argument.of(errorType));
@@ -222,6 +227,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param uri The URI of the GET request
      * @param <O> The response body type
      * @return The full {@link HttpResponse} object
+     * @throws HttpClientResponseException when an error status is returned
      */
     default <O> HttpResponse<O> exchange(String uri) {
         return exchange(HttpRequest.GET(uri), (Argument<O>) null);
@@ -235,6 +241,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param <O>      The response body type
      * @param bodyType The body type
      * @return The full {@link HttpResponse} object
+     * @throws HttpClientResponseException when an error status is returned
      */
     default <O> HttpResponse<O> exchange(String uri, Class<O> bodyType) {
         return exchange(HttpRequest.GET(uri), Argument.of(bodyType));
@@ -250,6 +257,7 @@ public interface BlockingHttpClient extends Closeable {
      * @param bodyType The body type
      * @param errorType The error type
      * @return The full {@link HttpResponse} object
+     * @throws HttpClientResponseException when an error status is returned
      */
     default <O, E> HttpResponse<O> exchange(String uri, Class<O> bodyType, Class<E> errorType) {
         return exchange(HttpRequest.GET(uri), Argument.of(bodyType), Argument.of(errorType));

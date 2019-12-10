@@ -1838,12 +1838,18 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
                             headers.remove(HttpHeaderNames.CONTENT_LENGTH);
                         }
-                        boolean errorStatus = statusCode >= 400;
+
+                        boolean convertBodyWithBodyType = statusCode < 400 ||
+                                (!DefaultHttpClient.this.configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType));
                         FullNettyClientHttpResponse<O> response
-                                = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, errorStatus);
+                                = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType);
 
                         if (complete.compareAndSet(false, true)) {
-                            if (errorStatus) {
+                            if (convertBodyWithBodyType) {
+                                emitter.onNext(response);
+                                response.onComplete();
+                                emitter.onComplete();
+                            } else { // error flow
                                 try {
                                     HttpClientResponseException clientError;
                                     if (errorType != HttpClient.DEFAULT_ERROR_TYPE) {
@@ -1884,7 +1890,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                                 mediaTypeCodecRegistry,
                                                 byteBufferFactory,
                                                 null,
-                                                true
+                                                false
                                         );
                                         errorResponse.onComplete();
                                         HttpClientResponseException clientResponseError = new HttpClientResponseException(
@@ -1896,10 +1902,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                         emitter.tryOnError(clientResponseError);
                                     }
                                 }
-                            } else {
-                                emitter.onNext(response);
-                                response.onComplete();
-                                emitter.onComplete();
                             }
                         }
                     } catch (Throwable t) {
@@ -1907,7 +1909,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             if (t instanceof HttpClientResponseException) {
                                 emitter.tryOnError(t);
                             } else {
-                                FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, null, true);
+                                FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, null, false);
                                 HttpClientResponseException clientResponseError = new HttpClientResponseException(
                                         "Error decoding HTTP response body: " + t.getMessage(),
                                         t,
