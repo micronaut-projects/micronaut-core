@@ -22,7 +22,10 @@ import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.context.ServerContextPathProvider;
 
+import javax.annotation.Nullable;
+import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -59,12 +62,24 @@ public class StaticResourceConfiguration implements Toggleable {
     private String mapping = DEFAULT_MAPPING;
 
     private final ResourceResolver resourceResolver;
+    private final ServerContextPathProvider contextPathProvider;
 
     /**
      * @param resourceResolver The {@linkplain ResourceResolver}
      */
     public StaticResourceConfiguration(ResourceResolver resourceResolver) {
+        this(resourceResolver, null);
+    }
+
+    /**
+     * @param resourceResolver The {@linkplain ResourceResolver}
+     * @param contextPathProvider The context path provider
+     */
+    @Inject
+    public StaticResourceConfiguration(ResourceResolver resourceResolver,
+                                       @Nullable ServerContextPathProvider contextPathProvider) {
         this.resourceResolver = resourceResolver;
+        this.contextPathProvider = contextPathProvider;
     }
 
     /**
@@ -132,7 +147,12 @@ public class StaticResourceConfiguration implements Toggleable {
      */
     public void setMapping(String mapping) {
         if (StringUtils.isNotEmpty(mapping)) {
-            this.mapping = mapping;
+            String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
+            if (contextPath != null && !mapping.startsWith(contextPath)) {
+                this.mapping = StringUtils.prependUri(contextPath, mapping);
+            } else {
+                this.mapping = mapping;
+            }
         }
     }
 }
