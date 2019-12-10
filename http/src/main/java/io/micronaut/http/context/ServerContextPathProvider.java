@@ -15,21 +15,19 @@
  */
 package io.micronaut.http.context;
 
-import java.util.Optional;
+import javax.annotation.Nullable;
 
 /**
- * A contract for providing a context path.
+ * A contract for providing a context path to a server.
  *
  * @author James Kleeh
- * @since 1.2.6
- * @deprecated Use either {@link ClientContextPathProvider} or {@link ServerContextPathProvider} instead.
+ * @since 1.3.0
  */
-@Deprecated
-public interface ContextPathProvider {
+public interface ServerContextPathProvider {
 
     /**
-     * @return An optional context path
+     * @return The server context path, or null
      */
-    Optional<String> getContextPath();
-
+    @Nullable
+    String getContextPath();
 }

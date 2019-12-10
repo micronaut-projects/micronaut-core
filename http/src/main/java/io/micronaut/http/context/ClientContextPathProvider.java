@@ -15,21 +15,11 @@
  */
 package io.micronaut.http.context;
 
-import java.util.Optional;
-
 /**
- * A contract for providing a context path.
+ * A contract for providing a context path to a client.
  *
  * @author James Kleeh
- * @since 1.2.6
- * @deprecated Use either {@link ClientContextPathProvider} or {@link ServerContextPathProvider} instead.
+ * @since 1.3.0
  */
-@Deprecated
-public interface ContextPathProvider {
-
-    /**
-     * @return An optional context path
-     */
-    Optional<String> getContextPath();
-
+public interface ClientContextPathProvider extends ContextPathProvider {
 }
