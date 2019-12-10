@@ -10,7 +10,7 @@ dependencies {
     testCompile dependencyModuleVersion("micronaut.sql", "micronaut-jdbc-tomcat")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     testCompile dependencyVersion("h2")
-    testCompile "mysql:mysql-connector-java:6.0.6"
+    testCompile "mysql:mysql-connector-java:8.0.18"
 
     compileOnly "ch.qos.logback:logback-classic:1.2.3"
 }
