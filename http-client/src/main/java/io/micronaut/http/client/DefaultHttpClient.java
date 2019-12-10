@@ -2011,7 +2011,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             while (headerIterator.hasNext()) {
                 final Map.Entry<String, List<String>> originalHeader = headerIterator.next();
                 final List<String> originalHeaderValue = originalHeader.getValue();
-                if (originalHeaderValue!= null && !originalHeaderValue.isEmpty()) {
+                if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
                     final Iterator<String> headerValueIterator = originalHeaderValue.iterator();
                     while (headerValueIterator.hasNext()) {
                         final String value = headerValueIterator.next();
