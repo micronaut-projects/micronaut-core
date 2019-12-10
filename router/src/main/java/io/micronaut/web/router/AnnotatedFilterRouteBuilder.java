@@ -19,14 +19,18 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.annotation.Filter;
+import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Collection;
 
@@ -40,6 +44,7 @@ import java.util.Collection;
 public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
 
     private final BeanContext beanContext;
+    private final ServerContextPathProvider contextPathProvider;
 
     /**
      * Constructor.
@@ -48,7 +53,9 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
      * @param executionHandleLocator The execution handler locator
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
+     * @deprecated Use
      */
+    @Deprecated
     public AnnotatedFilterRouteBuilder(
         BeanContext beanContext,
         ExecutionHandleLocator executionHandleLocator,
@@ -56,6 +63,28 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
         ConversionService<?> conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         this.beanContext = beanContext;
+        this.contextPathProvider = null;
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param beanContext The bean context
+     * @param executionHandleLocator The execution handler locator
+     * @param uriNamingStrategy The URI naming strategy
+     * @param conversionService The conversion service
+     * @param contextPathProvider The server context path provider
+     */
+    @Inject
+    public AnnotatedFilterRouteBuilder(
+            BeanContext beanContext,
+            ExecutionHandleLocator executionHandleLocator,
+            UriNamingStrategy uriNamingStrategy,
+            ConversionService<?> conversionService,
+            @Nullable ServerContextPathProvider contextPathProvider) {
+        super(executionHandleLocator, uriNamingStrategy, conversionService);
+        this.beanContext = beanContext;
+        this.contextPathProvider = contextPathProvider;
     }
 
     /**
@@ -69,7 +98,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
                 // ignore http client filters
                 continue;
             }
-            String[] patterns = beanDefinition.stringValues(Filter.class);
+            String[] patterns = getPatterns(beanDefinition);
             if (ArrayUtils.isNotEmpty(patterns)) {
                 HttpMethod[] methods = beanDefinition.getValue(Filter.class, "methods", HttpMethod[].class).orElse(null);
                 String first = patterns[0];
@@ -85,5 +114,27 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
                 }
             }
         }
+    }
+
+    /**
+     * @param beanDefinition The bean definition
+     * @return The array of patterns that should match request URLs for the bean to
+     * be invoked.
+     */
+    protected String[] getPatterns(BeanDefinition<?> beanDefinition) {
+        String[] values = beanDefinition.stringValues(Filter.class);
+        String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
+        if (contextPath != null) {
+            for (int i = 0; i < values.length; i++) {
+                if (!values[i].startsWith(contextPath)) {
+                    String newValue = StringUtils.prependUri(contextPath, values[i]);
+                    if (newValue.charAt(0) != '/') {
+                        newValue = "/" + newValue;
+                    }
+                    values[i] = newValue;
+                }
+            }
+        }
+        return values;
     }
 }
