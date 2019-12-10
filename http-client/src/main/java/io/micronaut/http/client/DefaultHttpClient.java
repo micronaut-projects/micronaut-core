@@ -2007,11 +2007,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
     private void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
         if (request != null) {
-            final io.micronaut.http.HttpHeaders headers = request.getHeaders();
-            headers.names().forEach(name -> {
-                final Optional<String> headerValue = request.getHeaders().get(name, String.class);
-                headerValue.ifPresent(value -> redirectRequest.header(name, value));
-            });
+            final Iterator<Map.Entry<String, List<String>>> headerIterator = request.getHeaders().iterator();
+            while (headerIterator.hasNext()) {
+                final Map.Entry<String, List<String>> originalHeader = headerIterator.next();
+                final List<String> originalHeaderValue = originalHeader.getValue();
+                if (originalHeaderValue!= null && !originalHeaderValue.isEmpty()) {
+                    final Iterator<String> headerValueIterator = originalHeaderValue.iterator();
+                    while (headerValueIterator.hasNext()) {
+                        final String value = headerValueIterator.next();
+                        if (value != null) {
+                            redirectRequest.header(originalHeader.getKey(), value);
+                        }
+                    }
+                }
+            }
         }
     }
 
