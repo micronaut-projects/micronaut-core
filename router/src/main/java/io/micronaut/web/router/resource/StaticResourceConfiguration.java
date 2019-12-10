@@ -25,6 +25,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.context.ServerContextPathProvider;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -75,6 +76,7 @@ public class StaticResourceConfiguration implements Toggleable {
     /**
      * @param resourceResolver The {@linkplain ResourceResolver}
      */
+    @Inject
     public StaticResourceConfiguration(ResourceResolver resourceResolver,
                                        @Nullable ServerContextPathProvider contextPathProvider) {
         this.resourceResolver = resourceResolver;

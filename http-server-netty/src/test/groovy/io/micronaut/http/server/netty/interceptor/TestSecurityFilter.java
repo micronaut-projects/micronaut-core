@@ -49,7 +49,7 @@ public class TestSecurityFilter implements HttpServerFilter {
         }
         else {
             request.getAttributes().put("authenticated", true);
-            return Publishers.map(
+            return Publishers.then(
                     chain.proceed(request),
                     mutableHttpResponse -> mutableHttpResponse.header("X-Test", "Foo " + request.getAttributes().get("SomeServiceValue", String.class, "none"))
             );
