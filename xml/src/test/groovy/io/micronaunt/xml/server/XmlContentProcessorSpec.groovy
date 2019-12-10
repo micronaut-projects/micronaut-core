@@ -23,6 +23,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.RxStreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -93,7 +94,7 @@ class XmlContentProcessorSpec extends Specification {
         author.name == "Joe"
     }
 
-    void "test mapping xml single field to controller param"() {
+    void "test mapping xml single primitive field to controller param"() {
         RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -103,6 +104,18 @@ class XmlContentProcessorSpec extends Specification {
 
         then:
         name == 'Joe'
+    }
+
+    void "test mapping xml single complex field to controller param"() {
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        Book book = client.toBlocking().retrieve(
+                HttpRequest.POST("/xml/stream/author/book", '<author name="Joe"><book><title>First Book</title></book></author>')
+                        .contentType(MediaType.TEXT_XML_TYPE), Book)
+
+        then:
+        book.title == "First Book"
     }
 
     void "test mapping xml list field to controller param"() {
@@ -184,6 +197,12 @@ class XmlContentProcessorSpec extends Specification {
             return name
         }
 
+        @Produces(MediaType.TEXT_XML)
+        @Post("/author/book")
+        Book bookList(Book book) {
+            return book
+        }
+
         @Post("/author/books")
         Flowable<Book> bookList(List<Book> books) {
             return Flowable.fromIterable(books)
@@ -202,6 +221,6 @@ class XmlContentProcessorSpec extends Specification {
     static class Author {
         String name
         List<Book> books
-
+        Book book
     }
 }

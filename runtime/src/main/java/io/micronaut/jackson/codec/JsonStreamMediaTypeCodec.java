@@ -58,7 +58,8 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
             this.additionalTypes = codecConfiguration.getAdditionalTypes();
         } else {
             this.additionalTypes = Collections.emptyList();
-        }    }
+        }
+    }
 
     @Override
     public Collection<MediaType> getMediaTypes() {

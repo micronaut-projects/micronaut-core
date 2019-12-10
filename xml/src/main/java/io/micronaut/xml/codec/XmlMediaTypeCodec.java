@@ -45,8 +45,9 @@ public class XmlMediaTypeCodec extends AbstractJacksonMediaTypeCodec {
     public static final String CONFIGURATION_QUALIFIER = "xml";
 
     /**
-     * @param xmlMapper                Object mapper for xml
+     * @param xmlMapper                Object mapper for xml. If null, retrieved from beanContext
      * @param applicationConfiguration The common application configurations
+     * @param beanContext              Bean context that will be used to retrieve object mapper if one was not provided
      * @param codecConfiguration       The configuration for the codec
      */
     @Inject

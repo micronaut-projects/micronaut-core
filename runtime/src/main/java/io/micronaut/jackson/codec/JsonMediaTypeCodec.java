@@ -44,8 +44,9 @@ public class JsonMediaTypeCodec extends AbstractJacksonMediaTypeCodec {
     public static final String CONFIGURATION_QUALIFIER = "json";
 
     /**
-     * @param objectMapper             To read/write JSON
+     * @param objectMapper             To read/write JSON. If null, will be retrieved from beanContext
      * @param applicationConfiguration The common application configurations
+     * @param beanContext              Bean context that will be used to lookup object mapper if it was not provided
      * @param codecConfiguration       The configuration for the codec
      */
     @Inject

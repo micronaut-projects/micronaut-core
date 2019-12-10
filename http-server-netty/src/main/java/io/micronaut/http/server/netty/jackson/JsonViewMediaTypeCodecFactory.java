@@ -59,7 +59,7 @@ public class JsonViewMediaTypeCodecFactory implements JsonViewCodecResolver {
     /**
      * @param objectMapper             To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param beanContext
+     * @param beanContext              Bean context
      * @param codecConfiguration       The configuration for the codec
      */
     protected JsonViewMediaTypeCodecFactory(ObjectMapper objectMapper,

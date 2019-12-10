@@ -16,7 +16,6 @@
 package io.micronaut.xml.server.convert;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
@@ -65,7 +64,7 @@ public class XmlMapperFactory {
     protected BeanDeserializerModifier[] beanDeserializerModifiers = new BeanDeserializerModifier[0];
 
     /**
-     * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
+     * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link com.fasterxml.jackson.core.JsonFactory}.
      *
      * @param jacksonConfiguration The configuration
      * @return The {@link ObjectMapper}

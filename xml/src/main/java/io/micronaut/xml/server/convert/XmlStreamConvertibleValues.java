@@ -77,14 +77,14 @@ public class XmlStreamConvertibleValues<V> implements ConvertibleValues<V> {
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         try {
             FromXmlParser parser = xmlMapper.getFactory().createParser(stream.copy());
-            FieldRenamerJsonParser fieldParser = new FieldRenamerJsonParser(
+            SelectiveJsonParser xmlParser = new SelectiveJsonParser(
                     name.toString(), ParsedValueHolder.VALUE_FIELD_NAME, parser
             );
 
             JavaType javaType = xmlMapper.getTypeFactory()
                     .constructParametricType(ParsedValueHolder.class, conversionContext.getArgument().getType());
 
-            ParsedValueHolder<T> valueHolder = xmlMapper.readValue(fieldParser, javaType);
+            ParsedValueHolder<T> valueHolder = xmlMapper.readValue(xmlParser, javaType);
             return Optional.of(valueHolder.getValue());
 
         } catch (Exception e) {

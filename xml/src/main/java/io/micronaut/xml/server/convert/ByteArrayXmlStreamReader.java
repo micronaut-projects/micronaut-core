@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.util.StreamReaderDelegate;
+import java.util.Arrays;
 
 /**
  * Stream reader that pairs xml stream with underlying byte array.
@@ -36,6 +37,7 @@ public final class ByteArrayXmlStreamReader extends StreamReaderDelegate {
 
     /**
      * @param bytes raw representation of xml
+     * @throws XMLStreamException if byte array represents corrupted xml
      */
     public ByteArrayXmlStreamReader(byte[] bytes) throws XMLStreamException {
         super(toReader(bytes));
@@ -47,13 +49,25 @@ public final class ByteArrayXmlStreamReader extends StreamReaderDelegate {
     }
 
     /**
-     * @return byte array of the underlying stream.
+     * @return copy of byte array of the underlying stream.
      */
     byte[] getBytes() {
-        return this.bytes;
+        return Arrays.copyOf(this.bytes, bytes.length);
     }
 
-    public XMLStreamReader copy() throws XMLStreamException {
-        return new ByteArrayXmlStreamReader(bytes);
+    /**
+     *
+     * @return copy of the given stream
+     */
+    public XMLStreamReader copy() {
+        try {
+            return new ByteArrayXmlStreamReader(bytes);
+        } catch (XMLStreamException e) {
+            // We can get exception only if there are a problem with parsing an xml out of byte array.
+            // Taking into we got here, it means we already have instance of the class and byte array was accepted just
+            // fine. That is why it is safe to assume that if we use same byte array to create new instance, there should not
+            // be an exception unless byte array was modified.
+            throw new RuntimeException(e);
+        }
     }
 }
