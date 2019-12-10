@@ -116,6 +116,11 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
         }
     }
 
+    /**
+     * @param beanDefinition The bean definition
+     * @return The array of patterns that should match request URLs for the bean to
+     * be invoked.
+     */
     protected String[] getPatterns(BeanDefinition<?> beanDefinition) {
         String[] values = beanDefinition.stringValues(Filter.class);
         String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
