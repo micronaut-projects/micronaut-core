@@ -28,6 +28,7 @@ import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -80,7 +81,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
             ExecutionHandleLocator executionHandleLocator,
             UriNamingStrategy uriNamingStrategy,
             ConversionService<?> conversionService,
-            ServerContextPathProvider contextPathProvider) {
+            @Nullable ServerContextPathProvider contextPathProvider) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         this.beanContext = beanContext;
         this.contextPathProvider = contextPathProvider;
@@ -97,7 +98,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
                 // ignore http client filters
                 continue;
             }
-            String[] patterns = beanDefinition.stringValues(Filter.class);
+            String[] patterns = getPatterns(beanDefinition);
             if (ArrayUtils.isNotEmpty(patterns)) {
                 HttpMethod[] methods = beanDefinition.getValue(Filter.class, "methods", HttpMethod[].class).orElse(null);
                 String first = patterns[0];
@@ -121,7 +122,11 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
         if (contextPath != null) {
             for (int i = 0; i < values.length; i++) {
                 if (!values[i].startsWith(contextPath)) {
-                    values[i] = StringUtils.prependUri(contextPath, values[i]);
+                    String newValue = StringUtils.prependUri(contextPath, values[i]);
+                    if (newValue.charAt(0) != '/') {
+                        newValue = "/" + newValue;
+                    }
+                    values[i] = newValue;
                 }
             }
         }
