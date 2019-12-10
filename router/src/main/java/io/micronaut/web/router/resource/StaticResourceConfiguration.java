@@ -75,6 +75,7 @@ public class StaticResourceConfiguration implements Toggleable {
 
     /**
      * @param resourceResolver The {@linkplain ResourceResolver}
+     * @param contextPathProvider The context path provider
      */
     @Inject
     public StaticResourceConfiguration(ResourceResolver resourceResolver,

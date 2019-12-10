@@ -25,6 +25,9 @@ import javax.annotation.Nullable;
  */
 public interface ServerContextPathProvider {
 
+    /**
+     * @return The server context path, or null
+     */
     @Nullable
     String getContextPath();
 }
