@@ -633,7 +633,17 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         public Environment stop() {
+            bootstrapEnvironment.stop();
             return super.stop();
+        }
+
+        @Override
+        public Environment start() {
+            if (this.bootstrapEnvironment == null) {
+                this.bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
+            }
+            bootstrapEnvironment.start();
+            return super.start();
         }
 
         @Override
@@ -644,13 +654,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     LOG.info("Reading Startup environment from bootstrap.yml");
                 }
 
-                Set<String> activeNames = getActiveNames();
-                String[] environmentNamesArray = activeNames.toArray(new String[0]);
-                if (this.bootstrapEnvironment == null) {
-                    this.bootstrapEnvironment = createBootstrapEnvironment(environmentNamesArray);
-                }
                 refreshablePropertySources.addAll(bootstrapEnvironment.getRefreshablePropertySources());
 
+                String[] environmentNamesArray = getActiveNames().toArray(new String[0]);
                 BootstrapPropertySourceLocator bootstrapPropertySourceLocator = resolveBootstrapPropertySourceLocator(environmentNamesArray);
 
                 for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapEnvironment)) {

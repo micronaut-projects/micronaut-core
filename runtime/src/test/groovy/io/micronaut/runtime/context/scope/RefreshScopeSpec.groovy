@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Value
 import io.micronaut.context.env.Environment
+import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.scheduling.TaskExecutors
@@ -101,6 +102,84 @@ class RefreshScopeSpec extends Specification {
         cleanup:
         System.setProperty("foo.bar", "")
         beanContext?.stop()
+    }
+
+    void "test refresh event includes external files"() {
+        File file = File.createTempFile("temp-config", ".yml")
+        file.write("foo.bar: test")
+        System.setProperty("micronaut.config.files", file.absolutePath)
+
+        ApplicationContext beanContext = ApplicationContext.build().start()
+
+        // override IO executor with synchronous impl
+        beanContext.registerSingleton(Executor.class, new Executor() {
+            @Override
+            void execute(Runnable command) {
+                command.run()
+            }
+        }, Qualifiers.byName(TaskExecutors.IO))
+
+        when:
+        RefreshBean bean = beanContext.getBean(RefreshBean)
+
+        then:
+        bean.testValue() == 'test'
+        bean.testConfigProps() == 'test'
+
+        when:
+        file.write("foo.bar: bar")
+        Environment environment = beanContext.getEnvironment()
+        environment.refresh()
+        beanContext.publishEvent(new RefreshEvent())
+
+        then:
+        bean.testValue() == 'bar'
+        bean.testConfigProps() == 'bar'
+
+        cleanup:
+        System.setProperty("micronaut.config.files", "")
+        beanContext?.stop()
+        file.delete()
+    }
+
+    void "test refresh event includes external files with the bootstrap environment"() {
+        File file = File.createTempFile("temp-config", ".yml")
+        file.write("foo.bar: test")
+        System.setProperty("micronaut.config.files", file.absolutePath)
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+
+        ApplicationContext beanContext = ApplicationContext.build(["bootstrap-env": true]).start()
+
+        // override IO executor with synchronous impl
+        beanContext.registerSingleton(Executor.class, new Executor() {
+            @Override
+            void execute(Runnable command) {
+                command.run()
+            }
+        }, Qualifiers.byName(TaskExecutors.IO))
+
+        when:
+        RefreshBean bean = beanContext.getBean(RefreshBean)
+
+        then:
+        bean.testValue() == 'test'
+        bean.testConfigProps() == 'test'
+
+        when:
+        file.write("foo.bar: bar")
+        Environment environment = beanContext.getEnvironment()
+        environment.refresh()
+        beanContext.publishEvent(new RefreshEvent())
+
+        then:
+        bean.testValue() == 'bar'
+        bean.testConfigProps() == 'bar'
+
+        cleanup:
+        System.setProperty("micronaut.config.files", "")
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "")
+        beanContext?.stop()
+        file.delete()
     }
 
     @Refreshable
