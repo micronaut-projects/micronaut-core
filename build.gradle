@@ -589,25 +589,18 @@ subprojects { Project subproject ->
     ext {
         userOrg = "grails"
         isGrailsPlugin = false
-        isConfiguration = subproject.projectDir.parentFile.name == 'configurations'
         isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
         shadowJarEnabled = false
     }
 
-    if (subproject.name == "configurations" || subproject.name.contains("bom")) {
+    if (subproject.name.contains("bom")) {
         return
     }
 
-    if (isConfiguration) {
-        group "io.micronaut.configuration"
-    } else {
-        group projectGroupId
-    }
-
+    group projectGroupId
 
     repositories {
         maven { url "https://repo.grails.org/grails/core" }
-        maven { url "https://oss.jfrog.org/artifactory/oss-snapshot-local/" }
     }
 
     if (subproject.name.startsWith("examples") || subproject.name.contains("bom")) {
