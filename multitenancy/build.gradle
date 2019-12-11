@@ -6,6 +6,7 @@ dependencies {
     api project(":http-server")
     compileOnly project(":session")
 
+    testImplementation dependencyVersion("snakeyaml")
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")

@@ -14,6 +14,7 @@ dependencies {
     annotationProcessor project(":inject-java")
     api project(":inject")
 
+    testImplementation dependencyVersion("netty")
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
     testImplementation project(":validation")
