@@ -58,42 +58,15 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import javax.validation.ClockProvider;
-import javax.validation.Constraint;
-import javax.validation.ConstraintViolation;
-import javax.validation.ConstraintViolationException;
-import javax.validation.ElementKind;
-import javax.validation.Path;
-import javax.validation.TraversableResolver;
-import javax.validation.Valid;
-import javax.validation.ValidationException;
+import javax.validation.*;
 import javax.validation.groups.Default;
-import javax.validation.metadata.BeanDescriptor;
-import javax.validation.metadata.ConstraintDescriptor;
-import javax.validation.metadata.ConstructorDescriptor;
-import javax.validation.metadata.ElementDescriptor;
-import javax.validation.metadata.MethodDescriptor;
-import javax.validation.metadata.MethodType;
-import javax.validation.metadata.PropertyDescriptor;
-import javax.validation.metadata.Scope;
+import javax.validation.metadata.*;
 import javax.validation.valueextraction.ValueExtractor;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -1542,7 +1515,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                     messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
                                     messageTemplate,
                                     new PathImpl(context.currentPath),
-                                    new DefaultConstraintDescriptor(annotationMetadata, constraintType, annotationValue), null)
+                                    new DefaultConstraintDescriptor(annotationMetadata, constraintType, annotationValue))
 
                     );
                 }
