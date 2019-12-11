@@ -18,9 +18,11 @@ package io.micronaut.inject.visitor
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.inject.ast.EnumElement
+import spock.util.environment.RestoreSystemProperties
 
 import java.util.function.Supplier
 
+@RestoreSystemProperties
 class ClassElementSpec extends AbstractBeanDefinitionSpec {
 
     def setup() {
