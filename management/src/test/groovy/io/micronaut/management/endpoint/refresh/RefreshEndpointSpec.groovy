@@ -28,11 +28,13 @@ import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
+import spock.util.environment.RestoreSystemProperties
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@RestoreSystemProperties
 class RefreshEndpointSpec extends Specification {
 
     void "test refresh endpoint"() {
@@ -70,7 +72,6 @@ class RefreshEndpointSpec extends Specification {
         }
 1
         cleanup:
-        System.setProperty("foo.bar", "")
         rxClient.close()
         embeddedServer.close()
     }
@@ -119,7 +120,6 @@ class RefreshEndpointSpec extends Specification {
 
 
         cleanup:
-        System.setProperty("foo.bar", "")
         rxClient.close()
         embeddedServer.close()
     }
