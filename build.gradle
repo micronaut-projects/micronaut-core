@@ -603,9 +603,7 @@ subprojects { Project subproject ->
         maven { url "https://repo.grails.org/grails/core" }
     }
 
-    if (subproject.name.startsWith("examples") || subproject.name.contains("bom")) {
-        // apply plugin:"org.grails.grails-web"
-    } else {
+    if (!subproject.name.contains("bom")) {
         apply plugin: "groovy"
         apply plugin: "java-library"
 
