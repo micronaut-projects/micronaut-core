@@ -1,11 +1,14 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    compileOnly project(":http-server")
+    
     api project(":inject")
     api project(":http")
     api dependencyVersion("validation")
+
     compileOnly dependencyVersion("gorm")
+    compileOnly project(":http-server")
     
+    testAnnotationProcessor project(":inject-java")
     testImplementation project(":http-server-netty")
     testImplementation project(":websocket")
     testImplementation project(":http-client")
@@ -13,6 +16,5 @@ dependencies {
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation project(":inject-java-test")
 
-    testAnnotationProcessor project(":inject-java")
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

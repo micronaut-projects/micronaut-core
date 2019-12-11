@@ -2,19 +2,19 @@ ext {
     shadowJarEnabled = true
 }
 dependencies {
-    for(proj in ['http']) {
-        api project(":$proj")
-    }
+    annotationProcessor project(":inject-java")
+    api project(":http")
     api project(':inject')
     api project(':aop')
-    compileOnly "com.oracle.substratevm:svm:$graalVersion"
-    compileOnly project(":graal")
-    compileOnly dependencyVersion("jcache")
     api dependencyVersion("validation")
     api dependencyVersion("jackson.databind")
     api dependencyVersion("rxjava2")
 
-    compile([
+    compileOnly "com.oracle.substratevm:svm:$graalVersion"
+    compileOnly project(":graal")
+    compileOnly dependencyVersion("jcache")
+
+    implementation([
         dependencyVersion('jackson.datatype'),
         dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
     ])
@@ -38,15 +38,14 @@ dependencies {
     compileOnly 'org.glassfish:javax.el:3.0.1-b09'
     compileOnly dependencyVersion("reactor")
     compileOnly dependencyVersion("rxjava1.interop")
-    compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-    annotationProcessor project(":inject-java")
+    compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"    
 
+    testAnnotationProcessor project(":inject-java") 
     testImplementation 'org.jsr107.ri:cache-ri-impl:1.1.0'
     testImplementation dependencyVersion("jcache")
     testImplementation dependencyVersion("rxjava1.interop")
     testImplementation dependencyVersion("reactor")
-    testImplementation project(":inject-java")
-    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject-java")    
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-groovy")
     testImplementation dependencyModuleVersion("gorm", "grails-datastore-gorm")

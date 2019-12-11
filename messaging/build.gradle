@@ -1,5 +1,4 @@
 dependencies {
-    compileOnly project(":inject-java")
     annotationProcessor project(":inject-java")
     api project(":inject")
     api project(":runtime")

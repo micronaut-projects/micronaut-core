@@ -5,7 +5,7 @@ dependencies {
     api dependencyVersion("javax.annotation-api")
     api group: 'javax.inject', name: 'javax.inject', version: '1'
     api project(':core')
-    api dependencyVersion("snakeyaml")
+    implementation dependencyVersion("snakeyaml")
 
     compileOnly "javax.persistence:javax.persistence-api:2.2"
     compileOnly dependencyVersion("groovy")

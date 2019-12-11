@@ -1,5 +1,5 @@
 dependencies {
-
+    annotationProcessor project(":inject-java")
     api dependencyVersion("opentracing")
     api dependencyModuleVersion('opentracing', 'opentracing-util')
     api project(":runtime")
@@ -8,7 +8,7 @@ dependencies {
 
     // the following are Tracing implementations and instrumentations which
     // are optionally loaded and not required
-    annotationProcessor project(":inject-java")
+    
     compileOnly dependencyModuleVersion('micronaut.netflix', 'micronaut-netflix-hystrix'), {
         exclude group:"io.micronaut", module:'micronaut-runtime'
         exclude group:"io.micronaut.configuration", module:'micronaut-netflix-archaius'
