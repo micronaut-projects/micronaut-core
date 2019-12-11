@@ -641,11 +641,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         public Environment start() {
-            if (isRuntimeConfigured) {
-                if (this.bootstrapEnvironment == null) {
-                    this.bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
-                }
-                bootstrapEnvironment.start();
+            if (isRuntimeConfigured && bootstrapEnvironment == null) {
+                bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
             }
             return super.start();
         }
@@ -703,6 +700,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             for (PropertySource source : propertySources.values()) {
                 bootstrapEnvironment.addPropertySource(source);
             }
+            bootstrapEnvironment.start();
             for (String pkg : bootstrapEnvironment.getPackages()) {
                 addPackage(pkg);
             }
