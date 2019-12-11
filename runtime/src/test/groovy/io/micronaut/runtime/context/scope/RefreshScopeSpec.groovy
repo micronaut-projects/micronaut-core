@@ -23,7 +23,9 @@ import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.scheduling.TaskExecutors
+import org.junit.Rule
 import spock.lang.Specification
+import spock.util.environment.RestoreSystemProperties
 
 import java.util.concurrent.Executor
 
@@ -31,6 +33,7 @@ import java.util.concurrent.Executor
  * @author Graeme Rocher
  * @since 1.0
  */
+@RestoreSystemProperties
 class RefreshScopeSpec extends Specification {
 
     void "test fire refresh event that refreshes all"() {
@@ -64,7 +67,6 @@ class RefreshScopeSpec extends Specification {
         bean.testConfigProps() == 'bar'
 
         cleanup:
-        System.setProperty("foo.bar", "")
         beanContext?.stop()
     }
 
@@ -100,7 +102,6 @@ class RefreshScopeSpec extends Specification {
         bean.testConfigProps() == 'bar'
 
         cleanup:
-        System.setProperty("foo.bar", "")
         beanContext?.stop()
     }
 
@@ -137,7 +138,6 @@ class RefreshScopeSpec extends Specification {
         bean.testConfigProps() == 'bar'
 
         cleanup:
-        System.setProperty("micronaut.config.files", "")
         beanContext?.stop()
         file.delete()
     }
@@ -176,8 +176,6 @@ class RefreshScopeSpec extends Specification {
         bean.testConfigProps() == 'bar'
 
         cleanup:
-        System.setProperty("micronaut.config.files", "")
-        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "")
         beanContext?.stop()
         file.delete()
     }
