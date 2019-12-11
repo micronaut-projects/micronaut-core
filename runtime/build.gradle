@@ -3,7 +3,7 @@ dependencies {
     for(proj in ['inject', 'http', 'aop']) {
         compile project(":$proj")
     }
-    compileOnly "com.oracle.substratevm:svm:$graalVersion"
+    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
     compileOnly project(":graal")
     compileOnly dependencyVersion("jcache")
     compile dependencyVersion("validation")
