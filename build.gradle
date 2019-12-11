@@ -691,8 +691,6 @@ subprojects { Project subproject ->
         configurations = [project.configurations.shadowCompile]
         relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
         relocate "org.objectweb.asm", "io.micronaut.asm"
-
-        classifier = null
     }
 
     def isDocumented = subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')
