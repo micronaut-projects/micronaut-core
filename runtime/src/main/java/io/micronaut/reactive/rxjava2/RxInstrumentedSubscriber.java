@@ -16,10 +16,12 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+
+import java.util.Deque;
+import java.util.LinkedList;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -30,61 +32,84 @@ import org.reactivestreams.Subscription;
  * @since 1.1
  */
 @Internal
-class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent  {
+class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent {
     private final Subscriber<T> source;
-    private final InvocationInstrumenter instrumenter;
+    private final RxInstrumenterFactory instrumenterFactory;
+    private final Deque<InvocationInstrumenter> instrumenters = new LinkedList<>();
 
     /**
      * Default constructor.
      *
-     * @param source       The source subscriber
-     * @param instrumenter The instrumenter
+     * @param source              The source subscriber
+     * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedSubscriber(Subscriber<T> source, InvocationInstrumenter instrumenter) {
-        ArgumentUtils.requireNonNull("source", source);
-        ArgumentUtils.requireNonNull("instrumenter", instrumenter);
+    RxInstrumentedSubscriber(Subscriber<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = instrumenter;
+        this.instrumenterFactory = instrumenterFactory;
     }
 
     @Override
     public final void onSubscribe(Subscription s) {
-        try {
-            instrumenter.beforeInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
             source.onSubscribe(s);
-        } finally {
-            instrumenter.afterInvocation();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onSubscribe(s);
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 
     @Override
     public void onNext(T t) {
-        try {
-            instrumenter.beforeInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
             source.onNext(t);
-        } finally {
-            instrumenter.afterInvocation();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onNext(t);
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 
     @SuppressWarnings("Duplicates")
     @Override
     public void onError(Throwable t) {
-        try {
-            instrumenter.beforeInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
             source.onError(t);
-        } finally {
-            instrumenter.afterInvocation();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onError(t);
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 
     @Override
     public void onComplete() {
-        try {
-            instrumenter.beforeInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
             source.onComplete();
-        } finally {
-            instrumenter.afterInvocation();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onComplete();
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 }

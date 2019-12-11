@@ -58,9 +58,9 @@ final class RxInstrumentedWrappers {
         final InvocationInstrumenter instumenter = instrumenterFactory.create();
         if (instumenter != null) {
             if (downstream instanceof FlowableSubscriber) {
-                return new RxInstrumentedFlowableSubscriber<>(downstream, instumenter);
+                return new RxInstrumentedFlowableSubscriber<>(downstream, instrumenterFactory);
             } else {
-                return new RxInstrumentedSubscriber<>(downstream, instumenter);
+                return new RxInstrumentedSubscriber<>(downstream, instrumenterFactory);
             }
         } else {
             return downstream;
@@ -230,7 +230,7 @@ final class RxInstrumentedWrappers {
         }
         final InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter != null) {
-            return new RxInstrumentedObserver<>(downstream, instrumenter);
+            return new RxInstrumentedObserver<>(downstream, instrumenterFactory);
         }
         return downstream;
     }
@@ -249,7 +249,7 @@ final class RxInstrumentedWrappers {
         }
         final InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter != null) {
-            return new RxInstrumentedSingleObserver<>(downstream, instrumenter);
+            return new RxInstrumentedSingleObserver<>(downstream, instrumenterFactory);
         }
         return downstream;
     }
@@ -268,7 +268,7 @@ final class RxInstrumentedWrappers {
         }
         final InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter != null) {
-            return new RxInstrumentedMaybeObserver<>(downstream, instrumenter);
+            return new RxInstrumentedMaybeObserver<>(downstream, instrumenterFactory);
         }
         return downstream;
     }
@@ -286,7 +286,7 @@ final class RxInstrumentedWrappers {
         }
         final InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter != null) {
-            return new RxInstrumentedCompletableObserver(downstream, instrumenter);
+            return new RxInstrumentedCompletableObserver(downstream, instrumenterFactory);
         } else {
             return downstream;
         }

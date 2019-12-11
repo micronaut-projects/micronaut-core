@@ -20,6 +20,9 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 
+import java.util.Deque;
+import java.util.LinkedList;
+
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
  * See https://github.com/openzipkin/brave/tree/master/context/rxjava2/src/main/java/brave/context/rxjava2/internal.
@@ -29,60 +32,85 @@ import io.reactivex.disposables.Disposable;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComponent  {
-    private final Observer<T> downstream;
-    private final InvocationInstrumenter instrumenter;
+final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComponent {
+    private final Observer<T> source;
+    private final RxInstrumenterFactory instrumenterFactory;
+    private final Deque<InvocationInstrumenter> instrumenters = new LinkedList<>();
 
     /**
      * Default constructor.
      *
-     * @param downstream   The downstream observer
-     * @param instrumenter The instrumenter
+     * @param source              The downstream observer
+     * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedObserver(Observer<T> downstream, InvocationInstrumenter instrumenter) {
-        this.downstream = downstream;
-        this.instrumenter = instrumenter;
+    RxInstrumentedObserver(Observer<T> source, RxInstrumenterFactory instrumenterFactory) {
+        this.source = source;
+        this.instrumenterFactory = instrumenterFactory;
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        try {
-            instrumenter.beforeInvocation();
-            downstream.onSubscribe(d);
-        } finally {
-            instrumenter.afterInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onSubscribe(d);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onSubscribe(d);
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 
     @Override
     public void onNext(T t) {
-        try {
-            instrumenter.beforeInvocation();
-            downstream.onNext(t);
-        } finally {
-            instrumenter.afterInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onNext(t);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onNext(t);
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 
     @SuppressWarnings("Duplicates")
     @Override
     public void onError(Throwable t) {
-        try {
-            instrumenter.beforeInvocation();
-            downstream.onError(t);
-        } finally {
-            instrumenter.afterInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onError(t);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onError(t);
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 
     @SuppressWarnings("Duplicates")
     @Override
     public void onComplete() {
-        try {
-            instrumenter.beforeInvocation();
-            downstream.onComplete();
-        } finally {
-            instrumenter.afterInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onComplete();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onComplete();
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 

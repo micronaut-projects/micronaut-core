@@ -20,6 +20,9 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.MaybeObserver;
 import io.reactivex.disposables.Disposable;
 
+import java.util.Deque;
+import java.util.LinkedList;
+
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
  * See https://github.com/openzipkin/brave/tree/master/context/rxjava2/src/main/java/brave/context/rxjava2/internal.
@@ -31,56 +34,81 @@ import io.reactivex.disposables.Disposable;
 @Internal
 final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstrumentedComponent {
     private final MaybeObserver<T> source;
-    private final InvocationInstrumenter instrumenter;
+    private final RxInstrumenterFactory instrumenterFactory;
+    private final Deque<InvocationInstrumenter> instrumenters = new LinkedList<>();
 
     /**
      * Default constructor.
      *
-     * @param source       The source observer
-     * @param instrumenter The instrumenter
+     * @param source              The source observer
+     * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedMaybeObserver(MaybeObserver<T> source, InvocationInstrumenter instrumenter) {
+    RxInstrumentedMaybeObserver(MaybeObserver<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenter = instrumenter;
+        this.instrumenterFactory = instrumenterFactory;
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        try {
-            instrumenter.beforeInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
             source.onSubscribe(d);
-        } finally {
-            instrumenter.afterInvocation();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onSubscribe(d);
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 
     @Override
     public void onError(Throwable t) {
-        try {
-            instrumenter.beforeInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
             source.onError(t);
-        } finally {
-            instrumenter.afterInvocation();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onError(t);
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 
     @Override
     public void onSuccess(T value) {
-        try {
-            instrumenter.beforeInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
             source.onSuccess(value);
-        } finally {
-            instrumenter.afterInvocation();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onSuccess(value);
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 
     @Override
     public void onComplete() {
-        try {
-            instrumenter.beforeInvocation();
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
             source.onComplete();
-        } finally {
-            instrumenter.afterInvocation();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                instrumenters.push(instrumenter);
+                source.onComplete();
+            } finally {
+                instrumenters.pop().afterInvocation();
+            }
         }
     }
 

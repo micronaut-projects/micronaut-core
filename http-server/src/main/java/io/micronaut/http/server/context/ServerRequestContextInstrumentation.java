@@ -23,8 +23,6 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 
 import javax.inject.Singleton;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Optional;
 
 /**
@@ -41,17 +39,24 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
     public Optional<InvocationInstrumenter> newInvocationInstrumenter() {
         return ServerRequestContext.currentRequest().map(invocationRequest -> new InvocationInstrumenter() {
 
-            private final Deque<Optional<HttpRequest<Object>>> requests = new ArrayDeque<>(1);
+            private HttpRequest<Object> currentRequest;
+            private boolean isSet = false;
 
             @Override
             public void beforeInvocation() {
-                requests.push(ServerRequestContext.currentRequest());
-                ServerRequestContext.set(invocationRequest);
+                currentRequest = ServerRequestContext.currentRequest().orElse(null);
+                if (invocationRequest != currentRequest) {
+                    isSet = true;
+                    ServerRequestContext.set(invocationRequest);
+                }
             }
 
             @Override
             public void afterInvocation() {
-                ServerRequestContext.set(requests.pop().orElse(null));
+                if (isSet) {
+                    ServerRequestContext.set(currentRequest);
+                    isSet = false;
+                }
             }
 
         });
