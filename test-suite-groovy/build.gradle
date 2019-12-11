@@ -1,4 +1,5 @@
 dependencies {
+    testImplementation dependencyVersion("netty")
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
