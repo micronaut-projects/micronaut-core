@@ -633,16 +633,20 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         public Environment stop() {
-            bootstrapEnvironment.stop();
+            if (bootstrapEnvironment != null) {
+                bootstrapEnvironment.stop();
+            }
             return super.stop();
         }
 
         @Override
         public Environment start() {
-            if (this.bootstrapEnvironment == null) {
-                this.bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
+            if (isRuntimeConfigured) {
+                if (this.bootstrapEnvironment == null) {
+                    this.bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(new String[0]));
+                }
+                bootstrapEnvironment.start();
             }
-            bootstrapEnvironment.start();
             return super.start();
         }
 
@@ -699,7 +703,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             for (PropertySource source : propertySources.values()) {
                 bootstrapEnvironment.addPropertySource(source);
             }
-            bootstrapEnvironment.start();
             for (String pkg : bootstrapEnvironment.getPackages()) {
                 addPackage(pkg);
             }

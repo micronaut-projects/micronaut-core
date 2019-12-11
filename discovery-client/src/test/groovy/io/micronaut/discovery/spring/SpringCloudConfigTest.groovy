@@ -13,30 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.discovery.spring;
+package io.micronaut.discovery.spring
 
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.env.Environment;
-import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.discovery.vault.MockingVaultServerV1Controller;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.LoadBalancer;
-import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import spock.lang.AutoCleanup;
-import spock.lang.Shared;
-import spock.lang.Specification;
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
+import io.micronaut.discovery.vault.MockingVaultServerV1Controller
+import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.AutoCleanup
+import spock.lang.Shared
+import spock.lang.Specification
+import spock.util.environment.RestoreSystemProperties
 
-import java.util.HashMap;
-import java.util.Map;
-
-import static junit.framework.TestCase.assertNotNull;
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.MatcherAssert.assertThat;
-
+@RestoreSystemProperties
 class SpringCloudConfigTest extends Specification {
 
     @Shared
@@ -63,7 +51,6 @@ class SpringCloudConfigTest extends Specification {
         1 == context.getRequiredProperty("config-secret-6", Integer.class)
 
         cleanup:
-        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "")
         context.stop()
     }
 

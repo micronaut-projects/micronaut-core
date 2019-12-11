@@ -10,7 +10,9 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import spock.util.environment.RestoreSystemProperties
 
+@RestoreSystemProperties
 class ElementAnnotateSpec extends AbstractBeanDefinitionSpec{
 
     def setup() {
@@ -19,7 +21,6 @@ class ElementAnnotateSpec extends AbstractBeanDefinitionSpec{
 
     def cleanup() {
         AllElementsVisitor.clearVisited()
-        System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, "")
     }
 
     void "test annotate introduction advice"() {
