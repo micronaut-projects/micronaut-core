@@ -22,14 +22,9 @@ import io.micronaut.core.annotation.*;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
-import io.micronaut.inject.annotation.internal.FindBugsRemapper;
-import io.micronaut.inject.annotation.internal.KotlinNotNullMapper;
-import io.micronaut.inject.annotation.internal.KotlinNullableMapper;
-import io.micronaut.inject.beans.visitor.JsonCreatorAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.Nonnull;
@@ -37,7 +32,6 @@ import javax.annotation.Nullable;
 import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 import java.util.*;
-import java.util.stream.Stream;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.
@@ -54,53 +48,38 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<MetadataKey, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>();
 
     static {
-        try {
-            SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
-            for (ServiceDefinition<AnnotationMapper> definition : serviceLoader) {
-                if (definition.isPresent()) {
-                    AnnotationMapper mapper = definition.load();
-                    try {
-                        String name = null;
-                        if (mapper instanceof TypedAnnotationMapper) {
-                            name = ((TypedAnnotationMapper) mapper).annotationType().getName();
-                        } else if (mapper instanceof NamedAnnotationMapper) {
-                            name = ((NamedAnnotationMapper) mapper).getName();
-                        }
-                        if (StringUtils.isNotEmpty(name)) {
-                            ANNOTATION_MAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
-                        }
-                    } catch (Throwable e) {
-                        // mapper, missing dependencies, continue
+        SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
+        for (ServiceDefinition<AnnotationMapper> definition : serviceLoader) {
+            if (definition.isPresent()) {
+                AnnotationMapper mapper = definition.load();
+                try {
+                    String name = null;
+                    if (mapper instanceof TypedAnnotationMapper) {
+                        name = ((TypedAnnotationMapper) mapper).annotationType().getName();
+                    } else if (mapper instanceof NamedAnnotationMapper) {
+                        name = ((NamedAnnotationMapper) mapper).getName();
                     }
+                    if (StringUtils.isNotEmpty(name)) {
+                        ANNOTATION_MAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
+                    }
+                } catch (Throwable e) {
+                    // mapper, missing dependencies, continue
                 }
             }
-        } catch (ServiceConfigurationError e) {
-            // trigger fallback behaviour for Micronaut Core due to Gradle JAR locking bug
-            System.err.println("Failed to configure default AnnotationMappers. Using fallback behaviour: " + e.getMessage());
-            Stream.of(KotlinNotNullMapper.class, KotlinNullableMapper.class, JsonCreatorAnnotationMapper.class)
-                  .map(InstantiationUtils::instantiate)
-                  .forEach(am -> ANNOTATION_MAPPERS.computeIfAbsent(am.getName(), s -> new ArrayList<>(2)).add(am));
         }
-        try {
-            SoftServiceLoader<AnnotationRemapper> remapperLoader = SoftServiceLoader.load(AnnotationRemapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
-            for (ServiceDefinition<AnnotationRemapper> definition : remapperLoader) {
-                if (definition.isPresent()) {
-                    AnnotationRemapper mapper = definition.load();
-                    try {
-                        String name = mapper.getPackageName();
-                        if (StringUtils.isNotEmpty(name)) {
-                            ANNOTATION_REMAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
-                        }
-                    } catch (Throwable e) {
-                        // mapper, missing dependencies, continue
+        SoftServiceLoader<AnnotationRemapper> remapperLoader = SoftServiceLoader.load(AnnotationRemapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
+        for (ServiceDefinition<AnnotationRemapper> definition : remapperLoader) {
+            if (definition.isPresent()) {
+                AnnotationRemapper mapper = definition.load();
+                try {
+                    String name = mapper.getPackageName();
+                    if (StringUtils.isNotEmpty(name)) {
+                        ANNOTATION_REMAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
                     }
+                } catch (Throwable e) {
+                    // mapper, missing dependencies, continue
                 }
             }
-        } catch (ServiceConfigurationError e) {
-            System.err.println("Failed to configure default AnnotationMappers. Using fallback behaviour: " + e.getMessage());
-            Stream.of(FindBugsRemapper.class)
-                    .map(InstantiationUtils::instantiate)
-                    .forEach(am -> ANNOTATION_REMAPPERS.computeIfAbsent(am.getPackageName(), s -> new ArrayList<>(2)).add(am));
         }
     }
 

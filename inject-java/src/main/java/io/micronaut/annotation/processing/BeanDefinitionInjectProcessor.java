@@ -37,7 +37,6 @@ import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
-import io.micronaut.inject.configuration.JsonConfigurationMetadataWriter;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessedTypes;
@@ -236,14 +235,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
                 }
             } catch (ServiceConfigurationError e) {
-                warning("Falling back to default configuration metadata writer behaviour. Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
-                ConfigurationMetadataWriter writer = new JsonConfigurationMetadataWriter();
-                try {
-                    writer.write(metadataBuilder, classWriterOutputVisitor);
-                } catch (IOException ex) {
-                    error("Error occurred writing configuration metadata: %s", e.getMessage());
-                }
-
+                warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
             }
         }
     }

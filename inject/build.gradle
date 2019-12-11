@@ -20,4 +20,3 @@ dependencies {
     }
     testImplementation "junit:junit-dep:4.9"
 }
-compileJava.options.fork = true

@@ -11,7 +11,7 @@ env:
   global:
   - TERM=dumb
   - MALLOC_ARENA_MAX=1
-  - GRADLE_OPTS="-Dsun.zip.disableMemoryMapping=true -Xmx768m -Xms256m -XX:+CMSClassUnloadingEnabled"
+  - GRADLE_OPTS="-Dsun.zip.disableMemoryMapping=true -Xmx768m -Xms256m -XX:MaxPermSize=372m -XX:+CMSClassUnloadingEnabled"
   - GIT_NAME="Graeme Rocher"
   - GIT_EMAIL="graeme.rocher@gmail.com"
   - secure: W08aMUtRD+SUWY0Xe4t9Jhv+uVS3CDSpQuNn63fylR0bCKBnRI8TJWzSm5oTWH1EuIrFP9H8D0lY7UlzzNaemwFPOZ+YXmNnYqTlJ1P6eRyIGSQ6TpS1wJsMx0EzTeeTx+TpPQ4cmcvQlHQC9ZJS7knAP2/k6IY9cbuo90JHXgmPHAwWvIOwJvHo5dqPCyhqLkWvkEtQmywe73C/e921uLgE120que7nzq5z+njad7FNa1Kr36eYjMwjUybouE2tEOgQ0bEBhM6cJDPI1EKN0n9cnJs98rhLRFY00b7OUKl1HmGOl6RB8WW4OuJu6JNsrSJBl3019yamnmpkK4sI+O3ZEicS1z2iG7w1gSjG8rYr1srhBdxHCHJzx9Kw9pdJCOaTVyQvCdXTjbdEjMeMI1BvhUdY5zkWlasiWGBBif8QwaeUsyj+Hh9nE6OZQQ/gywrqVzLJ8SsHKx3jJ0O6e5kZwwllvo74e05SIQg2Coe/bS60jzKvG0jak///GGRWnIOHeumofqwywUzP4uJle6xWYzpheJNbN/w92jaAJovsg9o87AixS/sJ8zvLmrx42uBQHudDytSxQZCzVxW2UQZXknB/omTzEWPy1PaxwyLsQEutE5npvXETNnOVu/ynEyLQb1wPHCfzmi+nN4vxcukXPU0tdAujySa2TDtB6wQ=
