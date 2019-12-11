@@ -1,6 +1,7 @@
 dependencies {
-    api project(":runtime")
-    annotationProcessor project(":inject-java")
+	annotationProcessor project(":inject-java")
+
+    api project(":runtime")    
     api project(":http")
 
     testAnnotationProcessor project(":inject-java")

@@ -1,18 +1,20 @@
 dependencies {
     annotationProcessor project(":inject-java")
-    api dependencyVersion("rxjava2")
-    api project(":http-netty")
+    api dependencyVersion("rxjava2")    
     api project(":runtime")
-    api dependencyModuleVersion("netty", "netty-handler-proxy")
-
-    compileOnly dependencyVersion("reactor")
     api project(":websocket")
 
-    testImplementation project(":inject-groovy")
-    testImplementation project(":validation")
+    implementation project(":http-netty")
+    implementation dependencyModuleVersion("netty", "netty-handler-proxy")
+    
+    compileOnly dependencyVersion("reactor")
+    
     testAnnotationProcessor project(":validation")
-    testImplementation project(":inject-java")
     testAnnotationProcessor project(":inject-java")
+
+    testImplementation project(":inject-groovy")
+    testImplementation project(":validation")    
+    testImplementation project(":inject-java")    
     testImplementation dependencyVersion("rxjava2")
     testImplementation dependencyVersion("reactor")
     testImplementation project(":http-server-netty")

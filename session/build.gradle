@@ -2,19 +2,18 @@ ext {
     shadowJarEnabled = true
 }
 dependencies {
+    annotationProcessor project(":inject-java")
     api project(":runtime")
     api project(":http")
-
-    annotationProcessor project(":inject-java")
+    
     compileOnly project(":http-server")
 
+
+    testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
-
-    testAnnotationProcessor project(":inject-groovy")
-    testAnnotationProcessor project(":inject-java")
 }
 
 

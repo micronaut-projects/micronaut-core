@@ -11,6 +11,7 @@ profiles.load(new StringReader(new File("$projectDir/profiles.properties").text)
 boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
 
 def excludedProjects = [
+        "benchmarks",
         "test-suite",
         "test-suite-groovy",
         "test-suite-helper",
