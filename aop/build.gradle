@@ -3,5 +3,5 @@ ext {
 }
 dependencies {
     api project(':inject')
-    implementation project(path: ':core', configuration: 'shadow')
+    api project(':core')
 }

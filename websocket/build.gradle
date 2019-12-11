@@ -1,7 +1,7 @@
 dependencies {
     api project(":http")
     api project(":inject")
-    api project(path: ':aop', configuration: 'shadow')
+    api project(':aop')
 
     api dependencyVersion("rxjava2")
     annotationProcessor project(":inject-java")

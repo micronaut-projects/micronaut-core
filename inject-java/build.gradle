@@ -1,12 +1,12 @@
 dependencies {
     api project(":inject")
-    api project(path: ':aop', configuration: 'shadow')
+    api project(':aop')
 
     compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     compileOnly dependencyVersion("validation")
 
     testImplementation 'com.github.spotbugs:spotbugs-annotations:3.1.12'
-    testImplementation project(path: ':aop', configuration: 'shadow')
+    testImplementation project(':aop')
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":runtime")
     testImplementation dependencyVersion("rxjava2")

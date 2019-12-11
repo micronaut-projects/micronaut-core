@@ -2,7 +2,7 @@ dependencies {
     api project(":router")
     api project(":runtime")
     annotationProcessor project(":inject-java")
-    compileOnly project(":graal")
+    annotationProcessor project(":graal")
 
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")

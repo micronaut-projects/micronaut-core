@@ -5,8 +5,8 @@ dependencies {
     for(proj in ['http']) {
         api project(":$proj")
     }
-    api project(path: ':inject', configuration: 'shadow')
-    api project(path: ':aop', configuration: 'shadow')
+    api project(':inject')
+    api project(':aop')
     compileOnly "com.oracle.substratevm:svm:$graalVersion"
     compileOnly project(":graal")
     compileOnly dependencyVersion("jcache")
