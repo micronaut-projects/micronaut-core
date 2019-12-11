@@ -1667,6 +1667,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         Flowable<io.micronaut.http.HttpResponse<Object>> redirectedExchange;
                         try {
                             MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
+                            setRedirectHeaders(nettyRequest, redirectRequest);
                             redirectedExchange = Flowable.fromPublisher(resolveRequestURI(redirectRequest))
                                     .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri));
 
@@ -1821,8 +1822,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         // it is a redirect
                         if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
                             String location = headers.get(HttpHeaderNames.LOCATION);
-                            Flowable<io.micronaut.http.HttpResponse<O>> redirectedRequest = exchange(io.micronaut.http.HttpRequest.GET(location), bodyType);
-                            redirectedRequest.first(io.micronaut.http.HttpResponse.notFound())
+                            final MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
+                            setRedirectHeaders(request, redirectRequest);
+                            Flowable<io.micronaut.http.HttpResponse<O>> redirectExchange = exchange(redirectRequest, bodyType);
+                            redirectExchange.first(io.micronaut.http.HttpResponse.notFound())
                                     .subscribe((oHttpResponse, throwable) -> {
                                         if (throwable != null) {
                                             emitter.tryOnError(throwable);
@@ -1999,6 +2002,31 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             pipeline.addBefore(HANDLER_HTTP_CLIENT_CODEC, HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
         }
 
+    }
+
+    private void setRedirectHeaders(@Nullable HttpRequest request, MutableHttpRequest<Object> redirectRequest) {
+        if (request != null) {
+            request.headers().forEach(header -> redirectRequest.header(header.getKey(), header.getValue()));
+        }
+    }
+
+    private void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
+        if (request != null) {
+            final Iterator<Map.Entry<String, List<String>>> headerIterator = request.getHeaders().iterator();
+            while (headerIterator.hasNext()) {
+                final Map.Entry<String, List<String>> originalHeader = headerIterator.next();
+                final List<String> originalHeaderValue = originalHeader.getValue();
+                if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
+                    final Iterator<String> headerValueIterator = originalHeaderValue.iterator();
+                    while (headerValueIterator.hasNext()) {
+                        final String value = headerValueIterator.next();
+                        if (value != null) {
+                            redirectRequest.header(originalHeader.getKey(), value);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private ClientFilterChain buildChain(AtomicReference<io.micronaut.http.HttpRequest> requestWrapper, List<HttpClientFilter> filters) {

@@ -10,6 +10,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
+import spock.util.environment.RestoreSystemProperties
 
 class RequiresSpec extends AbstractTypeElementSpec{
 
@@ -398,6 +399,7 @@ class MyBean {
         context.close()
     }
 
+    @RestoreSystemProperties
     void "test requires property with property not present"() {
         setup:
         System.setProperty("foo.bar","")

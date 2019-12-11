@@ -25,11 +25,13 @@ import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.environment.RestoreSystemProperties
 
 /**
  * @author graemerocher
  * @since 1.0
  */
+@RestoreSystemProperties
 class ConsulMockConfigurationClientFilesSpec extends Specification {
 
     @AutoCleanup
@@ -65,10 +67,6 @@ class ConsulMockConfigurationClientFilesSpec extends Specification {
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "true")
         consulServer.applicationContext.getBean(MockConsulServer)
                 .keyvalues.clear()
-    }
-
-    def cleanup() {
-        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "")
     }
 
     void "test discovery property sources from Consul with YAML handling"() {
