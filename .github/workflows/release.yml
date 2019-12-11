@@ -1,0 +1,37 @@
+name: Release
+on:
+  push:
+    tags:
+    - v*
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up JDK
+      uses: actions/setup-java@v1
+      with:
+        java-version: 1.8
+        ref: ${{ github.head_ref }}
+    - name: Publish to Bintray
+      env:
+         BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
+         BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
+      run: ./gradlew assemble bintrayUpload docs
+    - id: release_version
+      run: echo ::set-output name=release_version::${GITHUB_REF:11}
+    - name: Publish to Github Pages
+      if: success()
+      uses: micronaut-projects/github-pages-deploy-action@master
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        BASE_BRANCH: master 
+        BRANCH: gh-pages 
+        FOLDER: build/docs
+        VERSION: ${{ steps.release_version.outputs.release_version }}
+    - name: Synchronize Maven Central
+      if: success()
+      env:
+         BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
+         BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
+      run: ./gradlew sWMC
