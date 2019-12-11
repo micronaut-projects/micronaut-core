@@ -1,5 +1,5 @@
 dependencies {
-    compileOnly "com.oracle.substratevm:svm:$graalVersion"
+    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
     compileOnly project(":graal")
     compile project(":buffer-netty")
     compile project(":http")
