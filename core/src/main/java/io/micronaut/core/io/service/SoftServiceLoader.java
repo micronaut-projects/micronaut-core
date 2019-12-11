@@ -217,7 +217,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
 
                     }
                 } catch (IOException e) {
-                    throw new ServiceConfigurationError("Failed to load resources for service [" + serviceType.getName() + "]: " + url, e);
+                    // ignore, can't do anything here and can't log because class used in compiler
                 }
             }
             return unprocessed.hasNext();

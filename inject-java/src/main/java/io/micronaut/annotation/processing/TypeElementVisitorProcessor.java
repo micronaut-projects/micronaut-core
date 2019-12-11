@@ -19,7 +19,6 @@ import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.io.service.ServiceDefinition;
@@ -27,7 +26,6 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
-import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
@@ -130,50 +128,38 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     protected @Nonnull Collection<TypeElementVisitor> findTypeElementVisitors() {
         Map<String, TypeElementVisitor> typeElementVisitors = new HashMap<>(10);
         SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, getClass().getClassLoader());
-        try {
-            for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
-                if (definition.isPresent()) {
-                    TypeElementVisitor visitor;
-                    try {
-                        visitor = definition.load();
-                    } catch (Throwable e) {
-                        warning("TypeElementVisitor [" + definition.getName() + "] will be ignored due to loading error: " + e.getMessage());
-                        continue;
-                    }
-                    if (visitor == null) {
-                        continue;
-                    }
+        for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
+            if (definition.isPresent()) {
+                TypeElementVisitor visitor;
+                try {
+                    visitor = definition.load();
+                } catch (Throwable e) {
+                    warning("TypeElementVisitor [" + definition.getName() + "] will be ignored due to loading error: " + e.getMessage());
+                    continue;
+                }
+                if (visitor == null) {
+                    continue;
+                }
 
-                    final Requires requires = visitor.getClass().getAnnotation(Requires.class);
-                    if (requires != null) {
-                        final Requires.Sdk sdk = requires.sdk();
-                        if (sdk == Requires.Sdk.MICRONAUT) {
-                            final String version = requires.version();
-                            if (StringUtils.isNotEmpty(version)) {
-                                if (!VersionUtils.isAtLeastMicronautVersion(version)) {
-                                    try {
-                                        warning("TypeElementVisitor [" + definition.getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
-                                        continue;
-                                    } catch (IllegalArgumentException e) {
-                                        // shouldn't happen, thrown when invalid version encountered
-                                    }
+                final Requires requires = visitor.getClass().getAnnotation(Requires.class);
+                if (requires != null) {
+                    final Requires.Sdk sdk = requires.sdk();
+                    if (sdk == Requires.Sdk.MICRONAUT) {
+                        final String version = requires.version();
+                        if (StringUtils.isNotEmpty(version)) {
+                            if (!VersionUtils.isAtLeastMicronautVersion(version)) {
+                                try {
+                                    warning("TypeElementVisitor [" + definition.getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
+                                    continue;
+                                } catch (IllegalArgumentException e) {
+                                    // shouldn't happen, thrown when invalid version encountered
                                 }
                             }
                         }
                     }
-
-                    typeElementVisitors.put(definition.getName(), visitor);
                 }
-            }
-        } catch (ServiceConfigurationError e) {
-            System.err.println("Failed to configure default TypeElementVisitors. Using fallback behaviour: " + e.getMessage());
-            typeElementVisitors.put(IntrospectedTypeElementVisitor.class.getName(), new IntrospectedTypeElementVisitor());
-            try {
-                final TypeElementVisitor graalVisitor =
-                        InstantiationUtils.instantiate("io.micronaut.graal.reflect.GraalTypeElementVisitor", TypeElementVisitor.class);
-                typeElementVisitors.put(graalVisitor.getClass().getName(), graalVisitor);
-            } catch (Exception ex) {
-                // ignore
+
+                typeElementVisitors.put(definition.getName(), visitor);
             }
         }
         return typeElementVisitors.values();
