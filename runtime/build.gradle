@@ -10,7 +10,7 @@ dependencies {
     api dependencyVersion("jackson.databind")
     api dependencyVersion("rxjava2")
 
-    compileOnly "com.oracle.substratevm:svm:$graalVersion"
+    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
     compileOnly project(":graal")
     compileOnly dependencyVersion("jcache")
 
