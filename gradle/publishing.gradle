@@ -27,7 +27,6 @@ import static groovyx.net.http.ContentType.*
 
 apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
-apply plugin: 'com.bmuschko.nexus'
 
 ext.extraPomInfo = {}
 ext.pomInfo = {
@@ -63,9 +62,16 @@ ext.pomInfo = {
     ext.extraPomInfo.call()
 }
 
+if (project.name != 'bom') {
+    task sourcesJar(type: Jar) {
+        classifier = 'sources'
+        from sourceSets.main.allJava
+    }
 
-modifyPom {
-    project(pomInfo)
+    task javadocJar(type: Jar) {
+        classifier = 'javadoc'
+        from javadoc.destinationDir
+    }    
 }
 
 publishing {
@@ -224,45 +230,53 @@ bintray {
 task synchronizeWithMavenCentral() {
     description = "Syncs with Maven Central/Sonatype"
     doLast {
+        boolean ongoing = true
+
         println """
 Synchronizing with Maven central. This may take a few minutes ...
 If this fails, log on to http://oss.sonatype.org/ using the centralUser credentials
 and progress through process manually -> Close -> Publish ... under staging repositories
 """
-        List<String> versions = [projectVersion]
-
-        for (v in versions) {
-            try {
-                try {
-                    def mavenClent = new RESTClient("https://repo.maven.apache.org/maven2/")
-                    mavenClent.get(path: "${project.group.replace('.', '/')}/micronaut-$project.name/$v/micronaut-$project.name-${v}.jar")
-                } catch (groovyx.net.http.HttpResponseException e) {
-                    // doesn't exist.. try sync
-                    def client = new RESTClient('https://api.bintray.com/maven_central_sync/micronaut/core-releases-local/')
-                    client.headers['Authorization'] = 'Basic ' + "$bintrayUser:$bintrayKey".getBytes('iso-8859-1').encodeBase64()
-                    def body = /{}/
-                    def resp = client.post(
-                            path: "$bintray.pkg.name/versions/$v",
-                            body: body,
-                            requestContentType: JSON
-                    )
-                    assert resp.status == 200
-                    println resp.data.status
-                    println resp.data.messages.join('\n')
-                }
-            } catch (groovyx.net.http.HttpResponseException e) {
-                println "Error: $e"
-                println "Message: $e.message"
-                println "Body: $e.response.data"
-                throw e
+        // this hack is here to keep Travis from thinking this is
+        // a stalled build
+        Thread.start {
+            while(ongoing) {
+                sleep 5000
+                println "Still Publishing. Please wait..."
             }
         }
+        try {
+            try {
+                def mavenClent = new RESTClient("https://repo.maven.apache.org/maven2/")
+                mavenClent.get(path:"${project.group.replace('.','/')}/micronaut-$project.name/$project.version/micronaut-$project.name-${project.version}.jar")
+            } catch(groovyx.net.http.HttpResponseException e) {
+                // doesn't exist.. try sync
+                def client = new RESTClient('https://api.bintray.com/maven_central_sync/micronaut/core-releases-local/')
+                client.headers['Authorization'] = 'Basic ' + "$bintrayUser:$bintrayKey".getBytes('iso-8859-1').encodeBase64()
+                def body = /{}/
+                def resp = client.post(
+                        path: "$bintray.pkg.name/versions/$project.version",
+                        body: body,
+                        requestContentType: JSON
+                )
+                assert resp.status == 200
 
+                println resp.data.status
+                println resp.data.messages.join('\n')
+            }
+        } catch (groovyx.net.http.HttpResponseException e) {
+            println "Error: $e"
+            println "Message: $e.message"
+            println "Body: $e.response.data"
+            throw e
+        } finally {
+            ongoing = false
+        }
     }
 }
 
-def fetch(addr, params = [:]) {
-    def auth = "<personal api token>"
-    def json = new groovy.json.JsonSlurper()
-    return json.parse(addr.toURL().newReader(requestProperties: ["Authorization": "token ${System.getenv("GH_TOKEN")}".toString(), "Accept": "application/json"]))
+if (!project.version.endsWith("-SNAPSHOT")) {
+    // disable remote publish for non-snapshot versions
+    // since releases are published to bintray
+    publishMavenPublicationToMavenRepository.enabled = false
 }

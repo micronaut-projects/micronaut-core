@@ -41,6 +41,5 @@ dependencies {
     testAnnotationProcessor project(":http-server-netty")
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":inject-groovy")
-
-    testRuntime dependencyVersion("snakeyaml")
+    testRuntimeOnly dependencyVersion("snakeyaml")
 }
