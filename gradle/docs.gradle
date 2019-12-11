@@ -194,8 +194,8 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
 }
 task zipDocs(type:Zip) {
     group = DOCUMENTATION_GROUP
-    baseName = "${project.name}-${project.version}"
-    destinationDir = new File(project.buildDir, "distributions")
+    archiveBaseName = "${project.name}-${project.version}"
+    destinationDirectory = new File(project.buildDir, "distributions")
     from project.files("${buildDir}/docs")
 }
 task assemble() {

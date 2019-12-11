@@ -52,11 +52,11 @@ dependencies {
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":test-suite")
 
-    testRuntime dependencyVersion("tomcatJdbc")
-    testRuntime dependencyVersion("h2")
-    testRuntime "org.junit.vintage:junit-vintage-engine:$junit5Version"
-    testRuntime "ch.qos.logback:logback-classic:1.2.3"
-    testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
+    testRuntimeOnly dependencyVersion("tomcatJdbc")
+    testRuntimeOnly dependencyVersion("h2")
+    testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junit5Version"
+    testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
+    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }
 
 tasks.withType(Test) {

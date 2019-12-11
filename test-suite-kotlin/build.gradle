@@ -41,8 +41,8 @@ dependencies {
 
     kaptTest project(':inject-java')
     kaptTest project(':validation')
-    testRuntime "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
-    testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
+    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }
 
 compileTestKotlin {

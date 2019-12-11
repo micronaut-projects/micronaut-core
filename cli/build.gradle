@@ -15,8 +15,8 @@ dependencies {
     api "jline:jline:2.12"
     api "org.springframework.boot:spring-boot-cli:1.5.10.RELEASE"
     api dependencyVersion("snakeyaml")
-    runtime dependencyModuleVersion("slf4j", "slf4j-simple")
-    runtime "org.codehaus.plexus:plexus-component-api:1.0-alpha-33"
+    runtimeOnly dependencyModuleVersion("slf4j", "slf4j-simple")
+    runtimeOnly "org.codehaus.plexus:plexus-component-api:1.0-alpha-33"
 
 
     testImplementation "net.sf.expectit:expectit-core:0.9.0"
@@ -32,6 +32,8 @@ task createStartScripts(type: MicronautCreateStartScripts) {
     defaultJvmOpts = ["-XX:+TieredCompilation", "-XX:TieredStopAtLevel=1", "-XX:CICompilerCount=3"]
     outputDir = outDir
     classpath = configurations.runtime
+    inputs.file 'src/main/resources/mn_completion'
+    outputs.dir outDir
     doLast {
         ant.chmod(file: new File(outDir, 'mn'), perm: 'ugo+rx')
         copy {
