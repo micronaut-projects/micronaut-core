@@ -9,10 +9,13 @@ import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.introspections.Person
+import spock.util.environment.RestoreSystemProperties
 
 import javax.validation.constraints.Size
 
+@RestoreSystemProperties
 class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
+
     def setup() {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, IntrospectedTypeElementVisitor.name)
     }
