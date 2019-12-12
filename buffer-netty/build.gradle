@@ -1,5 +1,6 @@
 dependencies {
     api project(":core")
+    api project(":inject")
     api dependencyModuleVersion("netty", "netty-buffer")
 
     annotationProcessor project(":inject-java")

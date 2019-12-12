@@ -17,10 +17,13 @@ import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
+import spock.lang.IgnoreIf
+
 //import org.objectweb.asm.ClassReader
 //import org.objectweb.asm.util.ASMifier
 //import org.objectweb.asm.util.TraceClassVisitor
 import spock.lang.Issue
+import spock.util.environment.Jvm
 
 import javax.annotation.processing.SupportedAnnotationTypes
 import javax.persistence.Column
@@ -1355,34 +1358,7 @@ class Test {
         introspection.getRequiredProperty("name", String).get(instance) == "Apple"
     }
 
-    void "test instantiating an enum"() {
-        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
-package test;
-
-import io.micronaut.core.annotation.*;
-
-@Introspected
-enum Test {
-    A, B, C
-}
-''')
-
-        expect:
-        introspection != null
-
-        when:
-        def instance = introspection.instantiate("A")
-
-        then:
-        instance.name() == "A"
-
-        when:
-        introspection.instantiate()
-
-        then:
-        thrown(InstantiationException)
-    }
-
+    @IgnoreIf({ Jvm.current.isJava9Compatible() })
     void "test enum bean properties"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test;
@@ -1424,6 +1400,36 @@ public enum Test {
         then:
         thrown(InstantiationException)
     }
+
+    void "test instantiating an enum"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+enum Test {
+    A, B, C
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
+
 
     @Override
     protected JavaParser newJavaParser() {

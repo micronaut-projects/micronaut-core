@@ -648,6 +648,10 @@ subprojects { Project subproject ->
         }
     }
 
+//    tasks.withType(GroovyCompile).configureEach {
+//        options.incremental = true
+//    }
+
     tasks.withType(Test) {
         jvmArgs '-Duser.country=US'
         jvmArgs '-Duser.language=en'
@@ -699,7 +703,9 @@ subprojects { Project subproject ->
 
 
         if (isDocumented) {
-            compileOnly "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion"
+            compileOnly "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion", {
+                transitive = false
+            }
         }
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testImplementation "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
