@@ -49,7 +49,9 @@ dependencies {
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-groovy")
     testImplementation dependencyModuleVersion("gorm", "grails-datastore-gorm")
-    testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    if (!JavaVersion.current().isJava9Compatible()) {
+        testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
 }
 
 //compileJava.options.fork = true
