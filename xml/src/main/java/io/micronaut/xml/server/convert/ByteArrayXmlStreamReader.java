@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.Internal;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.util.StreamReaderDelegate;
-import java.util.Arrays;
 
 /**
  * Stream reader that pairs xml stream with underlying byte array.
@@ -49,17 +48,20 @@ public final class ByteArrayXmlStreamReader extends StreamReaderDelegate {
     }
 
     /**
-     * @return copy of byte array of the underlying stream.
+     * @return underlying byte representation of xml content.
      */
     byte[] getBytes() {
-        return Arrays.copyOf(this.bytes, bytes.length);
+        return this.bytes;
     }
 
     /**
+     * The xmlStream is stateful. Once we walked through the whole stream, before we can re-read its content we need to
+     * reset state. Unfortunately the stream implementation does not have an api to flush the state, so a simple solution
+     * is to create a new instance with the same underlying byte array.
      *
-     * @return copy of the given stream
+     * @return new instance with fresh state
      */
-    public XMLStreamReader copy() {
+    public XMLStreamReader reset() {
         try {
             return new ByteArrayXmlStreamReader(bytes);
         } catch (XMLStreamException e) {

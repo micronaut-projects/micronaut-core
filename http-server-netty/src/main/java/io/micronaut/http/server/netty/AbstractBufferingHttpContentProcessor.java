@@ -16,9 +16,9 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.multipart.HttpData;
@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public abstract class AbstractBufferingHttpContentProcessor<T> extends SingleThreadedBufferingProcessor<ByteBufHolder, T> implements HttpContentProcessor<T> {
 
     protected final NettyHttpRequest nettyHttpRequest;
+    // Will be -1 if length is unknown
     protected final long advertisedLength;
     protected final long requestMaxSize;
     protected final AtomicLong receivedLength = new AtomicLong();

@@ -21,7 +21,6 @@ import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.xml.server.convert.ByteArrayXmlStreamReader;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.buffer.ByteBufUtil;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +39,7 @@ import java.io.ByteArrayOutputStream;
 public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(XmlContentProcessor.class);
+    private static final int DEFAULT_REQUEST_SIZE = 1024;
 
     private final ByteArrayOutputStream byteArrayStream;
 
@@ -51,7 +51,8 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
     public XmlContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         super(nettyHttpRequest, configuration);
 
-        byteArrayStream = new ByteArrayOutputStream((int) this.advertisedLength);
+        int requestLength = this.advertisedLength != -1 ? (int) this.advertisedLength : DEFAULT_REQUEST_SIZE;
+        byteArrayStream = new ByteArrayOutputStream(requestLength);
     }
 
     @Override
@@ -62,13 +63,20 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
     @Override
     protected void onUpstreamMessage(ByteBufHolder message) {
         ByteBuf content = message.content();
-        byte[] bytes = ByteBufUtil.getBytes(content);
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Buffer xml bytes of size {}", bytes.length);
+            LOG.debug("Buffer xml bytes of size {}", content.readableBytes());
         }
 
-        byteArrayStream.write(bytes, 0, bytes.length);
+        if (content.hasArray()) {
+            byteArrayStream.write(content.array(), content.readerIndex(), content.readableBytes());
+        }
+        else {
+            while(content.isReadable()) {
+                byteArrayStream.write(content.readByte());
+            }
+        }
+
         upstreamSubscription.request(1);
     }
 
@@ -82,7 +90,7 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
         }
     }
 
-    private synchronized void sendXmlStreamToSubscriber() {
+    private void sendXmlStreamToSubscriber() {
         currentDownstreamSubscriber().ifPresent(subscriber -> {
             try {
                 byte[] bytes = byteArrayStream.toByteArray();
