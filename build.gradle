@@ -616,6 +616,10 @@ subprojects { Project subproject ->
         compileJava.options.compilerArgs.add '-parameters'
         compileTestJava.options.compilerArgs.add '-parameters'
 
+        testlogger {
+            showPassed false
+        }
+
         if (
         !subproject.name.startsWith('test-') &&
                 !subproject.toString().contains('build-projects') &&
