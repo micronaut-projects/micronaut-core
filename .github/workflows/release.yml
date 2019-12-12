@@ -20,6 +20,20 @@ jobs:
 #      run: ./gradlew assemble bintrayUpload docs
 #    - id: release_version
 #      run: echo ::set-output name=release_version::${GITHUB_REF:11}
+#    - name: Create Release
+#        id: create_release
+#        uses: actions/create-release@v1
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+#        with:
+#          tag_name: ${{ github.ref }}
+#          release_name: Micronaut ${{ steps.release_version.outputs.release_version }}
+#          body: |
+#            Changes in this Release
+#            - First Change
+#            - Second Change
+#          draft: false
+#          prerelease: false
 #    - name: Publish to Github Pages
 #      if: success()
 #      uses: micronaut-projects/github-pages-deploy-action@master
