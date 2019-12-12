@@ -11,7 +11,6 @@ buildscript {
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.1"
         classpath 'javax.xml.bind:jaxb-api:2.2.8'
-        classpath 'com.adarshr:gradle-test-logger-plugin:2.0.0'
         classpath "io.micronaut.docs:micronaut-docs-asciidoc-extensions:$micronautDocsVersion"
         classpath "io.micronaut.docs:micronaut-docs-gradle-plugins:$micronautDocsVersion", {
             exclude module:'shadow'
@@ -609,16 +608,11 @@ subprojects { Project subproject ->
     if (!subproject.name.contains("bom")) {
         apply plugin: "groovy"
         apply plugin: "java-library"
-        apply plugin: 'com.adarshr.test-logger'
 
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
         compileJava.options.compilerArgs.add '-parameters'
         compileTestJava.options.compilerArgs.add '-parameters'
-
-        testlogger {
-            showPassed false
-        }
 
         if (
         !subproject.name.startsWith('test-') &&
@@ -660,6 +654,13 @@ subprojects { Project subproject ->
         jvmArgs '-Duser.country=US', '-Duser.language=en', '-Xmx2048m'
         reports.html.enabled = !System.getenv("TRAVIS")
         reports.junitXml.enabled = !System.getenv("TRAVIS")
+        testLogging {
+            exceptionFormat = 'full'
+        }
+        afterSuite {
+            System.out.print(".")
+            System.out.flush()
+        }
 
         systemProperty "micronaut.cloud.platform", "OTHER"
     }
