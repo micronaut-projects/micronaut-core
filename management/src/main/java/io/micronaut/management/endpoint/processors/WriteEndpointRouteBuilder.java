@@ -62,7 +62,7 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
     protected void registerRoute(ExecutableMethod<?, ?> method, String id) {
         Class<?> declaringType = method.getDeclaringType();
         UriTemplate template = buildUriTemplate(method, id);
-        String[] consumes = method.getValue(Write.class, "consumes", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
+        String[] consumes = method.stringValues(Write.class, "consumes");
         final UriRoute uriRoute = POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
                 .consumes(MediaType.of(consumes));
         if (LOG.isDebugEnabled()) {

@@ -51,7 +51,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
         if (skipValidation) {
             return;
         }
-        String uri = element.getValue(WEB_SOCKET_COMPONENT, String.class).orElse("/ws");
+        String uri = element.stringValue(WEB_SOCKET_COMPONENT).orElse("/ws");
         UriMatchTemplate template = uriCache.computeIfAbsent(uri, UriMatchTemplate::of);
         List<String> variables = template.getVariableNames();
         ParameterElement[] parameters = element.getParameters();

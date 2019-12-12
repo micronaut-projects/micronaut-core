@@ -100,7 +100,9 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
             }
             String[] patterns = getPatterns(beanDefinition);
             if (ArrayUtils.isNotEmpty(patterns)) {
-                HttpMethod[] methods = beanDefinition.getValue(Filter.class, "methods", HttpMethod[].class).orElse(null);
+                HttpMethod[] methods = beanDefinition.findAnnotation(Filter.class)
+                        .map(av -> av.enumValues("methods", HttpMethod.class))
+                        .orElse(null);
                 String first = patterns[0];
                 FilterRoute filterRoute = addFilter(first, () -> beanContext.getBean((Class<HttpFilter>) beanDefinition.getBeanType()));
                 if (patterns.length > 1) {

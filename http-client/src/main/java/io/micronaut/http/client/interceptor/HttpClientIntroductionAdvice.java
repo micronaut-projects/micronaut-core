@@ -181,7 +181,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
 
             HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase());
-            String httpMethodName = context.getValue(CustomHttpMethod.class, "method", String.class).orElse(httpMethod.name());
+            String httpMethodName = context.stringValue(CustomHttpMethod.class, "method").orElse(httpMethod.name());
 
             ReturnType returnType = context.getReturnType();
             Class<?> javaReturnType = returnType.getType();
@@ -257,7 +257,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     }
                 }
                 if (definedValue == null) {
-                    definedValue = argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", String.class).orElse(null);
+                    definedValue = argument.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null);
                 }
 
                 if (definedValue == null && !argument.isNullable()) {
@@ -407,7 +407,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
             final Class<?> methodDeclaringType = declaringType;
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
-                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.getValue(Consumes.class, "single", Boolean.class).orElse(false);
+                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.isTrue(Consumes.class, "single");
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
 
