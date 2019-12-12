@@ -23,7 +23,7 @@ dependencies {
     testImplementation dependencyModuleVersion("micronaut.groovy","micronaut-runtime-groovy"), {
         exclude module:'micronaut-inject'
     }
-    testImplementation project(":inject-groovy")
+    testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")
     testImplementation group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }

@@ -9,12 +9,13 @@ dependencies {
     compileOnly project(":http-server")
     
     testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject")
     testImplementation project(":http-server-netty")
     testImplementation project(":websocket")
     testImplementation project(":http-client")
-    testImplementation project(":inject-groovy")
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation project(":inject-java-test")
+    testCompileOnly project(":inject-groovy")
 
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

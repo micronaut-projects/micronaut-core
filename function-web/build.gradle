@@ -5,10 +5,9 @@ dependencies {
     api project(":http-server")
 
     testImplementation project(":http-client")
-    testImplementation project(":inject-groovy")
-    testImplementation project(":inject-java")
+    testImplementation project(":inject")
     testImplementation project(":http-server-netty")
 
     testAnnotationProcessor project(":inject-java")
-    testAnnotationProcessor project(":inject-groovy")
+    testCompileOnly project(":inject-groovy")
 }
