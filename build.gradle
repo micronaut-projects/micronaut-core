@@ -651,14 +651,6 @@ subprojects { Project subproject ->
     tasks.withType(Test) {
         jvmArgs '-Duser.country=US'
         jvmArgs '-Duser.language=en'
-        testLogging {
-            exceptionFormat = 'full'
-        }
-        afterSuite {
-            System.out.print(".")
-            System.out.flush()
-        }
-
         reports.html.enabled = !System.getenv("TRAVIS")
         reports.junitXml.enabled = !System.getenv("TRAVIS")
 
