@@ -23,12 +23,11 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.core.annotation.Internal;
 
 /**
- * Group together jackson features which going to be used to configure Jackson based media codecs.
+ * Stores features to later configure an {@link com.fasterxml.jackson.databind.ObjectMapper}.
+ * Features are supplied through the {@link io.micronaut.jackson.annotation.JacksonFeatures} annotation.
  *
- * @see JsonMediaTypeCodec
- * @see XmlMediaTypeCodec
- * @see JsonStreamMediaTypeCodec
- * @since 1.2
+ * @author svishnyakov
+ * @since 1.3.0
  */
 @Internal
 public final class JacksonFeatures {

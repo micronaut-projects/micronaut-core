@@ -27,14 +27,15 @@ import org.slf4j.LoggerFactory;
 
 import javax.xml.stream.XMLStreamException;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 /**
  * This class will handle subscribing to a Xml stream and binding once the events are complete in a non-blocking
  * manner.
  *
  * @author svishnyakov
- * @author jameskleeh
- * @since 1.2
+ * @author James Kleeh
+ * @since 1.3.0
  */
 public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<Object> {
 
@@ -68,16 +69,12 @@ public class XmlContentProcessor extends AbstractBufferingHttpContentProcessor<O
             LOG.debug("Buffer xml bytes of size {}", content.readableBytes());
         }
 
-        if (content.hasArray()) {
-            byteArrayStream.write(content.array(), content.readerIndex(), content.readableBytes());
+        try {
+            content.readBytes(byteArrayStream, content.readableBytes());
+            upstreamSubscription.request(1);
+        } catch (IOException e) {
+            onError(e);
         }
-        else {
-            while(content.isReadable()) {
-                byteArrayStream.write(content.readByte());
-            }
-        }
-
-        upstreamSubscription.request(1);
     }
 
     @Override

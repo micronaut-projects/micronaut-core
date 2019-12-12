@@ -16,53 +16,48 @@
 package io.micronaut.xml.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
-import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.jackson.codec.AbstractJacksonMediaTypeCodec;
+import io.micronaut.jackson.codec.JacksonMediaTypeCodec;
+import io.micronaut.jackson.codec.JacksonFeatures;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nullable;
-import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.Optional;
 
 /**
  * A jackson based {@link io.micronaut.http.codec.MediaTypeCodec} that handles XML requests/responses.
  *
- * @since 1.3
+ * @author svishnyakov
+ * @since 1.3.0
  */
 @Named("xml")
 @Singleton
 @BootstrapContextCompatible
-public class XmlMediaTypeCodec extends AbstractJacksonMediaTypeCodec {
+public class XmlMediaTypeCodec extends JacksonMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "xml";
 
     /**
      * @param xmlMapper                Object mapper for xml. If null, retrieved from beanContext
      * @param applicationConfiguration The common application configurations
-     * @param beanContext              Bean context that will be used to retrieve object mapper if one was not provided
      * @param codecConfiguration       The configuration for the codec
      */
-    @Inject
-    public XmlMediaTypeCodec(@Nullable @Parameter ObjectMapper xmlMapper,
+    public XmlMediaTypeCodec(@Named(CONFIGURATION_QUALIFIER) ObjectMapper xmlMapper,
                              ApplicationConfiguration applicationConfiguration,
-                             BeanContext beanContext,
                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        super(setupXmlMapper(xmlMapper, beanContext), applicationConfiguration, codecConfiguration,
+        super(xmlMapper, applicationConfiguration, codecConfiguration,
               MediaType.APPLICATION_XML_TYPE);
     }
 
-    private static ObjectMapper setupXmlMapper(ObjectMapper mapper, BeanContext beanContext) {
-        mapper = Optional.ofNullable(mapper).orElse(beanContext.getBean(ObjectMapper.class, Qualifiers.byName("xml"))).copy();
-        mapper.registerModule(new JaxbAnnotationModule());
+    @Override
+    public JacksonMediaTypeCodec cloneWithFeatures(JacksonFeatures jacksonFeatures) {
+        ObjectMapper objectMapper = this.objectMapper.copy();
+        jacksonFeatures.getDeserializationFeatures().forEach(objectMapper::configure);
+        jacksonFeatures.getSerializationFeatures().forEach(objectMapper::configure);
 
-        return mapper;
+        return new XmlMediaTypeCodec(objectMapper, applicationConfiguration, codecConfiguration);
     }
 }

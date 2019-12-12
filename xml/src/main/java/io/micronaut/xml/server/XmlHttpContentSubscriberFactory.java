@@ -25,9 +25,10 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import javax.inject.Singleton;
 
 /**
- * Builds the {@link org.reactivestreams.Subscriber} for Xml requests.
+ * Builds the {@link org.reactivestreams.Subscriber} for XML requests.
  *
- * @since 1.2
+ * @author svishnyakov
+ * @since 1.3.0
  */
 @Consumes({MediaType.APPLICATION_XML, MediaType.APPLICATION_XHTML, MediaType.TEXT_XML})
 @Singleton

@@ -26,6 +26,7 @@ import javax.xml.stream.util.StreamReaderDelegate;
  * Stream reader that pairs xml stream with underlying byte array.
  *
  * @author sergey.vishnyakov
+ * @since 1.3.0
  */
 @Internal
 public final class ByteArrayXmlStreamReader extends StreamReaderDelegate {

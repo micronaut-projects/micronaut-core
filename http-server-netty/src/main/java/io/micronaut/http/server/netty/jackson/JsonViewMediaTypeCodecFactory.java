@@ -54,22 +54,18 @@ public class JsonViewMediaTypeCodecFactory implements JsonViewCodecResolver {
     private final ApplicationConfiguration applicationConfiguration;
     private final CodecConfiguration codecConfiguration;
     private final Map<Class<?>, JsonMediaTypeCodec> jsonViewCodecs = new ConcurrentHashMap<>(5);
-    private final BeanContext beanContext;
 
     /**
      * @param objectMapper             To read/write JSON
      * @param applicationConfiguration The common application configurations
-     * @param beanContext              Bean context
      * @param codecConfiguration       The configuration for the codec
      */
     protected JsonViewMediaTypeCodecFactory(ObjectMapper objectMapper,
                                             ApplicationConfiguration applicationConfiguration,
-                                            BeanContext beanContext,
                                             @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this.objectMapper = objectMapper;
         this.applicationConfiguration = applicationConfiguration;
         this.codecConfiguration = codecConfiguration;
-        this.beanContext = beanContext;
     }
 
     /**
@@ -85,7 +81,7 @@ public class JsonViewMediaTypeCodecFactory implements JsonViewCodecResolver {
 
             ObjectMapper viewMapper = objectMapper.copy();
             viewMapper.setConfig(viewMapper.getSerializationConfig().withView(viewClass));
-            codec = new JsonMediaTypeCodec(viewMapper, applicationConfiguration, beanContext, codecConfiguration);
+            codec = new JsonMediaTypeCodec(viewMapper, applicationConfiguration, codecConfiguration);
             jsonViewCodecs.put(viewClass, codec);
         }
         return codec;

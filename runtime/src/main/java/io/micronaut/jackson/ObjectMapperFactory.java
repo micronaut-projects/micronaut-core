@@ -151,7 +151,7 @@ public class ObjectMapperFactory {
 
             ObjectMapper.DefaultTyping defaultTyping = jacksonConfiguration.getDefaultTyping();
             if (defaultTyping != null) {
-                objectMapper.enableDefaultTyping(defaultTyping);
+                objectMapper.activateDefaultTyping(objectMapper.getPolymorphicTypeValidator(), defaultTyping);
             }
 
             JsonInclude.Include include = jacksonConfiguration.getSerializationInclusion();

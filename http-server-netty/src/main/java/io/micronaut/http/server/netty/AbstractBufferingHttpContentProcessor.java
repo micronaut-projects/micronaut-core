@@ -37,7 +37,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public abstract class AbstractBufferingHttpContentProcessor<T> extends SingleThreadedBufferingProcessor<ByteBufHolder, T> implements HttpContentProcessor<T> {
 
     protected final NettyHttpRequest nettyHttpRequest;
-    // Will be -1 if length is unknown
     protected final long advertisedLength;
     protected final long requestMaxSize;
     protected final AtomicLong receivedLength = new AtomicLong();

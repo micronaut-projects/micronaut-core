@@ -95,9 +95,9 @@ ext {
                     modules: ['jackson-datatype-jsr310']
             ],
             'jackson.dataformat'       : [
-                    version: jacksonVersion,
-                    group  : 'com.fasterxml.jackson.dataformat',
-                    name   : 'jackson-dataformat-xml',
+                    version : jacksonVersion,
+                    group   : 'com.fasterxml.jackson.dataformat',
+                    modules : ['jackson-dataformat-xml'],
             ],
             jaeger                     : [
                     version: jaegerVersion,

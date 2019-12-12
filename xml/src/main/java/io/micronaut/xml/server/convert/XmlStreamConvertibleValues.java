@@ -25,6 +25,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.CollectionUtils;
 
+import javax.xml.stream.XMLStreamReader;
 import java.io.IOException;
 import java.util.*;
 
@@ -76,6 +77,9 @@ public class XmlStreamConvertibleValues<V> implements ConvertibleValues<V> {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         try {
+            //XMLStreamReader streamReader = stream.reset();
+            //streamReader.next()
+
             FromXmlParser parser = xmlMapper.getFactory().createParser(stream.reset());
             SelectiveJsonParser xmlParser = new SelectiveJsonParser(
                     name.toString(), ParsedValueHolder.VALUE_FIELD_NAME, parser

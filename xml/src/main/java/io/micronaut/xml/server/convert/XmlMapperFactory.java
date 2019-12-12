@@ -16,6 +16,7 @@
 package io.micronaut.xml.server.convert;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
@@ -41,14 +42,14 @@ import java.util.TimeZone;
  * of {@link io.micronaut.jackson.ObjectMapperFactory}.
  *
  * @author svishnyakoff
- * @since 1.3
+ * @since 1.3.0
  */
 @Factory
 @BootstrapContextCompatible
 public class XmlMapperFactory {
 
     @Inject
-    // have to be fully qualified due to JDK Module type
+    // has to be fully qualified due to JDK Module type
     protected com.fasterxml.jackson.databind.Module[] jacksonModules = new com.fasterxml.jackson.databind.Module[0];
 
     @Inject
@@ -72,8 +73,7 @@ public class XmlMapperFactory {
     @Singleton
     @BootstrapContextCompatible
     @Named("xml")
-    @Requires(classes = XmlMapper.class)
-    public ObjectMapper xmlMapper(@Nullable JacksonConfiguration jacksonConfiguration) {
+    public XmlMapper xmlMapper(@Nullable JacksonConfiguration jacksonConfiguration) {
 
         XmlMapper objectMapper = new XmlMapper();
 
@@ -98,7 +98,7 @@ public class XmlMapperFactory {
 
             ObjectMapper.DefaultTyping defaultTyping = jacksonConfiguration.getDefaultTyping();
             if (defaultTyping != null) {
-                objectMapper.enableDefaultTyping(defaultTyping);
+                objectMapper.activateDefaultTyping(objectMapper.getPolymorphicTypeValidator(), defaultTyping);
             }
 
             JsonInclude.Include include = jacksonConfiguration.getSerializationInclusion();

@@ -16,47 +16,27 @@
 package io.micronaut.jackson.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nullable;
-import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.Optional;
 
 /**
  * A {@link io.micronaut.http.codec.MediaTypeCodec} for JSON and Jackson.
  *
  * @author Graeme Rocher
- * @since 1.0
+ * @since 1.0.0
  */
 @Named("json")
 @Singleton
 @BootstrapContextCompatible
-public class JsonMediaTypeCodec extends AbstractJacksonMediaTypeCodec {
+public class JsonMediaTypeCodec extends JacksonMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json";
-
-    /**
-     * @param objectMapper             To read/write JSON. If null, will be retrieved from beanContext
-     * @param applicationConfiguration The common application configurations
-     * @param beanContext              Bean context that will be used to lookup object mapper if it was not provided
-     * @param codecConfiguration       The configuration for the codec
-     */
-    @Inject
-    public JsonMediaTypeCodec(@Nullable @Parameter ObjectMapper objectMapper,
-                              ApplicationConfiguration applicationConfiguration,
-                              BeanContext beanContext,
-                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        super(Optional.ofNullable(objectMapper).orElse(beanContext.getBean(ObjectMapper.class, Qualifiers.byName("json"))),
-              applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
-    }
 
     /**
      * @param objectMapper             To read/write JSON
@@ -67,5 +47,14 @@ public class JsonMediaTypeCodec extends AbstractJacksonMediaTypeCodec {
                               ApplicationConfiguration applicationConfiguration,
                               @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         super(objectMapper, applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
+    }
+
+    @Override
+    public JacksonMediaTypeCodec cloneWithFeatures(JacksonFeatures jacksonFeatures) {
+        ObjectMapper objectMapper = this.objectMapper.copy();
+        jacksonFeatures.getDeserializationFeatures().forEach(objectMapper::configure);
+        jacksonFeatures.getSerializationFeatures().forEach(objectMapper::configure);
+
+        return new JsonMediaTypeCodec(objectMapper, applicationConfiguration, codecConfiguration);
     }
 }

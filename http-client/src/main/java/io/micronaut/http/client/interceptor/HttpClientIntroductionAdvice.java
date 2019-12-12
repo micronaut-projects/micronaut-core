@@ -50,6 +50,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.sse.SseClient;
+import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathProvider;
@@ -58,8 +59,11 @@ import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.annotation.JacksonFeatures;
+import io.micronaut.jackson.codec.JacksonMediaTypeCodec;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
+import io.micronaut.runtime.ApplicationConfiguration;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -720,9 +724,17 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     }
 
                     List<MediaTypeCodec> codecs = new ArrayList<>(2);
-                    setupCodec(beanContext, "json", jacksonFeatures).ifPresent(codecs::add);
-                    setupCodec(beanContext, "xml", jacksonFeatures).ifPresent(codecs::add);
-
+                    MediaTypeCodecRegistry codecRegistry = defaultClient.getMediaTypeCodecRegistry();
+                    for (MediaTypeCodec codec: codecRegistry.getCodecs()) {
+                        if (codec instanceof JacksonMediaTypeCodec) {
+                            codecs.add(((JacksonMediaTypeCodec) codec).cloneWithFeatures(jacksonFeatures));
+                        } else {
+                            codecs.add(codec);
+                        }
+                    }
+                    if (!codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isPresent()) {
+                        codecs.add(createNewJsonCodec(beanContext, jacksonFeatures));
+                    }
                     defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(codecs));
                 }
             }
@@ -730,20 +742,17 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         });
     }
 
-    private static Optional<MediaTypeCodec> setupCodec(BeanContext beanContext, String qualifierName, io.micronaut.jackson.codec.JacksonFeatures jacksonFeatures) {
-        Optional<ObjectMapper> objectMapper = beanContext.findBean(ObjectMapper.class, Qualifiers.byName(qualifierName));
+    private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, io.micronaut.jackson.codec.JacksonFeatures jacksonFeatures) {
+        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(null, null);
 
-        if (!beanContext.findBeanDefinition(ObjectMapper.class, Qualifiers.byName(qualifierName)).isPresent()) {
-            return Optional.empty();
-        }
+        jacksonFeatures.getDeserializationFeatures().forEach(objectMapper::configure);
+        jacksonFeatures.getSerializationFeatures().forEach(objectMapper::configure);
 
-        return objectMapper.map(mapper -> {
-            jacksonFeatures.getDeserializationFeatures().forEach(mapper::configure);
-            jacksonFeatures.getSerializationFeatures().forEach(mapper::configure);
-
-            return beanContext.createBean(MediaTypeCodec.class, Qualifiers.byName(qualifierName), mapper);
-        });
+        return new JsonMediaTypeCodec(objectMapper,
+                                beanContext.getBean(ApplicationConfiguration.class),
+                                beanContext.findBean(CodecConfiguration.class, Qualifiers.byName(JsonMediaTypeCodec.CONFIGURATION_QUALIFIER)).orElse(null));
     }
+
 
     private String getClientId(AnnotationValue<Client> clientAnn) {
         String clientId = clientAnn.stringValue().orElse(null);

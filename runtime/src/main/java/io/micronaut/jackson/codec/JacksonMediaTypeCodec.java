@@ -39,17 +39,19 @@ import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 /**
- * A {@link MediaTypeCodec} for JSON and Jackson.
+ * A {@link MediaTypeCodec} Jackson based implementations.
  *
  * @author Graeme Rocher
- * @since 1.0
+ * @author svishnyakov
+ * @since 1.3.0
  */
-public abstract class AbstractJacksonMediaTypeCodec implements MediaTypeCodec {
+public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
 
-    private final ObjectMapper objectMapper;
-    private final ApplicationConfiguration applicationConfiguration;
-    private final List<MediaType> additionalTypes;
-    private final MediaType mediaType;
+    protected final ObjectMapper objectMapper;
+    protected final ApplicationConfiguration applicationConfiguration;
+    protected final List<MediaType> additionalTypes;
+    protected final CodecConfiguration codecConfiguration;
+    protected final MediaType mediaType;
 
     /**
      * @param objectMapper             To read/write JSON
@@ -57,12 +59,13 @@ public abstract class AbstractJacksonMediaTypeCodec implements MediaTypeCodec {
      * @param codecConfiguration       The configuration for the codec
      * @param mediaType                Client request/response media type
      */
-    public AbstractJacksonMediaTypeCodec(ObjectMapper objectMapper,
-                                         ApplicationConfiguration applicationConfiguration,
-                                         CodecConfiguration codecConfiguration,
-                                         MediaType mediaType) {
+    public JacksonMediaTypeCodec(ObjectMapper objectMapper,
+                                 ApplicationConfiguration applicationConfiguration,
+                                 CodecConfiguration codecConfiguration,
+                                 MediaType mediaType) {
         this.objectMapper = objectMapper;
         this.applicationConfiguration = applicationConfiguration;
+        this.codecConfiguration = codecConfiguration;
         this.mediaType = mediaType;
         if (codecConfiguration != null) {
             this.additionalTypes = codecConfiguration.getAdditionalTypes();
@@ -77,6 +80,8 @@ public abstract class AbstractJacksonMediaTypeCodec implements MediaTypeCodec {
     public ObjectMapper getObjectMapper() {
         return objectMapper;
     }
+
+    public abstract JacksonMediaTypeCodec cloneWithFeatures(JacksonFeatures jacksonFeatures);
 
     @Override
     public Collection<MediaType> getMediaTypes() {

@@ -31,6 +31,7 @@ import java.util.Optional;
  * Converts {@link ByteArrayXmlStreamReader} to object.
  *
  * @author sergey.vishnyakov
+ * @since 1.3.0
  */
 @Singleton
 @Internal
@@ -38,12 +39,9 @@ public class XmlStreamToObjectConverter implements TypeConverter<ByteArrayXmlStr
 
     private final XmlMapper xmlMapper;
 
-    /**
-     * @param xmlMapper object mapper for xml content
-     */
     @Inject
-    public XmlStreamToObjectConverter(@Named("xml") ObjectMapper xmlMapper) {
-        this.xmlMapper = (XmlMapper) xmlMapper;
+    public XmlStreamToObjectConverter(XmlMapper xmlMapper) {
+        this.xmlMapper = xmlMapper;
     }
 
     @Override
