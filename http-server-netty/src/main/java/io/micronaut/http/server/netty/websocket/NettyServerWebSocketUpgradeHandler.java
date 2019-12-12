@@ -224,7 +224,9 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
      * @return The channel future
      **/
     protected ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, MutableHttpResponse<?> response) {
-        int maxFramePayloadLength = webSocketBean.messageMethod().flatMap(m -> m.getValue(OnMessage.class, "maxPayloadLength", Integer.class)).orElse(65536);
+        int maxFramePayloadLength = webSocketBean.messageMethod()
+                .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
+                .orElse(65536)).orElse(65536);
         WebSocketServerHandshakerFactory wsFactory =
                 new WebSocketServerHandshakerFactory(
                         getWebSocketURL(ctx, req),
