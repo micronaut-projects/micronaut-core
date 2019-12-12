@@ -708,7 +708,7 @@ subprojects { Project subproject ->
             exclude module: 'groovy-all'
         }
         testImplementation "cglib:cglib-nodep:3.3.0"
-        testImplementation "org.objenesis:objenesis:1.4"
+        testImplementation "org.objenesis:objenesis:3.1"
 
         testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
         testImplementation "org.codehaus.groovy:groovy-test:$groovyVersion"
