@@ -9,15 +9,15 @@ dependencies {
     api dependencyVersion("validation")
     api dependencyVersion("jackson.databind")
     api dependencyVersion("rxjava2")
+    api([
+            dependencyVersion('jackson.datatype'),
+            dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
+    ])
 
     compileOnly "com.oracle.substratevm:svm:$graalVersion"
     compileOnly project(":graal")
     compileOnly dependencyVersion("jcache")
 
-    implementation([
-        dependencyVersion('jackson.datatype'),
-        dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
-    ])
 
     compileOnly(
         dependencyModuleVersion('jackson.modules', 'jackson-module-kotlin')

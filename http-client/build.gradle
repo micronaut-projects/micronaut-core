@@ -4,17 +4,17 @@ dependencies {
     api project(":runtime")
     api project(":websocket")
 
-    implementation project(":http-netty")
-    implementation dependencyModuleVersion("netty", "netty-handler-proxy")
+    api project(":http-netty")
+    api dependencyModuleVersion("netty", "netty-handler-proxy")
     
     compileOnly dependencyVersion("reactor")
     
     testAnnotationProcessor project(":validation")
     testAnnotationProcessor project(":inject-java")
 
-    testImplementation project(":inject-groovy")
+    testCompileOnly project(":inject-groovy")
     testImplementation project(":validation")    
-    testImplementation project(":inject-java")    
+    testImplementation project(":inject")
     testImplementation dependencyVersion("rxjava2")
     testImplementation dependencyVersion("reactor")
     testImplementation project(":http-server-netty")

@@ -3,8 +3,9 @@ dependencies {
     api project(":inject")    
     compileOnly project(":graal")
 
-    testImplementation project(":inject-groovy")
-    testAnnotationProcessor project(":inject-groovy")
+    testCompileOnly project(":inject-groovy")
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject")
 }
 
 //compileJava.options.fork = true
