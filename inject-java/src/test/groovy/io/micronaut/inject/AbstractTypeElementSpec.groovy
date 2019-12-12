@@ -196,12 +196,15 @@ abstract class AbstractTypeElementSpec extends Specification {
         return (BeanIntrospection)classLoader.loadClass(beanFullName).newInstance()
     }
 
-    @CompileStatic
     private static JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
         def context = new Context()
         def env = JavacProcessingEnvironment.instance(context)
-        final com.sun.tools.javac.main.JavaCompiler jc = com.sun.tools.javac.main.JavaCompiler.instance(context);
-        jc?.initModules(com.sun.tools.javac.util.List.nil())
+        try {
+            final com.sun.tools.javac.main.JavaCompiler jc = com.sun.tools.javac.main.JavaCompiler.instance(context)
+            jc?.initModules(com.sun.tools.javac.util.List.nil())
+        } catch (e) {
+            // ignore, must be JDK 8
+        }
         def elements = JavacElements.instance(context)
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
         GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
