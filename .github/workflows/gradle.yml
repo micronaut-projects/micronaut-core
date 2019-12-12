@@ -25,7 +25,7 @@ jobs:
       with:
         java-version: ${{ matrix.java }}   
     - name: Build with Gradle
-      run: ./gradlew assemble && ./gradlew check --parallel --continue
+      run: ./gradlew check --parallel --continue
 #    - name: Publish to JFrog OSS
 #      if: success() && github.event_name == 'push' && matrix.java == '1.8'
 #      env:

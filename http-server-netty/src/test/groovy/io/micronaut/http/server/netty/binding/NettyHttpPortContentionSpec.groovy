@@ -21,7 +21,8 @@ import spock.util.environment.Jvm
 @PowerMockRunnerDelegate(Sputnik.class)
 @PowerMockIgnore(["javax.net.ssl.*"])
 @PrepareForTest([SocketUtils.class])
-@Retry // due to the nature of port binding here there is a likelyhood this will sometimes fails to bind port on Travis
+// due to the nature of port binding here there is a likelyhood this will sometimes fails to bind port on Travis
+@Retry(count = 5, delay = 200)
 // This test causes issues on Java 9+ due to use of javax.xml.parsers
 // In general this test os overly complex and uses things we don't use elsewhere like powermock
 // and should be rewritten and simplified
