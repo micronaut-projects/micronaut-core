@@ -1,11 +1,13 @@
 dependencies {
-    compileOnly project(":inject-java")
-    compile project(":function")
-    compile project(":router")
-    compile project(":http-server")
+    annotationProcessor project(":inject-java")
+    api project(":function")
+    api project(":router")
+    api project(":http-server")
 
-    testCompile project(":http-client")
-    testCompile project(":inject-groovy")
-    testCompile project(":inject-java")
-    testCompile project(":http-server-netty")
+    testImplementation project(":http-client")
+    testImplementation project(":inject")
+    testImplementation project(":http-server-netty")
+
+    testAnnotationProcessor project(":inject-java")
+    testCompileOnly project(":inject-groovy")
 }

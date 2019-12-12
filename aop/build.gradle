@@ -1,4 +1,7 @@
-dependencies {
-    compile project(":inject")
+ext {
+    shadowJarEnabled = true
 }
-shadowJar.enabled = true
+dependencies {
+    api project(':inject')
+    api project(':core')
+}

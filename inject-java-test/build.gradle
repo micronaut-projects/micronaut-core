@@ -1,19 +1,16 @@
 dependencies {
-    compile project(":inject-java")
-    compile "com.google.testing.compile:compile-testing:0.18"
-    compile dependencyVersion("groovy")
-    compile(dependencyVersion("spock")) {
+    annotationProcessor project(":inject-java")
+    
+    api project(":inject-java")    
+    api "com.google.testing.compile:compile-testing:0.18"
+    api dependencyVersion("groovy")
+    api(dependencyVersion("spock")) {
         exclude module:'groovy-all'
     }
-    compile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-    testCompile dependencyVersion("validation")
-    testCompile "javax.persistence:javax.persistence-api:2.2"
-    testCompile project(":runtime")
+    api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
 
-//    testCompile "org.ow2.asm:asm-tree:$asmVersion"
-//    testCompile "org.ow2.asm:asm-util:$asmVersion"
-//    testCompile "org.ow2.asm:asm:$asmVersion"
-//    testCompile "org.ow2.asm:asm-commons:$asmVersion"
-//    testCompile "org.ow2.asm:asm-tree:$asmVersion"
-
+    testAnnotationProcessor project(":inject-java")
+    testImplementation dependencyVersion("validation")
+    testImplementation "javax.persistence:javax.persistence-api:2.2"
+    testImplementation project(":runtime")
 }

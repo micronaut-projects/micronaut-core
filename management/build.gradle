@@ -1,16 +1,17 @@
 dependencies {
-    compile project(":router")
-    compile project(":runtime")
-    compileOnly project(":inject-java")
-    compileOnly project(":graal")
+    annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
+        
+    api project(":router")
+    api project(":runtime")
 
-    testCompile project(":http-client")
-    testCompile project(":inject-groovy")
-    testCompile project(":http-server-netty")
-    testCompile dependencyModuleVersion("micronaut.sql", "micronaut-jdbc-tomcat")
-    testCompile dependencyModuleVersion("groovy", "groovy-json")
-    testCompile dependencyVersion("h2")
-    testCompile "mysql:mysql-connector-java:8.0.18"
+    testImplementation project(":http-client")
+    testImplementation project(":inject-groovy")
+    testImplementation project(":http-server-netty")
+    testImplementation dependencyModuleVersion("micronaut.sql", "micronaut-jdbc-tomcat")
+    testImplementation dependencyModuleVersion("groovy", "groovy-json")
+    testImplementation dependencyVersion("h2")
+    testImplementation "mysql:mysql-connector-java:8.0.18"
 
     compileOnly "ch.qos.logback:logback-classic:1.2.3"
 }
