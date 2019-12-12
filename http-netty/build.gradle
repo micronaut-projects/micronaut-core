@@ -1,6 +1,6 @@
 dependencies {
-    annotationProcessor project(":inject-java")
-    compileOnly "com.oracle.substratevm:svm:$graalVersion"
+	annotationProcessor project(":inject-java")
+    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
     compileOnly project(":graal")
     
     api project(":http")

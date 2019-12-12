@@ -5,8 +5,11 @@ import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import spock.util.environment.RestoreSystemProperties
 
+@RestoreSystemProperties
 class IntroductionVisitorSpec extends AbstractBeanDefinitionSpec {
+
     def setup() {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, AllElementsVisitor.name)
     }

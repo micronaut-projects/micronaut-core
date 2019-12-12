@@ -611,7 +611,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         randomValue = UUID.randomUUID().toString();
                         break;
                     case "uuid2":
-                        randomValue = UUID.randomUUID().toString().replaceAll("-", "");
+                        randomValue = UUID.randomUUID().toString().replace("-", "");
                         break;
                     default:
                         throw new ConfigurationException("Invalid random expression " + matcher.group(0) + " for property: " + property);

@@ -19,6 +19,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
@@ -27,6 +28,7 @@ import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
@@ -221,6 +223,13 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
                 return genericReturnType.getTypeVariables();
             }
             return Collections.emptyMap();
+        }
+
+        @Override
+        public Argument asArgument() {
+            Collection<Argument<?>> values = getTypeVariables().values();
+            final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+            return Argument.of(getType(), NameUtils.decapitalize(getType().getSimpleName()), annotationMetadata, values.toArray(new Argument[0]));
         }
     }
 
