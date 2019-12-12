@@ -14,7 +14,7 @@ dependencies {
             dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
     ])
 
-    compileOnly "com.oracle.substratevm:svm:$graalVersion"
+    compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
     compileOnly project(":graal")
     compileOnly dependencyVersion("jcache")
 

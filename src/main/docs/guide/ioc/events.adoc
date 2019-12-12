@@ -14,3 +14,5 @@ snippet::io.micronaut.docs.events.factory.V8Engine,io.micronaut.docs.events.fact
 <5> Within the `onInitialized` method the `rodLength` is overridden prior to the engine being created by the factory bean.
 
 The link:{api}/io/micronaut/context/event/BeanCreatedEventListener.html[BeanCreatedEventListener] interface is more typically used to decorate or enhance a fully initialized bean by creating a proxy for example.
+
+IMPORTANT: Bean event listeners are initialized *before* type converters. If your event listener relies on type conversion either by relying on a configuration properties bean or by any other mechanism, you may see errors related to type conversion.

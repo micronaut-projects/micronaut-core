@@ -16,6 +16,7 @@
 package io.micronaut.validation.routes
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import spock.util.environment.RestoreSystemProperties
 
 class MissingParameterRuleSpec extends AbstractTypeElementSpec {
 
@@ -110,6 +111,7 @@ class Foo {
         ex.message.contains("The route declares a uri variable named [abc], but no corresponding method argument is present")
     }
 
+    @RestoreSystemProperties
     void "test validation can be turned off with a system property"() {
         setup:
         System.setProperty("micronaut.route.validation", "false")
@@ -134,9 +136,6 @@ class Foo {
 
         then:
         noExceptionThrown()
-
-        cleanup:
-        System.setProperty("micronaut.route.validation", "")
     }
 
     void "test property name change with bindable"() {

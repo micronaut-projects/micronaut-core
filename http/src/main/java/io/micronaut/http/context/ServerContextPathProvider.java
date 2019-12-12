@@ -21,7 +21,7 @@ import javax.annotation.Nullable;
  * A contract for providing a context path to a server.
  *
  * @author James Kleeh
- * @since 1.3.0
+ * @since 1.2.8
  */
 public interface ServerContextPathProvider {
 

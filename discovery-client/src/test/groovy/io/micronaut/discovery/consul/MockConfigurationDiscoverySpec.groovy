@@ -24,7 +24,9 @@ import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.environment.RestoreSystemProperties
 
+@RestoreSystemProperties
 class MockConfigurationDiscoverySpec extends Specification {
 
     @AutoCleanup
@@ -48,9 +50,6 @@ class MockConfigurationDiscoverySpec extends Specification {
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "true")
     }
 
-    def cleanup() {
-        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "")
-    }
     void 'test read application configuration from Consul'() {
         given:
         System.setProperty("some.consul.value", "other") // consul should override
@@ -87,9 +86,6 @@ class MockConfigurationDiscoverySpec extends Specification {
 
         then:"The value is retrieved again"
         environment.getProperty('must.override1', String).get() == 'changed'
-
-        cleanup:
-        System.setProperty('some.consul.value','')
     }
 
     void "test multiple environment precedence"() {
