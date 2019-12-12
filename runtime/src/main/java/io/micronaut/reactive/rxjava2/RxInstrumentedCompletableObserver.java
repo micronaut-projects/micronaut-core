@@ -20,9 +20,6 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.CompletableObserver;
 import io.reactivex.disposables.Disposable;
 
-import java.util.Deque;
-import java.util.LinkedList;
-
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
  * See https://github.com/openzipkin/brave/tree/master/context/rxjava2/src/main/java/brave/context/rxjava2/internal.
@@ -34,12 +31,11 @@ import java.util.LinkedList;
 final class RxInstrumentedCompletableObserver implements CompletableObserver, RxInstrumentedComponent {
     private final CompletableObserver source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Deque<InvocationInstrumenter> instrumenters = new LinkedList<>();
 
     /**
      * Default constructor.
      *
-     * @param source          downstream observer
+     * @param source              downstream observer
      * @param instrumenterFactory The instrumenter factory
      */
     RxInstrumentedCompletableObserver(CompletableObserver source, RxInstrumenterFactory instrumenterFactory) {
@@ -55,10 +51,9 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
         } else {
             try {
                 instrumenter.beforeInvocation();
-                instrumenters.push(instrumenter);
                 source.onSubscribe(d);
             } finally {
-                instrumenters.pop().afterInvocation();
+                instrumenter.afterInvocation();
             }
         }
     }
@@ -71,10 +66,9 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
         } else {
             try {
                 instrumenter.beforeInvocation();
-                instrumenters.push(instrumenter);
                 source.onError(t);
             } finally {
-                instrumenters.pop().afterInvocation();
+                instrumenter.afterInvocation();
             }
         }
     }
@@ -87,10 +81,9 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
         } else {
             try {
                 instrumenter.beforeInvocation();
-                instrumenters.push(instrumenter);
                 source.onComplete();
             } finally {
-                instrumenters.pop().afterInvocation();
+                instrumenter.afterInvocation();
             }
         }
     }

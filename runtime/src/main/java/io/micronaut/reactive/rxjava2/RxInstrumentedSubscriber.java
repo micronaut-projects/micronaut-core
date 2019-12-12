@@ -20,9 +20,6 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
-import java.util.Deque;
-import java.util.LinkedList;
-
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
  * See https://github.com/openzipkin/brave/tree/master/context/rxjava2/src/main/java/brave/context/rxjava2/internal.
@@ -35,7 +32,6 @@ import java.util.LinkedList;
 class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent {
     private final Subscriber<T> source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Deque<InvocationInstrumenter> instrumenters = new LinkedList<>();
 
     /**
      * Default constructor.
@@ -56,10 +52,9 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
         } else {
             try {
                 instrumenter.beforeInvocation();
-                instrumenters.push(instrumenter);
                 source.onSubscribe(s);
             } finally {
-                instrumenters.pop().afterInvocation();
+                instrumenter.afterInvocation();
             }
         }
     }
@@ -72,10 +67,9 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
         } else {
             try {
                 instrumenter.beforeInvocation();
-                instrumenters.push(instrumenter);
                 source.onNext(t);
             } finally {
-                instrumenters.pop().afterInvocation();
+                instrumenter.afterInvocation();
             }
         }
     }
@@ -89,10 +83,9 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
         } else {
             try {
                 instrumenter.beforeInvocation();
-                instrumenters.push(instrumenter);
                 source.onError(t);
             } finally {
-                instrumenters.pop().afterInvocation();
+                instrumenter.afterInvocation();
             }
         }
     }
@@ -105,10 +98,9 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
         } else {
             try {
                 instrumenter.beforeInvocation();
-                instrumenters.push(instrumenter);
                 source.onComplete();
             } finally {
-                instrumenters.pop().afterInvocation();
+                instrumenter.afterInvocation();
             }
         }
     }

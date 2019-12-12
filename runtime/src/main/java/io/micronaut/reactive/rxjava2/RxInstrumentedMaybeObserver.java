@@ -20,9 +20,6 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.MaybeObserver;
 import io.reactivex.disposables.Disposable;
 
-import java.util.Deque;
-import java.util.LinkedList;
-
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
  * See https://github.com/openzipkin/brave/tree/master/context/rxjava2/src/main/java/brave/context/rxjava2/internal.
@@ -35,7 +32,6 @@ import java.util.LinkedList;
 final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstrumentedComponent {
     private final MaybeObserver<T> source;
     private final RxInstrumenterFactory instrumenterFactory;
-    private final Deque<InvocationInstrumenter> instrumenters = new LinkedList<>();
 
     /**
      * Default constructor.
@@ -56,10 +52,9 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstru
         } else {
             try {
                 instrumenter.beforeInvocation();
-                instrumenters.push(instrumenter);
                 source.onSubscribe(d);
             } finally {
-                instrumenters.pop().afterInvocation();
+                instrumenter.afterInvocation();
             }
         }
     }
@@ -72,10 +67,9 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstru
         } else {
             try {
                 instrumenter.beforeInvocation();
-                instrumenters.push(instrumenter);
                 source.onError(t);
             } finally {
-                instrumenters.pop().afterInvocation();
+                instrumenter.afterInvocation();
             }
         }
     }
@@ -88,10 +82,9 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstru
         } else {
             try {
                 instrumenter.beforeInvocation();
-                instrumenters.push(instrumenter);
                 source.onSuccess(value);
             } finally {
-                instrumenters.pop().afterInvocation();
+                instrumenter.afterInvocation();
             }
         }
     }
@@ -104,10 +97,9 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstru
         } else {
             try {
                 instrumenter.beforeInvocation();
-                instrumenters.push(instrumenter);
                 source.onComplete();
             } finally {
-                instrumenters.pop().afterInvocation();
+                instrumenter.afterInvocation();
             }
         }
     }
