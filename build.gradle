@@ -626,8 +626,8 @@ subprojects { Project subproject ->
             apply plugin: 'checkstyle'
 
             checkstyle {
-                toolVersion = 8.10
-                configFile = rootProject.file('config/checkstyle/checkstyle.xml')
+                toolVersion = 8.16
+                configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
 
                 // Per submodule
                 maxErrors = 0

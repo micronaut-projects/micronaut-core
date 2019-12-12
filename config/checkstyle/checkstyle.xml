@@ -42,7 +42,7 @@
     <module name="RegexpHeader">
         <!-- Requires a licence copyright notice in each file. -->
         <property name="headerFile"
-                  value="config/checkstyle/HEADER"/>
+                  value="${config_loc}/HEADER"/>
     </module>
 
     <property name="fileExtensions" value="java, properties, xml"/>
@@ -81,7 +81,7 @@
     <!-- See http://checkstyle.sourceforge.net/config_filters.html#SuppressionFilter -->
 
     <module name="SuppressionFilter">
-        <property name="file" value="config/checkstyle/suppressions.xml"/>
+        <property name="file" value="${config_loc}/suppressions.xml"/>
         <property name="optional" value="false"/>
     </module>
 
