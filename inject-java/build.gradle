@@ -2,7 +2,9 @@ dependencies {
     api project(":inject")
     api project(':aop')
 
-    compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    if (!JavaVersion.current().isJava9Compatible()) {
+        compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
     compileOnly dependencyVersion("validation")
 
     testImplementation 'com.github.spotbugs:spotbugs-annotations:3.1.12'
@@ -16,7 +18,9 @@ dependencies {
     testImplementation 'org.mongodb:mongo-java-driver:3.7.1'
     testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
-    testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)    
+    if (!JavaVersion.current().isJava9Compatible()) {
+        testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
     testImplementation dependencyVersion("micrometer")
     testImplementation project(":validation")
 
