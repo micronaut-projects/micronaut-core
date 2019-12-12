@@ -17,7 +17,6 @@ package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
-import io.micronaut.core.attr.AttributeHolder;
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
