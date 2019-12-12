@@ -27,7 +27,6 @@ import static groovyx.net.http.ContentType.*
 
 apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
-apply plugin: 'com.bmuschko.nexus'
 
 ext.extraPomInfo = {}
 ext.pomInfo = {
@@ -49,9 +48,9 @@ ext.pomInfo = {
         delegate.developerConnection "scm:git@github.com:${githubSlug}.git"
     }
 
-    if(developers) {
+    if (developers) {
         delegate.developers {
-            for(dev in developers.split(',')) {
+            for (dev in developers.split(',')) {
                 delegate.developer {
                     delegate.id dev.toLowerCase().replace(' ', '')
                     delegate.name dev
@@ -63,108 +62,130 @@ ext.pomInfo = {
     ext.extraPomInfo.call()
 }
 
+if (project.name != 'bom') {
+    task sourcesJar(type: Jar) {
+        classifier = 'sources'
+        from sourceSets.main.allJava
+    }
 
-
-modifyPom {
-    project(pomInfo)
+    task javadocJar(type: Jar) {
+        classifier = 'javadoc'
+        from javadoc.destinationDir
+    }    
 }
 
 publishing {
+    afterEvaluate {
+        repositories {
+            maven {
+                credentials {
+                    def bintrayUser = System.getenv("BINTRAY_USER") ?: project.hasProperty("bintrayUser") ? project.bintrayUser : ''
+                    def bintrayKey = System.getenv("BINTRAY_KEY") ?: project.hasProperty("bintrayKey") ? project.bintrayKey : ''
 
-    repositories {
-        maven {
-            credentials {
-                def bintrayUser = System.getenv("BINTRAY_USER") ?: project.hasProperty("bintrayUser") ? project.bintrayUser : ''
-                def bintrayKey = System.getenv("BINTRAY_KEY") ?: project.hasProperty("bintrayKey") ? project.bintrayKey : ''
-
-                username = bintrayUser
-                password = bintrayKey
+                    username = bintrayUser
+                    password = bintrayKey
+                }
+                url  "https://oss.jfrog.org/oss-snapshot-local"
             }
-            url  "https://oss.jfrog.org/oss-snapshot-local"
         }
-    }
 
-    publications {
-        maven(MavenPublication) { publication ->
-            artifactId( "micronaut-" + project.name.substring(project.name.indexOf('/') + 1) )
+        publications {
+            maven(MavenPublication) {
+                artifactId("micronaut-" + project.name.substring(project.name.indexOf('/') + 1))
+                if (project.name == "bom") {
+                    from components.javaPlatform
 
-            def shadowJar = tasks.findByName("shadowJar")
-            if(shadowJar && shadowJar.enabled) {
-                artifact(project.tasks.shadowJar) {
-                    classifier = null
-                }
-                pom.withXml { xml ->
-                    def xmlNode = xml.asNode()
-                    def dependenciesNode = xmlNode.appendNode('dependencies')
-                    Set<Dependency> visited = new HashSet<>()
-                    
-                    project.configurations.compile.allDependencies.each {
-                        if (! (it instanceof SelfResolvingDependency)) {
-                            def dependencyNode = dependenciesNode.appendNode('dependency')
-                            dependencyNode.appendNode('groupId', it.group)
-                            dependencyNode.appendNode('artifactId', it.name)
-                            dependencyNode.appendNode('version', it.version)
-                            dependencyNode.appendNode('scope', 'compile')
-                        }
-                        else if(it instanceof ProjectDependency) {
-                            def dependencyNode = dependenciesNode.appendNode('dependency')
-                            dependencyNode.appendNode('groupId', project.group)
-                            dependencyNode.appendNode('artifactId', "micronaut-$it.name")
-                            dependencyNode.appendNode('version', project.version)
-                            dependencyNode.appendNode('scope', 'compile')
-                        }
-                        visited.add(it)
+                    pom.withXml {
+                        def xml = asNode()
+
+                        xml.children().last() + pomInfo
                     }
-                    project.configurations.runtime.allDependencies.each {
-                        if (visited.contains(it)) {
-                            return
-                        }
-                        if (! (it instanceof SelfResolvingDependency)) {
-                            def dependencyNode = dependenciesNode.appendNode('dependency')
-                            dependencyNode.appendNode('groupId', it.group)
-                            dependencyNode.appendNode('artifactId', it.name)
-                            dependencyNode.appendNode('version', it.version)
-                            dependencyNode.appendNode('scope', 'runtime')
-                        }
-                        else if(it instanceof ProjectDependency) {
-                            def dependencyNode = dependenciesNode.appendNode('dependency')
-                            dependencyNode.appendNode('groupId', project.group)
-                            dependencyNode.appendNode('artifactId', "micronaut-$it.name")
-                            dependencyNode.appendNode('version', project.version)
-                            dependencyNode.appendNode('scope', 'runtime')
 
-                        }
-                        visited.add(it)
-                    }
-                    xmlNode.children().last() + pomInfo
-                }
-                artifact sourcesJar {
-                    classifier "sources"
-                }
-                artifact javadocJar {
-                    classifier "javadoc"
-                }
-
-            }
-            else {
-
-                if (project.name != 'bom') {
+                } else if (project.name == "cli") {
                     from components.java
+                    artifact cliZip {
+                        classifier "dist"
+                    }
+                    artifact sourcesJar
+                    artifact javadocJar
+
+                    pom.withXml {
+                        def xml = asNode()
+
+                        xml.children().last() + pomInfo
+                    }
+                } else if (project.shadowJarEnabled == true) {
+                    def shadowJar = tasks.findByName("shadowJar")
+                    artifact(project.tasks.shadowJar) {
+                        classifier = null
+                    }
+                    pom.withXml { xml ->
+                        def xmlNode = xml.asNode()
+                        def dependenciesNode = xmlNode.appendNode('dependencies')
+                        Set<Dependency> visited = new HashSet<>()
+
+                        project.configurations.api.allDependencies.each {
+                            if (!(it instanceof SelfResolvingDependency)) {
+                                def dependencyNode = dependenciesNode.appendNode('dependency')
+                                dependencyNode.appendNode('groupId', it.group)
+                                dependencyNode.appendNode('artifactId', it.name)
+                                dependencyNode.appendNode('version', it.version)
+                                dependencyNode.appendNode('scope', 'compile')
+                            } else if (it instanceof ProjectDependency) {
+                                def dependencyNode = dependenciesNode.appendNode('dependency')
+                                dependencyNode.appendNode('groupId', project.group)
+                                dependencyNode.appendNode('artifactId', "micronaut-$it.name")
+                                dependencyNode.appendNode('version', project.version)
+                                dependencyNode.appendNode('scope', 'compile')
+                            }
+                            visited.add(it)
+                        }
+                        project.configurations.runtime.allDependencies.each {
+                            if (visited.contains(it)) {
+                                return
+                            }
+                            if (!(it instanceof SelfResolvingDependency)) {
+                                def dependencyNode = dependenciesNode.appendNode('dependency')
+                                dependencyNode.appendNode('groupId', it.group)
+                                dependencyNode.appendNode('artifactId', it.name)
+                                dependencyNode.appendNode('version', it.version)
+                                dependencyNode.appendNode('scope', 'runtime')
+                            } else if (it instanceof ProjectDependency) {
+                                def dependencyNode = dependenciesNode.appendNode('dependency')
+                                dependencyNode.appendNode('groupId', project.group)
+                                dependencyNode.appendNode('artifactId', "micronaut-$it.name")
+                                dependencyNode.appendNode('version', project.version)
+                                dependencyNode.appendNode('scope', 'runtime')
+
+                            }
+                            visited.add(it)
+                        }
+                    }
+
+                    pom.withXml {
+                        def xml = asNode()
+
+                        xml.children().last() + pomInfo
+                    }
+
                     artifact sourcesJar {
                         classifier "sources"
                     }
                     artifact javadocJar {
                         classifier "javadoc"
                     }
-                }
+                } else {
+                    from components.java
+                    artifact sourcesJar
+                    artifact javadocJar
 
-                pom.withXml {
-                    def xml = asNode()
+                    pom.withXml {
+                        def xml = asNode()
 
-                    xml.children().last() + pomInfo
+                        xml.children().last() + pomInfo
+                    }
                 }
             }
-
         }
     }
 }
@@ -209,45 +230,53 @@ bintray {
 task synchronizeWithMavenCentral() {
     description = "Syncs with Maven Central/Sonatype"
     doLast {
+        boolean ongoing = true
+
         println """
 Synchronizing with Maven central. This may take a few minutes ...
 If this fails, log on to http://oss.sonatype.org/ using the centralUser credentials
 and progress through process manually -> Close -> Publish ... under staging repositories
 """
-        List<String> versions = [projectVersion]
-
-        for(v in versions) {
-            try {
-                try {
-                    def mavenClent = new RESTClient("https://repo.maven.apache.org/maven2/")
-                    mavenClent.get(path:"${project.group.replace('.','/')}/micronaut-$project.name/$v/micronaut-$project.name-${v}.jar")
-                } catch(groovyx.net.http.HttpResponseException e) {
-                    // doesn't exist.. try sync
-                    def client = new RESTClient('https://api.bintray.com/maven_central_sync/micronaut/core-releases-local/')
-                    client.headers['Authorization'] = 'Basic ' + "$bintrayUser:$bintrayKey".getBytes('iso-8859-1').encodeBase64()
-                    def body = /{}/
-                    def resp = client.post(
-                            path: "$bintray.pkg.name/versions/$v",
-                            body: body,
-                            requestContentType: JSON
-                    )
-                    assert resp.status == 200
-                    println resp.data.status
-                    println resp.data.messages.join('\n')
-                }
-            } catch (groovyx.net.http.HttpResponseException e) {
-                println "Error: $e"
-                println "Message: $e.message"
-                println "Body: $e.response.data"
-                throw e
+        // this hack is here to keep Travis from thinking this is
+        // a stalled build
+        Thread.start {
+            while(ongoing) {
+                sleep 5000
+                println "Still Publishing. Please wait..."
             }
         }
+        try {
+            try {
+                def mavenClent = new RESTClient("https://repo.maven.apache.org/maven2/")
+                mavenClent.get(path:"${project.group.replace('.','/')}/micronaut-$project.name/$project.version/micronaut-$project.name-${project.version}.jar")
+            } catch(groovyx.net.http.HttpResponseException e) {
+                // doesn't exist.. try sync
+                def client = new RESTClient('https://api.bintray.com/maven_central_sync/micronaut/core-releases-local/')
+                client.headers['Authorization'] = 'Basic ' + "$bintrayUser:$bintrayKey".getBytes('iso-8859-1').encodeBase64()
+                def body = /{}/
+                def resp = client.post(
+                        path: "$bintray.pkg.name/versions/$project.version",
+                        body: body,
+                        requestContentType: JSON
+                )
+                assert resp.status == 200
 
+                println resp.data.status
+                println resp.data.messages.join('\n')
+            }
+        } catch (groovyx.net.http.HttpResponseException e) {
+            println "Error: $e"
+            println "Message: $e.message"
+            println "Body: $e.response.data"
+            throw e
+        } finally {
+            ongoing = false
+        }
     }
 }
 
-def fetch(addr, params = [:]) {
-    def auth = "<personal api token>"
-    def json = new groovy.json.JsonSlurper()
-    return json.parse(addr.toURL().newReader(requestProperties: ["Authorization": "token ${System.getenv("GH_TOKEN")}".toString(), "Accept": "application/json"]))
+if (!project.version.endsWith("-SNAPSHOT")) {
+    // disable remote publish for non-snapshot versions
+    // since releases are published to bintray
+    publishMavenPublicationToMavenRepository.enabled = false
 }

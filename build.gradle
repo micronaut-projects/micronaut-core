@@ -1,19 +1,17 @@
 buildscript {
     repositories {
-        mavenLocal()
         maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
-        classpath "org.grails:grails-gradle-plugin:$grailsVersion"
         classpath "org.grails:grails-docs:$grailsVersion"
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
-        classpath 'com.bmuschko:gradle-nexus-plugin:2.3.1'
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:4.0.2'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
         classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.0.0"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.1"
         classpath 'javax.xml.bind:jaxb-api:2.2.8'
+        classpath 'com.adarshr:gradle-test-logger-plugin:2.0.0'
         classpath "io.micronaut.docs:micronaut-docs-asciidoc-extensions:$micronautDocsVersion"
         classpath "io.micronaut.docs:micronaut-docs-gradle-plugins:$micronautDocsVersion", {
             exclude module:'shadow'
@@ -594,31 +592,24 @@ subprojects { Project subproject ->
     ext {
         userOrg = "grails"
         isGrailsPlugin = false
-        isConfiguration = subproject.projectDir.parentFile.name == 'configurations'
         isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
+        shadowJarEnabled = false
     }
 
-    if (subproject.name == "configurations") {
+    if (subproject.name.contains("bom")) {
         return
     }
 
-    if (isConfiguration) {
-        group "io.micronaut.configuration"
-    } else {
-        group projectGroupId
-    }
-
+    group projectGroupId
 
     repositories {
         maven { url "https://repo.grails.org/grails/core" }
-        maven { url "https://oss.jfrog.org/artifactory/oss-snapshot-local/" }
     }
 
-    if (subproject.name.startsWith("examples")) {
-        // apply plugin:"org.grails.grails-web"
-    } else {
+    if (!subproject.name.contains("bom")) {
         apply plugin: "groovy"
-        apply plugin: "java"
+        apply plugin: "java-library"
+        apply plugin: 'com.adarshr.test-logger'
 
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
@@ -660,14 +651,6 @@ subprojects { Project subproject ->
     tasks.withType(Test) {
         jvmArgs '-Duser.country=US'
         jvmArgs '-Duser.language=en'
-        testLogging {
-            exceptionFormat = 'full'
-        }
-        afterSuite {
-            System.out.print(".")
-            System.out.flush()
-        }
-
         reports.html.enabled = !System.getenv("TRAVIS")
         reports.junitXml.enabled = !System.getenv("TRAVIS")
 
@@ -704,8 +687,6 @@ subprojects { Project subproject ->
         relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
         relocate "org.objectweb.asm", "io.micronaut.asm"
     }
-    
-    shadowJar.enabled = false
 
     def isDocumented = subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')
 
@@ -713,7 +694,7 @@ subprojects { Project subproject ->
         documentation "org.codehaus.groovy:groovy-templates:$groovyVersion"
         documentation "org.codehaus.groovy:groovy-dateutil:$groovyVersion"
         if (subproject.name != "bom") {
-            compile dependencyVersion("slf4j")
+            api dependencyVersion("slf4j")
         }
 
 
@@ -721,21 +702,25 @@ subprojects { Project subproject ->
             compileOnly "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion"
         }
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-        testCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-        testCompile dependencyVersion("groovy")
-        testCompile(dependencyVersion("spock")) {
+        testImplementation "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+        testImplementation dependencyVersion("groovy")
+        testImplementation(dependencyVersion("spock")) {
             exclude module: 'groovy-all'
         }
-        testCompile "cglib:cglib-nodep:3.3.0"
-        testCompile "org.objenesis:objenesis:1.4"
+        testImplementation "cglib:cglib-nodep:3.3.0"
+        testImplementation "org.objenesis:objenesis:1.4"
 
-        testRuntime "ch.qos.logback:logback-classic:1.2.3"
-        testCompile "org.codehaus.groovy:groovy-test:$groovyVersion"
+        testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
+        testImplementation "org.codehaus.groovy:groovy-test:$groovyVersion"
         compileOnly "org.ow2.asm:asm:$asmVersion"
         compileOnly "org.ow2.asm:asm-commons:$asmVersion"
+        annotationProcessor "org.ow2.asm:asm:$asmVersion"
+        annotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
 
-        testCompile "org.ow2.asm:asm:$asmVersion"
-        testCompile "org.ow2.asm:asm-commons:$asmVersion"
+        testImplementation "org.ow2.asm:asm:$asmVersion"
+        testImplementation "org.ow2.asm:asm-commons:$asmVersion"
+        testAnnotationProcessor "org.ow2.asm:asm:$asmVersion"
+        testAnnotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
     }
 
     task moveConfigProps() {

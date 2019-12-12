@@ -1,19 +1,23 @@
-shadowJar.enabled = true
+ext {
+    shadowJarEnabled = true
+}
 dependencies {
-    for(proj in ['inject', 'http', 'aop']) {
-        compile project(":$proj")
-    }
+    annotationProcessor project(":inject-java")
+    api project(":http")
+    api project(':inject')
+    api project(':aop')
+    api dependencyVersion("validation")
+    api dependencyVersion("jackson.databind")
+    api dependencyVersion("rxjava2")
+    api([
+            dependencyVersion('jackson.datatype'),
+            dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
+    ])
+
     compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
     compileOnly project(":graal")
     compileOnly dependencyVersion("jcache")
-    compile dependencyVersion("validation")
-    compile dependencyVersion("jackson.databind")
-    compile dependencyVersion("rxjava2")
 
-    compile([
-        dependencyVersion('jackson.datatype'),
-        dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
-    ])
 
     compileOnly(
         dependencyModuleVersion('jackson.modules', 'jackson-module-kotlin')
@@ -34,18 +38,18 @@ dependencies {
     compileOnly 'org.glassfish:javax.el:3.0.1-b09'
     compileOnly dependencyVersion("reactor")
     compileOnly dependencyVersion("rxjava1.interop")
-    compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-    compileOnly project(":inject-java")
+    compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"    
 
-    testCompile 'org.jsr107.ri:cache-ri-impl:1.1.0'
-    testCompile dependencyVersion("jcache")
-    testCompile dependencyVersion("rxjava1.interop")
-    testCompile dependencyVersion("reactor")
-    testCompile project(":inject-java")
-    testCompile project(":inject-java-test")
-    testCompile project(":inject-groovy")
-    testCompile dependencyModuleVersion("gorm", "grails-datastore-gorm")
-    testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    testAnnotationProcessor project(":inject-java") 
+    testImplementation 'org.jsr107.ri:cache-ri-impl:1.1.0'
+    testImplementation dependencyVersion("jcache")
+    testImplementation dependencyVersion("rxjava1.interop")
+    testImplementation dependencyVersion("reactor")
+    testImplementation project(":inject-java")    
+    testImplementation project(":inject-java-test")
+    testImplementation project(":inject-groovy")
+    testImplementation dependencyModuleVersion("gorm", "grails-datastore-gorm")
+    testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
 }
 
 //compileJava.options.fork = true

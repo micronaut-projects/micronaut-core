@@ -1,27 +1,28 @@
 dependencies {
-    testCompile project(":http-client")
-    testCompile project(":inject-groovy")
-    testCompile project(":http-server-netty")
-    testCompile project(":runtime")
-    testCompile project(":validation")
-    testCompile project(":inject")
-    testCompile project(":management")
-    testCompile project(":session")
-    testCompile dependencyVersion("jcache")
-    testCompile dependencyVersion("reactor")
-    testCompile dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
+    testImplementation dependencyVersion("netty")
+    testImplementation project(":http-client")
+    testImplementation project(":inject-groovy")
+    testImplementation project(":http-server-netty")
+    testImplementation project(":runtime")
+    testImplementation project(":validation")
+    testImplementation project(":inject")
+    testImplementation project(":management")
+    testImplementation project(":session")
+    testImplementation dependencyVersion("jcache")
+    testImplementation dependencyVersion("reactor")
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-    testCompile project(":function-client")
-    testCompile project(":function-web")
-    testCompile dependencyModuleVersion("micronaut.groovy","micronaut-function-groovy"), {
+    testImplementation project(":function-client")
+    testImplementation project(":function-web")
+    testImplementation dependencyModuleVersion("micronaut.groovy","micronaut-function-groovy"), {
         exclude module:'micronaut-function'
         exclude module:'micronaut-runtime-groovy'
     }
-    testCompile dependencyModuleVersion("micronaut.groovy","micronaut-runtime-groovy"), {
+    testImplementation dependencyModuleVersion("micronaut.groovy","micronaut-runtime-groovy"), {
         exclude module:'micronaut-inject'
     }
-    testRuntime group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
+    testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 
 }

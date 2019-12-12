@@ -1,19 +1,19 @@
 dependencies {
-    compile project(":inject")
-    compile project(":aop")
-    compile dependencyVersion("groovy")
+    api project(":inject")
+    api project(':aop')
+    api dependencyVersion("groovy")
 
-    testCompile "junit:junit:4.12"
-//    testCompile 'javax.validation:validation-api:1.1.0.Final'
-    testCompile "org.hibernate:hibernate-core:5.3.6.Final"
-    testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
-    testRuntime 'org.glassfish:javax.el:3.0.1-b08'
-    testCompile project(":http-server-netty")
-    testCompile project(":http-client")
-    testCompile project(":validation")
-    testCompile 'org.neo4j.driver:neo4j-java-driver:1.4.5'
-    testCompile dependencyModuleVersion("groovy", "groovy-json")
-    testCompile project(":validation")
+    testImplementation "junit:junit:4.12"
+//    testImplementation 'javax.validation:validation-api:1.1.0.Final'
+    testImplementation "org.hibernate:hibernate-core:5.3.6.Final"
+    testImplementation 'org.hibernate:hibernate-validator:6.0.13.Final'
+    testRuntimeOnly 'org.glassfish.web:el-impl:2.2.1-b05'
+    testRuntimeOnly 'org.glassfish:javax.el:3.0.1-b08'
+    testImplementation project(":http-server-netty")
+    testImplementation project(":http-client")
+    testImplementation project(":validation")
+    testImplementation 'org.neo4j.driver:neo4j-java-driver:1.4.5'
+    testImplementation dependencyModuleVersion("groovy", "groovy-json")
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
