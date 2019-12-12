@@ -17,6 +17,8 @@ package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.attr.AttributeHolder;
+import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 import org.jetbrains.annotations.NotNull;
@@ -43,7 +45,8 @@ public interface BeanContext extends
     BeanLocator,
     BeanDefinitionRegistry,
     ApplicationEventPublisher,
-    AnnotationMetadataResolver {
+    AnnotationMetadataResolver,
+    MutableAttributeHolder {
 
     /**
      * Inject an existing instance.
