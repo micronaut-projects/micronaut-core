@@ -3,9 +3,14 @@ package io.micronaut.visitors
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import spock.lang.IgnoreIf
+import spock.util.environment.Jvm
 
 class IntroductionVisitorSpec extends AbstractTypeElementSpec {
 
+    // Java 9+ doesn't allow resolving elements was the compiler
+    // is finished being used so this test cannot be made to work beyond Java 8 the way it is currently written
+    @IgnoreIf({ Jvm.current.isJava9Compatible() })
     void "test that it is possible to visit introduction advice that extend from existing interfaces"() {
         given:
         def definition = buildBeanDefinition('test.MyInterface' + BeanDefinitionVisitor.PROXY_SUFFIX, '''

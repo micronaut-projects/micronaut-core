@@ -470,7 +470,9 @@ class GrandParentProperties {
         context.put(JavaFileManager, compiler.getStandardFileManager(diagnosticCollector, Locale.getDefault(), UTF_8))
         def elements = JavacElements.instance(context)
         def types = JavacTypes.instance(context)
-        def env = JavacProcessingEnvironment.instance(new Context())
+        def env = JavacProcessingEnvironment.instance(context)
+        final com.sun.tools.javac.main.JavaCompiler jc = com.sun.tools.javac.main.JavaCompiler.instance(context);
+        jc?.initModules(com.sun.tools.javac.util.List.nil())
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
         GenericUtils genericUtils = new GenericUtils(elements, env.typeUtils, modelUtils) {}
         AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils,genericUtils, env.filer) {

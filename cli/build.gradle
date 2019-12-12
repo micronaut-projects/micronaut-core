@@ -6,6 +6,7 @@ repositories {
 dependencies {
     api "info.picocli:picocli-groovy:$picocliVersion"
     api "org.apache.ant:ant:1.9.7"
+    api dependencyVersion("jsr305")
     api dependencyModuleVersion("groovy", "groovy-ant")
     api dependencyModuleVersion("groovy", "groovy-json")
     api dependencyModuleVersion("groovy", "groovy-jmx")
