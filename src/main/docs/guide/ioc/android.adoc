@@ -8,8 +8,7 @@ To get started you must add the Micronaut annotation processors to the processor
 
 The Micronaut `micronaut-inject-java` dependency should be included in both the `annotationProcessor` and `compileOnly` scopes of your Android build configuration:
 
-.Example Android build.gradle
-[source,groovy,subs="attributes"]
+[source.multi-language-sample,groovy,Example Android build.gradle]
 ----
 dependencies {
     ...
@@ -19,10 +18,22 @@ dependencies {
 }
 ----
 
+
+[source.multi-language-sample,kotlin,Example Android build.gradle]
+----
+dependencies {
+    ...
+    annotationProcessor("io.micronaut:micronaut-inject-java:{version}")
+    compileOnly("io.micronaut:micronaut-inject-java:{version}")
+    ...
+}
+----
+
+
+
 If you use `lint` as part of your build you may also need to disable the invalid packages check since Android includes a hard coded check that regards the `javax.inject` package as invalid unless you are using Dagger:
 
-.Configure lint within build.gradle
-[source,groovy]
+[source.multi-language-sample,groovy,Configure lint within build.gradle]
 ----
 
 android {
@@ -32,6 +43,20 @@ android {
     }
 }
 ----
+
+
+[source.multi-language-sample,kotlin,Configure lint within build.gradle]
+----
+
+android {
+    ...
+    lintOptions {
+        lintOptions { warning("InvalidPackage") }
+    }
+}
+----
+
+
 
 You can find more information on https://developer.android.com/studio/build/gradle-plugin-3-0-0-migration.html#annotationProcessor_config[configuring annotations processors] in the Android documentation.
 
