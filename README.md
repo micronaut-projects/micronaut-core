@@ -1,6 +1,6 @@
 # Micronaut 
 
-[![Build Status](https://travis-ci.org/micronaut-projects/micronaut-core.svg?branch=master)](https://travis-ci.org/micronaut-projects/micronaut-core)
+[![Build Status](https://github.com/micronaut-projects/micronaut-core/workflows/Java%20CI/badge.svg)](https://github.com/micronaut-projects/micronaut-core/actions)
 
 Micronaut is a modern, JVM-based, full stack microservices framework designed for building modular, easily testable microservice applications.
 
@@ -60,7 +60,7 @@ Micronaut is using Semantic Versioning 2.0.0. To understand what that means, ple
 
 ## CI
 
-[Travis-CI](http://travis-ci.org) is used to build Micronaut. If a build fails in `master`, check the [test reports](https://micronaut-projects.github.io/micronaut-core/index.html). 
+[Github Actions](https://github.com/micronaut-projects/micronaut-core/actions) are used to build Micronaut. If a build fails in `master`, check the [test reports](https://micronaut-projects.github.io/micronaut-core/index.html). 
 
 
 
