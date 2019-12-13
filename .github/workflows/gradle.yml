@@ -3,11 +3,9 @@ on:
   push:
     branches:
     - master
-    - 1.2.x
   pull_request:
     branches:
     - master
-    - 1.2.x
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,7 +33,7 @@ jobs:
          BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
       run: ./gradlew publish docs --no-daemon --build-cache
     - name: Publish to Github Pages
-      if: success() && github.event_name == 'push' && matrix.java == '8' && github.ref == 'master'
+      if: success() && github.event_name == 'push' && matrix.java == '8'
       uses: micronaut-projects/micronaut-docs-deploy@master
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}

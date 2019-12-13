@@ -3,7 +3,6 @@ on:
   push:
     branches-ignore:
       - master
-      - 1.2.x
 jobs:
   build:
     runs-on: ubuntu-latest
