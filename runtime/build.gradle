@@ -41,7 +41,7 @@ dependencies {
     compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"    
 
     testAnnotationProcessor project(":inject-java") 
-    testImplementation 'org.jsr107.ri:cache-ri-impl:1.1.0'
+    testImplementation 'org.jsr107.ri:cache-ri-impl:1.1.1'
     testImplementation dependencyVersion("jcache")
     testImplementation dependencyVersion("rxjava1.interop")
     testImplementation dependencyVersion("reactor")
