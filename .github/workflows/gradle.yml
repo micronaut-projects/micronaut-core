@@ -25,13 +25,13 @@ jobs:
       with:
         java-version: ${{ matrix.java }}   
     - name: Build with Gradle
-      run: ./gradlew check --no-daemon --parallel --continue
+      run: ./gradlew check --no-daemon --parallel --continue --build-cache
     - name: Publish to JFrog OSS
       if: success() && github.event_name == 'push' && matrix.java == '8'
       env:
          BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
          BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
-      run: ./gradlew publish docs --no-daemon
+      run: ./gradlew publish docs --no-daemon --build-cache
     - name: Publish to Github Pages
       if: success() && github.event_name == 'push' && matrix.java == '8'
       uses: micronaut-projects/micronaut-docs-deploy@master
