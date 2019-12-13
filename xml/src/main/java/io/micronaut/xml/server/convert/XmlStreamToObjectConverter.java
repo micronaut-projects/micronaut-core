@@ -18,6 +18,7 @@ package io.micronaut.xml.server.convert;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 
@@ -38,17 +39,19 @@ import java.util.Optional;
 public class XmlStreamToObjectConverter implements TypeConverter<ByteArrayXmlStreamReader, Object> {
 
     private final XmlMapper xmlMapper;
+    private final ConversionService<?> conversionService;
 
     @Inject
-    public XmlStreamToObjectConverter(XmlMapper xmlMapper) {
+    public XmlStreamToObjectConverter(XmlMapper xmlMapper, ConversionService<?> conversionService) {
         this.xmlMapper = xmlMapper;
+        this.conversionService = conversionService;
     }
 
     @Override
     public Optional<Object> convert(ByteArrayXmlStreamReader stream, Class<Object> targetType, io.micronaut.core.convert.ConversionContext context) {
         try {
             if (ConvertibleValues.class.isAssignableFrom(targetType)) {
-                return Optional.of(new XmlStreamConvertibleValues<>(stream, xmlMapper));
+                return Optional.of(new XmlStreamConvertibleValues<>(stream, xmlMapper, conversionService));
             } else {
                 return Optional.of(xmlMapper.readValue(stream, targetType));
             }

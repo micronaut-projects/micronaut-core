@@ -15,19 +15,21 @@
  */
 package io.micronaut.xml.server.convert;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import com.fasterxml.jackson.dataformat.xml.deser.FromXmlParser;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.jackson.JacksonConfiguration;
 
-import javax.xml.stream.XMLStreamReader;
 import java.io.IOException;
 import java.util.*;
+
+import static javax.xml.stream.XMLStreamConstants.END_ELEMENT;
+import static javax.xml.stream.XMLStreamConstants.START_ELEMENT;
 
 /**
  * An implementation of {@link ConvertibleValues} backed by xml stream.
@@ -42,6 +44,7 @@ public class XmlStreamConvertibleValues<V> implements ConvertibleValues<V> {
 
     private final ByteArrayXmlStreamReader stream;
     private final XmlMapper xmlMapper;
+    private final ConversionService<?> conversionService;
     private final JsonNode objectNode;
 
     /**
@@ -50,9 +53,11 @@ public class XmlStreamConvertibleValues<V> implements ConvertibleValues<V> {
      * @throws IOException xml mapper fails to read xml stream
      */
     public XmlStreamConvertibleValues(ByteArrayXmlStreamReader stream,
-                                      XmlMapper xmlMapper) throws IOException {
+                                      XmlMapper xmlMapper,
+                                      ConversionService<?> conversionService) throws IOException {
         this.stream = stream;
         this.xmlMapper = xmlMapper;
+        this.conversionService = conversionService;
         this.objectNode = xmlMapper.readTree(stream.getBytes());
     }
 
@@ -76,54 +81,39 @@ public class XmlStreamConvertibleValues<V> implements ConvertibleValues<V> {
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-        try {
-            //XMLStreamReader streamReader = stream.reset();
-            //streamReader.next()
-
-            FromXmlParser parser = xmlMapper.getFactory().createParser(stream.reset());
-            SelectiveJsonParser xmlParser = new SelectiveJsonParser(
-                    name.toString(), ParsedValueHolder.VALUE_FIELD_NAME, parser
-            );
-
-            JavaType javaType = xmlMapper.getTypeFactory()
-                    .constructParametricType(ParsedValueHolder.class, conversionContext.getArgument().getType());
-
-            ParsedValueHolder<T> valueHolder = xmlMapper.readValue(xmlParser, javaType);
-            return Optional.of(valueHolder.getValue());
-
+        int depth = 0;
+        JavaType javaType = JacksonConfiguration.constructType(conversionContext.getArgument(), xmlMapper.getTypeFactory());
+        String nameString = name.toString();
+        try (ByteArrayXmlStreamReader streamReader = stream.reset()) {
+            while (streamReader.hasNext()) {
+                int token = streamReader.next();
+                if (token == START_ELEMENT) {
+                    depth++;
+                    if (depth == 1 && nameString.equals(streamReader.getName().toString())) {
+                        if (ClassUtils.isJavaBasicType(conversionContext.getArgument().getType())) {
+                            String value = streamReader.getElementText();
+                            return conversionService.convert(value, conversionContext);
+                        } else {
+                            return Optional.ofNullable(xmlMapper.readValue(streamReader, javaType));
+                        }
+                    }
+                    if (depth == 0) {
+                        for (int i = 0; i < streamReader.getAttributeCount(); ++i) {
+                            String attr = streamReader.getAttributeLocalName(i);
+                            if (attr.equals(nameString)) {
+                                return conversionService.convert(streamReader.getAttributeValue(i), conversionContext);
+                            }
+                        }
+                    }
+                }
+                if (token == END_ELEMENT) {
+                    depth--;
+                }
+            }
         } catch (Exception e) {
             LOG.error("Failed to retrieve {} field from xml stream", name, e);
         }
 
         return Optional.empty();
-    }
-
-    /**
-     * Type that works as a selector for a single field from xml stream. The algorithm works as following: <pre>
-     * 1. Modify xml stream and rename the field we are interested in to "noWayYouCanNameFieldLikeThis"
-     * 2. Parse xml stream as {@link ParsedValueHolder}.
-     * 3. {@link ParsedValueHolder} will contain a single field we are interested in and nothing else
-     * </pre>
-     *
-     * @param <T> type of the selected field.
-     */
-    static class ParsedValueHolder<T> {
-        static final String VALUE_FIELD_NAME = "noWayYouCanNameFieldLikeThis";
-        private final T value;
-
-        /**
-         * @param fieldValue the value of a selected field
-         */
-        @JsonCreator
-        ParsedValueHolder(@JsonProperty(VALUE_FIELD_NAME) T fieldValue) {
-            value = fieldValue;
-        }
-
-        /**
-         * @return selected field value
-         */
-        T getValue() {
-            return this.value;
-        }
     }
 }

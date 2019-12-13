@@ -29,7 +29,7 @@ import javax.xml.stream.util.StreamReaderDelegate;
  * @since 1.3.0
  */
 @Internal
-public final class ByteArrayXmlStreamReader extends StreamReaderDelegate {
+public final class ByteArrayXmlStreamReader extends StreamReaderDelegate implements AutoCloseable {
 
     private static final InputFactoryImpl XML_STREAM_FACTORY = new InputFactoryImpl();
 
@@ -62,7 +62,7 @@ public final class ByteArrayXmlStreamReader extends StreamReaderDelegate {
      *
      * @return new instance with fresh state
      */
-    public XMLStreamReader reset() {
+    public ByteArrayXmlStreamReader reset() {
         try {
             return new ByteArrayXmlStreamReader(bytes);
         } catch (XMLStreamException e) {

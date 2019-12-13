@@ -1,7 +1,7 @@
 shadowJar.enabled = true
 
 dependencies {
-    compile dependencyVersion('jackson.dataformat', 'jackson-dataformat-xml')
+    compile dependencyModuleVersion('jackson.dataformat', 'jackson-dataformat-xml')
     
     compileOnly project(":http")
     compileOnly project(":inject")
