@@ -13,39 +13,57 @@ jobs:
       with:
         java-version: 1.8
         ref: ${{ github.head_ref }}
-#    - name: Publish to Bintray
-#      env:
-#         BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
-#         BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
-#      run: ./gradlew assemble bintrayUpload docs
-#    - id: release_version
-#      run: echo ::set-output name=release_version::${GITHUB_REF:11}
-#    - name: Create Release
-#        id: create_release
-#        uses: actions/create-release@v1
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-#        with:
-#          tag_name: ${{ github.ref }}
-#          release_name: Micronaut ${{ steps.release_version.outputs.release_version }}
-#          body: |
-#            Changes in this Release
-#            - First Change
-#            - Second Change
-#          draft: false
-#          prerelease: false
-#    - name: Publish to Github Pages
-#      if: success()
-#      uses: micronaut-projects/github-pages-deploy-action@master
-#      env:
-#        GH_TOKEN: ${{ secrets.GH_TOKEN }}
-#        BASE_BRANCH: master
-#        BRANCH: gh-pages
-#        FOLDER: build/docs
-#        VERSION: ${{ steps.release_version.outputs.release_version }}
-#    - name: Synchronize Maven Central
-#      if: success()
-#      env:
-#         BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
-#         BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
-#      run: ./gradlew sWMC
+    - name: Publish to Bintray
+      env:
+         BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
+         BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
+      run: ./gradlew assemble bintrayUpload docs --no-daemon
+    - id: release_version
+      if: success()
+      run: echo ::set-output name=release_version::${GITHUB_REF:11}
+    - name: Create Release
+        id: create_release
+        if: success()
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Micronaut ${{ steps.release_version.outputs.release_version }}
+          body: |
+            Micronaut ${{ steps.release_version.outputs.release_version }}
+            - What's New: https://docs.micronaut.io/${{ steps.release_version.outputs.release_version }}/guide/index.html#whatsNew
+            - Issues Closed:  https://github.com/micronaut-projects/micronaut-core/milestone/TODO?closed=1
+          draft: false
+          prerelease: false
+    - name: Upload Release
+      if: success()
+      id: upload-release-asset
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: cli/build/distributions/micronaut-${{ steps.release_version.outputs.release_version }}.zip
+        asset_name: micronaut-${{ steps.release_version.outputs.release_version }}.zip
+        asset_content_type: application/zip
+    - name: SDKMan Announce
+      if: success()
+      run: ./gradlew sdkMinorRelease
+    - name: Publish to Github Pages
+      if: success()
+      uses: micronaut-projects/micronaut-docs-deploy@master
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GH_REPOSITORY: micronaut-projects/micronaut-docs
+        BASE_BRANCH: master
+        BRANCH: gh-pages
+        FOLDER: build/docs
+        BETA: true
+        VERSION: ${{ steps.release_version.outputs.release_version }}
+    - name: Synchronize Maven Central
+      if: success()
+      env:
+         BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
+         BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
+      run: ./gradlew sWMC
