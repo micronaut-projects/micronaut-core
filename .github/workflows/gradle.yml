@@ -34,7 +34,7 @@ jobs:
       run: ./gradlew publish docs
     - name: Publish to Github Pages
       if: success() && github.event_name == 'push' && matrix.java == '1.8'
-      uses: micronaut-projects/micronaut-docs-deploy
+      uses: micronaut-projects/micronaut-docs-deploy@master
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
         GH_REPOSITORY: micronaut-projects/micronaut-docs
