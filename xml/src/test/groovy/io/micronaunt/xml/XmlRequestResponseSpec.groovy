@@ -59,7 +59,7 @@ class XmlRequestResponseSpec extends Specification {
         xmlClient.sendRawXmlContent("<xmlModel><value></></xmlModel>").blockingGet()
         then:
         def exception = thrown(Exception)
-        exception.message.contains "Unexpected end tag: expected </value>"
+        exception.message.contains "Failed to convert argument [xmlModel] for value [null] due to: Unexpected character '>' (code 62)"
     }
 
     @Client('/media/xml/')
