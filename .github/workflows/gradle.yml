@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['1.8', '11.0.4']
+        java: ['8', '11', '13']
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
     - uses: actions/cache@v1
       with:
         path: ~/.gradle/caches
@@ -24,14 +24,14 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: ${{ matrix.java }}   
-#    - name: Build with Gradle
-#      run: ./gradlew check --no-daemon --parallel --continue
+    - name: Build with Gradle
+      run: ./gradlew check --no-daemon --parallel --continue
     - name: Publish to JFrog OSS
       if: success() && github.event_name == 'push' && matrix.java == '1.8'
       env:
          BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
          BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
-      run: ./gradlew publish docs
+      run: ./gradlew publish docs --no-daemon
     - name: Publish to Github Pages
       if: success() && github.event_name == 'push' && matrix.java == '1.8'
       uses: micronaut-projects/micronaut-docs-deploy@master
