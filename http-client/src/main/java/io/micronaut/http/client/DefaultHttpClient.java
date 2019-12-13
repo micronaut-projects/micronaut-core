@@ -767,6 +767,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             int maxFramePayloadLength = finalWebSocketBean.messageMethod()
                     .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
                     .orElse(65536)).orElse(65536);
+            String subprotocol = finalWebSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class, "subprotocol").orElse(StringUtils.EMPTY_STRING);
 
             RequestKey requestKey;
             try {
@@ -809,12 +810,15 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         if (headers instanceof NettyHttpHeaders) {
                             customHeaders = ((NettyHttpHeaders) headers).getNettyHeaders();
                         }
+                        if (StringUtils.isNotEmpty(subprotocol)) {
+                            customHeaders.add("Sec-WebSocket-Protocol", subprotocol);
+                        }
 
                         webSocketHandler = new NettyWebSocketClientHandler<>(
                                 request,
                                 finalWebSocketBean,
                                 WebSocketClientHandshakerFactory.newHandshaker(
-                                        webSocketURL, protocolVersion, null, false, customHeaders, maxFramePayloadLength),
+                                        webSocketURL, protocolVersion, subprotocol, false, customHeaders, maxFramePayloadLength),
                                 requestBinderRegistry,
                                 mediaTypeCodecRegistry,
                                 emitter);
