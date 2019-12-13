@@ -1,6 +1,7 @@
 package io.micronaut.docs.server.json;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -17,6 +18,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Requires(property = "spec.name", value = "PersonControllerSpec")
 // tag::class[]
 @Controller("/people")
 public class PersonController {

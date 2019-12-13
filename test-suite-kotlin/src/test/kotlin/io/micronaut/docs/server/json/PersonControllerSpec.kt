@@ -37,7 +37,7 @@ import org.junit.Assert.assertTrue
 class PersonControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java)
+            ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to PersonControllerSpec::class.simpleName))
     )
 
     val client = autoClose(
