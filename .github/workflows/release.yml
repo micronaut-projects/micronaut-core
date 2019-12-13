@@ -50,6 +50,10 @@ jobs:
     - name: SDKMan Announce
       if: success()
       run: ./gradlew sdkMinorRelease
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GVM_SDKVENDOR_KEY: ${{ secrets.GVM_SDKVENDOR_KEY }}
+        GVM_SDKVENDOR_TOKEN: ${{ secrets.GVM_SDKVENDOR_TOKEN }}
     - name: Publish to Github Pages
       if: success()
       uses: micronaut-projects/micronaut-docs-deploy@master
