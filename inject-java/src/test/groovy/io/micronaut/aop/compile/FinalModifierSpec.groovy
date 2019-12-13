@@ -15,10 +15,43 @@
  */
 package io.micronaut.aop.compile
 
+import io.micronaut.aop.simple.Mutating
 import io.micronaut.inject.AbstractTypeElementSpec
 import spock.lang.Issue
 
 class FinalModifierSpec extends AbstractTypeElementSpec {
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2479')
+    void "test final modifier on inherited public method"() {
+        when:
+        def definition = buildBeanDefinition('test.CountryRepositoryImpl', '''
+package test;
+
+import io.micronaut.aop.simple.*;
+import io.micronaut.context.annotation.*;
+
+
+abstract class BaseRepositoryImpl {
+    public final Object getContext() {
+        return new Object();
+    }
+}
+
+interface CountryRepository {    
+}
+
+@javax.inject.Singleton
+@Mutating("someVal")
+class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
+    
+    public String someMethod() {
+        return "test";
+    }
+}
+''')
+        then:"Compilation passes"
+        definition != null
+    }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2479')
     void "test final modifier on inherited protected method"() {
