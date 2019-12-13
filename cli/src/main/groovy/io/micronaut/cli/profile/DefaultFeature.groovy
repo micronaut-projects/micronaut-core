@@ -105,6 +105,11 @@ class DefaultFeature implements Feature {
 
         this.minJava = (Integer) configuration.get("java.min") ?: null
         this.maxJava = (Integer) configuration.get("java.max") ?: null
+
+        String mainClassName = (String) configuration.get("mainClassName") ?: null
+        if (mainClassName != null) {
+            profile.setMainClassName(mainClassName)
+        }
     }
 
     @Override

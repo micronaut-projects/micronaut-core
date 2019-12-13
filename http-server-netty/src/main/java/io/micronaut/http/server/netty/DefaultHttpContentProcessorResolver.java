@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.BeanLocator;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
@@ -75,7 +76,14 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
                 body or just a part of the body. We check to ensure the argument has the body
                 annotation to exclude that use case
                 */
-                .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class))
+                .filter(argument -> {
+                    AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+                    if (annotationMetadata.hasAnnotation(Body.class)) {
+                        return !annotationMetadata.stringValue(Body.class).isPresent();
+                    } else {
+                        return false;
+                    }
+                })
                 .orElseGet(() -> {
                     if (route instanceof ExecutionHandle) {
                         for (Argument<?> argument: ((ExecutionHandle) route).getArguments()) {

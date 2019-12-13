@@ -81,6 +81,12 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
         return objectMapper;
     }
 
+    /**
+     * Create a new codec with the provided features.
+     *
+     * @param jacksonFeatures The jackson features
+     * @return The new codec
+     */
     public abstract JacksonMediaTypeCodec cloneWithFeatures(JacksonFeatures jacksonFeatures);
 
     @Override

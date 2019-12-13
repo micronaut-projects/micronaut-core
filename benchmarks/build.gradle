@@ -5,20 +5,15 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":validation")
-    compileOnly project(":inject-java")
     compileOnly project(":validation")
-    compile project(":inject")
-    compile project(":inject-java-test")
-    compile project(":inject-java")
-    compile project(":http-server-netty")
-    compile project(":validation")
-    compile project(":runtime")
-    compile project(":xml")
-    compileOnly dependencyModuleVersion("netty", "netty-all")
-    compile 'org.mockito:mockito-core:2.1.0'
+    api project(":inject")
+    api project(":inject-java-test")
+    api project(":validation")
+    api project(":runtime")
+    api project(":xml")
 
     jmh 'org.openjdk.jmh:jmh-core:1.22'
-    jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.21'
+    jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.22'
 }
 jmh {
     include =['io.micronaut.aop.around.AroundCompileBenchmark']

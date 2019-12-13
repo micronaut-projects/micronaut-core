@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;

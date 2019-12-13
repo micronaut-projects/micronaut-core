@@ -18,6 +18,7 @@ package io.micronaut.xml.server.convert;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -27,6 +28,7 @@ import io.micronaut.jackson.JacksonConfiguration;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Supplier;
 
 import static javax.xml.stream.XMLStreamConstants.END_ELEMENT;
 import static javax.xml.stream.XMLStreamConstants.START_ELEMENT;
@@ -36,7 +38,8 @@ import static javax.xml.stream.XMLStreamConstants.START_ELEMENT;
  *
  * @param <V> The generic type for values
  * @author sergey.vishnyakov
- * @since 1.2
+ * @author James Kleeh
+ * @since 1.3.0
  */
 public class XmlStreamConvertibleValues<V> implements ConvertibleValues<V> {
 
@@ -45,75 +48,105 @@ public class XmlStreamConvertibleValues<V> implements ConvertibleValues<V> {
     private final ByteArrayXmlStreamReader stream;
     private final XmlMapper xmlMapper;
     private final ConversionService<?> conversionService;
-    private final JsonNode objectNode;
+    private final Supplier<JsonNode> objectNode;
 
     /**
-     * @param stream    xml input stream
-     * @param xmlMapper object mapper specializing on xml content
-     * @throws IOException xml mapper fails to read xml stream
+     * @param stream            The XML input stream
+     * @param xmlMapper         The Jackson XML Mapper
+     * @param conversionService The conversion service
      */
     public XmlStreamConvertibleValues(ByteArrayXmlStreamReader stream,
                                       XmlMapper xmlMapper,
-                                      ConversionService<?> conversionService) throws IOException {
+                                      ConversionService<?> conversionService) {
         this.stream = stream;
         this.xmlMapper = xmlMapper;
         this.conversionService = conversionService;
-        this.objectNode = xmlMapper.readTree(stream.getBytes());
+        this.objectNode = SupplierUtil.memoized(() -> {
+            try {
+                return xmlMapper.readTree(stream.getBytes());
+            } catch (IOException e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Failed to read the xml stream as a tree", e);
+                }
+                return null;
+            }
+        });
     }
 
     @Override
     public Set<String> names() {
-        Set<String> names = new HashSet<>();
-        for (Map.Entry<String, JsonNode> child : CollectionUtils.iteratorToSet(objectNode.fields())) {
-            names.add(child.getKey());
-            for (Map.Entry<String, JsonNode> grandChild : CollectionUtils.iteratorToSet(child.getValue().fields())) {
-                names.add(grandChild.getKey());
-            }
+        JsonNode jsonNode = objectNode.get();
+        if (jsonNode != null) {
+            Iterator<String> fieldNames = objectNode.get().fieldNames();
+            return CollectionUtils.iteratorToSet(fieldNames);
+        } else {
+            return Collections.emptySet();
         }
-
-        return Collections.unmodifiableSet(names);
     }
 
     @Override
     public Collection<V> values() {
-        return (Collection<V>) Collections.unmodifiableSet(CollectionUtils.iteratorToSet(objectNode.iterator()));
+        JsonNode jsonNode = objectNode.get();
+        if (jsonNode != null) {
+            List<V> values = new ArrayList<>();
+            for (JsonNode node : jsonNode) {
+                values.add((V) node);
+            }
+            return Collections.unmodifiableCollection(values);
+        } else {
+            return Collections.emptyList();
+        }
     }
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-        int depth = 0;
-        JavaType javaType = JacksonConfiguration.constructType(conversionContext.getArgument(), xmlMapper.getTypeFactory());
-        String nameString = name.toString();
-        try (ByteArrayXmlStreamReader streamReader = stream.reset()) {
-            while (streamReader.hasNext()) {
-                int token = streamReader.next();
-                if (token == START_ELEMENT) {
-                    depth++;
-                    if (depth == 1 && nameString.equals(streamReader.getName().toString())) {
-                        if (ClassUtils.isJavaBasicType(conversionContext.getArgument().getType())) {
-                            String value = streamReader.getElementText();
-                            return conversionService.convert(value, conversionContext);
-                        } else {
-                            return Optional.ofNullable(xmlMapper.readValue(streamReader, javaType));
+        Class<T> type = conversionContext.getArgument().getType();
+        //Necessary to process the XML this way for collections because the JsonNode
+        //will only keep the last item due to the key being duplicated
+        if (Collection.class.isAssignableFrom(type)) {
+            int depth = -1;
+            JavaType javaType = JacksonConfiguration.constructType(conversionContext.getArgument(), xmlMapper.getTypeFactory());
+            String nameString = name.toString();
+            try (ByteArrayXmlStreamReader streamReader = stream.reset()) {
+                while (streamReader.hasNext()) {
+                    int token = streamReader.next();
+                    if (token == START_ELEMENT) {
+                        depth++;
+                        if (depth == 1 && nameString.equals(streamReader.getName().toString())) {
+                            if (ClassUtils.isJavaBasicType(conversionContext.getArgument().getType())) {
+                                String value = streamReader.getElementText();
+                                return conversionService.convert(value, conversionContext);
+                            } else {
+                                return Optional.ofNullable(xmlMapper.readValue(streamReader, javaType));
+                            }
                         }
-                    }
-                    if (depth == 0) {
-                        for (int i = 0; i < streamReader.getAttributeCount(); ++i) {
-                            String attr = streamReader.getAttributeLocalName(i);
-                            if (attr.equals(nameString)) {
-                                return conversionService.convert(streamReader.getAttributeValue(i), conversionContext);
+                        if (depth == 0) {
+                            for (int i = 0; i < streamReader.getAttributeCount(); ++i) {
+                                String attr = streamReader.getAttributeLocalName(i);
+                                if (attr.equals(nameString)) {
+                                    return conversionService.convert(streamReader.getAttributeValue(i), conversionContext);
+                                }
                             }
                         }
                     }
+                    if (token == END_ELEMENT) {
+                        depth--;
+                    }
                 }
-                if (token == END_ELEMENT) {
-                    depth--;
+            } catch (Exception e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Failed to retrieve {} field from xml stream", name, e);
                 }
             }
-        } catch (Exception e) {
-            LOG.error("Failed to retrieve {} field from xml stream", name, e);
-        }
 
-        return Optional.empty();
+            return Optional.empty();
+        } else {
+            JsonNode node = objectNode.get();
+            if (node != null) {
+                return conversionService.convert(node.get(name.toString()), conversionContext);
+            } else  {
+                return Optional.empty();
+            }
+        }
     }
 }

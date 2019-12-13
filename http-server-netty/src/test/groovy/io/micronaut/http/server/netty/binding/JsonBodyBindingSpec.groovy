@@ -97,7 +97,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == "Body: [title:The Stand]"
     }
 
-    void  "test simple string-based body parsing"() {
+    void "test simple string-based body parsing"() {
         when:
         def json = '{"title":"The Stand"}'
         def response = rxClient.exchange(
@@ -106,6 +106,17 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         response.body() == "Body: $json"
+    }
+
+    void "test binding to part of body with @Body(name)"() {
+        when:
+        def json = '{"title":"The Stand"}'
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/body-title', json), String
+        ).blockingFirst()
+
+        then:
+        response.body() == "Body Title: The Stand"
     }
 
     void  "test simple string-based body parsing with request argument"() {
@@ -301,8 +312,13 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
             "Body: ${text}"
         }
 
+        @Post("/body-title")
+        String bodyNamed(@Body("title") String text) {
+            "Body Title: ${text}"
+        }
+
         @Post("/request-string")
-        String string(HttpRequest<String> req) {
+        String requestString(HttpRequest<String> req) {
             "Body: ${req.body.orElse("empty")}"
         }
 

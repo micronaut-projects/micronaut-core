@@ -15,15 +15,12 @@
  */
 package io.micronaut.xml.server.convert;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 
-import javax.inject.Inject;
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.util.Optional;
@@ -41,7 +38,11 @@ public class XmlStreamToObjectConverter implements TypeConverter<ByteArrayXmlStr
     private final XmlMapper xmlMapper;
     private final ConversionService<?> conversionService;
 
-    @Inject
+
+    /**
+     * @param xmlMapper The XML Mapper
+     * @param conversionService The conversion service
+     */
     public XmlStreamToObjectConverter(XmlMapper xmlMapper, ConversionService<?> conversionService) {
         this.xmlMapper = xmlMapper;
         this.conversionService = conversionService;

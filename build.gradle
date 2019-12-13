@@ -1,19 +1,16 @@
 buildscript {
     repositories {
-        mavenLocal()
         maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
-        classpath "org.grails:grails-gradle-plugin:$grailsVersion"
         classpath "org.grails:grails-docs:$grailsVersion"
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
-        classpath 'com.bmuschko:gradle-nexus-plugin:2.3.1'
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:4.0.2'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
         classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.0.0"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.1"
-        classpath 'javax.xml.bind:jaxb-api:2.2.8'
+        classpath 'javax.xml.bind:jaxb-api:2.3.1'
         classpath "io.micronaut.docs:micronaut-docs-asciidoc-extensions:$micronautDocsVersion"
         classpath "io.micronaut.docs:micronaut-docs-gradle-plugins:$micronautDocsVersion", {
             exclude module:'shadow'
@@ -24,7 +21,7 @@ buildscript {
 
 plugins {
     id 'com.github.hierynomus.license' version '0.15.0' apply false
-    id 'com.github.ben-manes.versions' version '0.21.0'
+    id 'com.github.ben-manes.versions' version '0.27.0'
 }
 
 apply plugin: "io.sdkman.vendors"
@@ -441,9 +438,14 @@ ext {
                     name   : 'hystrix-core',
                     modules: ['hystrix-serialization']
             ],
+            graalSubstrate             : [
+                    version: '19.2.1',
+                    group  : 'com.oracle.substratevm',
+                    name   : 'svm'
+            ],
             graal                      : [
                     version: graalVersion,
-                    group  : 'com.oracle.substratevm',
+                    group  : 'org.graalvm.nativeimage',
                     name   : 'svm'
             ],
             h2                         : [
@@ -594,31 +596,23 @@ subprojects { Project subproject ->
     ext {
         userOrg = "grails"
         isGrailsPlugin = false
-        isConfiguration = subproject.projectDir.parentFile.name == 'configurations'
         isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
+        shadowJarEnabled = false
     }
 
-    if (subproject.name == "configurations") {
+    if (subproject.name.contains("bom")) {
         return
     }
 
-    if (isConfiguration) {
-        group "io.micronaut.configuration"
-    } else {
-        group projectGroupId
-    }
-
+    group projectGroupId
 
     repositories {
         maven { url "https://repo.grails.org/grails/core" }
-        maven { url "https://oss.jfrog.org/artifactory/oss-snapshot-local/" }
     }
 
-    if (subproject.name.startsWith("examples")) {
-        // apply plugin:"org.grails.grails-web"
-    } else {
+    if (!subproject.name.contains("bom")) {
         apply plugin: "groovy"
-        apply plugin: "java"
+        apply plugin: "java-library"
 
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
@@ -635,8 +629,8 @@ subprojects { Project subproject ->
             apply plugin: 'checkstyle'
 
             checkstyle {
-                toolVersion = 8.10
-                configFile = rootProject.file('config/checkstyle/checkstyle.xml')
+                toolVersion = 8.16
+                configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
 
                 // Per submodule
                 maxErrors = 0
@@ -657,9 +651,14 @@ subprojects { Project subproject ->
         }
     }
 
+//    tasks.withType(GroovyCompile).configureEach {
+//        options.incremental = true
+//    }
+
     tasks.withType(Test) {
-        jvmArgs '-Duser.country=US'
-        jvmArgs '-Duser.language=en'
+        jvmArgs '-Duser.country=US', '-Duser.language=en', '-Xmx2048m'
+        reports.html.enabled = !System.getenv("TRAVIS")
+        reports.junitXml.enabled = !System.getenv("TRAVIS")
         testLogging {
             exceptionFormat = 'full'
         }
@@ -667,9 +666,6 @@ subprojects { Project subproject ->
             System.out.print(".")
             System.out.flush()
         }
-
-        reports.html.enabled = !System.getenv("TRAVIS")
-        reports.junitXml.enabled = !System.getenv("TRAVIS")
 
         systemProperty "micronaut.cloud.platform", "OTHER"
     }
@@ -705,37 +701,41 @@ subprojects { Project subproject ->
         relocate "org.objectweb.asm", "io.micronaut.asm"
     }
 
-    shadowJar.enabled = false
-
     def isDocumented = subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')
 
     dependencies {
         documentation "org.codehaus.groovy:groovy-templates:$groovyVersion"
         documentation "org.codehaus.groovy:groovy-dateutil:$groovyVersion"
         if (subproject.name != "bom") {
-            compile dependencyVersion("slf4j")
+            api dependencyVersion("slf4j")
         }
 
 
         if (isDocumented) {
-            compileOnly "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion"
+            compileOnly "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion", {
+                transitive = false
+            }
         }
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-        testCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
-        testCompile dependencyVersion("groovy")
-        testCompile(dependencyVersion("spock")) {
+        testImplementation "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+        testImplementation dependencyVersion("groovy")
+        testImplementation(dependencyVersion("spock")) {
             exclude module: 'groovy-all'
         }
-        testCompile "cglib:cglib-nodep:2.2.2"
-        testCompile "org.objenesis:objenesis:1.4"
+        testImplementation "cglib:cglib-nodep:3.3.0"
+        testImplementation "org.objenesis:objenesis:3.1"
 
-        testRuntime "ch.qos.logback:logback-classic:1.2.3"
-        testCompile "org.codehaus.groovy:groovy-test:$groovyVersion"
+        testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
+        testImplementation "org.codehaus.groovy:groovy-test:$groovyVersion"
         compileOnly "org.ow2.asm:asm:$asmVersion"
         compileOnly "org.ow2.asm:asm-commons:$asmVersion"
+        annotationProcessor "org.ow2.asm:asm:$asmVersion"
+        annotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
 
-        testCompile "org.ow2.asm:asm:$asmVersion"
-        testCompile "org.ow2.asm:asm-commons:$asmVersion"
+        testImplementation "org.ow2.asm:asm:$asmVersion"
+        testImplementation "org.ow2.asm:asm-commons:$asmVersion"
+        testAnnotationProcessor "org.ow2.asm:asm:$asmVersion"
+        testAnnotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
     }
 
     task moveConfigProps() {

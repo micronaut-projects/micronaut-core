@@ -26,8 +26,7 @@ import io.micronaut.inject.BeanContextConditional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nonnull;
 
 /**
  * Abstract implementation of the {@link BeanContextConditional} interface.
@@ -40,29 +39,23 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
 
     static final Logger LOG = LoggerFactory.getLogger(Condition.class);
 
-    private final Map<Integer, Boolean> enabled = new ConcurrentHashMap<>(2);
-
     @Override
-    public boolean isEnabled(BeanContext context) {
-        int contextId = System.identityHashCode(context);
-        Boolean enabled = this.enabled.get(contextId);
-        if (enabled == null) {
-            AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
-            DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(context, this);
-            enabled = condition == null || condition.matches(conditionContext);
-            if (LOG.isDebugEnabled() && !enabled) {
-                if (this instanceof BeanConfiguration) {
-                    LOG.debug(this + " will not be loaded due to failing conditions:");
-                } else {
-                    LOG.debug("Bean [" + this + "] will not be loaded due to failing conditions:");
-                }
-                for (Failure failure : conditionContext.getFailures()) {
-                    LOG.debug("* {}", failure.getMessage());
-                }
+    public boolean isEnabled(@Nonnull BeanContext context) {
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
+        DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(context, this);
+        boolean enabled = condition == null || condition.matches(conditionContext);
+        if (LOG.isDebugEnabled() && !enabled) {
+            if (this instanceof BeanConfiguration) {
+                LOG.debug(this + " will not be loaded due to failing conditions:");
+            } else {
+                LOG.debug("Bean [" + this + "] will not be loaded due to failing conditions:");
             }
-            this.enabled.put(contextId, enabled);
+            for (Failure failure : conditionContext.getFailures()) {
+                LOG.debug("* {}", failure.getMessage());
+            }
         }
+
         return enabled;
     }
 }

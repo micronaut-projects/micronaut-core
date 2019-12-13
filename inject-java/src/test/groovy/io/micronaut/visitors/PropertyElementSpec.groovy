@@ -17,13 +17,17 @@ package io.micronaut.visitors
 
 import io.micronaut.http.annotation.Get
 import io.micronaut.inject.AbstractTypeElementSpec
+import spock.lang.IgnoreIf
 import spock.lang.Specification
+import spock.util.environment.Jvm
 
 import javax.annotation.Nullable
 import javax.validation.constraints.NotBlank
 
 class PropertyElementSpec extends AbstractTypeElementSpec {
-
+    // Java 9+ doesn't allow resolving elements was the compiler
+    // is finished being used so this test cannot be made to work beyond Java 8 the way it is currently written
+    @IgnoreIf({ Jvm.current.isJava9Compatible() })
     void "test simple bean properties"() {
         buildBeanDefinition('test.TestController', '''
 package test;

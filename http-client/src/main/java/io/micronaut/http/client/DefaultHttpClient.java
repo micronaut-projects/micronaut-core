@@ -764,7 +764,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return Flowable.create(emitter -> {
             SslContext sslContext = buildSslContext(uri);
             WebSocketVersion protocolVersion = finalWebSocketBean.getBeanDefinition().enumValue(ClientWebSocket.class, "version", WebSocketVersion.class).orElse(WebSocketVersion.V13);
-            int maxFramePayloadLength = finalWebSocketBean.messageMethod().flatMap(m -> m.getValue(OnMessage.class, "maxPayloadLength", Integer.class)).orElse(65536);
+            int maxFramePayloadLength = finalWebSocketBean.messageMethod()
+                    .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
+                    .orElse(65536)).orElse(65536);
 
             RequestKey requestKey;
             try {
@@ -1667,6 +1669,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         Flowable<io.micronaut.http.HttpResponse<Object>> redirectedExchange;
                         try {
                             MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
+                            setRedirectHeaders(nettyRequest, redirectRequest);
                             redirectedExchange = Flowable.fromPublisher(resolveRequestURI(redirectRequest))
                                     .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri));
 
@@ -1821,8 +1824,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         // it is a redirect
                         if (statusCode > 300 && statusCode < 400 && configuration.isFollowRedirects() && headers.contains(HttpHeaderNames.LOCATION)) {
                             String location = headers.get(HttpHeaderNames.LOCATION);
-                            Flowable<io.micronaut.http.HttpResponse<O>> redirectedRequest = exchange(io.micronaut.http.HttpRequest.GET(location), bodyType);
-                            redirectedRequest.first(io.micronaut.http.HttpResponse.notFound())
+                            final MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
+                            setRedirectHeaders(request, redirectRequest);
+                            Flowable<io.micronaut.http.HttpResponse<O>> redirectExchange = exchange(redirectRequest, bodyType);
+                            redirectExchange.first(io.micronaut.http.HttpResponse.notFound())
                                     .subscribe((oHttpResponse, throwable) -> {
                                         if (throwable != null) {
                                             emitter.tryOnError(throwable);
@@ -1838,12 +1843,18 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
                             headers.remove(HttpHeaderNames.CONTENT_LENGTH);
                         }
-                        boolean errorStatus = statusCode >= 400;
+
+                        boolean convertBodyWithBodyType = statusCode < 400 ||
+                                (!DefaultHttpClient.this.configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType));
                         FullNettyClientHttpResponse<O> response
-                                = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, errorStatus);
+                                = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType);
 
                         if (complete.compareAndSet(false, true)) {
-                            if (errorStatus) {
+                            if (convertBodyWithBodyType) {
+                                emitter.onNext(response);
+                                response.onComplete();
+                                emitter.onComplete();
+                            } else { // error flow
                                 try {
                                     HttpClientResponseException clientError;
                                     if (errorType != HttpClient.DEFAULT_ERROR_TYPE) {
@@ -1884,7 +1895,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                                 mediaTypeCodecRegistry,
                                                 byteBufferFactory,
                                                 null,
-                                                true
+                                                false
                                         );
                                         errorResponse.onComplete();
                                         HttpClientResponseException clientResponseError = new HttpClientResponseException(
@@ -1896,10 +1907,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                         emitter.tryOnError(clientResponseError);
                                     }
                                 }
-                            } else {
-                                emitter.onNext(response);
-                                response.onComplete();
-                                emitter.onComplete();
                             }
                         }
                     } catch (Throwable t) {
@@ -1907,7 +1914,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             if (t instanceof HttpClientResponseException) {
                                 emitter.tryOnError(t);
                             } else {
-                                FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, null, true);
+                                FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(fullResponse, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, null, false);
                                 HttpClientResponseException clientResponseError = new HttpClientResponseException(
                                         "Error decoding HTTP response body: " + t.getMessage(),
                                         t,
@@ -1997,6 +2004,31 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             pipeline.addBefore(HANDLER_HTTP_CLIENT_CODEC, HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
         }
 
+    }
+
+    private void setRedirectHeaders(@Nullable HttpRequest request, MutableHttpRequest<Object> redirectRequest) {
+        if (request != null) {
+            request.headers().forEach(header -> redirectRequest.header(header.getKey(), header.getValue()));
+        }
+    }
+
+    private void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
+        if (request != null) {
+            final Iterator<Map.Entry<String, List<String>>> headerIterator = request.getHeaders().iterator();
+            while (headerIterator.hasNext()) {
+                final Map.Entry<String, List<String>> originalHeader = headerIterator.next();
+                final List<String> originalHeaderValue = originalHeader.getValue();
+                if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
+                    final Iterator<String> headerValueIterator = originalHeaderValue.iterator();
+                    while (headerValueIterator.hasNext()) {
+                        final String value = headerValueIterator.next();
+                        if (value != null) {
+                            redirectRequest.header(originalHeader.getKey(), value);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private ClientFilterChain buildChain(AtomicReference<io.micronaut.http.HttpRequest> requestWrapper, List<HttpClientFilter> filters) {

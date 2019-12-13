@@ -1,15 +1,13 @@
-shadowJar.enabled = true
-
 dependencies {
-    compile dependencyModuleVersion('jackson.dataformat', 'jackson-dataformat-xml')
-    
-    compileOnly project(":http")
-    compileOnly project(":inject")
+    annotationProcessor project(":inject-java")
+    api dependencyModuleVersion('jackson.dataformat', 'jackson-dataformat-xml')
+    api project(":inject")
+    api project(":http")
     compileOnly project(":http-server-netty")
-    compileOnly project(":inject-java")
 
-    testCompile project(":inject-groovy")
-    testCompile project(":http-client")
-    testCompile project(":runtime")
-    testCompile project(":http-server-netty")
+    testCompileOnly project(":inject-groovy")
+    testImplementation project(":inject")
+    testImplementation project(":http-client")
+    testImplementation project(":runtime")
+    testImplementation project(":http-server-netty")
 }

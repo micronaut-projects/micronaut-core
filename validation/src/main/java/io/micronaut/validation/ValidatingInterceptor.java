@@ -29,6 +29,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.validation.Constraint;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
 import javax.validation.Valid;
@@ -120,7 +121,7 @@ public class ValidatingInterceptor implements MethodInterceptor {
             final boolean supportsReactive = micronautValidator instanceof ReactiveValidator;
             if (constraintViolations.isEmpty()) {
                 final Object result = context.proceed();
-                if (context.hasStereotype(Valid.class)) {
+                if (context.hasStereotype(Valid.class) || context.hasStereotype(Constraint.class)) {
                     final boolean hasResult = result != null;
                     if (supportsReactive & hasResult && Publishers.isConvertibleToPublisher(result)) {
                         ReactiveValidator reactiveValidator = (ReactiveValidator) micronautValidator;

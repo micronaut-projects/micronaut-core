@@ -2,6 +2,7 @@ package io.micronaut.jackson.modules
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.JsonView
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
@@ -40,6 +41,18 @@ class BeanIntrospectionModuleSpec extends Specification {
         result.contains('"book_pages":1000')
         result.contains('"author":{"name":"Fred"}')
 
+        when:
+        result = objectMapper.writerWithView(PublicView).writeValueAsString(b)
+        then:
+        result.contains('"book_title":')
+        !result.contains('"book_pages":')
+
+        when:
+        result = objectMapper.writerWithView(AllView).writeValueAsString(b)
+        then:
+        result.contains('"book_title":')
+        result.contains('"book_pages":')
+
         cleanup:
         ctx.close()
     }
@@ -77,9 +90,11 @@ class BeanIntrospectionModuleSpec extends Specification {
     @Introspected
     static class Book {
         @JsonProperty("book_title")
+        @JsonView(PublicView)
         String title
 
         @JsonProperty("book_pages")
+        @JsonView(AllView)
         int pages
 
         Author author
@@ -95,4 +110,9 @@ class BeanIntrospectionModuleSpec extends Specification {
     static class Author {
         String name
     }
+
+    //Used for @JsonView
+    static class PublicView {}
+    static class AllView extends PublicView {}
+
 }

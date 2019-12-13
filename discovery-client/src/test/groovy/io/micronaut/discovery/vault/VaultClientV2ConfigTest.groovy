@@ -1,29 +1,19 @@
-package io.micronaut.discovery.vault;
+package io.micronaut.discovery.vault
 
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.env.Environment;
-import io.micronaut.discovery.vault.config.v2.VaultResponseV2;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.LoadBalancer;
-import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import spock.lang.AutoCleanup;
-import spock.lang.Shared;
-import spock.lang.Specification;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.Assert.*;
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
+import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.AutoCleanup
+import spock.lang.Shared
+import spock.lang.Specification
+import spock.util.environment.RestoreSystemProperties
 
 /**
  *  Tests for Vault KV version 2.
  *
  *  @author thiagolocatelli
  */
+@RestoreSystemProperties
 class VaultClientV2ConfigTest extends Specification {
 
     @Shared
@@ -54,7 +44,6 @@ class VaultClientV2ConfigTest extends Specification {
         1 == context.getRequiredProperty("v2-secret-6", Integer.class)
 
         cleanup:
-        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "")
         context.stop()
     }
 

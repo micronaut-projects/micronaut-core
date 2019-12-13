@@ -1,20 +1,24 @@
 dependencies {
-    compileOnly project(":inject-java")
-    compile dependencyVersion("rxjava2")
-    compile project(":http-netty")
-    compile project(":runtime")
-    compile dependencyModuleVersion("netty", "netty-handler-proxy")
+    annotationProcessor project(":inject-java")
+    api dependencyVersion("rxjava2")    
+    api project(":runtime")
+    api project(":websocket")
 
+    api project(":http-netty")
+    api dependencyModuleVersion("netty", "netty-handler-proxy")
+    
     compileOnly dependencyVersion("reactor")
-    compile project(":websocket")
+    
+    testAnnotationProcessor project(":validation")
+    testAnnotationProcessor project(":inject-java")
 
-    testCompile project(":inject-groovy")
-    testCompile project(":validation")
-    testCompile project(":inject-java")
-    testCompile dependencyVersion("rxjava2")
-    testCompile dependencyVersion("reactor")
-    testCompile project(":http-server-netty")
-    testCompile "com.github.tomakehurst:wiremock-jre8:2.25.0"
+    testCompileOnly project(":inject-groovy")
+    testImplementation project(":validation")    
+    testImplementation project(":inject")
+    testImplementation dependencyVersion("rxjava2")
+    testImplementation dependencyVersion("reactor")
+    testImplementation project(":http-server-netty")
+    testImplementation "com.github.tomakehurst:wiremock-jre8:2.25.0"
 }
 
 //tasks.withType(Test) {

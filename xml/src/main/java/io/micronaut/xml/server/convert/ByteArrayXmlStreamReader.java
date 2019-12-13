@@ -15,12 +15,14 @@
  */
 package io.micronaut.xml.server.convert;
 
-import com.fasterxml.aalto.stax.InputFactoryImpl;
 import io.micronaut.core.annotation.Internal;
 
+import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.util.StreamReaderDelegate;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 
 /**
  * Stream reader that pairs xml stream with underlying byte array.
@@ -30,8 +32,6 @@ import javax.xml.stream.util.StreamReaderDelegate;
  */
 @Internal
 public final class ByteArrayXmlStreamReader extends StreamReaderDelegate implements AutoCloseable {
-
-    private static final InputFactoryImpl XML_STREAM_FACTORY = new InputFactoryImpl();
 
     private byte[] bytes;
 
@@ -45,7 +45,8 @@ public final class ByteArrayXmlStreamReader extends StreamReaderDelegate impleme
     }
 
     private static XMLStreamReader toReader(byte[] bytes) throws XMLStreamException {
-        return XML_STREAM_FACTORY.createAsyncFor(bytes);
+        InputStream in = new ByteArrayInputStream(bytes);
+        return XMLInputFactory.newInstance().createXMLStreamReader(in);
     }
 
     /**

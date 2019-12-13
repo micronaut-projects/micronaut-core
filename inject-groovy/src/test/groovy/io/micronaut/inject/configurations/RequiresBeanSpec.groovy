@@ -27,6 +27,8 @@ import io.micronaut.inject.configurations.requiresconfig.RequiresConfig
 import io.micronaut.inject.configurations.requiresproperty.RequiresProperty
 import io.micronaut.inject.configurations.requiressdk.RequiresJava9
 import spock.lang.Specification
+import spock.util.environment.Jvm
+
 /**
  * Created by graemerocher on 19/05/2017.
  */
@@ -43,7 +45,7 @@ class RequiresBeanSpec extends Specification {
         context.containsBean(TrueLambdaBean)
         !context.containsBean(RequiresBean)
         !context.containsBean(RequiresConfig)
-        !context.containsBean(RequiresJava9)
+        Jvm.current.isJava9Compatible() || !context.containsBean(RequiresJava9)
 //        !context.containsBean(TravisBean) // TODO: these are broken because closures are not supported for @Requires( condition = {})
 //        !context.containsBean(TravisBean2)
     }

@@ -53,7 +53,7 @@ import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.context.ContextPathProvider;
+import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
@@ -182,7 +182,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
 
             HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase());
-            String httpMethodName = context.getValue(CustomHttpMethod.class, "method", String.class).orElse(httpMethod.name());
+            String httpMethodName = context.stringValue(CustomHttpMethod.class, "method").orElse(httpMethod.name());
 
             ReturnType returnType = context.getReturnType();
             Class<?> javaReturnType = returnType.getType();
@@ -258,7 +258,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     }
                 }
                 if (definedValue == null) {
-                    definedValue = argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", String.class).orElse(null);
+                    definedValue = argument.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null);
                 }
 
                 if (definedValue == null && !argument.isNullable()) {
@@ -408,7 +408,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
             final Class<?> methodDeclaringType = declaringType;
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
-                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.getValue(Consumes.class, "single", Boolean.class).orElse(false);
+                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.isTrue(Consumes.class, "single");
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
 
@@ -680,8 +680,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>) configurationClass.orElse(HttpClientConfiguration.class);
             configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
 
-            if (contextPath == null && configuration instanceof ContextPathProvider) {
-                contextPath = ((ContextPathProvider) configuration).getContextPath().orElse(null);
+            if (contextPath == null && configuration instanceof ClientContextPathProvider) {
+                contextPath = ((ClientContextPathProvider) configuration).getContextPath().orElse(null);
             }
 
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath);
@@ -752,7 +752,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 beanContext.getBean(ApplicationConfiguration.class),
                                 beanContext.findBean(CodecConfiguration.class, Qualifiers.byName(JsonMediaTypeCodec.CONFIGURATION_QUALIFIER)).orElse(null));
     }
-
 
     private String getClientId(AnnotationValue<Client> clientAnn) {
         String clientId = clientAnn.stringValue().orElse(null);

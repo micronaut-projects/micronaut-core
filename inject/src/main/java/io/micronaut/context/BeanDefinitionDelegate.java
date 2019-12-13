@@ -198,6 +198,11 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         return new BeanDefinitionDelegate<>(definition);
     }
 
+    @Override
+    public String getName() {
+        return definition.getName();
+    }
+
     /**
      * @param <T> The bean definition type
      */

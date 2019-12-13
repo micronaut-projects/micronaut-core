@@ -15,6 +15,7 @@
  */
 package io.micronaut.xml.server;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.server.netty.HttpContentProcessor;
@@ -32,6 +33,7 @@ import javax.inject.Singleton;
  */
 @Consumes({MediaType.APPLICATION_XML, MediaType.APPLICATION_XHTML, MediaType.TEXT_XML})
 @Singleton
+@Requires(classes = HttpContentSubscriberFactory.class)
 public class XmlHttpContentSubscriberFactory implements HttpContentSubscriberFactory {
 
     private final NettyHttpServerConfiguration configuration;

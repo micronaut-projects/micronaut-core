@@ -1,14 +1,15 @@
 dependencies {
-    compileOnly project(":inject-java")
+    annotationProcessor project(":inject-java")
 
-    compile project(":runtime")
-    compile project(":http")
-    compile project(":http-server")
+    api project(":runtime")
+    api project(":http")
+    api project(":http-server")
     compileOnly project(":session")
 
-    testCompile project(":http-client")
-    testCompile project(":inject-groovy")
-    testCompile project(":http-server-netty")
-    testCompile project(":session")
-    testCompile project(":test-utils")
+    testImplementation dependencyVersion("snakeyaml")
+    testImplementation project(":http-client")
+    testImplementation project(":inject-groovy")
+    testImplementation project(":http-server-netty")
+    testImplementation project(":session")
+    testImplementation project(":test-utils")
 }

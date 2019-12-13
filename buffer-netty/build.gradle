@@ -1,6 +1,7 @@
 dependencies {
-    compile project(":core")
-    compile dependencyModuleVersion("netty", "netty-buffer")
+    api project(":core")
+    api project(":inject")
+    api dependencyModuleVersion("netty", "netty-buffer")
 
-    compileOnly project(":inject-java")
+    annotationProcessor project(":inject-java")
 }

@@ -16,8 +16,11 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.io.buffer.ByteBuffer
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -103,6 +106,32 @@ class ServerRedirectSpec extends Specification {
 
     }
 
+    void "test stream redirect headers"() {
+        given:
+        RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
+
+        when:
+        HttpResponse<ByteBuffer> response = ((RxStreamingHttpClient) client).exchangeStream(
+                HttpRequest.GET("/redirect/stream/title").accept(MediaType.TEXT_EVENT_STREAM_TYPE)).blockingFirst()
+
+        then:
+        response.status() == HttpStatus.OK
+        new String(response.body().toByteArray()) == "data: The Stand\n\n"
+    }
+
+    void "test redirect headers"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/redirect/title").accept(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE), String)
+
+        then:
+        response.status() == HttpStatus.OK
+        response.body() == "The Stand"
+
+    }
+
     @Controller("/redirect")
     static class RedirectController {
 
@@ -126,9 +155,24 @@ class ServerRedirectSpec extends Specification {
             HttpResponse.seeOther(URI.create('/redirect'))
         }
 
+        @Get("/title")
+        @Produces(MediaType.TEXT_PLAIN)
+        HttpResponse textTitle() {
+            HttpResponse.seeOther(URI.create("/redirect/text"))
+        }
+
         @Get
         String home() {
             return "good"
+        }
+
+        @Get("/text")
+        @Produces([MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON])
+        HttpResponse<?> title(final HttpHeaders headers) {
+            if (headers.accept().contains(MediaType.TEXT_PLAIN_TYPE)) {
+                return HttpResponse.ok("The Stand").contentType(MediaType.TEXT_PLAIN)
+            }
+            return HttpResponse.ok(new Book(title: "The Stand")).contentType(MediaType.APPLICATION_JSON)
         }
     }
 
@@ -155,11 +199,28 @@ class ServerRedirectSpec extends Specification {
             HttpResponse.seeOther(URI.create('/redirect/stream'))
         }
 
+        @Get("/title")
+        @Produces(MediaType.TEXT_EVENT_STREAM)
+        HttpResponse textTitle() {
+            HttpResponse.seeOther(URI.create("/redirect/stream/text"))
+        }
+
         @Get
         @Produces(MediaType.APPLICATION_JSON_STREAM)
         Flowable<Book> home() {
             Flowable.just(new Book(title: "The Stand"))
         }
+
+        @Get("/text")
+        @Produces([MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON_STREAM])
+        Flowable<HttpResponse<?>> title(final HttpHeaders headers) {
+            if (headers.accept().contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
+                return Flowable.just(HttpResponse.ok("The Stand").contentType(MediaType.TEXT_EVENT_STREAM))
+            }
+            return Flowable.just(HttpResponse.ok(new Book(title: "The Stand")).contentType(MediaType.APPLICATION_JSON_STREAM))
+
+        }
+
     }
 
     @Client("https://youtube.com")

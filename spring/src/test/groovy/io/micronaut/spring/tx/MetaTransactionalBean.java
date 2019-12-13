@@ -8,7 +8,7 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 @MetaAnnotation
 public class MetaTransactionalBean {
 
-    String doSomething() {
+    public String doSomething() {
         // should not throw
         final TransactionStatus transactionStatus = TransactionAspectSupport.currentTransactionStatus();
         Assert.assertNotNull(transactionStatus);
