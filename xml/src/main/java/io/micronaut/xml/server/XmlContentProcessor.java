@@ -33,7 +33,7 @@ import java.io.IOException;
  * This class will handle subscribing to a Xml stream and binding once the events are complete in a non-blocking
  * manner.
  *
- * @author svishnyakov
+ * @author Sergey Vishnyakov
  * @author James Kleeh
  * @since 1.3.0
  */

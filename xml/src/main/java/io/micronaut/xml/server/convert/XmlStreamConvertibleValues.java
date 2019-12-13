@@ -37,7 +37,7 @@ import static javax.xml.stream.XMLStreamConstants.START_ELEMENT;
  * An implementation of {@link ConvertibleValues} backed by xml stream.
  *
  * @param <V> The generic type for values
- * @author sergey.vishnyakov
+ * @author Sergey Vishnyakov
  * @author James Kleeh
  * @since 1.3.0
  */

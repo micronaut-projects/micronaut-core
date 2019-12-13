@@ -39,7 +39,7 @@ import java.util.TimeZone;
  * object mappers dedicated for xml processing and avoid some json specific configuration that might have been done inside
  * of {@link io.micronaut.jackson.ObjectMapperFactory}.
  *
- * @author svishnyakoff
+ * @author Sergey Vishnyakov
  * @since 1.3.0
  */
 @Factory

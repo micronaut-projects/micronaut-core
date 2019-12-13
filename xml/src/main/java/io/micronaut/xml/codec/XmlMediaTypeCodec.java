@@ -30,7 +30,7 @@ import javax.inject.Singleton;
 /**
  * A jackson based {@link io.micronaut.http.codec.MediaTypeCodec} that handles XML requests/responses.
  *
- * @author svishnyakov
+ * @author Sergey Vishnyakov
  * @since 1.3.0
  */
 @Named("xml")

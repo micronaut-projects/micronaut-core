@@ -28,7 +28,7 @@ import java.util.Optional;
 /**
  * Converts {@link ByteArrayXmlStreamReader} to object.
  *
- * @author sergey.vishnyakov
+ * @author Sergey Vishnyakov
  * @since 1.3.0
  */
 @Singleton

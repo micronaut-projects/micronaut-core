@@ -27,7 +27,7 @@ import java.io.InputStream;
 /**
  * Stream reader that pairs xml stream with underlying byte array.
  *
- * @author sergey.vishnyakov
+ * @author Sergey Vishnyakov
  * @since 1.3.0
  */
 @Internal

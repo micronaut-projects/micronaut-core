@@ -28,7 +28,7 @@ import javax.inject.Singleton;
 /**
  * Builds the {@link org.reactivestreams.Subscriber} for XML requests.
  *
- * @author svishnyakov
+ * @author Sergey Vishnyakov
  * @since 1.3.0
  */
 @Consumes({MediaType.APPLICATION_XML, MediaType.APPLICATION_XHTML, MediaType.TEXT_XML})
