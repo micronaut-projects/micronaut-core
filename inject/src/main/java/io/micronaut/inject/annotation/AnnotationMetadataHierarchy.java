@@ -83,6 +83,17 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         hierarchy[0] = newChild;
     }
 
+    @Override
+    public Optional<Class<? extends Annotation>> getAnnotationType(@Nonnull String name) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            final Optional<Class<? extends Annotation>> annotationType = metadata.getAnnotationType(name);
+            if (annotationType.isPresent()) {
+                return annotationType;
+            }
+        }
+        return Optional.empty();
+    }
+
     /**
      * @return The metadata that is actually declared in the element
      */
