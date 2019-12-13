@@ -18,5 +18,5 @@ dependencies {
     testImplementation("com.github.stefanbirkner:system-rules:$systemRulesVersion") {
         exclude group: "junit", module: "junit-dep"
     }
-    testImplementation "junit:junit-dep:4.9"
+    testImplementation "junit:junit-dep:4.11"
 }
