@@ -60,7 +60,7 @@ class ErrorMissingArgumentSpec extends Specification {
         '/queryvalue'                  | 'Required QueryValue [number-of-items] not specified'
         '/queryvalueNoValue'           | 'Required QueryValue [numberOfItems] not specified'
         '/body'                        | 'Required Body [numberOfItems] not specified'
-        '/queryvalueWithoutAnnotation' | 'Required argument [numberOfItems] not specified'
+        '/queryvalueWithoutAnnotation' | 'Required argument [Integer numberOfItems] not specified'
     }
 
     @Requires(property = 'spec.name', value= 'ErrorMissingArgumentSpec')

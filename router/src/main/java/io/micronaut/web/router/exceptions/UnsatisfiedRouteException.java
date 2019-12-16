@@ -73,7 +73,7 @@ public class UnsatisfiedRouteException extends RoutingException {
             }
         }
 
-        throw new UnsatisfiedRouteException("Required argument [" + argument.getName() + "] not specified", argument);
+        throw new UnsatisfiedRouteException("Required argument [" + argument + "] not specified", argument);
     }
 
     /**
