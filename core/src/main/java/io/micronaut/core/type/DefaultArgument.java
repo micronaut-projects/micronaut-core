@@ -18,6 +18,7 @@ package io.micronaut.core.type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.ArrayUtils;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -47,7 +48,12 @@ public class DefaultArgument<T> implements Argument<T> {
      * @param genericTypes       The generic types
      */
     public DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Argument... genericTypes) {
-        this(type, name, annotationMetadata, initializeTypeParameters(genericTypes), genericTypes);
+        this(type,
+             name,
+             annotationMetadata,
+             ArrayUtils.isNotEmpty(genericTypes) ? initializeTypeParameters(genericTypes) : Collections.EMPTY_MAP,
+             genericTypes
+        );
     }
 
     /**

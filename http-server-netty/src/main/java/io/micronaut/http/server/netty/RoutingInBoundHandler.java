@@ -781,9 +781,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                             if (isPublisher) {
                                 Integer dataKey = System.identityHashCode(data);
-                                HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, (key) -> {
-                                    return new HttpDataReference(data);
-                                });
+                                HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, (key) -> new HttpDataReference(data));
                                 Argument typeVariable;
 
                                 if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
@@ -827,7 +825,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                                 }
 
-                                UnicastProcessor subject = Optional.ofNullable(dataReference.subject.get()).orElse(namedSubject);
+
+                                UnicastProcessor subject;
+
+                                final UnicastProcessor ds = dataReference.subject.get();
+                                if (ds != null) {
+                                    subject = ds;
+                                } else {
+                                    subject = namedSubject;
+                                }
 
                                 Object part = data;
 
@@ -1004,10 +1010,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 RouteMatch<?> routeMatch = finalRoute;
                 MutableHttpResponse<?> finalResponse = messageToResponse(routeMatch, message);
                 if (requestReference.get().getMethod().equals(HttpMethod.HEAD)) {
-                    finalResponse.getBody()
-                            .filter(ReferenceCounted.class::isInstance)
-                            .map(ReferenceCounted.class::cast)
-                            .ifPresent(ReferenceCounted::release);
+                    final Object o = finalResponse.getBody().orElse(null);
+                    if (o instanceof ReferenceCounted) {
+                        ((ReferenceCounted) o).release();
+                    }
                     finalResponse.body(null);
                 }
                 HttpStatus status = finalResponse.getStatus();

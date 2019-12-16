@@ -312,7 +312,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @Nonnull
     static <T> Argument<T> of(
         Class<T> type) {
-        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
+        return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
     }
 
     /**
@@ -340,7 +340,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
             TypeVariable<Class<T>> parameter = parameters[i];
             typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
         }
-        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeArguments);
+        return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, typeArguments);
     }
 
     /**
