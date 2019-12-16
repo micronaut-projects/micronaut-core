@@ -55,12 +55,12 @@ class ErrorMissingArgumentSpec extends Specification {
         uri                            | message
         '/header'                      | 'Required Header [X-API-Version] not specified'
         '/cookie'                      | 'Required CookieValue [myCookie] not specified'
-        '/headerNoValue'               | 'Required Header [String apiVersion] not specified'
-        '/cookieNoValue'               | 'Required CookieValue [String myCookie] not specified'
+        '/headerNoValue'               | 'Required Header [apiVersion] not specified'
+        '/cookieNoValue'               | 'Required CookieValue [myCookie] not specified'
         '/queryvalue'                  | 'Required QueryValue [number-of-items] not specified'
-        '/queryvalueNoValue'           | 'Required QueryValue [Integer numberOfItems] not specified'
-        '/body'                        | 'Required Body [Integer numberOfItems] not specified'
-        '/queryvalueWithoutAnnotation' | 'Required argument [Integer numberOfItems] not specified'
+        '/queryvalueNoValue'           | 'Required QueryValue [numberOfItems] not specified'
+        '/body'                        | 'Required Body [numberOfItems] not specified'
+        '/queryvalueWithoutAnnotation' | 'Required argument [numberOfItems] not specified'
     }
 
     @Requires(property = 'spec.name', value= 'ErrorMissingArgumentSpec')

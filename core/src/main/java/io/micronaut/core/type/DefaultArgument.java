@@ -17,7 +17,6 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 
 import java.lang.reflect.ParameterizedType;
@@ -106,7 +105,7 @@ public class DefaultArgument<T> implements Argument<T> {
             throw new IllegalArgumentException(type.getClass().getSimpleName() + " types are not supported");
         }
         if (name == null) {
-            name = NameUtils.decapitalize(this.type.getSimpleName());
+            name = this.type.getSimpleName();
         }
         this.name = name;
         this.typeParameters = initializeTypeParameters(this.typeParameterArray);
