@@ -36,7 +36,7 @@ class MdcInstrumenterSpec extends Specification {
                 assert MDC.get(key) == value
             }
         }
-        runnable = InvocationInstrumenter.instrument(runnable, mdcInstrumenter.newInvocationInstrumenter().get())
+        runnable = InvocationInstrumenter.instrument(runnable, mdcInstrumenter.newInvocationInstrumenter())
         def thread = new Thread(runnable)
 
         when:
@@ -55,7 +55,7 @@ class MdcInstrumenterSpec extends Specification {
         MDC.put(key, value)
 
         and:
-        def instrumenter = mdcInstrumenter.newInvocationInstrumenter().get()
+        def instrumenter = mdcInstrumenter.newInvocationInstrumenter()
 
         and:
         Runnable runnable = {
@@ -76,7 +76,7 @@ class MdcInstrumenterSpec extends Specification {
     def "old context map is preserved after instrumented execution"() {
         given:
         MDC.put(key, value)
-        def instrumenter1 = mdcInstrumenter.newInvocationInstrumenter().get()
+        def instrumenter1 = mdcInstrumenter.newInvocationInstrumenter()
         Runnable runnable1 = InvocationInstrumenter.instrument({
             conds.evaluate {
                 assert MDC.get(key) == value
@@ -86,7 +86,7 @@ class MdcInstrumenterSpec extends Specification {
         and:
         String value2 = 'baz'
         MDC.put(key, value2)
-        def instrumenter2 = mdcInstrumenter.newInvocationInstrumenter().get()
+        def instrumenter2 = mdcInstrumenter.newInvocationInstrumenter()
         Runnable runnable2 = InvocationInstrumenter.instrument({
             conds.evaluate {
                 assert MDC.get(key) == value2
