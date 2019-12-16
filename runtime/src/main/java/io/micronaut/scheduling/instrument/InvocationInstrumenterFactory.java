@@ -15,20 +15,22 @@
  */
 package io.micronaut.scheduling.instrument;
 
-import java.util.Optional;
+import javax.annotation.Nullable;
 
 /**
  * An factory interface for invocation instrumentation, factory method decides if instrumentation is needed.
  *
  * @author Denis Stepanov
+ * @author graemerocher
  * @since 1.3
  */
 public interface InvocationInstrumenterFactory {
 
     /**
      * An optional invocation instrumentation.
-     * @return An optional invocation instrumentation.
+     * @return An invocation instrumentation or null if non exists for this factory.
      */
-    Optional<InvocationInstrumenter> newInvocationInstrumenter();
+    @Nullable
+    InvocationInstrumenter newInvocationInstrumenter();
 
 }

@@ -17,12 +17,13 @@ package io.micronaut.scheduling.instrument;
 
 import io.micronaut.core.annotation.Indexed;
 
-import java.util.Optional;
+import javax.annotation.Nullable;
 
 /**
  * An factory interface for reactive invocation instrumentation, factory method decides if instrumentation is needed.
  *
  * @author Denis Stepanov
+ * @author graemerocher
  * @since 1.3
  */
 @Indexed(ReactiveInvocationInstrumenterFactory.class)
@@ -31,8 +32,8 @@ public interface ReactiveInvocationInstrumenterFactory {
     /**
      * An optional invocation instrumentation.
      *
-     * @return An optional invocation instrumentation.
+     * @return A invocation instrumentation or null if non exists.
      */
-    Optional<InvocationInstrumenter> newReactiveInvocationInstrumenter();
+    @Nullable InvocationInstrumenter newReactiveInvocationInstrumenter();
 
 }

@@ -23,6 +23,7 @@ import com.netflix.hystrix.strategy.concurrency.HystrixRequestVariable;
 import com.netflix.hystrix.strategy.concurrency.HystrixRequestVariableLifecycle;
 import com.netflix.hystrix.strategy.properties.HystrixProperty;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory;
 
@@ -43,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 @Requires(classes = HystrixConcurrencyStrategy.class)
 @Requires(beans = TracingInvocationInstrumenterFactory.class)
 @Singleton
+@Internal
 public class TracingHystrixConcurrentStrategy extends HystrixConcurrencyStrategy {
 
     private final HystrixConcurrencyStrategy delegate;
@@ -87,9 +89,12 @@ public class TracingHystrixConcurrentStrategy extends HystrixConcurrencyStrategy
     @Override
     public <T> Callable<T> wrapCallable(Callable<T> callable) {
         Callable<T> wrapped = super.wrapCallable(callable);
-        return tracingInvocationInstrumenterFactory.newTracingInvocationInstrumenter()
-                .map(invocationInstrumenter -> InvocationInstrumenter.instrument(wrapped, invocationInstrumenter))
-                .orElse(wrapped);
+        final InvocationInstrumenter instrumenter = tracingInvocationInstrumenterFactory.newTracingInvocationInstrumenter();
+        if (instrumenter != null) {
+            return InvocationInstrumenter.instrument(wrapped, instrumenter);
+        } else {
+            return wrapped;
+        }
     }
 
     @Override

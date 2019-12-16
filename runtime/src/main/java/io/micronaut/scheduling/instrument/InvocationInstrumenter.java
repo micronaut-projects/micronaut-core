@@ -15,6 +15,9 @@
  */
 package io.micronaut.scheduling.instrument;
 
+import io.micronaut.core.util.CollectionUtils;
+
+import javax.annotation.Nonnull;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 
@@ -22,6 +25,7 @@ import java.util.concurrent.Callable;
  * An interface for invocation instrumentation.
  *
  * @author Denis Stepanov
+ * @author graemerocher
  * @since 1.3
  */
 public interface InvocationInstrumenter {
@@ -55,8 +59,8 @@ public interface InvocationInstrumenter {
      * @param invocationInstrumenters instrumenters to combine
      * @return new instrumenter
      */
-    static InvocationInstrumenter combine(Collection<InvocationInstrumenter> invocationInstrumenters) {
-        if (invocationInstrumenters.isEmpty()) {
+    static @Nonnull InvocationInstrumenter combine(Collection<InvocationInstrumenter> invocationInstrumenters) {
+        if (CollectionUtils.isEmpty(invocationInstrumenters)) {
             return NOOP;
         }
         if (invocationInstrumenters.size() == 1) {
@@ -72,8 +76,8 @@ public interface InvocationInstrumenter {
      * @param invocationInstrumenters instrumenters to be used
      * @return wrapper
      */
-    static Runnable instrument(Runnable runnable, Collection<InvocationInstrumenter> invocationInstrumenters) {
-        if (invocationInstrumenters.isEmpty()) {
+    static @Nonnull Runnable instrument(@Nonnull Runnable runnable, Collection<InvocationInstrumenter> invocationInstrumenters) {
+        if (CollectionUtils.isEmpty(invocationInstrumenters)) {
             return runnable;
         }
         return instrument(runnable, combine(invocationInstrumenters));
@@ -88,8 +92,8 @@ public interface InvocationInstrumenter {
      * @param <V>                     callable generic param
      * @return wrapper
      */
-    static <V> Callable<V> instrument(Callable<V> callable, Collection<InvocationInstrumenter> invocationInstrumenters) {
-        if (invocationInstrumenters.isEmpty()) {
+    static @Nonnull <V> Callable<V> instrument(@Nonnull Callable<V> callable, Collection<InvocationInstrumenter> invocationInstrumenters) {
+        if (CollectionUtils.isEmpty(invocationInstrumenters)) {
             return callable;
         }
         return instrument(callable, combine(invocationInstrumenters));
@@ -102,7 +106,7 @@ public interface InvocationInstrumenter {
      * @param invocationInstrumenter instrumenter to be used
      * @return wrapper
      */
-    static Runnable instrument(Runnable runnable, InvocationInstrumenter invocationInstrumenter) {
+    static @Nonnull Runnable instrument(@Nonnull Runnable runnable, InvocationInstrumenter invocationInstrumenter) {
         if (runnable instanceof InvocationInstrumenterWrappedRunnable) {
             return runnable;
         }
@@ -117,7 +121,7 @@ public interface InvocationInstrumenter {
      * @param <V>                    callable generic param
      * @return wrapper
      */
-    static <V> Callable<V> instrument(Callable<V> callable, InvocationInstrumenter invocationInstrumenter) {
+    static @Nonnull <V> Callable<V> instrument(@Nonnull Callable<V> callable, InvocationInstrumenter invocationInstrumenter) {
         if (callable instanceof InvocationInstrumenterWrappedCallable) {
             return callable;
         }

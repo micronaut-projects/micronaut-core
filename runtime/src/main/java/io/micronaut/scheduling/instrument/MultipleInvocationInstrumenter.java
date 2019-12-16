@@ -30,7 +30,7 @@ import java.util.Deque;
  * @since 1.3
  */
 @Internal
-class MultipleInvocationInstrumenter implements InvocationInstrumenter {
+final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
     private static final Logger LOG = LoggerFactory.getLogger(InvocationInstrumenter.class);
 
     private final Collection<InvocationInstrumenter> invocationInstrumenters;

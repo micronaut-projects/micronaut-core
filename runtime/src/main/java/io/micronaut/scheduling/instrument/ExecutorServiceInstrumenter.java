@@ -20,12 +20,11 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
 
 import javax.inject.Singleton;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.stream.Collectors;
 
 /**
  * Wraps {@link ExecutorService} to instrument {@link Callable} and {@link Runnable}.
@@ -35,7 +34,7 @@ import java.util.stream.Collectors;
  */
 @Singleton
 @Internal
-class ExecutorServiceInstrumenter implements BeanCreatedEventListener<ExecutorService> {
+final class ExecutorServiceInstrumenter implements BeanCreatedEventListener<ExecutorService> {
 
     private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
 
@@ -106,11 +105,14 @@ class ExecutorServiceInstrumenter implements BeanCreatedEventListener<ExecutorSe
     }
 
     private List<InvocationInstrumenter> getInvocationInstrumenter() {
-        return invocationInstrumenterFactories.stream()
-                .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .collect(Collectors.toList());
+        List<InvocationInstrumenter> instrumenters = new ArrayList<>(invocationInstrumenterFactories.size());
+        for (InvocationInstrumenterFactory instrumenterFactory : invocationInstrumenterFactories) {
+            final InvocationInstrumenter instrumenter = instrumenterFactory.newInvocationInstrumenter();
+            if (instrumenter != null) {
+                instrumenters.add(instrumenter);
+            }
+        }
+        return instrumenters;
     }
 
 }

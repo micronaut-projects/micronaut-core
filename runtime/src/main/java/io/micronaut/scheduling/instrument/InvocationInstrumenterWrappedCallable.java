@@ -28,7 +28,7 @@ import java.util.concurrent.Callable;
  * @since 1.3
  */
 @Internal
-class InvocationInstrumenterWrappedCallable<V> implements Callable<V> {
+final class InvocationInstrumenterWrappedCallable<V> implements Callable<V> {
 
     private final InvocationInstrumenter invocationInstrumenter;
     private final Callable<V> callable;

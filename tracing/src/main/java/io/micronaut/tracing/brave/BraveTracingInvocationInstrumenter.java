@@ -17,13 +17,14 @@ package io.micronaut.tracing.brave;
 
 import brave.Tracing;
 import brave.propagation.CurrentTraceContext;
+import brave.propagation.TraceContext;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory;
 
 import javax.inject.Singleton;
-import java.util.Optional;
 
 /**
  * Tracing invocation instrument for Brave.
@@ -33,7 +34,8 @@ import java.util.Optional;
  */
 @Singleton
 @Requires(beans = Tracing.class)
-public class BraveTracingInvocationInstrumenter implements ReactiveInvocationInstrumenterFactory, TracingInvocationInstrumenterFactory {
+@Internal
+public final class BraveTracingInvocationInstrumenter implements ReactiveInvocationInstrumenterFactory, TracingInvocationInstrumenterFactory {
 
     private final CurrentTraceContext currentTraceContext;
 
@@ -47,26 +49,30 @@ public class BraveTracingInvocationInstrumenter implements ReactiveInvocationIns
     }
 
     @Override
-    public Optional<InvocationInstrumenter> newReactiveInvocationInstrumenter() {
+    public InvocationInstrumenter newReactiveInvocationInstrumenter() {
         return newTracingInvocationInstrumenter();
     }
 
     @Override
-    public Optional<InvocationInstrumenter> newTracingInvocationInstrumenter() {
-        return Optional.ofNullable(currentTraceContext.get()).map(invocationContext -> new InvocationInstrumenter() {
+    public InvocationInstrumenter newTracingInvocationInstrumenter() {
+        final TraceContext invocationContext = currentTraceContext.get();
+        if (invocationContext != null) {
+            return new InvocationInstrumenter() {
 
-            CurrentTraceContext.Scope activeScope;
+                CurrentTraceContext.Scope activeScope;
 
-            @Override
-            public void beforeInvocation() {
-                activeScope = currentTraceContext.maybeScope(invocationContext);
-            }
+                @Override
+                public void beforeInvocation() {
+                    activeScope = currentTraceContext.maybeScope(invocationContext);
+                }
 
-            @Override
-            public void afterInvocation() {
-                activeScope.close();
-            }
+                @Override
+                public void afterInvocation() {
+                    activeScope.close();
+                }
 
-        });
+            };
+        }
+        return null;
     }
 }

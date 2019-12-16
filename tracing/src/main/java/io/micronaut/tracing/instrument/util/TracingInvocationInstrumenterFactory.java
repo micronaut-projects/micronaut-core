@@ -17,7 +17,7 @@ package io.micronaut.tracing.instrument.util;
 
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 
-import java.util.Optional;
+import javax.annotation.Nullable;
 
 /**
  * An factory interface for tracing invocation instrumentation, factory method decides if instrumentation is needed.
@@ -29,8 +29,8 @@ public interface TracingInvocationInstrumenterFactory {
 
     /**
      * An optional instrumentation.
-     * @return An optional instrumentation.
+     * @return An instrumentation or null if non is necessary.
      */
-    Optional<InvocationInstrumenter> newTracingInvocationInstrumenter();
+    @Nullable InvocationInstrumenter newTracingInvocationInstrumenter();
 
 }

@@ -18,15 +18,15 @@ package io.micronaut.reactive.rxjava2;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import io.reactivex.Flowable;
 
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Factory of {@link InvocationInstrumenter} for reactive calls instrumentation.
@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 @Context
 @Requires(classes = Flowable.class)
 @Internal
-class RxInstrumenterFactory {
+final class RxInstrumenterFactory {
 
     private final List<ReactiveInvocationInstrumenterFactory> reactiveInvocationInstrumenterFactories;
 
@@ -65,7 +65,7 @@ class RxInstrumenterFactory {
      */
     public @Nullable InvocationInstrumenter create() {
         List<InvocationInstrumenter> invocationInstrumenter = getReactiveInvocationInstrumenters();
-        if (!invocationInstrumenter.isEmpty()) {
+        if (CollectionUtils.isNotEmpty(invocationInstrumenter)) {
             return InvocationInstrumenter.combine(invocationInstrumenter);
         }
         return null;
@@ -75,11 +75,14 @@ class RxInstrumenterFactory {
      * @return The invocation instrumenters
      */
     private List<InvocationInstrumenter> getReactiveInvocationInstrumenters() {
-        return reactiveInvocationInstrumenterFactories.stream()
-                .map(ReactiveInvocationInstrumenterFactory::newReactiveInvocationInstrumenter)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .collect(Collectors.toList());
+        List<InvocationInstrumenter> instrumenters = new ArrayList<>(reactiveInvocationInstrumenterFactories.size());
+        for (ReactiveInvocationInstrumenterFactory instrumenterFactory : reactiveInvocationInstrumenterFactories) {
+            final InvocationInstrumenter instrumenter = instrumenterFactory.newReactiveInvocationInstrumenter();
+            if (instrumenter != null) {
+                instrumenters.add(instrumenter);
+            }
+        }
+        return instrumenters;
     }
 
 }

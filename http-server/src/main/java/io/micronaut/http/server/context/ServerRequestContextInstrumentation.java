@@ -23,7 +23,6 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 
 import javax.inject.Singleton;
-import java.util.Optional;
 
 /**
  * Instruments Micronaut such that {@link io.micronaut.http.context.ServerRequestContext} state is propagated.
@@ -36,7 +35,7 @@ import java.util.Optional;
 final class ServerRequestContextInstrumentation implements InvocationInstrumenterFactory, ReactiveInvocationInstrumenterFactory {
 
     @Override
-    public Optional<InvocationInstrumenter> newInvocationInstrumenter() {
+    public InvocationInstrumenter newInvocationInstrumenter() {
         return ServerRequestContext.currentRequest().map(invocationRequest -> new InvocationInstrumenter() {
 
             private HttpRequest<Object> currentRequest;
@@ -59,11 +58,11 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
                 }
             }
 
-        });
+        }).orElse(null);
     }
 
     @Override
-    public Optional<InvocationInstrumenter> newReactiveInvocationInstrumenter() {
+    public InvocationInstrumenter newReactiveInvocationInstrumenter() {
         return newInvocationInstrumenter();
     }
 

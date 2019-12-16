@@ -17,6 +17,8 @@ package io.micronaut.tracing.instrument.rxjava;
 
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory;
 import rx.Single;
 import rx.functions.Action0;
@@ -36,7 +38,8 @@ import javax.inject.Singleton;
 @Context
 @Requires(classes = Single.class)
 @Requires(beans = TracingInvocationInstrumenterFactory.class)
-public class RxJava1TracingInstrumentation {
+@Internal
+public final class RxJava1TracingInstrumentation {
 
     /**
      * Instrumentation for RxJava 1 for tracing.
@@ -69,14 +72,19 @@ public class RxJava1TracingInstrumentation {
 
         @Override
         public Action0 call(Action0 action0) {
-            return instrumenter.newTracingInvocationInstrumenter().map(instument -> (Action0) () -> {
-                try {
-                    instument.beforeInvocation();
-                    action0.call();
-                } finally {
-                    instument.afterInvocation();
-                }
-            }).orElse(action0);
+            final InvocationInstrumenter instrumenter = this.instrumenter.newTracingInvocationInstrumenter();
+            if (instrumenter != null) {
+                return () -> {
+                    try {
+                        instrumenter.beforeInvocation();
+                        action0.call();
+                    } finally {
+                        instrumenter.afterInvocation();
+                    }
+                };
+            } else {
+                return action0;
+            }
         }
     }
 }

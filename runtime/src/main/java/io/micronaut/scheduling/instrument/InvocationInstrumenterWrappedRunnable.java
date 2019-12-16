@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Internal;
  * @since 1.3
  */
 @Internal
-class InvocationInstrumenterWrappedRunnable implements Runnable {
+final class InvocationInstrumenterWrappedRunnable implements Runnable {
 
     private final InvocationInstrumenter invocationInstrumenter;
     private final Runnable runnable;
@@ -33,7 +33,7 @@ class InvocationInstrumenterWrappedRunnable implements Runnable {
      * @param invocationInstrumenter instrumenter to be invoked
      * @param runnable               original runnable
      */
-    public InvocationInstrumenterWrappedRunnable(InvocationInstrumenter invocationInstrumenter, Runnable runnable) {
+    InvocationInstrumenterWrappedRunnable(InvocationInstrumenter invocationInstrumenter, Runnable runnable) {
         this.invocationInstrumenter = invocationInstrumenter;
         this.runnable = runnable;
     }

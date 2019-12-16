@@ -16,13 +16,14 @@
 package io.micronaut.tracing.instrument.util;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import io.opentracing.Scope;
+import io.opentracing.Span;
 import io.opentracing.Tracer;
 
 import javax.inject.Singleton;
-import java.util.Optional;
 
 /**
  * Tracing invocation instrument for OpenTracing.
@@ -34,6 +35,7 @@ import java.util.Optional;
 @Singleton
 @Requires(beans = Tracer.class)
 @Requires(missingBeans = TracingInvocationInstrumenterFactory.class)
+@Internal
 public class OpenTracingInvocationInstrumenter implements TracingInvocationInstrumenterFactory, ReactiveInvocationInstrumenterFactory {
 
     private final Tracer tracer;
@@ -43,31 +45,35 @@ public class OpenTracingInvocationInstrumenter implements TracingInvocationInstr
      *
      * @param tracer invocation tracer
      */
-    public OpenTracingInvocationInstrumenter(Tracer tracer) {
+    protected OpenTracingInvocationInstrumenter(Tracer tracer) {
         this.tracer = tracer;
     }
 
     @Override
-    public Optional<InvocationInstrumenter> newReactiveInvocationInstrumenter() {
+    public InvocationInstrumenter newReactiveInvocationInstrumenter() {
         return newTracingInvocationInstrumenter();
     }
 
     @Override
-    public Optional<InvocationInstrumenter> newTracingInvocationInstrumenter() {
-        return Optional.ofNullable(tracer.activeSpan()).map(activeSpan -> new InvocationInstrumenter() {
+    public InvocationInstrumenter newTracingInvocationInstrumenter() {
+        final Span activeSpan = tracer.activeSpan();
+        if (activeSpan != null) {
+            return new InvocationInstrumenter() {
 
-            Scope activeScope;
+                Scope activeScope;
 
-            @Override
-            public void beforeInvocation() {
-                activeScope = tracer.scopeManager().activate(activeSpan);
-            }
+                @Override
+                public void beforeInvocation() {
+                    activeScope = tracer.scopeManager().activate(activeSpan);
+                }
 
-            @Override
-            public void afterInvocation() {
-                activeScope.close();
-            }
+                @Override
+                public void afterInvocation() {
+                    activeScope.close();
+                }
 
-        });
+            };
+        }
+        return null;
     }
 }

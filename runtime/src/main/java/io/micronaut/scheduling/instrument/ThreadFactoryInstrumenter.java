@@ -20,10 +20,9 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
 
 import javax.inject.Singleton;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
-import java.util.stream.Collectors;
 
 /**
  * Wraps {@link ThreadFactory} to instrument {@link Runnable}.
@@ -33,7 +32,7 @@ import java.util.stream.Collectors;
  */
 @Singleton
 @Internal
-class ThreadFactoryInstrumenter implements BeanCreatedEventListener<ThreadFactory> {
+final class ThreadFactoryInstrumenter implements BeanCreatedEventListener<ThreadFactory> {
 
     private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
 
@@ -62,14 +61,17 @@ class ThreadFactoryInstrumenter implements BeanCreatedEventListener<ThreadFactor
     }
 
     private Runnable instrument(Runnable runnable) {
-        return InvocationInstrumenter.instrument(runnable, getInvocationInstrumenter());
+        return InvocationInstrumenter.instrument(runnable, getInvocationInstrumenterList());
     }
 
-    private List<InvocationInstrumenter> getInvocationInstrumenter() {
-        return invocationInstrumenterFactories.stream()
-                .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .collect(Collectors.toList());
+    private List<InvocationInstrumenter> getInvocationInstrumenterList() {
+        List<InvocationInstrumenter> instrumenters = new ArrayList<>(invocationInstrumenterFactories.size());
+        for (InvocationInstrumenterFactory instrumenterFactory : invocationInstrumenterFactories) {
+            final InvocationInstrumenter instrumenter = instrumenterFactory.newInvocationInstrumenter();
+            if (instrumenter != null) {
+                instrumenters.add(instrumenter);
+            }
+        }
+        return instrumenters;
     }
 }

@@ -24,7 +24,6 @@ import org.slf4j.MDC;
 
 import javax.inject.Singleton;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * A function that instruments invocations with the Mapped Diagnostic Context for Slf4j.
@@ -43,10 +42,10 @@ public final class MdcInstrumenter implements InvocationInstrumenterFactory, Rea
      * @return An optional that contains the invocation instrumenter
      */
     @Override
-    public Optional<InvocationInstrumenter> newInvocationInstrumenter() {
+    public InvocationInstrumenter newInvocationInstrumenter() {
         Map<String, String> contextMap = MDC.getCopyOfContextMap();
         if (contextMap != null && !contextMap.isEmpty()) {
-            return Optional.of(new InvocationInstrumenter() {
+            return new InvocationInstrumenter() {
 
                 Map<String, String> oldContextMap;
 
@@ -64,17 +63,13 @@ public final class MdcInstrumenter implements InvocationInstrumenterFactory, Rea
                         MDC.clear();
                     }
                 }
-            });
+            };
         }
-        return Optional.empty();
+        return null;
     }
 
-    /**
-     * Creates optional reactive invocation instrumenter.
-     * @return
-     */
     @Override
-    public Optional<InvocationInstrumenter> newReactiveInvocationInstrumenter() {
-        return Optional.empty();
+    public InvocationInstrumenter newReactiveInvocationInstrumenter() {
+        return newInvocationInstrumenter();
     }
 }

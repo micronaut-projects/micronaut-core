@@ -22,7 +22,6 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 
 import javax.inject.Singleton;
-import java.util.Optional;
 
 import static io.micronaut.tracing.instrument.util.ThreadTracingInvocationInstrumenterFactory.PROPERTY_INSTRUMENT_THREADS;
 
@@ -33,7 +32,7 @@ import static io.micronaut.tracing.instrument.util.ThreadTracingInvocationInstru
 @Requires(property = PROPERTY_INSTRUMENT_THREADS, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Singleton
 @Internal
-class ThreadTracingInvocationInstrumenterFactory implements InvocationInstrumenterFactory {
+final class ThreadTracingInvocationInstrumenterFactory implements InvocationInstrumenterFactory {
 
     public static final String PROPERTY_INSTRUMENT_THREADS = "tracing.instrument-threads";
 
@@ -53,7 +52,7 @@ class ThreadTracingInvocationInstrumenterFactory implements InvocationInstrument
      * @return An optional invocation instrumentation.
      */
     @Override
-    public Optional<InvocationInstrumenter> newInvocationInstrumenter() {
+    public InvocationInstrumenter newInvocationInstrumenter() {
         return tracingInvocationInstrumenterFactory.newTracingInvocationInstrumenter();
     }
 }
