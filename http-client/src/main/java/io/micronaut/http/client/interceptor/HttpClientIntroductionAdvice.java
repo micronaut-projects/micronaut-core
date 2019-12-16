@@ -58,6 +58,7 @@ import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.annotation.JacksonFeatures;
@@ -286,14 +287,27 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                 } else if (annotationMetadata.isAnnotationPresent(QueryValue.class)) {
                     String parameterName = annotationMetadata.stringValue(QueryValue.class).orElse(null);
-                    conversionService.convert(definedValue, ConversionContext.of(String.class).with(annotationMetadata)).ifPresent(o -> {
+                    boolean isExploded = uriTemplate.getVariables()
+                            .stream()
+                            .filter(v -> v.getName().equals(parameterName))
+                            .findFirst()
+                            .map(UriMatchVariable::isExploded).orElse(false);
+
+                    if (isExploded) {
                         if (!StringUtils.isEmpty(parameterName)) {
-                            paramMap.put(parameterName, o);
-                            queryParams.put(parameterName, o);
-                        } else {
-                            queryParams.put(argumentName, o);
+                            paramMap.put(parameterName, definedValue);
                         }
-                    });
+                    } else {
+                        conversionService.convert(definedValue, ConversionContext.of(String.class).with(annotationMetadata)).ifPresent(o -> {
+                            if (!StringUtils.isEmpty(parameterName)) {
+                                paramMap.put(parameterName, o);
+                                queryParams.put(parameterName, o);
+                            } else {
+                                queryParams.put(argumentName, o);
+                            }
+                        });
+                    }
+
                 } else if (annotationMetadata.isAnnotationPresent(RequestAttribute.class)) {
                     String attributeName = annotationMetadata.stringValue(RequestAttribute.class).orElse(null);
                     if (StringUtils.isEmpty(attributeName)) {
