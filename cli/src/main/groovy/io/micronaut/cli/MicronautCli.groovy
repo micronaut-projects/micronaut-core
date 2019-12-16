@@ -365,7 +365,11 @@ class MicronautCli {
     }
 
     protected boolean executeCommand(Command cmd, ParseResult parseResult) {
-        return cmd.handle(createExecutionContext(parseResult))
+        try {
+            return cmd.handle(createExecutionContext(parseResult))
+        } catch (MissingMethodException e) {
+            return false
+        }
     }
 
     protected void initializeApplication() {
