@@ -16,13 +16,9 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
-
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -33,86 +29,81 @@ import java.util.List;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedObserver<T> implements Observer<T>, Disposable, RxInstrumentedComponent {
-    protected boolean done;
-    protected final Observer<T> downstream;
-    private final List<RunnableInstrumenter> instrumentations;
-    private Disposable upstream;
+final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComponent {
+    private final Observer<T> source;
+    private final RxInstrumenterFactory instrumenterFactory;
 
     /**
      * Default constructor.
-     * @param downstream The downstream observer
-     * @param instrumentations The instrumentations
+     *
+     * @param source              The downstream observer
+     * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedObserver(
-            Observer<T> downstream, List<RunnableInstrumenter> instrumentations) {
-        this.downstream = downstream;
-        this.instrumentations = instrumentations;
+    RxInstrumentedObserver(Observer<T> source, RxInstrumenterFactory instrumenterFactory) {
+        this.source = source;
+        this.instrumenterFactory = instrumenterFactory;
     }
 
-    /**
-     * Default constructor.
-     * @param downstream The downstream observer
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedObserver(
-            Observer<T> downstream, Collection<ReactiveInstrumenter> instrumentations) {
-        this.downstream = downstream;
-        this.instrumentations = toRunnableInstrumenters(instrumentations);
-    }
-
-    @Override public void onSubscribe(Disposable d) {
-        if (!validate(upstream, d)) {
-            return;
+    @Override
+    public void onSubscribe(Disposable d) {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onSubscribe(d);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onSubscribe(d);
+            } finally {
+                instrumenter.afterInvocation();
+            }
         }
-        upstream = d;
-
-        // Operators need to detect the fuseable feature of their immediate upstream. We pass "this"
-        // to ensure downstream don't interface with the wrong operator (s).
-        downstream.onSubscribe(this);
     }
 
-    @Override public void onNext(T t) {
-        Runnable onNext = () -> downstream.onNext(t);
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onNext = instrumentation.instrument(onNext);
+    @Override
+    public void onNext(T t) {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onNext(t);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onNext(t);
+            } finally {
+                instrumenter.afterInvocation();
+            }
         }
-        onNext.run();
     }
 
     @SuppressWarnings("Duplicates")
-    @Override public void onError(Throwable t) {
-        if (done) {
-            onStateError(t);
-            return;
+    @Override
+    public void onError(Throwable t) {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onError(t);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onError(t);
+            } finally {
+                instrumenter.afterInvocation();
+            }
         }
-        done = true;
-
-        Runnable onError = () -> downstream.onError(t);
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onError = instrumentation.instrument(onError);
-        }
-        onError.run();
     }
 
     @SuppressWarnings("Duplicates")
-    @Override public void onComplete() {
-        if (done) {
-            return;
+    @Override
+    public void onComplete() {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onComplete();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onComplete();
+            } finally {
+                instrumenter.afterInvocation();
+            }
         }
-        done = true;
-        Runnable onComplete = downstream::onComplete;
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onComplete = instrumentation.instrument(onComplete);
-        }
-        onComplete.run();
     }
 
-    @Override public void dispose() {
-        upstream.dispose();
-    }
-
-    @Override public boolean isDisposed() {
-        return upstream.isDisposed();
-    }
 }

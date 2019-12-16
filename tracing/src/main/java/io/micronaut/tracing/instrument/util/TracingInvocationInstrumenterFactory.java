@@ -13,27 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.scheduling.instrument;
+package io.micronaut.tracing.instrument.util;
 
-import io.micronaut.core.annotation.Indexed;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 
 import java.util.Optional;
 
 /**
- * An interface for reactive instrumentation where the instrumenter is initialized a head of time
- * at the point where state is available.
+ * An factory interface for tracing invocation instrumentation, factory method decides if instrumentation is needed.
  *
- * @author graemerocher
- * @since 1.1
- * @deprecated Use {@link InvocationInstrumenter} and {@link ReactiveInvocationInstrumenterFactory} instead.
+ * @author Denis Stepanov
+ * @since 1.3
  */
-@Indexed(ReactiveInstrumenter.class)
-@Deprecated
-public interface ReactiveInstrumenter {
+public interface TracingInvocationInstrumenterFactory {
 
     /**
      * An optional instrumentation.
      * @return An optional instrumentation.
      */
-    Optional<RunnableInstrumenter> newInstrumentation();
+    Optional<InvocationInstrumenter> newTracingInvocationInstrumenter();
+
 }
