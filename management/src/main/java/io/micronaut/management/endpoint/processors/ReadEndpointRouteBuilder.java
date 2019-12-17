@@ -55,14 +55,20 @@ public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
     }
 
     @Override
-    protected void registerRoute(ExecutableMethod<?, ?> method, String id) {
+    protected void registerRoute(ExecutableMethod<?, ?> method, String id, Integer port) {
         Class<?> declaringType = method.getDeclaringType();
         UriTemplate template = buildUriTemplate(method, id);
         UriRoute uriRoute = GET(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        if (port != null) {
+            uriRoute = uriRoute.exposedPort(port);
+        }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);
         }
         uriRoute = HEAD(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        if (port != null) {
+            uriRoute = uriRoute.exposedPort(port);
+        }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);
         }

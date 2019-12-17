@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -60,6 +61,11 @@ public interface Router {
     default @Nonnull <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
         return findAny(uri);
     }
+
+    /**
+     * @return The exposed ports.
+     */
+    Set<Integer> getExposedPorts();
 
     /**
      * Finds all of the possible routes for the given HTTP method and URI.

@@ -48,6 +48,7 @@ public class DefaultRouter implements Router {
     private final Set<StatusRoute> statusRoutes = new HashSet<>();
     private final Collection<FilterRoute> filterRoutes = new ArrayList<>();
     private final Set<ErrorRoute> errorRoutes = new HashSet<>();
+    private final Set<Integer> exposedPorts;
 
     /**
      * Construct a new router for the given route builders.
@@ -56,6 +57,7 @@ public class DefaultRouter implements Router {
      */
     @Inject
     public DefaultRouter(Collection<RouteBuilder> builders) {
+        Set<Integer> exposedPorts = new HashSet<>(5);
         for (RouteBuilder builder : builders) {
             List<UriRoute> constructedRoutes = builder.getUriRoutes();
             for (UriRoute route : constructedRoutes) {
@@ -66,6 +68,13 @@ public class DefaultRouter implements Router {
             this.statusRoutes.addAll(builder.getStatusRoutes());
             this.errorRoutes.addAll(builder.getErrorRoutes());
             this.filterRoutes.addAll(builder.getFilterRoutes());
+            exposedPorts.addAll(builder.getExposedPorts());
+        }
+
+        if (CollectionUtils.isNotEmpty(exposedPorts)) {
+            this.exposedPorts = exposedPorts;
+        } else {
+            this.exposedPorts = Collections.emptySet();
         }
 
         routesByMethod.values().forEach(this::finalizeRoutes);
@@ -78,6 +87,11 @@ public class DefaultRouter implements Router {
      */
     public DefaultRouter(RouteBuilder... builders) {
         this(Arrays.asList(builders));
+    }
+
+    @Override
+    public Set<Integer> getExposedPorts() {
+        return exposedPorts;
     }
 
     @SuppressWarnings("unchecked")
@@ -273,11 +287,17 @@ public class DefaultRouter implements Router {
     @Nonnull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
-        return uriRoutes()
-                .filter(Objects::nonNull)
-                .map(route -> route.match(uri.toString()))
-                .filter(Optional::isPresent)
-                .map(Optional::get);
+        List matchedRoutes = new ArrayList<>(5);
+        final String uriStr = uri.toString();
+        for (List<UriRoute> routes : routesByMethod.values()) {
+            for (UriRoute route : routes) {
+                final UriRouteMatch match = route.match(uriStr).orElse(null);
+                if (match != null && match.test(context)) {
+                    matchedRoutes.add(match);
+                }
+            }
+        }
+        return (Stream<UriRouteMatch<T, R>>) matchedRoutes.stream();
     }
 
     private <T, R> List<UriRouteMatch<T, R>> find(String httpMethodName, CharSequence uri) {

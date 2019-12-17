@@ -46,9 +46,6 @@ class AWSPropertyStoreMockConfigurationClientSpec extends Specification {
         System.setProperty("aws.region", "us-west-1")
     }
 
-    @Shared
-    int serverPort = SocketUtils.findAvailableTcpPort()
-
     @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
