@@ -662,9 +662,6 @@ subprojects { Project subproject ->
             System.out.flush()
         }
 
-        forkEvery = 100
-        maxParallelForks = 2
-
         systemProperty "micronaut.cloud.platform", "OTHER"
     }
 
