@@ -25,6 +25,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.event.ServiceShutdownEvent;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -81,6 +82,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -349,6 +351,27 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 // By default we will bind ssl first and then bind http after.
                 int httpPort = getPortOrDefault(getHttpPort(serverConfiguration));
                 bindServerToHost(serverBootstrap, host.orElse(null), httpPort, new AtomicInteger(0));
+            }
+            final Set<Integer> exposedPorts = router.getExposedPorts();
+            if (CollectionUtils.isNotEmpty(exposedPorts)) {
+                for (Integer exposedPort : exposedPorts) {
+                    try {
+                        if (host.isPresent()) {
+                            serverBootstrap.bind(host.get(), exposedPort).sync();
+                        } else {
+                            serverBootstrap.bind(exposedPort).sync();
+                        }
+                    } catch (Throwable e) {
+                        final boolean isBindError = e instanceof BindException;
+                        if (LOG.isErrorEnabled()) {
+                            if (isBindError) {
+                                LOG.error("Unable to start server. Additional specified server port {} already in use.", exposedPort);
+                            } else {
+                                LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
+                            }
+                        }
+                    }
+                }
             }
             fireStartupEvents();
             running.set(true);

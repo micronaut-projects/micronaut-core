@@ -55,10 +55,13 @@ public class DeleteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
     }
 
     @Override
-    protected void registerRoute(ExecutableMethod<?, ?> method, String id) {
+    protected void registerRoute(ExecutableMethod<?, ?> method, String id, Integer port) {
         Class<?> declaringType = method.getDeclaringType();
         UriTemplate template = buildUriTemplate(method, id);
-        final UriRoute uriRoute = DELETE(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        UriRoute uriRoute = DELETE(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        if (port != null) {
+            uriRoute = uriRoute.port(port);
+        }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);
         }

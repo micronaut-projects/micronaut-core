@@ -40,12 +40,18 @@ public class EndpointDefaultConfiguration {
     public static final String PATH = "endpoints.all.path";
 
     /**
+     * The path for endpoints settings.
+     */
+    public static final String PORT = "endpoints.all.port";
+
+    /**
      * The default base path.
      */
     public static final String DEFAULT_ENDPOINT_BASE_PATH = "/";
 
     private Boolean enabled;
     private Boolean sensitive;
+    private Integer port;
     private String path = DEFAULT_ENDPOINT_BASE_PATH;
 
     /**
@@ -96,5 +102,20 @@ public class EndpointDefaultConfiguration {
         if (StringUtils.isNotEmpty(path)) {
             this.path = path;
         }
+    }
+
+    /**
+     * @return The port to expose endpoints via.
+     */
+    public Optional<Integer> getPort() {
+        return Optional.ofNullable(port);
+    }
+
+    /**
+     * Sets the port to expose endpoints via.
+     * @param port The port
+     */
+    public void setPort(Integer port) {
+        this.port = port;
     }
 }
