@@ -15,16 +15,20 @@
  */
 package io.micronaut.core.util;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import kotlin.coroutines.intrinsics.IntrinsicsKt;
 
 import javax.annotation.Nullable;
 
 /**
- * <p>Utility methods for working with Kotlin <code>suspend</code> functions</p>.
+ * <p>Internal Utility methods for working with Kotlin <code>suspend</code> functions</p>.
  *
  * @author Konrad Kamiński
  * @since 1.3.0
  */
+@Internal
+@Experimental
 public class KotlinUtils {
     /**
      * Constant indicating whether coroutines are supported.

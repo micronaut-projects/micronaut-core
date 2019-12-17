@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Executable;
 
 /**
@@ -43,6 +44,7 @@ public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReferenc
      * @return Is the method Kotlin suspend function.
      * @since 1.3.0
      */
+    @Experimental
     default boolean isSuspend() {
         return false;
     }

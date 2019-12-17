@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.util;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import kotlin.Unit;
@@ -24,11 +25,12 @@ import javax.annotation.Nonnull;
 import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
 /**
- * <p>Utility methods for working with Kotlin <code>suspend</code> functions</p>.
+ * <p>Internal Utility methods for working with Kotlin <code>suspend</code> functions</p>.
  *
  * @author Konrad Kamiński
  * @since 1.3.0
  */
+@Internal
 public class KotlinExecutableMethodUtils {
     /**
      * Kotlin <code>suspend</code> function return type check.
