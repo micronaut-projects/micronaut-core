@@ -93,6 +93,7 @@ public class DefaultBeanContext implements BeanContext {
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String AROUND_TYPE = "io.micronaut.aop.Around";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
+    private static final String ADAPTER_TYPE = "io.micronaut.aop.Adapter";
     private static final String NAMED_MEMBER = "named";
     private static final String NAMED_ATTRIBUTE = Named.class.getName();
 
@@ -178,9 +179,6 @@ public class DefaultBeanContext implements BeanContext {
         System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, "true");
         this.classLoader = contextConfiguration.getClassLoader();
         this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
-
-        // startup optimization.. index Jackson modules
-        ClassUtils.forName("com.fasterxml.jackson.databind.Module", classLoader).ifPresent(indexedTypes::add);
     }
 
     @Override
@@ -2422,55 +2420,43 @@ public class DefaultBeanContext implements BeanContext {
         List<BeanDefinitionReference> contextScopeBeans = new ArrayList<>(20);
         List<BeanDefinitionReference> processedBeans = new ArrayList<>(10);
         List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
-        List<BeanDefinitionReference> disabled = new ArrayList<>(20);
         beanDefinitionsClasses.addAll(beanDefinitionReferences);
 
         Map<BeanConfiguration, Boolean> configurationEnabled = beanConfigurations.values().stream()
                 .collect(Collectors.toMap(Function.identity(), bc -> bc.isEnabled(this)));
-        Set<Map.Entry<BeanConfiguration, Boolean>> configurationEntries = configurationEnabled.entrySet();
+        final Set<Map.Entry<BeanConfiguration, Boolean>> configurationEnabledEntries = configurationEnabled.entrySet();
 
-        for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
-            boolean disabledByConfiguration = configurationEntries
-                    .stream()
-                    .anyMatch(entry -> entry.getKey().isWithin(beanDefinitionReference) && !entry.getValue());
-
-            if (disabledByConfiguration) {
-                disabled.add(beanDefinitionReference);
-
+        reference: for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
+            for (Map.Entry<BeanConfiguration, Boolean> entry : configurationEnabledEntries) {
+                if (entry.getKey().isWithin(beanDefinitionReference) && !entry.getValue()) {
+                    beanDefinitionsClasses.remove(beanDefinitionReference);
+                    continue reference;
+                }
+            }
+            final AnnotationMetadata annotationMetadata = beanDefinitionReference.getAnnotationMetadata();
+            final List<AnnotationValue<Indexed>> indexes = annotationMetadata.getAnnotationValuesByType(Indexed.class);
+            if (CollectionUtils.isNotEmpty(indexes)) {
+                for (AnnotationValue<Indexed> index : indexes) {
+                    index.classValue().ifPresent(t -> resolveTypeIndex(t).add(beanDefinitionReference));
+                }
             } else {
-                final List<AnnotationValue<Indexed>> indexes = beanDefinitionReference.getAnnotationMetadata().getAnnotationValuesByType(Indexed.class);
-                if (CollectionUtils.isNotEmpty(indexes)) {
-                    for (AnnotationValue<Indexed> index : indexes) {
-                        index.classValue().ifPresent(this::resolveTypeIndex);
+                if (annotationMetadata.hasStereotype(ADAPTER_TYPE)) {
+                    final Class aClass = annotationMetadata.classValue(ADAPTER_TYPE).orElse(null);
+                    if (indexedTypes.contains(aClass)) {
+                        resolveTypeIndex(aClass).add(beanDefinitionReference);
                     }
                 }
-                if (beanDefinitionReference.isContextScope()) {
-                    contextScopeBeans.add(beanDefinitionReference);
-                }
-                if (beanDefinitionReference.requiresMethodProcessing()) {
-                    processedBeans.add(beanDefinitionReference);
-                }
+            }
+            if (beanDefinitionReference.isContextScope()) {
+                contextScopeBeans.add(beanDefinitionReference);
+            }
+            if (beanDefinitionReference.requiresMethodProcessing()) {
+                processedBeans.add(beanDefinitionReference);
             }
         }
 
-        beanDefinitionsClasses.removeAll(disabled);
-        indexBeanDefinitions();
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans);
-    }
-
-    private void indexBeanDefinitions() {
-        for (BeanDefinitionReference beanDefinitionReference : beanDefinitionsClasses) {
-            if (beanDefinitionReference.isPresent()) {
-                final Class beanType = beanDefinitionReference.getBeanType();
-                indexedTypes.stream()
-                        .filter(t -> t == beanType || t.isAssignableFrom(beanType))
-                        .forEach(indexedType -> {
-                            final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType);
-                            indexed.add(beanDefinitionReference);
-                        });
-            }
-        }
     }
 
     @Nonnull
@@ -3025,7 +3011,6 @@ public class DefaultBeanContext implements BeanContext {
             return Optional.of(Singleton.class);
         }
 
-        @SuppressWarnings("unchecked")
         @Nonnull
         @Override
         public List<Argument<?>> getTypeArguments(Class<?> type) {

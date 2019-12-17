@@ -630,7 +630,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             key = new DefaultBeanContext.BeanKey(this, resolutionContext.getCurrentQualifier());
             resolutionContext.addInFlightBean(key, bean);
         }
-        Collection<BeanRegistration<BeanInitializedEventListener>> beanInitializedEventListeners = ((DefaultBeanContext) context).beanInitializedEventListeners;
+        Collection<BeanRegistration<BeanInitializedEventListener>> beanInitializedEventListeners =
+                ((DefaultBeanContext) context).beanInitializedEventListeners;
         if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
             for (BeanRegistration<BeanInitializedEventListener> registration : beanInitializedEventListeners) {
                 BeanDefinition<BeanInitializedEventListener> definition = registration.getBeanDefinition();

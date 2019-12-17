@@ -68,7 +68,8 @@ public abstract class AbstractBeanConfiguration extends AbstractBeanContextCondi
 
     @Override
     public boolean isWithin(String className) {
-        String pkgName = NameUtils.getPackageName(className);
+        final int i = className.lastIndexOf('.');
+        String pkgName = i > -1 ? className.substring(0, i) : className;
         return pkgName.equals(this.packageName) || pkgName.startsWith(this.packageName + '.');
     }
 }
