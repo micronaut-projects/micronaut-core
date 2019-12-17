@@ -473,7 +473,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             );
             return;
         }
-        Optional<UriRouteMatch<Object, Object>> routeMatch = Optional.empty();
+        UriRouteMatch<Object, Object> routeMatch = null;
 
         List<UriRouteMatch<Object, Object>> uriRoutes = router.findAllClosest(request);
 
@@ -484,12 +484,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             request.setAttribute(HttpAttributes.ROUTE, establishedRoute.getRoute());
             request.setAttribute(HttpAttributes.ROUTE_MATCH, establishedRoute);
             request.setAttribute(HttpAttributes.URI_TEMPLATE, establishedRoute.getRoute().getUriMatchTemplate().toString());
-            routeMatch = Optional.of(establishedRoute);
+            routeMatch = establishedRoute;
         }
 
         RouteMatch<?> route;
 
-        if (!routeMatch.isPresent()) {
+        if (routeMatch == null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("No matching route found for URI {} and method {}", request.getUri(), httpMethod);
             }
@@ -557,7 +557,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
 
         } else {
-            route = routeMatch.get();
+            route = routeMatch;
         }
 
         if (LOG.isDebugEnabled()) {
@@ -1076,7 +1076,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             boolean isStreaming = isReactiveReturnType && !isSingle;
 
-            Optional<Class<?>> javaPayloadType = genericReturnType.getFirstTypeVariable().map(arg -> arg.getType());
+            Optional<Class<?>> javaPayloadType = genericReturnType.getFirstTypeVariable().map(Argument::getType);
 
             if (!isStreaming) {
                 if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
@@ -1474,8 +1474,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     private MutableHttpResponse<Object> forStatus(AnnotationMetadata annotationMetadata, HttpStatus defaultStatus) {
         return HttpResponse.status(
-                annotationMetadata.stringValue(Status.class)
-                        .map(HttpStatus::valueOf)
+                annotationMetadata.enumValue(Status.class, HttpStatus.class)
                         .orElse(defaultStatus));
     }
 
