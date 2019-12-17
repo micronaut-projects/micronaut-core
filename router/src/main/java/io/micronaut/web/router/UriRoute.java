@@ -87,11 +87,12 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
     UriRoute body(String argument);
 
     /**
-     * The port for the route.
+     * The exposed port that the route applies to.
+     *
      * @param port The port
      * @return The route
      */
-    UriRoute port(int port);
+    UriRoute exposedPort(int port);
 
     /**
      *

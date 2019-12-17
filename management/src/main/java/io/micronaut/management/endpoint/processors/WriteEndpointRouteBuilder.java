@@ -65,7 +65,7 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
         UriRoute uriRoute = POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
                 .consumes(MediaType.of(consumes));
         if (port != null) {
-            uriRoute = uriRoute.port(port);
+            uriRoute = uriRoute.exposedPort(port);
         }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);

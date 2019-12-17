@@ -887,7 +887,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute port(int port) {
+        public UriRoute exposedPort(int port) {
             where(httpRequest -> httpRequest.getServerAddress().getPort() == port);
             DefaultRouteBuilder.this.exposedPorts.add(port);
             return this;
