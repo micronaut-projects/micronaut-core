@@ -101,6 +101,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     private List<StatusRoute> statusRoutes = new ArrayList<>();
     private List<ErrorRoute> errorRoutes = new ArrayList<>();
     private List<FilterRoute> filterRoutes = new ArrayList<>();
+    private Set<Integer> exposedPorts = new HashSet<>(5);
 
     /**
      * @param executionHandleLocator The execution handler locator
@@ -133,6 +134,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         } else {
             defaultCharset = StandardCharsets.UTF_8;
         }
+    }
+
+    @Override
+    public Set<Integer> getExposedPorts() {
+        return exposedPorts;
     }
 
     @Override
@@ -878,6 +884,13 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public UriRoute body(String argument) {
             return (UriRoute) super.body(argument);
+        }
+
+        @Override
+        public UriRoute exposedPort(int port) {
+            where(httpRequest -> httpRequest.getServerAddress().getPort() == port);
+            DefaultRouteBuilder.this.exposedPorts.add(port);
+            return this;
         }
 
         @Override

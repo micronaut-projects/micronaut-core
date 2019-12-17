@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.uri.UriTemplate;
@@ -32,6 +31,7 @@ import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.web.router.DefaultRouteBuilder;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.Map;
 import java.util.Optional;
@@ -55,9 +55,9 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
     private final EndpointDefaultConfiguration endpointDefaultConfiguration;
 
     /**
-     * @param applicationContext The application context
-     * @param uriNamingStrategy  The URI naming strategy
-     * @param conversionService  The conversion service
+     * @param applicationContext           The application context
+     * @param uriNamingStrategy            The URI naming strategy
+     * @param conversionService            The conversion service
      * @param endpointDefaultConfiguration Endpoints default Configuration
      */
     AbstractEndpointRouteBuilder(ApplicationContext applicationContext,
@@ -79,8 +79,9 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      *
      * @param method The {@link ExecutableMethod}
      * @param id     The route id
+     * @param port   The port
      */
-    protected abstract void registerRoute(ExecutableMethod<?, ?> method, String id);
+    protected abstract void registerRoute(ExecutableMethod<?, ?> method, String id, @Nullable Integer port);
 
     /**
      * Clears endpoint ids information.
@@ -99,13 +100,8 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
         Class<?> declaringType = method.getDeclaringType();
         if (method.hasStereotype(getSupportedAnnotation())) {
             Optional<String> endPointId = resolveActiveEndPointId(declaringType);
-            endPointId.ifPresent(id -> {
-                ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
-                for (Class argumentType : method.getArgumentTypes()) {
-                    ClassLoadingReporter.reportBeanPresent(argumentType);
-                }
-                registerRoute(method, id);
-            });
+            final Integer port = endpointDefaultConfiguration.getPort().orElse(null);
+            endPointId.ifPresent(id -> registerRoute(method, id, port));
         }
     }
 
