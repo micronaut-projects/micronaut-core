@@ -93,7 +93,7 @@ class FormController {
         ASTNode[] nodes = new AstBuilder().buildFromString(source)
 
         ClassNode element = nodes ? nodes.find { it instanceof ClassNode && it.name == cls } : null
-        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
+        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
         return metadata
     }
@@ -104,7 +104,7 @@ class FormController {
 
         ClassNode element = nodes ? nodes.find { it instanceof ClassNode &&  it.name == cls } : null
         MethodNode method = element.getMethods(methodName)[0]
-        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
+        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
         return metadata
     }

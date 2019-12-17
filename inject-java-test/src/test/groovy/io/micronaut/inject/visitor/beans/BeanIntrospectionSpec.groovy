@@ -11,15 +11,19 @@ import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.TypeConverter
+import io.micronaut.core.naming.Named
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
+import spock.lang.IgnoreIf
+
 //import org.objectweb.asm.ClassReader
 //import org.objectweb.asm.util.ASMifier
 //import org.objectweb.asm.util.TraceClassVisitor
 import spock.lang.Issue
+import spock.util.environment.Jvm
 
 import javax.annotation.processing.SupportedAnnotationTypes
 import javax.persistence.Column
@@ -30,6 +34,217 @@ import javax.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test bean introspection with property from default interface method"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Test implements Foo {
+
+}
+
+interface Foo {
+    default String getBar() {
+        return "good";
+    }
+}
+
+''')
+        when:
+        def test = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("bar", String)
+                     .get(test) == 'good'
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties interface"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+public interface ValidatedConfig {
+
+    @NotNull
+    public URL getUrl();
+
+}
+
+
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for interface"() {
+        when:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+@io.micronaut.core.annotation.Introspected
+interface Test extends io.micronaut.core.naming.Named {
+    void setName(String name);
+}
+''')
+        then:
+        introspection != null
+        introspection.propertyNames.length == 1
+        introspection.propertyNames[0] == 'name'
+
+        when:
+        introspection.instantiate()
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'No default constructor exists'
+
+        when:
+        def property = introspection.getRequiredProperty("name", String)
+        String setNameValue
+        def named = [getName:{-> "test"}, setName:{String n -> setNameValue= n }].asType(introspection.beanType)
+
+        property.set(named, "test")
+
+        then:
+        property.get(named) == 'test'
+        setNameValue == 'test'
+
+    }
+
+    void "test compiled introspection for interface"() {
+        when:
+        def introspection = BeanIntrospection.getIntrospection(TestNamed.class)
+        def property = introspection.getRequiredProperty("name", String)
+        String setNameValue
+        def named = [getName:{-> "test"}, setName:{String n -> setNameValue= n }].asType(introspection.beanType)
+
+        then:
+        property.get(named) == 'test'
+
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on getters"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+public class ValidatedConfig {
+
+    private URL url;
+    private String name;
+
+    @NotNull
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+
+    @NotBlank
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules on fields"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.ValidatedConfig','''\
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
+import java.net.URL;
+
+@ConfigurationProperties("foo.bar")
+public class ValidatedConfig {
+
+    @NotNull
+    URL url;
+
+    @NotBlank
+    protected String name;
+
+    public URL getUrl() {
+        return url;
+    }
+
+    public void setUrl(URL url) {
+        this.url = url;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+
+''')
+        expect:
+        introspection != null
+    }
+
+    void "test generate bean introspection for @ConfigurationProperties with validation rules"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.MyConfig','''\
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("foo.bar")
+class MyConfig {
+    private String host;
+    private int serverPort;
+    
+    @ConfigurationInject
+    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+        this.host = host;
+        this.serverPort = serverPort;
+    }
+    
+    public String getHost() {
+        return host;
+    }
+    
+    public int getServerPort() {
+        return serverPort;
+    }
+}
+
+''')
+        expect:
+        introspection != null
+    }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2059')
     void "test annotation metadata doesn't cause stackoverflow"() {
@@ -678,7 +893,6 @@ class Test {}
         reference != null
         reference.getBeanType() == TestBean
 
-
         cleanup:
         context?.close()
     }
@@ -922,6 +1136,300 @@ class ParentBean {
         cleanup:
         context?.close()
     }
+
+    void "test constructor argument generics"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+import com.fasterxml.jackson.annotation.*;
+
+@Introspected
+class Test {
+    private Map<String, String> properties;
+    
+    @Creator
+    Test(Map<String, String> properties) {
+        this.properties = properties;
+    }
+    
+    public Map<String, String> getProperties() {
+        return properties;
+    }
+    public void setProperties(Map<String, String> properties) {
+        this.properties = properties;
+    }
+}
+''')
+        expect:
+        introspection.constructorArguments[0].getTypeVariable("K").get().getType() == String
+        introspection.constructorArguments[0].getTypeVariable("V").get().getType() == String
+    }
+
+    void "test static creator"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+    private String name;
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    @Creator
+    public static Test forName(String name) {
+        return new Test(name);
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Sally"
+
+        when:
+        introspection.instantiate(new Object[0])
+
+        then:
+        thrown(InstantiationException)
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "test static creator with no args"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+    private String name;
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    @Creator
+    public static Test forName() {
+        return new Test("default");
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        thrown(InstantiationException)
+
+        when:
+        instance = introspection.instantiate(new Object[0])
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+
+        when:
+        instance = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+    }
+
+    void "test static creator multiple"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+    private String name;
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    @Creator
+    public static Test forName() {
+        return new Test("default");
+    }
+    
+    @Creator
+    public static Test forName(String name) {
+        return new Test(name);
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Sally")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Sally"
+
+        when:
+        instance = introspection.instantiate(new Object[0])
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+
+        when:
+        instance = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "default"
+    }
+
+    void "test kotlin static creator"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+
+    private final String name;
+    public static final Companion Companion = new Companion();
+    
+    public final String getName() {
+        return name;
+    }
+    
+    private Test(String name) {
+        this.name = name;
+    }
+    
+    public static final class Companion {
+        
+        @Creator
+        public final Test forName(String name) {
+            return new Test(name);
+        }
+        
+        private Companion() {
+        }
+    }
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("Apple")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(instance) == "Apple"
+    }
+
+    @IgnoreIf({ Jvm.current.isJava9Compatible() })
+    void "test enum bean properties"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+public enum Test {
+
+    A(0), B(1), C(2);
+
+    private final int number;
+
+    Test(int number) {
+        this.number = number;
+    }
+    
+    public int getNumber() {
+        return number;
+    }
+}
+''')
+
+        expect:
+        introspection != null
+        introspection.beanProperties.size() == 1
+        introspection.getProperty("number").isPresent()
+
+        when:
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+        introspection.getRequiredProperty("number", int).get(instance) == 0
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "test instantiating an enum"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+enum Test {
+    A, B, C
+}
+''')
+
+        expect:
+        introspection != null
+
+        when:
+        def instance = introspection.instantiate("A")
+
+        then:
+        instance.name() == "A"
+
+        when:
+        introspection.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
+
 
     @Override
     protected JavaParser newJavaParser() {

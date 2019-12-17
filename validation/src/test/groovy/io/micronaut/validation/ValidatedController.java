@@ -29,7 +29,6 @@ import javax.validation.constraints.Digits;
 @Controller("/validated")
 public class ValidatedController {
 
-
     @Post("/args")
     public String args(@Digits(integer = 3, fraction = 2) String amount) {
         return "$" + amount;
@@ -37,6 +36,11 @@ public class ValidatedController {
 
     @Post("/pojo")
     public Pojo pojo(@Body @Valid Pojo pojo) {
+        return pojo;
+    }
+
+    @Post("/no-introspection")
+    public PojoNoIntrospection pojo(@Body @Valid PojoNoIntrospection pojo) {
         return pojo;
     }
 }

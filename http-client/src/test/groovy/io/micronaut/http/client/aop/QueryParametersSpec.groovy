@@ -31,6 +31,8 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import javax.annotation.Nullable
+
 
 class QueryParametersSpec extends Specification {
 
@@ -109,6 +111,22 @@ class QueryParametersSpec extends Specification {
         flavour << [ "pojo", "list", "map" ]
     }
 
+    void "test client mapping URL parameters appended through multiple POJOs"() {
+        expect: ""
+            client.searchExplodedMultiplePojos(new SearchParams(term: "Agnes Obel"), new SearchParams2(song: 'Citizen of Glass')).albums.size() == 1
+    }
+
+    void "test client mapping URL parameters appended through multiple optional POJOs"() {
+        expect: ""
+            client.searchExplodedMultipleOptionalPojos(null, null).albums.size() == 6
+        and:
+            client.searchExplodedMultipleOptionalPojos(new SearchParams(term: "Agnes Obel"), null).albums.size() == 3
+        and:
+            client.searchExplodedMultipleOptionalPojos(new SearchParams(term: "Agnes Obel"), new SearchParams2(song: 'Citizen of Glass')).albums.size() == 1
+        and:
+            client.searchExplodedMultipleOptionalPojos(null, new SearchParams2(song: 'Citizen of Glass')).albums.size() == 1
+    }
+
     void "test query value with default value"() {
         given:
         RxHttpClient lowLevelClient = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL())
@@ -154,6 +172,10 @@ class QueryParametersSpec extends Specification {
 
     static class SearchParams {
         String term // Now, POJO parameters can bind request params to simple fields, too.
+    }
+
+    static class SearchParams2 {
+        String song // Now, POJO parameters can bind request params to multiple POJOs, too.
     }
 
     @Controller('/itunes')
@@ -209,6 +231,23 @@ class QueryParametersSpec extends Specification {
             }
         }
 
+        @Get("/search-exploded/multipleExplodedPojos{?term*}{&song*}")
+        SearchResult searchMultipleExplodedPojos(@QueryValue SearchParams term, @QueryValue SearchParams2 song) {
+            // We get a POJO with terms and song
+            def albums = term.term?.with { artists.get(it) }
+            return new SearchResult(albums: albums.findAll { it.matches(song.song)})
+        }
+
+        @Get("/search-exploded/multipleOptionalExplodedPojos{?term*}{?song*}")
+        SearchResult searchMultipleOptionalExplodedPojos(@QueryValue SearchParams term, @QueryValue SearchParams2 song) {
+            // We get a POJO with terms and/or song
+            def albums = term.term?.with { artists.get(it) } ?: artists.values().flatten()
+            if (song?.song) {
+                albums = albums.findAll { it.matches(song.song)}
+            }
+            return new SearchResult(albums: albums)
+        }
+
         @Get("/search-default")
         SearchResult searchDefault(@QueryValue(defaultValue = "Tool") String term) {
             def albums = artists.get(term)
@@ -236,6 +275,12 @@ class QueryParametersSpec extends Specification {
 
         @Get("/search-exploded/{flavour}{?params*}")
         SearchResult searchExplodedSinglePojo(String flavour, SearchParams params)
+
+        @Get("/search-exploded/multipleExplodedPojos{?term*}{&song*}")
+        SearchResult searchExplodedMultiplePojos(SearchParams term, SearchParams2 song)
+
+        @Get("/search-exploded/multipleOptionalExplodedPojos{?term*}{?song*}")
+        SearchResult searchExplodedMultipleOptionalPojos(@Nullable SearchParams term, @Nullable SearchParams2 song)
 
         @Get("/search-exploded/{flavour}{?params*}")
         SearchResult searchExplodedPojo(String flavour, SearchParamsAsList params)

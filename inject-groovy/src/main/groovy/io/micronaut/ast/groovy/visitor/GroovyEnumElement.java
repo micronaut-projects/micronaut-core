@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.EnumElement;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
+import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import java.util.Collections;
@@ -34,11 +35,12 @@ import java.util.stream.Collectors;
 class GroovyEnumElement extends GroovyClassElement implements EnumElement {
     /**
      * @param sourceUnit The source unit
+     * @param compilationUnit    The compilation unit
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyEnumElement(SourceUnit sourceUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
-        super(sourceUnit, classNode, annotationMetadata);
+    GroovyEnumElement(SourceUnit sourceUnit, CompilationUnit compilationUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
+        super(sourceUnit, compilationUnit, classNode, annotationMetadata);
     }
 
     @Override

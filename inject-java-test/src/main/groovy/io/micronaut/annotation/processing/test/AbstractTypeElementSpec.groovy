@@ -235,7 +235,7 @@ class Test {
         return (TypeElement) element
     }
 
-    protected BeanDefinition buildBeanDefinition(String className, String cls) {
+    BeanDefinition buildBeanDefinition(String className, String cls) {
         def beanDefName= '$' + NameUtils.getSimpleName(className) + 'Definition'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"

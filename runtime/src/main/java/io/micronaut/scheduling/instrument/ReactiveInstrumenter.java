@@ -15,15 +15,20 @@
  */
 package io.micronaut.scheduling.instrument;
 
+import io.micronaut.core.annotation.Indexed;
+
 import java.util.Optional;
 
 /**
- * An interface for reactive instrumentation where the instrumenter is initialized a head of type
+ * An interface for reactive instrumentation where the instrumenter is initialized a head of time
  * at the point where state is available.
  *
  * @author graemerocher
  * @since 1.1
+ * @deprecated Use {@link InvocationInstrumenter} and {@link ReactiveInvocationInstrumenterFactory} instead.
  */
+@Indexed(ReactiveInstrumenter.class)
+@Deprecated
 public interface ReactiveInstrumenter {
 
     /**

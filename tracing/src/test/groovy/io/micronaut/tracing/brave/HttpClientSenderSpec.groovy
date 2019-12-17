@@ -68,19 +68,19 @@ class HttpClientSenderSpec extends Specification {
         then:"spans are received"
         conditions.eventually {
             response.status() == HttpStatus.OK
-            spanController.receivedSpans.size() == 4
+            spanController.receivedSpans.size() == 3
             spanController.receivedSpans[0].tags.get("foo") == 'bar'
             spanController.receivedSpans[0].tags.get('http.path') == '/traced/hello/John'
             spanController.receivedSpans[0].name == 'get /traced/hello/{name}'
             spanController.receivedSpans[0].kind == Span.Kind.SERVER.name()
-            spanController.receivedSpans[1].name == 'get /traced/hello/{name}'
-            spanController.receivedSpans[1].kind == Span.Kind.CLIENT.name()
+            spanController.receivedSpans[1].name == 'get /traced/nested/{name}'
+            spanController.receivedSpans[1].kind == Span.Kind.SERVER.name()
             spanController.receivedSpans[1].tags.get('http.method') == 'GET'
-            spanController.receivedSpans[1].tags.get('http.path') == '/traced/hello/John'
+            spanController.receivedSpans[1].tags.get('http.path') == '/traced/nested/John'
             spanController.receivedSpans[2].tags.get("foo") == null
             spanController.receivedSpans[2].tags.get('http.path') == '/traced/nested/John'
-            spanController.receivedSpans[2].name == 'get /traced/nested/{name}'
-            spanController.receivedSpans[2].kind == Span.Kind.SERVER.name()
+            spanController.receivedSpans[2].name == 'get'
+            spanController.receivedSpans[2].kind == Span.Kind.CLIENT.name()
 
         }
 

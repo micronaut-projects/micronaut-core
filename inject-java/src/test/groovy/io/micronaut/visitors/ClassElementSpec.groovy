@@ -17,6 +17,8 @@ package io.micronaut.visitors
 
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.ast.EnumElement
+import spock.lang.IgnoreIf
+import spock.util.environment.Jvm
 
 import java.util.function.Supplier
 
@@ -131,6 +133,9 @@ class Foo {}
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'test.Foo'
     }
 
+    // Java 9+ doesn't allow resolving elements was the compiler
+    // is finished being used so this test cannot be made to work beyond Java 8 the way it is currently written
+    @IgnoreIf({ Jvm.current.isJava9Compatible() })
     void "test resolve generic type using getTypeArguments"() {
         buildBeanDefinition('test.TestController', '''
 package test;

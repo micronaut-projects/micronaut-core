@@ -81,7 +81,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
 
     protected final ClassPathResourceLoader resourceLoader;
-    protected final List<PropertySource> refreshablePropertySources = new ArrayList<>();
+    protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
 
     private EnvironmentsAndPackage environmentsAndPackage;
 
@@ -89,8 +89,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final ClassLoader classLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final ClassPathAnnotationScanner annotationScanner;
-    private Collection<String> configurationIncludes = new HashSet<>();
-    private Collection<String> configurationExcludes = new HashSet<>();
+    private Collection<String> configurationIncludes = new HashSet<>(3);
+    private Collection<String> configurationExcludes = new HashSet<>(3);
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Collection<PropertySourceLoader> propertySourceLoaderList;
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();

@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.annotation;
 
+import io.micronaut.core.bind.annotation.Bindable;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
@@ -42,4 +44,10 @@ public @interface Property {
      * @return The value of the property
      */
     String value() default "";
+
+    /**
+     * @return The default value if none is specified
+     */
+    @AliasFor(annotation = Bindable.class, member = "defaultValue")
+    String defaultValue() default "";
 }

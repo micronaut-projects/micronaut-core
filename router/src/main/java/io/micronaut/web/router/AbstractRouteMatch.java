@@ -25,6 +25,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -275,7 +276,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                                 ConversionError conversionError = conversionErrors.iterator().next();
                                 throw new ConversionErrorException(argument, conversionError);
                             } else {
-                                throw new UnsatisfiedRouteException(argument);
+                                throw UnsatisfiedRouteException.create(argument);
                             }
                         }
 
@@ -283,7 +284,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 } else if (value instanceof ConversionError) {
                     throw new ConversionErrorException(argument, (ConversionError) value);
                 } else if (value == DefaultRouteBuilder.NO_VALUE) {
-                    throw new UnsatisfiedRouteException(argument);
+                    throw UnsatisfiedRouteException.create(argument);
                 } else {
                     ConversionContext conversionContext = ConversionContext.of(argument);
                     Optional<?> result = conversionService.convert(value, argument.getType(), conversionContext);
@@ -307,39 +308,42 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public RouteMatch<R> fulfill(Map<String, Object> argumentValues) {
-        Map<String, Object> oldVariables = getVariableValues();
-        Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
-        for (Argument requiredArgument : getArguments()) {
-            Object value = argumentValues.get(requiredArgument.getName());
-            Optional<Argument<?>> ba = getBodyArgument();
-            if (ba.isPresent()) {
-                Argument<?> a = ba.get();
-                if (a.getName().equals(requiredArgument.getName())) {
-                    requiredArgument = a;
+        if (CollectionUtils.isEmpty(argumentValues)) {
+            return this;
+        } else {
+            Map<String, Object> oldVariables = getVariableValues();
+            Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
+            final Argument<?> ba = getBodyArgument().orElse(null);
+            for (Argument requiredArgument : getArguments()) {
+                Object value = argumentValues.get(requiredArgument.getName());
+                if (ba != null) {
+                    if (ba.getName().equals(requiredArgument.getName())) {
+                        requiredArgument = ba;
+                    }
                 }
-            }
 
-            if (value != null) {
-                String name = resolveInputName(requiredArgument);
-                if (value instanceof UnresolvedArgument) {
-                    newVariables.put(name, value);
-                } else {
-                    ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
-                    Optional converted = conversionService.convert(value, conversionContext);
-                    Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
-                    if (result != null) {
-                        newVariables.put(name, result);
+                if (value != null) {
+                    String name = resolveInputName(requiredArgument);
+                    if (value instanceof UnresolvedArgument) {
+                        newVariables.put(name, value);
+                    } else {
+                        ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
+                        Optional converted = conversionService.convert(value, conversionContext);
+                        Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
+                        if (result != null) {
+                            newVariables.put(name, result);
+                        }
                     }
                 }
             }
-        }
-        Set<String> argumentNames = argumentValues.keySet();
-        List<Argument> requiredArguments = getRequiredArguments()
-            .stream()
-            .filter(arg -> !argumentNames.contains(arg.getName()))
-            .collect(Collectors.toList());
+            Set<String> argumentNames = argumentValues.keySet();
+            List<Argument> requiredArguments = getRequiredArguments()
+                    .stream()
+                    .filter(arg -> !argumentNames.contains(arg.getName()))
+                    .collect(Collectors.toList());
 
-        return newFulfilled(newVariables, requiredArguments);
+            return newFulfilled(newVariables, requiredArguments);
+        }
     }
 
     /**
@@ -355,7 +359,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 return null;
             }
             throw lastError.map(conversionError ->
-                (RuntimeException) new ConversionErrorException(argument, conversionError)).orElseGet(() -> new UnsatisfiedRouteException(argument)
+                (RuntimeException) new ConversionErrorException(argument, conversionError)).orElseGet(() -> UnsatisfiedRouteException.create(argument)
             );
         } else {
             return result.get();

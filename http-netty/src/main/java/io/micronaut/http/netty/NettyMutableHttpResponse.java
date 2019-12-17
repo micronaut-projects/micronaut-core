@@ -35,11 +35,10 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -125,6 +124,26 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
             headers.add(HttpHeaderNames.SET_COOKIE, value);
         } else {
             throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+        }
+        return this;
+    }
+
+    @Override
+    public MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
+        if (cookies.size() > 1) {
+            Set<String> values = new HashSet<>(cookies.size());
+            for (Cookie cookie: cookies) {
+                if (cookie instanceof NettyCookie) {
+                    NettyCookie nettyCookie = (NettyCookie) cookie;
+                    String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+                    values.add(value);
+                } else {
+                    throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+                }
+            }
+            headers.add(HttpHeaderNames.COOKIE, String.join(";", values));
+        } else if (!cookies.isEmpty()) {
+            cookie(cookies.iterator().next());
         }
         return this;
     }

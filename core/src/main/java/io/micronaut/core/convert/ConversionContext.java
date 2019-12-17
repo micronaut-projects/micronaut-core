@@ -42,6 +42,31 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
     };
 
     /**
+     * Constant for Boolean argument.
+     */
+    ArgumentConversionContext<Boolean> BOOLEAN = ConversionContext.of(Argument.BOOLEAN);
+
+    /**
+     * Constant for Integer argument.
+     */
+    ArgumentConversionContext<Integer> INT = ConversionContext.of(Argument.INT);
+
+    /**
+     * Constant for Long argument.
+     */
+    ArgumentConversionContext<Long> LONG = ConversionContext.of(Argument.LONG);
+
+    /**
+     * Constant for String argument.
+     */
+    ArgumentConversionContext<String> STRING = ConversionContext.of(Argument.STRING);
+
+    /**
+     * Constant for List<String> argument.
+     */
+    ArgumentConversionContext<List<String>> LIST_OF_STRING = ConversionContext.of(Argument.LIST_OF_STRING);
+
+    /**
      * In the case where the type to be converted contains generic type arguments this map will return
      * the concrete types of those arguments. For example for the {@link Map} type two keys will be present
      * called 'K' and 'V' with the actual types of the key and value.

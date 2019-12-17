@@ -8,6 +8,8 @@ import io.micronaut.http.annotation.Header;
 
 import javax.annotation.Nullable;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
+import java.util.List;
 
 @Controller("/binding")
 public class BindingController {
@@ -31,6 +33,16 @@ public class BindingController {
     // tag::cookie2[]
     }
     // end::cookie2[]
+
+    // tag::cookieMultiple[]
+    @Get("/cookieMultiple")
+    public List<String> cookieMultiple(@CookieValue("myCookieA") String myCookieA, @CookieValue("myCookieB") String myCookieB) {
+        // ...
+        // end::cookieMultiple[]
+        return Arrays.asList(myCookieA, myCookieB);
+        // tag::cookieMultiple[]
+    }
+    // end::cookieMultiple[]
 
     // tag::header1[]
     @Get("/headerName")

@@ -91,6 +91,12 @@ class MavenBuildTokens extends BuildTokens {
                 .unique()
                 .findAll( { it.scope == 'annotationProcessor' || it.scope == 'kapt' })
 
+        annotationProcessors.find {
+            if (it.artifact.artifactId == 'micronaut-picocli') {
+                annotationProcessors.swap(annotationProcessors.indexOf(it), annotationProcessors.size() - 1)
+            }
+        }
+
         dependencies = dependencies.unique()
             .findAll { scopeConversions.containsKey(it.scope) }
             .collect { convertScope(it) }
@@ -139,6 +145,22 @@ class MavenBuildTokens extends BuildTokens {
 
         def annotationProcessorsWriter = new StringWriter()
         MarkupBuilder annotationProcessorPathsXml = new MarkupBuilder(annotationProcessorsWriter)
+        annotationProcessors = annotationProcessors.sort { Dependency dep1, Dependency dep2 ->
+            def g1 = dep1.artifact.groupId
+            if (g1 == 'org.projectlombok') {
+                // lombok always first
+                return -1
+            } else {
+                def g2 = dep2.artifact.groupId
+                if (g1 == g2 ){
+                    return 0
+                } else if (g1 == 'io.micronaut' && g2 != 'io.micronaut') {
+                    return -1
+                } else {
+                    return 1
+                }
+            }
+        }
         annotationProcessors.each { Dependency dep ->
             def artifact = dep.artifact
             String methodToCall = sourceLanguage == 'kotlin' ? 'annotationProcessorPath' : 'path'

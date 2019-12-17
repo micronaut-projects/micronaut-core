@@ -1,7 +1,7 @@
 package io.micronaut.test.replaces;
 
 import io.micronaut.context.annotation.Factory;
-import org.testcontainers.shaded.javax.inject.Singleton;
+import javax.inject.Singleton;
 
 @Factory
 public class InterfaceCFactory {

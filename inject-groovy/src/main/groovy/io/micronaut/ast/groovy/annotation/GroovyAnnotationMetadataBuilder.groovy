@@ -20,6 +20,7 @@ import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
@@ -44,6 +45,7 @@ import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
+import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
 import javax.annotation.Nonnull
@@ -65,8 +67,10 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     final SourceUnit sourceUnit
     final AnnotatedElementValidator elementValidator
+    final CompilationUnit compilationUnit
 
-    GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit) {
+    GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
+        this.compilationUnit = compilationUnit
         this.sourceUnit = sourceUnit
         def ast = sourceUnit?.getAST()
         if (ast != null) {
@@ -123,7 +127,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     @Override
     protected VisitorContext createVisitorContext() {
-        return new GroovyVisitorContext(sourceUnit)
+        return new GroovyVisitorContext(sourceUnit, compilationUnit)
     }
 
     @Override
@@ -221,7 +225,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             Object annotationValue,
             Map<CharSequence, Object> annotationValues) {
         if (!annotationValues.containsKey(memberName)) {
-            def v = readAnnotationValue(originatingElement, memberName, annotationValue)
+            def v = readAnnotationValue(originatingElement, member, memberName, annotationValue)
             if (v != null) {
                 validateAnnotationValue(originatingElement, annotationName, member, memberName, v)
                 annotationValues.put(memberName, v)
@@ -304,12 +308,16 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
-    protected Object readAnnotationValue(AnnotatedNode originatingElement, String memberName, Object annotationValue) {
+    protected Object readAnnotationValue(AnnotatedNode originatingElement, AnnotatedNode member, String memberName, Object annotationValue) {
         if (annotationValue instanceof ConstantExpression) {
             if (annotationValue instanceof AnnotationConstantExpression) {
                 AnnotationConstantExpression ann = (AnnotationConstantExpression) annotationValue
                 AnnotationNode value = (AnnotationNode) ann.getValue()
-                return readNestedAnnotationValue(originatingElement, value)
+                if (member instanceof MethodNode && member.returnType.isArray()) {
+                    return [readNestedAnnotationValue(originatingElement, value)] as AnnotationValue[]
+                } else {
+                    return readNestedAnnotationValue(originatingElement, value)
+                }
             } else {
                 return ((ConstantExpression) annotationValue).value
             }
@@ -343,7 +351,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             Class arrayType = Object.class
             for (exp in le.expressions) {
                 if (exp instanceof AnnotationConstantExpression) {
-                    arrayType = io.micronaut.core.annotation.AnnotationValue
+                    arrayType = AnnotationValue
                     AnnotationConstantExpression ann = (AnnotationConstantExpression) exp
                     AnnotationNode value = (AnnotationNode) ann.getValue()
                     converted.add(readNestedAnnotationValue(originatingElement, value))

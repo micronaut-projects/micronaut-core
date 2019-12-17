@@ -36,7 +36,6 @@ import java.util.Optional;
 @Internal
 public class ByteBufConverters {
 
-
     /**
      * @return A converter that converts bytebufs to strings
      */
@@ -67,14 +66,6 @@ public class ByteBufConverters {
     @Singleton
     TypeConverter<byte[], ByteBuf> byteArrayToByteBuffTypeConverter() {
         return (object, targetType, context) -> Optional.of(Unpooled.wrappedBuffer(object));
-    }
-
-    /**
-     * @return A converter that converts composite bytebufs to byte arrays
-     */
-    @Singleton
-    TypeConverter<CompositeByteBuf, byte[]> compositeByteBufTypeConverter() {
-        return (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object));
     }
 
 }

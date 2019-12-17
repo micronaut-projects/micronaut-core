@@ -25,6 +25,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.ExecutableMethod
 import spock.lang.Issue
 
 import javax.inject.Scope
@@ -136,11 +137,13 @@ class Test {
     void sometMethod() {}
 }
 ''')
+        def method = definition.findMethod('sometMethod').get()
+
         expect:
         definition != null
         definition.hasDeclaredAnnotation(Singleton)
-        definition.findMethod('sometMethod').isPresent()
-        definition.findMethod('sometMethod').get().annotationMetadata.hasDeclaredAnnotation(Executable)
+        method.annotationMetadata.hasAnnotation(Singleton)
+        method.annotationMetadata.hasDeclaredAnnotation(Executable)
     }
 
     void "test build configuration"() {

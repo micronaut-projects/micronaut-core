@@ -42,6 +42,7 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.naming.Named;
@@ -52,7 +53,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.*;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -171,7 +171,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @param arguments                     The constructor arguments used to build the bean
      */
     @Internal
-    @SuppressWarnings({"unchecked", "WeakerAccess"})
     @UsedByGeneratedCode
     protected AbstractBeanDefinition(Class<T> type,
                                      AnnotationMetadata constructorAnnotationMetadata,
@@ -298,7 +297,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         return singleton;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public Optional<Class<? extends Annotation>> getScope() {
         return getAnnotationMetadata().getDeclaredAnnotationTypeByStereotype(Scope.class);
@@ -599,7 +597,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @return The bean
      */
     @Internal
-    @SuppressWarnings({"WeakerAccess", "unused"})
+    @SuppressWarnings({"unused"})
     @UsedByGeneratedCode
     protected Object injectAnother(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
@@ -618,7 +616,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @param bean              The bean
      * @return The bean
      */
-    @SuppressWarnings({"WeakerAccess", "unused", "unchecked"})
+    @SuppressWarnings({"unused", "unchecked"})
     @Internal
     @UsedByGeneratedCode
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
@@ -1043,10 +1041,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 ApplicationContext propertyResolver = (ApplicationContext) context;
                 AnnotationMetadata argMetadata = argument.getAnnotationMetadata();
                 Optional<String> valAnn = argMetadata.stringValue(Value.class);
-                String prop = valAnn.orElseGet(() ->
-                        argMetadata.stringValue(Property.class, "name")
-                                .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."))
-                );
+                String prop = resolvePropertyValueName(resolutionContext, argMetadata, argument, valAnn.orElse(null));
                 ArgumentConversionContext<?> conversionContext = ConversionContext.of(argument);
                 Optional<?> value = resolveValue(propertyResolver, conversionContext, valAnn.isPresent(), prop);
                 if (argument.getType() == Optional.class) {
@@ -1059,13 +1054,25 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         if (argument.isDeclaredNullable()) {
                             result = null;
                         } else {
-                            throw new DependencyInjectionException(resolutionContext, conversionContext, prop);
+                            result = argMetadata.getValue(Bindable.class, "defaultValue", argument)
+                                    .orElseThrow(() -> new DependencyInjectionException(resolutionContext, conversionContext, prop));
                         }
                     }
                 }
             } else {
                 throw new DependencyInjectionException(resolutionContext, argument, "BeanContext must support property resolution");
             }
+
+            if (this instanceof ValidatedBeanDefinition) {
+                ((ValidatedBeanDefinition) this).validateBeanArgument(
+                        resolutionContext,
+                        constructorInjectionPoint,
+                        argument,
+                        argIndex,
+                        result
+                );
+            }
+
             path.pop();
             return result;
         } catch (NoSuchBeanException | BeanInstantiationException e) {
@@ -1511,10 +1518,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private AnnotationMetadata initializeAnnotationMetadata() {
         AnnotationMetadata annotationMetadata = resolveAnnotationMetadata();
-        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        if (annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
             // we make a copy of the result of annotation metadata which is normally a reference
             // to the class metadata
-            return new BeanAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+            return new BeanAnnotationMetadata(annotationMetadata);
         } else {
             return AnnotationMetadata.EMPTY_METADATA;
         }
@@ -1867,7 +1874,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * Internal environment aware annotation metadata delegate.
      */
     private final class BeanAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
-        BeanAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
+        BeanAnnotationMetadata(AnnotationMetadata targetMetadata) {
             super(targetMetadata);
         }
 

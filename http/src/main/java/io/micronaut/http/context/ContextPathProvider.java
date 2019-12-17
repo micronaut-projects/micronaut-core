@@ -22,7 +22,9 @@ import java.util.Optional;
  *
  * @author James Kleeh
  * @since 1.2.6
+ * @deprecated Use either {@link ClientContextPathProvider} or {@link ServerContextPathProvider} instead.
  */
+@Deprecated
 public interface ContextPathProvider {
 
     /**

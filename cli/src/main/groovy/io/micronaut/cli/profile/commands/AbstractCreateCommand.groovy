@@ -270,6 +270,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         String profileName = cmd.profileName
 
         Profile profileInstance = profileRepository.getProfile(profileName)
+
         if (!validateProfile(profileInstance, profileName)) {
             return false
         }
@@ -463,6 +464,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         }
 
         tokens.put("micronautVersion", cmd.micronautVersion)
+        tokens.put("mainClassName", profile.mainClassName)
 
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->

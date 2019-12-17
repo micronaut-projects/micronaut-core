@@ -18,6 +18,7 @@ package io.micronaut.web.router;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
@@ -122,20 +123,22 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
     @Override
     public Map<String, Object> getVariableValues() {
         Map<String, Object> variables = matchInfo.getVariableValues();
-        Map<String, Object> decoded = new LinkedHashMap<>(variables.size());
-        for (Map.Entry<String, Object> entry : variables.entrySet()) {
-            String k = entry.getKey();
-            Object v = entry.getValue();
-            if (v instanceof CharSequence) {
-                try {
-                    v = URLDecoder.decode(v.toString(), defaultCharset.toString());
-                } catch (UnsupportedEncodingException e) {
-                    // ignore
+        if (CollectionUtils.isNotEmpty(variables)) {
+            final String charset = defaultCharset.toString();
+            Map<String, Object> decoded = new LinkedHashMap<>(variables.size());
+            variables.forEach((k, v) -> {
+                if (v instanceof CharSequence) {
+                    try {
+                        v = URLDecoder.decode(v.toString(), charset);
+                    } catch (UnsupportedEncodingException e) {
+                        // ignore
+                    }
                 }
-            }
-            decoded.put(k, v);
+                decoded.put(k, v);
+            });
+            return decoded;
         }
-        return decoded;
+        return variables;
     }
 
     @Override

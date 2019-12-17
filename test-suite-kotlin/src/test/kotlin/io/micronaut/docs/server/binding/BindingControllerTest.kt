@@ -11,6 +11,7 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
+import java.util.ArrayList
 
 class BindingControllerTest: StringSpec() {
 
@@ -33,6 +34,17 @@ class BindingControllerTest: StringSpec() {
 
             body shouldNotBe null
             body shouldBe "cookie value"
+        }
+
+        "test multiple cookie binding" {
+            val cookies = HashSet<Cookie>()
+            cookies.add(Cookie.of("myCookieA", "cookie A value"))
+            cookies.add(Cookie.of("myCookieB", "cookie B value"))
+
+            var body = client.toBlocking().retrieve(HttpRequest.GET<Any>("/binding/cookieMultiple").cookies(cookies))
+
+            body shouldNotBe null
+            body shouldBe "[\"cookie A value\",\"cookie B value\"]"
         }
 
         "test header binding"() {

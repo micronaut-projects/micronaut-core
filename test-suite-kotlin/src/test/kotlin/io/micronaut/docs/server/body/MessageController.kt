@@ -26,8 +26,8 @@ open class MessageController {
 
     // tag::echoReactive[]
     @Post(value = "/echo-flow", consumes = [MediaType.TEXT_PLAIN]) // <1>
-    fun echoFlow(@Body text: Flowable<String>): Single<MutableHttpResponse<String>> { //<2>
-        return text.collect<StringBuffer>({ StringBuffer() }, { obj, str -> obj.append(str) }) // <3>
+    open fun echoFlow(@Body text: Flowable<String>): Single<MutableHttpResponse<String>> { //<2>
+        return text.collect({ StringBuffer() }, { obj, str -> obj.append(str) }) // <3>
                 .map { buffer -> HttpResponse.ok(buffer.toString()) }
     }
     // end::echoReactive[]

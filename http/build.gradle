@@ -3,12 +3,14 @@ plugins {
 }
 
 dependencies {
-    compile project(":inject")
-    compileOnly project(":inject-java")
+	annotationProcessor project(":inject-java")
+    api project(":inject")    
     compileOnly project(":graal")
     compileOnly "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.1.1"
 
-    testCompile project(":inject-groovy")
+    testCompileOnly project(":inject-groovy")
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject")
 }
 
 compileKotlin {

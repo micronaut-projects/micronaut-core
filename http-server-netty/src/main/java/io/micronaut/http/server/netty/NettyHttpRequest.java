@@ -303,7 +303,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @param httpContent The HttpContent as {@link ByteBufHolder}
      */
     @Internal
-    void addContent(ByteBufHolder httpContent) {
+    public void addContent(ByteBufHolder httpContent) {
         if (httpContent instanceof AbstractHttpData) {
             receivedData.computeIfAbsent(System.identityHashCode(httpContent), (key) -> {
                 httpContent.retain();

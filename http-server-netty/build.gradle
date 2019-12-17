@@ -1,25 +1,29 @@
 dependencies {
-    compile project(":http-server")
-    compile project(":http-netty")
+    annotationProcessor project(":inject-java")
 
-    compileOnly project(":inject-java")
+    api project(":http-server")
+    api project(":core")
+    api project(":http-netty")
+    api dependencyVersion("netty")
+
     compileOnly dependencyModuleVersion("netty", "netty-transport-native-epoll")
     compileOnly dependencyModuleVersion("netty", "netty-transport-native-kqueue")
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 
-    testCompile project(":inject-groovy")
-    testCompile project(":inject-java")
-    testCompile project(":inject-java-test")
-    testCompile project(":http-client")
-    testCompile group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.2'
-    testCompile group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.2'
+    testCompileOnly project(":inject-groovy")
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject")
+    testImplementation project(":inject-java-test")
+    testImplementation project(":http-client")
+    testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.4'
+    testImplementation group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.4'
 
-    testCompile dependencyModuleVersion("groovy", "groovy-json")
-    testCompile dependencyModuleVersion("groovy", "groovy-templates")
-    testCompile dependencyVersion("rxjava2")
-    testCompile dependencyVersion("reactor")
-    testCompile(dependencyModuleVersion("netty", "netty-transport-native-epoll") + ":linux-x86_64")
-    testCompile(dependencyModuleVersion("netty", "netty-transport-native-kqueue") + ":osx-x86_64")
+    testImplementation dependencyModuleVersion("groovy", "groovy-json")
+    testImplementation dependencyModuleVersion("groovy", "groovy-templates")
+    testImplementation dependencyVersion("rxjava2")
+    testImplementation dependencyVersion("reactor")
+    testImplementation(dependencyModuleVersion("netty", "netty-transport-native-epoll") + ":linux-x86_64")
+    testImplementation(dependencyModuleVersion("netty", "netty-transport-native-kqueue") + ":osx-x86_64")
 }
 
 tasks.withType(Test) {

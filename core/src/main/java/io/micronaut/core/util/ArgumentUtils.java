@@ -16,7 +16,6 @@
 package io.micronaut.core.util;
 
 import javax.annotation.Nonnull;
-import java.util.Objects;
 
 /**
  * Utility methods for checking method argument values.
@@ -41,16 +40,18 @@ public class ArgumentUtils {
     }
 
     /**
-     * Adds a check that the given number is positive.
+     * Adds a check that the given number is not null.
      *
      * @param name The name of the argument
      * @param value The value
      * @param <T> The generic type
-     * @throws IllegalArgumentException if the argument is not positive
+     * @throws NullPointerException if the argument is null
      * @return The value
      */
     public static <T> T requireNonNull(String name, T value) {
-        Objects.requireNonNull(value, "Argument [" + name + "] cannot be null");
+        if (value == null) {
+            throw new NullPointerException("Argument [" + name + "] cannot be null");
+        }
         return value;
     }
 
@@ -135,11 +136,11 @@ public class ArgumentUtils {
         /**
          * Fail the argument with the given message.
          *
-         * @throws IllegalArgumentException Thrown with the given message if the check fails
+         * @throws NullPointerException Thrown with the given message if the check fails
          */
         public void notNull() {
-            if (name != null && value != null) {
-                Objects.requireNonNull(value, "Argument [" + name + "] cannot be null");
+            if (value == null) {
+                throw new NullPointerException("Argument [" + name + "] cannot be null");
             }
         }
     }

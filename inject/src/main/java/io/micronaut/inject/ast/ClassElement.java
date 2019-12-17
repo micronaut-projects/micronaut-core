@@ -52,15 +52,18 @@ public interface ClassElement extends TypedElement {
      *
      * @return The primary constructor if one is present
      */
-    default @Nonnull Optional<ConstructorElement> getPrimaryConstructor() {
+    default @Nonnull Optional<MethodElement> getPrimaryConstructor() {
         return Optional.empty();
     }
 
     /**
-     * @return True if the class has a non private constructor with no arguments.
+     * Find and return a single default constructor. A default constructor is one
+     * without arguments that is accessible.
+     *
+     * @return The default constructor if one is present
      */
-    default boolean hasDefaultConstructor() {
-        return false;
+    default @Nonnull Optional<MethodElement> getDefaultConstructor() {
+        return Optional.empty();
     }
 
     /**

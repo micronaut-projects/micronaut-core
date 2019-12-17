@@ -7,6 +7,7 @@ To get started creating a Microservice that can be compiled into a native image,
 ----
 $ mn create-app hello-world --features graal-native-image
 ----
+NOTE: For Kotlin use `graal-native-image-kotlin` feature.
 
 The `graal-native-image` feature adds three important items:
 
@@ -56,11 +57,11 @@ The provided `Dockerfile` is a multi-stage dockerfile which builds the project i
 
 To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using SDKman:
 
-.Installing GraalVM 19.0.0 with SDKman
+.Installing GraalVM 19.3.0 with SDKman
 [source,bash]
 ----
-$ sdk install java 19.0.0-grl
-$ sdk use java 19.0.0-grl
+$ sdk install java 19.3.0.r8-grl # or 19.3.0.r11-grl if you want to use JDK 11
+$ sdk use java 19.3.0.r8-grl
 ----
 
 The `native-image` tool was extracted from the base GraalVM distribution. Currently it is available as an early adopter plugin. To install it, run:
@@ -83,7 +84,7 @@ $ native-image --no-server -cp build/libs/hello-world-0.1-all.jar
 [source,bash]
 ----
 $ ./mvnw package
-$ native-image --no-server -cp target/hello-world-0.1.jar
+$ native-image --no-server -cp target/hello-world-0.1-all.jar
 ----
 
 .Run native image
@@ -153,12 +154,10 @@ GraalVM's `native-image` command is used to generate native images. You can use 
 [source,bash]
 ----
 native-image --no-server \ # <1>
-             --class-path build/libs/hello-world-0.1-all.jar \ # <2>
-             -H:ReflectionConfigurationFiles=reflect.json  # <3>
+             --class-path build/libs/hello-world-0.1-all.jar # <2>
 ----
 <1> Do not start a background server to generate the native image
 <2> The `class-path` argument is used to refer to the Micronaut shaded JAR
-<3> The `-H:ReflectionConfigurationFiles` option points GraalVM to any additional `reflect.json` files needed to run the application. Multiple comma-separated files can be specified.
 
 Once the image has been built you can run the application using the native image name:
 

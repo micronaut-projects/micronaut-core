@@ -71,7 +71,7 @@ public interface HttpClientErrorDecoder {
         } else if (mediaType.equals(MediaType.APPLICATION_VND_ERROR_TYPE)) {
             return Argument.of(VndError.class);
         } else {
-            return Argument.of(String.class);
+            return Argument.STRING;
         }
     }
 }

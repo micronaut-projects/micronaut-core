@@ -84,13 +84,13 @@ class EurekaAutoRegistrationSpec extends Specification{
         EurekaClient eurekaClient = ApplicationContext.build(eurekaConfiguration).run(EurekaClient)
 
         // since Eureka is eventually consistent a long timeout/delay is required slowing this test down significantly
-        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
+        PollingConditions conditions = new PollingConditions(timeout: 60, delay: 1)
 
         then: "The application is registered"
         conditions.eventually {
-            Flowable.fromPublisher(eurekaClient.getInstances(serviceId)).timeout(30, TimeUnit.SECONDS).blockingFirst().size() == 1
+            Flowable.fromPublisher(eurekaClient.getInstances(serviceId)).timeout(60, TimeUnit.SECONDS).blockingFirst().size() == 1
             // Eureka uses upper case for application names
-            Flowable.fromPublisher(eurekaClient.getServiceIds()).timeout(30, TimeUnit.SECONDS).blockingFirst().contains(
+            Flowable.fromPublisher(eurekaClient.getServiceIds()).timeout(60, TimeUnit.SECONDS).blockingFirst().contains(
                     NameUtils.hyphenate(serviceId).toUpperCase()
             )
         }

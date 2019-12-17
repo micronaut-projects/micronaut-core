@@ -16,14 +16,11 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Observable;
 import io.reactivex.ObservableSource;
 import io.reactivex.Observer;
 
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -34,33 +31,28 @@ import java.util.List;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedObservable<T> extends Observable<T> implements RxInstrumentedComponent {
+final class RxInstrumentedObservable<T> extends Observable<T> implements RxInstrumentedComponent  {
     private final ObservableSource<T> source;
-    private final List<RunnableInstrumenter> instrumentations;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
+     *
+     * @param source       The source
+     * @param instrumenter The instrumenter
      */
-    RxInstrumentedObservable(
-            ObservableSource<T> source, List<RunnableInstrumenter> instrumentations) {
+    RxInstrumentedObservable(ObservableSource<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumentations = instrumentations;
+        this.instrumenter = instrumenter;
     }
 
-    /**
-     * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedObservable(
-            ObservableSource<T> source, Collection<ReactiveInstrumenter> instrumentations) {
-        this.source = source;
-        this.instrumentations = toRunnableInstrumenters(instrumentations);
-    }
-
-    @Override protected void subscribeActual(Observer<? super T> o) {
-        source.subscribe(new RxInstrumentedObserver<>(o, instrumentations));
+    @Override
+    protected void subscribeActual(Observer<? super T> o) {
+        try {
+            instrumenter.beforeInvocation();
+            source.subscribe(o);
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 }
