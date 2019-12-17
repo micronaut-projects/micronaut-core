@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinitionReference;
 
