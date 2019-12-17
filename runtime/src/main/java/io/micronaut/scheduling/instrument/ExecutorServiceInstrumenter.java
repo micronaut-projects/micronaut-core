@@ -13,52 +13,51 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tracing.instrument.scheduling;
+package io.micronaut.scheduling.instrument;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
-import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
-import io.micronaut.tracing.instrument.TracingWrapper;
+import io.micronaut.core.annotation.Internal;
 
 import javax.inject.Singleton;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
- * Instruments runnable threads with {@link TracingWrapper}.
+ * Wraps {@link ExecutorService} to instrument {@link Callable} and {@link Runnable}.
  *
- * @author graemerocher
- * @since 1.0
+ * @author Denis Stepanov
+ * @since 1.3
  */
 @Singleton
-@Requires(beans = TracingWrapper.class)
-@Requires(property = ExecutorServiceInstrumenter.PROPERTY_INSTRUMENT_THREADS,
-          value = StringUtils.TRUE,
-          defaultValue = StringUtils.FALSE)
-public class ExecutorServiceInstrumenter implements BeanCreatedEventListener<ExecutorService> {
+@Internal
+final class ExecutorServiceInstrumenter implements BeanCreatedEventListener<ExecutorService> {
+
+    private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
 
     /**
-     * Whether to instrument threads.
-     */
-    public static final String PROPERTY_INSTRUMENT_THREADS = "tracing.instrument-threads";
-
-    private final TracingWrapper tracingWrapper;
-
-    /**
-     * Creates a new {@link ExecutorServiceInstrumenter}.
+     * Creates new instance.
      *
-     * @param tracingWrapper The tracingWrapper
+     * @param invocationInstrumenterFactories invocation instrumentation factories.
      */
-    public ExecutorServiceInstrumenter(TracingWrapper tracingWrapper) {
-        this.tracingWrapper = tracingWrapper;
+    public ExecutorServiceInstrumenter(List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
+        this.invocationInstrumenterFactories = invocationInstrumenterFactories;
     }
 
+    /**
+     * Wraps {@link ExecutorService}.
+     *
+     * @param event The bean created event
+     * @return wrapped instance
+     */
     @Override
     public ExecutorService onCreated(BeanCreatedEvent<ExecutorService> event) {
+        if (invocationInstrumenterFactories.isEmpty()) {
+            return event.getBean();
+        }
         ExecutorService executorService = event.getBean();
         if (executorService instanceof ScheduledExecutorService) {
             return new InstrumentedScheduledExecutorService() {
@@ -69,12 +68,12 @@ public class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exe
 
                 @Override
                 public <T> Callable<T> instrument(Callable<T> task) {
-                    return tracingWrapper.wrap(task);
+                    return instrumentInvocation(task);
                 }
 
                 @Override
                 public Runnable instrument(Runnable command) {
-                    return tracingWrapper.wrap(command);
+                    return instrumentInvocation(command);
                 }
             };
         } else {
@@ -86,14 +85,34 @@ public class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exe
 
                 @Override
                 public <T> Callable<T> instrument(Callable<T> task) {
-                    return tracingWrapper.wrap(task);
+                    return instrumentInvocation(task);
                 }
 
                 @Override
                 public Runnable instrument(Runnable command) {
-                    return tracingWrapper.wrap(command);
+                    return instrumentInvocation(command);
                 }
             };
         }
     }
+
+    private Runnable instrumentInvocation(Runnable runnable) {
+        return InvocationInstrumenter.instrument(runnable, getInvocationInstrumenter());
+    }
+
+    private <V> Callable<V> instrumentInvocation(Callable<V> callable) {
+        return InvocationInstrumenter.instrument(callable, getInvocationInstrumenter());
+    }
+
+    private List<InvocationInstrumenter> getInvocationInstrumenter() {
+        List<InvocationInstrumenter> instrumenters = new ArrayList<>(invocationInstrumenterFactories.size());
+        for (InvocationInstrumenterFactory instrumenterFactory : invocationInstrumenterFactories) {
+            final InvocationInstrumenter instrumenter = instrumenterFactory.newInvocationInstrumenter();
+            if (instrumenter != null) {
+                instrumenters.add(instrumenter);
+            }
+        }
+        return instrumenters;
+    }
+
 }

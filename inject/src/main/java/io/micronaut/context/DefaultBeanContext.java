@@ -26,6 +26,7 @@ import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -107,6 +108,7 @@ public class DefaultBeanContext implements BeanContext {
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     private final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
     private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
+    private final Map<CharSequence, Object> attributes = Collections.synchronizedMap(new HashMap<>(5));
 
     private final Map<BeanKey, Collection<Object>> initializedObjectsByType = new ConcurrentLinkedHashMap.Builder<BeanKey, Collection<Object>>().maximumWeightedCapacity(30).build();
     private final Map<BeanKey, Optional<BeanDefinition>> beanConcreteCandidateCache = new ConcurrentLinkedHashMap.Builder<BeanKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
@@ -236,6 +238,7 @@ public class DefaultBeanContext implements BeanContext {
                 LOG.debug("Stopping BeanContext");
             }
             publishEvent(new ShutdownEvent(this));
+            attributes.clear();
 
             // need to sort registered singletons so that beans with that require other beans appear first
             List<BeanRegistration> objects = topologicalSort(singletonObjects.values());
@@ -2708,6 +2711,59 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         return sorted;
+    }
+
+    @Nonnull
+    @Override
+    public MutableConvertibleValues<Object> getAttributes() {
+        return MutableConvertibleValues.of(attributes);
+    }
+
+    @Nonnull
+    @Override
+    public Optional<Object> getAttribute(CharSequence name) {
+        if (name != null) {
+            return Optional.ofNullable(attributes.get(name));
+        } else {
+            return Optional.empty();
+        }
+    }
+
+    @Nonnull
+    @Override
+    public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
+        if (name != null) {
+            final Object o = attributes.get(name);
+            if (type.isInstance(o)) {
+                return Optional.of((T) o);
+            } else if (o != null) {
+                return ConversionService.SHARED.convert(o, type);
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Nonnull
+    @Override
+    public BeanContext setAttribute(@Nonnull CharSequence name, @Nullable Object value) {
+        if (name != null) {
+            if (value != null) {
+                attributes.put(name, value);
+            } else {
+                attributes.remove(name);
+            }
+        }
+        return this;
+    }
+
+    @Nonnull
+    @Override
+    public <T> Optional<T> removeAttribute(@Nonnull CharSequence name, @Nonnull Class<T> type) {
+        final Object o = attributes.remove(name);
+        if (type.isInstance(o)) {
+            return Optional.of((T) o);
+        }
+        return Optional.empty();
     }
 
     /**

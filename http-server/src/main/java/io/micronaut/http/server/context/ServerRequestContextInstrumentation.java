@@ -15,23 +15,14 @@
  */
 package io.micronaut.http.server.context;
 
-import io.micronaut.context.event.BeanCreatedEvent;
-import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
-import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
-import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
+import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 
 import javax.inject.Singleton;
-import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.function.Function;
 
 /**
  * Instruments Micronaut such that {@link io.micronaut.http.context.ServerRequestContext} state is propagated.
@@ -41,100 +32,38 @@ import java.util.function.Function;
  */
 @Singleton
 @Internal
-final class ServerRequestContextInstrumentation implements Function<Runnable, Runnable>, RunnableInstrumenter, ReactiveInstrumenter, BeanCreatedEventListener<ThreadFactory> {
+final class ServerRequestContextInstrumentation implements InvocationInstrumenterFactory, ReactiveInvocationInstrumenterFactory {
 
     @Override
-    public Runnable apply(Runnable runnable) {
-        return instrumentRunnable(runnable);
-    }
+    public InvocationInstrumenter newInvocationInstrumenter() {
+        return ServerRequestContext.currentRequest().map(invocationRequest -> new InvocationInstrumenter() {
 
-    @Override
-    public Runnable instrument(Runnable command) {
-        return apply(command);
-    }
+            private HttpRequest<Object> currentRequest;
+            private boolean isSet = false;
 
-    @Override
-    public ThreadFactory onCreated(BeanCreatedEvent<ThreadFactory> event) {
-        final ThreadFactory original = event.getBean();
-        return r -> {
-            final Optional<HttpRequest<Object>> httpRequest = ServerRequestContext.currentRequest();
-            return original.newThread(
-                    httpRequest.map(objectHttpRequest -> ServerRequestContext.instrument(objectHttpRequest, r))
-                            .orElse(r)
-            );
-        };
-    }
-
-    private static Runnable instrumentRunnable(Runnable runnable) {
-        final Optional<HttpRequest<Object>> httpRequest = ServerRequestContext.currentRequest();
-        return httpRequest.map(objectHttpRequest -> ServerRequestContext.instrument(objectHttpRequest, runnable))
-                .orElse(runnable);
-    }
-
-    @Override
-    public Optional<RunnableInstrumenter> newInstrumentation() {
-        final Optional<HttpRequest<Object>> httpRequest = ServerRequestContext.currentRequest();
-        return httpRequest.map(request -> new RunnableInstrumenter() {
             @Override
-            public Runnable instrument(Runnable command) {
-                return ServerRequestContext.instrument(request, command);
+            public void beforeInvocation() {
+                currentRequest = ServerRequestContext.currentRequest().orElse(null);
+                if (invocationRequest != currentRequest) {
+                    isSet = true;
+                    ServerRequestContext.set(invocationRequest);
+                }
             }
-        });
+
+            @Override
+            public void afterInvocation() {
+                if (isSet) {
+                    ServerRequestContext.set(currentRequest);
+                    isSet = false;
+                }
+            }
+
+        }).orElse(null);
     }
 
-    /**
-     * Instruments executor services.
-     *
-     * @author graemerocher
-     * @since 1.0
-     */
-    @Singleton
-    static class ExecutorServiceInstrumentation implements BeanCreatedEventListener<ExecutorService> {
-        @Override
-        public final ExecutorService onCreated(BeanCreatedEvent<ExecutorService> event) {
-            ExecutorService executorService = event.getBean();
-            if (executorService instanceof ScheduledExecutorService) {
-                return new InstrumentedScheduledExecutorService() {
-                    @Override
-                    public ScheduledExecutorService getTarget() {
-                        return (ScheduledExecutorService) executorService;
-                    }
-
-                    @Override
-                    public <T> Callable<T> instrument(Callable<T> task) {
-                        return doInstrument(task);
-                    }
-
-                    @Override
-                    public Runnable instrument(Runnable command) {
-                        return instrumentRunnable(command);
-                    }
-                };
-            } else {
-                return new InstrumentedExecutorService() {
-                    @Override
-                    public ExecutorService getTarget() {
-                        return executorService;
-                    }
-
-                    @Override
-                    public <T> Callable<T> instrument(Callable<T> task) {
-                        return doInstrument(task);
-                    }
-
-                    @Override
-                    public Runnable instrument(Runnable command) {
-                        return instrumentRunnable(command);
-                    }
-                };
-            }
-        }
-
-        private <T> Callable<T> doInstrument(Callable<T> task) {
-            Optional<HttpRequest<Object>> current = ServerRequestContext.currentRequest();
-            return current.<Callable<T>>map(objectHttpRequest -> () ->
-                    ServerRequestContext.with(objectHttpRequest, task)
-            ).orElse(task);
-        }
+    @Override
+    public InvocationInstrumenter newReactiveInvocationInstrumenter() {
+        return newInvocationInstrumenter();
     }
+
 }

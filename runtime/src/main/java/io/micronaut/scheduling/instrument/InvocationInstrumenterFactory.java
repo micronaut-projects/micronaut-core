@@ -13,30 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tracing.instrument;
+package io.micronaut.scheduling.instrument;
 
-import java.util.concurrent.Callable;
+import javax.annotation.Nullable;
 
 /**
- * The tracing wrapper of {@link Runnable} and {@link Callable}.
+ * An factory interface for invocation instrumentation, factory method decides if instrumentation is needed.
  *
- * @author dstepanov
+ * @author Denis Stepanov
+ * @author graemerocher
  * @since 1.3
  */
-public interface TracingWrapper {
+public interface InvocationInstrumenterFactory {
 
     /**
-     * Wraps {@link Runnable} for tracing.
-     * @param runnable instance to be wrapped
-     * @return wrapped instance
+     * An optional invocation instrumentation.
+     * @return An invocation instrumentation or null if non exists for this factory.
      */
-    Runnable wrap(Runnable runnable);
+    @Nullable
+    InvocationInstrumenter newInvocationInstrumenter();
 
-    /**
-     * Wraps {@link Callable} for tracing.
-     * @param callable instance to be wrapped
-     * @param <V> callable generic param
-     * @return wrapped instance
-     */
-    <V> Callable<V> wrap(Callable<V> callable);
 }

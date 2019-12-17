@@ -8,9 +8,9 @@ The most common reason that Dependency Injection fails to work is when you eithe
 
 Groovy by default imports the `groovy.lang` package which includes a class called `@Singleton` that is an AST transformation that makes your class a singleton (adding a private constructor and static retrieval method). This annotation is easily confused with the `javax.inject.Singleton` annotation used to define singleton beans in Micronaut. Make sure you are using the correct annotation in your Groovy classes.
 
-==== It is taking much longer to start my application than it should (MacOS)
+==== It is taking much longer to start my application than it should (*nix OS)
 
-This is likely due to a bug in MacOS that has to do with executions of `java.net.InetAddress.getLocalHost()` causing a long delay. The solution is to edit your `/etc/hosts` file to add an entry that contains your host name. To find your host name, simply enter `hostname` in the terminal and the value will be output. Then edit your `/etc/hosts` file to add or change entries like the example below, replacing `<hostname>` with your host name.
+This is likely due to a bug that has to do with executions of `java.net.InetAddress.getLocalHost()` causing a long delay. The solution is to edit your `/etc/hosts` file to add an entry that contains your host name. To find your host name, simply enter `hostname` in the terminal and the value will be output. Then edit your `/etc/hosts` file to add or change entries like the example below, replacing `<hostname>` with your host name.
 
 ----
 127.0.0.1       localhost <hostname>

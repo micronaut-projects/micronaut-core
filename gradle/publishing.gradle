@@ -200,7 +200,7 @@ bintray {
     user = bintrayUser
     key = bintrayKey
     publications = ['maven']
-    publish = false
+    publish = true
     pkg {
         repo = 'core-releases-local'
         userOrg = 'micronaut'

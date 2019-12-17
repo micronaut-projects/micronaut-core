@@ -1224,7 +1224,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             // shouldn't visit around advice on an introduction advice instance
             if (!(beanWriter instanceof AopProxyWriter)) {
-                boolean hasAround = hasConstraints || methodAnnotationMetadata.hasStereotype(AROUND_TYPE);
                 final boolean isConcrete = !modelUtils.isAbstract(concreteClass);
                 final boolean isPublic = method.getModifiers().contains(Modifier.PUBLIC);
                 if ((isAopProxyType && isPublic) ||
@@ -1259,7 +1258,22 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         if (methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE)) {
                             error(method, "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.");
                         } else {
-                            error(method, "Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");
+                            if (isAopProxyType && isPublic && !declaringClass.equals(concreteClass)) {
+                                if (executableMethodWriter == null) {
+                                    beanWriter.visitExecutableMethod(
+                                            typeRef,
+                                            resolvedReturnType,
+                                            resolvedReturnType,
+                                            returnTypeGenerics,
+                                            method.getSimpleName().toString(),
+                                            params.getParameters(),
+                                            params.getGenericParameters(),
+                                            params.getParameterMetadata(),
+                                            params.getGenericTypes(), methodAnnotationMetadata);
+                                }
+                            } else {
+                                error(method, "Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");
+                            }
                         }
                     } else {
                         aopProxyWriter.visitAroundMethod(
