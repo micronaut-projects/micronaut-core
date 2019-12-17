@@ -40,26 +40,27 @@ import javax.inject.Singleton
  * @author Graeme Rocher
  * @since 1.0
  */
-@Retry
+@Retry(mode = Retry.Mode.SETUP_FEATURE_CLEANUP)
 class ClientScopeSpec extends Specification {
 
-    @Shared int port = SocketUtils.findAvailableTcpPort()
+    ApplicationContext context
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run(
-            'spec.name': 'ClientScopeSpec',
-            'from.config': '/',
-            'micronaut.server.port':port,
-            'micronaut.http.services.my-service.url': "http://localhost:$port",
-            'micronaut.http.services.my-service-declared.url': "http://my-service-declared:$port",
-            'micronaut.http.services.my-service-declared.path': "/my-declarative-client-path",
-            'micronaut.http.services.other-service.url': "http://localhost:$port",
-            'micronaut.http.services.other-service.path': "/scope",
-    )
+    void setup() {
+        int port = SocketUtils.findAvailableTcpPort()
+        context = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'ClientScopeSpec',
+                'from.config': '/',
+                'micronaut.server.port':port,
+                'micronaut.http.services.my-service.url': "http://localhost:$port",
+                'micronaut.http.services.my-service-declared.url': "http://my-service-declared:$port",
+                'micronaut.http.services.my-service-declared.path': "/my-declarative-client-path",
+                'micronaut.http.services.other-service.url': "http://localhost:$port",
+                'micronaut.http.services.other-service.path': "/scope"]).applicationContext
+    }
 
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    void cleanup() {
+        context.close()
+    }
 
     void "test client scope annotation method injection"() {
         given:
@@ -71,6 +72,9 @@ class ClientScopeSpec extends Specification {
         myService.get() == 'success'
         myJavaService.client == myService.client
         myJavaService.rxHttpClient == myService.rxHttpClient
+
+        cleanup:
+        context.close()
     }
 
     void "test client scope annotation field injection"() {
