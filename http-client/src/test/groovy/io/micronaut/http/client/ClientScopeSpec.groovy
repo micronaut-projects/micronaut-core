@@ -44,9 +44,10 @@ import javax.inject.Singleton
 class ClientScopeSpec extends Specification {
 
     ApplicationContext context
+    int port
 
     void setup() {
-        int port = SocketUtils.findAvailableTcpPort()
+        port = SocketUtils.findAvailableTcpPort()
         context = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': 'ClientScopeSpec',
                 'from.config': '/',
