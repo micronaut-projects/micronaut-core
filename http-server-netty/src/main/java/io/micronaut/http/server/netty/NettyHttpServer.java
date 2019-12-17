@@ -370,6 +370,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                                 LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                             }
                         }
+                        throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, e);
                     }
                 }
             }
