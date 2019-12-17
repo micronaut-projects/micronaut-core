@@ -292,4 +292,21 @@ public class CollectionUtils {
         }
         return Collections.unmodifiableList(list);
     }
+
+    /**
+     * Returns the last element of a collection.
+     *
+     * @param collection The collection
+     * @param <T> The generic type
+     * @return The last element of a collection or null
+     */
+    public static @Nullable <T> T last(@Nonnull Collection<T> collection) {
+        T result = null;
+        Iterator<T> i = collection.iterator();
+        while (i.hasNext()) {
+            result = i.next();
+        }
+
+        return result;
+    }
 }

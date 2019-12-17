@@ -1,0 +1,19 @@
+Kotlin coroutines allow you to create asynchronous applications with imperative style code. A Micronaut's controller
+action can be a `suspend` function:
+
+snippet::io.micronaut.docs.server.suspend.SuspendController[tags="suspend", indent=0, title="Controller suspend function example"]
+
+<1> The function is marked as `suspend`, though in reality it won't be suspended.
+
+snippet::io.micronaut.docs.server.suspend.SuspendController[tags="suspendDelayed", indent=0, title="Controller suspend function example"]
+
+<1> The function is marked as `suspend`.
+<2> The `delay` is called to make sure that a function is suspended and the response is returned from a different thread.
+
+snippet::io.micronaut.docs.server.suspend.SuspendController[tags="suspendStatus", indent=0, title="Controller suspend function example"]
+
+<1> `suspend` function also works when all we want is to return a status.
+
+snippet::io.micronaut.docs.server.suspend.SuspendController[tags="suspendStatusDelayed", indent=0, title="Controller suspend function example"]
+
+NOTE: Due to the way Kotlin compiler generates bytecode for coroutines they are currently https://github.com/oracle/graal/issues/366[unsuppoprted] out-of-the-box in GraalVM. There is, however, a https://github.com/HewlettPackard/kraal[workaround] for this problem.

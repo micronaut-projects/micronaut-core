@@ -36,4 +36,14 @@ public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReferenc
     default boolean isAbstract() {
         return false;
     }
+
+    /**
+     * Defines whether the method is Kotlin suspend function.
+     *
+     * @return Is the method Kotlin suspend function.
+     * @since 1.3.0
+     */
+    default boolean isSuspend() {
+        return false;
+    }
 }

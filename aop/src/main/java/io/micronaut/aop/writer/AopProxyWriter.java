@@ -31,6 +31,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -519,9 +520,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             bridgeArguments.add(proxyFullName);
             bridgeArguments.addAll(argumentTypeList);
             String bridgeDesc = getMethodDescriptor(returnType, bridgeArguments);
+            boolean isSuspend = "kotlin.coroutines.Continuation".equals(CollectionUtils.last(argumentTypes.values()));
 
             ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
-                    proxyFullName, methodExecutorClassName, methodProxyShortName, isInterface, isAbstract, annotationMetadata) {
+                    proxyFullName, methodExecutorClassName, methodProxyShortName, isInterface, isAbstract, isSuspend, annotationMetadata) {
 
                 @Override
                 protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, GeneratorAdapter invokeMethodVisitor) {
