@@ -663,7 +663,7 @@ subprojects { Project subproject ->
         }
 
         forkEvery = 100
-        maxParallelForks = 3
+        maxParallelForks = 2
 
         systemProperty "micronaut.cloud.platform", "OTHER"
     }
