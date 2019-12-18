@@ -372,6 +372,22 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return AnnotationClassValue.EMPTY_ARRAY;
     }
 
+    @Override
+    public Optional<AnnotationClassValue<?>> annotationClassValue(@Nonnull String member) {
+        if (StringUtils.isNotEmpty(member)) {
+            Object o = values.get(member);
+            if (o instanceof AnnotationClassValue) {
+                return Optional.of((AnnotationClassValue<?>) o);
+            } else if (o instanceof AnnotationClassValue[]) {
+                AnnotationClassValue[] a = (AnnotationClassValue[]) o;
+                if (a.length > 0) {
+                    return Optional.of(a[0]);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     /**
      * The integer value of the given member.
      *

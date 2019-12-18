@@ -51,6 +51,9 @@ import java.util.*;
 /**
  * An abstract {@link Condition} implementation that is based on the presence
  * of {@link Requires} annotation.
+ *
+ * @author graemerocher
+ * @since 1.0.0
  */
 public class RequiresCondition implements Condition {
 
@@ -330,41 +333,52 @@ public class RequiresCondition implements Condition {
     @SuppressWarnings("unchecked")
     private boolean matchesCustomConditions(ConditionContext context, AnnotationValue<Requires> requirements) {
         if (requirements.contains(MEMBER_CONDITION)) {
-            Class<? extends Condition> conditionClass = (Class<? extends Condition>) requirements.classValue(MEMBER_CONDITION).orElse(null);
-            if (conditionClass == TrueCondition.class) {
+            final AnnotationClassValue<?> annotationClassValue = requirements.annotationClassValue(MEMBER_CONDITION).orElse(null);
+            if (annotationClassValue == null) {
                 return true;
-            } else if (conditionClass != null) {
-                // try first via instantiated metadata
-                Optional<? extends Condition> condition = requirements.get(MEMBER_CONDITION, conditionClass);
-                if (!condition.isPresent()) {
-                    condition = InstantiationUtils.tryInstantiate(conditionClass);
-                }
-                if (condition.isPresent()) {
-                    boolean conditionResult = condition.get().matches(context);
+            } else {
+                final Object instance = annotationClassValue.getInstance().orElse(null);
+                if (instance instanceof Condition) {
+                    final boolean conditionResult = ((Condition) instance).matches(context);
                     if (!conditionResult) {
-                        context.fail("Custom condition [" + conditionClass + "] failed evaluation");
+                        context.fail("Custom condition [" + instance.getClass() + "] failed evaluation");
                     }
                     return conditionResult;
                 } else {
-                    // maybe a Groovy closure
-                    Optional<Constructor<?>> constructor = ReflectionUtils.findConstructor((Class) conditionClass, Object.class, Object.class);
-                    boolean conditionResult = constructor.flatMap(ctor ->
-                            InstantiationUtils.tryInstantiate(ctor, null, null)
-                    ).flatMap(obj -> {
-                        Optional<Method> method = ReflectionUtils.findMethod(obj.getClass(), "call", ConditionContext.class);
-                        if (method.isPresent()) {
-                            Object result = ReflectionUtils.invokeMethod(obj, method.get(), context);
-                            if (result instanceof Boolean) {
-                                return Optional.of((Boolean) result);
-                            }
-                        }
-                        return Optional.empty();
-                    }).orElse(false);
-                    if (!conditionResult) {
-                        context.fail("Custom condition [" + conditionClass + "] failed evaluation");
-                    }
-                    return conditionResult;
 
+                    final Class<?> conditionClass = annotationClassValue.getType().orElse(null);
+                    if (conditionClass == null || conditionClass == TrueCondition.class || !Condition.class.isAssignableFrom(conditionClass)) {
+                        return true;
+                    }
+                    // try first via instantiated metadata
+                    Optional<? extends Condition> condition = InstantiationUtils.tryInstantiate((Class<? extends Condition>) conditionClass);
+                    if (condition.isPresent()) {
+                        boolean conditionResult = condition.get().matches(context);
+                        if (!conditionResult) {
+                            context.fail("Custom condition [" + conditionClass + "] failed evaluation");
+                        }
+                        return conditionResult;
+                    } else {
+                        // maybe a Groovy closure
+                        Optional<Constructor<?>> constructor = ReflectionUtils.findConstructor((Class) conditionClass, Object.class, Object.class);
+                        boolean conditionResult = constructor.flatMap(ctor ->
+                                InstantiationUtils.tryInstantiate(ctor, null, null)
+                        ).flatMap(obj -> {
+                            Optional<Method> method = ReflectionUtils.findMethod(obj.getClass(), "call", ConditionContext.class);
+                            if (method.isPresent()) {
+                                Object result = ReflectionUtils.invokeMethod(obj, method.get(), context);
+                                if (result instanceof Boolean) {
+                                    return Optional.of((Boolean) result);
+                                }
+                            }
+                            return Optional.empty();
+                        }).orElse(false);
+                        if (!conditionResult) {
+                            context.fail("Custom condition [" + conditionClass + "] failed evaluation");
+                        }
+                        return conditionResult;
+
+                    }
                 }
             }
         }
