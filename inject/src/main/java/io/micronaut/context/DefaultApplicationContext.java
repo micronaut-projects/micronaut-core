@@ -410,11 +410,31 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param beanContext The bean context
      */
     protected void initializeTypeConverters(BeanContext beanContext) {
-        Collection<BeanRegistration<TypeConverter>> typeConverters = beanContext.getBeanRegistrations(TypeConverter.class);
-        for (BeanRegistration<TypeConverter> typeConverterRegistration : typeConverters) {
-            TypeConverter typeConverter = typeConverterRegistration.getBean();
-            List<Argument<?>> typeArguments = typeConverterRegistration.getBeanDefinition().getTypeArguments(TypeConverter.class);
+        Collection<BeanDefinition<TypeConverter>> typeConverters = beanContext.getBeanDefinitions(TypeConverter.class);
+        for (BeanDefinition<TypeConverter> typeConverterBeanDefinition : typeConverters) {
+            final Qualifier qualifier = resolveDeclaredQualifier(typeConverterBeanDefinition);
+            List<Argument<?>> typeArguments = typeConverterBeanDefinition.getTypeArguments(TypeConverter.class);
             if (typeArguments.size() == 2) {
+                TypeConverter typeConverter;
+                if (typeConverterBeanDefinition.isSingleton()) {
+                    try (DefaultBeanResolutionContext context = new DefaultBeanResolutionContext(this, typeConverterBeanDefinition)) {
+                        typeConverter = createAndRegisterSingleton(
+                                context,
+                                typeConverterBeanDefinition,
+                                typeConverterBeanDefinition.getBeanType(),
+                                qualifier
+                        );
+                    }
+                } else {
+                    try (DefaultBeanResolutionContext context = new DefaultBeanResolutionContext(this, typeConverterBeanDefinition)) {
+                        typeConverter = doCreateBean(
+                                context,
+                                typeConverterBeanDefinition,
+                                TypeConverter.class,
+                                qualifier
+                        );
+                    }
+                }
                 Class source = typeArguments.get(0).getType();
                 Class target = typeArguments.get(1).getType();
                 if (source != null && target != null) {
