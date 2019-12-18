@@ -1136,27 +1136,26 @@ public class DefaultBeanContext implements BeanContext {
                 if (EVENT_LOGGER.isTraceEnabled()) {
                     EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);
                 }
-                eventListeners
-                        .forEach(listener -> {
-                                    if (listener.supports(event)) {
-                                        try {
-                                            if (EVENT_LOGGER.isTraceEnabled()) {
-                                                EVENT_LOGGER.trace("Invoking event listener [{}] for event: {}", listener, event);
-                                            }
-                                            listener.onApplicationEvent(event);
-                                        } catch (ClassCastException ex) {
-                                            String msg = ex.getMessage();
-                                            if (msg == null || msg.startsWith(event.getClass().getName())) {
-                                                if (EVENT_LOGGER.isDebugEnabled()) {
-                                                    EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
-                                                }
-                                            } else {
-                                                throw ex;
-                                            }
-                                        }
-                                    }
+                for (ApplicationEventListener listener : eventListeners) {
+                    if (listener.supports(event)) {
+                        try {
+                            if (EVENT_LOGGER.isTraceEnabled()) {
+                                EVENT_LOGGER.trace("Invoking event listener [{}] for event: {}", listener, event);
+                            }
+                            listener.onApplicationEvent(event);
+                        } catch (ClassCastException ex) {
+                            String msg = ex.getMessage();
+                            if (msg == null || msg.startsWith(event.getClass().getName())) {
+                                if (EVENT_LOGGER.isDebugEnabled()) {
+                                    EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
                                 }
-                        );
+                            } else {
+                                throw ex;
+                            }
+                        }
+                    }
+
+                }
             }
         }
     }
@@ -1440,7 +1439,7 @@ public class DefaultBeanContext implements BeanContext {
         final Runnable runnable = () ->
                 beanDefinitionsClasses.removeIf((BeanDefinitionReference beanDefinitionReference) ->
                         !beanDefinitionReference.isEnabled(this));
-        new Thread(runnable).start();
+        ForkJoinPool.commonPool().execute(runnable);
 
     }
 
