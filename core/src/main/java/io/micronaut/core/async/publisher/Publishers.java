@@ -50,7 +50,8 @@ public class Publishers {
         Publishers.SINGLE_TYPES.add(JustPublisher.class);
         List<String> typeNames = Arrays.asList(
             "io.reactivex.Observable",
-            "reactor.core.publisher.Flux"
+            "reactor.core.publisher.Flux",
+            "kotlinx.coroutines.flow.Flow"
         );
         for (String name : typeNames) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
