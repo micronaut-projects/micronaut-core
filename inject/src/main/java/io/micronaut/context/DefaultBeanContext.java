@@ -1758,13 +1758,7 @@ public class DefaultBeanContext implements BeanContext {
         return bean;
     }
 
-    /**
-     * Resolve a bean qualifier for the given definition.
-     * @param beanDefinition The bean definition.
-     * @param <T> The type
-     * @return The qualifier
-     */
-    protected final <T> Qualifier resolveDeclaredQualifier(@Nonnull BeanDefinition<T> beanDefinition) {
+    private <T> Qualifier resolveDeclaredQualifier(@Nonnull BeanDefinition<T> beanDefinition) {
         final Class<? extends Annotation> annotation = beanDefinition
                 .getAnnotationTypeByStereotype(javax.inject.Qualifier.class).orElse(null);
         if (annotation != null) {
@@ -2386,21 +2380,7 @@ public class DefaultBeanContext implements BeanContext {
         }
     }
 
-    /**
-     * Creates an registers a bean.
-     * @param resolutionContext The resolution context
-     * @param definition The definition
-     * @param beanType The bean type
-     * @param qualifier The qualifier
-     * @param <T> The bean generic type
-     * @return The bean
-     */
-    @Internal
-    protected final <T> T createAndRegisterSingleton(
-            BeanResolutionContext resolutionContext,
-            BeanDefinition<T> definition,
-            Class<T> beanType,
-            Qualifier<T> qualifier) {
+    private <T> T createAndRegisterSingleton(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier) {
         synchronized (singletonObjects) {
             if (definition instanceof NoInjectionBeanDefinition) {
                 NoInjectionBeanDefinition<T> manuallyRegistered = (NoInjectionBeanDefinition) definition;
