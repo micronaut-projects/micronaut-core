@@ -227,7 +227,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         Environment defaultEnvironment = getEnvironment();
         defaultEnvironment.start();
         registerSingleton(Environment.class, defaultEnvironment);
-        registerSingleton(new AnnotationProcessorListener());
     }
 
     @Override
