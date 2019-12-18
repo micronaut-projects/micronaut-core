@@ -31,7 +31,6 @@ include "spring"
 include "tracing"
 include "validation"
 include "websocket"
-include "xml"
 
 // test suites
 include "test-suite"

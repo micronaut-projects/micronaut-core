@@ -60,8 +60,8 @@ public class JsonViewMediaTypeCodecFactory implements JsonViewCodecResolver {
      * @param codecConfiguration       The configuration for the codec
      */
     protected JsonViewMediaTypeCodecFactory(ObjectMapper objectMapper,
-                                            ApplicationConfiguration applicationConfiguration,
-                                            @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
+                          ApplicationConfiguration applicationConfiguration,
+                          @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this.objectMapper = objectMapper;
         this.applicationConfiguration = applicationConfiguration;
         this.codecConfiguration = codecConfiguration;

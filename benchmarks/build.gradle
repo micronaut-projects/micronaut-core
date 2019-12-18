@@ -10,9 +10,6 @@ dependencies {
     api project(":inject-java-test")
     api project(":validation")
     api project(":runtime")
-    api project(":xml")
-    api project(":http-server-netty")
-    api 'org.mockito:mockito-core:2.1.0'
 
     jmh 'org.openjdk.jmh:jmh-core:1.22'
     jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.22'
@@ -23,5 +20,5 @@ jmh {
     warmupIterations = 2
     iterations = 4
     fork = 1
-    resultFormat = 'JSON'
+//    jvmArgs = ["-agentpath:/Applications/YourKit-Java-Profiler-2018.04.app/Contents/Resources/bin/mac/libyjpagent.jnilib"]
 }
