@@ -201,6 +201,7 @@ languageSupport:
     kaptintellij: Kotlin, Kapt and IntelliJ
     openandaop: Kotlin and AOP Advice
     kotlinretainparamnames: Kotlin and Retaining Parameter Names
+    coroutines: Coroutines Support
   graal:
     title: Micronaut for GraalVM
     graalServices: Microservices as GraalVM native images

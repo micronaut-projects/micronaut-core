@@ -25,42 +25,47 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
+@Retry(mode = Retry.Mode.SETUP_FEATURE_CLEANUP)
 class SslStaticCertSpec extends Specification {
 
     @Shared
     String host = Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST)
 
-    @Shared
-    int port = SocketUtils.findAvailableTcpPort()
+    int port
+    ApplicationContext context
+    EmbeddedServer embeddedServer
+    HttpClient client
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run([
-            'micronaut.ssl.enabled': true,
-            'micronaut.ssl.keyStore.path': 'classpath:keystore.p12',
-            'micronaut.ssl.keyStore.password': 'foobar',
-            'micronaut.ssl.keyStore.type': 'PKCS12',
-            'micronaut.ssl.protocols': ['TLSv1.2'],
-            'micronaut.ssl.port': port,
-            'micronaut.ssl.ciphers': ['TLS_RSA_WITH_AES_128_CBC_SHA',
-                                      'TLS_RSA_WITH_AES_256_CBC_SHA',
-                                      'TLS_RSA_WITH_AES_128_GCM_SHA256',
-                                      'TLS_RSA_WITH_AES_256_GCM_SHA384',
-                                      'TLS_DHE_RSA_WITH_AES_128_GCM_SHA256',
-                                      'TLS_DHE_RSA_WITH_AES_256_GCM_SHA384',
-                                      'TLS_DHE_DSS_WITH_AES_128_GCM_SHA256',
-                                      'TLS_DHE_DSS_WITH_AES_256_GCM_SHA384'],
-    ])
+    void setup() {
+        port = SocketUtils.findAvailableTcpPort()
+        context = ApplicationContext.run([
+                'micronaut.ssl.enabled': true,
+                'micronaut.ssl.keyStore.path': 'classpath:keystore.p12',
+                'micronaut.ssl.keyStore.password': 'foobar',
+                'micronaut.ssl.keyStore.type': 'PKCS12',
+                'micronaut.ssl.protocols': ['TLSv1.2'],
+                'micronaut.ssl.port': port,
+                'micronaut.ssl.ciphers': ['TLS_RSA_WITH_AES_128_CBC_SHA',
+                                          'TLS_RSA_WITH_AES_256_CBC_SHA',
+                                          'TLS_RSA_WITH_AES_128_GCM_SHA256',
+                                          'TLS_RSA_WITH_AES_256_GCM_SHA384',
+                                          'TLS_DHE_RSA_WITH_AES_128_GCM_SHA256',
+                                          'TLS_DHE_RSA_WITH_AES_256_GCM_SHA384',
+                                          'TLS_DHE_DSS_WITH_AES_128_GCM_SHA256',
+                                          'TLS_DHE_DSS_WITH_AES_256_GCM_SHA384'],
+        ])
+        embeddedServer = context.getBean(EmbeddedServer).start()
+        client = context.createBean(HttpClient, embeddedServer.getURL())
+    }
 
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
-    @Shared
-    @AutoCleanup
-    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+    void cleanup() {
+        client.close()
+        context.close()
+    }
 
     void "expect the url to be https"() {
         expect:

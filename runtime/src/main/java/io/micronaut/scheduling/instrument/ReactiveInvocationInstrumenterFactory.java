@@ -13,12 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.scheduling.instrument;
+
+import io.micronaut.core.annotation.Indexed;
+
+import javax.annotation.Nullable;
+
 /**
- * Instruments thread creation.
+ * An factory interface for reactive invocation instrumentation, factory method decides if instrumentation is needed.
  *
+ * @author Denis Stepanov
  * @author graemerocher
- * @since 1.0
+ * @since 1.3
  */
-package io.micronaut.tracing.instrument.scheduling;
+@Indexed(ReactiveInvocationInstrumenterFactory.class)
+public interface ReactiveInvocationInstrumenterFactory {
 
+    /**
+     * An optional invocation instrumentation.
+     *
+     * @return A invocation instrumentation or null if non exists.
+     */
+    @Nullable InvocationInstrumenter newReactiveInvocationInstrumenter();
 
+}

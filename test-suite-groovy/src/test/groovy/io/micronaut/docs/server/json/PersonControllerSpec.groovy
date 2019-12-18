@@ -17,7 +17,7 @@ import spock.lang.Stepwise
 class PersonControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
+            ApplicationContext.run(EmbeddedServer, ["spec.name": getClass().simpleName])
 
     @Shared @AutoCleanup RxHttpClient client = RxHttpClient.create(embeddedServer.URL)
 

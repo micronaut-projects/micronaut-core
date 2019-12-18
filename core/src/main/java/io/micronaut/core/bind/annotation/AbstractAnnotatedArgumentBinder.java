@@ -118,10 +118,14 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
      * @return The binding result
      */
     protected BindingResult<T> doConvert(Object value, ArgumentConversionContext<T> context) {
-        Optional<T> result = conversionService.convert(value, context);
-        if (result.isPresent() && context.getArgument().getType() == Optional.class) {
-            return () -> (Optional<T>) result.get();
+        if (value == null) {
+            return BindingResult.EMPTY;
+        } else {
+            Optional<T> result = conversionService.convert(value, context);
+            if (result.isPresent() && context.getArgument().getType() == Optional.class) {
+                return () -> (Optional<T>) result.get();
+            }
+            return () -> result;
         }
-        return () -> result;
     }
 }

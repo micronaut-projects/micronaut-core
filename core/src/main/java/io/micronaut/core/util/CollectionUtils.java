@@ -292,4 +292,42 @@ public class CollectionUtils {
         }
         return Collections.unmodifiableList(list);
     }
+
+    /**
+     * Returns the last element of a collection.
+     *
+     * @param collection The collection
+     * @param <T> The generic type
+     * @return The last element of a collection or null
+     */
+    public static @Nullable <T> T last(@Nonnull Collection<T> collection) {
+        if (collection instanceof List) {
+            List<T> list = (List<T>) collection;
+            final int s = list.size();
+            if (s > 0) {
+                return list.get(s - 1);
+            } else {
+                return null;
+            }
+        } else if (collection instanceof Deque) {
+            final Iterator<T> i = ((Deque<T>) collection).descendingIterator();
+            if (i.hasNext()) {
+                return i.next();
+            }
+            return null;
+        } else if (collection instanceof NavigableSet) {
+            final Iterator<T> i = ((NavigableSet<T>) collection).descendingIterator();
+            if (i.hasNext()) {
+                return i.next();
+            }
+            return null;
+        } else {
+            T result = null;
+            for (T t : collection) {
+                result = t;
+            }
+            return result;
+        }
+
+    }
 }

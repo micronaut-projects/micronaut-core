@@ -58,12 +58,15 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
     }
 
     @Override
-    protected void registerRoute(ExecutableMethod<?, ?> method, String id) {
+    protected void registerRoute(ExecutableMethod<?, ?> method, String id, Integer port) {
         Class<?> declaringType = method.getDeclaringType();
         UriTemplate template = buildUriTemplate(method, id);
         String[] consumes = method.stringValues(Write.class, "consumes");
-        final UriRoute uriRoute = POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
+        UriRoute uriRoute = POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
                 .consumes(MediaType.of(consumes));
+        if (port != null) {
+            uriRoute = uriRoute.exposedPort(port);
+        }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);
         }

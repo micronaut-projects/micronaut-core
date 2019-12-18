@@ -16,15 +16,12 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Consumer;
 import io.reactivex.observables.ConnectableObservable;
 
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -35,41 +32,38 @@ import java.util.List;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable<T> implements RxInstrumentedComponent {
+final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable<T> implements RxInstrumentedComponent  {
     private final ConnectableObservable<T> source;
-    private final List<RunnableInstrumenter> instrumentations;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
+     *
+     * @param source       The source
+     * @param instrumenter The instrumenter
      */
-    RxInstrumentedConnectableObservable(
-            ConnectableObservable<T> source, List<RunnableInstrumenter> instrumentations) {
+    RxInstrumentedConnectableObservable(ConnectableObservable<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumentations = instrumentations;
+        this.instrumenter = instrumenter;
     }
 
-    /**
-     * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedConnectableObservable(
-            ConnectableObservable<T> source, Collection<ReactiveInstrumenter> instrumentations) {
-        this.source = source;
-        this.instrumentations = toRunnableInstrumenters(instrumentations);
-    }
-
-    @Override protected void subscribeActual(Observer<? super T> o) {
-        source.subscribe(new RxInstrumentedObserver<>(o, instrumentations));
-    }
-
-    @Override public void connect(Consumer<? super Disposable> connection) {
-        Runnable onConnect = () -> source.connect(connection);
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onConnect = instrumentation.instrument(onConnect);
+    @Override
+    protected void subscribeActual(Observer<? super T> o) {
+        try {
+            instrumenter.beforeInvocation();
+            source.subscribe(o);
+        } finally {
+            instrumenter.afterInvocation();
         }
-        onConnect.run();
+    }
+
+    @Override
+    public void connect(Consumer<? super Disposable> connection) {
+        try {
+            instrumenter.beforeInvocation();
+            source.connect(connection);
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 }

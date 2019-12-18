@@ -53,6 +53,8 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethod.class, "invokeInternal", Object.class, Object[].class));
     protected static final org.objectweb.asm.commons.Method METHOD_IS_ABSTRACT = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(ExecutableMethod.class, "isAbstract"));
+    protected static final org.objectweb.asm.commons.Method METHOD_IS_SUSPEND = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(ExecutableMethod.class, "isSuspend"));
     protected static final Method METHOD_GET_TARGET = Method.getMethod("java.lang.reflect.Method resolveTargetMethod()");
     private  static final Type TYPE_REFLECTION_UTILS = Type.getType(ReflectionUtils.class);
     private static final org.objectweb.asm.commons.Method METHOD_GET_REQUIRED_METHOD = org.objectweb.asm.commons.Method.getMethod(
@@ -67,6 +69,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final String methodProxyShortName;
     private final boolean isInterface;
     private final boolean isAbstract;
+    private final boolean isSuspend;
     private String outerClassName = null;
     private boolean isStatic = false;
 
@@ -75,6 +78,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param methodClassName      The method class name
      * @param methodProxyShortName The method proxy short name
      * @param isInterface          Whether is an interface
+     * @param isSuspend            Whether the method is Kotlin suspend function
      * @param annotationMetadata   The annotation metadata
      */
     public ExecutableMethodWriter(
@@ -82,6 +86,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             String methodClassName,
             String methodProxyShortName,
             boolean isInterface,
+            boolean isSuspend,
             AnnotationMetadata annotationMetadata) {
         super(methodClassName, annotationMetadata, true);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -92,6 +97,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.methodType = getObjectType(methodClassName);
         this.isInterface = isInterface;
         this.isAbstract = isInterface;
+        this.isSuspend = isSuspend;
     }
 
 
@@ -101,6 +107,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param methodProxyShortName The method proxy short name
      * @param isInterface          Whether is an interface
      * @param isAbstract           Whether the method is abstract
+     * @param isSuspend            Whether the method is Kotlin suspend function
      * @param annotationMetadata   The annotation metadata
      */
     public ExecutableMethodWriter(
@@ -109,6 +116,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             String methodProxyShortName,
             boolean isInterface,
             boolean isAbstract,
+            boolean isSuspend,
             AnnotationMetadata annotationMetadata) {
         super(methodClassName, annotationMetadata, true);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -119,6 +127,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.methodType = getObjectType(methodClassName);
         this.isInterface = isInterface;
         this.isAbstract = isInterface || isAbstract;
+        this.isSuspend = isSuspend;
     }
 
     /**
@@ -126,6 +135,13 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      */
     public boolean isAbstract() {
         return isAbstract;
+    }
+
+    /**
+     * @return Is the method suspend.
+     */
+    public boolean isSuspend() {
+        return isSuspend;
     }
 
     /**
@@ -296,6 +312,23 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         isAbstractMethod.returnValue();
         isAbstractMethod.visitMaxs(1, 1);
         isAbstractMethod.endMethod();
+
+        // add isSuspend method
+        GeneratorAdapter isSuspendMethod = new GeneratorAdapter(classWriter.visitMethod(
+                ACC_PUBLIC | ACC_FINAL,
+                METHOD_IS_SUSPEND.getName(),
+                METHOD_IS_SUSPEND.getDescriptor(),
+                null,
+                null),
+                ACC_PUBLIC,
+                METHOD_IS_SUSPEND.getName(),
+                METHOD_IS_SUSPEND.getDescriptor()
+        );
+
+        isSuspendMethod.push(isSuspend());
+        isSuspendMethod.returnValue();
+        isSuspendMethod.visitMaxs(1, 1);
+        isSuspendMethod.endMethod();
 
         // invoke the methods with the passed arguments
         String invokeDescriptor = METHOD_INVOKE_INTERNAL.getDescriptor();

@@ -64,4 +64,9 @@ public @interface ClientWebSocket {
      */
     @AliasFor(annotation = WebSocketComponent.class, member = "version")
     WebSocketVersion version() default WebSocketVersion.V13;
+
+    /**
+     * @return The Sec-WebSocket-Protocol header field is used in the WebSocket opening handshake.
+     */
+    String subprotocol() default "";
 }

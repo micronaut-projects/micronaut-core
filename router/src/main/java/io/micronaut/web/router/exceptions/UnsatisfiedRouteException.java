@@ -52,8 +52,7 @@ public class UnsatisfiedRouteException extends RoutingException {
 
         if (classOptional.isPresent()) {
             Class<? extends Annotation> clazz = classOptional.get();
-            Optional<Object> valOptional = argument.getAnnotationMetadata().getValue(clazz);
-            String name = valOptional.orElse(argument).toString();
+            String name = argument.getAnnotationMetadata().stringValue(clazz).orElse(argument.getName());
 
             if (clazz == Body.class) {
                 throw new UnsatisfiedBodyRouteException(name, argument);

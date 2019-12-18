@@ -657,8 +657,8 @@ subprojects { Project subproject ->
 
     tasks.withType(Test) {
         jvmArgs '-Duser.country=US', '-Duser.language=en', '-Xmx2048m'
-        reports.html.enabled = !System.getenv("TRAVIS")
-        reports.junitXml.enabled = !System.getenv("TRAVIS")
+        reports.html.enabled = !System.getenv("GITHUB_ACTIONS")
+        reports.junitXml.enabled = !System.getenv("GITHUB_ACTIONS")
         testLogging {
             exceptionFormat = 'full'
         }
@@ -672,8 +672,8 @@ subprojects { Project subproject ->
 
     tasks.withType(Checkstyle) {
         reports {
-            xml.enabled = !System.getenv("TRAVIS")
-            html.enabled = !System.getenv("TRAVIS")
+            xml.enabled = !System.getenv("GITHUB_ACTIONS")
+            html.enabled = !System.getenv("GITHUB_ACTIONS")
         }
     }
 

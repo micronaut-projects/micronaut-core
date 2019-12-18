@@ -806,7 +806,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 } else if (allAnnotations != null) {
                     final Map<CharSequence, Object> values = allAnnotations.get(annotationType.getName());
                     if (values != null) {
-                        results = Collections.singletonList(new AnnotationValue<T>(annotationType.getName(), values));
+                        results = Collections.singletonList(new AnnotationValue<>(annotationType.getName(), values));
                     }
                 }
 
@@ -877,12 +877,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public boolean hasAnnotation(String annotation) {
-        return hasDeclaredAnnotation(annotation) || (allAnnotations != null && StringUtils.isNotEmpty(annotation) && allAnnotations.keySet().contains(annotation));
+        return hasDeclaredAnnotation(annotation) || (allAnnotations != null && StringUtils.isNotEmpty(annotation) && allAnnotations.containsKey(annotation));
     }
 
     @Override
     public boolean hasStereotype(String annotation) {
-        return hasAnnotation(annotation) || (allStereotypes != null && StringUtils.isNotEmpty(annotation) && allStereotypes.keySet().contains(annotation));
+        return hasAnnotation(annotation) || (allStereotypes != null && StringUtils.isNotEmpty(annotation) && allStereotypes.containsKey(annotation));
     }
 
     @Override

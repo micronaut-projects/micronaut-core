@@ -630,16 +630,17 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             key = new DefaultBeanContext.BeanKey(this, resolutionContext.getCurrentQualifier());
             resolutionContext.addInFlightBean(key, bean);
         }
-        Collection<BeanRegistration<BeanInitializedEventListener>> beanInitializedEventListeners = ((DefaultBeanContext) context).beanInitializedEventListeners;
+
+        final Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners
+                = ((DefaultBeanContext) context).beanInitializedEventListeners;
         if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
-            for (BeanRegistration<BeanInitializedEventListener> registration : beanInitializedEventListeners) {
-                BeanDefinition<BeanInitializedEventListener> definition = registration.getBeanDefinition();
-                List<Argument<?>> typeArguments = definition.getTypeArguments(BeanInitializedEventListener.class);
-                if (CollectionUtils.isEmpty(typeArguments) || typeArguments.get(0).getType().isAssignableFrom(getBeanType())) {
-                    BeanInitializedEventListener listener = registration.getBean();
-                    bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
-                    if (bean == null) {
-                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onInitialized event");
+            for (Map.Entry<Class, List<BeanInitializedEventListener>> entry : beanInitializedEventListeners) {
+                if (entry.getKey().isAssignableFrom(getBeanType())) {
+                    for (BeanInitializedEventListener listener : entry.getValue()) {
+                        bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
+                        if (bean == null) {
+                            throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onInitialized event");
+                        }
                     }
                 }
             }
