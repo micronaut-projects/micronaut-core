@@ -91,6 +91,11 @@ ext {
                     name   : 'jackson-datatype-jdk8',
                     modules: ['jackson-datatype-jsr310']
             ],
+            'jackson.dataformat'       : [
+                    version : jacksonVersion,
+                    group   : 'com.fasterxml.jackson.dataformat',
+                    modules : ['jackson-dataformat-xml'],
+            ],
             jaeger                     : [
                     version: jaegerVersion,
                     group  : 'io.jaegertracing',
