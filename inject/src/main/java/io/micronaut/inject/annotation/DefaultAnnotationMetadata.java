@@ -806,7 +806,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 } else if (allAnnotations != null) {
                     final Map<CharSequence, Object> values = allAnnotations.get(annotationType.getName());
                     if (values != null) {
-                        results = Collections.singletonList(new AnnotationValue<T>(annotationType.getName(), values));
+                        results = Collections.singletonList(new AnnotationValue<>(annotationType.getName(), values));
                     }
                 }
 

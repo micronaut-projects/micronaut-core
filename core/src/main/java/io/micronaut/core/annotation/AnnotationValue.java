@@ -358,6 +358,20 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
+    @Nonnull
+    @Override
+    public AnnotationClassValue<?>[] annotationClassValues(@Nonnull String member) {
+        if (StringUtils.isNotEmpty(member)) {
+            Object o = values.get(member);
+            if (o instanceof AnnotationClassValue) {
+                return new AnnotationClassValue[] {(AnnotationClassValue) o};
+            } else if (o instanceof AnnotationClassValue[]) {
+                return (AnnotationClassValue<?>[]) o;
+            }
+        }
+        return AnnotationClassValue.EMPTY_ARRAY;
+    }
+
     /**
      * The integer value of the given member.
      *

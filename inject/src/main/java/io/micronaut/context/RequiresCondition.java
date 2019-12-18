@@ -225,8 +225,8 @@ public class RequiresCondition implements Condition {
                 if (beanContext instanceof PropertyResolver) {
                     PropertyResolver propertyResolver = (PropertyResolver) beanContext;
                     String defaultValue = requirements.stringValue(MEMBER_DEFAULT_VALUE).orElse(null);
-                    boolean hasNotEquals = requirements.contains(MEMBER_NOT_EQUALS);
                     if (!propertyResolver.containsProperties(property) && StringUtils.isEmpty(defaultValue)) {
+                        boolean hasNotEquals = requirements.contains(MEMBER_NOT_EQUALS);
                         if (hasNotEquals) {
                             return true;
                         } else {
@@ -240,7 +240,7 @@ public class RequiresCondition implements Condition {
                             context.fail("Property [" + property + "] with value [" + resolved + "] does not equal required value: " + value);
                         }
                         return result;
-                    } else if (hasNotEquals) {
+                    } else if (requirements.contains(MEMBER_NOT_EQUALS)) {
                         String notEquals = requirements.stringValue(MEMBER_NOT_EQUALS).orElse(null);
                         String resolved = resolvePropertyValue(property, propertyResolver, defaultValue);
                         boolean result = resolved == null || !resolved.equals(notEquals);
@@ -450,18 +450,13 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesAbsenceOfClasses(ConditionContext context, AnnotationValue<Requires> requirements) {
         if (requirements.contains(MEMBER_MISSING_CLASSES)) {
-            Optional<AnnotationClassValue[]> classNames = requirements.get(MEMBER_MISSING_CLASSES, AnnotationClassValue[].class);
-            if (classNames.isPresent()) {
-                AnnotationClassValue[] classValues = classNames.get();
-                if (ArrayUtils.isNotEmpty(classValues)) {
-                    for (AnnotationClassValue classValue : classValues) {
-                        if (classValue.getType().isPresent()) {
-                            context.fail("Class [" + classValue.getName() + "] is not absent");
-                            return false;
-                        }
+            AnnotationClassValue[] classValues = requirements.annotationClassValues(MEMBER_MISSING_CLASSES);
+            if (ArrayUtils.isNotEmpty(classValues)) {
+                for (AnnotationClassValue classValue : classValues) {
+                    if (classValue.getType().isPresent()) {
+                        context.fail("Class [" + classValue.getName() + "] is not absent");
+                        return false;
                     }
-                } else {
-                    return matchAbsenceOfClassNames(context, requirements);
                 }
             } else {
                 return matchAbsenceOfClassNames(context, requirements);
@@ -486,14 +481,11 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesPresenceOfClasses(ConditionContext context, AnnotationValue<Requires> requirements, String attr) {
         if (requirements.contains(attr)) {
-            Optional<AnnotationClassValue[]> classNames = requirements.get(attr, AnnotationClassValue[].class);
-            if (classNames.isPresent()) {
-                AnnotationClassValue[] classValues = classNames.get();
-                for (AnnotationClassValue classValue : classValues) {
-                    if (!classValue.getType().isPresent()) {
-                        context.fail("Class [" + classValue.getName() + "] is not present");
-                        return false;
-                    }
+            AnnotationClassValue[] classValues = requirements.annotationClassValues(attr);
+            for (AnnotationClassValue classValue : classValues) {
+                if (!classValue.getType().isPresent()) {
+                    context.fail("Class [" + classValue.getName() + "] is not present");
+                    return false;
                 }
             }
         }
@@ -555,14 +547,10 @@ public class RequiresCondition implements Condition {
 
                 for (Class<?> type : missingBeans) {
                     // remove self by passing definition as filter
-                    Collection<? extends BeanDefinition<?>> beanDefinitions = new ArrayList<>(beanContext.findBeanCandidates(type, bd, true));
-
-                    if (!beanDefinitions.isEmpty()) {
-                        // remove abstract beans
-                        beanDefinitions.removeIf(BeanDefinition::isAbstract);
-                        if (!beanDefinitions.isEmpty()) {
-                            BeanDefinition<?> existing = beanDefinitions.iterator().next();
-                            context.fail("Existing bean [" + existing.getName() + "] of type [" + type + "] registered in context");
+                    final Collection<? extends BeanDefinition<?>> beanDefinitions = beanContext.findBeanCandidates(type, bd, true);
+                    for (BeanDefinition<?> beanDefinition : beanDefinitions) {
+                        if (!beanDefinition.isAbstract()) {
+                            context.fail("Existing bean [" + beanDefinition.getName() + "] of type [" + type + "] registered in context");
                             return false;
                         }
                     }
