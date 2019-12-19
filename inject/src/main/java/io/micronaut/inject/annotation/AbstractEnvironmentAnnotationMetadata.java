@@ -39,7 +39,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractEnvironmentAnnotationMetadata implements AnnotationMetadata {
+public abstract class AbstractEnvironmentAnnotationMetadata implements AnnotationMetadataDelegate {
 
     private final EnvironmentAnnotationMetadata environmentAnnotationMetadata;
 
@@ -59,20 +59,9 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     /**
      * @return The backing annotation metadata
      */
+    @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return environmentAnnotationMetadata;
-    }
-
-    @Nullable
-    @Override
-    public <T extends Annotation> T synthesize(@Nonnull Class<T> annotationClass) {
-        return environmentAnnotationMetadata.synthesize(annotationClass);
-    }
-
-    @Nullable
-    @Override
-    public <T extends Annotation> T synthesizeDeclared(@Nonnull Class<T> annotationClass) {
-        return environmentAnnotationMetadata.synthesizeDeclared(annotationClass);
     }
 
     @Override
@@ -100,16 +89,6 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         } else {
             return environmentAnnotationMetadata.getValue(annotation, member, requiredType);
         }
-    }
-
-    @Override
-    public <T> Class<T>[] classValues(@Nonnull String annotation, @Nonnull String member) {
-        return environmentAnnotationMetadata.classValues(annotation, member);
-    }
-
-    @Override
-    public <T> Class<T>[] classValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
-        return environmentAnnotationMetadata.classValues(annotation, member);
     }
 
     @Override
@@ -146,18 +125,6 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
         } else {
             return !environmentAnnotationMetadata.isTrue(annotation, member);
         }
-    }
-
-    @Nonnull
-    @Override
-    public Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
-        return environmentAnnotationMetadata.getAnnotationTypeByStereotype(stereotype);
-    }
-
-    @Nonnull
-    @Override
-    public Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(@Nullable String stereotype) {
-        return environmentAnnotationMetadata.getAnnotationTypeByStereotype(stereotype);
     }
 
     @Nonnull
@@ -301,12 +268,6 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
-    public @Nonnull Optional<Class<? extends Annotation>> getAnnotationType(@Nonnull String name) {
-        ArgumentUtils.requireNonNull("name", name);
-        return environmentAnnotationMetadata.getAnnotationType(name);
-    }
-
-    @Override
     public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@Nonnull Class<T> annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         Environment environment = getEnvironment();
@@ -366,46 +327,6 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
-    public boolean hasDeclaredAnnotation(@Nullable String annotation) {
-        return environmentAnnotationMetadata.hasDeclaredAnnotation(annotation);
-    }
-
-    @Override
-    public boolean hasAnnotation(@Nullable String annotation) {
-        return environmentAnnotationMetadata.hasAnnotation(annotation);
-    }
-
-    @Override
-    public boolean hasStereotype(@Nullable String annotation) {
-        return environmentAnnotationMetadata.hasStereotype(annotation);
-    }
-
-    @Override
-    public boolean hasDeclaredStereotype(@Nullable String annotation) {
-        return environmentAnnotationMetadata.hasDeclaredStereotype(annotation);
-    }
-
-    @Override
-    public @Nonnull List<String> getAnnotationNamesByStereotype(String stereotype) {
-        return environmentAnnotationMetadata.getAnnotationNamesByStereotype(stereotype);
-    }
-
-    @Override
-    public @Nonnull Set<String> getAnnotationNames() {
-        return environmentAnnotationMetadata.getAnnotationNames();
-    }
-
-    @Override
-    public @Nonnull Set<String> getDeclaredAnnotationNames() {
-        return environmentAnnotationMetadata.getDeclaredAnnotationNames();
-    }
-
-    @Override
-    public @Nonnull List<String> getDeclaredAnnotationNamesByStereotype(String stereotype) {
-        return environmentAnnotationMetadata.getDeclaredAnnotationNamesByStereotype(stereotype);
-    }
-
-    @Override
     public @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@Nonnull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         Environment env = getEnvironment();
@@ -456,16 +377,6 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
 
         }
         return OptionalValues.empty();
-    }
-
-    @Override
-    public @Nonnull <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
-        return environmentAnnotationMetadata.getDefaultValue(annotation, member, requiredType);
-    }
-
-    @Override
-    public @Nonnull <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
-        return environmentAnnotationMetadata.getDefaultValue(annotation, member, requiredType);
     }
 
     /**

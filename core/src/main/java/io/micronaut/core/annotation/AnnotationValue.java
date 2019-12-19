@@ -931,6 +931,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             }
         } else if (enumType.isAssignableFrom(rawValue.getClass())) {
             list.add((E) rawValue);
+        } else {
+            convertToEnum(enumType, rawValue).ifPresent(list::add);
         }
         return list.toArray((E[]) Array.newInstance(enumType, 0));
     }

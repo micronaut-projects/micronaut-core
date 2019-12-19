@@ -77,10 +77,10 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
                     AnnotationMetadata annotationMetadata;
                     annotationMetadata = finalAnnotationMetadataResolver.resolveMetadata(httpClientFilter);
                     HttpMethod[] methods = annotationMetadata.enumValues(Filter.class, "methods", HttpMethod.class);
-                    final List<HttpMethod> httpMethods = Arrays.asList(methods);
-                    if (annotationValue != null) {
+                    final List<HttpMethod> httpMethods = new ArrayList<>(Arrays.asList(methods));
+                    if (annotationMetadata.hasStereotype(FilterMatcher.class)) {
                         httpMethods.addAll(
-                            Arrays.asList(annotationValue.enumValues("methods", HttpMethod.class))
+                            Arrays.asList(annotationMetadata.enumValues(FilterMatcher.class, "methods", HttpMethod.class))
                         );
                     }
 
@@ -91,12 +91,10 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
                             annotationMetadata.stringValues(Filter.class)
                     );
                 }).filter(entry -> {
-                    boolean matches;
                     AnnotationMetadata annotationMetadata = entry.annotationMetadata;
-                    if (annotationValue != null) {
+                    boolean matches = !annotationMetadata.hasStereotype(FilterMatcher.class);
+                    if (annotationValue != null && !matches) {
                         matches = annotationMetadata.hasAnnotation(annotationValue.getAnnotationName());
-                    } else {
-                        matches = !annotationMetadata.hasStereotype(FilterMatcher.class);
                     }
 
                     if (matches) {
