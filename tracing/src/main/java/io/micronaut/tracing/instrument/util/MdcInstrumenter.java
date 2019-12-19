@@ -15,19 +15,18 @@
  */
 package io.micronaut.tracing.instrument.util;
 
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.Function;
-import javax.inject.Singleton;
-
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
+import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import org.slf4j.MDC;
 
+import javax.inject.Singleton;
+import java.util.Map;
+
 /**
- * A function that instruments an existing Runnable with the Mapped Diagnostic Context for Slf4j.
+ * A function that instruments invocations with the Mapped Diagnostic Context for Slf4j.
  *
  * @author graemerocher
  * @author LarsEckart
@@ -36,45 +35,41 @@ import org.slf4j.MDC;
 @Singleton
 @Requires(classes = MDC.class)
 @Internal
-public final class MdcInstrumenter implements Function<Runnable, Runnable>, RunnableInstrumenter, ReactiveInstrumenter {
+public final class MdcInstrumenter implements InvocationInstrumenterFactory, ReactiveInvocationInstrumenterFactory {
 
+    /**
+     * Creates optional invocation instrumenter.
+     * @return An optional that contains the invocation instrumenter
+     */
     @Override
-    public Runnable apply(Runnable runnable) {
+    public InvocationInstrumenter newInvocationInstrumenter() {
         Map<String, String> contextMap = MDC.getCopyOfContextMap();
         if (contextMap != null && !contextMap.isEmpty()) {
-            return passMdcTo(runnable, contextMap);
-        } else {
-            return runnable;
-        }
-    }
+            return new InvocationInstrumenter() {
 
-    @Override
-    public Runnable instrument(Runnable command) {
-        return apply(command);
-    }
+                Map<String, String> oldContextMap;
 
-    @Override
-    public Optional<RunnableInstrumenter> newInstrumentation() {
-        Map<String, String> contextMap = MDC.getCopyOfContextMap();
-        if (contextMap != null && !contextMap.isEmpty()) {
-            return Optional.of(new RunnableInstrumenter() {
                 @Override
-                public Runnable instrument(Runnable runnable) {
-                    return passMdcTo(runnable, contextMap);
+                public void beforeInvocation() {
+                    oldContextMap = MDC.getCopyOfContextMap();
+                    MDC.setContextMap(contextMap);
                 }
-            });
+
+                @Override
+                public void afterInvocation() {
+                    if (oldContextMap != null && !oldContextMap.isEmpty()) {
+                        MDC.setContextMap(oldContextMap);
+                    } else {
+                        MDC.clear();
+                    }
+                }
+            };
         }
-        return Optional.empty();
+        return null;
     }
 
-    private Runnable passMdcTo(Runnable runnable, Map<String, String> contextMap) {
-        return () -> {
-            try {
-                MDC.setContextMap(contextMap);
-                runnable.run();
-            } finally {
-                MDC.clear();
-            }
-        };
+    @Override
+    public InvocationInstrumenter newReactiveInvocationInstrumenter() {
+        return newInvocationInstrumenter();
     }
 }

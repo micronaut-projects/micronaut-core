@@ -41,10 +41,10 @@ public class EndpointEnabledCondition implements Condition {
 
         if (annotationMetadata.hasDeclaredAnnotation(Endpoint.class)) {
 
-            Boolean defaultEnabled = annotationMetadata.getValue(Endpoint.class, "defaultEnabled", Boolean.class).orElse(true);
-            String prefix = annotationMetadata.getValue(Endpoint.class, "prefix", String.class).orElse(null);
-            String id = annotationMetadata.getValue(Endpoint.class, "value", String.class).orElse(null);
-            String defaultId = annotationMetadata.getValue(Endpoint.class, "defaultConfigurationId", String.class).orElse(null);
+            Boolean defaultEnabled = annotationMetadata.booleanValue(Endpoint.class, "defaultEnabled").orElse(true);
+            String prefix = annotationMetadata.stringValue(Endpoint.class, "prefix").orElse(Endpoint.DEFAULT_PREFIX);
+            String id = annotationMetadata.stringValue(Endpoint.class).orElse(null);
+            String defaultId = annotationMetadata.stringValue(Endpoint.class, "defaultConfigurationId").orElse("all");
 
             BeanContext beanContext = context.getBeanContext();
             if (beanContext instanceof PropertyResolver) {

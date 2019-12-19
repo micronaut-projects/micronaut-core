@@ -17,21 +17,17 @@ package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.context.BeanLocator;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
+import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
+import io.netty.buffer.ByteBufHolder;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
@@ -49,23 +45,22 @@ import java.util.concurrent.CompletableFuture;
 public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<CompletableFuture>
     implements NonBlockingBodyArgumentBinder<CompletableFuture> {
 
-    private final BeanLocator beanLocator;
-    private final HttpServerConfiguration httpServerConfiguration;
+    private static final Argument<CompletableFuture> TYPE = Argument.of(CompletableFuture.class);
+
+    private final HttpContentProcessorResolver httpContentProcessorResolver;
 
     /**
-     * @param beanLocator             The bean locator
-     * @param httpServerConfiguration The Http server configuration
-     * @param conversionService       The conversion service
+     * @param httpContentProcessorResolver The http content processor resolver
+     * @param conversionService            The conversion service
      */
-    public CompletableFutureBodyBinder(BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration, ConversionService conversionService) {
+    public CompletableFutureBodyBinder(HttpContentProcessorResolver httpContentProcessorResolver, ConversionService conversionService) {
         super(conversionService);
-        this.beanLocator = beanLocator;
-        this.httpServerConfiguration = httpServerConfiguration;
+        this.httpContentProcessorResolver = httpContentProcessorResolver;
     }
 
     @Override
     public Argument<CompletableFuture> argumentType() {
-        return Argument.of(CompletableFuture.class);
+        return TYPE;
     }
 
     @Override
@@ -76,11 +71,9 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
             if (nativeRequest instanceof StreamedHttpRequest) {
 
                 CompletableFuture future = new CompletableFuture();
-                Optional<MediaType> contentType = source.getContentType();
-                HttpContentProcessor<?> processor = contentType
-                    .flatMap(type -> beanLocator.findBean(HttpContentSubscriberFactory.class, new ConsumesMediaTypeQualifier<>(type)))
-                    .map(factory -> factory.build(nettyHttpRequest))
-                    .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration));
+                Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+
+                HttpContentProcessor<?> processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
 
                 processor.subscribe(new CompletionAwareSubscriber<Object>() {
                     @Override
@@ -90,7 +83,11 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
 
                     @Override
                     protected void doOnNext(Object message) {
-                        nettyHttpRequest.setBody(message);
+                        if (message instanceof ByteBufHolder) {
+                            nettyHttpRequest.addContent((ByteBufHolder) message);
+                        } else {
+                            nettyHttpRequest.setBody(message);
+                        }
                         subscription.request(1);
                     }
 
@@ -102,23 +99,16 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
                     @Override
                     protected void doOnComplete() {
                         Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
-                        Optional body = nettyHttpRequest.getBody();
-                        if (body.isPresent()) {
-
-                            if (firstTypeParameter.isPresent()) {
-                                Argument<?> arg = firstTypeParameter.get();
-                                Class targetType = arg.getType();
-                                Optional converted = conversionService.convert(body.get(), context.with(arg));
-                                if (converted.isPresent()) {
-                                    future.complete(converted.get());
-                                } else {
-                                    future.completeExceptionally(new IllegalArgumentException("Cannot bind JSON to argument type: " + targetType.getName()));
-                                }
+                        if (firstTypeParameter.isPresent()) {
+                            Argument<?> arg = firstTypeParameter.get();
+                            Optional converted = nettyHttpRequest.getBody(arg);
+                            if (converted.isPresent()) {
+                                future.complete(converted.get());
                             } else {
-                                future.complete(body.get());
+                                future.completeExceptionally(new IllegalArgumentException("Cannot bind body to argument type: " + arg.getType().getName()));
                             }
                         } else {
-                            future.complete(null);
+                            future.complete(nettyHttpRequest.getBody().orElse(null));
                         }
                     }
                 });

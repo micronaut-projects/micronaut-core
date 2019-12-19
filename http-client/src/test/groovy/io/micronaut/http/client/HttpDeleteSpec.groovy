@@ -59,6 +59,13 @@ class HttpDeleteSpec extends Specification {
         res.status == HttpStatus.NO_CONTENT
     }
 
+    void "test http delete with blocking client"() {
+        when:
+        def res = Flowable.fromPublisher(client.exchange(HttpRequest.DELETE('/delete/simple'))).blockingFirst()
+
+        then:
+        res.status == HttpStatus.NO_CONTENT
+    }
 
     void "test http delete with body"() {
         when:

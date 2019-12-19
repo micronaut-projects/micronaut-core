@@ -1,0 +1,25 @@
+Before installing it is recommended to sync the latest Portfiles.
+
+[source,bash]
+----
+$ sudo port sync
+----
+
+In order to install Micronaut, run following command:
+
+[source,bash]
+----
+$ sudo port install micronaut
+----
+
+You can find more information about MacPorts usage on their https://www.macports.org[homepage].
+
+You should now be able to run the Micronaut CLI.
+
+[source,bash]
+----
+$ mn
+| Starting interactive mode...
+| Enter a command name to run. Use TAB for completion:
+mn>
+----

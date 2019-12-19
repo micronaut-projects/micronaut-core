@@ -18,14 +18,11 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
-
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
@@ -42,25 +39,47 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnnotationMetadata implements AnnotationMetadata {
+public abstract class AbstractEnvironmentAnnotationMetadata implements AnnotationMetadata {
 
-    private final DefaultAnnotationMetadata annotationMetadata;
+    private final EnvironmentAnnotationMetadata environmentAnnotationMetadata;
 
     /**
      * Construct a new environment aware annotation metadata.
      *
      * @param targetMetadata The target annotation metadata
      */
-    protected AbstractEnvironmentAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
-        super(targetMetadata.declaredAnnotations, targetMetadata.allAnnotations);
-        this.annotationMetadata = targetMetadata;
+    protected AbstractEnvironmentAnnotationMetadata(AnnotationMetadata targetMetadata) {
+        if (targetMetadata instanceof EnvironmentAnnotationMetadata) {
+            this.environmentAnnotationMetadata = (EnvironmentAnnotationMetadata) targetMetadata;
+        } else {
+            this.environmentAnnotationMetadata = new AnnotationMetadataHierarchy(targetMetadata);
+        }
+    }
+
+    /**
+     * @return The backing annotation metadata
+     */
+    public AnnotationMetadata getAnnotationMetadata() {
+        return environmentAnnotationMetadata;
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesize(@Nonnull Class<T> annotationClass) {
+        return environmentAnnotationMetadata.synthesize(annotationClass);
+    }
+
+    @Nullable
+    @Override
+    public <T extends Annotation> T synthesizeDeclared(@Nonnull Class<T> annotationClass) {
+        return environmentAnnotationMetadata.synthesizeDeclared(annotationClass);
     }
 
     @Override
     public <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
         Environment environment = getEnvironment();
         if (environment != null) {
-            return annotationMetadata.getValue(annotation, member, requiredType, o -> {
+            return environmentAnnotationMetadata.getValue(annotation, member, requiredType, o -> {
                 PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
                 if (o instanceof String) {
                     String v = (String) o;
@@ -79,25 +98,25 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
                 return o;
             });
         } else {
-            return annotationMetadata.getValue(annotation, member, requiredType);
+            return environmentAnnotationMetadata.getValue(annotation, member, requiredType);
         }
     }
 
     @Override
     public <T> Class<T>[] classValues(@Nonnull String annotation, @Nonnull String member) {
-        return annotationMetadata.classValues(annotation, member);
+        return environmentAnnotationMetadata.classValues(annotation, member);
     }
 
     @Override
     public <T> Class<T>[] classValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
-        return annotationMetadata.classValues(annotation, member);
+        return environmentAnnotationMetadata.classValues(annotation, member);
     }
 
     @Override
     public boolean isTrue(@Nonnull String annotation, @Nonnull String member) {
         Environment environment = getEnvironment();
         if (environment != null) {
-            return annotationMetadata.isTrue(annotation, member, o -> {
+            return environmentAnnotationMetadata.isTrue(annotation, member, o -> {
                 if (o instanceof String) {
                     String v = (String) o;
                     if (v.contains("${")) {
@@ -107,7 +126,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
                 return o;
             });
         } else {
-            return annotationMetadata.isTrue(annotation, member);
+            return environmentAnnotationMetadata.isTrue(annotation, member);
         }
     }
 
@@ -115,7 +134,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     public boolean isFalse(@Nonnull String annotation, @Nonnull String member) {
         Environment environment = getEnvironment();
         if (environment != null) {
-            return !annotationMetadata.isTrue(annotation, member, o -> {
+            return !environmentAnnotationMetadata.isTrue(annotation, member, o -> {
                 if (o instanceof String) {
                     String v = (String) o;
                     if (v.contains("${")) {
@@ -125,66 +144,66 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
                 return o;
             });
         } else {
-            return !annotationMetadata.isTrue(annotation, member);
+            return !environmentAnnotationMetadata.isTrue(annotation, member);
         }
     }
 
     @Nonnull
     @Override
     public Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
-        return annotationMetadata.getAnnotationTypeByStereotype(stereotype);
+        return environmentAnnotationMetadata.getAnnotationTypeByStereotype(stereotype);
     }
 
     @Nonnull
     @Override
     public Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(@Nullable String stereotype) {
-        return annotationMetadata.getAnnotationTypeByStereotype(stereotype);
+        return environmentAnnotationMetadata.getAnnotationTypeByStereotype(stereotype);
     }
 
     @Nonnull
     @Override
     public Optional<Class> classValue(@Nonnull String annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.classValue(annotation, member, valueMapper);
+        return environmentAnnotationMetadata.classValue(annotation, member, valueMapper);
     }
 
     @Nonnull
     @Override
     public Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.classValue(annotation, member, valueMapper);
+        return environmentAnnotationMetadata.classValue(annotation, member, valueMapper);
     }
 
     @Override
     public <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.enumValue(annotation, member,  enumType, valueMapper);
+        return environmentAnnotationMetadata.enumValue(annotation, member,  enumType, valueMapper);
     }
 
     @Override
     public <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.enumValue(annotation, member,  enumType, valueMapper);
+        return environmentAnnotationMetadata.enumValue(annotation, member,  enumType, valueMapper);
     }
 
     @Override
     public Optional<Boolean> booleanValue(@Nonnull String annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.booleanValue(annotation, member,  valueMapper);
+        return environmentAnnotationMetadata.booleanValue(annotation, member, valueMapper);
 
     }
 
     @Override
     public Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.booleanValue(annotation, member,  valueMapper);
+        return environmentAnnotationMetadata.booleanValue(annotation, member,  valueMapper);
     }
 
     @Nonnull
     @Override
     public Optional<String> stringValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.stringValue(annotation, member, valueMapper);
+        return environmentAnnotationMetadata.stringValue(annotation, member, valueMapper);
     }
 
     @Nonnull
@@ -216,9 +235,9 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
                         })
                         .toArray(String[]::new);
             };
-            return annotationMetadata.stringValues(annotation, member, valueMapper);
+            return environmentAnnotationMetadata.stringValues(annotation, member, valueMapper);
         } else {
-            return annotationMetadata.stringValues(annotation, member, null);
+            return environmentAnnotationMetadata.stringValues(annotation, member, null);
         }
     }
 
@@ -226,72 +245,72 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     @Override
     public Optional<String> stringValue(@Nonnull String annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.stringValue(annotation, member, valueMapper);
+        return environmentAnnotationMetadata.stringValue(annotation, member, valueMapper);
     }
 
     @Override
     public OptionalLong longValue(@Nonnull String annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.longValue(annotation, member, valueMapper);
+        return environmentAnnotationMetadata.longValue(annotation, member, valueMapper);
     }
 
     @Override
     public OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.longValue(annotation, member, valueMapper);
+        return environmentAnnotationMetadata.longValue(annotation, member, valueMapper);
     }
 
     @Nonnull
     @Override
     public OptionalInt intValue(@Nonnull String annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.intValue(annotation, member, valueMapper);
+        return environmentAnnotationMetadata.intValue(annotation, member, valueMapper);
     }
 
     @Nonnull
     @Override
     public OptionalInt intValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.intValue(annotation, member, valueMapper);
+        return environmentAnnotationMetadata.intValue(annotation, member, valueMapper);
     }
 
     @Nonnull
     @Override
     public OptionalDouble doubleValue(@Nonnull String annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.doubleValue(annotation, member, valueMapper);
+        return environmentAnnotationMetadata.doubleValue(annotation, member, valueMapper);
     }
 
     @Nonnull
     @Override
     public OptionalDouble doubleValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.doubleValue(annotation, member, valueMapper);
+        return environmentAnnotationMetadata.doubleValue(annotation, member, valueMapper);
     }
 
     @Override
     public boolean isTrue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return annotationMetadata.isTrue(annotation, member, valueMapper);
+        return environmentAnnotationMetadata.isTrue(annotation, member, valueMapper);
     }
 
     @Override
     public boolean isFalse(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return !annotationMetadata.isTrue(annotation, member, valueMapper);
+        return !environmentAnnotationMetadata.isTrue(annotation, member, valueMapper);
     }
 
     @Override
     public @Nonnull Optional<Class<? extends Annotation>> getAnnotationType(@Nonnull String name) {
         ArgumentUtils.requireNonNull("name", name);
-        return annotationMetadata.getAnnotationType(name);
+        return environmentAnnotationMetadata.getAnnotationType(name);
     }
 
     @Override
     public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@Nonnull Class<T> annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         Environment environment = getEnvironment();
-        List<AnnotationValue<T>> values = annotationMetadata.getAnnotationValuesByType(annotationType);
+        List<AnnotationValue<T>> values = environmentAnnotationMetadata.getAnnotationValuesByType(annotationType);
         if (environment != null) {
             return values.stream().map(entries ->
                     new EnvironmentAnnotationValue<>(environment, entries)
@@ -304,7 +323,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@Nonnull Class<T> annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         Environment environment = getEnvironment();
-        List<AnnotationValue<T>> values = annotationMetadata.getDeclaredAnnotationValuesByType(annotationType);
+        List<AnnotationValue<T>> values = environmentAnnotationMetadata.getDeclaredAnnotationValuesByType(annotationType);
         if (environment != null) {
             return values.stream().map(entries -> new EnvironmentAnnotationValue<>(environment, entries))
                     .collect(Collectors.toList());
@@ -319,13 +338,13 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
         Environment environment = getEnvironment();
         if (environment != null) {
 
-            List<AnnotationValue<T>> values = annotationMetadata.getAnnotationValuesByType(annotationClass);
+            List<AnnotationValue<T>> values = environmentAnnotationMetadata.getAnnotationValuesByType(annotationClass);
 
             return values.stream()
-                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, EnvironmentConvertibleValuesMap.of(environment, entries.getValues())))
+                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, new EnvironmentAnnotationValue<>(environment, entries)))
                     .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
         } else {
-            return annotationMetadata.synthesizeAnnotationsByType(annotationClass);
+            return environmentAnnotationMetadata.synthesizeAnnotationsByType(annotationClass);
         }
     }
 
@@ -336,54 +355,54 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
         Environment environment = getEnvironment();
         if (environment != null) {
 
-            List<AnnotationValue<T>> values = annotationMetadata.getDeclaredAnnotationValuesByType(annotationClass);
+            List<AnnotationValue<T>> values = environmentAnnotationMetadata.getDeclaredAnnotationValuesByType(annotationClass);
 
             return values.stream()
-                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, EnvironmentConvertibleValuesMap.of(environment, entries.getValues())))
+                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, new EnvironmentAnnotationValue<>(environment, entries)))
                     .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
         } else {
-            return annotationMetadata.synthesizeDeclaredAnnotationsByType(annotationClass);
+            return environmentAnnotationMetadata.synthesizeDeclaredAnnotationsByType(annotationClass);
         }
     }
 
     @Override
     public boolean hasDeclaredAnnotation(@Nullable String annotation) {
-        return annotationMetadata.hasDeclaredAnnotation(annotation);
+        return environmentAnnotationMetadata.hasDeclaredAnnotation(annotation);
     }
 
     @Override
     public boolean hasAnnotation(@Nullable String annotation) {
-        return annotationMetadata.hasAnnotation(annotation);
+        return environmentAnnotationMetadata.hasAnnotation(annotation);
     }
 
     @Override
     public boolean hasStereotype(@Nullable String annotation) {
-        return annotationMetadata.hasStereotype(annotation);
+        return environmentAnnotationMetadata.hasStereotype(annotation);
     }
 
     @Override
     public boolean hasDeclaredStereotype(@Nullable String annotation) {
-        return annotationMetadata.hasDeclaredStereotype(annotation);
+        return environmentAnnotationMetadata.hasDeclaredStereotype(annotation);
     }
 
     @Override
     public @Nonnull List<String> getAnnotationNamesByStereotype(String stereotype) {
-        return annotationMetadata.getAnnotationNamesByStereotype(stereotype);
+        return environmentAnnotationMetadata.getAnnotationNamesByStereotype(stereotype);
     }
 
     @Override
     public @Nonnull Set<String> getAnnotationNames() {
-        return annotationMetadata.getAnnotationNames();
+        return environmentAnnotationMetadata.getAnnotationNames();
     }
 
     @Override
     public @Nonnull Set<String> getDeclaredAnnotationNames() {
-        return annotationMetadata.getDeclaredAnnotationNames();
+        return environmentAnnotationMetadata.getDeclaredAnnotationNames();
     }
 
     @Override
     public @Nonnull List<String> getDeclaredAnnotationNamesByStereotype(String stereotype) {
-        return annotationMetadata.getDeclaredAnnotationNamesByStereotype(stereotype);
+        return environmentAnnotationMetadata.getDeclaredAnnotationNamesByStereotype(stereotype);
     }
 
     @Override
@@ -391,7 +410,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
         ArgumentUtils.requireNonNull("annotation", annotation);
         Environment env = getEnvironment();
 
-        Optional<AnnotationValue<T>> values = annotationMetadata.findAnnotation(annotation);
+        Optional<AnnotationValue<T>> values = environmentAnnotationMetadata.findAnnotation(annotation);
 
         if (env != null) {
             return values.map(av -> new EnvironmentAnnotationValue<>(env, av));
@@ -404,7 +423,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
         ArgumentUtils.requireNonNull("annotation", annotation);
         Environment env = getEnvironment();
 
-        Optional<AnnotationValue<T>> values = annotationMetadata.findDeclaredAnnotation(annotation);
+        Optional<AnnotationValue<T>> values = environmentAnnotationMetadata.findDeclaredAnnotation(annotation);
 
         if (env != null) {
             return values.map(av -> new EnvironmentAnnotationValue<>(env, av));
@@ -416,24 +435,37 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     public @Nonnull <T> OptionalValues<T> getValues(@Nonnull String annotation, @Nonnull Class<T> valueType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("valueType", valueType);
-        Map<String, Map<CharSequence, Object>> allAnnotations = annotationMetadata.allAnnotations;
-        Map<String, Map<CharSequence, Object>> allStereotypes = annotationMetadata.allStereotypes;
-        Environment environment = getEnvironment();
-        OptionalValues<T> values = resolveOptionalValuesForEnvironment(annotation, valueType, allAnnotations, allStereotypes, environment);
-        if (values != null) {
-            return values;
+
+        if (environmentAnnotationMetadata instanceof DefaultAnnotationMetadata) {
+            Environment environment = getEnvironment();
+            return resolveOptionalValuesForEnvironment(
+                    annotation,
+                    valueType,
+                    Collections.singleton(environmentAnnotationMetadata),
+                    environment
+            );
+        } else if (environmentAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
+            AnnotationMetadataHierarchy hierarchy = (AnnotationMetadataHierarchy) environmentAnnotationMetadata;
+            Environment environment = getEnvironment();
+            return resolveOptionalValuesForEnvironment(
+                    annotation,
+                    valueType,
+                    hierarchy,
+                    environment
+            );
+
         }
         return OptionalValues.empty();
     }
 
     @Override
     public @Nonnull <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
-        return annotationMetadata.getDefaultValue(annotation, member, requiredType);
+        return environmentAnnotationMetadata.getDefaultValue(annotation, member, requiredType);
     }
 
     @Override
     public @Nonnull <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
-        return annotationMetadata.getDefaultValue(annotation, member, requiredType);
+        return environmentAnnotationMetadata.getDefaultValue(annotation, member, requiredType);
     }
 
     /**
@@ -442,16 +474,6 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
      * @return The metadata
      */
     protected abstract @Nullable Environment getEnvironment();
-
-    @Override
-    protected void addValuesToResults(List<AnnotationValue> results, AnnotationValue values) {
-        Environment environment = getEnvironment();
-        if (environment != null) {
-            results.add(new EnvironmentAnnotationValue<>(environment, values));
-        } else {
-            results.add(values);
-        }
-    }
 
     /**
      * @return The value mapper for the environment
@@ -472,26 +494,40 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
         return null;
     }
 
-    private <T> OptionalValues<T> resolveOptionalValuesForEnvironment(String annotation, Class<T> valueType, Map<String, Map<CharSequence, Object>> allAnnotations, Map<String, Map<CharSequence, Object>> allStereotypes, Environment environment) {
-        if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
-            Map<CharSequence, Object> values = allAnnotations.get(annotation);
-            if (values != null) {
-                if (environment != null) {
-                    return new EnvironmentOptionalValuesMap<>(valueType, values, environment);
-                } else {
-                    return OptionalValues.of(valueType, values);
-                }
-            } else {
-                values = allStereotypes.get(annotation);
-                if (values != null) {
-                    if (environment != null) {
-                        return new EnvironmentOptionalValuesMap<>(valueType, values, environment);
-                    } else {
-                        return OptionalValues.of(valueType, values);
-                    }
+    private <T> OptionalValues<T> resolveOptionalValuesForEnvironment(
+            String annotation,
+            Class<T> valueType,
+            Iterable<AnnotationMetadata> metadata,
+            Environment environment) {
+
+        Map<CharSequence, Object> finalValues = new LinkedHashMap<>();
+        for (AnnotationMetadata annotationMetadata : metadata) {
+            if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+
+                Map<String, Map<CharSequence, Object>> allAnnotations = ((DefaultAnnotationMetadata) annotationMetadata).allAnnotations;
+                Map<String, Map<CharSequence, Object>> allStereotypes = ((DefaultAnnotationMetadata) annotationMetadata).allStereotypes;
+                if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
+                    processMap(annotation, finalValues, allStereotypes);
+                    processMap(annotation, finalValues, allAnnotations);
                 }
             }
         }
-        return null;
+
+        if (environment != null) {
+            return new EnvironmentOptionalValuesMap<>(valueType, finalValues, environment);
+        } else {
+            return OptionalValues.of(valueType, finalValues);
+        }
+    }
+
+    private void processMap(String annotation, Map<CharSequence, Object> finalValues, Map<String, Map<CharSequence, Object>> allStereotypes) {
+        if (allStereotypes != null) {
+            Map<CharSequence, Object> values = allStereotypes.get(annotation);
+            if (values != null) {
+                for (Map.Entry<CharSequence, Object> entry : values.entrySet()) {
+                    finalValues.putIfAbsent(entry.getKey(), entry.getValue());
+                }
+            }
+        }
     }
 }

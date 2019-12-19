@@ -38,7 +38,12 @@ public final class ServerRequestContext {
     private ServerRequestContext() {
     }
 
-    private static void set(@Nullable HttpRequest request) {
+    /**
+     * Set {@link HttpRequest}.
+     *
+     * @param request new {@link HttpRequest}
+     */
+    public static void set(@Nullable HttpRequest request) {
         if (request == null) {
             REQUEST.remove();
         } else {

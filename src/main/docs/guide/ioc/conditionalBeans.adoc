@@ -98,7 +98,7 @@ Adding a requirement on a property has some additional functionality. You can re
 @Requires(property="foo", notEquals="Sally") //<4>
 ----
 
-<1> Requires the property to be "yes", "YES", "true", "TRUE", "y" or "Y"
+<1> Requires the property to be set
 <2> Requires the property to be "John"
 <3> Requires the property to be "John" or not set
 <4> Requires the property to not be "Sally" or not set

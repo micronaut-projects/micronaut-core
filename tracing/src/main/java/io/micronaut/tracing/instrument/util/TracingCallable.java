@@ -29,6 +29,7 @@ import java.util.concurrent.Callable;
  * @author graemerocher
  * @since 1.0
  */
+@Deprecated
 public class TracingCallable<V> implements Callable<V> {
 
     private final Callable<V> callable;

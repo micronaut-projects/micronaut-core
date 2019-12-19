@@ -19,10 +19,11 @@ public class VehicleSpec {
         ApplicationContext applicationContext = ApplicationContext.run(map, "test");
 
         Vehicle vehicle = applicationContext.getBean(Vehicle.class);
-        DefaultGroovyMethods.println(this, vehicle.start());
+        System.out.println(vehicle.start());
         // end::start[]
 
         assertEquals("Ford Engine Starting V8 [rodLength=6.0]", vehicle.start());
+        applicationContext.close();
     }
 
 }

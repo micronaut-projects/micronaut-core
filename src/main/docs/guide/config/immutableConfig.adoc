@@ -1,0 +1,55 @@
+Since 1.3, Micronaut supports the definition of immutable configuration.
+
+There are two ways to define immutable configuration. The preferred way is to define an interface that is annotated with ann:context.annotation.ConfigurationProperties[]. For example:
+
+snippet::io.micronaut.docs.config.itfce.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
+
+<1> The ann:context.annotation.ConfigurationProperties[] annotation takes the configuration prefix and is declared on an interface
+<2> You can use ann:core.bind.annotation.Bindable[] to set a default value if you want
+<3> Validation annotations can be used too
+<4> You can also specify references to other ann:context.annotation.ConfigurationProperties[] beans.
+<5> You can nest immutable configuration
+<6> Optional configuration can be indicated by returning an `Optional` or specifying `@Nullable`
+
+In this case what Micronaut does is provide a compilation time implementation that delegates all getters to call the `getProperty(..)` method of the api:context.env.Environment[] interface.
+
+This has the advantage that if the application's configuration is <<refreshable, refreshed>> (for example by invoking the `/refresh` endpoint) then the injected interface will automatically see the new values.
+
+NOTE: If you try to specify any other abstract method other than a getter a compilation error will occur (default methods are supported).
+
+An alternative way to implement immutable configuration is to define a class and use the ann:context.annotation.ConfigurationInject[] annotation on a constructor of a ann:context.annotation.ConfigurationProperties[] or ann:context.annotation.EachProperty[] bean.
+
+An example of an immutable configuration class can be seen below:
+
+snippet::io.micronaut.docs.config.immutable.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
+
+<1> The ann:context.annotation.ConfigurationProperties[] annotation takes the configuration prefix
+<2> The ann:context.annotation.ConfigurationInject[]  annotation is defined on the constructor
+<3> You can use ann:core.bind.annotation.Bindable[] to set a default value if you want
+<4> Validation annotations can be used too
+<5> You can nest immutable configuration
+<6> Optional configuration can be indicated with `@Nullable`
+
+The ann:context.annotation.ConfigurationInject[] annotation provides a hint to Micronaut to prioritize binding values from configuration instead of injecting beans.
+
+NOTE: Using this approach if you want the configuration to be refreshable then you must add the ann:runtime.context.scope.Refreshable[] annotation to the class as well. This allows the bean to be re-created in the case of a <<refreshable,runtime configuration refresh event>>.
+
+There are a few exceptions to this rule. Micronaut will not perform configuration binding for a parameter if one of these conditions is met:
+
+* The parameter is annotated with `@Value` (explicit binding)
+* The parameter is annotated with `@Property` (explicit binding)
+* The parameter is annotated with `@Parameter` (parameterized bean handling)
+* The type of the parameter is annotated with a bean scope (such as `@Singleton`)
+
+Once you have prepared a type safe configuration it can simply be injected into your objects like any other bean:
+
+snippet::io.micronaut.docs.config.immutable.EngineImpl[tags="class",indent=0,title="@ConfigurationProperties Dependency Injection"]
+
+<1> Inject the `EngineConfig` bean
+<2> Use the configuration properties
+
+Configuration values can then be supplied when running the application. For example:
+
+snippet::io.micronaut.docs.config.immutable.VehicleSpec[tags="start",indent=0,title="Supply Configuration"]
+
+The above example prints: `"Ford Engine Starting V8 [rodLength=7B.0]"`

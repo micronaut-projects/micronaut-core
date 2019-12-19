@@ -15,9 +15,7 @@
  */
 package io.micronaut.jackson.serialize;
 
-import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import io.micronaut.core.annotation.Indexed;
 
 import javax.inject.Singleton;
 
@@ -28,7 +26,6 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Singleton
-@Indexed(Module.class)
 public class ResourceModule extends SimpleModule {
 
     /**

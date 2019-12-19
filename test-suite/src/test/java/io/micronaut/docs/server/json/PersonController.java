@@ -1,6 +1,7 @@
 package io.micronaut.docs.server.json;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -17,6 +18,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Requires(property = "spec.name", value = "PersonControllerSpec")
 // tag::class[]
 @Controller("/people")
 public class PersonController {
@@ -94,7 +96,7 @@ public class PersonController {
     }
 
     // tag::globalError[]
-    @Error // <1>
+    @Error(global = true) // <1>
     public HttpResponse<JsonError> error(HttpRequest request, Throwable e) {
         JsonError error = new JsonError("Bad Things Happened: " + e.getMessage()) // <2>
                 .link(Link.SELF, Link.of(request.getUri()));

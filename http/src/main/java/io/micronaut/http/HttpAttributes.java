@@ -66,7 +66,12 @@ public enum HttpAttributes implements CharSequence {
     /**
      * Attribute used to store the MethodInvocationContext by declarative client.
      */
-    INVOCATION_CONTEXT(Constants.PREFIX + ".invocationContext");
+    INVOCATION_CONTEXT(Constants.PREFIX + ".invocationContext"),
+
+    /**
+     * Attribute used to store a client Certificate (mutual authentication).
+     */
+    X509_CERTIFICATE("javax.servlet.request.X509Certificate");
 
     private final String name;
 

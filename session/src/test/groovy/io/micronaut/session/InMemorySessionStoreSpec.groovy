@@ -1,21 +1,7 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.session
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.session.event.AbstractSessionEvent
 import io.micronaut.session.event.SessionCreatedEvent
@@ -26,10 +12,6 @@ import spock.util.concurrent.PollingConditions
 
 import javax.inject.Singleton
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 class InMemorySessionStoreSpec extends Specification {
 
     void "test in-memory session store read and write"() {
@@ -49,7 +31,7 @@ class InMemorySessionStoreSpec extends Specification {
         session.lastAccessedTime
 
         when:
-        sessionStore.save(session)
+        sessionStore.save(session).get()
         def lastAccessedTime = session.lastAccessedTime
 
         then:
@@ -57,6 +39,7 @@ class InMemorySessionStoreSpec extends Specification {
         listener.events[0] instanceof SessionCreatedEvent
 
         when:
+        Thread.sleep(50)
         session == sessionStore.findSession(session.id).get().get()
         def conditions = new PollingConditions(timeout: 10)
 
@@ -84,7 +67,6 @@ class InMemorySessionStoreSpec extends Specification {
 
     void "test session expiry"() {
         when:
-        //expire in 1 second
         ApplicationContext applicationContext = ApplicationContext.run(['micronaut.session.max-inactive-interval': 'PT1S'])
         SessionStore sessionStore = applicationContext.getBean(SessionStore)
         TestListener listener = applicationContext.getBean(TestListener)
@@ -96,8 +78,53 @@ class InMemorySessionStoreSpec extends Specification {
 
         then:
         conditions.eventually {
-            !sessionStore.findSession(id).get().isPresent()
-            listener.events.any { it instanceof SessionExpiredEvent }
+            assert !sessionStore.findSession(id).get().isPresent()
+            assert listener.events.any { it instanceof SessionExpiredEvent }
+        }
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test session prompt expiration"() {
+        when:
+        ApplicationContext applicationContext = ApplicationContext.run([
+                'micronaut.session.prompt-expiration': true,
+                'micronaut.session.max-inactive-interval': 'PT3S'
+        ])
+        SessionStore sessionStore = applicationContext.getBean(SessionStore)
+        TestListener listener = applicationContext.getBean(TestListener)
+        Session session = sessionStore.newSession()
+
+        session.put("foo", "bar")
+        sessionStore.save(session)
+
+        then:
+        session != null
+        session.id
+        !session.expired
+        session.creationTime
+        session.lastAccessedTime
+
+        when:
+        sessionStore.save(session).get()
+        def lastAccessedTime = session.lastAccessedTime
+
+        then:
+        listener.events.size() == 1
+        listener.events[0] instanceof SessionCreatedEvent
+
+        when:
+        Thread.sleep(50)
+        session == sessionStore.findSession(session.id).get().get()
+        def conditions = new PollingConditions(timeout: 10)
+
+        then:
+        conditions.eventually {
+            assert session.lastAccessedTime > lastAccessedTime
+            assert session.get("foo").isPresent()
+            assert session.get("foo").get() == "bar"
+            assert listener.events.any { it instanceof SessionExpiredEvent }
         }
 
         cleanup:

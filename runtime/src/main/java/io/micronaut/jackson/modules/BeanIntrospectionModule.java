@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.deser.std.StdValueInstantiator;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import com.fasterxml.jackson.databind.introspect.VirtualAnnotatedMember;
+import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
 import com.fasterxml.jackson.databind.ser.BeanSerializerBuilder;
@@ -183,7 +184,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                                                     existing,
                                                     beanProperty,
                                                     existing.getSerializer(),
-                                                    config.getTypeFactory()
+                                                    config.getTypeFactory(),
+                                                    existing.getViews()
                                             )
                                     );
                                     continue;
@@ -193,7 +195,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                                                     existing,
                                                     beanProperty,
                                                     existing.getSerializer(),
-                                                    config.getTypeFactory()
+                                                    config.getTypeFactory(),
+                                                    existing.getViews()
                                             )
                                     );
                                     continue;
@@ -203,7 +206,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                                         existing,
                                         beanProperty,
                                         existing.getSerializer(),
-                                        config.getTypeFactory()
+                                        config.getTypeFactory(),
+                                        existing.getViews()
                                     )
                             );
                         } else {
@@ -268,7 +272,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                 final Argument<?>[] constructorArguments = introspection.getConstructorArguments();
                 final TypeFactory typeFactory = config.getTypeFactory();
-                builder.setValueInstantiator(new StdValueInstantiator(config, config.getTypeFactory().constructType(beanClass)) {
+                builder.setValueInstantiator(new StdValueInstantiator(config, typeFactory.constructType(beanClass)) {
 
                     @Override
                     public SettableBeanProperty[] getFromObjectArguments(DeserializationConfig config) {
@@ -281,11 +285,17 @@ public class BeanIntrospectionModule extends SimpleModule {
                             final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
                             PropertyMetadata propertyMetadata = newPropertyMetadata(argument, annotationMetadata);
                             final String simpleName = annotationMetadata.stringValue(JsonProperty.class).orElse(argument.getName());
+                            TypeDeserializer typeDeserializer;
+                            try {
+                                typeDeserializer = config.findTypeDeserializer(javaType);
+                            } catch (JsonMappingException e) {
+                                typeDeserializer = null;
+                            }
                             props[i] = new CreatorProperty(
                                     PropertyName.construct(simpleName),
                                     javaType,
                                     null,
-                                    null,
+                                    typeDeserializer,
                                     null,
                                     null,
                                     i,
@@ -371,7 +381,7 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                     @Override
                     public Object createFromObjectWith(DeserializationContext ctxt, Object[] args) throws IOException {
-                        return introspection.instantiate(args);
+                        return introspection.instantiate(false, args);
                     }
                 });
                 return builder;
@@ -477,6 +487,7 @@ public class BeanIntrospectionModule extends SimpleModule {
      * Introspected property writer.
      */
     private class BeanIntrospectionPropertyWriter extends BeanPropertyWriter {
+        protected final Class<?>[] _views;
         final BeanProperty<Object, Object> beanProperty;
         final SerializableString fastName;
         private final JavaType type;
@@ -484,20 +495,23 @@ public class BeanIntrospectionModule extends SimpleModule {
         BeanIntrospectionPropertyWriter(BeanPropertyWriter src,
                                         BeanProperty<Object, Object> introspection,
                                         JsonSerializer<Object> ser,
-                                        TypeFactory typeFactory) {
-            this(src.getSerializedName(), src, introspection, ser, typeFactory);
+                                        TypeFactory typeFactory,
+                                        Class<?>[] views) {
+            this(src.getSerializedName(), src, introspection, ser, typeFactory, views);
         }
 
         BeanIntrospectionPropertyWriter(SerializableString name,
                                         BeanPropertyWriter src,
                                         BeanProperty<Object, Object> introspection,
                                         JsonSerializer<Object> ser,
-                                        TypeFactory typeFactory) {
+                                        TypeFactory typeFactory,
+                                        Class<?>[] views) {
             super(src);
             // either use the passed on serializer or the original one
             _serializer = (ser != null) ? ser : src.getSerializer();
             beanProperty = introspection;
             fastName = name;
+            _views = views;
             this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = (ser == null) ? PropertySerializerMap
                     .emptyForProperties() : null;
@@ -509,6 +523,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                 TypeFactory typeFactory) {
             beanProperty = introspection;
             fastName = new SerializedString(name);
+            _views = null;
             this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = PropertySerializerMap
                     .emptyForProperties();
@@ -534,8 +549,25 @@ public class BeanIntrospectionModule extends SimpleModule {
             return type;
         }
 
+        private boolean inView(Class<?> activeView) {
+            if (activeView == null || _views == null) {
+                return true;
+            }
+            final int len = _views.length;
+            for (int i = 0; i < len; ++i) {
+                if (_views[i].isAssignableFrom(activeView)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         @Override
         public final void serializeAsField(Object bean, JsonGenerator gen, SerializerProvider prov) throws Exception {
+            if (!inView(prov.getActiveView())) {
+                serializeAsOmittedField(bean, gen, prov);
+                return;
+            }
             Object value = beanProperty.get(bean);
             // Null (etc) handling; copied from super-class impl
             if (value == null) {
@@ -582,6 +614,11 @@ public class BeanIntrospectionModule extends SimpleModule {
 
         @Override
         public final void serializeAsElement(Object bean, JsonGenerator gen, SerializerProvider prov) throws Exception {
+            if (!inView(prov.getActiveView())) {
+                serializeAsOmittedField(bean, gen, prov);
+                return;
+            }
+
             Object value = beanProperty.get(bean);
             // Null (etc) handling; copied from super-class impl
             if (value == null) {

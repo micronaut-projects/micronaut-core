@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationUtils;
+import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.annotation.processing.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -362,11 +363,36 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
     @Nonnull
     @Override
-    public Optional<ConstructorElement> getPrimaryConstructor() {
+    public Optional<MethodElement> getPrimaryConstructor() {
         final AnnotationUtils annotationUtils = visitorContext.getAnnotationUtils();
-        return Optional.ofNullable(visitorContext.getModelUtils().concreteConstructorFor(classElement, annotationUtils)).map(executableElement -> {
+        final ModelUtils modelUtils = visitorContext.getModelUtils();
+        ExecutableElement method = modelUtils.staticCreatorFor(classElement, annotationUtils);
+        if (method == null) {
+            method = modelUtils.concreteConstructorFor(classElement, annotationUtils);
+        }
+
+        return createMethodElement(annotationUtils, method);
+    }
+
+    @Override
+    public Optional<MethodElement> getDefaultConstructor() {
+        final AnnotationUtils annotationUtils = visitorContext.getAnnotationUtils();
+        final ModelUtils modelUtils = visitorContext.getModelUtils();
+        ExecutableElement method = modelUtils.defaultStaticCreatorFor(classElement, annotationUtils);
+        if (method == null) {
+            method = modelUtils.defaultConstructorFor(classElement);
+        }
+        return createMethodElement(annotationUtils, method);
+    }
+
+    private Optional<MethodElement> createMethodElement(AnnotationUtils annotationUtils, ExecutableElement method) {
+        return Optional.ofNullable(method).map(executableElement -> {
             final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(executableElement);
-            return new JavaConstructorElement(this, executableElement, annotationMetadata, visitorContext);
+            if (executableElement.getKind() == ElementKind.CONSTRUCTOR) {
+                return new JavaConstructorElement(this, executableElement, annotationMetadata, visitorContext);
+            } else {
+                return new JavaMethodElement(this, executableElement, annotationMetadata, visitorContext);
+            }
         });
     }
 

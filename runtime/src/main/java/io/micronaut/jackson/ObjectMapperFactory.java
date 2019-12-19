@@ -26,6 +26,7 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
@@ -75,6 +76,7 @@ public class ObjectMapperFactory {
      */
     @Singleton
     @Primary
+    @Named("json")
     @BootstrapContextCompatible
     public ObjectMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
                                      @Nullable JsonFactory jsonFactory) {
@@ -146,7 +148,7 @@ public class ObjectMapperFactory {
 
             ObjectMapper.DefaultTyping defaultTyping = jacksonConfiguration.getDefaultTyping();
             if (defaultTyping != null) {
-                objectMapper.enableDefaultTyping(defaultTyping);
+                objectMapper.activateDefaultTyping(objectMapper.getPolymorphicTypeValidator(), defaultTyping);
             }
 
             JsonInclude.Include include = jacksonConfiguration.getSerializationInclusion();
@@ -169,7 +171,7 @@ public class ObjectMapperFactory {
             if (propertyNamingStrategy != null) {
                 objectMapper.setPropertyNamingStrategy(propertyNamingStrategy);
             }
-            
+
             jacksonConfiguration.getSerializationSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getDeserializationSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getMapperSettings().forEach(objectMapper::configure);

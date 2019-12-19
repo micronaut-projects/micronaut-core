@@ -17,12 +17,11 @@ package io.micronaut.inject;
 
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.type.Argument;
+import io.micronaut.inject.validation.BeanDefinitionValidator;
 
-import javax.validation.ConstraintViolation;
-import javax.validation.Validator;
-import javax.validation.ValidatorFactory;
-import java.util.Optional;
-import java.util.Set;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * A bean definition that is validated with javax.validation.
@@ -41,23 +40,29 @@ public interface ValidatedBeanDefinition<T> extends BeanDefinition<T> {
      * @return The instance
      */
     default T validate(BeanResolutionContext resolutionContext, T instance) {
-        Optional<ValidatorFactory> validatorFactoryBean = resolutionContext.getContext().findBean(ValidatorFactory.class);
-        if (validatorFactoryBean.isPresent()) {
-            ValidatorFactory validatorFactory = validatorFactoryBean.get();
-            Validator validator = validatorFactory.getValidator();
-            Set<ConstraintViolation<T>> errors = validator.validate(instance);
-            if (!errors.isEmpty()) {
-                StringBuilder builder = new StringBuilder();
-                builder.append("Validation failed for bean definition [");
-                builder.append(instance.getClass().getName());
-                builder.append("]\nList of constraint violations:[\n");
-                for (ConstraintViolation<?> violation : errors) {
-                    builder.append("\t").append(violation.getPropertyPath()).append(" - ").append(violation.getMessage()).append("\n");
-                }
-                builder.append("]");
-                throw new BeanInstantiationException(resolutionContext, builder.toString());
-            }
-        }
+        BeanDefinitionValidator validator = resolutionContext.getContext().getBeanValidator();
+        validator.validateBean(resolutionContext, this, instance);
         return instance;
+    }
+
+    /**
+     * Validates the given bean after it has been constructor.
+     *
+     * @param resolutionContext The resolution context
+     * @param injectionPoint    The injection point
+     * @param argument          The argument
+     * @param index             The argument index
+     * @param value             The value
+     * @param <V>               The value type
+     * @throws BeanInstantiationException if the bean is invalid
+     */
+    default <V> void validateBeanArgument(
+            @Nonnull BeanResolutionContext resolutionContext,
+            @Nonnull InjectionPoint injectionPoint,
+            @Nonnull Argument<V> argument,
+            int index,
+            @Nullable V value) throws BeanInstantiationException {
+        BeanDefinitionValidator validator = resolutionContext.getContext().getBeanValidator();
+        validator.validateBeanArgument(resolutionContext, injectionPoint, argument, index, value);
     }
 }

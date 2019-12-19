@@ -37,9 +37,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.Specification
 
-import javax.validation.ConstraintViolation
 import javax.validation.ConstraintViolationException
-import javax.validation.ValidatorFactory
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotNull
 import javax.validation.constraints.Size
@@ -80,6 +78,71 @@ class ValidatedSpec extends Specification {
         then:
         result == "\$100.00"
 
+    }
+
+    def "test validated return value"() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run()
+        Foo foo = beanContext.getBean(Foo)
+
+        when:
+        foo.notNull()
+
+        then:
+        def e = thrown(ConstraintViolationException)
+        e.message == "string: must not be null"
+    }
+
+    def "test validated return value without cascade"() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run()
+        Foo foo = beanContext.getBean(Foo)
+
+        when:
+        foo.notNullBar()
+
+        then:
+        def e = thrown(ConstraintViolationException)
+        e.message == "bar: must not be null"
+    }
+
+    def "test validate return value with cascading"() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run()
+        Foo foo = beanContext.getBean(Foo)
+
+        when:
+        foo.cascadeValidateReturnValue()
+
+        then:
+        def e = thrown(ConstraintViolationException)
+        e.message == "bar.prop: must not be null"
+    }
+
+    def "test validate list return value with cascading"() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run()
+        Foo foo = beanContext.getBean(Foo)
+
+        when:
+        foo.validateReturnList()
+
+        then:
+        def e = thrown(ConstraintViolationException)
+        e.message == "list[0].prop: must not be null"
+    }
+
+    def "test validate map return value with cascading"() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run()
+        Foo foo = beanContext.getBean(Foo)
+
+        when:
+        foo.validateMap()
+
+        then:
+        def e = thrown(ConstraintViolationException)
+        e.message == "map[barObj].prop: must not be null"
     }
 
     def "test validated controller validates @Valid classes"() {
@@ -252,6 +315,33 @@ class ValidatedSpec extends Specification {
 
         then:
         thrown(ConstraintViolationException)
+    }
+
+    void "test validated controller with non introspected pojo"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'spec.name': getClass().simpleName
+        ])
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(
+                HttpRequest.POST("/validated/no-introspection", '{"email":"a@a.com","name":"Micronaut"}')
+                        .contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE),
+                String
+        )
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
+
+        when:
+        def result = new JsonSlurper().parseText((String) e.response.getBody().get())
+
+        then:
+        result.message == 'pojo: Cannot validate io.micronaut.validation.PojoNoIntrospection. No bean introspection present. Please add @Introspected to the class and ensure Micronaut annotation processing is enabled'
 
         cleanup:
         server.close()

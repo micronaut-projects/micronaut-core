@@ -89,6 +89,7 @@ class BinaryWebSocketSpec extends Specification{
 
         when:
         bob.close()
+        sleep(1000)
 
 
         then:

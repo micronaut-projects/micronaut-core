@@ -49,6 +49,7 @@ import picocli.CommandLine
 abstract class AbstractProfile implements Profile {
     protected final Resource profileDir
     protected String name
+    protected String mainClassName
     protected List<Profile> parentProfiles
     protected Map<String, Command> commandsByName
     protected NavigableMap navigableConfig
@@ -115,6 +116,7 @@ abstract class AbstractProfile implements Profile {
         def profileConfig = (Map<String, Object>) new Yaml().loadAs(profileYml.getInputStream(), Map)
 
         name = profileConfig.get("name")?.toString()
+        mainClassName = profileConfig.get("mainClassName")?.toString() ?: ''
         description = profileConfig.get("description")?.toString() ?: ''
         instructions = profileConfig.get("instructions")?.toString() ?: ''
         abstractProfile = Boolean.valueOf(profileConfig.get("abstract")?.toString() ?: '')
@@ -153,6 +155,7 @@ abstract class AbstractProfile implements Profile {
             for (fn in featureList) {
                 def featureData = profileDir.createRelative("features/${fn}/feature.yml")
                 if (featureData.exists()) {
+                    //must come after setting mainClassName as it can override
                     def f = new DefaultFeature(this, fn.toString(), profileDir.createRelative("features/$fn/"))
                     features.add f
                 }
@@ -173,8 +176,6 @@ abstract class AbstractProfile implements Profile {
                 }
                 oneOfFeatureGroups.add(group)
             }
-
-
             defaultFeaturesNames.addAll(defaultFeatures)
             requiredFeatureNames.addAll(requiredFeatures)
         }
@@ -228,6 +229,14 @@ abstract class AbstractProfile implements Profile {
         this.skeletonExcludes = (List<String>) navigableConfig.get("skeleton.excludes", [])
         this.binaryExtensions = (List<String>) navigableConfig.get("skeleton.binaryExtensions", [])
         this.executablePatterns = (List<String>) navigableConfig.get("skeleton.executable", [])
+    }
+
+    String getMainClassName() {
+        mainClassName
+    }
+
+    void setMainClassName(String mainClassName) {
+        this.mainClassName = mainClassName
     }
 
     boolean isAbstract() {

@@ -17,7 +17,7 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.ArrayUtils;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -47,11 +47,12 @@ public class DefaultArgument<T> implements Argument<T> {
      * @param genericTypes       The generic types
      */
     public DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Argument... genericTypes) {
-        this.type = type;
-        this.name = name;
-        this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
-        this.typeParameters = initializeTypeParameters(genericTypes);
-        this.typeParameterArray = genericTypes;
+        this(type,
+             name,
+             annotationMetadata,
+             ArrayUtils.isNotEmpty(genericTypes) ? initializeTypeParameters(genericTypes) : Collections.EMPTY_MAP,
+             genericTypes
+        );
     }
 
     /**
@@ -104,7 +105,7 @@ public class DefaultArgument<T> implements Argument<T> {
             throw new IllegalArgumentException(type.getClass().getSimpleName() + " types are not supported");
         }
         if (name == null) {
-            name = NameUtils.decapitalize(this.type.getSimpleName());
+            name = this.type.getSimpleName();
         }
         this.name = name;
         this.typeParameters = initializeTypeParameters(this.typeParameterArray);
@@ -184,7 +185,7 @@ public class DefaultArgument<T> implements Argument<T> {
         return Objects.hash(type, name, typeParameters);
     }
 
-    private Map<String, Argument<?>> initializeTypeParameters(Argument[] genericTypes) {
+    private static Map<String, Argument<?>> initializeTypeParameters(Argument[] genericTypes) {
         Map<String, Argument<?>> typeParameters;
         if (genericTypes != null && genericTypes.length > 0) {
             typeParameters = new LinkedHashMap<>(genericTypes.length);

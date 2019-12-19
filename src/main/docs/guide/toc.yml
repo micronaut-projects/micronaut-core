@@ -7,6 +7,7 @@ quickStart:
     title: Build/Install the CLI
     installSdkman: Install with Sdkman
     installHomebrew: Install with Homebrew
+    installMacPorts: Install with MacPorts
     installWindows: Install through Binary on Windows
     buildSource: Building from Source
   creatingServer: Creating a Server Application
@@ -46,6 +47,7 @@ config:
   customTypeConverter: Custom Type Converters
   eachProperty: Using @EachProperty to Drive Configuration
   eachBean: Using @EachBean to Drive Configuration
+  immutableConfig: Immutable Configuration
   # validation: Validating Configuration
   jmx:
     title: JMX Support
@@ -199,6 +201,7 @@ languageSupport:
     kaptintellij: Kotlin, Kapt and IntelliJ
     openandaop: Kotlin and AOP Advice
     kotlinretainparamnames: Kotlin and Retaining Parameter Names
+    coroutines: Coroutines Support
   graal:
     title: Micronaut for GraalVM
     graalServices: Microservices as GraalVM native images

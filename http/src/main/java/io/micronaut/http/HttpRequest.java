@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
+import java.security.cert.Certificate;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -149,6 +150,14 @@ public interface HttpRequest<B> extends HttpMessage<B> {
             .map(Locale::forLanguageTag);
     }
 
+    /**
+     * Retrieves the Certificate used for mutual authentication.
+     *
+     * @return A certificate used for authentication, if applicable.
+     */
+    default Optional<Certificate> getCertificate() {
+        return this.getAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
+    }
 
     /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.

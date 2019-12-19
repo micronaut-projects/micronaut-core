@@ -17,8 +17,10 @@ package io.micronaut.http.server.netty.jackson
 
 import com.fasterxml.jackson.annotation.JsonView
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.core.annotation.Introspected
 
 @EqualsAndHashCode
+@Introspected
 @JsonView(Views.Public)
 class TestModel {
 

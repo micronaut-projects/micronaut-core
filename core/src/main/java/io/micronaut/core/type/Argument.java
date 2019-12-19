@@ -41,58 +41,63 @@ import java.util.stream.Collectors;
 public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Type {
 
     /**
+     * Constant for string argument.
+     */
+    Argument<String> STRING = Argument.of(String.class);
+
+    /**
      * Constant for int argument. Used by generated code, do not remove.
      */
     @SuppressWarnings("unused")
-    Argument INT = Argument.of(int.class);
+    Argument<Integer> INT = Argument.of(int.class);
 
     /**
      * Constant for long argument. Used by generated code, do not remove.
      */
     @SuppressWarnings("unused")
-    Argument LONG = Argument.of(long.class);
+    Argument<Long> LONG = Argument.of(long.class);
 
     /**
      * Constant for float argument. Used by generated code, do not remove.
      */
     @SuppressWarnings("unused")
-    Argument FLOAT = Argument.of(float.class);
+    Argument<Float> FLOAT = Argument.of(float.class);
 
     /**
      * Constant for double argument. Used by generated code, do not remove.
      */
     @SuppressWarnings("unused")
-    Argument DOUBLE = Argument.of(double.class);
+    Argument<Double> DOUBLE = Argument.of(double.class);
 
     /**
      * Constant for void argument. Used by generated code, do not remove.
      */
     @SuppressWarnings("unused")
-    Argument VOID = Argument.of(void.class);
+    Argument<Void> VOID = Argument.of(void.class);
 
     /**
      * Constant for byte argument. Used by generated code, do not remove.
      */
     @SuppressWarnings("unused")
-    Argument BYTE = Argument.of(byte.class);
+    Argument<Byte> BYTE = Argument.of(byte.class);
 
     /**
      * Constant for boolean argument. Used by generated code, do not remove.
      */
     @SuppressWarnings("unused")
-    Argument BOOLEAN = Argument.of(boolean.class);
+    Argument<Boolean> BOOLEAN = Argument.of(boolean.class);
 
     /**
      * Constant char argument. Used by generated code, do not remove.
      */
     @SuppressWarnings("unused")
-    Argument CHAR = Argument.of(char.class);
+    Argument<Character> CHAR = Argument.of(char.class);
 
     /**
      * Constant short argument. Used by generated code, do not remove.
      */
     @SuppressWarnings("unused")
-    Argument SHORT = Argument.of(short.class);
+    Argument<Short> SHORT = Argument.of(short.class);
 
     /**
      * Constant representing zero arguments. Used by generated code, do not remove.
@@ -106,6 +111,11 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
      */
     @SuppressWarnings("unused")
     Argument<Object> OBJECT_ARGUMENT = of(Object.class);
+
+    /**
+     * Constant for List<String> argument.
+     */
+    Argument<List<String>> LIST_OF_STRING = Argument.listOf(String.class);
 
     /**
      * @return The name of the argument
@@ -302,7 +312,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @Nonnull
     static <T> Argument<T> of(
         Class<T> type) {
-        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
+        return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
     }
 
     /**
@@ -330,7 +340,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
             TypeVariable<Class<T>> parameter = parameters[i];
             typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
         }
-        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeArguments);
+        return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, typeArguments);
     }
 
     /**

@@ -46,6 +46,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationMapper>> ANNOTATION_MAPPERS = new HashMap<>();
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>();
     private static final Map<MetadataKey, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>();
+    private static final List<String> DEFAULT_ANNOTATE_EXCLUDES = Arrays.asList(Internal.class.getName(), Experimental.class.getName());
 
     static {
         SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
@@ -109,6 +110,37 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
             try {
                 AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true, true);
+                if (metadata.isEmpty()) {
+                    return AnnotationMetadata.EMPTY_METADATA;
+                }
+                return metadata;
+            } catch (RuntimeException e) {
+                if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
+                    // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
+                    return AnnotationMetadata.EMPTY_METADATA;
+                } else {
+                    throw e;
+                }
+            }
+        }
+    }
+
+    /**
+     * Build metadata for the given element, including any metadata that is inherited via method or type overrides.
+     *
+     * @param element The element
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata buildOverridden(T element) {
+        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(new MetadataKey(getDeclaringType(element), element));
+        if (existing != null) {
+            return existing;
+        } else {
+
+            DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+
+            try {
+                AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, false, false);
                 if (metadata.isEmpty()) {
                     return AnnotationMetadata.EMPTY_METADATA;
                 }
@@ -199,7 +231,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Build the meta data for the given method element excluding any class metadata.
+     * Get the annotation metadata for the given element and the given parent.
+     * This method is used for cases when you need to combine annotation metadata for
+     * two elements, for example a JavaBean property where the field and the method metadata
+     * need to be combined.
      *
      * @param parent  The parent element
      * @param element The element
@@ -223,7 +258,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         DefaultAnnotationMetadata annotationMetadata;
         if (existing instanceof DefaultAnnotationMetadata) {
             // ugly, but will have to do
-            annotationMetadata = (DefaultAnnotationMetadata) ((DefaultAnnotationMetadata) existing).clone();
+            annotationMetadata = ((DefaultAnnotationMetadata) existing).clone();
+        } else if (existing instanceof AnnotationMetadataHierarchy) {
+            final AnnotationMetadata declaredMetadata = ((AnnotationMetadataHierarchy) existing).getDeclaredMetadata();
+            if (declaredMetadata instanceof DefaultAnnotationMetadata) {
+                annotationMetadata = ((DefaultAnnotationMetadata) declaredMetadata).clone();
+            } else {
+                annotationMetadata = new DefaultAnnotationMetadata();
+            }
         } else {
             annotationMetadata = new DefaultAnnotationMetadata();
         }
@@ -381,11 +423,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Read the given member and value, applying conversions if necessary, and place the data in the given map.
      *
      * @param originatingElement The originating element
-     * @param memberName         The member
+     * @param member             The member
+     * @param memberName         The member name
      * @param annotationValue    The value
      * @return The object
      */
-    protected abstract Object readAnnotationValue(T originatingElement, String memberName, Object annotationValue);
+    protected abstract Object readAnnotationValue(T originatingElement, T member, String memberName, Object annotationValue);
 
 
     /**
@@ -527,7 +570,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 Object annotationValue = entry.getValue();
                 if (isInstantiatedMember) {
                     final String memberName = getAnnotationMemberName(member);
-                    final Object rawValue = readAnnotationValue(originatingElement, memberName, annotationValue);
+                    final Object rawValue = readAnnotationValue(originatingElement, member, memberName, annotationValue);
                     if (rawValue instanceof AnnotationClassValue) {
                         AnnotationClassValue acv = (AnnotationClassValue) rawValue;
                         annotationValues.put(memberName, new AnnotationClassValue(acv.getName(), true));
@@ -695,7 +738,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     aliasedAnnotationName = aliasAnnotationName.get().toString();
                 }
                 String aliasedMemberName = aliasMember.get().toString();
-                Object v = readAnnotationValue(originatingElement, aliasedMemberName, annotationValue);
+                Object v = readAnnotationValue(originatingElement, member, aliasedMemberName, annotationValue);
                 if (v != null) {
                     Optional<T> annotationMirror = getAnnotationMirror(aliasedAnnotationName);
                     if (annotationMirror.isPresent()) {
@@ -728,7 +771,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         } else if (aliasMember.isPresent()) {
             String aliasedNamed = aliasMember.get().toString();
-            Object v = readAnnotationValue(originatingElement, aliasedNamed, annotationValue);
+            Object v = readAnnotationValue(originatingElement, member, aliasedNamed, annotationValue);
             if (v != null) {
                 annotationValues.put(aliasedNamed, v);
             }
@@ -836,7 +879,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return annotationMetadata;
     }
 
-    private void buildStereotypeHierarchy(List<String> parents, T element, DefaultAnnotationMetadata metadata, boolean isDeclared) {
+    private void buildStereotypeHierarchy(List<String> parents, T element, DefaultAnnotationMetadata metadata, boolean isDeclared, List<String> excludes) {
         List<? extends A> annotationMirrors = getAnnotationsForType(element);
         if (!annotationMirrors.isEmpty()) {
 
@@ -849,7 +892,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
 
                 String annotationName = getAnnotationTypeName(annotationMirror);
-                if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
+                if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName) && !excludes.contains(annotationName)) {
                     topLevel.add(annotationMirror);
 
                     Map<CharSequence, Object> data = populateAnnotationData(element, annotationMirror, metadata, isDeclared);
@@ -883,18 +926,19 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         T annotationType = getTypeForAnnotation(annotationMirror);
         String parentAnnotationName = getAnnotationTypeName(annotationMirror);
         if (!parentAnnotationName.endsWith(".Nullable")) {
-            processAnnotationStereotypes(annotationMetadata, isDeclared, annotationType, parentAnnotationName);
+            processAnnotationStereotypes(annotationMetadata, isDeclared, annotationType, parentAnnotationName, Collections.emptyList());
         }
     }
 
-    private void processAnnotationStereotypes(DefaultAnnotationMetadata annotationMetadata, boolean isDeclared, T annotationType, String annotationName) {
+    private void processAnnotationStereotypes(DefaultAnnotationMetadata annotationMetadata, boolean isDeclared, T annotationType, String annotationName, List<String> excludes) {
         List<String> parentAnnotations = new ArrayList<>();
         parentAnnotations.add(annotationName);
         buildStereotypeHierarchy(
                 parentAnnotations,
                 annotationType,
                 annotationMetadata,
-                isDeclared
+                isDeclared,
+                excludes
         );
     }
 
@@ -907,7 +951,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private void processAnnotationStereotype(List<String> parents, T annotationType, String annotationTypeName, DefaultAnnotationMetadata metadata, boolean isDeclared) {
         List<String> stereoTypeParents = new ArrayList<>(parents);
         stereoTypeParents.add(annotationTypeName);
-        buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared);
+        buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared, Collections.emptyList());
     }
 
     /**
@@ -976,24 +1020,31 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     annotationValue.getAnnotationName(),
                     annotationValue.getValues()
             );
-            annotationMirror.ifPresent(annotationType ->
-                    processAnnotationStereotypes(
-                            defaultMetadata,
-                            true,
-                            annotationType,
-                            annotationValue.getAnnotationName()
-                    )
+            annotationMirror.ifPresent(annotationType -> {
+                processAnnotationStereotypes(
+                        defaultMetadata,
+                        true,
+                        annotationType,
+                        annotationValue.getAnnotationName(),
+                        DEFAULT_ANNOTATE_EXCLUDES
+                );
+            });
+        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+            AnnotationMetadataHierarchy hierarchy = (AnnotationMetadataHierarchy) annotationMetadata;
+            AnnotationMetadata declaredMetadata = annotate(hierarchy.getDeclaredMetadata(), annotationValue);
+            return hierarchy.createSibling(
+                    declaredMetadata
             );
         } else if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
             final Optional<T> annotationMirror = getAnnotationMirror(annotationValue.getAnnotationName());
             final Map<CharSequence, Object> values = annotationValue.getValues();
-            final Map<String, Map<CharSequence, Object>> declared =
-                    Collections.singletonMap(annotationValue.getAnnotationName(), values);
+            final Map<String, Map<CharSequence, Object>> declared = new HashMap<>(1);
+            declared.put(annotationValue.getAnnotationName(), values);
             final DefaultAnnotationMetadata newMetadata = new DefaultAnnotationMetadata(
                     declared,
                     null,
                     null,
-                    null,
+                    declared,
                     null
             );
             annotationMirror.ifPresent(annotationType ->
@@ -1001,7 +1052,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             newMetadata,
                             true,
                             annotationType,
-                            annotationValue.getAnnotationName()
+                            annotationValue.getAnnotationName(),
+                            DEFAULT_ANNOTATE_EXCLUDES
                     )
             );
             return newMetadata;

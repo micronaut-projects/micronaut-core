@@ -28,6 +28,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 
+import java.util.Collections;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
@@ -40,7 +41,7 @@ public class PersonControllerSpec {
 
     @BeforeClass
     public static void setupServer() {
-        server = ApplicationContext.run(EmbeddedServer.class);
+        server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", PersonControllerSpec.class.getSimpleName()));
         client = server
                 .getApplicationContext()
                 .createBean(RxHttpClient.class, server.getURL());

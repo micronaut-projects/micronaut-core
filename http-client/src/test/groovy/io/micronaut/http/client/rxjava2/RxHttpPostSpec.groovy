@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.rxjava2
 
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
@@ -198,6 +199,43 @@ class RxHttpPostSpec extends Specification {
         booleans[2] == false
     }
 
+    void "test creating a person"() {
+        Flowable<Person> flowable = client.retrieve(
+                HttpRequest.POST("/reactive/post/person", 'firstName=John')
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+
+                Argument.of(Person)
+        )
+
+        when:
+        Person person = flowable.blockingFirst()
+
+        then:
+        thrown(HttpClientResponseException)
+    }
+
+
+    @Introspected
+    static class Person {
+
+        private final String firstName
+        private final String lastName
+
+        Person(String firstName, String lastName) {
+            this.lastName = lastName
+            this.firstName = firstName
+        }
+
+        String getFirstName() {
+            return firstName
+        }
+
+        String getLastName() {
+            return lastName
+        }
+    }
+
     @Controller('/reactive/post')
     static class ReactivePostController {
         @Post('/single')
@@ -227,6 +265,11 @@ class RxHttpPostSpec extends Specification {
         @Post(uri = "/booleans")
         Flowable<Boolean> booleans(@Body Flowable<Boolean> booleans) {
             return booleans
+        }
+
+        @Post(uri = "/person", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        Single<HttpResponse<Person>> createPerson(@Body Person person)  {
+            return Single.just(HttpResponse.created(person))
         }
     }
 

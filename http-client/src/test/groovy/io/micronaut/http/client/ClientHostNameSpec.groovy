@@ -18,7 +18,6 @@ class ClientHostNameSpec extends Specification {
         client.close()
     }
 
-
     void "test host name with underscores and port"() {
         when:
         def client = HttpClient.create(new URL("https://foo_bar:8080"))
@@ -31,4 +30,18 @@ class ClientHostNameSpec extends Specification {
         cleanup:
         client.close()
     }
+
+    void "test host name with dots and dashes and port"() {
+        when:
+        def client = HttpClient.create(new URL("https://slave1-6x8-build-agent-2.0.1-5h7sl:8080"))
+        client.toBlocking().retrieve("/")
+
+        then:
+        def e = thrown(HttpClientException)
+        e.message.contains('Connect Error: slave1-6x8-build-agent-2.0.1-5h7sl')
+
+        cleanup:
+        client.close()
+    }
+
 }

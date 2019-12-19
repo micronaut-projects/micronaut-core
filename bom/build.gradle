@@ -1,81 +1,57 @@
-publishing {
-    publications {
-        maven(MavenPublication) {
-            pom.withXml {
-                def xml = asNode()
+plugins {
+    id 'java-platform'
+}
 
-                def profiles = new Properties()
-                profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
+group projectGroupId
 
-                boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
-                
-                xml.children().last() + {
-                    def mkp = delegate
+apply plugin: 'maven-publish'
 
-                    mkp.properties {
-                        for(dep in dependencyVersions) {
-                            def v = dep.value.version
-                            if(!v.toString().endsWith("-SNAPSHOT") || micronautSnapshot) {
-                                mkp."${dep.key}.version"(v)
-                            }
-                        }
-                    }
+def profiles = new Properties()
+profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
+boolean micronautSnapshot = rootProject.version.toString().endsWith("-SNAPSHOT")
 
-                    mkp.dependencyManagement {
-                        mkp.dependencies {
+def excludedProjects = [
+        "benchmarks",
+        "test-suite",
+        "test-suite-groovy",
+        "test-suite-helper",
+        "test-suite-kotlin",
+        "test-utils"
+]
 
-                            for (profile in profiles) {
-                                mkp.dependency {
-                                    mkp.groupId 'io.micronaut.profiles'
-                                    mkp.artifactId profile.key
-                                    def version = profile.value
-                                    if (!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
-                                        throw new RuntimeException("Cannot have a snapshot dependency on a profile [$profile.key] for a release!")
-                                    }
-                                    mkp.version(version)
-                                }
-                            }
+apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
+dependencies {
+    constraints {
+        for (profile in profiles) {
+            if (!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
+                throw new RuntimeException("Cannot have a snapshot dependency on a profile [$profile.key] for a release!")
+            }
+            api "io.micronaut.profiles:$profile.key:$profile.value"
+        }
 
-                            for (Project p : rootProject.subprojects) {
-                                if (!p.subprojects.empty) continue
-                                if (p.name == "bom") continue
-                                if (p.hasProperty("bomExclude") && p.property("bomExclude") == true) continue
-                                
-                                mkp.dependency {
-                                    mkp.groupId p.group
-                                    mkp.artifactId "micronaut-$p.name"
-                                    mkp.version p.version
-                                }
-                            }
+        for (Project p : rootProject.subprojects) {
+            if (!p.subprojects.empty) continue
+            if (p.name == "bom") continue
+            if (excludedProjects.contains(p.name)) continue
 
-                            for (dep in dependencyVersions) {
-                                def info = dep.value
-                                // don't include snapshots
-                                if(info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
-                                    continue
-                                }
+            api "$p.group:micronaut-$p.name:$p.version"
+        }
 
-                                def versionExpr = "\${${dep.key}.version}"
+        for (dep in dependencyVersions) {
+            def info = dep.value
+            // don't include snapshots
+            if (info.version.toString().endsWith("-SNAPSHOT") && !micronautSnapshot) {
+                continue
+            }
 
-                                if (info.name) {
-                                    mkp.dependency {
-                                        mkp.groupId info.group
-                                        mkp.artifactId info.name
-                                        mkp.version versionExpr
-                                    }
-                                }
-                                if(info.modules) {
-                                   for(m in info.modules) {
-                                       mkp.dependency {
-                                           mkp.groupId info.group
-                                           mkp.artifactId m
-                                           mkp.version versionExpr
-                                       }
-                                   }
-                                }
-                            }
-                        }
-                    }
+            def versionExpr = dep.value.version
+
+            if (info.name) {
+                api "$info.group:$info.name:$versionExpr"
+            }
+            if (info.modules) {
+                for (m in info.modules) {
+                    api "$info.group:$m:$versionExpr"
                 }
             }
         }

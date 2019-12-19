@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client
 
+import com.fasterxml.jackson.databind.DeserializationFeature
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.socket.SocketUtils
@@ -23,6 +24,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
+import io.micronaut.jackson.annotation.JacksonFeatures
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Get
 import io.reactivex.Flowable
@@ -38,24 +40,28 @@ import javax.inject.Singleton
  * @author Graeme Rocher
  * @since 1.0
  */
-@Retry
+@Retry(mode = Retry.Mode.SETUP_FEATURE_CLEANUP)
 class ClientScopeSpec extends Specification {
 
-    @Shared int port = SocketUtils.findAvailableTcpPort()
+    ApplicationContext context
+    int port
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run(
-            'spec.name': 'ClientScopeSpec',
-            'from.config': '/',
-            'micronaut.server.port':port,
-            'micronaut.http.services.my-service.url': "http://localhost:$port",
-            'micronaut.http.services.my-service-declared.url': "http://my-service-declared:$port",
-            'micronaut.http.services.my-service-declared.path': "/my-declarative-client-path"
-    )
+    void setup() {
+        port = SocketUtils.findAvailableTcpPort()
+        context = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'ClientScopeSpec',
+                'from.config': '/',
+                'micronaut.server.port':port,
+                'micronaut.http.services.my-service.url': "http://localhost:$port",
+                'micronaut.http.services.my-service-declared.url': "http://my-service-declared:$port",
+                'micronaut.http.services.my-service-declared.path': "/my-declarative-client-path",
+                'micronaut.http.services.other-service.url': "http://localhost:$port",
+                'micronaut.http.services.other-service.path': "/scope"]).applicationContext
+    }
 
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    void cleanup() {
+        context.close()
+    }
 
     void "test client scope annotation method injection"() {
         given:
@@ -67,6 +73,9 @@ class ClientScopeSpec extends Specification {
         myService.get() == 'success'
         myJavaService.client == myService.client
         myJavaService.rxHttpClient == myService.rxHttpClient
+
+        cleanup:
+        context.close()
     }
 
     void "test client scope annotation field injection"() {
@@ -119,6 +128,13 @@ class ClientScopeSpec extends Specification {
         then:
         Flowable.fromPublisher(((DefaultHttpClient) myJavaService.client)
                 .resolveRequestURI(HttpRequest.GET("/foo"))).blockingFirst().toString() == "http://localhost:${port}/foo"
+    }
+
+    void "test service definition with declarative client with jackson features"() {
+        MyServiceJacksonFeatures client = context.getBean(MyServiceJacksonFeatures)
+
+        expect:
+        client.name() == "success"
     }
 
     @Controller('/scope')
@@ -200,6 +216,15 @@ class ClientScopeSpec extends Specification {
     @Requires(property = 'spec.name', value = "ClientScopeSpec")
     @Client(id = 'my-service-declared')
     static interface MyDeclarativeService {
+
+        @Get
+        String name()
+    }
+
+    @Requires(property = 'spec.name', value = "ClientScopeSpec")
+    @Client(id = 'other-service')
+    @JacksonFeatures(disabledDeserializationFeatures = DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE)
+    static interface MyServiceJacksonFeatures {
 
         @Get
         String name()

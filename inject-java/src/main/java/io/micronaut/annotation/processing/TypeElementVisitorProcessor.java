@@ -19,6 +19,8 @@ import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
@@ -96,7 +98,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         roundEnv.getRootElements()
                 .stream()
-                .filter(JavaModelUtils::isClassOrInterface)
+                .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
                 .map(modelUtils::classElementFor)
                 .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
                 .forEach((typeElement) -> {
@@ -171,15 +173,17 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         private final TypeElement concreteClass;
         private final List<LoadedVisitor> visitors;
+        private AnnotationMetadata typeAnnotationMetadata;
 
         ElementVisitor(TypeElement concreteClass, List<LoadedVisitor> visitors) {
             this.concreteClass = concreteClass;
             this.visitors = visitors;
+            this.typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
         }
 
         @Override
         public Object visitType(TypeElement classElement, Object o) {
-            AnnotationMetadata typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(classElement);
+
 
             for (LoadedVisitor visitor : visitors) {
                 final io.micronaut.inject.ast.Element resultingElement = visitor.visit(classElement, typeAnnotationMetadata);
@@ -194,7 +198,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     concreteClass.getQualifiedName().equals(classElement.getQualifiedName());
 
             if (shouldVisit) {
-                if (typeAnnotationMetadata.hasStereotype(Introduction.class)) {
+                if (typeAnnotationMetadata.hasStereotype(Introduction.class) || (typeAnnotationMetadata.hasStereotype(Introspected.class) && modelUtils.isAbstract(classElement))) {
                     classElement.asType().accept(new PublicAbstractMethodVisitor<Object, Object>(classElement, modelUtils, elementUtils) {
                         @Override
                         protected void accept(DeclaredType type, Element element, Object o) {
@@ -222,7 +226,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         @Override
         public Object visitExecutable(ExecutableElement executableElement, Object o) {
-            AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(executableElement);
+            AnnotationMetadata methodAnnotationMetadata = new AnnotationMetadataHierarchy(
+                    typeAnnotationMetadata,
+                    annotationUtils.getAnnotationMetadata(executableElement)
+            );
             if (executableElement.getSimpleName().toString().equals("<init>")) {
                 for (LoadedVisitor visitor : visitors) {
                     final io.micronaut.inject.ast.Element resultingElement = visitor.visit(executableElement, methodAnnotationMetadata);

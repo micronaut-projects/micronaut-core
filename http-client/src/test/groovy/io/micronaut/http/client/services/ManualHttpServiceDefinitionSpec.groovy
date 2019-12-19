@@ -33,11 +33,13 @@ import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.ssl.SslHandler
+import spock.lang.Retry
 import spock.lang.Specification
 
 import java.security.cert.X509Certificate
 import java.time.Duration
 
+@Retry // sometimes fails due to port binding on CI, so retry
 class ManualHttpServiceDefinitionSpec extends Specification {
 
 

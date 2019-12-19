@@ -1,23 +1,30 @@
 plugins {
-    id "me.champeau.gradle.jmh" version "0.4.8"
+    id "me.champeau.gradle.jmh" version "0.5.0"
 }
 
 dependencies {
     annotationProcessor project(":inject-java")
+    jmhAnnotationProcessor project(":inject-java")
+    jmhAnnotationProcessor "org.ow2.asm:asm:$asmVersion"
+    jmhAnnotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
+    
     annotationProcessor project(":validation")
-    compileOnly project(":inject-java")
     compileOnly project(":validation")
-    compile project(":inject")
-    compile project(":validation")
-    compile project(":runtime")
+    api project(":inject")
+    api project(":inject-java-test")
+    api project(":validation")
+    api project(":http-server")
+    api project(":router")
+    api project(":runtime")
 
-
-    jmh 'org.openjdk.jmh:jmh-core:1.21'
-    jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.21'
+    jmh 'org.openjdk.jmh:jmh-core:1.22'
+    jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.22'
 }
 jmh {
+    include =['io.micronaut.http.server.StartupBenchmark']
     duplicateClassesStrategy = 'warn'
     warmupIterations = 2
-    iterations = 4
+    iterations = 3
     fork = 1
+//    jvmArgs = ["-agentpath:/Applications/YourKit-Java-Profiler-2018.04.app/Contents/Resources/bin/mac/libyjpagent.jnilib"]
 }

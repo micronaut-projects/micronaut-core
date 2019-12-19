@@ -26,6 +26,7 @@ import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.InnerClassNode
+import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
 import java.util.function.Function
@@ -40,8 +41,10 @@ import java.util.function.Function
 class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<ClassNode> {
 
     final SourceUnit sourceUnit
+    final CompilationUnit compilationUnit
 
-    GroovyConfigurationMetadataBuilder(SourceUnit sourceUnit) {
+    GroovyConfigurationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
+        this.compilationUnit = compilationUnit
         this.sourceUnit = sourceUnit
     }
 
@@ -53,9 +56,14 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
 
     @Override
     protected String buildTypePath(ClassNode owningType, ClassNode declaringType) {
-        StringBuilder path = new StringBuilder(calculateInitialPath(owningType, declaringType))
+        return buildTypePath(owningType, declaringType, getAnnotationMetadata(owningType.isInterface() ? owningType : declaringType))
+    }
 
-        prependSuperclasses(declaringType, path)
+    @Override
+    protected String buildTypePath(ClassNode owningType, ClassNode declaringType, AnnotationMetadata annotationMetadata) {
+        StringBuilder path = new StringBuilder(calculateInitialPath(owningType, annotationMetadata))
+
+        prependSuperclasses(owningType.isInterface() ? owningType : declaringType, path)
         while (declaringType != null && declaringType instanceof InnerClassNode) {
             // we have an inner class, so prepend inner class
             declaringType = ((InnerClassNode) declaringType).getOuterClass()
@@ -83,8 +91,7 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
         return path.toString()
     }
 
-    private String calculateInitialPath(ClassNode owningType, ClassNode declaringType) {
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata(declaringType)
+    private String calculateInitialPath(ClassNode owningType, AnnotationMetadata annotationMetadata) {
         return annotationMetadata.stringValue(ConfigurationReader.class)
                 .map(pathEvaluationFunction(annotationMetadata)).orElseGet( {->
             AnnotationMetadata ownerMetadata = getAnnotationMetadata(owningType)
@@ -121,19 +128,39 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
 
     @Override
     protected AnnotationMetadata getAnnotationMetadata(ClassNode type) {
-        return AstAnnotationUtils.getAnnotationMetadata(sourceUnit, type)
+        return AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, type)
     }
 
     private void prependSuperclasses(ClassNode declaringType, StringBuilder path) {
-        ClassNode superclass = declaringType.getSuperClass()
-        while (superclass != ClassHelper.OBJECT_TYPE) {
-            Optional<String> parentConfig = getAnnotationMetadata(superclass).stringValue(ConfigurationReader.class)
-            if (parentConfig.isPresent()) {
-                path.insert(0, parentConfig.get() + '.')
-                superclass = superclass.getSuperClass()
-            } else {
-                break
+        if (declaringType.isInterface()) {
+            ClassNode superInterface = resolveSuperInterface(declaringType)
+            while (superInterface != null) {
+                AnnotationMetadata annotationMetadata = getAnnotationMetadata(superInterface)
+                Optional<String> parentConfig = annotationMetadata.stringValue(ConfigurationReader.class)
+                if (parentConfig.isPresent()) {
+                    path.insert(0, parentConfig.get() + '.')
+                    superInterface = resolveSuperInterface(superInterface)
+                } else {
+                    break;
+                }
             }
+        } else {
+            ClassNode superclass = declaringType.getSuperClass()
+            while (superclass != ClassHelper.OBJECT_TYPE) {
+                Optional<String> parentConfig = getAnnotationMetadata(superclass).stringValue(ConfigurationReader.class)
+                if (parentConfig.isPresent()) {
+                    path.insert(0, parentConfig.get() + '.')
+                    superclass = superclass.getSuperClass()
+                } else {
+                    break
+                }
+            }
+        }
+    }
+    private ClassNode resolveSuperInterface(ClassNode declaringType) {
+        def interfaces = declaringType.getInterfaces()
+        if (interfaces) {
+            return interfaces.find { getAnnotationMetadata(it).hasStereotype(ConfigurationReader) }
         }
     }
 }

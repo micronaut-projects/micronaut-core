@@ -73,6 +73,7 @@ public final class Parser {
      */
     public static Iterable<? extends Element> parse(JavaFileObject... sources) {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
         InMemoryJavaFileManager fileManager =
                 new InMemoryJavaFileManager(
@@ -142,6 +143,7 @@ public final class Parser {
             if(error.length() > 0) {
                 throw new RuntimeException(error.toString());
             }
+
             return fileManager.getOutputFiles();
         } catch (IOException e) {
             throw new RuntimeException(e);

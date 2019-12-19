@@ -51,6 +51,15 @@ class UriTemplateSpec extends Specification {
         '{var}{?q}'    | '{var2}'             | [var: 'foo', var2: 'bar', q: 'test']    | 'foo/bar?q=test'
         '{var}{#hash}' | '{var2}'             | [var: 'foo', var2: 'bar', hash: 'test'] | 'foo/bar#test'
         '/'            | '{?req*}'            | [req: [var: 'foo', var2: null]]         | '/?var=foo'
+        '/'            | '{?keys*}{?keys2*}'  | [keys: [var: 'foo', var2: null]]          | '/?var=foo'
+        '/'            | '{?keys*}{?keys2*}'  | [keys: [var: null], keys2: [var2: null]]  | '/'
+        '/'            | '{?keys*}{?keys2*}'  | [keys: [var: 'foo'], keys2: [var2: null]] | '/?var=foo'
+        '/'            | '{?keys*}{?keys2*}'  | [keys: [var: 'foo'], keys2: [var2: 'bar']]| '/?var=foo&var2=bar'
+        '/'            | '{?keys*}{?keys2*}'  | [keys: [var: null], keys2: [var2: 'bar']] | '/?var2=bar'
+        '/'            | '{?keys*}{&keys2*}'  | [keys: [var: null], keys2: [var2: null]]  | '/'
+        '/'            | '{?keys*}{&keys2*}'  | [keys: [var: 'foo'], keys2: [var2: null]] | '/?var=foo'
+        '/'            | '{?keys*}{&keys2*}'  | [keys: [var: 'foo'], keys2: [var2: 'bar']]| '/?var=foo&var2=bar'
+        '/'            | '{?keys*}{&keys2*}'  | [keys: [var: null], keys2: [var2: 'bar']] | '/&var2=bar'
     }
 
     @Unroll
@@ -86,6 +95,8 @@ class UriTemplateSpec extends Specification {
         '{var}{?q}'    | '/{var2}'                      | '{var}/{var2}'
         '{var}{#hash}' | '{var2}'                       | '{var}/{var2}'
         '/foo'         | '/find{?year*}'                | '/foo/find'
+        '/foo'         | '/find{?bar*}{?baz*}'          | '/foo/find'
+        '/foo'         | '/find{?bar*}{&baz*}'          | '/foo/find'
 
 
     }
@@ -126,6 +137,8 @@ class UriTemplateSpec extends Specification {
         '{var}{?q}'    | '/{var2}'                      | '{var}/{var2}{?q}'
         '{var}{#hash}' | '{var2}'                       | '{var}/{var2}{#hash}'
         '/foo'         | '/find{?year*}'                | '/foo/find{?year*}'
+        '/foo'         | '/find{?keys1*}{?keys2*}'      | '/foo/find{?keys1*}{?keys2*}'
+        '/foo'         | '/find{?keys1*}{&keys2*}'      | '/foo/find{?keys1*}{&keys2*}'
 
 
     }
@@ -235,6 +248,7 @@ class UriTemplateSpec extends Specification {
         '{/list}'             | [list: ['red', 'green', 'blue']]                   | '/red,green,blue'
         '{/list*}'            | [list: ['red', 'green', 'blue']]                   | '/red/green/blue'
         '{/list*,path:4}'     | [list: ['red', 'green', 'blue'], path: "/foo/bar"] | '/red/green/blue/%2Ffoo'
+        '/files/content{/path*}{/name}' | [name: "value"]                                                 | '/files/content/value'
         '{/keys}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '/semi,%3B,dot,.,comma,%2C'
         '{/keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '/semi=%3B/dot=./comma=%2C'
         '{;who}'              | [who: 'fred']                                      | ';who=fred' // Section 3.2.7 - Level 3 - Path-Style Parameter Expansion: {;var}
@@ -271,6 +285,15 @@ class UriTemplateSpec extends Specification {
         '{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '&semi=%3B&dot=.&comma=%2C'
         '{?list*,locale,currency}' | [list: ['red', 'green', 'blue'], locale: null, currency: 'USD'] | '?list=red&list=green&list=blue&currency=USD'
         '{?param[]*}'         | ['param[]': ['a', 'b', 'c']]                       | '?param[]=a&param[]=b&param[]=c'
+        '{?keys*}{?keys2*}'   | [keys: [var: 'foo', var2: null]]                   | '?var=foo'
+        '{?keys*}{?keys2*}'   | [keys: [var: null], keys2: [var2: null]]           | ''
+        '{?keys*}{?keys2*}'   | [keys: [var: 'foo'], keys2: [var2: null]]          | '?var=foo'
+        '{?keys*}{?keys2*}'   | [keys: [var: 'foo'], keys2: [var2: 'bar']]         | '?var=foo&var2=bar'
+        '{?keys*}{?keys2*}'   | [keys: [var: null], keys2: [var2: 'bar']]          | '?var2=bar'
+        '{?keys*}{&keys2*}'   | [keys: [var: null], keys2: [var2: null]]           | ''
+        '{?keys*}{&keys2*}'   | [keys: [var: 'foo'], keys2: [var2: null]]          | '?var=foo'
+        '{?keys*}{&keys2*}'   | [keys: [var: 'foo'], keys2: [var2: 'bar']]         | '?var=foo&var2=bar'
+        '{?keys*}{&keys2*}'   | [keys: [var: null], keys2: [var2: 'bar']]          | '&var2=bar'
     }
 
 
@@ -284,6 +307,14 @@ class UriTemplateSpec extends Specification {
 
         where:
         template                                 | arguments                                          | result
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value']                                       | 'http://example.com/v/value/p'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val']                             | 'http://example.com/v/value/p?o=val'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', m: 'val']                             | 'http://example.com/v/value/p?m=val'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', s: 'val']                             | 'http://example.com/v/value/p?s=val'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', m: 'val2', s: 'val3']      | 'http://example.com/v/value/p?o=val1&m=val2&s=val3'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', m: 'val2', s: 'val3']                 | 'http://example.com/v/value/p?m=val2&s=val3'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', s: 'val3']                 | 'http://example.com/v/value/p?o=val1&s=val3'
+        'http://example.com/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', m: 'val2'           ]      | 'http://example.com/v/value/p?o=val1&m=val2'
         'http://example.com/{var}'               | [var: 'value']                                     | 'http://example.com/value' // Section 2.4.1 - Prefix Values
         'http://example.com/{var:20}'            | [var: 'value']                                     | 'http://example.com/value'
         'http://example.com/{var:3}'             | [var: 'value']                                     | 'http://example.com/val'
@@ -411,6 +442,15 @@ class UriTemplateSpec extends Specification {
         'http://example.com/foo{?query,number}'  | [query: 'mycelium', number: 100]                   | 'http://example.com/foo?query=mycelium&number=100'
         'http://example.com/foo{?query,number}'  | [number: 100]                                      | 'http://example.com/foo?number=100'
         'http://example.com/foo{?req*}'          | [req: [number: 100, name: null]]                   | 'http://example.com/foo?number=100'
+        'http://example.com/foo{?keys*}{?keys2*}'| [keys: [var: 'foo', var2: null]]                   | 'http://example.com/foo?var=foo'
+        'http://example.com/foo{?keys*}{?keys2*}'| [keys: [var: null], keys2: [var2: null]]           | 'http://example.com/foo'
+        'http://example.com/foo{?keys*}{?keys2*}'| [keys: [var: 'foo'], keys2: [var2: null]]          | 'http://example.com/foo?var=foo'
+        'http://example.com/foo{?keys*}{?keys2*}'| [keys: [var: 'foo'], keys2: [var2: 'bar']]         | 'http://example.com/foo?var=foo&var2=bar'
+        'http://example.com/foo{?keys*}{?keys2*}'| [keys: [var: null], keys2: [var2: 'bar']]          | 'http://example.com/foo?var2=bar'
+        'http://example.com/foo{?keys*}{&keys2*}'| [keys: [var: null], keys2: [var2: null]]           | 'http://example.com/foo'
+        'http://example.com/foo{?keys*}{&keys2*}'| [keys: [var: 'foo'], keys2: [var2: null]]          | 'http://example.com/foo?var=foo'
+        'http://example.com/foo{?keys*}{&keys2*}'| [keys: [var: 'foo'], keys2: [var2: 'bar']]         | 'http://example.com/foo?var=foo&var2=bar'
+        'http://example.com/foo{?keys*}{&keys2*}'| [keys: [var: null], keys2: [var2: 'bar']]          | 'http://example.com/foo&var2=bar'
     }
 
 
@@ -424,6 +464,14 @@ class UriTemplateSpec extends Specification {
 
         where:
         template                                      | arguments                                          | result
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value']                                       | 'http://example.com:8080/v/value/p'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val']                             | 'http://example.com:8080/v/value/p?o=val'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', m: 'val']                             | 'http://example.com:8080/v/value/p?m=val'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', s: 'val']                             | 'http://example.com:8080/v/value/p?s=val'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', m: 'val2', s: 'val3']      | 'http://example.com:8080/v/value/p?o=val1&m=val2&s=val3'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', m: 'val2', s: 'val3']                 | 'http://example.com:8080/v/value/p?m=val2&s=val3'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', s: 'val3']                 | 'http://example.com:8080/v/value/p?o=val1&s=val3'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val1', m: 'val2'           ]      | 'http://example.com:8080/v/value/p?o=val1&m=val2'
         'http://example.com:8080{+path,x}/here'       | [path: "/foo/bar", x: 1024]                        | 'http://example.com:8080/foo/bar,1024/here'
         'http://example.com:8080/{var}'               | [var: 'value']                                     | 'http://example.com:8080/value' // Section 2.4.1 - Prefix Values
         'http://example.com:8080/{var:20}'            | [var: 'value']                                     | 'http://example.com:8080/value'
@@ -548,5 +596,15 @@ class UriTemplateSpec extends Specification {
         'http://example.com:8080/{&keys}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com:8080/&keys=semi,%3B,dot,.,comma,%2C'
         'http://example.com:8080/{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com:8080/&semi=%3B&dot=.&comma=%2C'
         'http://example.com:8080/{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: null]]     | 'http://example.com:8080/&semi=%3B&dot=.'
+        'http://example.com:8080/{?keys*}{?keys2*}'   | [keys: [var: 'foo', var2: null]]                   | 'http://example.com:8080/?var=foo'
+        'http://example.com:8080/{?keys*}{?keys2*}'   | [keys: [var: null], keys2: [var2: null]]           | 'http://example.com:8080/'
+        'http://example.com:8080/{?keys*}{?keys2*}'   | [keys: [var: 'foo'], keys2: [var2: null]]          | 'http://example.com:8080/?var=foo'
+        'http://example.com:8080/{?keys*}{?keys2*}'   | [keys: [var: 'foo'], keys2: [var2: 'bar']]         | 'http://example.com:8080/?var=foo&var2=bar'
+        'http://example.com:8080/{?keys*}{?keys2*}'   | [keys: [var: null], keys2: [var2: 'bar']]          | 'http://example.com:8080/?var2=bar'
+        'http://example.com:8080/{?keys*}{&keys2*}'   | [keys: [var: null], keys2: [var2: null]]           | 'http://example.com:8080/'
+        'http://example.com:8080/{?keys*}{&keys2*}'   | [keys: [var: 'foo'], keys2: [var2: null]]          | 'http://example.com:8080/?var=foo'
+        'http://example.com:8080/{?keys*}{&keys2*}'   | [keys: [var: 'foo'], keys2: [var2: 'bar']]         | 'http://example.com:8080/?var=foo&var2=bar'
+        'http://example.com:8080/{?keys*}{&keys2*}'   | [keys: [var: null], keys2: [var2: 'bar']]          | 'http://example.com:8080/&var2=bar'
     }
+
 }

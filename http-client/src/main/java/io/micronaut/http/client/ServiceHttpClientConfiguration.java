@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
@@ -38,7 +39,7 @@ import static io.micronaut.http.client.ServiceHttpClientConfiguration.PREFIX;
  * @since 1.0
  */
 @EachProperty(PREFIX)
-public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
+public class ServiceHttpClientConfiguration extends HttpClientConfiguration implements ClientContextPathProvider {
 
     /**
      * Prefix for HTTP Client settings.
@@ -187,6 +188,11 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
      */
     public void setPath(String path) {
         this.path = path;
+    }
+
+    @Override
+    public Optional<String> getContextPath() {
+        return getPath();
     }
 
     /**

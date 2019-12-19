@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.configuration;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -34,6 +35,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @ConfigurationProperties("netty")
+@Replaces(HttpServerConfiguration.class)
 public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**

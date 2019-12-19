@@ -17,7 +17,9 @@ package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.inject.BeanIdentifier;
+import io.micronaut.inject.validation.BeanDefinitionValidator;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
@@ -42,7 +44,8 @@ public interface BeanContext extends
     BeanLocator,
     BeanDefinitionRegistry,
     ApplicationEventPublisher,
-    AnnotationMetadataResolver {
+    AnnotationMetadataResolver,
+    MutableAttributeHolder {
 
     /**
      * Inject an existing instance.
@@ -170,6 +173,11 @@ public interface BeanContext extends
      * @return The class loader used by this context
      */
     @Nonnull ClassLoader getClassLoader();
+
+    /**
+     * @return Get the configured bean validator, if any.
+     */
+    @Nonnull BeanDefinitionValidator getBeanValidator();
 
     @Override
     @Nonnull <T> BeanContext registerSingleton(@Nonnull Class<T> type, @Nonnull T singleton, @Nullable Qualifier<T> qualifier, boolean inject);

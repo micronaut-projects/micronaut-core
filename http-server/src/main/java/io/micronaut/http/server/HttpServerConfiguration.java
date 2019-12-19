@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.server.cors.CorsOriginConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
@@ -40,7 +41,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @ConfigurationProperties(value = HttpServerConfiguration.PREFIX, cliPrefix = "")
-public class HttpServerConfiguration {
+public class HttpServerConfiguration implements ServerContextPathProvider {
 
     /**
      * The default port value.
@@ -51,8 +52,8 @@ public class HttpServerConfiguration {
     /**
      * The prefix used for configuration.
      */
-
     public static final String PREFIX = "micronaut.server";
+
 
     /**
      * The default value random port.
