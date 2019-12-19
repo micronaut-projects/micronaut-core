@@ -45,6 +45,17 @@ class JacksonSetupSpec extends Specification {
         applicationContext?.close()
     }
 
+    void "verify json object mapper is primary"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper.class)
+
+        expect:
+        objectMapper.readTree('{"foo" : "bar"}').get('foo').textValue() == 'bar'
+
+        cleanup:
+        applicationContext?.close()
+    }
 
     void "verify custom jackson setup"() {
 
