@@ -278,5 +278,7 @@ and progress through process manually -> Close -> Publish ... under staging repo
 if (!project.version.endsWith("-SNAPSHOT")) {
     // disable remote publish for non-snapshot versions
     // since releases are published to bintray
-    publishMavenPublicationToMavenRepository.enabled = false
+    tasks.withType(PublishToMavenRepository) { task ->
+        task.enabled = false
+    }
 }

@@ -712,7 +712,7 @@ subprojects { Project subproject ->
 
 
         if (isDocumented) {
-            compileOnly "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion", {
+            annotationProcessor "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion", {
                 transitive = false
             }
         }
