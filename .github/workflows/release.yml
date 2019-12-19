@@ -13,11 +13,18 @@ jobs:
       with:
         java-version: 1.8
         ref: ${{ github.head_ref }}
-    - name: Publish to Bintray
+    - name: Upload to Bintray
       env:
          BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
          BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
-      run: ./gradlew assemble bintrayUpload docs --no-daemon && ./gradlew bintrayPublish --no-daemon --dry-run
+      run: ./gradlew bintrayUpload --no-daemon
+    - name: Publish to Bintray
+      env:
+        BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
+        BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
+      run: ./gradlew bintrayPublish --no-daemon --dry-run
+    - name: Assemble Distribution
+      run: ./gradlew assemble docs --no-daemon
     - id: release_version
       if: success()
       run: echo ::set-output name=release_version::${GITHUB_REF:11}
