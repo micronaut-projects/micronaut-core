@@ -240,7 +240,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     /**
-     * Intercept the aync method invocation.
+     * Intercept the async method invocation.
      *
      * @param context          Contains information about method invocation
      * @param returnTypeObject The return type of the method in Micronaut
@@ -273,7 +273,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                                 return;
                             }
                         }
-                        CompletableFuture<?> completableFuture = (CompletableFuture) context.proceed();
+                        CompletableFuture<?> completableFuture = (CompletableFuture<?>) context.proceed();
                         if (completableFuture == null) {
                             thisFuture.complete(null);
                         } else {
@@ -290,8 +290,14 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                                         }
                                     };
                                     if (o1 != null) {
+                                        if (LOG.isTraceEnabled()) {
+                                            LOG.trace("Storing in the cache [{}] with key [{}] the result of invocation [{}]: {}", asyncCache.getName(), key, context, o1);
+                                        }
                                         asyncCache.put(key, o1).whenComplete(completionHandler);
                                     } else {
+                                        if (LOG.isTraceEnabled()) {
+                                            LOG.trace("Invalidating the key [{}] of the cache [{}] since the result of invocation [{}] was null", key, asyncCache.getName(), context);
+                                        }
                                         asyncCache.invalidate(key).whenComplete(completionHandler);
                                     }
 
@@ -376,6 +382,9 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                         if (invalidateAll) {
                             for (String cacheName : cacheNames) {
                                 AsyncCache<?> asyncCache = cacheManager.getCache(cacheName).async();
+                                if (LOG.isTraceEnabled()) {
+                                    LOG.trace("Invalidating all the entries of the cache [{}]", asyncCache.getName());
+                                }
                                 asyncCache.invalidateAll().whenCompleteAsync((aBoolean, throwable) -> {
                                     if (throwable != null) {
                                         asyncCacheErrorHandler.handleInvalidateError(asyncCache, asRuntimeException(throwable));
@@ -389,6 +398,9 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                             Object key = keyGenerator.generateKey(context, parameterValues);
                             for (String cacheName : cacheNames) {
                                 AsyncCache<?> asyncCache = cacheManager.getCache(cacheName).async();
+                                if (LOG.isTraceEnabled()) {
+                                    LOG.trace("Invalidating the key [{}] of the cache [{}]", key, asyncCache.getName());
+                                }
                                 asyncCache.invalidate(key).whenCompleteAsync((aBoolean, throwable) -> {
                                     if (throwable != null) {
                                         asyncCacheErrorHandler.handleInvalidateError(asyncCache, asRuntimeException(throwable));
@@ -538,8 +550,14 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                                    }
                                };
                                if (o != null) {
+                                   if (LOG.isTraceEnabled()) {
+                                       LOG.trace("Storing in the cache [{}] with key [{}] the result of invocation [{}]: {}", asyncCache.getName(), key, context, o);
+                                   }
                                    asyncCache.put(key, o).whenComplete(completionHandler);
                                } else {
+                                   if (LOG.isTraceEnabled()) {
+                                       LOG.trace("Invalidating the key [{}] of the cache [{}] since the result of invocation [{}] was null", key, asyncCache.getName(), context);
+                                   }
                                    asyncCache.invalidate(key).whenComplete(completionHandler);
                                }
                            }).toFlowable();
@@ -787,6 +805,9 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 if (async) {
                     AsyncCache<?> asyncCache = syncCache.async();
                     if (invalidateAll) {
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("Invalidating all the entries of the cache [{}]", asyncCache.getName());
+                        }
                         CompletableFuture<Boolean> future = asyncCache.invalidateAll();
                         future.whenCompleteAsync((aBoolean, throwable) -> {
                             if (throwable != null) {
@@ -795,6 +816,9 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                         }, ioExecutor);
                     } else {
                         Object finalKey = key;
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("Invalidating the key [{}] of the cache [{}]", key, asyncCache.getName());
+                        }
                         CompletableFuture<Boolean> future = asyncCache.invalidate(key);
                         future.whenCompleteAsync((aBoolean, throwable) -> {
                             if (throwable != null) {
@@ -805,6 +829,9 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 } else {
                     if (invalidateAll) {
                         try {
+                            if (LOG.isTraceEnabled()) {
+                                LOG.trace("Invalidating all the entries of the cache [{}]", syncCache.getName());
+                            }
                             syncCache.invalidateAll();
                         } catch (RuntimeException e) {
                             if (errorHandler.handleInvalidateError(syncCache, e)) {
@@ -813,6 +840,9 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                         }
                     } else {
                         try {
+                            if (LOG.isTraceEnabled()) {
+                                LOG.trace("Invalidating the key [{}] of the cache [{}]", key, syncCache.getName());
+                            }
                             syncCache.invalidate(key);
                         } catch (RuntimeException e) {
                             if (errorHandler.handleInvalidateError(syncCache, key, e)) {
