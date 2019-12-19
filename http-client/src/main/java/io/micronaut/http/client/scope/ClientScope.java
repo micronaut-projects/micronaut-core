@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.annotation.HttpFilterStereotype;
+import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.filter.HttpClientFilterResolver;
@@ -99,7 +99,7 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
 
         AnnotationMetadata metadata = argument.getAnnotationMetadata();
         Optional<AnnotationValue> filterAnnotation = metadata
-                .getAnnotationNameByStereotype(HttpFilterStereotype.class)
+                .getAnnotationNameByStereotype(FilterMatcher.class)
                 .map(metadata::getAnnotation);
 
         //noinspection unchecked

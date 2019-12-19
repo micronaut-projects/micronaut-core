@@ -1,9 +1,9 @@
 package io.micronaut.docs.client.filter
 
 //tag::class[]
-import io.micronaut.http.annotation.HttpFilterStereotype
+import io.micronaut.http.annotation.FilterMatcher
 
-@HttpFilterStereotype // <1>
+@FilterMatcher // <1>
 @MustBeDocumented
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.VALUE_PARAMETER)

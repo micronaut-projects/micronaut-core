@@ -34,28 +34,52 @@ import java.util.function.Function;
 @Internal
 interface EnvironmentAnnotationMetadata extends AnnotationMetadata {
     /**
-     * Retrieve the class value and optionally map its value.
+     * Retrieve the enum value and optionally map its value.
      * @param annotation The annotation
      * @param member The member
      * @param enumType The enum type
      * @param valueMapper The value mapper
      * @param <E> The enum type
-     * @return The class value
+     * @return The enum value
      */
     @Internal
     <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
 
     /**
-     * Retrieve the class value and optionally map its value.
+     * Retrieve the enum value and optionally map its value.
      * @param annotation The annotation
      * @param member The member
      * @param enumType The enum type
      * @param valueMapper The value mapper
      * @param <E> The enum type
-     * @return The class value
+     * @return The enum value
      */
     @Internal
     <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
+
+    /**
+     * Retrieve the enum values and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param enumType The enum type
+     * @param valueMapper The value mapper
+     * @param <E> The enum type
+     * @return The enum value
+     */
+    @Internal
+    <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
+
+    /**
+     * Retrieve the enum values and optionally map its value.
+     * @param annotation The annotation
+     * @param member The member
+     * @param enumType The enum type
+     * @param valueMapper The value mapper
+     * @param <E> The enum type
+     * @return The enum value
+     */
+    @Internal
+    <E extends Enum> E[] enumValues(@Nonnull String annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper);
 
     /**
      * Retrieve the class value and optionally map its value.

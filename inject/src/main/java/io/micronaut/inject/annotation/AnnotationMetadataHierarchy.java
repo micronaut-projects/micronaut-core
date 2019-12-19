@@ -187,9 +187,15 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Nonnull
     @Override
     public String[] stringValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
-        return Arrays.stream(hierarchy)
-                .flatMap(am -> Stream.of(am.stringValues(annotation, member)))
-                .toArray(String[]::new);
+        String[] values = hierarchy[0].stringValues(annotation, member);
+        for (int i = 1; i < hierarchy.length; i++) {
+            AnnotationMetadata annotationMetadata = hierarchy[i];
+            final String[] moreValues = annotationMetadata.stringValues(annotation, member);
+            if (ArrayUtils.isNotEmpty(moreValues)) {
+                values = ArrayUtils.concat(values, moreValues);
+            }
+        }
+        return values;
     }
 
     @Override
@@ -417,6 +423,34 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+        E[] values = hierarchy[0].enumValues(annotation, member, enumType);
+        for (int i = 1; i < hierarchy.length; i++) {
+            AnnotationMetadata annotationMetadata = hierarchy[i];
+
+            final E[] moreValues = annotationMetadata.enumValues(annotation, member, enumType);
+            if (ArrayUtils.isNotEmpty(moreValues)) {
+                values = ArrayUtils.concat(values, moreValues);
+            }
+        }
+        return values;
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull String annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+        E[] values = hierarchy[0].enumValues(annotation, member, enumType);
+        for (int i = 1; i < hierarchy.length; i++) {
+            AnnotationMetadata annotationMetadata = hierarchy[i];
+
+            final E[] moreValues = annotationMetadata.enumValues(annotation, member, enumType);
+            if (ArrayUtils.isNotEmpty(moreValues)) {
+                values = ArrayUtils.concat(values, moreValues);
+            }
+        }
+        return values;
     }
 
     @Override

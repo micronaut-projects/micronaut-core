@@ -161,7 +161,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         );
 
         AnnotationValue filterAnnotation = context
-                .getAnnotationNameByStereotype(HttpFilterStereotype.class)
+                .getAnnotationNameByStereotype(FilterMatcher.class)
                 .map(context::getAnnotation)
                 .orElse(null);
 
@@ -169,7 +169,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         Class<?> declaringType = context.getDeclaringType();
         if (Closeable.class == declaringType || AutoCloseable.class == declaringType) {
-            ClientKey clientKey = new ClientKey(clientAnnotation, context, filterAnnotation);
+            ClientKey clientKey = new ClientKey(clientAnnotation, filterAnnotation);
             clients.remove(clientKey);
             httpClient.close();
             return null;
@@ -644,7 +644,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn, AnnotationValue filterAnnotation) {
         String clientId = getClientId(clientAnn);
         String path = clientAnn.stringValue("path").orElse(null);
-        ClientKey clientKey = new ClientKey(clientAnn, context, filterAnnotation);
+        ClientKey clientKey = new ClientKey(clientAnn, filterAnnotation);
 
         return clients.computeIfAbsent(clientKey, integer -> {
             HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(NameUtils.hyphenate(clientId))).orElse(null);
@@ -792,7 +792,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         final AnnotationValue filterAnnotation;
 
         public ClientKey(AnnotationValue<Client> clientAnn,
-                         MethodInvocationContext<Object, Object> context,
                          AnnotationValue filterAnnotation) {
             this.clientId = getClientId(clientAnn);
             this.path = clientAnn.stringValue("path").orElse(null);

@@ -222,25 +222,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @SuppressWarnings("unchecked")
     public <E extends Enum> E[] enumValues(@Nonnull String member, @Nonnull Class<E> enumType) {
         ArgumentUtils.requireNonNull("enumType", enumType);
-        List<E> list = new ArrayList<>();
         if (StringUtils.isNotEmpty(member)) {
             Object rawValue = values.get(member);
-            if (rawValue != null) {
-                if (rawValue.getClass().isArray()) {
-                    int len = Array.getLength(rawValue);
-                    for (int i = 0; i < len; i++) {
-                        convertToEnum(enumType, Array.get(rawValue, i)).ifPresent(list::add);
-                    }
-                } else if (rawValue instanceof Iterable) {
-                    for (Object o : (Iterable) rawValue) {
-                        convertToEnum(enumType, o).ifPresent(list::add);
-                    }
-                } else if (enumType.isAssignableFrom(rawValue.getClass())) {
-                    list.add((E) rawValue);
-                }
-            }
+            return resolveEnumValues(enumType, rawValue);
         }
-        return list.toArray((E[]) Array.newInstance(enumType, 0));
+        return (E[]) Array.newInstance(enumType, 0);
     }
 
     /**
@@ -922,6 +908,34 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
+     * The enum values for the given enum type and raw value.
+     * @param enumType The enum type
+     * @param rawValue The raw value
+     * @param <E> The enum generic type
+     * @return An array of enum values
+     */
+    @Internal
+    public static @Nonnull <E extends Enum> E[] resolveEnumValues(@Nonnull Class<E> enumType, @Nullable Object rawValue) {
+        if (rawValue == null) {
+            return (E[]) Array.newInstance(enumType, 0);
+        }
+        List<E> list = new ArrayList<>();
+        if (rawValue.getClass().isArray()) {
+            int len = Array.getLength(rawValue);
+            for (int i = 0; i < len; i++) {
+                convertToEnum(enumType, Array.get(rawValue, i)).ifPresent(list::add);
+            }
+        } else if (rawValue instanceof Iterable) {
+            for (Object o : (Iterable) rawValue) {
+                convertToEnum(enumType, o).ifPresent(list::add);
+            }
+        } else if (enumType.isAssignableFrom(rawValue.getClass())) {
+            list.add((E) rawValue);
+        }
+        return list.toArray((E[]) Array.newInstance(enumType, 0));
+    }
+
+    /**
      * The string[] values for the given value.
      * @param strs The strings
      * @param valueMapper The value mapper
@@ -1012,7 +1026,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return rawValue;
     }
 
-    private <T extends Enum> Optional<T> convertToEnum(Class<T> enumType, Object o) {
+    private static <T extends Enum> Optional<T> convertToEnum(Class<T> enumType, Object o) {
         if (enumType.isInstance(o)) {
             return Optional.of((T) o);
         } else {

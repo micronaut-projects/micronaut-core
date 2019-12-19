@@ -29,17 +29,19 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.annotation.HttpFilterStereotype;
+import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpFilterResolver;
 
 import javax.annotation.Nullable;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Resolves filters for http clients.
  *
  * @author James Kleeh
+ * @author graemerocher
  * @since 1.3.0
  */
 @Internal
@@ -47,10 +49,7 @@ import java.util.*;
 @BootstrapContextCompatible
 public class HttpClientFilterResolver implements HttpFilterResolver {
 
-    private final AnnotationMetadataResolver annotationMetadataResolver;
-    private final List<HttpClientFilter> clientFilters;
-    private final Collection<String> clientIdentifiers;
-    private final AnnotationValue annotationValue;
+    private final List<HttpClientFilterEntry> clientFilters;
 
     /**
      * Default constructor.
@@ -62,88 +61,82 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
      */
     public HttpClientFilterResolver(
             @Parameter @Nullable Collection<String> clientIdentifiers,
-            @Parameter @Nullable AnnotationValue annotationValue,
+            @Parameter @Nullable AnnotationValue<?> annotationValue,
             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
             List<HttpClientFilter> clientFilters) {
         if (clientIdentifiers == null) {
-            this.clientIdentifiers = Collections.emptyList();
-        } else {
-            this.clientIdentifiers = clientIdentifiers;
+            clientIdentifiers = Collections.emptyList();
         }
-        this.annotationValue = annotationValue;
         if (annotationMetadataResolver == null) {
-            this.annotationMetadataResolver = AnnotationMetadataResolver.DEFAULT;
-        } else {
-            this.annotationMetadataResolver = annotationMetadataResolver;
+            annotationMetadataResolver = AnnotationMetadataResolver.DEFAULT;
         }
-        this.clientFilters = clientFilters;
+        AnnotationMetadataResolver finalAnnotationMetadataResolver = annotationMetadataResolver;
+        Collection<String> finalClientIdentifiers = clientIdentifiers;
+        this.clientFilters = clientFilters.stream()
+                .map(httpClientFilter -> {
+                    AnnotationMetadata annotationMetadata;
+                    annotationMetadata = finalAnnotationMetadataResolver.resolveMetadata(httpClientFilter);
+                    HttpMethod[] methods = annotationMetadata.enumValues(Filter.class, "methods", HttpMethod.class);
+                    final List<HttpMethod> httpMethods = Arrays.asList(methods);
+                    if (annotationValue != null) {
+                        httpMethods.addAll(
+                            Arrays.asList(annotationValue.enumValues("methods", HttpMethod.class))
+                        );
+                    }
+
+                    return new HttpClientFilterEntry(
+                            httpClientFilter,
+                            annotationMetadata,
+                            httpMethods,
+                            annotationMetadata.stringValues(Filter.class)
+                    );
+                }).filter(entry -> {
+                    final HttpClientFilter filter = entry.httpClientFilter;
+                    if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
+                        return false;
+                    }
+
+                    boolean matches;
+                    AnnotationMetadata annotationMetadata = entry.annotationMetadata;
+                    if (annotationValue != null) {
+                        matches = annotationMetadata.hasAnnotation(annotationValue.getAnnotationName());
+                    } else {
+                        matches = !annotationMetadata.hasStereotype(FilterMatcher.class);
+                    }
+
+                    if (matches) {
+                        String[] clients = annotationMetadata.stringValues(Filter.class, "serviceId");
+                        boolean hasClients = ArrayUtils.isNotEmpty(clients);
+                        if (hasClients) {
+                            matches = containsIdentifier(finalClientIdentifiers, clients);
+                        }
+                    }
+                    return matches;
+                }).collect(Collectors.toList());
     }
 
     @Override
     public List<HttpClientFilter> resolveFilters(HttpRequest<?> request) {
         String requestPath = StringUtils.prependUri("/", request.getUri().getPath());
         io.micronaut.http.HttpMethod method = request.getMethod();
-        List<HttpClientFilter> filterList = new ArrayList<>();
-        for (HttpClientFilter filter : clientFilters) {
-            if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
-                continue;
+        List<HttpClientFilter> filterList = new ArrayList<>(clientFilters.size());
+        for (HttpClientFilterEntry filterEntry : clientFilters) {
+            boolean matches = true;
+            if (filterEntry.hasMethods) {
+                matches = anyMethodMatches(method, filterEntry.filterMethods);
             }
-            AnnotationMetadata annotationMetadata = annotationMetadataResolver.resolveMetadata(filter);
-            Optional<AnnotationValue<Filter>> filterOpt = annotationMetadata.findAnnotation(Filter.class);
-
-            boolean matches = false;
-
-            if (annotationValue != null) {
-                matches = annotationMetadata.hasAnnotation(annotationValue.getAnnotationName());
-
-                HttpMethod[] methods = annotationMetadata.findAnnotation(HttpFilterStereotype.class)
-                        .flatMap(ann -> ann.get("methods", HttpMethod[].class))
-                        .orElse(null);
-
-                if (ArrayUtils.isNotEmpty(methods)) {
-                    matches = matches && anyMethodMatches(method, methods);
-                }
-            }
-
-            if (!matches && filterOpt.isPresent()) {
-                AnnotationValue<Filter> filterAnn = filterOpt.get();
-
-                String[] clients = filterAnn.get("serviceId", String[].class).orElse(null);
-                HttpMethod[] methods = filterAnn.get("methods", HttpMethod[].class, null);
-                String[] patterns = filterAnn.stringValues();
-
-                boolean hasClients = ArrayUtils.isNotEmpty(clients);
-                boolean hasMethods = ArrayUtils.isNotEmpty(methods);
-                boolean hasPatterns = ArrayUtils.isNotEmpty(patterns);
-
-                if (hasClients) {
-                    matches = containsIndentifier(clients);
-                    if (hasMethods) {
-                        matches = matches && anyMethodMatches(method, methods);
-                    }
-                    if (hasPatterns) {
-                        matches = matches && anyPatternMatches(requestPath, patterns);
-                    }
-                } else if (hasPatterns) {
-                    matches = anyPatternMatches(requestPath, patterns);
-                    if (hasMethods) {
-                        matches = matches && anyMethodMatches(method, methods);
-                    }
-                }
-            }
-
-            if (!annotationMetadata.hasStereotype(HttpFilterStereotype.class) && !filterOpt.isPresent()) {
-                matches = true;
+            if (filterEntry.hasPatterns) {
+                matches = matches && anyPatternMatches(requestPath, filterEntry.patterns);
             }
 
             if (matches) {
-                filterList.add(filter);
+                filterList.add(filterEntry.httpClientFilter);
             }
         }
         return filterList;
     }
 
-    private boolean containsIndentifier(String[] clients) {
+    private boolean containsIdentifier(Collection<String> clientIdentifiers, String[] clients) {
         return Arrays.stream(clients).anyMatch(clientIdentifiers::contains);
     }
 
@@ -151,7 +144,32 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
         return Arrays.stream(patterns).anyMatch(pattern -> PathMatcher.ANT.matches(pattern, requestPath));
     }
 
-    private boolean anyMethodMatches(HttpMethod requestMethod, HttpMethod[] methods) {
-        return Arrays.asList(methods).contains(requestMethod);
+    private boolean anyMethodMatches(HttpMethod requestMethod, List<HttpMethod> methods) {
+        return methods.contains(requestMethod);
+    }
+
+    /**
+     * Internal entry to match a filter.
+     */
+    private final class HttpClientFilterEntry {
+        private final HttpClientFilter httpClientFilter;
+        private final AnnotationMetadata annotationMetadata;
+        private final List<HttpMethod> filterMethods;
+        private final String[] patterns;
+        private final boolean hasMethods;
+        private final boolean hasPatterns;
+
+        HttpClientFilterEntry(
+                HttpClientFilter httpClientFilter,
+                AnnotationMetadata annotationMetadata,
+                List<HttpMethod> httpMethods,
+                String[] patterns) {
+            this.httpClientFilter = httpClientFilter;
+            this.annotationMetadata = annotationMetadata;
+            this.filterMethods = httpMethods;
+            this.patterns = patterns;
+            this.hasMethods = !filterMethods.isEmpty();
+            this.hasPatterns = ArrayUtils.isNotEmpty(patterns);
+        }
     }
 }

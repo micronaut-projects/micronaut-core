@@ -23,6 +23,7 @@ import io.micronaut.core.value.OptionalValues;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.util.*;
 
 /**
@@ -33,6 +34,27 @@ import java.util.*;
  */
 @Internal
 final class EmptyAnnotationMetadata implements AnnotationMetadata {
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull String annotation, Class<E> enumType) {
+        return (E[]) Array.newInstance(enumType, 0);
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+        return (E[]) Array.newInstance(enumType, 0);
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, Class<E> enumType) {
+        return (E[]) Array.newInstance(enumType, 0);
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+        return (E[]) Array.newInstance(enumType, 0);
+    }
+
     @Nonnull
     @Override
     public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
