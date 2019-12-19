@@ -33,6 +33,11 @@ import java.util.Optional;
 @UsedByGeneratedCode
 public final class AnnotationClassValue<T> implements CharSequence, Named {
 
+    /**
+     * An empty array of class values.
+     */
+    public static final AnnotationClassValue<?>[] EMPTY_ARRAY = new AnnotationClassValue[0];
+
     private final String name;
     private final Class<T> theClass;
     private final T instance;

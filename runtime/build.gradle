@@ -3,6 +3,7 @@ ext {
 }
 dependencies {
     annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
     api project(":http")
     api project(':inject')
     api project(':aop')
@@ -15,10 +16,7 @@ dependencies {
     ])
 
     compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
-    compileOnly project(":graal")
-    compileOnly project(":inject-java")
     compileOnly dependencyVersion("jcache")
-
 
     compileOnly(
         dependencyModuleVersion('jackson.modules', 'jackson-module-kotlin')

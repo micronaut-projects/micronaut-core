@@ -51,6 +51,9 @@ import java.util.*;
 /**
  * An abstract {@link Condition} implementation that is based on the presence
  * of {@link Requires} annotation.
+ *
+ * @author graemerocher
+ * @since 1.0.0
  */
 public class RequiresCondition implements Condition {
 
@@ -225,8 +228,8 @@ public class RequiresCondition implements Condition {
                 if (beanContext instanceof PropertyResolver) {
                     PropertyResolver propertyResolver = (PropertyResolver) beanContext;
                     String defaultValue = requirements.stringValue(MEMBER_DEFAULT_VALUE).orElse(null);
-                    boolean hasNotEquals = requirements.contains(MEMBER_NOT_EQUALS);
                     if (!propertyResolver.containsProperties(property) && StringUtils.isEmpty(defaultValue)) {
+                        boolean hasNotEquals = requirements.contains(MEMBER_NOT_EQUALS);
                         if (hasNotEquals) {
                             return true;
                         } else {
@@ -240,7 +243,7 @@ public class RequiresCondition implements Condition {
                             context.fail("Property [" + property + "] with value [" + resolved + "] does not equal required value: " + value);
                         }
                         return result;
-                    } else if (hasNotEquals) {
+                    } else if (requirements.contains(MEMBER_NOT_EQUALS)) {
                         String notEquals = requirements.stringValue(MEMBER_NOT_EQUALS).orElse(null);
                         String resolved = resolvePropertyValue(property, propertyResolver, defaultValue);
                         boolean result = resolved == null || !resolved.equals(notEquals);
@@ -330,41 +333,52 @@ public class RequiresCondition implements Condition {
     @SuppressWarnings("unchecked")
     private boolean matchesCustomConditions(ConditionContext context, AnnotationValue<Requires> requirements) {
         if (requirements.contains(MEMBER_CONDITION)) {
-            Class<? extends Condition> conditionClass = (Class<? extends Condition>) requirements.classValue(MEMBER_CONDITION).orElse(null);
-            if (conditionClass == TrueCondition.class) {
+            final AnnotationClassValue<?> annotationClassValue = requirements.annotationClassValue(MEMBER_CONDITION).orElse(null);
+            if (annotationClassValue == null) {
                 return true;
-            } else if (conditionClass != null) {
-                // try first via instantiated metadata
-                Optional<? extends Condition> condition = requirements.get(MEMBER_CONDITION, conditionClass);
-                if (!condition.isPresent()) {
-                    condition = InstantiationUtils.tryInstantiate(conditionClass);
-                }
-                if (condition.isPresent()) {
-                    boolean conditionResult = condition.get().matches(context);
+            } else {
+                final Object instance = annotationClassValue.getInstance().orElse(null);
+                if (instance instanceof Condition) {
+                    final boolean conditionResult = ((Condition) instance).matches(context);
                     if (!conditionResult) {
-                        context.fail("Custom condition [" + conditionClass + "] failed evaluation");
+                        context.fail("Custom condition [" + instance.getClass() + "] failed evaluation");
                     }
                     return conditionResult;
                 } else {
-                    // maybe a Groovy closure
-                    Optional<Constructor<?>> constructor = ReflectionUtils.findConstructor((Class) conditionClass, Object.class, Object.class);
-                    boolean conditionResult = constructor.flatMap(ctor ->
-                            InstantiationUtils.tryInstantiate(ctor, null, null)
-                    ).flatMap(obj -> {
-                        Optional<Method> method = ReflectionUtils.findMethod(obj.getClass(), "call", ConditionContext.class);
-                        if (method.isPresent()) {
-                            Object result = ReflectionUtils.invokeMethod(obj, method.get(), context);
-                            if (result instanceof Boolean) {
-                                return Optional.of((Boolean) result);
-                            }
-                        }
-                        return Optional.empty();
-                    }).orElse(false);
-                    if (!conditionResult) {
-                        context.fail("Custom condition [" + conditionClass + "] failed evaluation");
-                    }
-                    return conditionResult;
 
+                    final Class<?> conditionClass = annotationClassValue.getType().orElse(null);
+                    if (conditionClass == null || conditionClass == TrueCondition.class || !Condition.class.isAssignableFrom(conditionClass)) {
+                        return true;
+                    }
+                    // try first via instantiated metadata
+                    Optional<? extends Condition> condition = InstantiationUtils.tryInstantiate((Class<? extends Condition>) conditionClass);
+                    if (condition.isPresent()) {
+                        boolean conditionResult = condition.get().matches(context);
+                        if (!conditionResult) {
+                            context.fail("Custom condition [" + conditionClass + "] failed evaluation");
+                        }
+                        return conditionResult;
+                    } else {
+                        // maybe a Groovy closure
+                        Optional<Constructor<?>> constructor = ReflectionUtils.findConstructor((Class) conditionClass, Object.class, Object.class);
+                        boolean conditionResult = constructor.flatMap(ctor ->
+                                InstantiationUtils.tryInstantiate(ctor, null, null)
+                        ).flatMap(obj -> {
+                            Optional<Method> method = ReflectionUtils.findMethod(obj.getClass(), "call", ConditionContext.class);
+                            if (method.isPresent()) {
+                                Object result = ReflectionUtils.invokeMethod(obj, method.get(), context);
+                                if (result instanceof Boolean) {
+                                    return Optional.of((Boolean) result);
+                                }
+                            }
+                            return Optional.empty();
+                        }).orElse(false);
+                        if (!conditionResult) {
+                            context.fail("Custom condition [" + conditionClass + "] failed evaluation");
+                        }
+                        return conditionResult;
+
+                    }
                 }
             }
         }
@@ -450,18 +464,13 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesAbsenceOfClasses(ConditionContext context, AnnotationValue<Requires> requirements) {
         if (requirements.contains(MEMBER_MISSING_CLASSES)) {
-            Optional<AnnotationClassValue[]> classNames = requirements.get(MEMBER_MISSING_CLASSES, AnnotationClassValue[].class);
-            if (classNames.isPresent()) {
-                AnnotationClassValue[] classValues = classNames.get();
-                if (ArrayUtils.isNotEmpty(classValues)) {
-                    for (AnnotationClassValue classValue : classValues) {
-                        if (classValue.getType().isPresent()) {
-                            context.fail("Class [" + classValue.getName() + "] is not absent");
-                            return false;
-                        }
+            AnnotationClassValue[] classValues = requirements.annotationClassValues(MEMBER_MISSING_CLASSES);
+            if (ArrayUtils.isNotEmpty(classValues)) {
+                for (AnnotationClassValue classValue : classValues) {
+                    if (classValue.getType().isPresent()) {
+                        context.fail("Class [" + classValue.getName() + "] is not absent");
+                        return false;
                     }
-                } else {
-                    return matchAbsenceOfClassNames(context, requirements);
                 }
             } else {
                 return matchAbsenceOfClassNames(context, requirements);
@@ -486,14 +495,11 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesPresenceOfClasses(ConditionContext context, AnnotationValue<Requires> requirements, String attr) {
         if (requirements.contains(attr)) {
-            Optional<AnnotationClassValue[]> classNames = requirements.get(attr, AnnotationClassValue[].class);
-            if (classNames.isPresent()) {
-                AnnotationClassValue[] classValues = classNames.get();
-                for (AnnotationClassValue classValue : classValues) {
-                    if (!classValue.getType().isPresent()) {
-                        context.fail("Class [" + classValue.getName() + "] is not present");
-                        return false;
-                    }
+            AnnotationClassValue[] classValues = requirements.annotationClassValues(attr);
+            for (AnnotationClassValue classValue : classValues) {
+                if (!classValue.getType().isPresent()) {
+                    context.fail("Class [" + classValue.getName() + "] is not present");
+                    return false;
                 }
             }
         }
@@ -555,14 +561,10 @@ public class RequiresCondition implements Condition {
 
                 for (Class<?> type : missingBeans) {
                     // remove self by passing definition as filter
-                    Collection<? extends BeanDefinition<?>> beanDefinitions = new ArrayList<>(beanContext.findBeanCandidates(type, bd, true));
-
-                    if (!beanDefinitions.isEmpty()) {
-                        // remove abstract beans
-                        beanDefinitions.removeIf(BeanDefinition::isAbstract);
-                        if (!beanDefinitions.isEmpty()) {
-                            BeanDefinition<?> existing = beanDefinitions.iterator().next();
-                            context.fail("Existing bean [" + existing.getName() + "] of type [" + type + "] registered in context");
+                    final Collection<? extends BeanDefinition<?>> beanDefinitions = beanContext.findBeanCandidates(type, bd, true);
+                    for (BeanDefinition<?> beanDefinition : beanDefinitions) {
+                        if (!beanDefinition.isAbstract()) {
+                            context.fail("Existing bean [" + beanDefinition.getName() + "] of type [" + type + "] registered in context");
                             return false;
                         }
                     }
