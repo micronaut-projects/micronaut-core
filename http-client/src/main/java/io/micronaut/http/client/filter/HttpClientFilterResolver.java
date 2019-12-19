@@ -91,11 +91,6 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
                             annotationMetadata.stringValues(Filter.class)
                     );
                 }).filter(entry -> {
-                    final HttpClientFilter filter = entry.httpClientFilter;
-                    if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
-                        return false;
-                    }
-
                     boolean matches;
                     AnnotationMetadata annotationMetadata = entry.annotationMetadata;
                     if (annotationValue != null) {
@@ -121,6 +116,10 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
         io.micronaut.http.HttpMethod method = request.getMethod();
         List<HttpClientFilter> filterList = new ArrayList<>(clientFilters.size());
         for (HttpClientFilterEntry filterEntry : clientFilters) {
+            final HttpClientFilter filter = filterEntry.httpClientFilter;
+            if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
+                continue;
+            }
             boolean matches = true;
             if (filterEntry.hasMethods) {
                 matches = anyMethodMatches(method, filterEntry.filterMethods);
@@ -130,7 +129,7 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
             }
 
             if (matches) {
-                filterList.add(filterEntry.httpClientFilter);
+                filterList.add(filter);
             }
         }
         return filterList;
