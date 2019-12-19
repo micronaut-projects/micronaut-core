@@ -15,16 +15,22 @@ jobs:
         ref: ${{ github.head_ref }}
     - name: Upload to Bintray
       env:
+         GRADLE_OPTS: "-Xmx768m -Xms256m -XX:+CMSClassUnloadingEnabled"
          BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
          BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
+         SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
       run: ./gradlew bintrayUpload --no-daemon
     - name: Publish to Bintray
+      run: ./gradlew bintrayPublish --no-daemon --dry-run
       env:
+        GRADLE_OPTS: "-Xmx768m -Xms256m -XX:+CMSClassUnloadingEnabled"
         BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
         BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
-      run: ./gradlew bintrayPublish --no-daemon --dry-run
+        SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
     - name: Assemble Distribution
       run: ./gradlew assemble docs --no-daemon
+      env:
+        GRADLE_OPTS: "-Xmx768m -Xms256m -XX:+CMSClassUnloadingEnabled"
     - id: release_version
       if: success()
       run: echo ::set-output name=release_version::${GITHUB_REF:11}
