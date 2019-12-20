@@ -13,26 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.management.endpoint.loggers;
+package io.micronaut.logging;
+
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 
 /**
- * Logging levels supported by a {@link LoggingSystem}
+ * Abstraction for a logging system.
  *
- * Typically, a logging system may permit the log level to be null, representing
- * an unspecified log level. For {@link LoggingSystem} and the loggers endpoint,
- * we prefer to return the NOT_SPECIFIED pseudo-level instead of null.
- *
- * @author Matthew Moss
- * @since 1.0
+ * @since 1.3.0
  */
-@Deprecated
-public enum LogLevel {
-    ALL,
-    TRACE,
-    DEBUG,
-    INFO,
-    WARN,
-    ERROR,
-    OFF,
-    NOT_SPECIFIED
+public interface LoggingSystem {
+
+    /**
+     * Set the log level for the logger found by name (or created if not found).
+     *
+     * @param name the logger name
+     * @param level the log level to set on the named logger
+     */
+    void setLogLevel(@NotBlank String name, @NotNull LogLevel level);
+
 }

@@ -25,7 +25,7 @@ import java.util.Collection;
  * @author Matthew Moss
  * @since 1.0
  */
-public interface LoggingSystem {
+public interface LoggingSystem extends io.micronaut.logging.LoggingSystem {
 
     /**
      * Returns all existing loggers.
@@ -48,6 +48,7 @@ public interface LoggingSystem {
      * @param name the logger name
      * @param level the log level to set on the named logger
      */
+    @Deprecated
     void setLogLevel(@NotBlank String name, @NotNull LogLevel level);
 
 }

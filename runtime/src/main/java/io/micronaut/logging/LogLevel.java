@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.management.endpoint.loggers;
+package io.micronaut.logging;
 
 /**
  * Logging levels supported by a {@link LoggingSystem}
@@ -25,7 +25,6 @@ package io.micronaut.management.endpoint.loggers;
  * @author Matthew Moss
  * @since 1.0
  */
-@Deprecated
 public enum LogLevel {
     ALL,
     TRACE,
