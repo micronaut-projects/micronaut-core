@@ -18,6 +18,7 @@ package io.micronaut.management.endpoint.loggers.impl;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.management.endpoint.loggers.LogLevel;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
@@ -38,6 +39,7 @@ import java.util.stream.Collectors;
 @Singleton
 @Requires(beans = LoggersEndpoint.class)
 @Requires(classes = ch.qos.logback.classic.LoggerContext.class)
+@Replaces(io.micronaut.logging.impl.LogbackLoggingSystem.class)
 public class LogbackLoggingSystem implements LoggingSystem {
 
     @Override
@@ -57,6 +59,11 @@ public class LogbackLoggingSystem implements LoggingSystem {
     @Override
     public void setLogLevel(String name, LogLevel level) {
         getLoggerContext().getLogger(name).setLevel(toLevel(level));
+    }
+
+    @Override
+    public void setLogLevel(String name, io.micronaut.logging.LogLevel level) {
+        setLogLevel(name, LogLevel.valueOf(level.name()));
     }
 
     /**
