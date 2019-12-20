@@ -15,6 +15,7 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
+import javax.annotation.Nonnull;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.util.Collection;
@@ -32,7 +33,7 @@ public interface LoggingSystem extends io.micronaut.logging.LoggingSystem {
      *
      * @return A {@link Collection} of {@link LoggerConfiguration} instances for all existing loggers
      */
-    Collection<LoggerConfiguration> getLoggers();
+    @Nonnull Collection<LoggerConfiguration> getLoggers();
 
     /**
      * Returns a {@link LoggerConfiguration} for the logger found by name (or created if not found).
@@ -40,15 +41,22 @@ public interface LoggingSystem extends io.micronaut.logging.LoggingSystem {
      * @param name the logger name
      * @return the logger configuration
      */
-    LoggerConfiguration getLogger(@NotBlank String name);
+    @Nonnull LoggerConfiguration getLogger(@NotBlank String name);
 
     /**
      * Set the log level for the logger found by name (or created if not found).
      *
      * @param name the logger name
      * @param level the log level to set on the named logger
+     * @deprecated Use {@link io.micronaut.logging.LoggingSystem#setLogLevel(String, io.micronaut.logging.LogLevel)} instead
      */
     @Deprecated
     void setLogLevel(@NotBlank String name, @NotNull LogLevel level);
 
+    @Override
+    default void setLogLevel(@NotBlank String name, io.micronaut.logging.@NotNull LogLevel level) {
+        if (level != null) {
+            setLogLevel(name, LogLevel.valueOf(level.name()));
+        }
+    }
 }

@@ -1,4 +1,4 @@
-Additional api:io.micronaut.context.env.PropertySource[] instances can be added to the environment prior to initializing the link:{api}/io/micronaut/context/ApplicationContext.html[ApplicationContext].
+Additional api:io.micronaut.context.env.PropertySource[] instances can be added to the environment prior to initializing the api:context.ApplicationContext[].
 
 snippet::io.micronaut.docs.context.env.EnvironmentSpec[tags="envProps",indent=0,title="Initializing the Environment"]
 
@@ -135,3 +135,16 @@ micronaut:
 For beans that inject required properties, the injection and potential failure will not occur until the bean is requested. To verify at startup that the properties exist and can be injected, the bean can be annotated with ann:io.micronaut.context.annotation.Context[]. Context scoped beans will be injected at startup time and thus will fail at startup time if any required properties are missing or could not be converted to the required type.
 
 IMPORTANT: To maintain a fast startup time, it is recommended to use this feature as sparingly as possible.
+
+=== Controlling Log Levels with Properties
+
+Log levels can be configured via properties defined in `application.yml` (and environment variables) with the `log.level` prefix:
+
+[source,yaml]
+----
+log:
+    levels:
+        foo.bar: ERROR
+----
+
+Note that the ability to control log levels via config is controlled via the api:logging.LoggingSystem[] interface. Currently Micronaut ships with a single implementation that allows setting log levels for the Logback library. If another library is chosen you should provide a bean that implements this interface.

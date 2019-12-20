@@ -27,6 +27,8 @@ import io.micronaut.management.endpoint.loggers.LoggingSystem;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
@@ -57,13 +59,16 @@ public class LogbackLoggingSystem implements LoggingSystem {
     }
 
     @Override
-    public void setLogLevel(String name, LogLevel level) {
-        getLoggerContext().getLogger(name).setLevel(toLevel(level));
+    @Deprecated
+    public void setLogLevel(@NotBlank String name, @NotNull LogLevel level) {
+        getLoggerContext().getLogger(name).setLevel(toLevel(
+                io.micronaut.logging.LogLevel.valueOf(level.name())
+        ));
     }
 
     @Override
     public void setLogLevel(String name, io.micronaut.logging.LogLevel level) {
-        setLogLevel(name, LogLevel.valueOf(level.name()));
+        getLoggerContext().getLogger(name).setLevel(toLevel(level));
     }
 
     /**
@@ -87,22 +92,22 @@ public class LogbackLoggingSystem implements LoggingSystem {
 
     /**
      * @param level The logback {@link Level} to convert
-     * @return The converted {@link LogLevel}
+     * @return The converted {@link io.micronaut.logging.LogLevel}
      */
-    private static LogLevel toLogLevel(Level level) {
+    private static io.micronaut.logging.LogLevel toLogLevel(Level level) {
         if (level == null) {
-            return LogLevel.NOT_SPECIFIED;
+            return io.micronaut.logging.LogLevel.NOT_SPECIFIED;
         } else {
-            return LogLevel.valueOf(level.toString());
+            return io.micronaut.logging.LogLevel.valueOf(level.toString());
         }
     }
 
     /**
-     * @param logLevel The micronaut {@link LogLevel} to convert
+     * @param logLevel The micronaut {@link io.micronaut.logging.LogLevel} to convert
      * @return The converted logback {@link Level}
      */
-    private static Level toLevel(LogLevel logLevel) {
-        if (logLevel == LogLevel.NOT_SPECIFIED) {
+    private static Level toLevel(io.micronaut.logging.LogLevel logLevel) {
+        if (logLevel == io.micronaut.logging.LogLevel.NOT_SPECIFIED) {
             return null;
         } else {
             return Level.valueOf(logLevel.name());

@@ -30,16 +30,31 @@ public class LoggerConfiguration {
     private static final String CONFIGURED_LEVEL = "configuredLevel";
     private static final String EFFECTIVE_LEVEL = "effectiveLevel";
     private final String name;
-    private final LogLevel configuredLevel;
-    private final LogLevel effectiveLevel;
+    private final io.micronaut.logging.LogLevel configuredLevel;
+    private final io.micronaut.logging.LogLevel effectiveLevel;
 
     /**
      * @param name the logger name
      * @param configuredLevel the configured {@link LogLevel}
      * @param effectiveLevel the effective {@link LogLevel}
+     * @deprecated Use {@link #LoggerConfiguration(String, io.micronaut.logging.LogLevel, io.micronaut.logging.LogLevel)} instead
      */
+    @Deprecated
     public LoggerConfiguration(String name, LogLevel configuredLevel,
                                LogLevel effectiveLevel) {
+        this(name,
+            io.micronaut.logging.LogLevel.valueOf(configuredLevel.name()),
+            io.micronaut.logging.LogLevel.valueOf(effectiveLevel.name()));
+    }
+
+    /**
+     * @param name the logger name
+     * @param configuredLevel the configured {@link io.micronaut.logging.LogLevel}
+     * @param effectiveLevel the effective {@link io.micronaut.logging.LogLevel}
+     */
+    public LoggerConfiguration(String name,
+                               io.micronaut.logging.LogLevel configuredLevel,
+                               io.micronaut.logging.LogLevel effectiveLevel) {
         this.name = name;
         this.configuredLevel = configuredLevel;
         this.effectiveLevel = effectiveLevel;
@@ -54,15 +69,33 @@ public class LoggerConfiguration {
 
     /**
      * @return the configured {@link LogLevel}
+     * @deprecated Use {@link #configuredLevel()} instead
      */
+    @Deprecated
     public LogLevel getConfiguredLevel() {
-        return configuredLevel;
+        return LogLevel.valueOf(configuredLevel.name());
     }
 
     /**
      * @return the effective {@link LogLevel}
+     * @deprecated Use {@link #effectiveLevel()} instead
      */
+    @Deprecated
     public LogLevel getEffectiveLevel() {
+        return LogLevel.valueOf(effectiveLevel.name());
+    }
+
+    /**
+     * @return the configured {@link io.micronaut.logging.LogLevel}
+     */
+    public io.micronaut.logging.LogLevel configuredLevel() {
+        return configuredLevel;
+    }
+
+    /**
+     * @return the effective {@link io.micronaut.logging.LogLevel}
+     */
+    public io.micronaut.logging.LogLevel effectiveLevel() {
         return effectiveLevel;
     }
 
@@ -71,8 +104,8 @@ public class LoggerConfiguration {
      */
     public Map<String, Object> getData() {
         Map<String, Object> data = new LinkedHashMap<>(2);
-        data.put(CONFIGURED_LEVEL, getConfiguredLevel());
-        data.put(EFFECTIVE_LEVEL, getEffectiveLevel());
+        data.put(CONFIGURED_LEVEL, configuredLevel());
+        data.put(EFFECTIVE_LEVEL, effectiveLevel());
         return data;
     }
 

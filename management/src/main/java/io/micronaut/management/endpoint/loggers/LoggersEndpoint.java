@@ -82,7 +82,7 @@ public class LoggersEndpoint {
 
     /**
      * @param name The name of the logger to find
-     * @return the {@link LogLevel} (both configured and effective) of the named logger
+     * @return the {@link io.micronaut.logging.LogLevel} (both configured and effective) of the named logger
      */
     @Read
     public Single<Map<String, Object>> logger(@NotBlank @Selector String name) {
@@ -91,17 +91,17 @@ public class LoggersEndpoint {
 
     /**
      * @param name The name of the logger to configure
-     * @param configuredLevel The {@link LogLevel} to set on the named logger
+     * @param configuredLevel The {@link io.micronaut.logging.LogLevel} to set on the named logger
      */
     @Write
     public void setLogLevel(@NotBlank @Selector String name,
-                            @Nullable LogLevel configuredLevel) {
+                            @Nullable io.micronaut.logging.LogLevel configuredLevel) {
         try {
             loggersManager.setLogLevel(loggingSystem, name,
-                    configuredLevel != null ? configuredLevel : LogLevel.NOT_SPECIFIED);
+                    configuredLevel != null ? configuredLevel : io.micronaut.logging.LogLevel.NOT_SPECIFIED);
         } catch (IllegalArgumentException ex) {
             throw new UnsatisfiedArgumentException(
-                    Argument.of(LogLevel.class, "configuredLevel"),
+                    Argument.of(io.micronaut.logging.LogLevel.class, "configuredLevel"),
                     "Invalid log level specified: " + configuredLevel
             );
         }

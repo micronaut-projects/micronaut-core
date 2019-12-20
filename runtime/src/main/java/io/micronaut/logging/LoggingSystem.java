@@ -15,6 +15,8 @@
  */
 package io.micronaut.logging;
 
+import io.micronaut.core.annotation.Indexed;
+
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 
@@ -22,7 +24,10 @@ import javax.validation.constraints.NotNull;
  * Abstraction for a logging system.
  *
  * @since 1.3.0
+ * @author graemerocher
+ * @author Denis Stepanov
  */
+@Indexed(LoggingSystem.class)
 public interface LoggingSystem {
 
     /**

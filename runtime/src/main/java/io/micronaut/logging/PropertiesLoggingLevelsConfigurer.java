@@ -29,11 +29,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import java.util.List;
 
 /**
  * Properties logging levels configurer.
  *
  * @author Denis Stepanov
+ * @author graemerocher
  * @since 1.3.0
  */
 @BootstrapContextCompatible
@@ -49,17 +51,17 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     private static final Logger LOGGER = LoggerFactory.getLogger(PropertiesLoggingLevelsConfigurer.class);
 
     private final Environment environment;
-    private final LoggingSystem loggingSystem;
+    private final List<LoggingSystem> loggingSystems;
 
     /**
      * Sets log level according to properties.
      *
      * @param environment   The environment
-     * @param loggingSystem The loggin system
+     * @param loggingSystems The logging systems
      */
-    public PropertiesLoggingLevelsConfigurer(Environment environment, LoggingSystem loggingSystem) {
+    public PropertiesLoggingLevelsConfigurer(Environment environment, List<LoggingSystem> loggingSystems) {
         this.environment = environment;
-        this.loggingSystem = loggingSystem;
+        this.loggingSystems = loggingSystems;
         configureLogLevels();
     }
 
@@ -84,7 +86,9 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Setting log level '{}' for logger: '{}'", newLevel, loggerPrefix);
             }
-            loggingSystem.setLogLevel(loggerPrefix, newLevel);
+            for (LoggingSystem loggingSystem : loggingSystems) {
+                loggingSystem.setLogLevel(loggerPrefix, newLevel);
+            }
         });
     }
 

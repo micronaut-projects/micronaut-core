@@ -38,6 +38,17 @@ Support for immutable ann:context.annotation.ConfigurationProperties[] has been 
 
 snippet::io.micronaut.docs.config.itfce.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
 
+=== Ability to Configure Log Levels via Properties
+
+Log levels can now be configured via properties defined in `application.yml` (and environment variables) with the `log.level` prefix:
+
+[source,yaml]
+----
+log:
+    levels:
+        foo.bar: ERROR
+----
+
 === New Micronaut Cache Modules
 
 https://micronaut-projects.github.io/micronaut-cache/1.0.x/guide/#introduction[Micronaut Cache] has been updated to support https://micronaut-projects.github.io/micronaut-cache/1.0.x/guide/#hazelcast[Hazelcast] and https://micronaut-projects.github.io/micronaut-cache/1.0.x/guide/#ehcache[Ehcache] as additional Cache providers.
