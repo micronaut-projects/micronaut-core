@@ -177,13 +177,19 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     @Override
     public <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return environmentAnnotationMetadata.enumValue(annotation, member,  enumType, valueMapper);
+        return environmentAnnotationMetadata.enumValue(annotation, member, enumType, valueMapper);
     }
 
     @Override
     public <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
-        return environmentAnnotationMetadata.enumValue(annotation, member,  enumType, valueMapper);
+        return environmentAnnotationMetadata.enumValue(annotation, member, enumType, valueMapper);
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+        Function<Object, Object> valueMapper = getEnvironmentValueMapper();
+        return environmentAnnotationMetadata.enumValues(annotation, member, enumType, valueMapper);
     }
 
     @Override

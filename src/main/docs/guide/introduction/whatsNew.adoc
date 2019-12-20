@@ -99,6 +99,10 @@ String login(BasicAuth basicAuth) {
 
 For SSL requests, the certificate is now available as a request attribute. See api:http.HttpRequest#getCertificate--[HttpRequest#getCertificate]
 
+=== Client Filter Matching By Annotation
+
+Micronaut HTTP clients and client filters can now be matched by the presence of an annotation. Previously only URL matching was supported. See <<_filter_matching_by_annotation,the documentation>> to get started.
+
 === Dependency Upgrades
 
 Required Third Party Dependencies:

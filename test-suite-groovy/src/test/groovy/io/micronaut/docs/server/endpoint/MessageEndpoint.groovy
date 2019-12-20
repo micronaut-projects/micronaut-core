@@ -1,5 +1,7 @@
 package io.micronaut.docs.server.endpoint
 
+import io.micronaut.context.annotation.Requires
+
 //tag::endpointImport[]
 import io.micronaut.management.endpoint.annotation.Endpoint
 //end::endpointImport[]
@@ -20,7 +22,7 @@ import io.micronaut.management.endpoint.annotation.Read
 
 import javax.annotation.PostConstruct
 
-
+@Requires(property = "spec.name", value = "MessageEndpointSpec")
 //tag::endpointClassBegin[]
 @Endpoint(id = "message", defaultSensitive = false)
 class MessageEndpoint {

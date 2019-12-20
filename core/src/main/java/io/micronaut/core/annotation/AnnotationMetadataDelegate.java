@@ -33,6 +33,36 @@ import java.util.*;
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
 
     @Override
+    default boolean hasSimpleAnnotation(@Nullable String annotation) {
+        return getAnnotationMetadata().hasSimpleAnnotation(annotation);
+    }
+
+    @Override
+    default boolean hasSimpleDeclaredAnnotation(@Nullable String annotation) {
+        return getAnnotationMetadata().hasSimpleDeclaredAnnotation(annotation);
+    }
+
+    @Override
+    default <E extends Enum> E[] enumValues(@Nonnull String annotation, Class<E> enumType) {
+        return getAnnotationMetadata().enumValues(annotation, enumType);
+    }
+
+    @Override
+    default <E extends Enum> E[] enumValues(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+        return getAnnotationMetadata().enumValues(annotation, member, enumType);
+    }
+
+    @Override
+    default <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, Class<E> enumType) {
+        return getAnnotationMetadata().enumValues(annotation, enumType);
+    }
+
+    @Override
+    default <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+        return getAnnotationMetadata().enumValues(annotation, member, enumType);
+    }
+
+    @Override
     default <T> Class<T>[] classValues(@Nonnull String annotation) {
         return getAnnotationMetadata().classValues(annotation, VALUE_MEMBER);
     }

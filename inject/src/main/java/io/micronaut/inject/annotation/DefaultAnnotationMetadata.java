@@ -195,6 +195,51 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
     }
 
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull String annotation, Class<E> enumType) {
+        return enumValues(annotation, VALUE_MEMBER, enumType, null);
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+        return enumValues(annotation, member, enumType, null);
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, Class<E> enumType) {
+        return enumValues(annotation, VALUE_MEMBER, enumType, null);
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+        return enumValues(annotation, member, enumType, null);
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("enumType", enumType);
+        final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            Object v = getRawValue(repeatable.value().getName(), member);
+            if (v instanceof AnnotationValue) {
+                return ((AnnotationValue<?>) v).enumValues(member, enumType);
+            }
+            return (E[]) Array.newInstance(enumType, 0);
+        } else {
+            Object v = getRawValue(annotation.getName(), member);
+            return AnnotationValue.resolveEnumValues(enumType, v);
+        }
+    }
+
+    @Override
+    public <E extends Enum> E[] enumValues(@Nonnull String annotation, @Nonnull String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("enumType", enumType);
+        Object v = getRawValue(annotation, member);
+        return AnnotationValue.resolveEnumValues(enumType, v);
+    }
+
     /**
      * Retrieve the class value and optionally map its value.
      * @param annotation The annotation

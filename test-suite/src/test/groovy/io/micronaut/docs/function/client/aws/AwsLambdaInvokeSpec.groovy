@@ -21,7 +21,6 @@ import javax.inject.Named
 })
 class AwsLambdaInvokeSpec extends Specification {
 
-
     void "test setup function definitions"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(

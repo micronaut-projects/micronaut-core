@@ -21,3 +21,23 @@ snippet::io.micronaut.docs.client.ThirdPartyClientFilterSpec[tags="bintrayFilter
 
 Now, whenever you invoke the `bintrayService.fetchRepositories()` method, the `Authorization` HTTP header is included in the request.
 
+=== Filter Matching By Annotation
+
+For cases where a filter should be applied to a client, regardless of the URL, filters can be matched by the presence of an annotation applied to both the filter and the client. Given the following client:
+
+snippet::io.micronaut.docs.client.filter.BasicAuthClient[tags="class"]
+
+<1> The `@BasicAuth` annotation is applied to the client
+
+The following filter will filter the client requests:
+
+snippet::io.micronaut.docs.client.filter.BasicAuthClientFilter[tags="class"]
+
+<1> The same annotation, `@BasicAuth`, is applied to the filter
+<2> Normally the `@Filter` annotation makes filters singletons by default. Because the `@Filter` annotation is not used, the desired scope must be applied
+
+The `@BasicAuth` annotation is just an example and can be replaced with your own custom annotation.
+
+snippet::io.micronaut.docs.client.filter.BasicAuth[tags="class"]
+
+<1> The only requirement for custom annotations is that the ann:http.annotation.HttpFilterStereotype[] annotation must be present

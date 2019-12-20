@@ -72,7 +72,7 @@ public interface ValueResolver<K extends CharSequence> {
      * @param requiredType The required type
      * @param defaultValue The default value
      * @param <T>          The concrete type
-     * @return An optional containing the property value if it exists
+     * @return Property value if it exists or default value
      */
     default <T> T get(K name, Class<T> requiredType, T defaultValue) {
         return get(name, requiredType).orElse(defaultValue);

@@ -31,6 +31,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.DefaultHttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.filter.HttpClientFilterResolver;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilter;
@@ -43,6 +44,7 @@ import javax.inject.Singleton;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 
@@ -80,11 +82,10 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
             LoadBalancer.empty(),
             configuration,
             null,
+            new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)),
             threadFactory,
             nettyClientSslBuilder,
-            codecRegistry,
-            annotationMetadataResolver,
-            filters
+            codecRegistry
         );
     }
 
