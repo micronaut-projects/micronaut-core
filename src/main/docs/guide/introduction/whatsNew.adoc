@@ -44,7 +44,7 @@ Log levels can now be configured via properties defined in `application.yml` (an
 
 [source,yaml]
 ----
-log:
+logger:
     levels:
         foo.bar: ERROR
 ----
