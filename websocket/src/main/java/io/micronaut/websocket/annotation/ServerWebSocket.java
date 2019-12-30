@@ -17,6 +17,7 @@ package io.micronaut.websocket.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.websocket.WebSocketVersion;
 
 import javax.inject.Singleton;
@@ -62,4 +63,9 @@ public @interface ServerWebSocket {
      */
     @AliasFor(annotation = WebSocketComponent.class, member = "version")
     WebSocketVersion version() default WebSocketVersion.V13;
+
+    /**
+     * @return A csv of the supported subprotocols
+     */
+    String subprotocols() default StringUtils.EMPTY_STRING;
 }
