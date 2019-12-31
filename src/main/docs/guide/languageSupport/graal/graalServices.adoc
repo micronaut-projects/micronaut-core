@@ -34,7 +34,7 @@ To build your native image using Docker simply run:
 
 [source,bash]
 ----
-$ ./gradlew assemble # or ./mvnw package if using Maven
+$ ./gradlew shadowJar # or ./mvnw package if using Maven
 $ docker build . -t hello-world
 $ docker run -p 8080:8080 hello-world
 ----
@@ -43,7 +43,7 @@ Or use the provided script:
 
 [source,bash]
 ----
-$ ./gradlew assemble # or ./mvnw package if using Maven
+$ ./gradlew shadowJar # or ./mvnw package if using Maven
 $ ./docker-build.sh
 ----
 
@@ -76,7 +76,7 @@ $ gu install native-image
 .Creating native image with Gradle
 [source,bash]
 ----
-$ ./gradlew assemble
+$ ./gradlew shadowJar
 $ native-image --no-server -cp build/libs/hello-world-0.1-all.jar
 ----
 
