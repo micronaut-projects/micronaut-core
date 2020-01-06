@@ -120,10 +120,10 @@ public class NameUtils {
      */
     public static String hyphenate(String name, boolean lowerCase) {
         if (isHyphenatedLowerCase(name)) {
-            return name.replace('_', '-');
+            return name.replaceAll("[_ ]", "-");
         } else {
             char separatorChar = '-';
-            return separateCamelCase(name.replace('_', '-'), lowerCase, separatorChar);
+            return separateCamelCase(name.replaceAll("[_ ]", "-"), lowerCase, separatorChar);
         }
     }
 

@@ -104,6 +104,7 @@ class NameUtilsSpec extends Specification {
         "FOO_BAR"                         | 'foo-bar'
         "fooBBar"                         | 'foo-bbar'
         "fooBar"                          | 'foo-bar'
+        "test.Foo bar"                    | 'test.foo-bar'
     }
 
     @Unroll
