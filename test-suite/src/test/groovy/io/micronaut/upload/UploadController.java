@@ -70,10 +70,10 @@ public class UploadController {
     }
 
     @Post(value = "/receive-file-upload", consumes = MediaType.MULTIPART_FORM_DATA)
-    public Publisher<HttpResponse> receiveFileUpload(StreamingFileUpload data, String title) {
+    public Publisher<MutableHttpResponse<?>> receiveFileUpload(StreamingFileUpload data, String title) {
         long size = data.getDefinedSize();
         return Flowable.fromPublisher(data.transferTo(title + ".json"))
-                       .map(success -> success ? HttpResponse.ok( "Uploaded " + size  ) : HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"));
+                       .map(success -> success ? HttpResponse.ok( "Uploaded " + size  ) : HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened")).onErrorReturnItem(HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"));
     }
 
     @Post(value = "/receive-completed-file-upload", consumes = MediaType.MULTIPART_FORM_DATA)
