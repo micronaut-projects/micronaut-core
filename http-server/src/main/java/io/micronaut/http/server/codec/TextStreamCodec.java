@@ -181,11 +181,25 @@ public class TextStreamCodec implements MediaTypeCodec {
         if (retry != null) {
             writeAttribute(eventData, RETRY_PREFIX, String.valueOf(retry.toMillis()));
         }
-        // Write the data: prefix
-        eventData.write(DATA_PREFIX)
-            .write(body)
-            .write(NEWLINE) // Write new lines for event separation
-            .write(NEWLINE);
+
+        // Write the data
+        int idx = body.indexOf((byte) '\n');
+        while (idx > -1) {
+            int length = idx + 1;
+            byte[] line = new byte[length];
+            body.read(line, 0, length);
+            eventData.write(DATA_PREFIX).write(line);
+            idx = body.indexOf((byte) '\n');
+        }
+        if (body.readableBytes() > 0) {
+            int length = body.readableBytes();
+            byte[] line = new byte[length];
+            body.read(line, 0, length);
+            eventData.write(DATA_PREFIX).write(line);
+        }
+
+        // Write new lines for event separation
+        eventData.write(NEWLINE).write(NEWLINE);
         return eventData;
     }
 
