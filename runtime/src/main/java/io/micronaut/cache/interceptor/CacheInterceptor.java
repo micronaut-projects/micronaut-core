@@ -902,8 +902,9 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             this.defaultCacheNames = context.stringValues(CacheConfig.class, MEMBER_CACHE_NAMES);
             this.cacheable = context.hasStereotype(Cacheable.class);
             if (!isVoid && cacheable) {
-                if (ArrayUtils.isNotEmpty(defaultCacheNames)) {
-                    this.cacheableCacheName = defaultCacheNames[0];
+                String[] names = resolveCacheNames(defaultCacheNames, context.stringValues(Cacheable.class, MEMBER_CACHE_NAMES));
+                if (ArrayUtils.isNotEmpty(names)) {
+                    this.cacheableCacheName = names[0];
                 } else {
                     if (LOG.isWarnEnabled()) {
                         LOG.warn("No cache names defined for invocation [{}]. Skipping cache read operations.", context);
