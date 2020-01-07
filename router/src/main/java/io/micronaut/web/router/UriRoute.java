@@ -21,6 +21,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatcher;
 
+import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -93,6 +94,12 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
      * @return The route
      */
     UriRoute exposedPort(int port);
+
+    /**
+     * @return The port the route listens to, or null if the default port
+     */
+    @Nullable
+    Integer getPort();
 
     /**
      *

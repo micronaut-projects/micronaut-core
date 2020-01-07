@@ -772,6 +772,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
+        private Integer port;
 
         /**
          * @param httpMethod The HTTP method
@@ -888,9 +889,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public UriRoute exposedPort(int port) {
+            this.port = port;
             where(httpRequest -> httpRequest.getServerAddress().getPort() == port);
             DefaultRouteBuilder.this.exposedPorts.add(port);
             return this;
+        }
+
+        @Override
+        public Integer getPort() {
+            return port;
         }
 
         @Override

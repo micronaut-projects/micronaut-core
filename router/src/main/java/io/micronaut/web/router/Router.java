@@ -68,6 +68,13 @@ public interface Router {
     Set<Integer> getExposedPorts();
 
     /**
+     * Sets the ports the application will listen to by default.
+     *
+     * @param ports The default ports
+     */
+    void applyDefaultPorts(List<Integer> ports);
+
+    /**
      * Finds all of the possible routes for the given HTTP method and URI.
      *
      * @param httpMethod The HTTP method

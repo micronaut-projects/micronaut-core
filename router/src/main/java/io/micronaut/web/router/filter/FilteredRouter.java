@@ -85,6 +85,11 @@ public class FilteredRouter implements Router {
         return router.getExposedPorts();
     }
 
+    @Override
+    public void applyDefaultPorts(List<Integer> ports) {
+        router.applyDefaultPorts(ports);
+    }
+
     @Nonnull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri) {
