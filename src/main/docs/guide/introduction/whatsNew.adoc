@@ -34,7 +34,7 @@ Thanks to https://github.com/konrad-kaminski[Konrad Kamiński] for this contribu
 
 === Immutable `@ConfigurationProperties` and `@EachProperty`
 
-Support for immutable ann:context.annotation.ConfigurationProperties[] has been added by annotating the constructor of any configuration class with ann:context.annotation.ConfigurationInject[]. See the docummentation on <<immutableConfig, Immutable Configuration>> for more information.
+Support for immutable ann:context.annotation.ConfigurationProperties[] has been added by annotating the constructor of any configuration class with ann:context.annotation.ConfigurationInject[]. See the documentation on <<immutableConfig, Immutable Configuration>> for more information.
 
 snippet::io.micronaut.docs.config.itfce.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
 
