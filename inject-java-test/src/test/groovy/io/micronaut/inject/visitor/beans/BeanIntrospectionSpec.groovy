@@ -656,7 +656,7 @@ class Test {
         context?.close()
     }
 
-    void "test write bean introspection data for classes"() {
+    void "test write bean introspection data for class in another package"() {
         given:
         ApplicationContext context = buildContext('test.Test', '''
 package test;
@@ -666,7 +666,7 @@ import javax.validation.constraints.*;
 import java.util.*;
 import io.micronaut.inject.visitor.beans.*;
 
-@Introspected(classes=TestBean.class)
+@Introspected(classes=OtherTestBean.class)
 class Test {}
 ''')
 
@@ -676,7 +676,13 @@ class Test {}
 
         then:"The reference is valid"
         reference != null
-        reference.getBeanType() == TestBean
+        reference.getBeanType() == OtherTestBean
+
+        when:
+        reference.load()
+
+        then:
+        noExceptionThrown()
 
         cleanup:
         context?.close()

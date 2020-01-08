@@ -73,6 +73,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private int propertyIndex = 0;
     private ParameterElement[] constructorArguments;
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
+    private final boolean publicIntrospection;
 
     /**
      * Default constructor.
@@ -88,6 +89,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         this.introspectionName = computeIntrospectionName(className);
         this.introspectionType = getTypeReference(introspectionName);
         this.beanType = getTypeReference(className);
+        this.publicIntrospection = false;
     }
 
     /**
@@ -106,6 +108,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         this.introspectionName = computeIntrospectionName(className);
         this.introspectionType = getTypeReference(introspectionName);
         this.beanType = getTypeReference(className);
+        this.publicIntrospection = true;
     }
 
     /**
@@ -189,7 +192,11 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
         try (OutputStream introspectionStream = classWriterOutputVisitor.visitClass(introspectionName)) {
 
-            startFinalClass(introspectionWriter, introspectionType.getInternalName(), superType);
+            if (publicIntrospection) {
+                startPublicFinalClass(introspectionWriter, introspectionType.getInternalName(), superType);
+            } else {
+                startFinalClass(introspectionWriter, introspectionType.getInternalName(), superType);
+            }
             final GeneratorAdapter constructorWriter = startConstructor(introspectionWriter);
 
             // writer the constructor
