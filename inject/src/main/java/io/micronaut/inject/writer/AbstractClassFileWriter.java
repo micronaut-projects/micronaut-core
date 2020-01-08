@@ -342,7 +342,16 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             generatorAdapter.push(i);
 
             String argumentName = entry.getKey();
-            Type argumentType = getTypeReference(entry.getValue());
+            final Object value = entry.getValue();
+            Type argumentType;
+            if (value instanceof Map) {
+                // for generic types the info as passed with the class name being the key of the map
+                // bit of a hack and we need better data structures for this.
+                argumentType = getTypeReference(((Map) value).keySet().iterator().next());
+            } else {
+                argumentType = getTypeReference(value);
+            }
+
 
             // 1st argument: The type
             generatorAdapter.push(argumentType);

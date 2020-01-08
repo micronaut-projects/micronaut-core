@@ -797,7 +797,25 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             Set<Modifier> modifiers = method.getModifiers();
             boolean hasInvalidModifiers = modelUtils.isAbstract(method) || modifiers.contains(Modifier.STATIC) || methodAnnotationMetadata.hasAnnotation(Internal.class) || modelUtils.isPrivate(method);
             boolean isPublic = modifiers.contains(Modifier.PUBLIC) && !hasInvalidModifiers;
-            boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable.class)) && !hasInvalidModifiers;
+            boolean isExecutable =
+                    !hasInvalidModifiers &&
+                    ((isExecutableType && isPublic) ||
+                            methodAnnotationMetadata.hasStereotype(Executable.class)) ;
+
+
+            boolean hasConstraints = false;
+            if (isDeclaredBean &&
+                    !methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
+                    method.getParameters()
+                            .stream()
+                            .anyMatch((p) -> annotationUtils.hasStereotype(p, ANN_CONSTRAINT) || annotationUtils.hasStereotype(p, ANN_VALID))) {
+                hasConstraints = true;
+                methodAnnotationMetadata = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder().annotate(
+                        methodAnnotationMetadata,
+                        io.micronaut.core.annotation.AnnotationValue.builder(ANN_VALIDATED).build()
+                );
+            }
+
             if (isExecutable) {
                 visitExecutableMethod(method, methodAnnotationMetadata);
                 return null;
@@ -811,14 +829,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         writer.setValidated(true);
                     }
                 }
-            } else if (isPublic) {
-                final boolean isConstrained =
-                        method.getParameters()
-                              .stream()
-                              .anyMatch((p) -> annotationUtils.hasStereotype(p, ANN_CONSTRAINT) || annotationUtils.hasStereotype(p, ANN_VALID));
-                if (isConstrained) {
-                    visitExecutableMethod(method, methodAnnotationMetadata);
-                }
+            } else if (isPublic && hasConstraints) {
+                visitExecutableMethod(method, methodAnnotationMetadata);
             }
 
             return null;
@@ -1180,7 +1192,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             BeanDefinitionVisitor beanWriter = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
 
             // This method requires pre-processing. See Executable#processOnStartup()
-            boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "processOnStartup", Boolean.class).orElse(false);
+            boolean preprocess = methodAnnotationMetadata.isTrue(Executable.class, "processOnStartup");
             if (preprocess) {
                 beanWriter.setRequiresMethodProcessing(true);
             }
@@ -1188,17 +1200,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             Object typeRef = modelUtils.resolveTypeReference(method.getEnclosingElement());
             if (typeRef == null) {
                 typeRef = modelUtils.resolveTypeReference(concreteClass);
-            }
-
-            boolean hasConstraints = false;
-            if (!methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
-                    isDeclaredBean &&
-                    params.getParameterMetadata().values().stream().anyMatch(IS_CONSTRAINT)) {
-                hasConstraints = true;
-                methodAnnotationMetadata = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder().annotate(
-                        methodAnnotationMetadata,
-                        io.micronaut.core.annotation.AnnotationValue.builder(ANN_VALIDATED).build()
-                );
             }
 
             final AopProxyWriter proxyWriter = resolveAopWriter(beanWriter);
@@ -1225,7 +1226,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             // shouldn't visit around advice on an introduction advice instance
             if (!(beanWriter instanceof AopProxyWriter)) {
                 final boolean isConcrete = !modelUtils.isAbstract(concreteClass);
-                final boolean isPublic = method.getModifiers().contains(Modifier.PUBLIC);
+                final boolean isPublic = method.getModifiers().contains(Modifier.PUBLIC) || modelUtils.isPackagePrivate(method);
                 if ((isAopProxyType && isPublic) ||
                         (!isAopProxyType && methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) ||
                         (methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE) && isConcrete)) {

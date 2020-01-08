@@ -359,7 +359,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Override
     public boolean hasAnnotation(@Nullable String annotation) {
         for (AnnotationMetadata annotationMetadata : hierarchy) {
-            if (annotationMetadata.hasStereotype(annotation)) {
+            if (annotationMetadata.hasAnnotation(annotation)) {
                 return true;
             }
         }
