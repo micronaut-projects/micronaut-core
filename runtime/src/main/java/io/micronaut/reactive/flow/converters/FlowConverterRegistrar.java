@@ -33,7 +33,7 @@ import java.util.function.Function;
  * @since 1.3
  */
 @Singleton
-@Requires(classes = Flow.class)
+@Requires(classes = {Flow.class, ReactiveFlowKt.class})
 public class FlowConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(ConversionService<?> conversionService) {
