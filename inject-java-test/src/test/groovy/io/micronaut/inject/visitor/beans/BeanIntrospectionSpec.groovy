@@ -679,10 +679,12 @@ class Test {}
         reference.getBeanType() == OtherTestBean
 
         when:
-        reference.load()
+        def introspection = reference.load()
 
-        then:
+        then: "the introspection is under the reference package"
         noExceptionThrown()
+        introspection.class.name == "test.\$io_micronaut_inject_visitor_beans_OtherTestBean\$Introspection"
+        introspection.instantiate()
 
         cleanup:
         context?.close()
