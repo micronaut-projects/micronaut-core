@@ -31,6 +31,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -49,6 +50,7 @@ public class DefaultRouter implements Router {
     private final Collection<FilterRoute> filterRoutes = new ArrayList<>();
     private final Set<ErrorRoute> errorRoutes = new HashSet<>();
     private final Set<Integer> exposedPorts;
+    private List<Integer> defaultPorts;
 
     /**
      * Construct a new router for the given route builders.
@@ -92,6 +94,19 @@ public class DefaultRouter implements Router {
     @Override
     public Set<Integer> getExposedPorts() {
         return exposedPorts;
+    }
+
+    @Override
+    public void applyDefaultPorts(List<Integer> ports) {
+        Predicate<HttpRequest<?>> portMatches = (httpRequest -> ports.contains(httpRequest.getServerAddress().getPort()));
+        routesByMethod.values().forEach(routes -> {
+            for (int i = 0; i < routes.size(); i++) {
+                UriRoute route = routes.get(i);
+                if (route.getPort() == null) {
+                    routes.set(i, route.where(portMatches));
+                }
+            }
+        });
     }
 
     @SuppressWarnings("unchecked")

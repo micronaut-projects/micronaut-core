@@ -79,10 +79,7 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.net.*;
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -347,13 +344,17 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             Optional<String> host = serverConfiguration.getHost();
 
             serverPort = bindServerToHost(serverBootstrap, host.orElse(null), serverPort, new AtomicInteger(0));
+            List<Integer> defaultPorts = new ArrayList<>(2);
+            defaultPorts.add(serverPort);
             if (serverConfiguration.isDualProtocol()) {
                 // By default we will bind ssl first and then bind http after.
                 int httpPort = getPortOrDefault(getHttpPort(serverConfiguration));
+                defaultPorts.add(httpPort);
                 bindServerToHost(serverBootstrap, host.orElse(null), httpPort, new AtomicInteger(0));
             }
             final Set<Integer> exposedPorts = router.getExposedPorts();
             if (CollectionUtils.isNotEmpty(exposedPorts)) {
+                router.applyDefaultPorts(defaultPorts);
                 for (Integer exposedPort : exposedPorts) {
                     try {
                         if (host.isPresent()) {
