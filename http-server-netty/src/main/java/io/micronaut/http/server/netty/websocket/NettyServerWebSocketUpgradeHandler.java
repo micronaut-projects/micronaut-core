@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.websocket;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.exceptions.HttpStatusException;
@@ -34,6 +35,7 @@ import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
+import io.micronaut.websocket.annotation.ServerWebSocket;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.Channel;
@@ -227,10 +229,13 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
         int maxFramePayloadLength = webSocketBean.messageMethod()
                 .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
                 .orElse(65536)).orElse(65536);
+        String subprotocols = webSocketBean.getBeanDefinition().stringValue(ServerWebSocket.class, "subprotocols")
+                                           .filter(s -> !StringUtils.isEmpty(s))
+                                           .orElse(null);
         WebSocketServerHandshakerFactory wsFactory =
                 new WebSocketServerHandshakerFactory(
                         getWebSocketURL(ctx, req),
-                        null,
+                        subprotocols,
                         true,
                         maxFramePayloadLength
                 );
