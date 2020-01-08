@@ -42,6 +42,7 @@ public class NameUtils {
     private static final String PREFIX_SET = "set";
     private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_{0-9}]+");
     private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+(\\-|\\.|:)?)*([a-z0-9])+$");
+    private static final Pattern KEBAB_REPLACEMENTS = Pattern.compile("[_ ]");
 
 
     /**
@@ -120,10 +121,10 @@ public class NameUtils {
      */
     public static String hyphenate(String name, boolean lowerCase) {
         if (isHyphenatedLowerCase(name)) {
-            return name.replace('_', '-');
+            return KEBAB_REPLACEMENTS.matcher(name).replaceAll("-");
         } else {
             char separatorChar = '-';
-            return separateCamelCase(name.replace('_', '-'), lowerCase, separatorChar);
+            return separateCamelCase(KEBAB_REPLACEMENTS.matcher(name).replaceAll("-"), lowerCase, separatorChar);
         }
     }
 

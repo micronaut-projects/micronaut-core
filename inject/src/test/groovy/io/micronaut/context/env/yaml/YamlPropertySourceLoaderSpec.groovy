@@ -130,4 +130,13 @@ datasources.default: {}
         expect:
         ctx.containsProperty("other-config")
     }
+
+    void "test properties with spaces"() {
+        ApplicationContext ctx = ApplicationContext.run("spaces")
+
+        expect:
+        ctx.containsProperties("test")
+        ctx.containsProperty("test.Key with space")
+        ctx.containsProperty("test.key-with-space")
+    }
 }

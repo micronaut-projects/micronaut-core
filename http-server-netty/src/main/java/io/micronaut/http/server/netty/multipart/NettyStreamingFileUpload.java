@@ -145,7 +145,11 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                     @Override
                     public void onComplete() {
                         if (fileUpload.isCompleted()) {
-                            emitter.onSuccess(transferOperation.get());
+                            try {
+                                emitter.onSuccess(transferOperation.get());
+                            } catch (Exception e) {
+                                emitter.onError(e);
+                            }
                         } else {
                             emitter.onError(new MultipartException("Transfer did not complete"));
                         }
