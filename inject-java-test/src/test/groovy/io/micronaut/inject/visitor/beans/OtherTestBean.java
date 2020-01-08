@@ -1,5 +1,6 @@
 package io.micronaut.inject.visitor.beans;
 
+@MarkerAnnotation
 public class OtherTestBean {
     private String name;
 

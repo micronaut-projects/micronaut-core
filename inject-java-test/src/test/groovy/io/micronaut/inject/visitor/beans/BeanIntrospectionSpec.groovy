@@ -720,8 +720,9 @@ package test;
 import io.micronaut.core.annotation.*;
 import javax.validation.constraints.*;
 import java.util.*;
+import io.micronaut.inject.visitor.beans.*;
 
-@Introspected(packages="io.micronaut.inject.visitor.beans", includedAnnotations=Introspected.class)
+@Introspected(packages="io.micronaut.inject.visitor.beans", includedAnnotations=MarkerAnnotation.class)
 class Test {}
 ''')
 
