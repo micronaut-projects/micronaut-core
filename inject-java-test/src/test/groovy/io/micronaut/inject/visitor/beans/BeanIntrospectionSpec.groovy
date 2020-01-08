@@ -688,6 +688,30 @@ class Test {}
         context?.close()
     }
 
+    void "test write bean introspection data for class already introspected"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+import io.micronaut.inject.visitor.beans.*;
+
+@Introspected(classes=TestBean.class)
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        context.classLoader.loadClass('test.$Test$IntrospectionRef0')
+
+        then:"The reference is not written"
+        thrown(ClassNotFoundException)
+
+        cleanup:
+        context?.close()
+    }
+
     void "test write bean introspection data for package with sources"() {
         given:
         ApplicationContext context = buildContext('test.Test', '''
