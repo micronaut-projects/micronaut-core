@@ -16,6 +16,8 @@ The `proceed(..)` method returns a Reactive Streams rs:Publisher[] that emits th
 
 To put these concepts into practise lets look at an example.
 
+IMPORTANT: Filters execute in the event loop therefore blocking operations must be offloaded to another thread pool.
+
 
 == Writing a Filter
 
