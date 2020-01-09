@@ -102,7 +102,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         this.classElement = classElement;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         this.introspectionWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        this.introspectionName = computeIntrospectionName(className);
+        this.introspectionName = computeIntrospectionName(generatingType, className);
         this.introspectionType = getTypeReference(introspectionName);
         this.beanType = getTypeReference(className);
     }
@@ -458,6 +458,12 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         String packageName = NameUtils.getPackageName(className);
         final String shortName = NameUtils.getSimpleName(className);
         return packageName + ".$" + shortName + INTROSPECTION_SUFFIX;
+    }
+
+    @NotNull
+    private static String computeIntrospectionName(String generatingName, String className) {
+        final String packageName = NameUtils.getPackageName(generatingName);
+        return packageName + ".$" + className.replace('.', '_') + INTROSPECTION_SUFFIX;
     }
 
     /**
