@@ -49,10 +49,18 @@ rebelAgent= -agentpath:~/bin/jrebel/lib/libjrebel64.dylib
 
 Add the appropriate JVM arg to `build.gradle` (not necessary if using the CLI feature)
 
-[source,groovy]
+[source.multi-language-sample,gradle-groovy]
 ----
 run.dependsOn(generateRebel)
 if (project.hasProperty('rebelAgent')) {
+    run.jvmArgs += rebelAgent
+}
+----
+
+[source.multi-language-sample,gradle-kotlin]
+----
+run.dependsOn(generateRebel)
+if (project.hasProperty("rebelAgent")) {
     run.jvmArgs += rebelAgent
 }
 ----

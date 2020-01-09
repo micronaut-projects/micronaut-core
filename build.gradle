@@ -747,8 +747,7 @@ subprojects { Project subproject ->
     }
 
     task javaDocAtReplacement(type: io.micronaut.docs.JavaDocAtValueReplacementTask, dependsOn: moveConfigProps) {
-        adocFile = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
-        rootProjectDir = rootProject.projectDir
+        adoc = "${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc"
     }
 
     task replaceAtLink(dependsOn: moveConfigProps) {

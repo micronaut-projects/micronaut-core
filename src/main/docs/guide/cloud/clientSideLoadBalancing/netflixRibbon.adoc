@@ -13,11 +13,7 @@ If you need more flexibility in how your application performs client-side load b
 
 To add Ribbon support to your application add the `netflix-ribbon` configuration to `build.gradle` or `pom.xml`:
 
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut.configuration:micronaut-netflix-ribbon"
-----
+dependency::io.micronaut.configuration:micronaut-netflix-ribbon[scope="compile"]
 
 The api:http.client.LoadBalancer[] implementations will now be api:configuration.ribbon.RibbonLoadBalancer[] instances.
 

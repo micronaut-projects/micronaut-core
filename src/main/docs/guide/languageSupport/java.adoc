@@ -18,10 +18,7 @@ If you are creating your project using the Micronaut CLI, the `javax.annotation`
 The `javax.annotation`, which includes `@PostConstruct`, `@PreDestroy` etc. is no longer part of the core JDK but instead a module. If you run under Java 9+ you will need to import the module or add the dependency to your classpath:
 
 .Adding the `javax.annotation` dependency
-[source,groovy]
-----
-compile 'javax.annotation:javax.annotation-api:1.3.2'
-----
+dependency:javax.annotation:javax.annotation-api:1.3.2[scope="compile"]
 
 == Using Project Lombok
 
@@ -31,33 +28,67 @@ Since both Micronaut and Lombok use annotation processors, special care needs to
 
 For example in Gradle adding the following dependencies to the `dependencies` block:
 
-.Configuring Lombok in Gradle
+
 [source,groovy]
 ----
+
+----
+
+[source.multi-language-sample,gradle-groovy,title="Configuring Lombok in build file"]
+----
 compileOnly 'org.projectlombok:lombok:1.16.20'
-annotationProcessor "org.projectlombok:lombok:1.16.20"
-...
-// Micronaut processor define after Lombok
-annotationProcessor "io.micronaut:micronaut-inject-java"
+annotationProcessor "org.projectlombok:lombok:1.16.20" // or kapt for kotlin sources
+// Micronaut processor must be defined *after* Lombok
+annotationProcessor "io.micronaut:micronaut-inject-java" // for java sources
+kapt "io.micronaut:micronaut-inject-kotlin" // for kotlin sources
 ----
 
-Or when using Maven:
-
-.Configuring Lombok in Maven
-[source,xml]
+[source.multi-language-sample,gradle-kotlin]
 ----
-<annotationProcessorPaths>
-  <path>
+compileOnly("org.projectlombok:lombok:1.16.20")
+annotationProcessor("org.projectlombok:lombok:1.16.20") // or kapt for kotlin sources
+// Micronaut processor must be defined *after* Lombok
+annotationProcessor("io.micronaut:micronaut-inject-java") // for java sources
+kapt("io.micronaut:micronaut-inject-kotlin") // for kotlin sources
+----
+
+[source.multi-language-sample,maven]
+----
+<provided>
     <groupId>org.projectlombok</groupId>
     <artifactId>lombok</artifactId>
-    <version>1.18.0</version>
-  </path>
-  <path>
+    <versionId>1.16.20</versionId>
+</provided>
+<annotationProcessorPath>
+    <groupId>org.projectlombok</groupId>
+    <artifactId>lombok</artifactId>
+    <versionId>1.16.20</versionId>
+</annotationProcessorPath>
+<!--  Micronaut processor must be defined *after* Lombok -->
+<!-- For Java sources, use the following -->
+<annotationProcessorPath>
     <groupId>io.micronaut</groupId>
-    <artifactId>micronaut-inject-java</artifactId>
-    <version>${micronaut.version}</version>
-  </path>
-</annotationProcessorPaths>
+    <artifactId>micronaut-inject-java/artifactId>
+</annotationProcessorPath>
+<!-- Following block only for kotlin sources -->
+<execution>
+    <id>kapt</id>
+    <goals>
+        <goal>kapt</goal>
+    </goals>
+    <configuration>
+        <sourceDirs>
+            <sourceDir>src/main/kotlin</sourceDir>
+            <sourceDir>src/main/java</sourceDir>
+        </sourceDirs>
+        <annotationProcessorPaths>
+            <annotationProcessorPath>
+                <groupId>io.micronaut</groupId>
+                <artifactId>micronaut-inject-kotlin</artifactId>
+            </annotationProcessorPath>
+        </annotationProcessorPaths>
+    </configuration>
+</execution>
 ----
 
 NOTE: In both cases (Gradle and Maven) the Micronaut processor should be configured after the Lombok processor, reversing the order of the declared dependencies will not work.

@@ -44,11 +44,8 @@ The table summarizes the configuration modules and the dependencies you should a
 
 For example, to add support for MongoDB you define the following dependency:
 
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut.configuration:micronaut-mongo-reactive"
-----
+.Required Dependency
+dependency:io.micronaut.configuration:micronaut-mongo-reactive[scope="compile"]
 
 For Groovy users, Micronaut provides special support for http://gorm.grails.org[GORM].
 

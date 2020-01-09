@@ -13,10 +13,7 @@ $ mn create-app my-app --features postgres-reactive
 
 To configure the Reactive Postgres client you should first add `postgres-reactive` module to your classpath:
 
-[source,groovy]
-.build.gradle
-----
-compile "io.micronaut.configuration:micronaut-postgres-reactive"
-----
+.Required Dependency
+dependency:io.micronaut.configuration:micronaut-postgres-reactive[scope="compile"]
 
 For more information see the https://micronaut-projects.github.io/micronaut-sql/latest/guide/#pgclient[Configuring Reactive Postgres] section of the https://github.com/micronaut-projects/micronaut-sql[Micronaut SQL libraries] project.

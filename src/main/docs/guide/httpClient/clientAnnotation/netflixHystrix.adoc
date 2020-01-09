@@ -11,11 +11,8 @@ https://github.com/Netflix/Hystrix[Netflix Hystrix] is a fault tolerance library
 
 Micronaut features integration with Hystrix through the `netflix-hystrix` module, which you can add to your `build.gradle` or `pom.xml`:
 
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut.configuration:micronaut-netflix-hystrix"
-----
+.Required Dependency
+dependency:io.micronaut.configuration:micronaut-netflix-hystrix[scope="compile"]
 
 == Using the @HystrixCommand Annotation
 

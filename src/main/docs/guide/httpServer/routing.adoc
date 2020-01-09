@@ -147,15 +147,54 @@ TIP: Unfortunately due to type erasure a Java method lambda reference cannot be 
 
 Micronaut supports validating route arguments at compile time with the validation library. To get started simply add the `validation` dependency to your build:
 
-[source,groovy]
-.build.gradle
+[source.multi-language-sample,gradle-groovy,title="Validation Dependencies"]
 ----
-annotationProcessor "io.micronaut:micronaut-validation" // Java only
-kapt "io.micronaut:micronaut-validation" // Kotlin only
-compile "io.micronaut:micronaut-validation"
+annotationProcessor "io.micronaut:micronaut-validation" // To support Java source files only
+kapt "io.micronaut:micronaut-validation" // To support Kotlin sources files only
+compile "io.micronaut:micronaut-validation" // Needed for all three supported source languages
 ----
 
-With the correct dependency on your classpath, route arguments will automatically be checked at compile time. The compilation will fail if any of the following conditions are met:
+[source.multi-language-sample,gradle-kotlin]
+----
+annotationProcessor("io.micronaut:micronaut-validation") // To support Java source files only
+kapt("io.micronaut:micronaut-validation") // To support Kotlin sources files only
+compile("io.micronaut:micronaut-validation") // Needed for all three supported source languages
+----
+
+[source.multi-language-sample,maven]
+----
+<!-- Following block only for java sources -->
+<annotationProcessorPath>
+    <groupId>io.micronaut</groupId>
+    <artifactId>micronaut-validation</artifactId>
+</annotationProcessorPath>
+<!-- Following block only for kotlin sources -->
+<execution>
+    <id>kapt</id>
+    <goals>
+        <goal>kapt</goal>
+    </goals>
+    <configuration>
+        <sourceDirs>
+            <sourceDir>src/main/kotlin</sourceDir>
+            <sourceDir>src/main/java</sourceDir>
+        </sourceDirs>
+        <annotationProcessorPaths>
+            <annotationProcessorPath>
+                <groupId>io.micronaut</groupId>
+                <artifactId>micronaut-validation</artifactId>
+            </annotationProcessorPath>
+        </annotationProcessorPaths>
+    </configuration>
+</execution>
+<!-- Required for any source types -->
+<dependency>
+    <groupId>io.micronaut.configuration</groupId>
+    <artifactId>micronaut-spring</artifactId>
+</dependency>
+----
+
+With the correct dependencies on your classpath, route arguments will automatically be checked at compile time. The compilation will fail if any of the following conditions are met:
 
 * {blank}
  The URI template contains a variable that is optional, but the method parameter is not annotated with `@Nullable` or is an `java.util.Optional`.

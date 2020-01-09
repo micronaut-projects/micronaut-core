@@ -28,10 +28,8 @@ A non-blocking Reactive Streams http://mongodb.github.io/mongo-java-driver-react
 
 To use the blocking driver, add a dependency to your application to the mongo-java-driver.
 
-[source,groovy]
-----
-compile "org.mongodb:mongo-java-driver"
-----
+.Required Dependency
+dependency:org.mongodb:mongo-java-driver[scope="compile"]
 
 Then the blocking http://mongodb.github.io/mongo-java-driver/3.7/javadoc/com/mongodb/MongoClient.html[MongoClient] will be available for injection.
 

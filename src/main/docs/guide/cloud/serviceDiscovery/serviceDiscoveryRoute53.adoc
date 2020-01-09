@@ -16,7 +16,7 @@ you are using
 2. Create a service with DNS Records with AWS-CLI command
 3. Add health checks or custom health checks (optional)
 4. Add Service ID to your application configuration file like so:
-
++
 .Sample application.yml
 [source,yaml]
 ----
@@ -30,11 +30,10 @@ micronaut:
     application:
         name: something
 ----
-
++
 5. Make sure you have the following dependencies included in your build file:
-
-.Sample build.gradle
-[source,groovy]
++
+[source.multi-language-sample,gradle-groovy,title="Required dependencies"]
 ----
 compile "io.micronaut:micronaut-discovery-client"
 compile "io.micronaut.configuration:micronaut-aws-common"
@@ -43,12 +42,53 @@ compile group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
 compile group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
 compile group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
 ----
-
-
++
+[source.multi-language-sample,gradle-kotlin]
+----
+compile("io.micronaut:micronaut-discovery-client")
+compile("io.micronaut.configuration:micronaut-aws-common")
+compile(group="com.amazonaws", name="aws-java-sdk-route53", version="1.11.297")
+compile(group="com.amazonaws", name="aws-java-sdk-core", version="1.11.297")
+compile(group="com.amazonaws", name="jmespath-java", version="1.11.297")
+compile(group="com.amazonaws", name="aws-java-sdk-servicediscovery", version="1.11.297")
+----
++
+[source.multi-language-sample,maven]
+----
+<dependency>
+    <groupId>io.micronaut</groupId>
+    <artifactId>micronaut-discovery-client</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.micronaut.configuration</groupId>
+    <artifactId>micronaut-aws-common</artifactId>
+</dependency>
+<dependency>
+    <groupId>com.amazonaws</groupId>
+    <artifactId>aws-java-sdk-route53</artifactId>
+    <versionId>1.11.297</versionId>
+</dependency>
+<dependency>
+    <groupId>com.amazonaws</groupId>
+    <artifactId>aws-java-sdk-core</artifactId>
+    <versionId>1.11.297</versionId>
+</dependency>
+<dependency>
+    <groupId>com.amazonaws</groupId>
+    <artifactId>jmespath-java</artifactId>
+    <versionId>1.11.297</versionId>
+</dependency>
+<dependency>
+    <groupId>com.amazonaws</groupId>
+    <artifactId>aws-java-sdk-servicediscovery</artifactId>
+    <versionId>1.11.297</versionId>
+</dependency>
+----
++
 6. On the client side, you will need the same dependencies and less configuration options:
 
 .Sample application.yml
-[source,groovy]
+[source,yaml]
 ----
 aws:
     route53:
@@ -66,7 +106,9 @@ You can then use the api:discovery.DiscoveryClient[] API to find other services 
 ----
 DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient);
 List<String> serviceIds = Flowable.fromPublisher(discoveryClient.getServiceIds()).blockingFirst();
-List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceIds.get(0))).blockingFirst();
+List<ServiceInstance> instances = Flowable.fromPublisher(
+        discoveryClient.getInstances(serviceIds.get(0))
+).blockingFirst();
 ----
 
 ==== Creating the Namespace

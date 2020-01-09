@@ -13,11 +13,7 @@ $ mn create-app my-app --features redis-lettuce
 
 To configure the Lettuce driver you should first add the `redis-lettuce` module to your classpath:
 
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut.configuration:micronaut-redis-lettuce"
-----
+dependency:io.micronaut.configuration:micronaut-redis-lettuce[scope="compile",title="Required Dependency"]
 
 You should then configure the URI of the Redis server you wish to communicate with in `application.yml`:
 
