@@ -77,9 +77,9 @@ Micronaut SQL includes the latest versions of Hibernate and adds support for the
 
 Micronaut Micrometer has been updated to support Micrometer 1.3.1.
 
-=== Micronaut Kafka 1.3 Update
+=== Micronaut Kafka 1.4 Update
 
-Micronaut Kafka 1.3 has been updated to support Kafka 2.3.1
+Micronaut Kafka 1.4 has been updated to support Kafka 2.4.0
 
 === Micronaut Neo4j 1.3 Update
 
@@ -133,6 +133,7 @@ Optional Third Party Dependencies:
 * Mongo Reactive Driver `1.11.0` -> `1.13.0`
 * Neo4j Java Driver `1.7.2` -> `1.7.5`
 * Jaeger `0.35.5` -> `1.0.0`
+* Kafka `2.3.0` -> `2.4.0`
 * Spring `5.1.8` -> `5.2.1`
 * Zipkin/Brave `5.6.5` -> `5.9.0`
 * Groovy `2.5.7` -> `2.5.8`
@@ -142,6 +143,7 @@ Optional Third Party Dependencies:
 Modules:
 
 * Micronaut GRPC `1.0.1` -> `1.1.1`
+* Micronaut Kafka `1.2.0` -> `1.4.0`
 * Micronaut Micrometer `1.2.1` -> `1.3.0`
 * Micronaut MongoDB `1.1.0` -> `1.2.0`
 * Micronaut MongoDB `1.1.0` -> `1.3.0`
