@@ -871,7 +871,41 @@ class Test {
         context?.close()
     }
 
-    void "test write bean introspection data for classes"() {
+    void "test write bean introspection data for class in another package"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+import io.micronaut.inject.visitor.beans.*;
+
+@Introspected(classes=OtherTestBean.class)
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType() == OtherTestBean
+
+        when:
+        def introspection = reference.load()
+
+        then: "the introspection is under the reference package"
+        noExceptionThrown()
+        introspection.class.name == "test.\$io_micronaut_inject_visitor_beans_OtherTestBean\$Introspection"
+        introspection.instantiate()
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test write bean introspection data for class already introspected"() {
         given:
         ApplicationContext context = buildContext('test.Test', '''
 package test;
@@ -886,12 +920,10 @@ class Test {}
 ''')
 
         when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
-        BeanIntrospectionReference reference = clazz.newInstance()
+        context.classLoader.loadClass('test.$Test$IntrospectionRef0')
 
-        then:"The reference is valid"
-        reference != null
-        reference.getBeanType() == TestBean
+        then:"The reference is not written"
+        thrown(ClassNotFoundException)
 
         cleanup:
         context?.close()
@@ -905,8 +937,9 @@ package test;
 import io.micronaut.core.annotation.*;
 import javax.validation.constraints.*;
 import java.util.*;
+import io.micronaut.inject.visitor.beans.*;
 
-@Introspected(packages="io.micronaut.inject.visitor.beans", includedAnnotations=Introspected.class)
+@Introspected(packages="io.micronaut.inject.visitor.beans", includedAnnotations=MarkerAnnotation.class)
 class Test {}
 ''')
 

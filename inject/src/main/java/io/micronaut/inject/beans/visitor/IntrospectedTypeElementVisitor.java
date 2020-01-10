@@ -188,7 +188,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             for (AnnotationClassValue aClass : classes) {
                 final Optional<ClassElement> classElement = context.getClassElement(aClass.getName());
                 classElement.ifPresent(ce -> {
-                    if (!ce.isAbstract() && ce.isPublic()) {
+                    if (!ce.isAbstract() && ce.isPublic() && !ce.hasStereotype(Introspected.class)) {
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                                 element.getName(),
                                 index.getAndIncrement(),
@@ -197,7 +197,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         );
 
                         processElement(metadata, includes, excludes, excludedAnnotations, indexedAnnotations, ce, writer);
-
                     }
                 });
             }
@@ -210,7 +209,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(new String[0]));
                     int j = 0;
                     for (ClassElement classElement : elements) {
-                        if (classElement.isAbstract() || !classElement.isPublic()) {
+                        if (classElement.isAbstract() || !classElement.isPublic() || classElement.hasStereotype(Introspected.class)) {
                             continue;
                         }
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
