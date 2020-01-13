@@ -40,7 +40,7 @@ compileOnly 'org.projectlombok:lombok:1.16.20'
 annotationProcessor "org.projectlombok:lombok:1.16.20" // or kapt for kotlin sources
 // Micronaut processor must be defined *after* Lombok
 annotationProcessor "io.micronaut:micronaut-inject-java" // for java sources
-kapt "io.micronaut:micronaut-inject-kotlin" // for kotlin sources
+kapt "io.micronaut:micronaut-inject-java" // for kotlin sources
 ----
 
 [source.multi-language-sample,gradle-kotlin]
@@ -49,7 +49,7 @@ compileOnly("org.projectlombok:lombok:1.16.20")
 annotationProcessor("org.projectlombok:lombok:1.16.20") // or kapt for kotlin sources
 // Micronaut processor must be defined *after* Lombok
 annotationProcessor("io.micronaut:micronaut-inject-java") // for java sources
-kapt("io.micronaut:micronaut-inject-kotlin") // for kotlin sources
+kapt("io.micronaut:micronaut-inject-java") // for kotlin sources
 ----
 
 [source.multi-language-sample,maven]
@@ -57,12 +57,12 @@ kapt("io.micronaut:micronaut-inject-kotlin") // for kotlin sources
 <provided>
     <groupId>org.projectlombok</groupId>
     <artifactId>lombok</artifactId>
-    <versionId>1.16.20</versionId>
+    <version>1.16.20</version>
 </provided>
 <annotationProcessorPath>
     <groupId>org.projectlombok</groupId>
     <artifactId>lombok</artifactId>
-    <versionId>1.16.20</versionId>
+    <version>1.16.20</version>
 </annotationProcessorPath>
 <!--  Micronaut processor must be defined *after* Lombok -->
 <!-- For Java sources, use the following -->
@@ -84,7 +84,7 @@ kapt("io.micronaut:micronaut-inject-kotlin") // for kotlin sources
         <annotationProcessorPaths>
             <annotationProcessorPath>
                 <groupId>io.micronaut</groupId>
-                <artifactId>micronaut-inject-kotlin</artifactId>
+                <artifactId>micronaut-inject-java</artifactId>
             </annotationProcessorPath>
         </annotationProcessorPaths>
     </configuration>

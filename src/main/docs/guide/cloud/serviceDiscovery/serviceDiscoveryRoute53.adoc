@@ -66,22 +66,22 @@ compile(group="com.amazonaws", name="aws-java-sdk-servicediscovery", version="1.
 <dependency>
     <groupId>com.amazonaws</groupId>
     <artifactId>aws-java-sdk-route53</artifactId>
-    <versionId>1.11.297</versionId>
+    <version>1.11.297</version>
 </dependency>
 <dependency>
     <groupId>com.amazonaws</groupId>
     <artifactId>aws-java-sdk-core</artifactId>
-    <versionId>1.11.297</versionId>
+    <version>1.11.297</version>
 </dependency>
 <dependency>
     <groupId>com.amazonaws</groupId>
     <artifactId>jmespath-java</artifactId>
-    <versionId>1.11.297</versionId>
+    <version>1.11.297</version>
 </dependency>
 <dependency>
     <groupId>com.amazonaws</groupId>
     <artifactId>aws-java-sdk-servicediscovery</artifactId>
-    <versionId>1.11.297</versionId>
+    <version>1.11.297</version>
 </dependency>
 ----
 +

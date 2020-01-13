@@ -12,17 +12,72 @@ TIP: Learn more about kapt and its features from the https://kotlinlang.org/docs
 
 The Micronaut annotation processors are declared in the `kapt` scope when using Gradle. For example:
 
-[source,groovy]
-.Example build.gradle
+[source.multi-language-sample,gradle-groovy,title="Required Dependencies"]
 ----
-dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion" //<1>
     compile "org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion"
     kapt "io.micronaut:micronaut-inject-java" //<2>
 
     kaptTest "io.micronaut:micronaut-inject-java" //<3>
-    ...
-}
+----
+
+[source.multi-language-sample,gradle-kotlin]
+----
+    compile("org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion") //<1>
+    compile("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
+    kapt("io.micronaut:micronaut-inject-java") //<2>
+
+    kaptTest("io.micronaut:micronaut-inject-java") //<3>
+----
+
+[source.multi-language-sample,maven]
+----
+<dependency>
+    <groupId>org.jetbrains.kotlin</groupId>
+    <artifactId>kotlin-stdlib-jdk8</artifactId> <!--- <1> --->
+    <version>${kotlin.version}</version>
+</dependency>
+<dependency>
+    <groupId>org.jetbrains.kotlin</groupId>
+    <artifactId>kotlin-reflect</artifactId>
+    <version>${kotlin.version}</version>
+</dependency>
+<execution>
+    <id>kapt</id>
+    <goals>
+        <goal>kapt</goal> <!--- <2> --->
+    </goals>
+    <configuration>
+        <sourceDirs>
+            <sourceDir>src/main/kotlin</sourceDir>
+            <sourceDir>src/main/java</sourceDir>
+        </sourceDirs>
+        <annotationProcessorPaths>
+            <annotationProcessorPath>
+                <groupId>io.micronaut</groupId>
+                <artifactId>micronaut-inject-java</artifactId>
+            </annotationProcessorPath>
+        </annotationProcessorPaths>
+    </configuration>
+</execution>
+<execution>
+    <id>kapt</id>
+    <goals>
+        <goal>kapt-test</goal> <!--- <3> --->
+    </goals>
+    <configuration>
+        <sourceDirs>
+            <sourceDir>src/test/kotlin</sourceDir>
+            <sourceDir>src/test/java</sourceDir>
+        </sourceDirs>
+        <annotationProcessorPaths>
+            <annotationProcessorPath>
+                <groupId>io.micronaut</groupId>
+                <artifactId>micronaut-inject-java</artifactId>
+            </annotationProcessorPath>
+        </annotationProcessorPaths>
+    </configuration>
+</execution>
 ----
 
 

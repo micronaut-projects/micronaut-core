@@ -2,16 +2,17 @@ NOTE: This section applies to Java & Kotlin functions - for functions written in
 
 In order to enable Micronaut's DI features in a deployed function, your project's *main* class must be set to the api:function.executor.FunctionApplication[] class. Typically this will be done in your `build.gradle` or `pom.xml` files, as seen in the examples below:
 
-.Example build.gradle
-[source,groovy]
+[source.multi-language-sample,gradle-groovy,title="Naming the main class"]
+----
+    mainClassName = "io.micronaut.function.executor.FunctionApplication"
 ----
 
-mainClassName = "io.micronaut.function.executor.FunctionApplication"
-
+[source.multi-language-sample,gradle-kotlin]
+----
+    mainClassName = "io.micronaut.function.executor.FunctionApplication"
 ----
 
-.Example pom.xml
-[source,xml]
+[source.multi-language-sample,maven]
 ----
 <project>
     <properties>

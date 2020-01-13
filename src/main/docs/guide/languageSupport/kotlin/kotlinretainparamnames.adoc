@@ -2,13 +2,41 @@ Like with Java, the parameter name data for method parameters is not retained at
 
 To enable the retention of parameter name data with Kotlin you should set the `javaParameters` option to `true` in your `build.gradle`:
 
-.build.gradle
-[source,groovy]
+[source.multi-language-sample,gradle-groovy,title="Required Dependencies"]
 ----
-compileTestKotlin {
-	kotlinOptions {
-	    jvmTarget = '1.8'
-	    javaParameters = true
-	}
-}
+    compileTestKotlin {
+	    kotlinOptions {
+	        jvmTarget = '1.8'
+	        javaParameters = true
+	    }
+    }
+----
+
+[source.multi-language-sample,gradle-kotlin]
+----
+    withType<KotlinCompile> {
+        kotlinOptions {
+	        jvmTarget = "1.8"
+	        javaParameters = true
+	    }
+    }
+----
+
+[source.multi-language-sample,maven]
+----
+    <properties>
+        <kotlin.compiler.jvmTarget>1.8</kotlin.compiler.jvmTarget>
+    </properties>
+
+    <!--- ... --->
+
+    <plugin>
+      <groupId>org.jetbrains.kotlin</groupId>
+      <artifactId>kotlin-maven-plugin</artifactId>
+      <configuration>
+        <args>
+          <arg>-java-parameters</arg>
+        </args>
+      </configuration>
+    </plugin>
 ----

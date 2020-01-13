@@ -27,7 +27,7 @@ compile(group="com.amazonaws", name="aws-java-sdk-ssm", version="1.11.308")
 <dependency>
     <groupId>com.amazonaws</groupId>
     <artifactId>aws-java-sdk-ssm</artifactId>
-    <versionId>1.11.308</versionId>
+    <version>1.11.308</version>
 </dependency>
 ----
 
