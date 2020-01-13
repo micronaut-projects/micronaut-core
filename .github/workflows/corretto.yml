@@ -1,11 +1,5 @@
 name: Corretto CI
-on:
-  push:
-    branches:
-    - master
-  pull_request:
-    branches:
-    - master
+on: push
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,5 +26,6 @@ jobs:
       with:
         java-version: ${{ matrix.java }}
         jdkFile: jdk.tar.gz
+    - run: java -version
     - name: Build with Gradle
       run: ./gradlew check --no-daemon --parallel --continue
