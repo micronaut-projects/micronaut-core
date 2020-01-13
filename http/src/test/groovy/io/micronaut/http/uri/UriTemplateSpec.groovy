@@ -434,6 +434,7 @@ class UriTemplateSpec extends Specification {
         where:
         template                                      | arguments                                          | result
         'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value']                                       | 'http://example.com:8080/v/value/p'
+        'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'val100', m: 'value']                          | 'http://example.com:8080/v/val100/p?m=value'
         'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', o: 'val']                             | 'http://example.com:8080/v/value/p?o=val'
         'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', m: 'val']                             | 'http://example.com:8080/v/value/p?m=val'
         'http://example.com:8080/v/{v}/p{?o,m,s}'     | [v: 'value', s: 'val']                             | 'http://example.com:8080/v/value/p?s=val'
