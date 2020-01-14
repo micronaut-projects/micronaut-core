@@ -7,12 +7,9 @@ on:
     branches:
       - master
 jobs:
-
   build:
     runs-on: ubuntu-latest
-#    strategy:
-#      matrix:
-#        java: ['8', '11']
+    container: amazoncorretto:8
     steps:
     - uses: actions/checkout@v2
     - uses: actions/cache@v1
@@ -27,17 +24,6 @@ jobs:
         key: ${{ runner.os }}-micronaut-core-wrapper-${{ hashFiles('**/*.gradle') }}
         restore-keys: |
           ${{ runner.os }}-micronaut-core-wrapper-
-    - uses: alvarosanchez/corretto-amazon-linux-action@master
-      with:
-        corretto-version: ${{ matrix.java }}
-        command: "./gradlew check --no-daemon --parallel --continue"
-
-  build_container:
-    runs-on: ubuntu-latest
-    container: amazoncorretto:8
-    steps:
     - run: java -version
-    - run: ls -l .
-    - run: pwd
-    - run: echo $GITHUB_WORKSPACE
-    - run: ./gradlew check --no-daemon --parallel --continue
+    - name: Build with Gradle
+      run: ./gradlew check --no-daemon --parallel --continue
