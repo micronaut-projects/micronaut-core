@@ -37,4 +37,6 @@ jobs:
     container: amazoncorretto:8
     steps:
     - run: java -version
-    - run: ./gradlew tasks
+    - run: ls -l $GITHUB_WORKSPACE
+    - run: pwd
+    - run: cd $GITHUB_WORKSPACE && ./gradlew tasks
