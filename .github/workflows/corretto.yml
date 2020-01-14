@@ -7,11 +7,12 @@ on:
     branches:
       - master
 jobs:
-  build:
+  build_corretto_8:
+    name: Build on Corretto 8
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        java: ['8', '11']
+#    strategy:
+#      matrix:
+#        java: ['8', '11']
     steps:
     - uses: actions/checkout@v2
     - uses: actions/cache@v1
@@ -30,7 +31,7 @@ jobs:
       with:
         corretto-version: ${{ matrix.java }}
     - run: java -version
-    - uses: docker://amazoncorretto:${{ matrix.java }}
+    - uses: docker://amazoncorretto:8
     - run: java -version
     - name: Build with Gradle
 #      run: ./gradlew check --no-daemon --parallel --continue
