@@ -18,8 +18,8 @@ jobs:
       run: java -version && cat /etc/system-release
     - name: Install tar && gzip
       run: yum install -y tar gzip
-    - name: Configure UTF-8
-      run: echo "LANG=en_US.utf-8" >> /etc/environment && echo "LC_ALL=en_US.utf-8" >> /etc/environment && source /etc/environment
+#    - name: Configure UTF-8
+#      run: echo "LANG=en_US.utf-8" >> /etc/environment && echo "LC_ALL=en_US.utf-8" >> /etc/environment && source /etc/environment
     - uses: actions/checkout@v2
     - uses: actions/cache@v1
       with:
@@ -34,4 +34,4 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-micronaut-core-wrapper-
     - name: Build with Gradle
-      run: ./gradlew check --no-daemon --parallel --continue
+      run: LANG=en_US.utf-8 LC_ALL=en_US.utf-8 ./gradlew check --no-daemon --parallel --continue
