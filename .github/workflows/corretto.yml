@@ -26,12 +26,12 @@ jobs:
         key: ${{ runner.os }}-micronaut-core-wrapper-${{ hashFiles('**/*.gradle') }}
         restore-keys: |
           ${{ runner.os }}-micronaut-core-wrapper-
-    - run: wget https://corretto.aws/downloads/latest/amazon-corretto-${{ matrix.java }}-x64-linux-jdk.tar.gz --output-document jdk.tar.gz
-    - name: Set up JDK
-      uses: actions/setup-java@v1
+    - uses: alvarosanchez/corretto-amazon-linux-action@master
       with:
-        java-version: ${{ matrix.java }}
-        jdkFile: jdk.tar.gz
+        corretto-version: ${{ matrix.java }}
+    - run: java -version
+    - uses: docker://amazoncorretto:${{ matrix.java }}
     - run: java -version
     - name: Build with Gradle
-      run: ./gradlew check --no-daemon --parallel --continue
+#      run: ./gradlew check --no-daemon --parallel --continue
+      run: ./gradlew --version
