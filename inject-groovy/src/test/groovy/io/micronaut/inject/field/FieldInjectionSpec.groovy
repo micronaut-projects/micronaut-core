@@ -1,43 +1,45 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.inject.field
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
+import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Value
 import spock.lang.Specification
 
+import javax.annotation.Nullable
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Created by graemerocher on 12/05/2017.
- */
 class FieldInjectionSpec extends Specification {
 
-
-    void "test injection via setter with interface"() {
+    void "test injection via private field with interface"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        BeanContext context = ApplicationContext.run()
 
         when:"A bean is obtained that has a setter with @Inject"
-        B b =  context.getBean(B)
+        C c =  context.getBean(C)
 
         then:"The implementation is injected"
-        b.a != null
+        c.a != null
+
+        cleanup:
+        context.close()
+    }
+
+    void "test injection via private field of property with replacement"() {
+        given:
+        BeanContext context = ApplicationContext.run(['from.config': 'greeting', 'greeting': 'Hello'])
+
+        when:"A bean is obtained that has a setter with @Inject"
+        C c =  context.getBean(C)
+
+        then:"The implementation is injected"
+        c.value == "Hello"
+
+        cleanup:
+        context.close()
     }
 
     static interface A {
@@ -49,12 +51,20 @@ class FieldInjectionSpec extends Specification {
 
     }
 
-    static class B {
+    static class C {
         @Inject
         private A a
 
+        @Nullable
+        @Property(name = '${from.config}')
+        private String value
+
         A getA() {
-            return this.a
+            return a
+        }
+
+        String getValue() {
+            return value
         }
     }
 
