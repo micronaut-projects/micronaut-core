@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     container: amazoncorretto:8
     steps:
+    - run: yum install -y tar
     - uses: actions/checkout@v2
     - uses: actions/cache@v1
       with:
