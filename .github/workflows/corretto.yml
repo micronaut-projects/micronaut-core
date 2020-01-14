@@ -14,6 +14,8 @@ jobs:
         java: ['8', '11']
     container: amazoncorretto:${{ matrix.java }}
     steps:
+    - name: Display Java and Linux version
+      run: java -version && cat /etc/system-release
     - name: Install tar && gzip
       run: yum install -y tar gzip
     - uses: actions/checkout@v2
