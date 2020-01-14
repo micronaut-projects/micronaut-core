@@ -37,6 +37,7 @@ jobs:
     container: amazoncorretto:8
     steps:
     - run: java -version
-    - run: ls -l $GITHUB_WORKSPACE
+    - run: ls -l .
     - run: pwd
-    - run: cd $GITHUB_WORKSPACE && ./gradlew tasks
+    - run: echo $GITHUB_WORKSPACE
+    - run: ./gradlew check --no-daemon --parallel --continue
