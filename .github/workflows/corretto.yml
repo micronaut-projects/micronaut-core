@@ -18,6 +18,8 @@ jobs:
       run: java -version && cat /etc/system-release
     - name: Install tar && gzip
       run: yum install -y tar gzip
+    - name: Configure UTF-8
+      run: echo "LANG=en_US.utf-8" >> /etc/environment && echo "LC_ALL=en_US.utf-8" >> /etc/environment && source /etc/environment
     - uses: actions/checkout@v2
     - uses: actions/cache@v1
       with:
