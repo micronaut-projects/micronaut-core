@@ -132,20 +132,11 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
-        if (cookies.size() > 1) {
-            Set<String> values = new HashSet<>(cookies.size());
-            for (Cookie cookie: cookies) {
-                if (cookie instanceof NettyCookie) {
-                    NettyCookie nettyCookie = (NettyCookie) cookie;
-                    String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
-                    values.add(value);
-                } else {
-                    throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
-                }
-            }
-            headers.add(HttpHeaderNames.COOKIE, String.join(";", values));
-        } else if (!cookies.isEmpty()) {
-            cookie(cookies.iterator().next());
+        if (cookies == null || cookies.isEmpty()) {
+            return this;
+        }
+        for (Cookie cookie : cookies) {
+            cookie(cookie);
         }
         return this;
     }
