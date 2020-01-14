@@ -7,8 +7,8 @@ on:
     branches:
       - master
 jobs:
-  build_corretto_8:
-    name: Build on Corretto 8
+
+  build:
     runs-on: ubuntu-latest
 #    strategy:
 #      matrix:
@@ -30,9 +30,10 @@ jobs:
     - uses: alvarosanchez/corretto-amazon-linux-action@master
       with:
         corretto-version: ${{ matrix.java }}
+        command: "./gradlew check --no-daemon --parallel --continue"
+
+  build_container:
+    image: amazoncorretto:8
+    steps:
     - run: java -version
-    - uses: docker://amazoncorretto:8
-    - run: java -version
-    - name: Build with Gradle
-#      run: ./gradlew check --no-daemon --parallel --continue
-      run: ./gradlew --version
+    - run: ./gradlew tasks
