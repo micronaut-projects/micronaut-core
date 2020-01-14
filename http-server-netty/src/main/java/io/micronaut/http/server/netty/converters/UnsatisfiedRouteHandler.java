@@ -42,8 +42,8 @@ public class UnsatisfiedRouteHandler implements ExceptionHandler<UnsatisfiedRout
 
     @Override
     public HttpResponse handle(HttpRequest request, UnsatisfiedRouteException exception) {
-        if (LOG.isErrorEnabled()) {
-            LOG.error("{} (Bad Request): {}", request, exception.getMessage());
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("{} (Bad Request): {}", request, exception.getMessage());
         }
         JsonError error = new JsonError(exception.getMessage());
         error.path('/' + exception.getArgument().getName());
