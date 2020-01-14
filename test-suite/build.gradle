@@ -1,10 +1,5 @@
-buildscript {
-    repositories {
-        maven { url "https://plugins.gradle.org/m2/" }
-    }
-    dependencies {
-        classpath "gradle.plugin.com.energizedwork.webdriver-binaries:webdriver-binaries-gradle-plugin:$webdriverBinariesVersion"
-    }
+plugins {
+    id "com.github.erdi.webdriver-binaries" version "2.2"
 }
 
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
