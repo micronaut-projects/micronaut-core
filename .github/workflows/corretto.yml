@@ -9,9 +9,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: amazoncorretto:8
+    strategy:
+      matrix:
+        java: ['8', '11']
+    container: amazoncorretto:${{ matrix.java }}
     steps:
-    - run: yum install -y tar gzip
+    - name: Install tar && gzip
+      run: yum install -y tar gzip
     - uses: actions/checkout@v2
     - uses: actions/cache@v1
       with:
@@ -25,6 +29,5 @@ jobs:
         key: ${{ runner.os }}-micronaut-core-wrapper-${{ hashFiles('**/*.gradle') }}
         restore-keys: |
           ${{ runner.os }}-micronaut-core-wrapper-
-    - run: java -version
     - name: Build with Gradle
       run: ./gradlew check --no-daemon --parallel --continue
