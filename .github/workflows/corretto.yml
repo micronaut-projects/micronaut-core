@@ -33,6 +33,7 @@ jobs:
         command: "./gradlew check --no-daemon --parallel --continue"
 
   build_container:
+    runs-on: ubuntu-latest
     image: amazoncorretto:8
     steps:
     - run: java -version
