@@ -59,7 +59,7 @@ class HeaderBindingSpec extends AbstractMicronautSpec {
         '/header/formatted-date'  | "Header: $formatted"         | ['Date': formatted]
         '/header/optional'        | "Header: application/json"   | ['Content-Type': 'application/json']
         '/header/optional'        | "Header: Not-Present"        | [:]
-        '/header/date'            | "Header: $now"               | ['Date': now]
+        '/header/date'            | "Header: $now"               | ['Date': timeNow.toString()]
         '/header/with-media-type' | "Header: application/json"   | ['Content-Type': 'application/json']
         '/header/all'             | "Header: application/json"   | ['Content-Type': 'application/json']
         '/header/multiple'        | "Header: [application/json]" | ['Content-Type': 'application/json']
