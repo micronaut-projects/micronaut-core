@@ -89,7 +89,8 @@ public class BindingControllerTest {
 
     @Test
     public void testHeaderDateBinding() {
-        String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/date").header("date", "Tue, 3 Jun 2008 11:05:30 GMT"));
+
+        String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/date").header("date", "2008-06-03T11:05:30Z"));
 
         assertNotNull(body);
         assertEquals("2008-06-03T11:05:30Z", body);
