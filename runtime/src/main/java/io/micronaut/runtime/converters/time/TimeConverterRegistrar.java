@@ -92,23 +92,23 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                         try {
                             switch (type) {
                                 case 's':
-                                    return Optional.of(Duration.ofSeconds(Integer.valueOf(amount)));
+                                    return Optional.of(Duration.ofSeconds(Integer.parseInt(amount)));
                                 case 'm':
                                     String ms = matcher.group(MILLIS);
                                     if (StringUtils.hasText(ms)) {
-                                        return Optional.of(Duration.ofMillis(Integer.valueOf(amount)));
+                                        return Optional.of(Duration.ofMillis(Integer.parseInt(amount)));
                                     } else {
-                                        return Optional.of(Duration.ofMinutes(Integer.valueOf(amount)));
+                                        return Optional.of(Duration.ofMinutes(Integer.parseInt(amount)));
                                     }
                                 case 'h':
-                                    return Optional.of(Duration.ofHours(Integer.valueOf(amount)));
+                                    return Optional.of(Duration.ofHours(Integer.parseInt(amount)));
                                 case 'd':
-                                    return Optional.of(Duration.ofDays(Integer.valueOf(amount)));
+                                    return Optional.of(Duration.ofDays(Integer.parseInt(amount)));
                                 default:
                                     final String seq = g2 + matcher.group(3);
                                     switch (seq) {
                                         case "ns":
-                                            return Optional.of(Duration.ofNanos(Integer.valueOf(amount)));
+                                            return Optional.of(Duration.ofNanos(Integer.parseInt(amount)));
                                         default:
                                             context.reject(
                                                     value,
@@ -131,7 +131,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             LocalDateTime.class,
             (object, targetType, context) -> {
                 try {
-                    DateTimeFormatter formatter = resolveFormatter(context);
+                    DateTimeFormatter formatter = resolveFormatter(context, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                     LocalDateTime result = LocalDateTime.parse(object, formatter);
                     return Optional.of(result);
                 } catch (DateTimeParseException e) {
@@ -144,7 +144,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         // TemporalAccessor - CharSequence
         final TypeConverter<TemporalAccessor, CharSequence> temporalConverter = (object, targetType, context) -> {
             try {
-                DateTimeFormatter formatter = resolveFormatter(context);
+                DateTimeFormatter formatter = resolveFormatter(context, DateTimeFormatter.RFC_1123_DATE_TIME);
                 return Optional.of(formatter.format(object));
             } catch (DateTimeParseException e) {
                 context.reject(object, e);
@@ -163,7 +163,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             LocalDate.class,
             (object, targetType, context) -> {
                 try {
-                    DateTimeFormatter formatter = resolveFormatter(context);
+                    DateTimeFormatter formatter = resolveFormatter(context, DateTimeFormatter.ISO_LOCAL_DATE);
                     LocalDate result = LocalDate.parse(object, formatter);
                     return Optional.of(result);
                 } catch (DateTimeParseException e) {
@@ -180,7 +180,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             ZonedDateTime.class,
             (object, targetType, context) -> {
                 try {
-                    DateTimeFormatter formatter = resolveFormatter(context);
+                    DateTimeFormatter formatter = resolveFormatter(context, DateTimeFormatter.ISO_ZONED_DATE_TIME);
                     ZonedDateTime result = ZonedDateTime.parse(object, formatter);
                     return Optional.of(result);
                 } catch (DateTimeParseException e) {
@@ -196,7 +196,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 OffsetDateTime.class,
                 (object, targetType, context) -> {
                     try {
-                        DateTimeFormatter formatter = resolveFormatter(context);
+                        DateTimeFormatter formatter = resolveFormatter(context, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
                         OffsetDateTime result = OffsetDateTime.parse(object, formatter);
                         return Optional.of(result);
                     } catch (DateTimeParseException e) {
@@ -207,10 +207,10 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         );
     }
 
-    private DateTimeFormatter resolveFormatter(ConversionContext context) {
+    private DateTimeFormatter resolveFormatter(ConversionContext context, DateTimeFormatter defaultFormatter) {
         Optional<String> format = context.getAnnotationMetadata().stringValue(Format.class);
         return format
             .map((pattern) -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
-            .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
+            .orElse(defaultFormatter);
     }
 }

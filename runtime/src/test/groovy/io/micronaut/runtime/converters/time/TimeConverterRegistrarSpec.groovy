@@ -21,6 +21,10 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZonedDateTime
 
 class TimeConverterRegistrarSpec extends Specification {
 
@@ -44,4 +48,22 @@ class TimeConverterRegistrarSpec extends Specification {
         '10ns' | Duration.ofNanos(10)
 
     }
+
+    @Unroll
+    void "test convert default formats #val"() {
+        given:
+        ConversionService conversionService = new DefaultConversionService()
+        new TimeConverterRegistrar().register(conversionService)
+
+        expect:
+        conversionService.convert(val1, val2).get() == expected
+
+        where:
+        val1                        | val2              | expected
+        "2020-01-01"                | LocalDate         | LocalDate.of(2020, 1, 1)
+        "2020-02-03T11:15:30"       | LocalDateTime     | LocalDateTime.parse("2020-02-03T11:15:30")
+        "2020-12-03T10:15:30+01:00" | ZonedDateTime     | ZonedDateTime.parse("2020-12-03T10:15:30+01:00")
+        "2011-12-03T10:15:30+01:00" | OffsetDateTime    | OffsetDateTime.parse("2011-12-03T10:15:30+01:00")
+    }
+
 }
