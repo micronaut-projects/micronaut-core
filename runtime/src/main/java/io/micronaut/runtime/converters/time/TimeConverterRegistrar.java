@@ -208,11 +208,11 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
     }
 
     private DateTimeFormatter defaultFormatter(Object current) {
-        if(current instanceof OffsetDateTime) {
+        if (current instanceof OffsetDateTime) {
             return DateTimeFormatter.ISO_OFFSET_DATE_TIME;
         } else if (current instanceof ZonedDateTime) {
             return DateTimeFormatter.ISO_ZONED_DATE_TIME;
-        } else if(current instanceof LocalDate) {
+        } else if (current instanceof LocalDate) {
            return DateTimeFormatter.ISO_LOCAL_DATE;
         } else if (current instanceof LocalDateTime) {
             return DateTimeFormatter.ISO_LOCAL_DATE_TIME;
