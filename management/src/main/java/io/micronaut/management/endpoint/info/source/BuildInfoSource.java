@@ -22,7 +22,6 @@ import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
-import io.micronaut.runtime.context.scope.Refreshable;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
@@ -35,7 +34,6 @@ import java.util.function.Supplier;
  * @author Zachary Klein
  * @since 1.0
  */
-@Refreshable
 @Requires(beans = InfoEndpoint.class)
 @Requires(property = "endpoints.info.build.enabled", notEquals = StringUtils.FALSE)
 public class BuildInfoSource implements PropertiesInfoSource {
