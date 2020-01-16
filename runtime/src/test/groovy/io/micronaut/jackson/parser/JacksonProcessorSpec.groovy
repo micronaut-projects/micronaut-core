@@ -15,9 +15,12 @@
  */
 package io.micronaut.jackson.parser
 
+import com.fasterxml.jackson.annotation.JsonFormat
 import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.core.io.JsonEOFException
+import com.fasterxml.jackson.databind.DeserializationConfig
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
@@ -25,6 +28,9 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.fasterxml.jackson.databind.node.LongNode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+
+import java.math.BigDecimal
+
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
@@ -39,11 +45,146 @@ class JacksonProcessorSpec extends Specification {
     @Shared @AutoCleanup
     ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
 
+    void "test big decimal"() {
+
+        given:
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        BigDecimal dec = new BigDecimal("888.7794538169553400000")
+        BigD bigD = new BigD(bd1: dec, bd2: dec)
+
+        when:
+        def string = objectMapper.writeValueAsString(bigD)
+        byte[] bytes = objectMapper.writeValueAsBytes(bigD)
+        boolean complete = false
+        JsonNode node = null
+        Throwable error = null
+        int nodeCount = 0
+        processor.subscribe(new Subscriber<JsonNode>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
+            }
+
+            @Override
+            void onNext(JsonNode jsonNode) {
+                nodeCount++
+                node = jsonNode
+            }
+
+            @Override
+            void onError(Throwable t) {
+                error = t
+            }
+
+            @Override
+            void onComplete() {
+                complete = true
+            }
+        })
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {
+
+            }
+
+            @Override
+            void cancel() {
+
+            }
+        })
+        processor.onNext(bytes)
+        processor.onComplete()
+
+        then:
+        complete
+        node != null
+        error == null
+        nodeCount == 1
+        string == '{"bd1":"888.7794538169553400000","bd2":888.7794538169553400000}'
+
+        when:
+        BigD foo = objectMapper.treeToValue(node, BigD)
+
+        then:
+        foo != null
+        foo.bd1 == dec
+        foo.bd2 == new BigDecimal("888.7794538169553")
+    }
+
+    void "test big decimal - USE_BIG_DECIMAL_FOR_FLOATS"() {
+
+        given:
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+        DeserializationConfig cfg = objectMapper.getDeserializationConfig()
+        JacksonProcessor processor = new JacksonProcessor(cfg.with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS))
+        BigDecimal dec = new BigDecimal("888.7794538169553400000")
+        BigD bigD = new BigD(bd1: dec, bd2: dec)
+
+        when:
+        def string = objectMapper.writeValueAsString(bigD)
+        byte[] bytes = objectMapper.writeValueAsBytes(bigD)
+        boolean complete = false
+        JsonNode node = null
+        Throwable error = null
+        int nodeCount = 0
+        processor.subscribe(new Subscriber<JsonNode>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
+            }
+
+            @Override
+            void onNext(JsonNode jsonNode) {
+                nodeCount++
+                node = jsonNode
+            }
+
+            @Override
+            void onError(Throwable t) {
+                error = t
+            }
+
+            @Override
+            void onComplete() {
+                complete = true
+            }
+        })
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {
+
+            }
+
+            @Override
+            void cancel() {
+
+            }
+        })
+        processor.onNext(bytes)
+        processor.onComplete()
+
+        then:
+        complete
+        node != null
+        error == null
+        nodeCount == 1
+        string == '{"bd1":"888.7794538169553400000","bd2":888.7794538169553400000}'
+
+        when:
+        BigD foo = objectMapper.treeToValue(node, BigD)
+
+        then:
+        foo != null
+        foo.bd1 == dec
+        foo.bd2 == dec
+    }
+
     void "test publish JSON node async"() {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor()
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
         Foo instance = new Foo(name: "Fred", age: 10)
 
 
@@ -110,7 +251,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor()
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
         Foo[] instances = [new Foo(name: "Fred", age: 10), new Foo(name: "Barney", age: 11)] as Foo[]
 
 
@@ -178,7 +319,7 @@ class JacksonProcessorSpec extends Specification {
     void "test incomplete JSON error"() {
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor()
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
 
 
         when:
@@ -233,7 +374,7 @@ class JacksonProcessorSpec extends Specification {
     void "test JSON syntax error"() {
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor()
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
 
 
         when:
@@ -288,7 +429,7 @@ class JacksonProcessorSpec extends Specification {
     void "test nested arrays"() {
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(new JsonFactory(), true)
+        JacksonProcessor processor = new JacksonProcessor(new JsonFactory(), true, objectMapper.getDeserializationConfig())
 
         when:
         byte[] bytes = '[1, 2, [3, 4, [5, 6], 7], [8, 9, 10], 11, 12]'.bytes
@@ -342,6 +483,12 @@ class JacksonProcessorSpec extends Specification {
         nodes[5].equals(JsonNodeFactory.instance.numberNode(12L))
     }
 
+}
+
+class BigD {
+    @JsonFormat(shape= JsonFormat.Shape.STRING)
+    BigDecimal bd1
+    BigDecimal bd2
 }
 
 class Foo {

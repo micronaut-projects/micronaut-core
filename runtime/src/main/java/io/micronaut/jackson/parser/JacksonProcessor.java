@@ -19,6 +19,8 @@ import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.async.ByteArrayFeeder;
 import com.fasterxml.jackson.core.io.JsonEOFException;
 import com.fasterxml.jackson.core.json.async.NonBlockingJsonParser;
+import com.fasterxml.jackson.databind.DeserializationConfig;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -45,6 +47,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     private NonBlockingJsonParser currentNonBlockingJsonParser;
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
     private final JsonFactory jsonFactory;
+    private final DeserializationConfig deserializationConfig;
     private String currentFieldName;
     private boolean streamArray;
     private boolean rootIsArray;
@@ -55,10 +58,12 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
      *
      * @param jsonFactory The JSON factory
      * @param streamArray Whether arrays should be streamed
+     * @param deserializationConfig The jackson deserialization configuration
      */
-    public JacksonProcessor(JsonFactory jsonFactory, boolean streamArray) {
+    public JacksonProcessor(JsonFactory jsonFactory, boolean streamArray, DeserializationConfig deserializationConfig) {
         try {
             this.jsonFactory = jsonFactory;
+            this.deserializationConfig = deserializationConfig;
             this.currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
             this.streamArray = streamArray;
             this.jsonStream = true;
@@ -72,16 +77,18 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
      *
      * @param jsonFactory To configure and construct reader (aka parser, {@link JsonParser})
      *                    and writer (aka generator, {@link JsonGenerator}) instances.
+     * @param deserializationConfig The jackson deserialization configuration
      */
-    public JacksonProcessor(JsonFactory jsonFactory) {
-        this(jsonFactory, false);
+    public JacksonProcessor(JsonFactory jsonFactory, DeserializationConfig deserializationConfig) {
+        this(jsonFactory, false, deserializationConfig);
     }
 
     /**
      * Construct with default JSON factory.
+     * @param deserializationConfig The jackson deserialization configuration
      */
-    public JacksonProcessor() {
-        this(new JsonFactory());
+    public JacksonProcessor(DeserializationConfig deserializationConfig) {
+        this(new JsonFactory(), deserializationConfig);
     }
 
     /**
@@ -252,16 +259,27 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 final JsonParser.NumberType numberType = currentNonBlockingJsonParser.getNumberType();
                 JsonNode decimalNode = nodeStack.peekFirst();
                 switch (numberType) {
-
                     case FLOAT:
-                        if (decimalNode instanceof ObjectNode) {
+                        if (deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
+                            if (decimalNode instanceof ObjectNode) {
+                                ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDecimalValue());
+                            } else {
+                                ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDecimalValue());
+                            }
+                        } else if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getFloatValue());
                         } else {
                             ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getFloatValue());
                         }
                         break;
                     case DOUBLE:
-                        if (decimalNode instanceof ObjectNode) {
+                        if (deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
+                            if (decimalNode instanceof ObjectNode) {
+                                ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDecimalValue());
+                            } else {
+                                ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDecimalValue());
+                            }
+                        } else if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDoubleValue());
                         } else {
                             ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDoubleValue());
@@ -289,7 +307,13 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                         }
                     break;
                     case INT:
-                        if (decimalNode instanceof ObjectNode) {
+                        if (deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)) {
+                            if (decimalNode instanceof ObjectNode) {
+                                ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getBigIntegerValue());
+                            } else {
+                                ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getBigIntegerValue());
+                            }
+                        } else if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getIntValue());
                         } else {
                             ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getIntValue());
