@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -92,6 +93,17 @@ public class GroovyVisitorContext implements VisitorContext {
         }
         return Optional.ofNullable(compilationUnit.getClassNode(name))
                 .map(cn -> new GroovyClassElement(sourceUnit, compilationUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)));
+    }
+
+    @Override
+    public Optional<ClassElement> getClassElement(Class<?> type) {
+        final ClassNode classNode = ClassHelper.makeCached(type);
+        final AnnotationMetadata annotationMetadata = AstAnnotationUtils
+                .getAnnotationMetadata(sourceUnit, compilationUnit, classNode);
+        final GroovyClassElement classElement = new GroovyClassElement(sourceUnit, compilationUnit, classNode, annotationMetadata);
+        return Optional.of(
+                classElement
+        );
     }
 
     @Nonnull
@@ -272,4 +284,5 @@ public class GroovyVisitorContext implements VisitorContext {
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         return attributes.get(name, conversionContext);
     }
+
 }
