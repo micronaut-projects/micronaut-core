@@ -34,7 +34,7 @@ The following table summarizes the annotations, their purpose and provides an ex
 |Binds from an attribute of the request. Attributes are typically created in filters
 |`@RequestAttribute String myAttribute`
 
-|link:{api}/io/micronaut/http/annotation/RequestAttribute.html[@PathVariable]
+|link:{api}/io/micronaut/http/annotation/PathVariable.html[@PathVariable]
 |Binds from the path of the request
 |`@PathVariable String id`
 |===
