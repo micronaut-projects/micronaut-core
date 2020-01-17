@@ -134,10 +134,10 @@ Optional Third Party Dependencies:
 * Neo4j Java Driver `1.7.2` -> `1.7.5`
 * Jaeger `0.35.5` -> `1.0.0`
 * Kafka `2.3.0` -> `2.4.0`
-* Spring `5.1.8` -> `5.2.1`
+* Spring `5.1.8` -> `5.2.3`
 * Zipkin/Brave `5.6.5` -> `5.9.0`
-* Groovy `2.5.7` -> `2.5.8`
-* Gradle `5.5` -> `Gradle 6.0.1` (for new applications)
+* Groovy `2.5.7` -> `2.5.9`
+* Gradle `5.5` -> `Gradle 6.1` (for new applications)
 * Hibernate Core `5.4.6.Final` -> `5.4.10.Final`
 
 Modules:
