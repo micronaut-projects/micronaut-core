@@ -22,6 +22,8 @@ import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nonnull;
 import javax.inject.Singleton;
+import java.util.Collection;
+import java.util.Optional;
 
 /**
  * Default {@link DynamicCacheManager} implementation that creates {@link DefaultSyncCache}s with default values.
@@ -36,23 +38,36 @@ public class DefaultDynamicCacheManager implements DynamicCacheManager<com.githu
     private final ApplicationContext applicationContext;
     private final ConversionService<?> conversionService;
     private final ApplicationConfiguration applicationConfiguration;
+    private final Collection<CacheConfiguration> cacheConfigurations;
 
     /**
      * Creates a default dynamic cache manager.
-     *
-     * @param applicationContext the application context
+     *  @param applicationContext the application context
      * @param conversionService the conversion service
      * @param applicationConfiguration the application configuration
+     * @param cacheConfigurations the cache configurations
      */
-    public DefaultDynamicCacheManager(ApplicationContext applicationContext, ConversionService<?> conversionService, ApplicationConfiguration applicationConfiguration) {
+    public DefaultDynamicCacheManager(ApplicationContext applicationContext, ConversionService<?> conversionService, ApplicationConfiguration applicationConfiguration, Collection<CacheConfiguration> cacheConfigurations) {
         this.applicationContext = applicationContext;
         this.conversionService = conversionService;
         this.applicationConfiguration = applicationConfiguration;
+        this.cacheConfigurations = cacheConfigurations;
     }
 
     @Nonnull
     @Override
-    public SyncCache<com.github.benmanes.caffeine.cache.Cache> getCache(String name) {
-        return new DefaultSyncCache(new DefaultCacheConfiguration(name, applicationConfiguration), applicationContext, conversionService);
+    public Optional<SyncCache<com.github.benmanes.caffeine.cache.Cache>> getCache(String name) {
+        Optional<CacheConfiguration> cacheConfiguration = cacheConfigurations.stream()
+                .filter(cc -> cc.getCacheName().equals(name))
+                .findFirst();
+        if (cacheConfiguration.isPresent()) {
+            if (cacheConfiguration.get().isEnabled()) {
+                return Optional.of(new DefaultSyncCache(cacheConfiguration.get(), applicationContext, conversionService));
+            } else {
+                return Optional.empty();
+            }
+        } else {
+            return Optional.of(new DefaultSyncCache(new DefaultCacheConfiguration(name, applicationConfiguration), applicationContext, conversionService));
+        }
     }
 }

@@ -16,6 +16,7 @@
 package io.micronaut.cache;
 
 import javax.annotation.Nonnull;
+import java.util.Optional;
 
 /**
  * <p>A contract for a cache manager that does not have pre-defined caches.</p>
@@ -36,5 +37,5 @@ public interface DynamicCacheManager<C> {
      * @return The {@link SyncCache} instance
      */
     @Nonnull
-    SyncCache<C> getCache(String name);
+    Optional<SyncCache<C>> getCache(String name);
 }
