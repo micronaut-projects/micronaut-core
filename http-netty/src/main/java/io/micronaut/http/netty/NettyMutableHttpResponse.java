@@ -49,6 +49,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
+    private static final ServerCookieEncoder DEFAULT_SERVER_COOKIE_ENCODER = ServerCookieEncoder.LAX;
 
     protected FullHttpResponse nettyResponse;
     final NettyHttpHeaders headers;
@@ -56,6 +57,8 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
     private B body;
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
     private final MutableConvertibleValues<Object> attributes;
+
+    private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
 
     /**
      * @param nettyResponse     The {@link FullHttpResponse}
@@ -119,7 +122,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
     public MutableHttpResponse<B> cookie(Cookie cookie) {
         if (cookie instanceof NettyCookie) {
             NettyCookie nettyCookie = (NettyCookie) cookie;
-            String value = ServerCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+            String value = serverCookieEncoder.encode(nettyCookie.getNettyCookie());
             headers.add(HttpHeaderNames.SET_COOKIE, value);
         } else {
             throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
@@ -194,4 +197,19 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
         return this;
     }
 
+    /**
+     *
+     * @return Server cookie encoder
+     */
+    public ServerCookieEncoder getServerCookieEncoder() {
+        return serverCookieEncoder;
+    }
+
+    /**
+     *
+     * @param serverCookieEncoder Server cookie encoder
+     */
+    public void setServerCookieEncoder(ServerCookieEncoder serverCookieEncoder) {
+        this.serverCookieEncoder = serverCookieEncoder;
+    }
 }
