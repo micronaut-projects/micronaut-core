@@ -16,8 +16,9 @@
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
@@ -49,23 +50,23 @@ import java.util.Optional;
 public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode> {
 
     private final JsonFactory jsonFactory;
-    private final DeserializationConfig deserializationConfig;
+    private final ObjectMapper objectMapper;
     private JacksonProcessor jacksonProcessor;
 
     /**
      * @param nettyHttpRequest The Netty Http request
      * @param configuration    The Http server configuration
      * @param jsonFactory      The json factory
-     * @param deserializationConfig The jackson deserialization configuration
+     * @param objectMapper The jackson object mapper
      */
     public JsonContentProcessor(
             NettyHttpRequest<?> nettyHttpRequest,
             HttpServerConfiguration configuration,
             @Nullable JsonFactory jsonFactory,
-            DeserializationConfig deserializationConfig) {
+            ObjectMapper objectMapper) {
         super(nettyHttpRequest, configuration);
         this.jsonFactory = jsonFactory != null ? jsonFactory : new JsonFactory();
-        this.deserializationConfig = deserializationConfig;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -94,7 +95,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
             }
         }
 
-        this.jacksonProcessor = new JacksonProcessor(jsonFactory, streamArray, deserializationConfig);
+        this.jacksonProcessor = new JacksonProcessor(jsonFactory, streamArray, objectMapper);
         this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
 
             @Override

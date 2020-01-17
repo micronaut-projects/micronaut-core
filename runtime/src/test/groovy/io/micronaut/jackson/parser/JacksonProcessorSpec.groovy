@@ -49,7 +49,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(objectMapper)
         BigDecimal dec = new BigDecimal("888.7794538169553400000")
         BigD bigD = new BigD(bd1: dec, bd2: dec)
 
@@ -115,9 +115,8 @@ class JacksonProcessorSpec extends Specification {
     void "test big decimal - USE_BIG_DECIMAL_FOR_FLOATS"() {
 
         given:
-        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        DeserializationConfig cfg = objectMapper.getDeserializationConfig()
-        JacksonProcessor processor = new JacksonProcessor(cfg.with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS))
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper).enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+        JacksonProcessor processor = new JacksonProcessor(objectMapper)
         BigDecimal dec = new BigDecimal("888.7794538169553400000")
         BigD bigD = new BigD(bd1: dec, bd2: dec)
 
@@ -184,7 +183,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(objectMapper)
         Foo instance = new Foo(name: "Fred", age: 10)
 
 
@@ -251,7 +250,7 @@ class JacksonProcessorSpec extends Specification {
 
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(objectMapper)
         Foo[] instances = [new Foo(name: "Fred", age: 10), new Foo(name: "Barney", age: 11)] as Foo[]
 
 
@@ -319,7 +318,7 @@ class JacksonProcessorSpec extends Specification {
     void "test incomplete JSON error"() {
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(objectMapper)
 
 
         when:
@@ -374,7 +373,7 @@ class JacksonProcessorSpec extends Specification {
     void "test JSON syntax error"() {
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(objectMapper)
 
 
         when:
@@ -429,7 +428,7 @@ class JacksonProcessorSpec extends Specification {
     void "test nested arrays"() {
         given:
         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor(new JsonFactory(), true, objectMapper.getDeserializationConfig())
+        JacksonProcessor processor = new JacksonProcessor(new JsonFactory(), true, objectMapper)
 
         when:
         byte[] bytes = '[1, 2, [3, 4, [5, 6], 7], [8, 9, 10], 11, 12]'.bytes
@@ -475,12 +474,12 @@ class JacksonProcessorSpec extends Specification {
 
         then:
         nodeCount == 6
-        nodes[0].equals(JsonNodeFactory.instance.numberNode(1L))
-        nodes[1].equals(JsonNodeFactory.instance.numberNode(2L))
+        nodes[0].equals(JsonNodeFactory.instance.numberNode(1))
+        nodes[1].equals(JsonNodeFactory.instance.numberNode(2))
         ((ArrayNode) nodes[2]).size() == 4
         ((ArrayNode) nodes[3]).size() == 3
-        nodes[4].equals(JsonNodeFactory.instance.numberNode(11L))
-        nodes[5].equals(JsonNodeFactory.instance.numberNode(12L))
+        nodes[4].equals(JsonNodeFactory.instance.numberNode(11))
+        nodes[5].equals(JsonNodeFactory.instance.numberNode(12))
     }
 
 }
