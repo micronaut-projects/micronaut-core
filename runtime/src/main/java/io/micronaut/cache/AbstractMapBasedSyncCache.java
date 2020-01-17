@@ -88,6 +88,19 @@ public abstract class AbstractMapBasedSyncCache<C extends Map<Object, Object>> i
         return conversionService.convert(v, aClass);
     }
 
+    @Nonnull
+    @Override
+    public <T> T putIfAbsent(@Nonnull Object key, @Nonnull Supplier<T> value) {
+        ArgumentUtils.requireNonNull("key", key);
+        ArgumentUtils.requireNonNull("value", value);
+        final Object v = nativeCache.get(key);
+        if (v == null) {
+            return (T) nativeCache.put(key, value.get());
+        } else {
+            return (T) v;
+        }
+    }
+
     @Override
     public void put(@Nonnull Object key, @Nonnull Object value) {
         ArgumentUtils.requireNonNull("key", key);

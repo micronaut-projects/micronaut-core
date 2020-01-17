@@ -173,6 +173,13 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
         return Optional.ofNullable((T) previous);
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> T putIfAbsent(Object key, Supplier<T> value) {
+        Object val = cache.asMap().computeIfAbsent(key, (k) -> value.get());
+        return (T) val;
+    }
+
     /**
      * Build a cache from the given configurations.
      *

@@ -28,7 +28,7 @@ import java.lang.annotation.*;
  * <pre>{@code
  * Example:
  *
- * @HttpFilterStereotype
+ * @FilterMatcher
  * public @interface Metered {
  *     ...
  * }

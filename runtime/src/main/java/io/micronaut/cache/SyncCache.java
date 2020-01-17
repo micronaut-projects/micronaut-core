@@ -76,6 +76,20 @@ public interface SyncCache<C> extends Cache<C> {
     <T> Optional<T> putIfAbsent(@Nonnull Object key, @Nonnull T value);
 
     /**
+     * <p>Cache the supplied value using the specified key if it is not already present.</p>
+     *
+     * @param key   the key with which the specified value is to be associated
+     * @param value the value supplier to be associated with the specified key
+     * @param <T>   The concrete type
+     * @return An optional of the existing value or the new value returned by the supplier
+     */
+    @Nonnull
+    default <T> T putIfAbsent(@Nonnull Object key, @Nonnull Supplier<T> value) {
+        T val = value.get();
+        return putIfAbsent(key, val).orElse(val);
+    }
+
+    /**
      * <p>Cache the specified value using the specified key.</p>
      *
      * @param key   the key with which the specified value is to be associated
