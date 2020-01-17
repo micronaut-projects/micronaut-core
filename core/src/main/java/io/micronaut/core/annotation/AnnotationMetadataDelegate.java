@@ -540,7 +540,7 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
 
     @Override
     default @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@Nonnull String annotation) {
-        return getAnnotationMetadata().findAnnotation(annotation);
+        return getAnnotationMetadata().findDeclaredAnnotation(annotation);
     }
 
     @Override

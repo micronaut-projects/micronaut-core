@@ -9,7 +9,7 @@ license {
         java   = 'SLASHSTAR_STYLE'
         groovy = 'SLASHSTAR_STYLE'
     }
-    ext.year = '2017-2019'
+    ext.year = '2017-2020'
 
     exclude '**/*.txt'
     exclude '**/*.html'

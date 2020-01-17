@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
@@ -34,6 +35,7 @@ import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
@@ -47,16 +49,23 @@ import java.util.Optional;
 public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode> {
 
     private final JsonFactory jsonFactory;
+    private final DeserializationConfig deserializationConfig;
     private JacksonProcessor jacksonProcessor;
 
     /**
      * @param nettyHttpRequest The Netty Http request
      * @param configuration    The Http server configuration
      * @param jsonFactory      The json factory
+     * @param deserializationConfig The jackson deserialization configuration
      */
-    public JsonContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration, Optional<JsonFactory> jsonFactory) {
+    public JsonContentProcessor(
+            NettyHttpRequest<?> nettyHttpRequest,
+            HttpServerConfiguration configuration,
+            @Nullable JsonFactory jsonFactory,
+            DeserializationConfig deserializationConfig) {
         super(nettyHttpRequest, configuration);
-        this.jsonFactory = jsonFactory.orElse(new JsonFactory());
+        this.jsonFactory = jsonFactory != null ? jsonFactory : new JsonFactory();
+        this.deserializationConfig = deserializationConfig;
     }
 
     @Override
@@ -85,7 +94,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
             }
         }
 
-        this.jacksonProcessor = new JacksonProcessor(jsonFactory, streamArray);
+        this.jacksonProcessor = new JacksonProcessor(jsonFactory, streamArray, deserializationConfig);
         this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
 
             @Override

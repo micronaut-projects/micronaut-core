@@ -19,6 +19,8 @@ import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.async.ByteArrayFeeder;
 import com.fasterxml.jackson.core.io.JsonEOFException;
 import com.fasterxml.jackson.core.json.async.NonBlockingJsonParser;
+import com.fasterxml.jackson.databind.DeserializationConfig;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -27,6 +29,7 @@ import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -45,6 +48,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     private NonBlockingJsonParser currentNonBlockingJsonParser;
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
     private final JsonFactory jsonFactory;
+    private final @Nullable DeserializationConfig deserializationConfig;
     private String currentFieldName;
     private boolean streamArray;
     private boolean rootIsArray;
@@ -55,10 +59,12 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
      *
      * @param jsonFactory The JSON factory
      * @param streamArray Whether arrays should be streamed
+     * @param deserializationConfig The jackson deserialization configuration
      */
-    public JacksonProcessor(JsonFactory jsonFactory, boolean streamArray) {
+    public JacksonProcessor(JsonFactory jsonFactory, boolean streamArray, @Nullable DeserializationConfig deserializationConfig) {
         try {
             this.jsonFactory = jsonFactory;
+            this.deserializationConfig = deserializationConfig;
             this.currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
             this.streamArray = streamArray;
             this.jsonStream = true;
@@ -68,20 +74,49 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     }
 
     /**
+     * Creates a new JacksonProcessor.
+     *
+     * @param jsonFactory The JSON factory
+     * @param streamArray Whether arrays should be streamed
+     */
+    public JacksonProcessor(JsonFactory jsonFactory, boolean streamArray) {
+        this(jsonFactory, streamArray, null);
+    }
+
+    /**
+     * Construct with given JSON factory.
+     *
+     * @param jsonFactory To configure and construct reader (aka parser, {@link JsonParser})
+     *                    and writer (aka generator, {@link JsonGenerator}) instances.
+     * @param deserializationConfig The jackson deserialization configuration
+     */
+    public JacksonProcessor(JsonFactory jsonFactory, DeserializationConfig deserializationConfig) {
+        this(jsonFactory, false, deserializationConfig);
+    }
+
+    /**
      * Construct with given JSON factory.
      *
      * @param jsonFactory To configure and construct reader (aka parser, {@link JsonParser})
      *                    and writer (aka generator, {@link JsonGenerator}) instances.
      */
     public JacksonProcessor(JsonFactory jsonFactory) {
-        this(jsonFactory, false);
+        this(jsonFactory, false, null);
     }
 
     /**
      * Construct with default JSON factory.
+     * @param deserializationConfig The jackson deserialization configuration
+     */
+    public JacksonProcessor(DeserializationConfig deserializationConfig) {
+        this(new JsonFactory(), deserializationConfig);
+    }
+
+    /**
+     * Default constructor.
      */
     public JacksonProcessor() {
-        this(new JsonFactory());
+        this(new JsonFactory(), null);
     }
 
     /**
@@ -252,16 +287,27 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 final JsonParser.NumberType numberType = currentNonBlockingJsonParser.getNumberType();
                 JsonNode decimalNode = nodeStack.peekFirst();
                 switch (numberType) {
-
                     case FLOAT:
-                        if (decimalNode instanceof ObjectNode) {
+                        if (deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
+                            if (decimalNode instanceof ObjectNode) {
+                                ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDecimalValue());
+                            } else {
+                                ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDecimalValue());
+                            }
+                        } else if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getFloatValue());
                         } else {
                             ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getFloatValue());
                         }
                         break;
                     case DOUBLE:
-                        if (decimalNode instanceof ObjectNode) {
+                        if (deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
+                            if (decimalNode instanceof ObjectNode) {
+                                ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDecimalValue());
+                            } else {
+                                ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDecimalValue());
+                            }
+                        } else if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDoubleValue());
                         } else {
                             ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDoubleValue());
@@ -289,7 +335,13 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                         }
                     break;
                     case INT:
-                        if (decimalNode instanceof ObjectNode) {
+                        if (deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)) {
+                            if (decimalNode instanceof ObjectNode) {
+                                ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getBigIntegerValue());
+                            } else {
+                                ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getBigIntegerValue());
+                            }
+                        } else if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getIntValue());
                         } else {
                             ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getIntValue());
