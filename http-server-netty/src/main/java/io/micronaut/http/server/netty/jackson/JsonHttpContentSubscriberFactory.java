@@ -16,6 +16,9 @@
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.databind.DeserializationConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
@@ -40,18 +43,21 @@ public class JsonHttpContentSubscriberFactory implements HttpContentSubscriberFa
 
     private final HttpServerConfiguration httpServerConfiguration;
     private final Optional<JsonFactory> jsonFactory;
+    private final DeserializationConfig deserializationConfig;
 
     /**
+     * @param objectMapper The jackson object mapper.
      * @param httpServerConfiguration The Http server configuration
      * @param jsonFactory             The json factory
      */
-    public JsonHttpContentSubscriberFactory(HttpServerConfiguration httpServerConfiguration, Optional<JsonFactory> jsonFactory) {
+    public JsonHttpContentSubscriberFactory(ObjectMapper objectMapper, HttpServerConfiguration httpServerConfiguration, Optional<JsonFactory> jsonFactory) {
         this.httpServerConfiguration = httpServerConfiguration;
         this.jsonFactory = jsonFactory;
+        this.deserializationConfig = objectMapper.getDeserializationConfig();
     }
 
     @Override
     public HttpContentProcessor build(NettyHttpRequest request) {
-        return new JsonContentProcessor(request, httpServerConfiguration, jsonFactory);
+        return new JsonContentProcessor(request, httpServerConfiguration, jsonFactory, deserializationConfig);
     }
 }
