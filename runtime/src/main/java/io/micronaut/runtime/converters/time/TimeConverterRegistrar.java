@@ -144,7 +144,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         // TemporalAccessor - CharSequence
         final TypeConverter<TemporalAccessor, CharSequence> temporalConverter = (object, targetType, context) -> {
             try {
-                DateTimeFormatter formatter = resolveFormatter(context, DateTimeFormatter.RFC_1123_DATE_TIME);
+                DateTimeFormatter formatter = resolveFormatter(context, defaultFormatter(object));
                 return Optional.of(formatter.format(object));
             } catch (DateTimeParseException e) {
                 context.reject(object, e);
@@ -205,6 +205,20 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                     }
                 }
         );
+    }
+
+    private DateTimeFormatter defaultFormatter(Object current) {
+        if (current instanceof OffsetDateTime) {
+            return DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+        } else if (current instanceof ZonedDateTime) {
+            return DateTimeFormatter.ISO_ZONED_DATE_TIME;
+        } else if (current instanceof LocalDate) {
+           return DateTimeFormatter.ISO_LOCAL_DATE;
+        } else if (current instanceof LocalDateTime) {
+            return DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        } else {
+            return DateTimeFormatter.RFC_1123_DATE_TIME;
+        }
     }
 
     private DateTimeFormatter resolveFormatter(ConversionContext context, DateTimeFormatter defaultFormatter) {

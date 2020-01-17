@@ -65,7 +65,7 @@ class BindingControllerTest: StringSpec() {
         }
 
         "test header date binding"() {
-            var body = client.toBlocking().retrieve(HttpRequest.GET<Any>("/binding/date").header("date", "Tue, 3 Jun 2008 11:05:30 GMT"))
+            var body = client.toBlocking().retrieve(HttpRequest.GET<Any>("/binding/date").header("date", "2008-06-03T11:05:30Z"))
 
             body shouldNotBe null
             body shouldBe "2008-06-03T11:05:30Z"

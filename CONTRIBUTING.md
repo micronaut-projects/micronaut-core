@@ -6,7 +6,9 @@ If you are interested in contributing to Micronaut and are looking for issues to
 
 ## JDK Setup
 
-Micronaut currently requires JDK 8
+Micronaut currently requires JDK 8.
+ 
+Additionally, the JDK must have the Java Cryptography Extension (JCE) files installed.
 
 ## IDE Setup
 
