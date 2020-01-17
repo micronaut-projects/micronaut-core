@@ -21,7 +21,6 @@ import com.github.benmanes.caffeine.cache.Policy;
 import com.github.benmanes.caffeine.cache.Weigher;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.annotation.EachBean;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -31,7 +30,6 @@ import org.reactivestreams.Publisher;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.inject.Inject;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -47,7 +45,6 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachBean(CacheConfiguration.class)
 public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.cache.Cache> {
 
     private final CacheConfiguration cacheConfiguration;
@@ -76,7 +73,6 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
      * @param applicationContext The application context
      * @param conversionService To convert the value from the cache into given required type
      */
-    @Inject
     public DefaultSyncCache(
             CacheConfiguration cacheConfiguration,
             ApplicationContext applicationContext,
@@ -251,5 +247,10 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
         values.put("evictionWeight", stats.evictionWeight());
 
         return values;
+    }
+
+    @Override
+    public String toString() {
+        return cacheConfiguration.getCacheName();
     }
 }

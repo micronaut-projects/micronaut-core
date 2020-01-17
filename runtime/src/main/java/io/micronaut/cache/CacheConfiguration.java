@@ -16,6 +16,7 @@
 package io.micronaut.cache;
 
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import java.nio.charset.Charset;
@@ -30,7 +31,7 @@ import java.util.OptionalLong;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class CacheConfiguration {
+public class CacheConfiguration implements Toggleable {
 
     /**
      * The prefix for cache configuration.
@@ -49,6 +50,11 @@ public class CacheConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_TESTMODE = false;
 
+    /**
+     * The default enabled value.
+     */
+    public static final boolean DEFAULT_ENABLED = true;
+
     protected Charset charset;
 
     private Integer initialCapacity;
@@ -58,6 +64,7 @@ public class CacheConfiguration {
     private Duration expireAfterAccess;
     private boolean recordStats = DEFAULT_RECORD_STATS;
     private boolean testMode = DEFAULT_TESTMODE;
+    private boolean enabled = DEFAULT_ENABLED;
     private final String cacheName;
 
     /**
@@ -205,5 +212,17 @@ public class CacheConfiguration {
      */
     public void setTestMode(boolean testMode) {
         this.testMode = testMode;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    /**
+     * @param enabled Whether the cache is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 }
