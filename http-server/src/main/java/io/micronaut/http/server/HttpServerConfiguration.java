@@ -28,7 +28,6 @@ import javax.inject.Inject;
 import java.io.File;
 import java.nio.charset.Charset;
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -54,7 +53,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public static final String PREFIX = "micronaut.server";
 
-
     /**
      * The default value random port.
      */
@@ -65,19 +63,19 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      * The default max request size.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final long DEFAULT_MAX_REQUEST_SIZE = 1024 * 1024 * 10; // 10MB
+    public static final long DEFAULT_MAX_REQUEST_SIZE = 1024 * 1024 * 10L; // 10MB
 
     /**
      * The default read idle time in minutes.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final long DEFAULT_READ_IDLE_TIME_MINUTES = 5;
+    public static final long DEFAULT_READ_IDLE_TIME_MINUTES = 5L;
 
     /**
      * The default write idle time in minutes.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final long DEFAULT_WRITE_IDLE_TIME_MINUTES = 5;
+    public static final long DEFAULT_WRITE_IDLE_TIME_MINUTES = 5L;
 
     /**
      * The default date header.
@@ -103,7 +101,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private long maxRequestSize = DEFAULT_MAX_REQUEST_SIZE;
     private Duration readIdleTimeout = null;
     private Duration writeIdleTimeout = null;
-    private Duration idleTimeout = Duration.of(DEFAULT_IDLE_TIME_MINUTES, ChronoUnit.MINUTES);
+    private Duration idleTimeout = Duration.ofMinutes(DEFAULT_IDLE_TIME_MINUTES);
     private MultipartConfiguration multipart = new MultipartConfiguration();
     private CorsConfiguration cors = new CorsConfiguration();
     private String serverHeader;
@@ -195,14 +193,14 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      * @return The default amount of time to allow read operation connections  to remain idle
      */
     public Duration getReadIdleTimeout() {
-        return Optional.ofNullable(readIdleTimeout).orElse(idleTimeout);
+        return Optional.ofNullable(readIdleTimeout).orElse(Duration.ofMinutes(DEFAULT_READ_IDLE_TIME_MINUTES));
     }
 
     /**
      * @return The default amount of time to allow write operation connections to remain idle
      */
     public Duration getWriteIdleTimeout() {
-        return Optional.ofNullable(writeIdleTimeout).orElse(idleTimeout);
+        return Optional.ofNullable(writeIdleTimeout).orElse(Duration.ofMinutes(DEFAULT_WRITE_IDLE_TIME_MINUTES));
     }
 
     /**
@@ -310,7 +308,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * Sets the amount of time a connection can remain idle without any reads occurring. Default value ({@value #DEFAULT_READ_IDLE_TIME_MINUTES} seconds).
+     * Sets the amount of time a connection can remain idle without any reads occurring. Default value ({@value #DEFAULT_READ_IDLE_TIME_MINUTES} minutes).
      *
      * @param readIdleTimeout The read idle time
      */
@@ -319,7 +317,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * Sets the amount of time a connection can remain idle without any writes occurring. Default value ({@value #DEFAULT_WRITE_IDLE_TIME_MINUTES} seconds).
+     * Sets the amount of time a connection can remain idle without any writes occurring. Default value ({@value #DEFAULT_WRITE_IDLE_TIME_MINUTES} minutes).
      *
      * @param writeIdleTimeout The write idle time
      */
@@ -328,7 +326,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * Sets the idle time of connections for the server. Default value ({@value #DEFAULT_IDLE_TIME_MINUTES} seconds).
+     * Sets the idle time of connections for the server. Default value ({@value #DEFAULT_IDLE_TIME_MINUTES} minutes).
      *
      * @param idleTimeout The idle time
      */
