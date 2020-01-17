@@ -316,6 +316,24 @@ class HttpTracingSpec extends Specification {
         context.close()
     }
 
+    void "tested continue nested http tracing - rx"() {
+        given:
+        ApplicationContext context = buildContext()
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/nestedRx/John', String)
+
+        then:
+        response.body() == "10"
+
+
+        cleanup:
+        client.close()
+        context.close()
+    }
+
 
     ApplicationContext buildContext() {
         def reporter = new InMemoryReporter()
@@ -371,6 +389,22 @@ class HttpTracingSpec extends Specification {
         String nestedError(String name) {
             tracedClient.error(name)
         }
+
+        @Get("/nestedRx/{name}")
+        Single<String> nestedRx(String name) {
+            spanCustomizer.activeSpan().setBaggageItem("foo", "bar")
+            tracedClient.continuedRx(name)
+                .flatMap({ String res ->
+                    assert spanCustomizer.activeSpan().getBaggageItem("foo") == "bar"
+                    return tracedClient.nestedRx2(res)
+                })
+        }
+
+        @Get("/nestedRx2/{name}")
+        Single<Integer> nestedRx2(String name) {
+            assert spanCustomizer.activeSpan().getBaggageItem("foo") == "bar"
+            return Single.just(10)
+        }
     }
 
     @Client('/traced')
@@ -386,5 +420,8 @@ class HttpTracingSpec extends Specification {
 
         @Get("/hello/{name}")
         Single<String> continuedRx(String name)
+
+        @Get("/nestedRx2/{name}")
+        Single<String> nestedRx2(String name)
     }
 }
