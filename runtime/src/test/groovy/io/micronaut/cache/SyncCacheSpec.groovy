@@ -221,7 +221,6 @@ class SyncCacheSpec extends Specification {
 
         then:
         conditions.eventually {
-
             !syncCache.get("one", Integer).isPresent()
             !syncCache.get("two", Integer).isPresent()
             syncCache.get("three", Integer).isPresent()
@@ -235,12 +234,15 @@ class SyncCacheSpec extends Specification {
 
         then:
         conditions.eventually {
-
             !syncCache.get("one", Integer).isPresent()
             !syncCache.get("two", Integer).isPresent()
             !syncCache.get("three", Integer).isPresent()
             !syncCache.get("four", Integer).isPresent()
         }
+
+        and:
+        !syncCache.putIfAbsent("five", 5).isPresent()
+        syncCache.putIfAbsent("five", 6).get() == 5
 
         cleanup:
         applicationContext.stop()
