@@ -29,6 +29,7 @@ import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -47,7 +48,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     private NonBlockingJsonParser currentNonBlockingJsonParser;
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
     private final JsonFactory jsonFactory;
-    private final DeserializationConfig deserializationConfig;
+    private final @Nullable DeserializationConfig deserializationConfig;
     private String currentFieldName;
     private boolean streamArray;
     private boolean rootIsArray;
@@ -60,7 +61,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
      * @param streamArray Whether arrays should be streamed
      * @param deserializationConfig The jackson deserialization configuration
      */
-    public JacksonProcessor(JsonFactory jsonFactory, boolean streamArray, DeserializationConfig deserializationConfig) {
+    public JacksonProcessor(JsonFactory jsonFactory, boolean streamArray, @Nullable DeserializationConfig deserializationConfig) {
         try {
             this.jsonFactory = jsonFactory;
             this.deserializationConfig = deserializationConfig;
@@ -70,6 +71,16 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         } catch (IOException e) {
             throw new IllegalStateException("Failed to create non-blocking JSON parser: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Creates a new JacksonProcessor.
+     *
+     * @param jsonFactory The JSON factory
+     * @param streamArray Whether arrays should be streamed
+     */
+    public JacksonProcessor(JsonFactory jsonFactory, boolean streamArray) {
+        this(jsonFactory, streamArray, null);
     }
 
     /**
@@ -84,11 +95,28 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     }
 
     /**
+     * Construct with given JSON factory.
+     *
+     * @param jsonFactory To configure and construct reader (aka parser, {@link JsonParser})
+     *                    and writer (aka generator, {@link JsonGenerator}) instances.
+     */
+    public JacksonProcessor(JsonFactory jsonFactory) {
+        this(jsonFactory, false, null);
+    }
+
+    /**
      * Construct with default JSON factory.
      * @param deserializationConfig The jackson deserialization configuration
      */
     public JacksonProcessor(DeserializationConfig deserializationConfig) {
         this(new JsonFactory(), deserializationConfig);
+    }
+
+    /**
+     * Default constructor.
+     */
+    public JacksonProcessor() {
+        this(new JsonFactory(), null);
     }
 
     /**
@@ -260,7 +288,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 JsonNode decimalNode = nodeStack.peekFirst();
                 switch (numberType) {
                     case FLOAT:
-                        if (deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
+                        if (deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
                             if (decimalNode instanceof ObjectNode) {
                                 ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDecimalValue());
                             } else {
@@ -273,7 +301,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                         }
                         break;
                     case DOUBLE:
-                        if (deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
+                        if (deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) {
                             if (decimalNode instanceof ObjectNode) {
                                 ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDecimalValue());
                             } else {
@@ -307,7 +335,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                         }
                     break;
                     case INT:
-                        if (deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)) {
+                        if (deserializationConfig != null && deserializationConfig.isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)) {
                             if (decimalNode instanceof ObjectNode) {
                                 ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getBigIntegerValue());
                             } else {

@@ -35,6 +35,7 @@ import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
@@ -57,9 +58,13 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
      * @param jsonFactory      The json factory
      * @param deserializationConfig The jackson deserialization configuration
      */
-    public JsonContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration, Optional<JsonFactory> jsonFactory, DeserializationConfig deserializationConfig) {
+    public JsonContentProcessor(
+            NettyHttpRequest<?> nettyHttpRequest,
+            HttpServerConfiguration configuration,
+            @Nullable JsonFactory jsonFactory,
+            DeserializationConfig deserializationConfig) {
         super(nettyHttpRequest, configuration);
-        this.jsonFactory = jsonFactory.orElse(new JsonFactory());
+        this.jsonFactory = jsonFactory != null ? jsonFactory : new JsonFactory();
         this.deserializationConfig = deserializationConfig;
     }
 
