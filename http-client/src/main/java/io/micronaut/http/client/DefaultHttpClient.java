@@ -867,7 +867,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                 boolean isJsonStream = response.getContentType().map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE)).orElse(false);
                 boolean streamArray = !Iterable.class.isAssignableFrom(type.getType()) && !isJsonStream;
-                JacksonProcessor jacksonProcessor = new JacksonProcessor(mediaTypeCodec.getObjectMapper().getFactory(), streamArray, mediaTypeCodec.getObjectMapper().getDeserializationConfig()) {
+                JacksonProcessor jacksonProcessor = new JacksonProcessor(mediaTypeCodec.getObjectMapper().getFactory(), streamArray, mediaTypeCodec.getObjectMapper()) {
                     @Override
                     public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {
                         httpContentFlowable.map(content -> {
