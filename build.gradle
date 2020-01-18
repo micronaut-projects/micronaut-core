@@ -162,6 +162,11 @@ ext {
                     group:'io.micronaut.graphql',
                     name:'micronaut-graphql'
             ],
+            'graphql': [
+                    version:graphqlJavaExtendedScalarsVersion,
+                    group:'com.graphql-java',
+                    name:'graphql-java-extended-scalars'
+            ],
             'micronaut.graphql.gorm': [
                     version:micronautGraphQLGormVersion,
                     group:'io.micronaut.graphql',
