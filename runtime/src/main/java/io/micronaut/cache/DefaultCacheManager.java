@@ -101,13 +101,9 @@ public class DefaultCacheManager<C> implements CacheManager<C> {
         SyncCache<C> cache = cacheMap.get(name);
         if (cache == null) {
             if (dynamicCacheManager != null) {
-                Optional<SyncCache<C>> dynamicCache = dynamicCacheManager.get().getCache(name);
-                if (dynamicCache.isPresent()) {
-                    cache = dynamicCache.get();
-                    cacheMap.put(name, cache);
-                } else {
-                    throw new ConfigurationException("No cache dynamically configured for name: " + name);
-                }
+                cache = dynamicCacheManager.get().getCache(name);
+                Objects.requireNonNull(cache);
+                cacheMap.put(name, cache);
             } else {
                 throw new ConfigurationException("No cache configured for name: " + name);
             }

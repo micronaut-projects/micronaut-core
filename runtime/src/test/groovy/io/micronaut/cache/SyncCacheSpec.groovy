@@ -15,7 +15,7 @@
  */
 package io.micronaut.cache
 
-import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.async.annotation.SingleResult
 import io.reactivex.Flowable
 import io.reactivex.Single
@@ -246,19 +246,37 @@ class SyncCacheSpec extends Specification {
         applicationContext.stop()
     }
 
-    void "caches can be disabled"() {
+    void "test exception isn't thrown if non configured cache is retrieved"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'micronaut.caches.test.initialCapacity': 1,
-                'micronaut.caches.test.maximumSize': 3,
-                'micronaut.caches.test.enabled': false,
+                'micronaut.caches.test.initialCapacity':1,
+                'micronaut.caches.test.maximumSize':3
         )
+        CacheManager cacheManager = applicationContext.getBean(CacheManager)
 
         when:
-        applicationContext.getBean(SyncCache, Qualifiers.byName('test'))
+        cacheManager.getCache("fooBar")
 
         then:
-        thrown(NoSuchBeanException)
+        noExceptionThrown()
+
+        cleanup:
+        applicationContext.stop()
+    }
+
+    void "the dynamic cache manager can be disabled"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'micronaut.caches.test.initialCapacity':1,
+                'micronaut.caches.dynamic': false
+        )
+        CacheManager cacheManager = applicationContext.getBean(CacheManager)
+
+        when:
+        cacheManager.getCache("fooBar")
+
+        then:
+        thrown(ConfigurationException)
 
         cleanup:
         applicationContext.stop()

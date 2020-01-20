@@ -48,8 +48,8 @@ class DynamicCacheSpec extends Specification {
     static class MyDynamicCacheManager implements DynamicCacheManager<Map> {
 
         @Override
-        Optional<SyncCache<Map>> getCache(String name) {
-            return Optional.of(new DynamicCache())
+        SyncCache<Map> getCache(String name) {
+            return new DynamicCache()
         }
     }
 
