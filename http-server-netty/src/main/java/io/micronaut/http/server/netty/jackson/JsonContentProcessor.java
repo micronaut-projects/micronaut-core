@@ -16,8 +16,8 @@
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.util.TokenBuffer;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
@@ -47,7 +47,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode> {
+public class JsonContentProcessor extends AbstractHttpContentProcessor<TokenBuffer> {
 
     private final JsonFactory jsonFactory;
     private final ObjectMapper objectMapper;
@@ -70,7 +70,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
     }
 
     @Override
-    protected void doOnSubscribe(Subscription subscription, Subscriber<? super JsonNode> subscriber) {
+    protected void doOnSubscribe(Subscription subscription, Subscriber<? super TokenBuffer> subscriber) {
         if (parentSubscription == null) {
             return;
         }
@@ -94,9 +94,8 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
                 }
             }
         }
-
         this.jacksonProcessor = new JacksonProcessor(jsonFactory, streamArray, objectMapper);
-        this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
+        this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<TokenBuffer>() {
 
             @Override
             protected void doOnSubscribe(Subscription jsonSubscription) {
@@ -127,7 +126,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
             }
 
             @Override
-            protected void doOnNext(JsonNode message) {
+            protected void doOnNext(TokenBuffer message) {
                 subscriber.onNext(message);
             }
 

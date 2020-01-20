@@ -28,6 +28,8 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.databind.util.TokenBuffer;
+
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -118,10 +120,27 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
     }
 
     /**
+     * Decodes the given JSON TokenBuffer.
+     *
+     * @param type The type
+     * @param tokenBuffer The Json TokenBuffer
+     * @param <T> The generic type
+     * @return The decoded object
+     * @throws CodecException When object cannot be decoded
+     */
+    public <T> T decode(Argument<T> type, TokenBuffer tokenBuffer) throws CodecException {
+        try {
+            return objectMapper.readValue(tokenBuffer.asParser(), type.getType());
+        } catch (IOException e) {
+            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Decodes the given JSON node.
      *
      * @param type The type
-     * @param node The Json Node
+     * @param node The JsonNode
      * @param <T> The generic type
      * @return The decoded object
      * @throws CodecException When object cannot be decoded

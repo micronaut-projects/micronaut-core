@@ -27,6 +27,8 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.fasterxml.jackson.databind.node.LongNode
+import com.fasterxml.jackson.databind.util.TokenBuffer
+
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
@@ -46,7 +48,7 @@ import spock.lang.Specification
 class JacksonProcessorSpec extends Specification {
     @Shared @AutoCleanup
     ApplicationContext applicationContext = new DefaultApplicationContext("test").start()
-            
+
     void "test big decimal"() {
 
         given:
@@ -59,19 +61,19 @@ class JacksonProcessorSpec extends Specification {
         def string = objectMapper.writeValueAsString(bigD)
         byte[] bytes = objectMapper.writeValueAsBytes(bigD)
         boolean complete = false
-        JsonNode node = null
+        TokenBuffer tokenBuffer = null
         Throwable error = null
         int nodeCount = 0
-        processor.subscribe(new Subscriber<JsonNode>() {
+        processor.subscribe(new Subscriber<TokenBuffer>() {
             @Override
             void onSubscribe(Subscription s) {
                 s.request(Long.MAX_VALUE)
             }
 
             @Override
-            void onNext(JsonNode jsonNode) {
+            void onNext(TokenBuffer tb) {
                 nodeCount++
-                node = jsonNode
+                tokenBuffer = tb
             }
 
             @Override
@@ -100,13 +102,13 @@ class JacksonProcessorSpec extends Specification {
 
         then:
         complete
-        node != null
+        tokenBuffer != null
         error == null
         nodeCount == 1
         string == '{"bd1":"888.7794538169553400000","bd2":888.7794538169553400000}'
 
         when:
-        BigD foo = objectMapper.treeToValue(node, BigD)
+        BigD foo = objectMapper.readValue(tokenBuffer.asParser(objectMapper), BigD)
 
         then:
         foo != null
@@ -126,19 +128,19 @@ class JacksonProcessorSpec extends Specification {
         def string = objectMapper.writeValueAsString(bigD)
         byte[] bytes = objectMapper.writeValueAsBytes(bigD)
         boolean complete = false
-        JsonNode node = null
+        TokenBuffer tokenBuffer = null
         Throwable error = null
         int nodeCount = 0
-        processor.subscribe(new Subscriber<JsonNode>() {
+        processor.subscribe(new Subscriber<TokenBuffer>() {
             @Override
             void onSubscribe(Subscription s) {
                 s.request(Long.MAX_VALUE)
             }
 
             @Override
-            void onNext(JsonNode jsonNode) {
+            void onNext(TokenBuffer tb) {
                 nodeCount++
-                node = jsonNode
+                tokenBuffer = tb
             }
 
             @Override
@@ -167,13 +169,13 @@ class JacksonProcessorSpec extends Specification {
 
         then:
         complete
-        node != null
+        tokenBuffer != null
         error == null
         nodeCount == 1
         string == '{"bd1":"888.7794538169553400000","bd2":888.7794538169553400000}'
 
         when:
-        BigD foo = objectMapper.treeToValue(node, BigD)
+        BigD foo = objectMapper.readValue(tokenBuffer.asParser(objectMapper), BigD)
 
         then:
         foo != null
@@ -193,19 +195,19 @@ class JacksonProcessorSpec extends Specification {
         def string = objectMapper.writeValueAsString(instance)
         byte[] bytes = objectMapper.writeValueAsBytes(instance)
         boolean complete = false
-        JsonNode node = null
+        TokenBuffer tokenBuffer = null
         Throwable error = null
         int nodeCount = 0
-        processor.subscribe(new Subscriber<JsonNode>() {
+        processor.subscribe(new Subscriber<TokenBuffer>() {
             @Override
             void onSubscribe(Subscription s) {
                 s.request(Long.MAX_VALUE)
             }
 
             @Override
-            void onNext(JsonNode jsonNode) {
+            void onNext(TokenBuffer tb) {
                 nodeCount++
-                node = jsonNode
+                tokenBuffer = tb
             }
 
             @Override
@@ -234,13 +236,13 @@ class JacksonProcessorSpec extends Specification {
 
         then:
         complete
-        node != null
+        tokenBuffer != null
         error == null
         nodeCount == 1
         string == '{"name":"Fred","age":10}'
 
         when:
-        Foo foo = objectMapper.treeToValue(node, Foo)
+        Foo foo = objectMapper.readValue(tokenBuffer.asParser(objectMapper), Foo)
 
         then:
         foo != null
@@ -260,19 +262,19 @@ class JacksonProcessorSpec extends Specification {
         def string = objectMapper.writeValueAsString(instances)
         byte[] bytes = objectMapper.writeValueAsBytes(instances)
         boolean complete = false
-        JsonNode node = null
+        TokenBuffer tokenBuffer = null
         Throwable error = null
         int nodeCount = 0
-        processor.subscribe(new Subscriber<JsonNode>() {
+        processor.subscribe(new Subscriber<TokenBuffer>() {
             @Override
             void onSubscribe(Subscription s) {
                 s.request(Long.MAX_VALUE)
             }
 
             @Override
-            void onNext(JsonNode jsonNode) {
+            void onNext(TokenBuffer tb) {
                 nodeCount++
-                node = jsonNode
+                tokenBuffer = tb
             }
 
             @Override
@@ -301,14 +303,13 @@ class JacksonProcessorSpec extends Specification {
 
         then:
         complete
-        node != null
+        tokenBuffer != null
         error == null
         nodeCount == 1
-        node instanceof ArrayNode
         string == '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
 
         when:
-        Foo[] foos = objectMapper.treeToValue(node, Foo[].class)
+        Foo[] foos = objectMapper.readValue(tokenBuffer.asParser(objectMapper), Foo[].class)
 
         then:
         foos.size() == 2
@@ -326,19 +327,19 @@ class JacksonProcessorSpec extends Specification {
         when:
         byte[] bytes = '{"name":"Fred","age":10'.bytes // invalid JSON
         boolean complete = false
-        JsonNode node = null
+        TokenBuffer tokenBuffer = null
         Throwable error = null
         int nodeCount = 0
-        processor.subscribe(new Subscriber<JsonNode>() {
+        processor.subscribe(new Subscriber<TokenBuffer>() {
             @Override
             void onSubscribe(Subscription s) {
                 s.request(Long.MAX_VALUE)
             }
 
             @Override
-            void onNext(JsonNode jsonNode) {
+            void onNext(TokenBuffer tb) {
                 nodeCount++
-                node = jsonNode
+                tokenBuffer = tb
             }
 
             @Override
@@ -366,7 +367,7 @@ class JacksonProcessorSpec extends Specification {
         processor.onComplete()
         then:
         !complete
-        node == null
+        tokenBuffer == null
         error != null
         error instanceof JsonEOFException
 
@@ -381,19 +382,19 @@ class JacksonProcessorSpec extends Specification {
         when:
         byte[] bytes = '{"name":Fred,"age":10}'.bytes // invalid JSON
         boolean complete = false
-        JsonNode node = null
+        TokenBuffer tokenBuffer = null
         Throwable error = null
         int nodeCount = 0
-        processor.subscribe(new Subscriber<JsonNode>() {
+        processor.subscribe(new Subscriber<TokenBuffer>() {
             @Override
             void onSubscribe(Subscription s) {
                 s.request(Long.MAX_VALUE)
             }
 
             @Override
-            void onNext(JsonNode jsonNode) {
+            void onNext(TokenBuffer tb) {
                 nodeCount++
-                node = jsonNode
+                tokenBuffer = tb
             }
 
             @Override
@@ -421,7 +422,7 @@ class JacksonProcessorSpec extends Specification {
         processor.onComplete()
         then:
         !complete
-        node == null
+        tokenBuffer == null
         error != null
         error instanceof JsonParseException
 
@@ -438,16 +439,16 @@ class JacksonProcessorSpec extends Specification {
         List<JsonNode> nodes = new ArrayList<>()
         Throwable error = null
         int nodeCount = 0
-        processor.subscribe(new Subscriber<JsonNode>() {
+        processor.subscribe(new Subscriber<TokenBuffer>() {
             @Override
             void onSubscribe(Subscription s) {
                 s.request(Long.MAX_VALUE)
             }
 
             @Override
-            void onNext(JsonNode jsonNode) {
+            void onNext(TokenBuffer tokenBuffer) {
                 nodeCount++
-                nodes.add(jsonNode)
+                nodes.add(objectMapper.readTree(tokenBuffer.asParser()))
             }
 
             @Override

@@ -15,8 +15,9 @@
  */
 package io.micronaut.http.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.util.TokenBuffer;
+
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
@@ -869,7 +870,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 boolean streamArray = !Iterable.class.isAssignableFrom(type.getType()) && !isJsonStream;
                 JacksonProcessor jacksonProcessor = new JacksonProcessor(mediaTypeCodec.getObjectMapper().getFactory(), streamArray, mediaTypeCodec.getObjectMapper()) {
                     @Override
-                    public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {
+                    public void subscribe(Subscriber<? super TokenBuffer> downstreamSubscriber) {
                         httpContentFlowable.map(content -> {
                             ByteBuf chunk = content.content();
                             if (log.isTraceEnabled()) {
@@ -886,8 +887,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         super.subscribe(downstreamSubscriber);
                     }
                 };
-                return Flowable.fromPublisher(jacksonProcessor).map(jsonNode ->
-                        mediaTypeCodec.decode(type, jsonNode)
+                return Flowable.fromPublisher(jacksonProcessor).map(tokenBuffer ->
+                        mediaTypeCodec.decode(type, tokenBuffer)
                 );
             });
         };

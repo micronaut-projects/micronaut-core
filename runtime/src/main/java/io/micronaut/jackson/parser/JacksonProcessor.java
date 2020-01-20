@@ -20,14 +20,13 @@ import com.fasterxml.jackson.core.async.ByteArrayFeeder;
 import com.fasterxml.jackson.core.io.JsonEOFException;
 import com.fasterxml.jackson.core.json.async.NonBlockingJsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.deser.DefaultDeserializationContext;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
 
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
+
+import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,14 +42,13 @@ import java.io.IOException;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], JsonNode> {
+public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], TokenBuffer> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JacksonProcessor.class);
 
     private NonBlockingJsonParser currentNonBlockingJsonParser;
     private final JsonFactory jsonFactory;
     private DeserializationContext deserializationContext;
-    private final ObjectMapper objectMapper;
     private boolean streamArray;
     private TokenBuffer tokenBuffer;
     private int objectDepth;
@@ -69,7 +67,6 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         try {
             this.jsonFactory = jsonFactory;
             this.currentNonBlockingJsonParser = (NonBlockingJsonParser) jsonFactory.createNonBlockingByteArrayParser();
-            this.objectMapper = objectMapper.copy().disable(DeserializationFeature.UNWRAP_ROOT_VALUE).disable(SerializationFeature.WRAP_ROOT_VALUE);
             this.deserializationContext = objectMapper.getDeserializationContext();
             if (this.deserializationContext instanceof DefaultDeserializationContext) {
                 this.deserializationContext = ((DefaultDeserializationContext) this.deserializationContext).createInstance(objectMapper.getDeserializationConfig(),
@@ -164,7 +161,6 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 }
                 return;
             }
-
             ByteArrayFeeder byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
             boolean needMoreInput = byteFeeder.needMoreInput();
             if (!needMoreInput) {
@@ -237,24 +233,21 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         }
     }
 
-    private void submitJsonNode() {
-        currentDownstreamSubscriber().ifPresent(subscriber -> {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Materialized new JsonNode call onNext...");
-            }
-            try {
-                JsonNode node = this.objectMapper.readTree(tokenBuffer.asParser());
-                subscriber.onNext(node);
-            } catch (IOException e) {
-                onError(e);
-            }
-        });
+    private void submitTokenBuffer() {
+        currentDownstreamSubscriber().ifPresent(this::onNext);
+    }
+
+    private void onNext(Subscriber<? super TokenBuffer> subscriber) {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Materialized new TokenBuffer call onNext...");
+        }
+        subscriber.onNext(tokenBuffer);
     }
 
     private void processTokenNormal(JsonToken token) throws IOException {
         this.tokenBuffer.copyCurrentEvent(this.currentNonBlockingJsonParser);
         if ((token.isStructEnd() || token.isScalarValue()) && this.objectDepth == 0 && this.arrayDepth == 0) {
-            submitJsonNode();
+            submitTokenBuffer();
             this.tokenBuffer = new TokenBuffer(this.currentNonBlockingJsonParser, this.deserializationContext);
         }
     }
@@ -265,7 +258,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         }
         if (this.objectDepth == 0 && (this.arrayDepth == 0 || this.arrayDepth == 1) && (token.isStructEnd() || token.isScalarValue())) {
             if (!(token == JsonToken.END_ARRAY && arrayDepth == 0)) {
-                submitJsonNode();
+                submitTokenBuffer();
             }
             this.tokenBuffer = new TokenBuffer(this.currentNonBlockingJsonParser, this.deserializationContext);
         }
