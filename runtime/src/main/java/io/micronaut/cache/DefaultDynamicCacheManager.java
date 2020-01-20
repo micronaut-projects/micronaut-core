@@ -32,7 +32,7 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Requires(missingBeans = DynamicCacheManager.class)
-@Requires(property = CacheConfiguration.PREFIX + ".dynamic", notEquals = StringUtils.FALSE)
+@Requires(property = "micronaut.cache.dynamic", notEquals = StringUtils.FALSE)
 public class DefaultDynamicCacheManager implements DynamicCacheManager<com.github.benmanes.caffeine.cache.Cache> {
 
     private final ApplicationContext applicationContext;

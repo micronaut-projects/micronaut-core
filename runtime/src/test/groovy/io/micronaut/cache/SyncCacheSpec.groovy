@@ -267,13 +267,12 @@ class SyncCacheSpec extends Specification {
     void "the dynamic cache manager can be disabled"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'micronaut.caches.test.initialCapacity':1,
-                'micronaut.caches.dynamic': false
+                'micronaut.cache.dynamic': false
         )
         CacheManager cacheManager = applicationContext.getBean(CacheManager)
 
         when:
-        cacheManager.getCache("fooBar")
+        cacheManager.getCache("test")
 
         then:
         thrown(ConfigurationException)
