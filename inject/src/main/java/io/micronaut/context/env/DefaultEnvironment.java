@@ -635,6 +635,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 if (inputStream.isPresent()) {
                     Map<String, Object> properties = propertySourceLoader.read(fileName, inputStream.get());
                     propertySources.add(PropertySource.of(filePath, properties));
+                } else {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("Unable to load properties file: {}", fileName);
+                    }
                 }
             } catch (IOException e) {
                 throw new ConfigurationException("Unsupported properties file: " + fileName);
