@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.loadbalance;
 
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.reactivex.Flowable;
