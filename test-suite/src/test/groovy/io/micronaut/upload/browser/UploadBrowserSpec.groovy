@@ -34,7 +34,6 @@ class UploadBrowserSpec extends GebSpec {
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
-    @Requires({sys['geb.env']})
     def "submitting a form without a file triggers an error"() {
         given:
         browser.baseUrl = "http://localhost:${embeddedServer.port}"
@@ -51,7 +50,5 @@ class UploadBrowserSpec extends GebSpec {
 
         then:
         at FileEmptyPage
-
-
     }
 }
