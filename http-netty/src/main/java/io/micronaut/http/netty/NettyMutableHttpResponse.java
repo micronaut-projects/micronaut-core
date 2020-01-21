@@ -16,7 +16,7 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -51,7 +51,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 @Internal
-@Introspected
+@TypeHint(value = NettyMutableHttpResponse.class)
 public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
 
     protected FullHttpResponse nettyResponse;

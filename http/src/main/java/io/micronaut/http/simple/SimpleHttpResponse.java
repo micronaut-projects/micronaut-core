@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.simple;
 
-import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -37,7 +37,7 @@ import java.util.Optional;
  * @author Vladimir Orany
  * @since 1.0
  */
-@Introspected
+@TypeHint(value = SimpleHttpResponse.class)
 class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
 
     private final MutableHttpHeaders headers = new SimpleHttpHeaders(ConversionService.SHARED);
