@@ -36,7 +36,7 @@ dependencies {
 [source.multi-language-sample,gradle-kotlin,title="Configuring Gradle",subs="attributes"]
 ----
 plugins {
-  kotlin("kapt")
+  kotlin("kapt") // <1>
 }
 
 ...
