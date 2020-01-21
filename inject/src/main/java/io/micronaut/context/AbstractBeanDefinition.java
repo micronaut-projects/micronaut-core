@@ -729,11 +729,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected final void injectBeanField(BeanResolutionContext resolutionContext, DefaultBeanContext context, int index, Object bean) {
         FieldInjectionPoint fieldInjectionPoint = fieldInjectionPoints.get(index);
-        instrumentAnnotationMetadata(context, fieldInjectionPoint);
         boolean isInject = fieldInjectionPoint.getAnnotationMetadata().hasDeclaredAnnotation(Inject.class);
         try {
             Object value;
             if (isInject) {
+                instrumentAnnotationMetadata(context, fieldInjectionPoint);
                 value = getBeanForField(resolutionContext, context, fieldInjectionPoint);
             } else {
                 value = getValueForField(resolutionContext, context, index);
@@ -746,12 +746,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             if (e instanceof BeanContextException) {
                 throw (BeanContextException) e;
             } else {
-                if (fieldInjectionPoint.isDeclaredNullable()) {
-                    //noinspection unchecked
-                    fieldInjectionPoint.set(bean, null);
-                } else {
-                    throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Error setting field value: " + e.getMessage(), e);
-                }
+                throw new DependencyInjectionException(resolutionContext, fieldInjectionPoint, "Error setting field value: " + e.getMessage(), e);
             }
         }
     }
