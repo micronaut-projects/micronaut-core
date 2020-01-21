@@ -18,6 +18,7 @@ package io.micronaut.http.client.loadbalance;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
+import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
@@ -38,7 +39,11 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
 
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
-        return Publishers.just(getNextAvailable(serviceInstanceList.getInstances()));
+        try {
+            return Publishers.just(getNextAvailable(serviceInstanceList.getInstances()));
+        } catch (NoAvailableServiceException e) {
+            return Publishers.just(e);
+        }
     }
 
     @Override
