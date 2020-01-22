@@ -1,10 +1,10 @@
 dependencies {
     annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
 
     api project(":http-client")
     api project(":validation")
-        
-    compileOnly project(":graal")
+
     compileOnly project(":management")
     compileOnly dependencyVersion("micronaut.aws"), {
         exclude module:'micronaut-http-client'
