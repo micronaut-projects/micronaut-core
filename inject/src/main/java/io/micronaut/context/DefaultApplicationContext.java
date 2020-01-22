@@ -41,6 +41,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.inject.Provider;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -295,7 +296,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     String qualifierKey = javax.inject.Qualifier.class.getName();
                                     Argument<?>[] arguments = candidate.getConstructor().getArguments();
                                     for (Argument<?> argument : arguments) {
-                                        if (argument.getType().equals(dependentType)) {
+                                        Class<?> argumentType;
+                                        if (Provider.class.isAssignableFrom(argument.getType())) {
+                                            argumentType = argument.getFirstTypeVariable().orElse(argument).getType();
+                                        } else {
+                                            argumentType = argument.getType();
+                                        }
+                                        if (argumentType.equals(dependentType)) {
                                             Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
                                             delegate.put(qualifierKey, qualifedArg);
                                             break;

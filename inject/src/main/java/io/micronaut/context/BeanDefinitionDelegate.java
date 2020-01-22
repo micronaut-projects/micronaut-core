@@ -30,6 +30,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.inject.Provider;
 import java.util.*;
 
 /**
@@ -101,10 +102,19 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
                         if (result.isPresent()) {
                             fulfilled.put(argumentName, result.get());
                         } else {
+                            Qualifier qualifier = Qualifiers.byName(named.toString());
                             // attempt bean lookup to full argument
-                            Optional bean = context.findBean(argumentType, Qualifiers.byName(named.toString()));
-                            if (bean.isPresent()) {
-                                fulfilled.put(argumentName, bean.get());
+                            if (Provider.class.isAssignableFrom(argumentType)) {
+                                Optional<Argument<?>> genericType = argument.getFirstTypeVariable();
+                                if (genericType.isPresent()) {
+                                    Class beanType = genericType.get().getType();
+                                    fulfilled.put(argumentName, ((DefaultBeanContext) context).getBeanProvider(resolutionContext, beanType, qualifier));
+                                }
+                            } else {
+                                Optional bean = context.findBean(argumentType, qualifier);
+                                if (bean.isPresent()) {
+                                    fulfilled.put(argumentName, bean.get());
+                                }
                             }
                         }
                     }

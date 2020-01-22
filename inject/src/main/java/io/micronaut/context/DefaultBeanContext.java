@@ -1190,7 +1190,15 @@ public class DefaultBeanContext implements BeanContext {
     protected @Nonnull
     <T> Provider<T> getBeanProvider(@Nullable BeanResolutionContext resolutionContext, @Nonnull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        @SuppressWarnings("unchecked") BeanRegistration<T> beanRegistration = singletonObjects.get(new BeanKey(beanType, qualifier));
+
+        BeanKey beanKey = new BeanKey(beanType, qualifier);
+
+        T inFlightBean = resolutionContext != null ? resolutionContext.getInFlightBean(beanKey) : null;
+        if (inFlightBean != null) {
+            return new ResolvedProvider<>(inFlightBean);
+        }
+
+        @SuppressWarnings("unchecked") BeanRegistration<T> beanRegistration = singletonObjects.get(beanKey);
         if (beanRegistration != null) {
             return new ResolvedProvider<>(beanRegistration.bean);
         }
