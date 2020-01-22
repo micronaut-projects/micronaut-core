@@ -40,6 +40,11 @@ import java.io.IOException;
  * non-blocking manner
  *
  * @author Graeme Rocher
+ *
+ * Token buffer processing based on spring Jackson2Tokenizer:
+ * @author Arjen Poutsma
+ * @author Rossen Stoyanchev
+ * @author Juergen Hoeller
  * @since 1.0
  */
 public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], TokenBuffer> {
