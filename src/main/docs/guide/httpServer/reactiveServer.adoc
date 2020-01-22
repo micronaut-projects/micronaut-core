@@ -1,15 +1,33 @@
 As mentioned previously, Micronaut is built on Netty which is designed around an Event loop model and non-blocking I/O.
 
-Although it is recommended to follow a non-blocking approach, in particular when making remote calls to other microservices, Micronaut acknowledges the fact that in real world scenarios developers encounter situations where the need arises to interface with blocking APIs and, in order to facilitate this, features blocking operation detection.
+Although it is recommended to follow a non-blocking approach, in particular when making remote calls to other microservices, Micronaut acknowledges the fact that in real world scenarios developers encounter situations where the need arises to interface with blocking APIs and, in order to facilitate this, features automatic thread selection based on the return type of the method.
 
 If your controller method returns a non-blocking type such as an RxJava `Observable` or a `CompletableFuture` then Micronaut will use the Event loop thread to subscribe to the result.
 
 If however you return any other type then Micronaut will execute your `@Controller` method in a preconfigured I/O thread pool.
 
-This thread pool by default is a caching, unbound thread pool. However, you may wish to configure the nature of the thread pool. For example the following configuration will configure the I/O thread pool as a fixed thread pool with 75 threads (similar to what a traditional blocking server such as Tomcat uses in the thread per connection model):
+WARNING: This means effectively that if you write a method that uses `Single.fromCallable(..)` and block within the body of the callable you may unknowingly block the Netty event loop thread and when writing such logic *you must* also invoke `Single.subscribeOn(..)` to ensure the event loop thread is not blocked.
+
+The I/O thread pool by default is a caching, unbound thread pool. However, you may wish to configure the nature of the thread pool to avoid exhausting resources in applications that perform a lot of blocking I/O under high load.
+
+For example the following configuration will configure the I/O thread pool as a fixed thread pool with 75 threads (similar to what a traditional blocking server such as Tomcat uses in the thread per connection model):
 
 [source,yaml]
 ----
-micronaut.executors.io.type=fixed
-micronaut.executors.io.nThreads=75
+micronaut:
+    executors:
+        io:
+            type: fixed
+            nThreads: 75
 ----
+
+If automatic thread selection is undesirable for your application you can either annotate the controller or method with ann:core.annotation.NonBlocking[] in which case all operations of the controller will run on the event loop or alternatively you can completely disable automatic thread selection by setting the `micronaut.server.thread-selection` to one of the values in the api:scheduling.executor.ThreadSelection[] enum. For example the following configuration:
+
+[source,yaml]
+----
+micronaut:
+    server:
+        thread-selection: MANUAL
+----
+
+Will perform no thread selection and run all operations on the Netty event loop thread. It is then up to the developer to ensure logic that includes blocking I/O is scheduled on another thread by, for example, using RxJava's `subscribeOn(..)` facility or the ann:scheduling.annotation.Async[] annotation (amongst other options).

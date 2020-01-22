@@ -100,6 +100,7 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.BasicObjectRouteMatch;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
@@ -983,11 +984,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         ChannelHandlerContext context = request.getChannelHandlerContext();
         // Select the most appropriate Executor
         ExecutorService executor;
-        if (route instanceof MethodBasedRouteMatch) {
-            executor = executorSelector.select((MethodBasedRouteMatch) route).orElse(context.channel().eventLoop());
-        } else {
-            executor = context.channel().eventLoop();
+        final ThreadSelection threadSelection = serverConfiguration.getThreadSelection();
+        switch (threadSelection) {
+            case MANUAL:
+                executor = context.channel().eventLoop();
+            break;
+            case IO:
+                executor = ioExecutor;
+            break;
+            case AUTO:
+            default:
+                if (route instanceof MethodBasedRouteMatch) {
+                    executor = executorSelector.select((MethodBasedRouteMatch) route).orElse(context.channel().eventLoop());
+                } else {
+                    executor = context.channel().eventLoop();
+                }
+                break;
         }
+
 
         route = route.decorate(finalRoute -> {
             MediaType defaultResponseMediaType = finalRoute

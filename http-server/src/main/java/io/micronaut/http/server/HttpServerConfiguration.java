@@ -22,7 +22,9 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.server.cors.CorsOriginConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.scheduling.executor.ThreadSelection;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.io.File;
@@ -122,6 +124,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
+    private ThreadSelection threadSelection = ThreadSelection.AUTO;
 
     /**
      * Default constructor.
@@ -140,6 +143,23 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         }
 
         this.applicationConfiguration = applicationConfiguration;
+    }
+
+    /**
+     * @return The {@link ThreadSelection} model to use for the server.
+     */
+    public @Nonnull ThreadSelection getThreadSelection() {
+        return threadSelection;
+    }
+
+    /**
+     * Sets the {@link ThreadSelection} model to use for the server.
+     * @param threadSelection The thread selection model
+     */
+    public void setThreadSelection(ThreadSelection threadSelection) {
+        if (threadSelection != null) {
+            this.threadSelection = threadSelection;
+        }
     }
 
     /**
