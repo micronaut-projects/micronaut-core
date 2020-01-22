@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.ports
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
@@ -46,7 +47,8 @@ class ControllerPortSpec extends Specification {
         client2.close()
     }
 
-    @Controller(value = "/custom-port1", port='${my.controller.port}')
+    @Requires(property = "my.controller.port")
+    @Controller(value = "/custom-port1", port='${my.controller.port:9999}')
     static class OneController {
 
         @Get("/")
