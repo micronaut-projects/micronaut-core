@@ -48,7 +48,9 @@ include::{includedir}configurationProperties/io.micronaut.cache.DefaultCacheConf
 
 == Dynamic Cache Creation
 
-For use cases where caches cannot be configured ahead of time, a api:cache.DynamicCacheManager[] bean can be registered. When a cache is attempted to be retrieved that was not predefined, the dynamic cache manager will be invoked to return a cache. By default there is no dynamic cache manager configured, however other cache implementations may do so.
+For use cases where caches cannot be configured ahead of time, a api:cache.DynamicCacheManager[] bean can be registered. When a cache is attempted to be retrieved that was not predefined, the dynamic cache manager will be invoked to return a cache.
+
+By default, if there is no other dynamic cache manager defined in the application, Micronaut registers an instance of api:cache.DefaultDynamicCacheManager[] that will create Caffeine caches with default values.
 
 == Other Cache Implementations
 

@@ -248,7 +248,7 @@ class SyncCacheSpec extends Specification {
         applicationContext.stop()
     }
 
-    void "test exception is thrown if non configured cache is retrieved"() {
+    void "test exception isn't thrown if non configured cache is retrieved"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'micronaut.caches.test.initialCapacity':1,
@@ -260,8 +260,24 @@ class SyncCacheSpec extends Specification {
         cacheManager.getCache("fooBar")
 
         then:
-        def ex = thrown(ConfigurationException)
-        ex.message == "No cache configured for name: fooBar"
+        noExceptionThrown()
+
+        cleanup:
+        applicationContext.stop()
+    }
+
+    void "the dynamic cache manager can be disabled"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'micronaut.cache.dynamic': false
+        )
+        CacheManager cacheManager = applicationContext.getBean(CacheManager)
+
+        when:
+        cacheManager.getCache("test")
+
+        then:
+        thrown(ConfigurationException)
 
         cleanup:
         applicationContext.stop()
