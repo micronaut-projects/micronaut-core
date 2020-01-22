@@ -400,7 +400,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
             return OptionalInt.empty();
         } else {
-            return intValue(annotation.getName(), member);
+            return intValue(annotation.getName(), member, valueMapper);
         }
     }
 
@@ -528,6 +528,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         if (rawValue instanceof Number) {
             return OptionalInt.of(((Number) rawValue).intValue());
+        } else if (rawValue instanceof CharSequence) {
+            try {
+                final int i = Integer.parseInt(rawValue.toString());
+                return OptionalInt.of(i);
+            } catch (NumberFormatException e) {
+                return OptionalInt.empty();
+            }
         }
         return OptionalInt.empty();
     }
