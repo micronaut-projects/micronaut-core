@@ -1,8 +1,8 @@
 dependencies {
-	annotationProcessor project(":inject-java")
+    annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
     compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
-    compileOnly project(":graal")
-    
+
     api project(":http")
     api project(":websocket")
     api project(":buffer-netty")
