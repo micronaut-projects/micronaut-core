@@ -29,6 +29,7 @@ import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -38,6 +39,7 @@ import java.text.SimpleDateFormat
 
 import static io.micronaut.http.HttpResponse.ok
 
+@Retry
 class RefreshEventSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer, [
