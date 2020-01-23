@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.annotation;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -511,6 +512,17 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         if (rawValue instanceof Number) {
             return OptionalLong.of(((Number) rawValue).longValue());
+        } else if (rawValue instanceof CharSequence) {
+            final String str = rawValue.toString();
+            if (StringUtils.isNotEmpty(str)) {
+                try {
+                    final long i = Long.parseLong(str);
+                    return OptionalLong.of(i);
+                } catch (NumberFormatException e) {
+                    throw new ConfigurationException("Invalid value [" + str + "] of [" + member + "] of annotation [" + annotation + "]: " + e.getMessage(), e);
+                }
+            }
+
         }
         return OptionalLong.empty();
     }
@@ -529,12 +541,16 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (rawValue instanceof Number) {
             return OptionalInt.of(((Number) rawValue).intValue());
         } else if (rawValue instanceof CharSequence) {
-            try {
-                final int i = Integer.parseInt(rawValue.toString());
-                return OptionalInt.of(i);
-            } catch (NumberFormatException e) {
-                return OptionalInt.empty();
+            final String str = rawValue.toString();
+            if (StringUtils.isNotEmpty(str)) {
+                try {
+                    final int i = Integer.parseInt(str);
+                    return OptionalInt.of(i);
+                } catch (NumberFormatException e) {
+                    throw new ConfigurationException("Invalid value [" + str + "] of [" + member + "] of annotation [" + annotation + "]: " + e.getMessage(), e);
+                }
             }
+
         }
         return OptionalInt.empty();
     }
@@ -741,6 +757,17 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         if (rawValue instanceof Number) {
             return OptionalDouble.of(((Number) rawValue).doubleValue());
+        } else if (rawValue instanceof CharSequence) {
+            final String str = rawValue.toString();
+            if (StringUtils.isNotEmpty(str)) {
+                try {
+                    final double i = Double.parseDouble(str);
+                    return OptionalDouble.of(i);
+                } catch (NumberFormatException e) {
+                    throw new ConfigurationException("Invalid value [" + str + "] of member [" + member + "] of annotation [" + annotation + "]: " + e.getMessage(), e);
+                }
+            }
+
         }
         return OptionalDouble.empty();
     }
