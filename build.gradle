@@ -263,6 +263,11 @@ ext {
                     name   : 'junit-jupiter-api',
                     modules: ['junit-jupiter-engine', 'junit-jupiter-params']
             ],
+            'micronaut.xml':[
+                version:micronautXmlVersion,
+                group:'io.micronaut.xml',
+                name:'micronaut-jackson-xml'
+            ],
             'micronaut.micrometer': [
                     version:micronautMicrometerVersion,
                     group:'io.micronaut.configuration',
