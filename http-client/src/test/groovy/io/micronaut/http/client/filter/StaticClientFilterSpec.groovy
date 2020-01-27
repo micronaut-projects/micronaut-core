@@ -13,10 +13,12 @@ import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
+import spock.lang.Retry
 import spock.lang.Specification
 
 class StaticClientFilterSpec extends Specification {
 
+    @Retry // can fail on CI due to port binding race condition, so retry
     void "test only the correct filter applies"() {
         def server = ApplicationContext.run(EmbeddedServer,
         ['spec.name': StaticClientFilterSpec.simpleName,
