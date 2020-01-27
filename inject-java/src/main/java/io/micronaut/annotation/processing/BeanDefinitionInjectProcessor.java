@@ -762,10 +762,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
 
-            AnnotationMetadata methodAnnotationMetadata = new AnnotationMetadataHierarchy(
-                    concreteClassMetadata,
-                    annotationUtils.getAnnotationMetadata(method)
-            );
+            final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
+
+            AnnotationMetadata methodAnnotationMetadata;
+
+            if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+                methodAnnotationMetadata = annotationMetadata;
+            } else {
+
+                methodAnnotationMetadata = new AnnotationMetadataHierarchy(
+                        concreteClassMetadata,
+                        annotationMetadata
+                );
+            }
 
             TypeKind returnKind = method.getReturnType().getKind();
             if ((returnKind == TypeKind.ERROR) && !processingOver) {
