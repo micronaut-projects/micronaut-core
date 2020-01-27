@@ -1,8 +1,8 @@
 Micronaut {version} includes the following changes:
 
-=== Support for GraalVM 19.3.0
+=== Support for GraalVM 19.3.1
 
-Micronaut now supports creating native-images using GraalVM 19.3.0 for both JDK 8 and JDK 11.
+Micronaut now supports creating native-images using GraalVM 19.3.1 for both JDK 8 and JDK 11.
 
 === Startup and Memory Usage Optimizations
 
