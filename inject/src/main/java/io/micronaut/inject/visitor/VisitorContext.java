@@ -26,6 +26,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.net.URL;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -129,5 +130,15 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      */
     default @Nonnull ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
         return new ClassElement[0];
+    }
+
+    /**
+     * The annotation processor environment custom options.
+     * @return A Map with annotation processor runtime options
+     * @see javax.annotation.processing.ProcessingEnvironment#getOptions()
+     */
+    @Experimental
+    default Map<String, String> getOptions() {
+        return Collections.emptyMap();
     }
 }

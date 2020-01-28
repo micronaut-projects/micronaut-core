@@ -67,7 +67,7 @@ public class JavaVisitorContext implements VisitorContext {
     private final AnnotationProcessingOutputVisitor outputVisitor;
     private final MutableConvertibleValues<Object> visitorAttributes;
     private final GenericUtils genericUtils;
-    private final ProcessingEnvironment proccessingEnv;
+    private final ProcessingEnvironment processingEnv;
     private @Nullable JavaFileManager standardFileManager;
 
     /**
@@ -100,7 +100,7 @@ public class JavaVisitorContext implements VisitorContext {
         this.genericUtils = genericUtils;
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.visitorAttributes = visitorAttributes;
-        this.proccessingEnv = processingEnv;
+        this.processingEnv = processingEnv;
     }
 
     @Nonnull
@@ -109,7 +109,7 @@ public class JavaVisitorContext implements VisitorContext {
         // reflective hack required because no way to get the JavaFileManager
         // from public processor API
         info("EXPERIMENTAL: Compile time resource scanning is experimental", null);
-        JavaFileManager standardFileManager = getStandardFileManager(proccessingEnv).orElse(null);
+        JavaFileManager standardFileManager = getStandardFileManager(processingEnv).orElse(null);
         if (standardFileManager != null) {
             try {
                 final ClassLoader classLoader = standardFileManager
@@ -257,6 +257,14 @@ public class JavaVisitorContext implements VisitorContext {
      */
     public GenericUtils getGenericUtils() {
         return genericUtils;
+    }
+
+    @Override
+    public Map<String, String> getOptions() {
+        Map<String, String> processorOptions = Optional.ofNullable(processingEnv)
+                .map(ProcessingEnvironment::getOptions)
+                .orElse(Collections.emptyMap());
+        return processorOptions;
     }
 
     @Override

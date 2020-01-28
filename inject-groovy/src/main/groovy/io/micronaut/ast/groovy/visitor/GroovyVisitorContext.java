@@ -248,6 +248,11 @@ public class GroovyVisitorContext implements VisitorContext {
         return sourceUnit;
     }
 
+    @Override
+    public Map<String, String> getOptions() {
+        return Collections.emptyMap();
+    }
+
     private SyntaxErrorMessage buildErrorMessage(String message, Element element) {
         ASTNode expr = (ASTNode) element.getNativeType();
         return new SyntaxErrorMessage(
