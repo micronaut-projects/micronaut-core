@@ -25,7 +25,7 @@ env:
 install: "/bin/true"
 script: ./travis-build.sh
 after_deploy:
-- "./gradlew sdkMinorRelease --no-daemon"
+- "./gradlew sdkMajorRelease --no-daemon"
 deploy:
   provider: releases
   api_key:
