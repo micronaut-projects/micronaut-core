@@ -89,8 +89,8 @@ public class RxJavaHealthAggregator implements HealthAggregator<HealthResult> {
     protected HealthStatus calculateOverallStatus(List<HealthResult> results) {
         return results.stream()
             .map(HealthResult::getStatus)
-            .distinct()
             .sorted()
+            .distinct()
             .reduce((a, b) -> b)
             .orElse(HealthStatus.UNKNOWN);
     }
