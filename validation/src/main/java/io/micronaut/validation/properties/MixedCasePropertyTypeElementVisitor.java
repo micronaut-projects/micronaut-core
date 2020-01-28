@@ -31,6 +31,7 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
+import javax.annotation.processing.SupportedOptions;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -42,9 +43,11 @@ import java.util.Set;
  * @since 1.1.0
  * @deprecated No replacement because mixed case keys can now be resolved
  */
+@SupportedOptions(MixedCasePropertyTypeElementVisitor.VALIDATION_OPTION)
 @Deprecated
 public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<Object, Object> {
 
+    static final String VALIDATION_OPTION = "micronaut.configuration.validation";
     private boolean skipValidation = false;
     private final DefaultPropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(new PropertySourcePropertyResolver(), new DefaultConversionService());
 
@@ -72,7 +75,7 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
 
     @Override
     public void start(VisitorContext visitorContext) {
-        String prop = System.getProperty("micronaut.configuration.validation");
+        String prop = visitorContext.getOptions().getOrDefault(VALIDATION_OPTION, "true");
         skipValidation = prop != null && prop.equals("false");
     }
 
