@@ -45,7 +45,7 @@ dependencies {
     testImplementation dependencyVersion("jaeger")
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     // tag::testcontainers-dependencies[]
-    testImplementation "org.testcontainers:spock:1.12.4"
+    testImplementation "org.testcontainers:spock:1.12.5"
     // end::testcontainers-dependencies[]
     testImplementation 'org.awaitility:awaitility:4.0.2'
 
