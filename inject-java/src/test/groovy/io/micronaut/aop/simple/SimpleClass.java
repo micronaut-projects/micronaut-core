@@ -188,4 +188,9 @@ public class SimpleClass<A extends CharSequence> {
     A testGenericsFromType(A name, int age) {
         return (A) ("Name is " + name);
     }
+
+    @Invalid
+    void invalidInterceptor() {
+
+    }
 }
