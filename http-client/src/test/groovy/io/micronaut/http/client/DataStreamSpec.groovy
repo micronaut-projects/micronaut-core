@@ -146,8 +146,9 @@ class DataStreamSpec extends Specification {
 
         cleanup:
         client.stop()
-
     }
+
+
     @Controller("/datastream/books")
     static class BookController {
 
