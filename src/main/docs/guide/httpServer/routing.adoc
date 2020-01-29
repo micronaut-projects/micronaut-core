@@ -147,14 +147,7 @@ TIP: Unfortunately due to type erasure a Java method lambda reference cannot be 
 
 Micronaut supports validating route arguments at compile time with the validation library. To get started simply add the `validation` dependency to your build:
 
-[source.multi-language-sample,gradle-groovy,title="Validation Dependencies"]
-----
-annotationProcessor "io.micronaut:micronaut-validation" // To support Java source files only
-kapt "io.micronaut:micronaut-validation" // To support Kotlin sources files only
-compile "io.micronaut:micronaut-validation" // Needed for all three supported source languages
-----
-
-[source.multi-language-sample,gradle-kotlin]
+[source.multi-language-sample,gradle,title="Validation Dependencies"]
 ----
 annotationProcessor("io.micronaut:micronaut-validation") // To support Java source files only
 kapt("io.micronaut:micronaut-validation") // To support Kotlin sources files only

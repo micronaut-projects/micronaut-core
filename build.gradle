@@ -1,6 +1,7 @@
 buildscript {
     repositories {
         maven { url "https://repo.grails.org/grails/core" }
+        // mavenLocal() // Useful when utilizing local builds of subprojects, like micronaut-docs
     }
     dependencies {
         classpath "org.grails:grails-docs:$grailsVersion"
@@ -30,6 +31,7 @@ apply plugin: 'org.aim42.htmlSanityCheck'
 repositories {
     maven { url "https://repo.grails.org/grails/core" }
     //maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
+    // mavenLocal() // Useful when utilizing local builds of subprojects, like micronaut-docs
 }
 
 version project.projectVersion
@@ -608,6 +610,7 @@ subprojects { Project subproject ->
 
     repositories {
         maven { url "https://repo.grails.org/grails/core" }
+        // mavenLocal() // Useful when utilizing local builds of subprojects, like micronaut-docs
     }
 
     if (!subproject.name.contains("bom")) {

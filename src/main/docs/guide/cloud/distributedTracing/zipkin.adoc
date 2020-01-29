@@ -25,14 +25,7 @@ $ mn create-app my-app --features tracing-zipkin
 
 To send tracing spans to Zipkin the minimal configuration requires you add the following dependencies to `build.gradle` or `pom.xml`:
 
-[source.multi-language-sample,gradle-groovy,title="Adding Zipkin Dependencies"]
-----
-runtime 'io.zipkin.brave:brave-instrumentation-http'
-runtime 'io.zipkin.reporter2:zipkin-reporter'
-compile 'io.opentracing.brave:brave-opentracing'
-----
-
-[source.multi-language-sample,gradle-kotlin]
+[source.multi-language-sample,gradle,title="Adding Zipkin Dependencies"]
 ----
 runtime("io.zipkin.brave:brave-instrumentation-http")
 runtime("io.zipkin.reporter2:zipkin-reporter")

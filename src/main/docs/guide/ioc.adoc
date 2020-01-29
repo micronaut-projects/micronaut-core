@@ -22,13 +22,12 @@ plugins {
   id "net.ltgt.apt" version "0.18" // <1>
 }
 
-...
+// ...
 dependencies {
     annotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <2>
     compile "io.micronaut:micronaut-inject:{version}"
-    ...
+
     testAnnotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <3>
-    ...
 }
 
 ----
@@ -43,9 +42,8 @@ plugins {
 dependencies {
     kapt("io.micronaut:micronaut-inject-java:{version}") // <2>
     compile("io.micronaut:micronaut-inject:{version}")
-    ...
+
     kaptTest("io.micronaut:micronaut-inject-java:{version}") // <3>
-    ...
 }
 
 ----

@@ -27,8 +27,7 @@ You can deploy your function to AWS Lambda manually by building and uploading an
 
 The https://plugins.gradle.org/plugin/com.github.johnrengelman.shadow[Gradle Shadow] plugin provides a `shadowJar` task to generate a self-contained executable JAR file, which is suitable for AWS Lambda deployments.
 
-.Example build.gradle
-[source,groovy]
+[source.multi-language-sample,gradle-groovy,title="Example gradle file"]
 ----
 buildscript {
     repositories {
@@ -36,7 +35,7 @@ buildscript {
     }
     dependencies {
         classpath "com.github.jengelman.gradle.plugins:shadow:2.0.4"
-...
+        // ...
     }
 }
 
@@ -46,6 +45,25 @@ shadowJar {
     mergeServiceFiles()
 }
 
+----
+
+[source.multi-language-sample,gradle-kotlin]
+----
+buildscript {
+    repositories {
+        maven("https://plugins.gradle.org/m2/") //<1>
+    }
+    dependencies {
+        classpath("com.github.jengelman.gradle.plugins:shadow:2.0.4")
+        // ...
+    }
+}
+
+apply plugin = "com.github.johnrengelman.shadow"
+
+shadowJar {
+    mergeServiceFiles()
+}
 ----
 <1> The Gradle Shadow plugin is hosted in the `http://plugins.gradle.org` repository
 
@@ -106,7 +124,7 @@ $ ./mvnw package
 For Gradle projects, deployment can be made even more straightforward using the https://github.com/classmethod/gradle-aws-plugin[Gradle AWS Plugin]. This plugin provides a `deploy` task which can push your function to AWS Lambda directly, as well as a `AWSLambdaInvokeTask` which can be used to invoke your function when it is deployed.
 
 .Example build.gradle
-[source,groovy]
+[source.multi-language-sample,gradle-groovy,title="Example gradle file]
 ----
 import com.amazonaws.services.lambda.model.InvocationType
 import jp.classmethod.aws.gradle.lambda.AWSLambdaInvokeTask
@@ -142,6 +160,47 @@ task invoke(type: AWSLambdaInvokeTask) {
     payload = '{"name":"Fred"}'
     doLast {
         println "Lambda function result: " + new String(invokeResult.payload.array(), "UTF-8")
+    }
+}
+----
+
+[source.multi-language-sample,gradle-kotlin]
+----
+import com.amazonaws.services.lambda.model.InvocationType
+import jp.classmethod.aws.gradle.lambda.AWSLambdaInvokeTask
+import jp.classmethod.aws.gradle.lambda.AWSLambdaMigrateFunctionTask
+import com.amazonaws.services.lambda.model.Runtime
+
+buildscript {
+    repositories {
+        ...
+        maven("https://plugins.gradle.org/m2/") //<1>
+    }
+    dependencies {
+        classpath("jp.classmethod.aws:gradle-aws-plugin:0.22")
+    }
+}
+
+apply(plugin = "jp.classmethod.aws.lambda") //<2>
+
+// ...
+tasks.register<AWSLambdaMigrateFunctionTask>("deploy") {
+    dependsOn = shadowJar
+    functionName = "hello-world"
+    handler = "example.HelloWorldFunction::hello"
+    role = "arn:aws:iam::${aws.accountId}:role/lambda_basic_execution" //<3>
+    runtime = Runtime.Java8
+    zipFile = shadowJar.archivePath
+    memorySize = 256
+    timeout = 60
+}
+
+tasks.register<AWSLambdaInvokeTask>("invoke") {
+    functionName = "hello-world"
+    invocationType = InvocationType.RequestResponse
+    payload = "{"name" ="Fred"}"
+    doLast {
+        println "Lambda function result = " + new String(invokeResult.payload.array(), "UTF-8")
     }
 }
 ----

@@ -12,16 +12,7 @@ TIP: Learn more about kapt and its features from the https://kotlinlang.org/docs
 
 The Micronaut annotation processors are declared in the `kapt` scope when using Gradle. For example:
 
-[source.multi-language-sample,gradle-groovy,title="Required Dependencies"]
-----
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion" //<1>
-    compile "org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion"
-    kapt "io.micronaut:micronaut-inject-java" //<2>
-
-    kaptTest "io.micronaut:micronaut-inject-java" //<3>
-----
-
-[source.multi-language-sample,gradle-kotlin]
+[source.multi-language-sample,gradle,title="Required Dependencies"]
 ----
     compile("org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion") //<1>
     compile("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")

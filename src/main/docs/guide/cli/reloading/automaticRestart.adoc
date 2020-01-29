@@ -41,11 +41,11 @@ configurations {
     developmentOnly
 }
 dependencies {
-    // Automatically added with the 'file-watch' feature in the CLi
-    developmentOnly "io.micronaut:micronaut-runtime-osx"
+    // Automatically added with the 'file-watch' feature in the CLI
+    developmentOnly("io.micronaut:micronaut-runtime-osx")
     ...
-    developmentOnly "net.java.dev.jna:jna"
-    developmentOnly "io.methvin:directory-watcher"
+    developmentOnly("net.java.dev.jna:jna")
+    developmentOnly("io.methvin:directory-watcher")
 
 }
 run.classpath += configurations.developmentOnly

@@ -8,9 +8,8 @@ dependency:micronaut-function-groovy[]
 
 You can now create your function as a Groovy script, under `src/main/groovy`. You will set your project's *main* class property to this function (instead of `FunctionApplication` as in Java/Kotlin). For example:
 
-
 .Example build.gradle
-[source,groovy]
+[source,gradle]
 ----
 mainClassName = "example.HelloGroovyFunction"
 ----

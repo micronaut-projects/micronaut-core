@@ -1,7 +1,6 @@
 To execute your function as a CLI application with `java -jar`, you will need to package your application as an executable JAR file. For example, in `build.gradle`:
 
-.build.gradle
-[source,groovy]
+[source.multi-language-sample,gradle-groovy,title="Sample gradle snippet"]
 ----
 buildscript {
     repositories {
@@ -9,16 +8,34 @@ buildscript {
     }
     dependencies {
         classpath "com.github.jengelman.gradle.plugins:shadow:2.0.4"
-...
+        // ...
     }
 }
 
-apply plugin:"com.github.johnrengelman.shadow"
+apply plugin: "com.github.johnrengelman.shadow"
 
 shadowJar {
     mergeServiceFiles()
 }
+----
 
+[source.multi-language-sample,gradle-kotlin]
+----
+buildscript {
+    repositories {
+        maven("https://plugins.gradle.org/m2/") //<1>
+    }
+    dependencies {
+        classpath("com.github.jengelman.gradle.plugins:shadow:2.0.4")
+        // ...
+    }
+}
+
+apply plugin = "com.github.johnrengelman.shadow"
+
+shadowJar {
+    mergeServiceFiles()
+}
 ----
 <1> The Gradle Shadow plugin is hosted in the `http://plugins.gradle.org` repository
 

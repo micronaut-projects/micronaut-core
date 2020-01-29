@@ -29,21 +29,7 @@ Since both Micronaut and Lombok use annotation processors, special care needs to
 For example in Gradle adding the following dependencies to the `dependencies` block:
 
 
-[source,groovy]
-----
-
-----
-
-[source.multi-language-sample,gradle-groovy,title="Configuring Lombok in build file"]
-----
-compileOnly 'org.projectlombok:lombok:1.16.20'
-annotationProcessor "org.projectlombok:lombok:1.16.20" // or kapt for kotlin sources
-// Micronaut processor must be defined *after* Lombok
-annotationProcessor "io.micronaut:micronaut-inject-java" // for java sources
-kapt "io.micronaut:micronaut-inject-java" // for kotlin sources
-----
-
-[source.multi-language-sample,gradle-kotlin]
+[source.multi-language-sample,gradle,title="Configuring Lombok in build file"]
 ----
 compileOnly("org.projectlombok:lombok:1.16.20")
 annotationProcessor("org.projectlombok:lombok:1.16.20") // or kapt for kotlin sources
