@@ -36,6 +36,8 @@ class SimpleRetryInstanceSpec extends Specification {
                 Duration.of(1, ChronoUnit.SECONDS),
                 null,
                 CollectionUtils.setOf(DiscoveryException.class),
+                Collections.emptySet(),
+                Collections.emptySet(),
                 Collections.emptySet()
         )
         RuntimeException r = new RuntimeException("bad")
@@ -43,6 +45,45 @@ class SimpleRetryInstanceSpec extends Specification {
         expect:
         !simpleRetry.canRetry(r)
         simpleRetry.canRetry(new DiscoveryException("something"))
+    }
+
+    void "test retry context includesAllOf"() {
+        given:
+        SimpleRetry simpleRetry = new SimpleRetry(
+                3,
+                2,
+                Duration.of(1, ChronoUnit.SECONDS),
+                null,
+                Collections.emptySet(),
+                Collections.emptySet(),
+                CollectionUtils.setOf(MyCustomBaseException.class),
+                Collections.emptySet()
+        )
+        RuntimeException r = new RuntimeException("bad")
+
+        expect:
+        !simpleRetry.canRetry(r)
+        simpleRetry.canRetry(new MyCustomChildException())
+    }
+
+    void "test retry context includes with includesAllOf"() {
+        given:
+        SimpleRetry simpleRetry = new SimpleRetry(
+                3,
+                2,
+                Duration.of(1, ChronoUnit.SECONDS),
+                null,
+                CollectionUtils.setOf(MyCustomException.class),
+                Collections.emptySet(),
+                CollectionUtils.setOf(MyCustomBaseException.class),
+                Collections.emptySet()
+        )
+        RuntimeException r = new RuntimeException("bad")
+
+        expect:
+        !simpleRetry.canRetry(r)
+        simpleRetry.canRetry(new MyCustomException())
+        simpleRetry.canRetry(new MyCustomChildException())
     }
 
     void "test retry context excludes"() {
@@ -53,7 +94,9 @@ class SimpleRetryInstanceSpec extends Specification {
                 Duration.of(1, ChronoUnit.SECONDS),
                 null,
                 Collections.emptySet(),
-                CollectionUtils.setOf(DiscoveryException.class)
+                CollectionUtils.setOf(DiscoveryException.class),
+                Collections.emptySet(),
+                Collections.emptySet()
         )
         RuntimeException r = new RuntimeException("bad")
 
@@ -61,6 +104,46 @@ class SimpleRetryInstanceSpec extends Specification {
         retryContext.canRetry(r)
         !retryContext.canRetry(new DiscoveryException("something"))
     }
+
+    void "test retry context excludesAllOf"() {
+        given:
+        SimpleRetry retryContext = new SimpleRetry(
+                3,
+                2,
+                Duration.of(1, ChronoUnit.SECONDS),
+                null,
+                Collections.emptySet(),
+                Collections.emptySet(),
+                Collections.emptySet(),
+                CollectionUtils.setOf(MyCustomBaseException.class)
+        )
+        RuntimeException r = new RuntimeException("bad")
+
+        expect:
+        retryContext.canRetry(r)
+        !retryContext.canRetry(new MyCustomChildException())
+    }
+
+    void "test retry context excludes with excludesAllOf"() {
+        given:
+        SimpleRetry retryContext = new SimpleRetry(
+                3,
+                2,
+                Duration.of(1, ChronoUnit.SECONDS),
+                null,
+                Collections.emptySet(),
+                CollectionUtils.setOf(MyCustomException.class),
+                Collections.emptySet(),
+                CollectionUtils.setOf(MyCustomBaseException.class)
+        )
+        RuntimeException r = new RuntimeException("bad")
+
+        expect:
+        retryContext.canRetry(r)
+        !retryContext.canRetry(new MyCustomException())
+        !retryContext.canRetry(new MyCustomChildException())
+    }
+
     void "test retry context next delay is exponential"() {
 
         given:

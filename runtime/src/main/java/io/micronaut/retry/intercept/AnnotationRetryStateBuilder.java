@@ -40,6 +40,8 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private static final String MAX_DELAY = "maxDelay";
     private static final String INCLUDES = "includes";
     private static final String EXCLUDES = "excludes";
+    private static final String INCLUDES_ALL_OF = "includesAllOf";
+    private static final String EXCLUDES_ALL_OF = "excludesAllOf";
     private static final int DEFAULT_RETRY_ATTEMPTS = 3;
 
     private final AnnotationMetadata annotationMetadata;
@@ -61,6 +63,8 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
         Duration delay = retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1));
         Set<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);
         Set<Class<? extends Throwable>> excludes = resolveIncludes(retry, EXCLUDES);
+        Set<Class<? extends Throwable>> includesAllOf = resolveIncludes(retry, INCLUDES_ALL_OF);
+        Set<Class<? extends Throwable>> excludesAllOf = resolveIncludes(retry, EXCLUDES_ALL_OF);
 
         return new SimpleRetry(
             attempts,
@@ -68,7 +72,9 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
             delay,
             retry.get(MAX_DELAY, Duration.class).orElse(null),
             includes,
-            excludes
+            excludes,
+            includesAllOf,
+            excludesAllOf
         );
     }
 

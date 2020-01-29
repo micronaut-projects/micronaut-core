@@ -51,10 +51,22 @@ public @interface CircuitBreaker {
     Class<? extends Throwable>[] includes() default {};
 
     /**
+     * @return The base exception types to include
+     */
+    @AliasFor(annotation = Retryable.class, member = "includesAllOf")
+    Class<? extends Throwable>[] includesAllOf() default {};
+
+    /**
      * @return The exception types to exclude (defaults to none)
      */
     @AliasFor(annotation = Retryable.class, member = "excludes")
     Class<? extends Throwable>[] excludes() default {};
+
+    /**
+     * @return The base exception types to exclude
+     */
+    @AliasFor(annotation = Retryable.class, member = "excludesAllOf")
+    Class<? extends Throwable>[] excludesAllOf() default {};
 
     /**
      * @return The maximum number of retry attempts

@@ -55,9 +55,19 @@ public @interface Retryable {
     Class<? extends Throwable>[] includes() default {};
 
     /**
+     * @return The base exception types to include
+     */
+    Class<? extends Throwable>[] includesAllOf() default {};
+
+    /**
      * @return The exception types to exclude (defaults to none)
      */
     Class<? extends Throwable>[] excludes() default {};
+
+    /**
+     * @return The base exception types to exclude
+     */
+    Class<? extends Throwable>[] excludesAllOf() default {};
 
     /**
      * @return The maximum number of retry attempts

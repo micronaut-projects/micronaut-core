@@ -22,6 +22,7 @@ import io.micronaut.retry.event.RetryEventListener
 import io.reactivex.Single
 import reactor.core.publisher.Mono
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import javax.inject.Singleton
 import java.util.concurrent.CompletableFuture
@@ -175,22 +176,59 @@ class SimpleRetrySpec extends Specification {
         context.stop()
     }
 
-    void "test retry with includes"() {
+    @Unroll
+    void "test retry inclusive exception filtering  with #name"() {
         given:
         ApplicationContext context = ApplicationContext.run()
         CounterService counterService = context.getBean(CounterService)
 
         when:
-        counterService.getCountIncludes(true)
+        callGetCount(counterService, CountMode.THROW_ILLEGAL_STATE)
 
-        then: "retry didn't kick in because the exception thrown doesn't match includes"
+        then: "retry didn't kick in because the exception thrown doesn't match $name"
         thrown(IllegalStateException)
         counterService.countIncludes == 1
 
         when:
-        counterService.getCountIncludes(false)
+        callGetCount(counterService, mode)
+
+        then: "retry kicks in because the exception thrown matches $name"
+        noExceptionThrown()
+        counterService.countIncludes == counterService.countThreshold
+
+        cleanup:
+        context.stop()
+
+        where:
+        name            | mode                  | callGetCount
+        "includes"      | CountMode.DEFAULT     | { service, mode -> service.getCountIncludes(mode) }
+        "includesAllOf" | CountMode.THROW_CHILD | { service, mode -> service.getCountIncludesAllOf(mode) }
+    }
+
+    void "test retry inclusive exception filtering with includes and includesAllOf"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountIncludesWithIncludesAllOf(CountMode.THROW_ILLEGAL_STATE)
+
+        then: "retry didn't kick in because the exception thrown doesn't match includes nor includesAllOf"
+        thrown(IllegalStateException)
+        counterService.countIncludes == 1
+
+        when:
+        counterService.getCountIncludesWithIncludesAllOf(CountMode.DEFAULT)
 
         then: "retry kicks in because the exception thrown matches includes"
+        noExceptionThrown()
+        counterService.countIncludes == counterService.countThreshold
+
+        when:
+        counterService.countIncludes = 0
+        counterService.getCountIncludesWithIncludesAllOf(CountMode.THROW_CHILD)
+
+        then: "retry kicks in because the exception thrown matches includesAllOf"
         noExceptionThrown()
         counterService.countIncludes == counterService.countThreshold
 
@@ -198,22 +236,58 @@ class SimpleRetrySpec extends Specification {
         context.stop()
     }
 
-    void "test retry with excludes"() {
+    @Unroll
+    void "test retry exclusive exception filtering with #name"() {
         given:
         ApplicationContext context = ApplicationContext.run()
         CounterService counterService = context.getBean(CounterService)
 
         when:
-        counterService.getCountExcludes(false)
+        callGetCount(counterService, mode)
+
+        then: "retry didn't kick in because the exception thrown matches $name"
+        thrown(expectedException)
+        counterService.countExcludes == 1
+
+        when:
+        callGetCount(counterService, CountMode.THROW_ILLEGAL_STATE)
+
+        then: "retry kicks in because the exception thrown doesn't match $name"
+        noExceptionThrown()
+        counterService.countExcludes == counterService.countThreshold
+
+        cleanup:
+        context.stop()
+
+        where:
+        name            | mode                  | expectedException      | callGetCount
+        "excludes"      | CountMode.DEFAULT     | MyCustomException      | { service, mode -> service.getCountExcludes(mode) }
+        "excludesAllOf" | CountMode.THROW_CHILD | MyCustomChildException | { service, mode -> service.getCountExcludesAllOf(mode) }
+    }
+
+    void "test retry exclusive exception filtering with excludes and excludesAllOf"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountExcludesWithExcludesAllOf(CountMode.DEFAULT)
 
         then: "retry didn't kick in because the exception thrown matches excludes"
         thrown(MyCustomException)
         counterService.countExcludes == 1
 
         when:
-        counterService.getCountExcludes(true)
+        counterService.getCountExcludesWithExcludesAllOf(CountMode.THROW_CHILD)
 
-        then: "retry kicks in because the exception thrown doesn't match excludes"
+        then: "retry didn't kick in because the exception thrown matches excludesAllOf"
+        thrown(MyCustomChildException)
+        counterService.countExcludes == 2
+
+        when:
+        counterService.getCountExcludesWithExcludesAllOf(CountMode.THROW_ILLEGAL_STATE)
+
+        then: "retry kicks in because the exception thrown doesn't match excludes nor excludesAllOf"
         noExceptionThrown()
         counterService.countExcludes == counterService.countThreshold
 
@@ -234,6 +308,13 @@ class SimpleRetrySpec extends Specification {
             events.add(event)
         }
     }
+
+    static enum CountMode {
+        THROW_ILLEGAL_STATE,
+        THROW_CHILD,
+        DEFAULT
+    }
+
     @Singleton
     static class CounterService {
         int count = 0
@@ -277,10 +358,10 @@ class SimpleRetrySpec extends Specification {
         }
 
         @Retryable(attempts = '5', delay = '5ms', includes = MyCustomException.class)
-        Integer getCountIncludes(boolean illegalState) {
+        Integer getCountIncludes(CountMode mode) {
             countIncludes++
             if(countIncludes < countThreshold) {
-                if (illegalState) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
                     throw new IllegalStateException("Bad count")
                 } else {
                     throw new MyCustomException()
@@ -289,12 +370,68 @@ class SimpleRetrySpec extends Specification {
             return countIncludes
         }
 
+        @Retryable(attempts = '5', delay = '5ms', includesAllOf = MyCustomBaseException.class)
+        Integer getCountIncludesAllOf(CountMode mode) {
+            countIncludes++
+            if(countIncludes < countThreshold) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
+                    throw new IllegalStateException("Bad count")
+                } else {
+                    throw new MyCustomChildException()
+                }
+            }
+            return countIncludes
+        }
+
+        @Retryable(attempts = '5', delay = '5ms', includes = MyCustomException.class, includesAllOf = MyCustomBaseException.class)
+        Integer getCountIncludesWithIncludesAllOf(CountMode mode) {
+            countIncludes++
+            if(countIncludes < countThreshold) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
+                    throw new IllegalStateException("Bad count")
+                } else if (mode == CountMode.THROW_CHILD) {
+                    throw new MyCustomChildException()
+                } else {
+                    throw new MyCustomException()
+                }
+            }
+            return countIncludes
+        }
+
         @Retryable(attempts = '5', delay = '5ms', excludes = MyCustomException.class)
-        Integer getCountExcludes(boolean illegalState) {
+        Integer getCountExcludes(CountMode mode) {
             countExcludes++
             if(countExcludes < countThreshold) {
-                if (illegalState) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
                     throw new IllegalStateException("Bad count")
+                } else {
+                    throw new MyCustomException()
+                }
+            }
+            return countExcludes
+        }
+
+        @Retryable(attempts = '5', delay = '5ms', excludesAllOf = MyCustomBaseException.class)
+        Integer getCountExcludesAllOf(CountMode mode) {
+            countExcludes++
+            if(countExcludes < countThreshold) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
+                    throw new IllegalStateException("Bad count")
+                } else {
+                    throw new MyCustomChildException()
+                }
+            }
+            return countExcludes
+        }
+
+        @Retryable(attempts = '5', delay = '5ms', excludes = MyCustomException.class, excludesAllOf = MyCustomBaseException.class)
+        Integer getCountExcludesWithExcludesAllOf(CountMode mode) {
+            countExcludes++
+            if(countExcludes < countThreshold) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
+                    throw new IllegalStateException("Bad count")
+                } else if (mode == CountMode.THROW_CHILD) {
+                    throw new MyCustomChildException()
                 } else {
                     throw new MyCustomException()
                 }

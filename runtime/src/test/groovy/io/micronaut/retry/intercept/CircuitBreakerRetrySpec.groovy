@@ -20,6 +20,7 @@ import io.micronaut.retry.CircuitState
 import io.micronaut.retry.annotation.CircuitBreaker
 import io.reactivex.Single
 import spock.lang.Specification
+import spock.lang.Unroll
 import spock.util.concurrent.PollingConditions
 
 import javax.inject.Singleton
@@ -109,13 +110,14 @@ class CircuitBreakerRetrySpec extends Specification {
 
     }
 
-    void "test circuit breaker with includes"() {
+    @Unroll
+    void "test circuit breaker inclusive exception filtering with #name"() {
         given:
         ApplicationContext context = ApplicationContext.run()
         CounterService counterService = context.getBean(CounterService)
 
         when:
-        counterService.getCountIncludes(false)
+        callGetCount(counterService, mode)
 
         then: "the circuit is open so the original exception is thrown"
         noExceptionThrown()
@@ -123,14 +125,14 @@ class CircuitBreakerRetrySpec extends Specification {
 
         when:
         counterService.countIncludes = 0
-        counterService.getCountIncludes(true)
+        callGetCount(counterService, CountMode.THROW_ILLEGAL_STATE)
 
         then: "retry didn't kick in because the exception thrown doesn't match includes"
         thrown(IllegalStateException)
         counterService.countIncludes == 1
 
         when:
-        counterService.getCountIncludes(false)
+        callGetCount(counterService, mode)
 
         then: "the circuit is open so the original exception is thrown"
         thrown(IllegalStateException)
@@ -138,15 +140,23 @@ class CircuitBreakerRetrySpec extends Specification {
 
         cleanup:
         context.stop()
+
+        where:
+        name                                                | mode                  | callGetCount
+        "includes"                                          | CountMode.DEFAULT     | { service, mode -> service.getCountIncludes(mode) }
+        "includesAllOf"                                     | CountMode.THROW_CHILD | { service, mode -> service.getCountIncludesAllOf(mode) }
+        "includes and includesAllOf using simple exception" | CountMode.DEFAULT     | { service, mode -> service.getCountIncludesWithIncludesAllOf(mode) }
+        "includes and includesAllOf using child exception"  | CountMode.THROW_CHILD | { service, mode -> service.getCountIncludesWithIncludesAllOf(mode) }
     }
 
-    void "test circuit breaker with excludes"() {
+    @Unroll
+    void "test circuit breaker exclusive exception filtering with #name"() {
         given:
         ApplicationContext context = ApplicationContext.run()
         CounterService counterService = context.getBean(CounterService)
 
         when:
-        counterService.getCountExcludes(true)
+        callGetCount(counterService, CountMode.THROW_ILLEGAL_STATE)
 
         then: "retry kicks in because the exception thrown doesn't match excludes"
         noExceptionThrown()
@@ -154,21 +164,28 @@ class CircuitBreakerRetrySpec extends Specification {
 
         when:
         counterService.countExcludes = 0
-        counterService.getCountExcludes(false)
+        callGetCount(counterService, mode)
 
         then: "retry didn't kick in because the exception thrown matches excludes"
-        thrown(MyCustomException)
+        thrown(expectedException)
         counterService.countExcludes == 1
 
         when:
-        counterService.getCountExcludes(true)
+        callGetCount(counterService, CountMode.THROW_ILLEGAL_STATE)
 
         then: "the circuit is open so the original exception is thrown"
-        thrown(MyCustomException)
+        thrown(expectedException)
         counterService.countExcludes == 1
 
         cleanup:
         context.stop()
+
+        where:
+        name                                                | mode                  | expectedException      | callGetCount
+        "excludes"                                          | CountMode.DEFAULT     | MyCustomException      | { service, mode -> service.getCountExcludes(mode) }
+        "excludesAllOf"                                     | CountMode.THROW_CHILD | MyCustomChildException | { service, mode -> service.getCountExcludesAllOf(mode) }
+        "excludes and excludesAllOf using simple exception" | CountMode.DEFAULT     | MyCustomException      | { service, mode -> service.getCountExcludesWithExcludesAllOf(mode) }
+        "excludes and excludesAllOf using child exception"  | CountMode.THROW_CHILD | MyCustomChildException | { service, mode -> service.getCountExcludesWithExcludesAllOf(mode) }
     }
 
     void "test circuit breaker with a single"() {
@@ -187,6 +204,12 @@ class CircuitBreakerRetrySpec extends Specification {
         context.stop()
     }
 
+    static enum CountMode {
+        THROW_ILLEGAL_STATE,
+        THROW_CHILD,
+        DEFAULT
+    }
+
     @Singleton
     static class CounterService {
         int countIncludes = 0
@@ -194,10 +217,10 @@ class CircuitBreakerRetrySpec extends Specification {
         int countThreshold = 3
 
         @CircuitBreaker(attempts = '5', delay = '5ms', includes = MyCustomException.class)
-        Integer getCountIncludes(boolean illegalState) {
+        Integer getCountIncludes(CountMode mode) {
             countIncludes++
             if(countIncludes < countThreshold) {
-                if (illegalState) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
                     throw new IllegalStateException("Bad count")
                 } else {
                     throw new MyCustomException()
@@ -206,12 +229,68 @@ class CircuitBreakerRetrySpec extends Specification {
             return countIncludes
         }
 
+        @CircuitBreaker(attempts = '5', delay = '5ms', includesAllOf = MyCustomBaseException.class)
+        Integer getCountIncludesAllOf(CountMode mode) {
+            countIncludes++
+            if(countIncludes < countThreshold) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
+                    throw new IllegalStateException("Bad count")
+                } else {
+                    throw new MyCustomChildException()
+                }
+            }
+            return countIncludes
+        }
+
+        @CircuitBreaker(attempts = '5', delay = '5ms', includes = MyCustomException.class, includesAllOf = MyCustomBaseException.class)
+        Integer getCountIncludesWithIncludesAllOf(CountMode mode) {
+            countIncludes++
+            if(countIncludes < countThreshold) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
+                    throw new IllegalStateException("Bad count")
+                } else if (mode == CountMode.THROW_CHILD) {
+                    throw new MyCustomChildException()
+                } else {
+                    throw new MyCustomException()
+                }
+            }
+            return countIncludes
+        }
+
         @CircuitBreaker(attempts = '5', delay = '5ms', excludes = MyCustomException.class)
-        Integer getCountExcludes(boolean illegalState) {
+        Integer getCountExcludes(CountMode mode) {
             countExcludes++
             if(countExcludes < countThreshold) {
-                if (illegalState) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
                     throw new IllegalStateException("Bad count")
+                } else {
+                    throw new MyCustomException()
+                }
+            }
+            return countExcludes
+        }
+
+        @CircuitBreaker(attempts = '5', delay = '5ms', excludesAllOf = MyCustomBaseException.class)
+        Integer getCountExcludesAllOf(CountMode mode) {
+            countExcludes++
+            if(countExcludes < countThreshold) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
+                    throw new IllegalStateException("Bad count")
+                } else {
+                    throw new MyCustomChildException()
+                }
+            }
+            return countExcludes
+        }
+
+        @CircuitBreaker(attempts = '5', delay = '5ms', excludes = MyCustomException.class, excludesAllOf = MyCustomBaseException.class)
+        Integer getCountExcludesWithExcludesAllOf(CountMode mode) {
+            countExcludes++
+            if(countExcludes < countThreshold) {
+                if (mode == CountMode.THROW_ILLEGAL_STATE) {
+                    throw new IllegalStateException("Bad count")
+                } else if (mode == CountMode.THROW_CHILD) {
+                    throw new MyCustomChildException()
                 } else {
                     throw new MyCustomException()
                 }
