@@ -1688,7 +1688,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
                     headers.set(HttpHeaderNames.CONTENT_LENGTH, fullHttpRequest.content().readableBytes());
                 } else {
-                    headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                    if (!headers.contains(HttpHeaderNames.CONTENT_LENGTH) && !headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
+                        headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                    }
                 }
             } else {
                 headers.set(HttpHeaderNames.CONTENT_LENGTH, 0);

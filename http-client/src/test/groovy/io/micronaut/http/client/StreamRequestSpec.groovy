@@ -19,6 +19,7 @@ import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -26,7 +27,6 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
-import io.micronaut.http.client.StreamRequestSpec.Book
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.BackpressureStrategy
 import io.reactivex.Flowable
@@ -248,6 +248,35 @@ class StreamRequestSpec extends Specification {
         cleanup:
         client.close()
     }
+
+    void "test manually setting the content length does not chunked encoding"() {
+        given:
+        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+
+        when:
+        int i = 0
+        HttpResponse<String> result = client.exchange(HttpRequest.POST('/stream/request/strings/contentLength', Flowable.create( new FlowableOnSubscribe<Object>() {
+            @Override
+            void subscribe(@NonNull FlowableEmitter<Object> emitter) throws Exception {
+                while(i < 5) {
+                    emitter.onNext("aa")
+                    i++
+                }
+                emitter.onComplete()
+            }
+        }, BackpressureStrategy.BUFFER
+
+        )).contentType(MediaType.TEXT_PLAIN_TYPE).contentLength(10), String).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        result.body().size() == 10
+        result.body() == "aaaaaaaaaa"
+
+        cleanup:
+        client.close()
+    }
+
     @Controller('/stream/request')
     static class StreamController {
 
@@ -260,6 +289,14 @@ class StreamRequestSpec extends Specification {
         @Post(uri = "/strings", consumes = MediaType.TEXT_PLAIN)
         Single<List<String>> strings(@Body Flowable<String> strings) {
             strings.toList()
+        }
+
+        @Post(uri = "/strings/contentLength", processes = MediaType.TEXT_PLAIN)
+        Flowable<String> strings(@Body Flowable<String> strings, HttpHeaders headers) {
+            assert headers.contentLength().isPresent()
+            assert headers.contentLength().getAsLong() == 10
+            assert !headers.getFirst(HttpHeaders.TRANSFER_ENCODING).isPresent()
+            strings
         }
 
         @Post(uri = "/bytes", consumes = MediaType.TEXT_PLAIN)
