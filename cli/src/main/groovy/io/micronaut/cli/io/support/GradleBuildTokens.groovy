@@ -119,7 +119,15 @@ class GradleBuildTokens extends BuildTokens {
             gradleDependencies.add(new GradleDependency("kapt", enforcedPlatform))
             gradleDependencies.add(new GradleDependency("kaptTest", enforcedPlatform))
         }
-        gradleDependencies.addAll(dependencies.collect{ new GradleDependency(it) })
+        gradleDependencies.addAll(dependencies.collect{
+            if (it.scope == 'annotationProcessor' && sourceLanguage == 'kotlin') {
+                new GradleDependency("kapt", it)
+            } else if (it.scope == 'testAnnotationProcessor' && sourceLanguage == 'kotlin') {
+                new GradleDependency("kaptTest", it)
+            } else {
+                return new GradleDependency(it)
+            }
+        })
         gradleDependencies
     }
 }

@@ -21,7 +21,11 @@ class GradleDependency {
     }
 
     GradleDependency(Dependency dependency) {
-        this.scope = SCOPE_MAP.get(dependency.scope) ?: dependency.scope
+        this(SCOPE_MAP.get(dependency.scope) ?: dependency.scope, dependency)
+    }
+
+    GradleDependency(String scope, Dependency dependency) {
+        this.scope = scope
         def artifact = dependency.artifact
         def v = artifact.version.replace('BOM', '')
         StringBuilder artifactString = new StringBuilder()
