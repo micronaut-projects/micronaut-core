@@ -20,6 +20,13 @@ def excludedProjects = [
 ]
 
 apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
+ext.extraPomInfo = {
+    delegate.properties {
+        for(dep in dependencyVersions) {
+            "${dep.key}.version"(dep.value.version)
+        }
+    }
+}
 dependencies {
     constraints {
         for (profile in profiles) {
