@@ -22,6 +22,9 @@ import io.micronaut.cache.CacheManager
 import io.micronaut.cache.interceptor.CacheInterceptor
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
+import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.context.exceptions.BeanInstantiationException
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -37,6 +40,8 @@ import io.reactivex.Flowable
 import spock.lang.Specification
 
 import javax.validation.ConstraintViolationException
+import javax.validation.constraints.Max
+import javax.validation.constraints.Min
 import javax.validation.constraints.NotNull
 import javax.validation.constraints.Size
 import java.util.concurrent.ExecutorService
@@ -318,6 +323,19 @@ class ValidatedSpec extends Specification {
         server.close()
     }
 
+    void "test validated config props with annotations in abstract class"() {
+        ApplicationContext context = ApplicationContext.run([
+                'spec.name': getClass().simpleName
+        ])
+
+        when:
+        context.getBean(Config)
+
+        then:
+        def ex = thrown(BeanInstantiationException)
+        ex.message.contains("count - must be greater than or equal to 1")
+    }
+
     @Client("/validated/tests")
     static interface TestClient {
         @Get(value = "/test1/{value}", produces = MediaType.TEXT_PLAIN)
@@ -366,6 +384,18 @@ class ValidatedSpec extends Specification {
                 this.thing = thing
             }
         }
+    }
+
+    @ConfigurationProperties("my.config")
+    @Introspected
+    static class Config extends AbstractConfig {
+    }
+
+    abstract static class AbstractConfig {
+        @NotNull
+        @Min(1L)
+        @Max(10L)
+        Integer count = 0
     }
 }
 
