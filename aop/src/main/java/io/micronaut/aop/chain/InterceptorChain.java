@@ -180,6 +180,7 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
                             }
                         });
                     }
+                    parameters = Collections.unmodifiableMap(parameters);
                     this.parameters = parameters;
                 }
             }

@@ -150,7 +150,7 @@ With the above in place you can set `micronaut.http.client.max-content-length` u
 
 === Formatting Dates
 
-The ann:io.micronaut.core.convert.format.Format[] annotation can be used on any setter to allow the date format to be specified when binding `javax.time` date objects.
+The ann:io.micronaut.core.convert.format.Format[] annotation can be used on any setter to allow the date format to be specified when binding `java.time` date objects.
 
 .Using `@Format` for Dates
 [source,java]
