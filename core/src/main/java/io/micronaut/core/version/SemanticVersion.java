@@ -48,7 +48,10 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
      */
     public SemanticVersion(String version) {
         this.version = version;
-        String[] parts = version.replace('_', '.').split("\\.");
+        String[] parts = version
+                .replace('_', '.')
+                .replace('-', '.')
+                .split("\\.");
         if (parts.length >= PARTS_MIN) {
             try {
                 this.major = Integer.valueOf(parts[0]);
