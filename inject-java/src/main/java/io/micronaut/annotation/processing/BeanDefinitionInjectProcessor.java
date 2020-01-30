@@ -464,6 +464,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         if (isBean) {
                             // we know this class has supported annotations so we need a beandef writer for it
+                            PackageElement packageElement = elementUtils.getPackageOf(classElement);
+                            if (packageElement.isUnnamed()) {
+                                error(classElement, "Micronaut beans cannot be in the default package");
+                                return null;
+                            }
                             BeanDefinitionVisitor beanDefinitionWriter = getOrCreateBeanDefinitionWriter(classElement, qualifiedName);
 
                             if (isAopProxyType) {
