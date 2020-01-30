@@ -15,7 +15,7 @@
  */
 package io.micronaut.docs.factories
 
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.BeanContext
 import spock.lang.Specification
 
 /**
@@ -27,10 +27,11 @@ class VehicleSpec extends Specification {
     void "test start vehicle"() {
         when:
         // tag::start[]
-        Vehicle vehicle = new DefaultBeanContext()
-                .start()
-                .getBean(Vehicle)
-        println( vehicle.start() )
+        Vehicle vehicle = BeanContext.run().withCloseable {
+            Vehicle vehicle = it.getBean(Vehicle)
+            println( vehicle.start() )
+            return vehicle
+        }
         // end::start[]
 
         then:
