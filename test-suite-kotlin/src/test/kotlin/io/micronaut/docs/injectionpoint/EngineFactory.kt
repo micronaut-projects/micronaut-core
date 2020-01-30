@@ -28,7 +28,7 @@ import io.micronaut.inject.InjectionPoint
 internal class EngineFactory {
 
     @Prototype
-    fun v8Engine(injectionPoint: InjectionPoint<Engine>, crankShaft: CrankShaft): Engine { // <1>
+    fun v8Engine(injectionPoint: InjectionPoint<*>, crankShaft: CrankShaft): Engine { // <1>
         val cylinders = injectionPoint
                 .annotationMetadata
                 .intValue(Cylinders::class.java).orElse(8) // <2>
