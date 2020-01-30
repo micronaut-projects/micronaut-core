@@ -15,26 +15,27 @@
  */
 package io.micronaut.inject;
 
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.type.Argument;
 
 import javax.annotation.Nonnull;
 
 /**
- * An injection point as a point in a class definition where dependency injection is required.
+ * An injection point for a method or constructor argument.
  *
- * @author Graeme Rocher
+ * @param <B> The declaring bean type
+ * @param <T> The argument type
+ * @author graemerocher
  * @since 1.0
- * @param <T> the bean type
  */
-public interface InjectionPoint<T> extends AnnotationMetadataProvider {
+public interface ArgumentInjectionPoint<B, T> extends InjectionPoint<B> {
 
     /**
-     * @return The bean that declares this injection point
+     * @return The outer injection point (method or constructor)
      */
-    @Nonnull BeanDefinition<T> getDeclaringBean();
+    @Nonnull CallableInjectionPoint<B> getOuterInjectionPoint();
 
     /**
-     * @return Whether reflection is required to satisfy the injection point
+     * @return The argument that is being injected
      */
-    boolean requiresReflection();
+    @Nonnull Argument<T> getArgument();
 }

@@ -35,9 +35,11 @@ import java.util.Objects;
  *
  * @author graemerocher
  * @since 1.0
+ * @param <B> The bean type
+ * @param <T> The injectable type
  */
 @Internal
-class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentConfigurable {
+class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, EnvironmentConfigurable {
 
     private final BeanDefinition declaringBean;
     private final AnnotationMetadata annotationMetadata;

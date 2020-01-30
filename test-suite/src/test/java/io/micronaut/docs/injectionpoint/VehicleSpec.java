@@ -13,22 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject;
+package io.micronaut.docs.injectionpoint;
 
-/**
- * A constructor injection point.
- *
- * @param <T> The constructed type
- * @author Graeme Rocher
- * @since 1.0
- */
-public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint<T> {
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.DefaultBeanContext;
+import org.junit.Test;
 
-    /**
-     * Invoke the constructor.
-     *
-     * @param args The arguments
-     * @return The new value
-     */
-    T invoke(Object... args);
+import static org.junit.Assert.assertEquals;
+
+public class VehicleSpec {
+
+    @Test
+    public void testStartVehicle() {
+        BeanContext beanContext = BeanContext.run();
+        Vehicle vehicle = beanContext.getBean(Vehicle.class);
+        System.out.println( vehicle.start() );
+
+        assertEquals("Starting V6", vehicle.start());
+
+        beanContext.close();
+    }
 }

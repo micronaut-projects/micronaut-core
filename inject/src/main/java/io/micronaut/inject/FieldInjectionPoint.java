@@ -23,11 +23,12 @@ import java.lang.reflect.Field;
 /**
  * Defines an injection point for a field.
  *
+ * @param <B> The bean type that declares the injection point
  * @param <T> The field component type
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotationMetadataProvider, AnnotatedElement {
+public interface FieldInjectionPoint<B, T> extends InjectionPoint<B>, AnnotationMetadataProvider, AnnotatedElement {
 
     /**
      * @return The name of the field
@@ -35,6 +36,9 @@ public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotationMetada
     String getName();
 
     /**
+     * Resolves the underlying field. Note that this method will cause reflection
+     * metadata to be initialized and should be avoided.
+     *
      * @return The target field
      */
     Field getField();
@@ -45,6 +49,9 @@ public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotationMetada
     Class<T> getType();
 
     /**
+     * Sets the value of the field. Note that this method will cause reflection
+     * metadata to be initialized and should be avoided.
+     *
      * @param instance the instance
      * @param object   The the field on the target object
      */

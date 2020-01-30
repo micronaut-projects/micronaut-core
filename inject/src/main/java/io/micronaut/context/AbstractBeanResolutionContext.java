@@ -16,11 +16,13 @@
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.CircularDependencyException;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.*;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
 
@@ -118,7 +120,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * Class that represents a default path.
      */
-    class DefaultPath extends LinkedList<Segment> implements Path {
+    class DefaultPath extends LinkedList<Segment<?>> implements Path {
 
         public static final String RIGHT_ARROW = " --> ";
 
@@ -130,7 +132,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public String toString() {
-            Iterator<Segment> i = descendingIterator();
+            Iterator<Segment<?>> i = descendingIterator();
             StringBuilder path = new StringBuilder();
             while (i.hasNext()) {
                 path.append(i.next().toString());
@@ -144,7 +146,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @SuppressWarnings("MagicNumber")
         @Override
         public String toCircularString() {
-            Iterator<Segment> i = descendingIterator();
+            Iterator<Segment<?>> i = descendingIterator();
             StringBuilder path = new StringBuilder();
             String ls = System.getProperty("line.separator");
             while (i.hasNext()) {
@@ -173,7 +175,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
-        public Optional<Segment> currentSegment() {
+        public Optional<Segment<?>> currentSegment() {
             return Optional.ofNullable(peek());
         }
 
@@ -285,6 +287,39 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 return baseString.toString();
             }
         }
+
+        @Override
+        public InjectionPoint getInjectionPoint() {
+            ConstructorInjectionPoint constructorInjectionPoint = getDeclaringType().getConstructor();
+            return new ArgumentInjectionPoint() {
+                @Nonnull
+                @Override
+                public CallableInjectionPoint getOuterInjectionPoint() {
+                    return constructorInjectionPoint;
+                }
+
+                @Nonnull
+                @Override
+                public Argument getArgument() {
+                    return ConstructorSegment.this.getArgument();
+                }
+
+                @Override
+                public BeanDefinition getDeclaringBean() {
+                    return constructorInjectionPoint.getDeclaringBean();
+                }
+
+                @Override
+                public boolean requiresReflection() {
+                    return constructorInjectionPoint.requiresReflection();
+                }
+
+                @Override
+                public AnnotationMetadata getAnnotationMetadata() {
+                    return getArgument().getAnnotationMetadata();
+                }
+            };
+        }
     }
 
     /**
@@ -311,12 +346,46 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             outputArguments(baseString, methodInjectionPoint.getArguments());
             return baseString.toString();
         }
+
+        @Override
+        public InjectionPoint getInjectionPoint() {
+            return new ArgumentInjectionPoint() {
+                @Nonnull
+                @Override
+                public CallableInjectionPoint getOuterInjectionPoint() {
+                    return methodInjectionPoint;
+                }
+
+                @Nonnull
+                @Override
+                public Argument getArgument() {
+                    return MethodSegment.this.getArgument();
+                }
+
+                @Override
+                public BeanDefinition getDeclaringBean() {
+                    return methodInjectionPoint.getDeclaringBean();
+                }
+
+                @Override
+                public boolean requiresReflection() {
+                    return methodInjectionPoint.requiresReflection();
+                }
+
+                @Override
+                public AnnotationMetadata getAnnotationMetadata() {
+                    return getArgument().getAnnotationMetadata();
+                }
+            };
+        }
     }
 
     /**
      * A segment that represents a field.
      */
     static class FieldSegment extends AbstractSegment {
+
+        private final FieldInjectionPoint injectionPoint;
 
         /**
          * @param declaringClass      The declaring class
@@ -326,11 +395,17 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             super(declaringClass,
                 fieldInjectionPoint.getName(),
                 fieldInjectionPoint.asArgument());
+            this.injectionPoint = fieldInjectionPoint;
         }
 
         @Override
         public String toString() {
             return getDeclaringType().getBeanType().getSimpleName() + "." + getName();
+        }
+
+        @Override
+        public InjectionPoint getInjectionPoint() {
+            return injectionPoint;
         }
     }
 

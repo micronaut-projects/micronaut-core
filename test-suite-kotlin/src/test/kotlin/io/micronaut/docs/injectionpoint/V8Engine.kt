@@ -13,22 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject;
+package io.micronaut.docs.injectionpoint
 
-/**
- * A constructor injection point.
- *
- * @param <T> The constructed type
- * @author Graeme Rocher
- * @since 1.0
- */
-public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint<T> {
+// tag::class[]
+internal class V8Engine(private val crankShaft: CrankShaft) : Engine {
+    private val cylinders = 8
 
-    /**
-     * Invoke the constructor.
-     *
-     * @param args The arguments
-     * @return The new value
-     */
-    T invoke(Object... args);
+    override fun start(): String {
+        return "Starting V8"
+    }
 }
+// end::class[]
