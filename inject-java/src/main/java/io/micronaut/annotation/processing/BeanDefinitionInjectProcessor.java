@@ -45,10 +45,12 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.inject.writer.ExecutableMethodWriter;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedOptions;
 import javax.inject.*;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
@@ -88,8 +90,8 @@ import java.util.stream.Stream;
  * @author Dean Wette
  * @since 1.0
  */
-@SupportedAnnotationTypes("*")
 @Internal
+@SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS})
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
     private static final String[] ANNOTATION_STEREOTYPES = new String[]{
@@ -123,11 +125,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         super.init(processingEnv);
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils, annotationUtils);
         this.beanDefinitions = new LinkedHashSet<>();
-    }
-
-    @Override
-    public Set<String> getSupportedOptions() {
-        return Collections.singleton("org.gradle.annotation.processing.aggregating");
     }
 
     @Override
