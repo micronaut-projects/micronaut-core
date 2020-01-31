@@ -31,7 +31,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.Nonnull;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
