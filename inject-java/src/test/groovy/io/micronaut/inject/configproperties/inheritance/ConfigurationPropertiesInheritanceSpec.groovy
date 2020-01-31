@@ -147,4 +147,51 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
         context.getBeansOfType(ParentEachPropsCtor).size() == 2
         context.getBeansOfType(ParentEachPropsCtor.ManagerProps).size() == 1
     }
+
+    void "test EachProperty array inner ConfigurationProperties with setter"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'teams': [['wins': 5, 'manager': ['age': 40]], ['wins': 6]]
+        ])
+
+        when:
+        Collection teams = context.getBeansOfType(ParentArrayEachProps)
+
+        then:
+        teams[0].wins == 5
+        teams[0].manager.age == 40
+        teams[1].wins == 6
+        teams[1].manager == null
+
+        when:
+        Collection<ParentArrayEachProps.ManagerProps> managers = context.getBeansOfType(ParentArrayEachProps.ManagerProps)
+
+        then: "The instance is the same"
+        managers.size() == 1
+        managers[0].is(teams[0].manager)
+    }
+
+    void "test EachProperty array inner ConfigurationProperties with constructor"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'teams': [['wins': 5, 'manager': ['age': 40]], ['wins': 6]]
+
+        ])
+
+        when:
+        Collection teams = context.getBeansOfType(ParentArrayEachProps)
+
+        then:
+        teams[0].wins == 5
+        teams[0].manager.age == 40
+        teams[1].wins == 6
+        teams[1].manager == null
+
+        when:
+        Collection<ParentArrayEachProps.ManagerProps> managers = context.getBeansOfType(ParentArrayEachProps.ManagerProps)
+
+        then: "The instance is the same"
+        managers.size() == 1
+        managers[0].is(teams[0].manager)
+    }
 }

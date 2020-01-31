@@ -140,14 +140,55 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     if (entries == null) {
                         return false;
                     } else {
-
-                        return entries.containsKey(finalName);
+                        return containsArrayProperty(entries, finalName, false);
                     }
                 });
 
                 containsCache.put(name, result);
             }
             return result;
+        }
+    }
+
+    private boolean containsArrayProperty(Map entries, String finalName, boolean nestedMap) {
+        int arrayIndex = finalName.indexOf('[');
+        if (arrayIndex > -1) {
+            String arrayName = finalName.substring(0, arrayIndex);
+            Object value = entries.get(arrayName);
+            int endIndex = finalName.indexOf(']');
+            if (endIndex > -1) {
+                String indexString = finalName.substring(arrayIndex + 1, endIndex);
+                if (value instanceof List) {
+                    try {
+                        int index = Integer.parseInt(indexString);
+                        value = ((List) value).get(index);
+                    } catch (NumberFormatException | IndexOutOfBoundsException e) {
+                        return false;
+                    }
+                } else if (value instanceof Map) {
+                    value = ((Map) value).get(indexString);
+                }
+                int nextName = endIndex + 2;
+                if (finalName.length() > nextName && value instanceof Map) {
+                    return containsArrayProperty((Map) value, finalName.substring(nextName), true);
+                }
+            }
+        }
+        int index = finalName.indexOf('.');
+        if (nestedMap && index != -1) {
+            String[] keys = DOT_PATTERN.split(finalName);
+            for (int i = 0; i < keys.length; i++) {
+                if (!entries.containsKey(keys[i])) {
+                    return false;
+                }
+                Object next = entries.get(keys[i]);
+                if (next instanceof Map) {
+                    entries = (Map) next;
+                }
+            }
+            return true;
+        } else {
+            return entries.containsKey(finalName);
         }
     }
 
@@ -162,14 +203,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 if (entries == null) {
                     return false;
                 } else {
-
                     if (entries.containsKey(trimmedName)) {
                         return true;
                     } else {
                         String finalName = trimmedName + ".";
                         return entries.keySet().stream().anyMatch(key ->
                                 key.startsWith(finalName)
-                        );
+                        ) || containsArrayProperty(entries, trimmedName, false);
                     }
                 }
             });
@@ -242,34 +282,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         }
                     }
                     if (value == null) {
-                        int i = name.indexOf('[');
-                        if (i > -1 && name.endsWith("]")) {
-                            String newKey = name.substring(0, i);
-                            value = entries.get(newKey);
-                            String index = name.substring(i + 1, name.length() - 1);
-                            if (value != null) {
-                                if (StringUtils.isNotEmpty(index)) {
-                                    if (value instanceof List) {
-                                        try {
-                                            value = ((List) value).get(Integer.valueOf(index));
-                                        } catch (NumberFormatException e) {
-                                            // ignore
-                                        }
-                                    } else if (value instanceof Map) {
-                                        try {
-                                            value = ((Map) value).get(index);
-                                        } catch (NumberFormatException e) {
-                                            // ignore
-                                        }
-                                    }
-                                }
-                            } else {
-                                if (StringUtils.isNotEmpty(index)) {
-                                    String subKey = newKey + '.' + index;
-                                    value = entries.get(subKey);
-                                }
-                            }
-                        }
+                        value = searchArrayProperty(entries, name, false);
                     }
 
                     if (value != null) {
@@ -315,6 +328,59 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             return Optional.of((T) Collections.emptyMap());
         }
         return Optional.empty();
+    }
+
+    private Object searchArrayProperty(Map entries, String name, boolean nestedMap) {
+        int idx = name.indexOf('[');
+        if (idx > -1) {
+            Object value;
+            String newKey = name.substring(0, idx);
+            value = entries.get(newKey);
+            int endIndex = name.indexOf(']');
+            if (endIndex > -1) {
+                String index = name.substring(idx + 1, endIndex);
+                if (value != null) {
+                    if (StringUtils.isNotEmpty(index)) {
+                        if (value instanceof List) {
+                            try {
+                                value = ((List) value).get(Integer.valueOf(index));
+                            } catch (NumberFormatException e) {
+                                // ignore
+                            }
+                        } else if (value instanceof Map) {
+                            value = ((Map) value).get(index);
+                        }
+                        int nextIndex = endIndex + 2;
+                        if (value instanceof Map && name.length() > nextIndex) {
+                            value = searchArrayProperty((Map) value, name.substring(nextIndex), true);
+                        }
+                    }
+                } else {
+                    if (StringUtils.isNotEmpty(index)) {
+                        String subKey = newKey + '.' + index;
+                        value = entries.get(subKey);
+                    }
+                }
+                return value;
+            }
+        }
+        int index = name.indexOf('.');
+        if (nestedMap && index != -1) {
+            String[] keys = DOT_PATTERN.split(name);
+            Object value = null;
+            for (int i = 0; i < keys.length; i++) {
+                if (!entries.containsKey(keys[i])) {
+                    return null;
+                }
+                value = entries.get(keys[i]);
+                if (value instanceof Map) {
+                    entries = (Map) value;
+                }
+            }
+            return value;
+        } else {
+            return entries.get(name);
+        }
     }
 
     @NotNull

@@ -73,11 +73,13 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
                 Optional<String> parentConfig = parentMetadata.getValue(ConfigurationReader.class, String.class)
                 if (parentConfig.isPresent()) {
                     String parentPath = parentConfig.get()
-                    if(parentMetadata.hasDeclaredAnnotation(EachProperty)) {
-                        path.insert(0, parentPath + ".*.")
-                    }
-                    else {
-
+                    if (parentMetadata.hasDeclaredAnnotation(EachProperty)) {
+                        if (annotationMetadata.booleanValue(EachProperty.class, "list").orElse(false)) {
+                            path.insert(0, parentPath + "[*].")
+                        } else {
+                            path.insert(0, parentPath + ".*.")
+                        }
+                    } else {
                         path.insert(0, parentPath + '.')
                     }
                     prependSuperclasses(declaringType, path)
@@ -105,7 +107,11 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
     private Function<String, String> pathEvaluationFunction(AnnotationMetadata annotationMetadata) {
         return { String path ->
             if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
-                return path + ".*"
+                if (annotationMetadata.booleanValue(EachProperty.class, "list").orElse(false)) {
+                    return path + "[*]"
+                } else {
+                    return path + ".*"
+                }
             }
             String prefix = annotationMetadata.getValue(ConfigurationReader.class, "prefix", String.class)
                     .orElse(null)
