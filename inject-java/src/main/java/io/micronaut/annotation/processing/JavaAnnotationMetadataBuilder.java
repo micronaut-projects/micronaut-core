@@ -36,6 +36,8 @@ import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.stream.Stream;
@@ -128,6 +130,28 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected VisitorContext createVisitorContext() {
         return annotationUtils.newVisitorContext();
+    }
+
+    @Nonnull
+    @Override
+    protected RetentionPolicy getRetentionPolicy(@Nonnull Element annotation) {
+        final List<? extends AnnotationMirror> annotationMirrors = annotation.getAnnotationMirrors();
+        for (AnnotationMirror annotationMirror : annotationMirrors) {
+            final String annotationTypeName = getAnnotationTypeName(annotationMirror);
+            if (Retention.class.getName().equals(annotationTypeName)) {
+
+                final Iterator<? extends AnnotationValue> i = annotationMirror
+                        .getElementValues().values().iterator();
+                if (i.hasNext()) {
+                    final AnnotationValue av = i.next();
+                    final String v = av.getValue().toString();
+                    return RetentionPolicy.valueOf(v);
+                }
+                break;
+            }
+
+        }
+        return RetentionPolicy.RUNTIME;
     }
 
     @Override
