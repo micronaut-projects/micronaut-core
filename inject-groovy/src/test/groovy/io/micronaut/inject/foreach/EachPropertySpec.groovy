@@ -21,8 +21,10 @@ import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.EachBean
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
+import io.micronaut.core.order.Ordered
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
@@ -446,8 +448,18 @@ class MyConfigurationWithPrimary {
 }
 
 @EachProperty(value = "array", list = true)
-class ArrayProperties {
+class ArrayProperties implements Ordered {
     String name
+    private final int index
+
+    ArrayProperties(@Parameter Integer index) {
+        this.index = index
+    }
+
+    @Override
+    int getOrder() {
+        index
+    }
 }
 
 @Factory

@@ -571,14 +571,21 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     int i = resolvedProperty.indexOf('[');
                     if (i > -1) {
                         String propertyName = resolvedProperty.substring(0, i);
-                        Map entries = resolveEntriesForKey(propertyName, true, null);
-                        if (entries != null) {
-                            processProperty(resolvedProperty.substring(i), val -> entries.put(propertyName, val), () -> entries.get(propertyName), value);
-                        }
-                    } else {
-                        Map entries = resolveEntriesForKey(resolvedProperty, true, null);
+                        Map<String, Object> entries = resolveEntriesForKey(propertyName, true, null);
                         if (entries != null) {
                             entries.put(resolvedProperty, value);
+                            expandProperty(resolvedProperty.substring(i), val -> entries.put(propertyName, val), () -> entries.get(propertyName), value);
+                        }
+                    } else {
+                        Map<String, Object> entries = resolveEntriesForKey(resolvedProperty, true, null);
+                        if (entries != null) {
+                            if (value instanceof List || value instanceof Map) {
+                                Deque<String> keys = new ArrayDeque<>();
+                                keys.add(resolvedProperty);
+                                collapseProperty(keys, entries, value);
+                            } else {
+                                entries.put(resolvedProperty, value);
+                            }
                         }
                     }
                 }
@@ -591,7 +598,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         }
     }
 
-    private void processProperty(String property, Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
+    private void expandProperty(String property, Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
         if (StringUtils.isEmpty(property)) {
             containerSet.accept(actualValue);
             return;
@@ -613,7 +620,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 }
                 fill(list, number, null);
 
-                processProperty(propertyRest, val -> list.set(number, val), () -> list.get(number), actualValue);
+                expandProperty(propertyRest, val -> list.set(number, val), () -> list.get(number), actualValue);
             } else {
                 Map map;
                 if (container instanceof Map) {
@@ -623,7 +630,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     containerSet.accept(map);
                 }
 
-                processProperty(propertyRest, val -> map.put(propertyIndex, val), () -> map.get(propertyIndex), actualValue);
+                expandProperty(propertyRest, val -> map.put(propertyIndex, val), () -> map.get(propertyIndex), actualValue);
             }
         } else if (property.startsWith(".")) {
             String propertyName;
@@ -643,8 +650,35 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 map = new LinkedHashMap(10);
                 containerSet.accept(map);
             }
-            processProperty(propertyRest, val -> map.put(propertyName, val), () -> map.get(propertyName), actualValue);
+            expandProperty(propertyRest, val -> map.put(propertyName, val), () -> map.get(propertyName), actualValue);
         }
+    }
+
+    private void collapseProperty(Deque<String> keys, Map<String, Object> entries, Object value) {
+        if (value instanceof List) {
+            for (int i = 0; i < ((List) value).size(); i++) {
+                keys.add("[" + i + "]");
+                collapseProperty(keys, entries, ((List) value).get(i));
+                keys.removeLast();
+            }
+
+        } else if (value instanceof Map) {
+            for (Map.Entry<?, ?> entry: ((Map<?, ?>) value).entrySet()) {
+                Object key = entry.getKey();
+                if (key instanceof CharSequence) {
+                    keys.add("." + ((CharSequence) key).toString());
+                    collapseProperty(keys, entries, entry.getValue());
+                    keys.removeLast();
+                }
+            }
+        } else {
+            StringBuilder key = new StringBuilder();
+            for (String s : keys) {
+                key.append(s);
+            }
+            entries.put(key.toString(), value);
+        }
+
     }
 
     private CharSequence processRandomExpressions(PropertySource.PropertyConvention convention, String property, CharSequence str) {
