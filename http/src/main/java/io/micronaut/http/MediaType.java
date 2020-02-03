@@ -425,6 +425,9 @@ public class MediaType implements CharSequence {
             this.type = withoutArgs.substring(0, i);
             this.subtype = withoutArgs.substring(i + 1);
         } else {
+            if (LOG.isWarnEnabled()) {
+                LOG.warn("Failed to parse media type [{}]", name);
+            }
             throw new IllegalArgumentException("Invalid mime type: " + name);
         }
 
@@ -545,8 +548,11 @@ public class MediaType implements CharSequence {
         if (StringUtils.isEmpty(contentType)) {
             return false;
         }
-        MediaType mediaType = new MediaType(contentType);
-        return mediaType.isTextBased();
+        try {
+            return new MediaType(contentType).isTextBased();
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     @Override
