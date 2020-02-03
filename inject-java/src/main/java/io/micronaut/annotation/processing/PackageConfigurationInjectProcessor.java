@@ -50,8 +50,8 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
     }
 
     @Override
-    public Set<String> getSupportedOptions() {
-        return Collections.singleton("org.gradle.annotation.processing.aggregating");
+    public Set<String> getSupportedAnnotationTypes() {
+        return Collections.singleton("io.micronaut.context.annotation.Configuration");
     }
 
     @Override

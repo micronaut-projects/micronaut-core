@@ -1003,6 +1003,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * @return Additional mapped annotation names
+     */
+    @Internal
+    public static Set<String> getMappedAnnotationNames() {
+        return ANNOTATION_MAPPERS.keySet();
+    }
+
+    /**
      * Annotate an existing annotation metadata object.
      *
      * @param annotationMetadata The annotation metadata

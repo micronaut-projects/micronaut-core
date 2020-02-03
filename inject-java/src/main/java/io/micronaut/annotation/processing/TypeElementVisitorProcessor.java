@@ -31,7 +31,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.Nonnull;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -51,15 +51,10 @@ import static javax.lang.model.element.ElementKind.FIELD;
  * @author graemerocher
  * @since 1.0
  */
-@SupportedAnnotationTypes("*")
+@SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS})
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
 
     private boolean executed = false;
-
-    @Override
-    public Set<String> getSupportedOptions() {
-        return Collections.singleton("org.gradle.annotation.processing.aggregating");
-    }
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
