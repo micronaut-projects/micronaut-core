@@ -179,7 +179,7 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
         ])
 
         when:
-        Collection teams = context.getBeansOfType(ParentArrayEachProps)
+        Collection teams = context.getBeansOfType(ParentArrayEachPropsCtor)
 
         then:
         teams[0].wins == 5
@@ -188,7 +188,7 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
         teams[1].manager == null
 
         when:
-        Collection<ParentArrayEachProps.ManagerProps> managers = context.getBeansOfType(ParentArrayEachProps.ManagerProps)
+        Collection<ParentArrayEachPropsCtor.ManagerProps> managers = context.getBeansOfType(ParentArrayEachPropsCtor.ManagerProps)
 
         then: "The instance is the same"
         managers.size() == 1

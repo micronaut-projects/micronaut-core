@@ -348,4 +348,21 @@ class EachPropertySpec extends Specification {
         cleanup:
         applicationContext.close()
     }
+
+    void "test configuration properties array"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'array': [['name': 'Sally'], ['name': 'John']]
+        ]))
+        applicationContext.start()
+
+        when:
+        Collection<ArrayProperties> props = applicationContext.getBeansOfType(ArrayProperties)
+
+        then:
+        props.size() == 2
+        props[0].name == "Sally"
+        props[1].name == "John"
+    }
 }

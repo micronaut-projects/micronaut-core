@@ -134,13 +134,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         } else {
             Boolean result = containsCache.get(name);
             if (result == null) {
-                String finalName = trimIndex(name);
                 result = Stream.of(null, StringConvention.RAW).anyMatch(convention -> {
-                    Map<String, Object> entries = resolveEntriesForKey(finalName, false, convention);
+                    Map<String, Object> entries = resolveEntriesForKey(name, false, convention);
                     if (entries == null) {
                         return false;
                     } else {
-                        return entries.containsKey(finalName);
+                        return entries.containsKey(name);
                     }
                 });
 
@@ -806,7 +805,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     private String trimIndex(String name) {
-        int i = name.indexOf('[');
+        int i = name.lastIndexOf('[');
         if (i > -1 && name.endsWith("]")) {
             name = name.substring(0, i);
         }
