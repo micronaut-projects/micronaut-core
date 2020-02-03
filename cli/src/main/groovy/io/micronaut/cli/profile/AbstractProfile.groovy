@@ -36,6 +36,7 @@ import org.eclipse.aether.graph.Dependency
 import org.eclipse.aether.graph.Exclusion
 import org.eclipse.aether.util.graph.selector.ExclusionDependencySelector
 import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.constructor.SafeConstructor
 import picocli.CommandLine
 
 /**
@@ -113,7 +114,7 @@ abstract class AbstractProfile implements Profile {
 
     protected void initialize() {
         def profileYml = profileDir.createRelative("profile.yml")
-        def profileConfig = (Map<String, Object>) new Yaml().loadAs(profileYml.getInputStream(), Map)
+        def profileConfig = (Map<String, Object>) new Yaml(new SafeConstructor()).loadAs(profileYml.getInputStream(), Map)
 
         name = profileConfig.get("name")?.toString()
         mainClassName = profileConfig.get("mainClassName")?.toString() ?: ''
