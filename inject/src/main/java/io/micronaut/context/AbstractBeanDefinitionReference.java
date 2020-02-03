@@ -92,11 +92,6 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
                 } else {
                     throw new BeanContextException("Unexpected error loading bean definition [" + beanDefinitionTypeName + "]: " + e.getMessage(), e);
                 }
-                if (ClassLoadingReporter.isReportingEnabled()) {
-                    ClassLoadingReporter.reportMissing(beanTypeName);
-                    ClassLoadingReporter.reportMissing(getBeanDefinitionName());
-                    ClassLoadingReporter.reportMissing(getClass().getName());
-                }
                 present = false;
             }
         }

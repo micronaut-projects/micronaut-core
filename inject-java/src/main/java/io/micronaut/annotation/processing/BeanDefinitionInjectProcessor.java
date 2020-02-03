@@ -82,6 +82,8 @@ import static javax.lang.model.type.TypeKind.ARRAY;
 @SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS})
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
+    private static final String AROUND_TYPE = "io.micronaut.aop.Around";
+    private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String[] ANNOTATION_STEREOTYPES = new String[]{
             ProcessedTypes.POST_CONSTRUCT,
             ProcessedTypes.PRE_DESTROY,
@@ -92,10 +94,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             "io.micronaut.context.annotation.Replaces",
             "io.micronaut.context.annotation.Value",
             "io.micronaut.context.annotation.Property",
-            "io.micronaut.context.annotation.Executable"
+            "io.micronaut.context.annotation.Executable",
+            AROUND_TYPE,
+            INTRODUCTION_TYPE
     };
-    private static final String AROUND_TYPE = "io.micronaut.aop.Around";
-    private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String ANN_CONSTRAINT = "javax.validation.Constraint";
     private static final String ANN_VALID = "javax.validation.Valid";
     private static final Predicate<AnnotationMetadata> IS_CONSTRAINT = am ->
@@ -122,7 +124,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         annotations = annotations
                 .stream()
                 .filter(ann -> !ann.getQualifiedName().toString().equals(AnnotationUtil.KOTLIN_METADATA))
-                .filter(ann -> annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES) || AbstractAnnotationMetadataBuilder.isAnnotationMapped(ann.getQualifiedName().toString()))
+                .filter(ann ->
+                        annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES) || AbstractAnnotationMetadataBuilder.isAnnotationMapped(ann.getQualifiedName().toString()))
                 .collect(Collectors.toSet());
 
         if (!annotations.isEmpty()) {
@@ -606,13 +609,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         throw new IllegalStateException("Owning type cannot be null");
                     }
                     TypeMirror returnTypeMirror = method.getReturnType();
+                    final Object returnType = modelUtils.resolveTypeReference(returnTypeMirror);
                     Object resolvedReturnType = genericUtils.resolveTypeReference(returnTypeMirror, boundTypes);
                     Map<String, Object> returnTypeGenerics = genericUtils.resolveGenericTypes(returnTypeMirror, boundTypes);
 
                     String methodName = method.getSimpleName().toString();
                     Map<String, Object> methodParameters = params.getParameters();
                     Map<String, Object> genericParameters = params.getGenericParameters();
-                    Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
+                    Map<String, AnnotationMetadata> parameterAnnotationMetadata = params.getParameterMetadata();
                     Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
                     AnnotationMetadata annotationMetadata;
 
@@ -682,6 +686,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             annotationMetadata = metadataBuilder.annotate(
                                     annotationMetadata,
                                     builder.build());
+
+                            if (annotationMetadata.hasStereotype(ANN_CONSTRAINT) && !annotationMetadata.hasStereotype(Executable.class)) {
+                                aopProxyWriter.visitExecutableMethod(
+                                        owningType,
+                                        returnType,
+                                        resolvedReturnType,
+                                        returnTypeGenerics,
+                                        methodName,
+                                        methodParameters,
+                                        genericParameters,
+                                        parameterAnnotationMetadata,
+                                        methodGenericTypes,
+                                        annotationMetadata
+                                );
+                            }
                         }
                     }
 
@@ -694,16 +713,30 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
 
 
-                    if (isAbstract) {
-                        aopProxyWriter.visitIntroductionMethod(
+                    if (annotationMetadata.hasStereotype(Executable.class)) {
+                        aopProxyWriter.visitExecutableMethod(
                                 owningType,
-                                modelUtils.resolveTypeReference(returnTypeMirror),
+                                returnType,
                                 resolvedReturnType,
                                 returnTypeGenerics,
                                 methodName,
                                 methodParameters,
                                 genericParameters,
-                                methodQualifier,
+                                parameterAnnotationMetadata,
+                                methodGenericTypes,
+                                annotationMetadata
+                        );
+                    }
+                    if (isAbstract) {
+                        aopProxyWriter.visitIntroductionMethod(
+                                owningType,
+                                returnType,
+                                resolvedReturnType,
+                                returnTypeGenerics,
+                                methodName,
+                                methodParameters,
+                                genericParameters,
+                                parameterAnnotationMetadata,
                                 methodGenericTypes,
                                 annotationMetadata
                         );
@@ -711,13 +744,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         // only apply around advise to non-abstract methods of introduction advise
                         aopProxyWriter.visitAroundMethod(
                                 owningType,
-                                modelUtils.resolveTypeReference(returnTypeMirror),
+                                returnType,
                                 resolvedReturnType,
                                 returnTypeGenerics,
                                 methodName,
                                 methodParameters,
                                 genericParameters,
-                                methodQualifier,
+                                parameterAnnotationMetadata,
                                 methodGenericTypes,
                                 annotationMetadata
                         );
@@ -798,8 +831,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             boolean isPublic = modifiers.contains(Modifier.PUBLIC) && !hasInvalidModifiers;
             boolean isExecutable =
                     !hasInvalidModifiers &&
-                    ((isExecutableType && isPublic) ||
-                            methodAnnotationMetadata.hasStereotype(Executable.class)) ;
+                            (isExecutableThroughType(methodAnnotationMetadata, modifiers, isPublic) ||
+                                annotationMetadata.hasStereotype(AROUND_TYPE));
 
 
             boolean hasConstraints = false;
@@ -833,6 +866,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             return null;
+        }
+
+        private boolean isExecutableThroughType(AnnotationMetadata methodAnnotationMetadata, Set<Modifier> modifiers, boolean isPublic) {
+            return (isExecutableType && (isPublic || modifiers.isEmpty())) ||
+                    methodAnnotationMetadata.hasStereotype(Executable.class);
         }
 
         private void visitConfigurationPropertySetter(ExecutableElement method) {
@@ -1276,6 +1314,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                         }
                     } else {
+                        if (aroundMethodMetadata.hasStereotype(Executable.class)) {
+                            aopProxyWriter.visitExecutableMethod(
+                                    typeRef,
+                                    resolvedReturnType,
+                                    resolvedReturnType,
+                                    returnTypeGenerics,
+                                    method.getSimpleName().toString(),
+                                    params.getParameters(),
+                                    params.getGenericParameters(),
+                                    params.getParameterMetadata(),
+                                    params.getGenericTypes(),
+                                    aroundMethodMetadata
+                            );
+                        }
                         aopProxyWriter.visitAroundMethod(
                                 typeRef,
                                 resolvedReturnType,

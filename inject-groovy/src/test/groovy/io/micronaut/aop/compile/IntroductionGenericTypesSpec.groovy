@@ -39,8 +39,10 @@ import java.net.*;
 
 interface MyInterface<T extends URL> {
 
+    @Executable
     T getURL();
     
+    @Executable
     java.util.List<T> getURLs();
 }
 
@@ -74,20 +76,28 @@ import io.micronaut.context.annotation.*;
 import java.net.*;
 
 interface MyInterface<T extends Person> {
+    @Executable
     T[] getPeopleArray();
 
+    @Executable
     def <V extends java.net.URL> java.util.Map<T,V> getPeopleMap();
 
+    @Executable
     io.reactivex.Single<java.util.List<T>> getPeopleSingle();
     
+    @Executable
     T getPerson();
     
+    @Executable
     java.util.List<T> getPeople();
     
+    @Executable
     void save(T person);
     
+    @Executable
     void saveAll(java.util.List<T> person);
     
+    @Executable
     java.util.List<T[]> getPeopleListArray();
     
     
@@ -151,20 +161,28 @@ import io.micronaut.context.annotation.*;
 import java.net.*;
 
 interface MyInterface<T extends Person> {
+    @Executable
     T[] getPeopleArray();
 
+    @Executable
     def <V extends java.net.URL> java.util.Map<T,V> getPeopleMap();
 
+    @Executable
     io.reactivex.Single<java.util.List<T>> getPeopleSingle();
     
+    @Executable
     T getPerson();
     
+    @Executable
     java.util.List<T> getPeople();
     
+    @Executable
     void save(T person);
     
+    @Executable
     void saveAll(java.util.List<T> person);
     
+    @Executable
     java.util.List<T[]> getPeopleListArray();
     
     
@@ -231,6 +249,7 @@ import java.net.*;
 
 @Stub
 @javax.inject.Singleton
+@Executable
 interface MyBean extends MyPrecompiledInterface {
 
 }
@@ -288,6 +307,7 @@ import io.micronaut.aop.compile.*;
 
 @Stub
 @javax.inject.Singleton
+@Executable
 interface MyBean extends MyPrecompiledInterface<SubPerson> {
 
 }
