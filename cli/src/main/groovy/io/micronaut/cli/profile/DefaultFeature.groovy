@@ -25,7 +25,6 @@ import org.eclipse.aether.artifact.DefaultArtifact
 import org.eclipse.aether.graph.Dependency
 import org.eclipse.aether.graph.Exclusion
 import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.SafeConstructor
 
 /**
  * Default implementation of the {@link Feature} interface
@@ -57,7 +56,7 @@ class DefaultFeature implements Feature {
         this.name = name
         this.location = location
         def featureYml = location.createRelative("feature.yml")
-        def featureConfig = (Map<String, Object>) new Yaml(new SafeConstructor()).loadAs(featureYml.getInputStream(), Map)
+        def featureConfig = (Map<String, Object>) new Yaml().loadAs(featureYml.getInputStream(), Map)
         configuration.merge(featureConfig)
         def dependencyMap = configuration.get("dependencies")
         Map featureMap = (Map) configuration.get("features", Collections.emptyMap())

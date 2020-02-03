@@ -20,7 +20,6 @@ import io.micronaut.core.util.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.InputStream;
 import java.util.Iterator;
@@ -54,7 +53,7 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
             System.setProperty("java.runtime.name", "Unknown");
         }
 
-        Yaml yaml = new Yaml(new SafeConstructor());
+        Yaml yaml = new Yaml();
         Iterable<Object> objects = yaml.loadAll(input);
         Iterator<Object> i = objects.iterator();
         if (i.hasNext()) {
