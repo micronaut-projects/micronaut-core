@@ -324,7 +324,13 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 NettyRxWebSocketSession currentSession = getSession();
 
                 if (!converted.isPresent()) {
-                    MediaType mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::new).orElse(MediaType.APPLICATION_JSON_TYPE);
+                    MediaType mediaType;
+                    try {
+                        mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::new).orElse(MediaType.APPLICATION_JSON_TYPE);
+                    } catch (IllegalArgumentException e) {
+                        exceptionCaught(ctx, e);
+                        return;
+                    }
                     try {
                         converted = mediaTypeCodecRegistry.findCodec(mediaType).map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())));
                     } catch (CodecException e) {
