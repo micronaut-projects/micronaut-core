@@ -32,7 +32,6 @@ import spock.lang.Unroll
  */
 class PropertySourcePropertyResolverSpec extends Specification {
 
-
     @Rule
     private final EnvironmentVariables environmentVariables = new EnvironmentVariables()
 

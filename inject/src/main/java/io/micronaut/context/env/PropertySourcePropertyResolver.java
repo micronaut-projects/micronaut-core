@@ -134,12 +134,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         } else {
             Boolean result = containsCache.get(name);
             if (result == null) {
+                String finalName = trimIndex(name);
                 result = Stream.of(null, StringConvention.RAW).anyMatch(convention -> {
-                    Map<String, Object> entries = resolveEntriesForKey(name, false, convention);
+                    Map<String, Object> entries = resolveEntriesForKey(finalName, false, convention);
                     if (entries == null) {
                         return false;
                     } else {
-                        return entries.containsKey(name);
+                        return entries.containsKey(finalName);
                     }
                 });
 
