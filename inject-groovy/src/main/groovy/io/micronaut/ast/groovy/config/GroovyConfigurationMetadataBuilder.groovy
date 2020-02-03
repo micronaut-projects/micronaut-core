@@ -74,7 +74,7 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
                 if (parentConfig.isPresent()) {
                     String parentPath = parentConfig.get()
                     if (parentMetadata.hasDeclaredAnnotation(EachProperty)) {
-                        if (annotationMetadata.booleanValue(EachProperty.class, "list").orElse(false)) {
+                        if (parentMetadata.booleanValue(EachProperty.class, "list").orElse(false)) {
                             path.insert(0, parentPath + "[*].")
                         } else {
                             path.insert(0, parentPath + ".*.")
