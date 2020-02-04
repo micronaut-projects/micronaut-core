@@ -122,7 +122,9 @@ import java.net.*;
 import javax.validation.constraints.*;
 
 interface MyInterface{
+    @Executable
     void save(@NotBlank String name, @Min(1L) int age);
+    @Executable
     void saveTwo(@Min(1L) String name);
 }
 

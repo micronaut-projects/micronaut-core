@@ -16,10 +16,7 @@
 package io.micronaut.aop.factory;
 
 import io.micronaut.aop.simple.Mutating;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.*;
 
 import javax.inject.Named;
 
@@ -33,6 +30,7 @@ public class InterfaceFactory {
     @Prototype
     @Mutating("name")
     @Primary
+    @Executable
     InterfaceClass interfaceClass() {
         return new InterfaceImpl();
     }
@@ -40,6 +38,7 @@ public class InterfaceFactory {
     @Prototype
     @Mutating("name")
     @Named("another")
+    @Executable
     InterfaceClass anotherImpl() {
         return new InterfaceImpl();
     }

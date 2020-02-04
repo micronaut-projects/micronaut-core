@@ -40,6 +40,7 @@ class MyFactory {
 
     
     @Bean
+    @Executable
     String myBean(@Parameter String name) {
         return name;
     }

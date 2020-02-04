@@ -41,6 +41,7 @@ import io.micronaut.context.annotation.*;
 @javax.inject.Singleton
 class MyBean  {
 
+    @Executable
     public String getFoo() { return "good"; }
 }
 
@@ -80,6 +81,7 @@ import io.micronaut.context.annotation.*;
 @javax.inject.Singleton
 abstract class MyBean2 {
 
+    @Executable
     public String getFoo() { return "good"; }
 }
 
@@ -121,6 +123,7 @@ import io.micronaut.context.annotation.*;
 @javax.inject.Singleton
 interface MyBean3  {
 
+    @Executable
     String getBar(); 
     
 }

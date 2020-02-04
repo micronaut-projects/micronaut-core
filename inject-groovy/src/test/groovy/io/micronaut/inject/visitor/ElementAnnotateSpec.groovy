@@ -35,7 +35,9 @@ import io.micronaut.aop.introduction.Stub;
 
 @Stub
 interface MyInterface{
+    @Executable
     void save(@NotBlank String name, @Min(1L) int age);
+    @Executable
     void saveTwo(String name);
 }
 

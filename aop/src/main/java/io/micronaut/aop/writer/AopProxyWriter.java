@@ -478,18 +478,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                    AnnotationMetadata annotationMetadata,
                                    boolean isAbstract) {
 
-        // to make dispatch to this method more efficient and annotation metadata accurate also generate an executable method
-        visitExecutableMethod(
-                declaringType,
-                returnType,
-                genericReturnType,
-                returnTypeGenericTypes,
-                methodName,
-                argumentTypes,
-                genericParameters,
-                argumentAnnotationMetadata,
-                genericTypes,
-                annotationMetadata);
 
         List<Object> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();

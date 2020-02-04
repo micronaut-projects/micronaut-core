@@ -474,6 +474,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         AstGenericUtils.createGenericsSpec(methodNode, boundTypes)
                     }
                     Object resolvedReturnType = AstGenericUtils.resolveTypeReference(methodNode.returnType, boundTypes)
+                    def owningType = AstGenericUtils.resolveTypeReference(methodNode.declaringClass)
+                    def returnType = resolveReturnType(classNode, methodNode, boundTypes)
+
                     Map<String, Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(
                             methodNode.returnType,
                             boundTypes
@@ -558,6 +561,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         } else {
                             annotationMetadata = addAnnotation(annotationMetadata, ANN_CONFIGURATION_ADVICE)
                         }
+
+                        if (annotationMetadata.hasStereotype(ANN_CONSTRAINT) && !annotationMetadata.hasStereotype(Executable.class)) {
+                            aopProxyWriter.visitExecutableMethod(
+                                    owningType,
+                                    returnType,
+                                    resolvedReturnType,
+                                    resolvedGenericTypes,
+                                    methodNode.name,
+                                    targetMethodParamsToType,
+                                    targetGenericParams,
+                                    targetAnnotationMetadata,
+                                    targetMethodGenericTypeMap,
+                                    annotationMetadata
+                            )
+                        }
                     }
 
                     if (AstAnnotationUtils.hasStereotype(source, unit, methodNode, AROUND_TYPE)) {
@@ -565,10 +583,24 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         aopProxyWriter.visitInterceptorTypes(interceptorTypeReferences)
                     }
 
+                    if (annotationMetadata.hasStereotype(Executable.class)) {
+                        aopProxyWriter.visitExecutableMethod(
+                                owningType,
+                                returnType,
+                                resolvedReturnType,
+                                resolvedGenericTypes,
+                                methodNode.name,
+                                targetMethodParamsToType,
+                                targetGenericParams,
+                                targetAnnotationMetadata,
+                                targetMethodGenericTypeMap,
+                                annotationMetadata
+                        )
+                    }
                     if (methodNode.isAbstract()) {
                         aopProxyWriter.visitIntroductionMethod(
-                                AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                                resolveReturnType(classNode, methodNode, boundTypes),
+                                owningType,
+                                returnType,
                                 resolvedReturnType,
                                 resolvedGenericTypes,
                                 methodNode.name,
@@ -580,8 +612,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         )
                     } else {
                         aopProxyWriter.visitAroundMethod(
-                                AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                                resolveReturnType(classNode, methodNode, boundTypes),
+                                owningType,
+                                returnType,
                                 resolvedReturnType,
                                 resolvedGenericTypes,
                                 methodNode.name,
@@ -910,7 +942,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             } else if (!isConstructor) {
                 boolean hasInvalidModifiers = methodNode.isStatic() || methodNode.isAbstract() || methodNode.isSynthetic() || methodAnnotationMetadata.hasAnnotation(Internal) || methodNode.isPrivate()
                 boolean isPublic = methodNode.isPublic() && !hasInvalidModifiers
-                boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable)) && !hasInvalidModifiers
+                boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable) || methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) && !hasInvalidModifiers
                 if (isExecutable) {
                     visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
                 } else if (isConfigurationProperties && isPublic) {
@@ -1107,6 +1139,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         if (proxyWriter != null && !methodNode.isFinal()) {
 
                             proxyWriter.visitInterceptorTypes(interceptorTypeReferences)
+
                             proxyWriter.visitAroundMethod(
                                     AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
                                     AstGenericUtils.resolveTypeReference(methodNode.returnType),
