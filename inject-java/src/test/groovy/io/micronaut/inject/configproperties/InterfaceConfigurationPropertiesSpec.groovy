@@ -63,12 +63,14 @@ import java.time.Duration;
 @ConfigurationProperties("bar")
 interface MyConfig extends ParentConfig {
     
+    @Executable
     @javax.validation.constraints.Min(10L)
     int getServerPort();
 }
 
 @ConfigurationProperties("foo")
 interface ParentConfig {
+    @Executable
     @javax.validation.constraints.NotBlank
     String getHost();
 }
@@ -106,14 +108,17 @@ import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
 interface MyConfig {
+    @Executable
     @javax.validation.constraints.NotBlank
     String getHost();
     
+    @Executable
     @javax.validation.constraints.Min(10L)
     int getServerPort();
 
     @ConfigurationProperties("child")    
     static interface ChildConfig {
+        @Executable
         URL getURL();
     }
 }
@@ -149,15 +154,19 @@ import java.net.URL;
 @ConfigurationProperties("foo.bar")
 interface MyConfig {
     @javax.validation.constraints.NotBlank
+    @Executable
     String getHost();
     
     @javax.validation.constraints.Min(10L)
+    @Executable
     int getServerPort();
     
+    @Executable
     ChildConfig getChild();
 
     @ConfigurationProperties("child")    
     static interface ChildConfig {
+        @Executable
         URL getURL();
     }
 }

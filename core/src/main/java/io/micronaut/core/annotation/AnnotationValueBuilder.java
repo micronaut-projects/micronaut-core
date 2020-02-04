@@ -15,8 +15,10 @@
  */
 package io.micronaut.core.annotation;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.RetentionPolicy;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,25 +32,52 @@ import java.util.Map;
 public class AnnotationValueBuilder<T extends Annotation> {
 
     private final String annotationName;
-    private Map<CharSequence, Object> values = new HashMap<>();
+    private final Map<CharSequence, Object> values = new HashMap<>(5);
+    private final RetentionPolicy retentionPolicy;
 
     /**
      * Default constructor.
      *
      * @param annotationName The annotation name
      */
+    @Internal
     AnnotationValueBuilder(String annotationName) {
-        this.annotationName = annotationName;
+        this(annotationName, RetentionPolicy.RUNTIME);
     }
 
+    /**
+     * Default constructor.
+     *
+     * @param annotationName The annotation name
+     * @param retentionPolicy The retention policy
+     */
+    @Internal
+    AnnotationValueBuilder(String annotationName, RetentionPolicy retentionPolicy) {
+        this.annotationName = annotationName;
+        this.retentionPolicy = retentionPolicy != null ? retentionPolicy : RetentionPolicy.RUNTIME;
+    }
 
     /**
      * Default constructor.
      *
      * @param annotation The annotation
      */
+    @Internal
     AnnotationValueBuilder(Class<?> annotation) {
-        this.annotationName = annotation.getName();
+        this(annotation.getName());
+    }
+
+    /**
+     * Default constructor.
+     *
+     * @param value An existing value
+     * @param retentionPolicy The retention policy
+     */
+    @Internal
+    AnnotationValueBuilder(AnnotationValue<T> value, RetentionPolicy retentionPolicy) {
+        this.annotationName = value.getAnnotationName();
+        this.values.putAll(value.getValues());
+        this.retentionPolicy = retentionPolicy != null ? retentionPolicy : RetentionPolicy.RUNTIME;
     }
 
     /**
@@ -56,7 +85,17 @@ public class AnnotationValueBuilder<T extends Annotation> {
      *
      * @return The {@link AnnotationValue}
      */
-    public AnnotationValue<T> build() {
+    public @Nonnull AnnotationValue<T> build() {
+        if (retentionPolicy != RetentionPolicy.RUNTIME) {
+            //noinspection unchecked
+            return new AnnotationValue(annotationName, values) {
+                @Nonnull
+                @Override
+                public RetentionPolicy getRetentionPolicy() {
+                    return retentionPolicy;
+                }
+            };
+        }
         return new AnnotationValue<>(annotationName, values);
     }
 

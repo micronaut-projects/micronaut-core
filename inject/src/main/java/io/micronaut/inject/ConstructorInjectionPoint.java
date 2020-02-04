@@ -18,11 +18,11 @@ package io.micronaut.inject;
 /**
  * A constructor injection point.
  *
- * @param <T> The constructor type
+ * @param <T> The constructed type
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint {
+public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint<T> {
 
     /**
      * Invoke the constructor.

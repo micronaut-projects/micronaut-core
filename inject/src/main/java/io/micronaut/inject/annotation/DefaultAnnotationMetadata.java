@@ -26,10 +26,12 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -93,6 +95,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     // should not be used in any of the read methods
     // The following fields are used only at compile time, and
     private Map<String, String> repeated = null;
+    private Set<String> sourceRetentionAnnotations;
 
     /**
      * Constructs empty annotation metadata.
@@ -124,6 +127,17 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         this.allStereotypes = allStereotypes;
         this.allAnnotations = allAnnotations;
         this.annotationsByStereotype = annotationsByStereotype;
+    }
+
+    /**
+     * @return The annotations that are source retention.
+     */
+    @Internal
+    Set<String> getSourceRetentionAnnotations() {
+        if (sourceRetentionAnnotations != null) {
+            return Collections.unmodifiableSet(sourceRetentionAnnotations);
+        }
+        return Collections.emptySet();
     }
 
     @Nonnull
@@ -172,11 +186,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the class value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
-     * @param enumType The enum type
+     *
+     * @param annotation  The annotation
+     * @param member      The member
+     * @param enumType    The enum type
      * @param valueMapper The value mapper
-     * @param <E> The enum type
+     * @param <E>         The enum type
      * @return The class value
      */
     @Override
@@ -243,11 +258,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the class value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
-     * @param enumType The enum type
+     *
+     * @param annotation  The annotation
+     * @param member      The member
+     * @param enumType    The enum type
      * @param valueMapper The value mapper
-     * @param <E> The enum type
+     * @param <E>         The enum type
      * @return The class value
      */
     @Override
@@ -312,8 +328,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the class value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The class value
      */
@@ -345,8 +362,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the class value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The class value
      */
@@ -383,8 +401,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the int value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The int value
      */
@@ -418,15 +437,16 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return booleanValue(annotation, member, null);
     }
 
-     /**
+    /**
      * Retrieve the boolean value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The boolean value
      */
-     @Override
-     public Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
+    @Override
+    public Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
@@ -443,8 +463,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the boolean value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The boolean value
      */
@@ -477,8 +498,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the long value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The long value
      */
@@ -501,8 +523,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the long value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The long value
      */
@@ -529,8 +552,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the int value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The int value
      */
@@ -563,8 +587,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the string value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The int value
      */
@@ -591,8 +616,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the string value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The int value
      */
@@ -624,8 +650,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the string value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The string value
      */
@@ -651,8 +678,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the boolean value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The boolean value
      */
@@ -682,8 +710,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the boolean value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The boolean value
      */
@@ -721,8 +750,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the double value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The double value
      */
@@ -745,8 +775,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Retrieve the double value and optionally map its value.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation  The annotation
+     * @param member      The member
      * @param valueMapper The value mapper
      * @return The double value
      */
@@ -801,11 +832,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     /**
      * Resolves the given value performing type conversion as necessary.
-     * @param annotation The annotation
-     * @param member The member
+     *
+     * @param annotation   The annotation
+     * @param member       The member
      * @param requiredType The required type
-     * @param valueMapper The value mapper
-     * @param <T> The generic type
+     * @param valueMapper  The value mapper
+     * @param <T>          The generic type
      * @return The resolved value
      */
     @Override
@@ -1010,7 +1042,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public @Nonnull List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
+    public @Nonnull
+    List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
         if (stereotype == null) {
             return Collections.emptyList();
         }
@@ -1136,7 +1169,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public @Nonnull <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
+    public @Nonnull
+    <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
@@ -1168,6 +1202,20 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @SuppressWarnings("WeakerAccess")
     protected final void addAnnotation(String annotation, Map<CharSequence, Object> values) {
+        addAnnotation(annotation, values, RetentionPolicy.RUNTIME);
+    }
+
+
+    /**
+     * Adds an annotation and its member values, if the annotation already exists the data will be merged with existing
+     * values replaced.
+     *
+     * @param annotation      The annotation
+     * @param values          The values
+     * @param retentionPolicy The retention policy
+     */
+    @SuppressWarnings("WeakerAccess")
+    protected final void addAnnotation(String annotation, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         if (annotation != null) {
             String repeatedName = getRepeatedName(annotation);
             Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
@@ -1185,7 +1233,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 }
             } else {
                 Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
-                addAnnotation(annotation, values, null, allAnnotations, false);
+                addAnnotation(annotation, values, null, allAnnotations, false, retentionPolicy);
             }
         }
     }
@@ -1268,10 +1316,21 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param annotationValue The annotation value
      */
     protected final void addRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue) {
+        addRepeatable(annotationName, annotationValue, annotationValue.getRetentionPolicy());
+    }
+
+    /**
+     * Adds a repeatable annotation value. If a value already exists will be added
+     *
+     * @param annotationName  The annotation name
+     * @param annotationValue The annotation value
+     * @param retentionPolicy The retention policy
+     */
+    protected final void addRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
         if (StringUtils.isNotEmpty(annotationName) && annotationValue != null) {
             Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
 
-            addRepeatableInternal(annotationName, annotationValue, allAnnotations);
+            addRepeatableInternal(annotationName, annotationValue, allAnnotations, retentionPolicy);
         }
     }
 
@@ -1291,7 +1350,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
         }
 
-        addRepeatableInternal(stereotype, annotationValue, allStereotypes);
+        addRepeatableInternal(stereotype, annotationValue, allStereotypes, RetentionPolicy.RUNTIME);
     }
 
     /**
@@ -1310,8 +1369,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
         }
 
-        addRepeatableInternal(stereotype, annotationValue, declaredStereotypes);
-        addRepeatableInternal(stereotype, annotationValue, getAllStereotypes());
+        addRepeatableInternal(stereotype, annotationValue, declaredStereotypes, RetentionPolicy.RUNTIME);
+        addRepeatableInternal(stereotype, annotationValue, getAllStereotypes(), RetentionPolicy.RUNTIME);
     }
 
     /**
@@ -1321,10 +1380,21 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param annotationValue The annotation value
      */
     protected final void addDeclaredRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue) {
+        addDeclaredRepeatable(annotationName, annotationValue, annotationValue.getRetentionPolicy());
+    }
+
+    /**
+     * Adds a repeatable annotation value. If a value already exists will be added
+     *
+     * @param annotationName  The annotation name
+     * @param annotationValue The annotation value
+     * @param retentionPolicy The retention policy
+     */
+    protected final void addDeclaredRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
         if (StringUtils.isNotEmpty(annotationName) && annotationValue != null) {
             Map<String, Map<CharSequence, Object>> allAnnotations = getDeclaredAnnotationsInternal();
 
-            addRepeatableInternal(annotationName, annotationValue, allAnnotations);
+            addRepeatableInternal(annotationName, annotationValue, allAnnotations, retentionPolicy);
 
             addRepeatable(annotationName, annotationValue);
         }
@@ -1341,6 +1411,21 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @SuppressWarnings("WeakerAccess")
     protected final void addStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
+        addStereotype(parentAnnotations, stereotype, values, RetentionPolicy.RUNTIME);
+    }
+
+
+    /**
+     * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing
+     * values replaced.
+     *
+     * @param parentAnnotations The parent annotations
+     * @param stereotype        The annotation
+     * @param values            The values
+     * @param retentionPolicy   The retention policy
+     */
+    @SuppressWarnings("WeakerAccess")
+    protected final void addStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         if (stereotype != null) {
             String repeatedName = getRepeatedName(stereotype);
             if (repeatedName != null) {
@@ -1373,10 +1458,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                         values,
                         null,
                         allStereotypes,
-                        false
+                        false,
+                        retentionPolicy
                 );
             }
-
         }
     }
 
@@ -1390,6 +1475,20 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @SuppressWarnings("WeakerAccess")
     protected final void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
+        addDeclaredStereotype(parentAnnotations, stereotype, values, RetentionPolicy.RUNTIME);
+    }
+
+    /**
+     * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing
+     * values replaced.
+     *
+     * @param parentAnnotations The parent annotations
+     * @param stereotype        The annotation
+     * @param values            The values
+     * @param retentionPolicy   The retention policy
+     */
+    @SuppressWarnings("WeakerAccess")
+    protected final void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         if (stereotype != null) {
             String repeatedName = getRepeatedName(stereotype);
             if (repeatedName != null) {
@@ -1422,7 +1521,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                         values,
                         declaredStereotypes,
                         allStereotypes,
-                        true
+                        true,
+                        retentionPolicy
                 );
             }
 
@@ -1437,6 +1537,18 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param values     The values
      */
     protected void addDeclaredAnnotation(String annotation, Map<CharSequence, Object> values) {
+        addDeclaredAnnotation(annotation, values, RetentionPolicy.RUNTIME);
+    }
+
+    /**
+     * Adds an annotation directly declared on the element and its member values, if the annotation already exists the
+     * data will be merged with existing values replaced.
+     *
+     * @param annotation      The annotation
+     * @param values          The values
+     * @param retentionPolicy The retention policy
+     */
+    protected void addDeclaredAnnotation(String annotation, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         if (annotation != null) {
             String repeatedName = getRepeatedName(annotation);
             if (repeatedName != null) {
@@ -1457,7 +1569,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             } else {
                 Map<String, Map<CharSequence, Object>> declaredAnnotations = getDeclaredAnnotationsInternal();
                 Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
-                addAnnotation(annotation, values, declaredAnnotations, allAnnotations, true);
+                addAnnotation(annotation, values, declaredAnnotations, allAnnotations, true, retentionPolicy);
             }
         }
     }
@@ -1499,13 +1611,25 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     private void addAnnotation(String annotation,
                                Map<CharSequence, Object> values,
-                               Map<String, Map<CharSequence, Object>> declaredAnnotations, Map<String,
-            Map<CharSequence, Object>> allAnnotations,
-                               boolean isDeclared) {
+                               Map<String, Map<CharSequence, Object>> declaredAnnotations,
+                               Map<String, Map<CharSequence, Object>> allAnnotations,
+                               boolean isDeclared,
+                               RetentionPolicy retentionPolicy) {
         if (isDeclared && declaredAnnotations != null) {
             putValues(annotation, values, declaredAnnotations);
         }
         putValues(annotation, values, allAnnotations);
+
+        if (retentionPolicy == RetentionPolicy.SOURCE) {
+            addSourceRetentionAnnotation(annotation);
+        }
+    }
+
+    private void addSourceRetentionAnnotation(String annotation) {
+        if (sourceRetentionAnnotations == null) {
+            sourceRetentionAnnotations = new HashSet<>(5);
+        }
+        sourceRetentionAnnotations.add(annotation);
     }
 
     private void putValues(String annotation, Map<CharSequence, Object> values, Map<String, Map<CharSequence, Object>> currentAnnotationValues) {
@@ -1593,7 +1717,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return annotations;
     }
 
-    private @Nullable Object getRawSingleValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
+    private @Nullable
+    Object getRawSingleValue(@Nonnull String annotation, @Nonnull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawValue(annotation, member);
         if (rawValue != null) {
             if (rawValue.getClass().isArray()) {
@@ -1632,16 +1757,28 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return rawValue;
     }
 
-    private void addRepeatableInternal(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue, Map<String, Map<CharSequence, Object>> allAnnotations) {
-        addRepeatableInternal(annotationName, AnnotationMetadata.VALUE_MEMBER, annotationValue, allAnnotations);
+    private void addRepeatableInternal(
+            String annotationName,
+            io.micronaut.core.annotation.AnnotationValue annotationValue,
+            Map<String, Map<CharSequence, Object>> allAnnotations,
+            RetentionPolicy retentionPolicy) {
+        addRepeatableInternal(annotationName, AnnotationMetadata.VALUE_MEMBER, annotationValue, allAnnotations, retentionPolicy);
     }
 
-    private void addRepeatableInternal(String annotationName, String member, io.micronaut.core.annotation.AnnotationValue annotationValue, Map<String, Map<CharSequence, Object>> allAnnotations) {
+    private void addRepeatableInternal(
+            String annotationName,
+            String member,
+            io.micronaut.core.annotation.AnnotationValue annotationValue,
+            Map<String, Map<CharSequence, Object>> allAnnotations,
+            RetentionPolicy retentionPolicy) {
         if (repeated == null) {
             repeated = new HashMap<>(2);
         }
 
         repeated.put(annotationName, annotationValue.getAnnotationName());
+        if (retentionPolicy == RetentionPolicy.SOURCE) {
+            addSourceRetentionAnnotation(annotationName);
+        }
 
         Map<CharSequence, Object> values = allAnnotations.computeIfAbsent(annotationName, s -> new HashMap<>());
         Object v = values.get(member);

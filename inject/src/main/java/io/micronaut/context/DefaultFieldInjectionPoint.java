@@ -34,12 +34,13 @@ import java.util.Objects;
 /**
  * Represents an injection point for a field.
  *
+ * @param <B> The declaring bean type
  * @param <T> The field type
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T>, EnvironmentConfigurable {
+class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, EnvironmentConfigurable {
 
     private final BeanDefinition declaringBean;
     private final Class declaringType;
@@ -91,7 +92,7 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T>, Environme
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        DefaultFieldInjectionPoint<?> that = (DefaultFieldInjectionPoint<?>) o;
+        DefaultFieldInjectionPoint<?, ?> that = (DefaultFieldInjectionPoint<?, ?>) o;
         return Objects.equals(declaringType, that.declaringType) &&
             Objects.equals(fieldType, that.fieldType) &&
             Objects.equals(field, that.field);

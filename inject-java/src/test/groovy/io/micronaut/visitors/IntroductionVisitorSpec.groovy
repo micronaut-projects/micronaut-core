@@ -20,6 +20,7 @@ import io.micronaut.aop.introduction.Stub;
 import io.micronaut.visitors.InterfaceWithGenerics;
 
 @Stub
+@io.micronaut.context.annotation.Executable
 interface MyInterface extends InterfaceWithGenerics<Foo, Long>  {
     String myMethod();
 }

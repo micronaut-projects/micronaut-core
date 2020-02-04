@@ -71,25 +71,16 @@ class InterfaceMethodLevelAopSpec extends Specification {
         given:
         BeanContext beanContext = new DefaultBeanContext().start()
 
-        when: "the bean definition is obtained"
-        BeanDefinition<InterfaceClass> beanDefinition = beanContext.findBeanDefinition(InterfaceClass).get()
-
-        then:
-        beanDefinition.findMethod("test", String).isPresent()
-        // should not be a reflection based method
-        !beanDefinition.findMethod("test", String).get().getClass().getName().contains("Reflection")
-
         when:
         InterfaceClass foo = beanContext.getBean(InterfaceClass)
 
 
         then:
         foo instanceof Intercepted
-        beanContext.findExecutableMethod(InterfaceClass, "test", String).isPresent()
-        // should not be a reflection based method
-        !beanContext.findExecutableMethod(InterfaceClass, "test", String).get().getClass().getName().contains("Reflection")
         foo.test("test") == "Name is changed"
 
+        cleanup:
+        beanContext.close()
     }
 
 }

@@ -61,6 +61,7 @@ import io.micronaut.context.annotation.*;
 import java.time.Duration;
 
 @ConfigurationProperties("bar")
+@Executable
 interface MyConfig extends ParentConfig {
     
     @javax.validation.constraints.Min(10L)
@@ -68,6 +69,7 @@ interface MyConfig extends ParentConfig {
 }
 
 @ConfigurationProperties("foo")
+@Executable
 interface ParentConfig {
     @javax.validation.constraints.NotBlank
     String getHost();
@@ -105,6 +107,7 @@ import java.time.Duration;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
+@Executable
 interface MyConfig {
     @javax.validation.constraints.NotBlank
     String getHost();
@@ -114,6 +117,7 @@ interface MyConfig {
 
     @ConfigurationProperties("child")    
     static interface ChildConfig {
+        @Executable
         URL getURL();
     }
 }
@@ -147,6 +151,7 @@ import java.time.Duration;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
+@Executable
 interface MyConfig {
     @javax.validation.constraints.NotBlank
     String getHost();
@@ -154,10 +159,12 @@ interface MyConfig {
     @javax.validation.constraints.Min(10L)
     int getServerPort();
     
+    @Executable
     ChildConfig getChild();
 
     @ConfigurationProperties("child")    
     static interface ChildConfig {
+        @Executable
         URL getURL();
     }
 }

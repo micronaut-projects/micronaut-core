@@ -398,13 +398,13 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             generatorAdapter.loadThis();
         }
         // 1st argument: the declared annotations
-        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.declaredAnnotations, loadTypeMethods);
+        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.declaredAnnotations, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
         // 2nd argument: the declared stereotypes
-        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.declaredStereotypes, loadTypeMethods);
+        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.declaredStereotypes, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
         // 3rd argument: all stereotypes
-        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.allStereotypes, loadTypeMethods);
+        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.allStereotypes, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
         // 4th argument: all annotations
-        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.allAnnotations, loadTypeMethods);
+        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.allAnnotations, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
         // 5th argument: annotations by stereotype
         pushCreateAnnotationsByStereotypeData(generatorAdapter, annotationMetadata.annotationsByStereotype);
 
@@ -485,7 +485,19 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         }
     }
 
-    private static void pushCreateAnnotationData(Type declaringType, ClassWriter declaringClassWriter, GeneratorAdapter methodVisitor, Map<String, Map<CharSequence, Object>> annotationData, Map<String, GeneratorAdapter> loadTypeMethods) {
+    private static void pushCreateAnnotationData(
+            Type declaringType,
+            ClassWriter declaringClassWriter,
+            GeneratorAdapter methodVisitor,
+            Map<String, Map<CharSequence, Object>> annotationData,
+            Map<String, GeneratorAdapter> loadTypeMethods,
+            Set<String> sourceRetentionAnnotations) {
+        if (annotationData != null) {
+            annotationData = new LinkedHashMap<>(annotationData);
+            for (String sourceRetentionAnnotation : sourceRetentionAnnotations) {
+                annotationData.remove(sourceRetentionAnnotation);
+            }
+        }
         int totalSize = annotationData == null ? 0 : annotationData.size() * 2;
         if (totalSize > 0) {
 

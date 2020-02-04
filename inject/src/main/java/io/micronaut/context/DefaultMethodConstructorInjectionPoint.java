@@ -28,9 +28,10 @@ import javax.annotation.Nullable;
  *
  * @author graemerocher
  * @since 1.0
+ * @param <T> The constructed type
  */
 @Internal
-class DefaultMethodConstructorInjectionPoint extends DefaultMethodInjectionPoint implements ConstructorInjectionPoint {
+class DefaultMethodConstructorInjectionPoint<T> extends DefaultMethodInjectionPoint<T, T> implements ConstructorInjectionPoint<T> {
 
     /**
      * @param declaringBean      The declaring bean
@@ -49,7 +50,7 @@ class DefaultMethodConstructorInjectionPoint extends DefaultMethodInjectionPoint
     }
 
     @Override
-    public Object invoke(Object... args) {
+    public T invoke(Object... args) {
         throw new UnsupportedOperationException("Use MethodInjectionPoint#invoke(..) instead");
     }
 }

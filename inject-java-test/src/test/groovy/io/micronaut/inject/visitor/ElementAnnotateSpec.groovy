@@ -32,7 +32,9 @@ import javax.validation.constraints.*;
 
 @Stub
 interface MyInterface{
+    @Executable
     void save(@NotBlank String name, @Min(1L) int age);
+    @Executable
     void saveTwo(String name);
 }
 

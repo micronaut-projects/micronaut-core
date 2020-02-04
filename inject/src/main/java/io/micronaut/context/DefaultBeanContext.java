@@ -2007,6 +2007,30 @@ public class DefaultBeanContext implements BeanContext {
             return (T) this;
         }
 
+        if (beanType == InjectionPoint.class) {
+            final BeanResolutionContext.Path path = resolutionContext != null ? resolutionContext.getPath() : null;
+
+            if (CollectionUtils.isNotEmpty(path)) {
+                final Iterator<BeanResolutionContext.Segment<?>> i = path.iterator();
+                i.next();
+                if (i.hasNext()) {
+                    BeanResolutionContext.Segment segment = i.next();
+                    final BeanDefinition declaringBean = segment.getDeclaringType();
+                    if (declaringBean.hasStereotype(INTRODUCTION_TYPE)) {
+                        if (!i.hasNext()) {
+                            throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                        } else {
+                            segment = i.next();
+                        }
+                    }
+                    return (T) segment.getInjectionPoint();
+                } else {
+                    throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                }
+            } else {
+                throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+            }
+        }
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
 
         if (LOG.isTraceEnabled()) {
@@ -2118,7 +2142,7 @@ public class DefaultBeanContext implements BeanContext {
                 return createBean;
             });
         } else {
-            Optional<BeanResolutionContext.Segment> currentSegment = resolutionContext.getPath().currentSegment();
+            Optional<BeanResolutionContext.Segment<?>> currentSegment = resolutionContext.getPath().currentSegment();
             Optional<CustomScope> registeredScope = Optional.empty();
 
             if (currentSegment.isPresent()) {

@@ -23,5 +23,28 @@ For example:
 snippet::io.micronaut.docs.factories.nullable.Engine,io.micronaut.docs.factories.nullable.EngineConfiguration,io.micronaut.docs.factories.nullable.EngineFactory[tags="class",indent=0]
 
 
+=== Injection Point
+
+A common use case with factories is to take advantage of annotation metadata from the point at which an object is injected such that behaviour can be modified based on said metadata.
+
+Consider an annotation such as the following:
+
+snippet::io.micronaut.docs.injectionpoint.Cylinders[tags="class",indent=0]
+
+The above annotation could be used to customize the type of engine we want to inject into a vehicle at the point at which the injection point is defined:
+
+snippet::io.micronaut.docs.injectionpoint.Vehicle[tags="class",indent=0]
+
+The above `Vehicle` class specifies an annotation value of `@Cylinders(6)` indicating an `Engine` of six cylinders is needed.
+
+To implement this use case you can define a factory that accepts the api:inject.InjectionPoint[] instance which can be used to analyze the annotation values defined:
+
+snippet::io.micronaut.docs.injectionpoint.EngineFactory[tags="class",indent=0]
+
+<1> The factory method defines a parameter of type api:inject.InjectionPoint[].
+<2> The annotation metadata is used to obtain the value of the `@Cylinder` annotation
+<3> The value is used to construct an engine, throwing an exception if an engine cannot be constructed.
+
+NOTE: It is important to note that the factory is declared as ann:context.annotation.Prototype[] scope so that the method is invoked for each injection point. If the `V8Engine` and `V6Engine` types are required to be singletons then the factory should use a map to ensure the objects are only constructed once.
 
 

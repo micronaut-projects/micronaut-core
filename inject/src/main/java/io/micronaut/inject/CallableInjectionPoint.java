@@ -22,8 +22,9 @@ import io.micronaut.core.type.Argument;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @param <T> The injectable type
  */
-public interface CallableInjectionPoint extends InjectionPoint {
+public interface CallableInjectionPoint<T> extends InjectionPoint<T> {
 
     /**
      *

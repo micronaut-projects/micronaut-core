@@ -43,6 +43,7 @@ abstract class AbstractBean {
     @Inject public void setValue( @Value("something") String val) {}  
     public abstract String isAbstract(); 
     
+    @io.micronaut.context.annotation.Executable
     public String nonAbstract() {
         return "good";
     }
