@@ -26,3 +26,10 @@ dependencies {
     testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 
 }
+
+tasks.withType(Test) {
+    testLogging {
+        showStandardStreams = true
+        exceptionFormat = 'full'
+    }
+}
