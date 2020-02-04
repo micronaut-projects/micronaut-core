@@ -25,7 +25,7 @@ public class VehicleSpec {
 
     @Test
     public void testStartVehicle() {
-        BeanContext beanContext = new DefaultBeanContext().start();
+        BeanContext beanContext = BeanContext.run();
         Vehicle vehicle = beanContext.getBean(Vehicle.class);
         System.out.println( vehicle.start() );
 

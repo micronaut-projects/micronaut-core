@@ -19,6 +19,9 @@ class AroundSpec extends Specification {
         then:
         IllegalArgumentException ex = thrown()
         ex.message == 'Null parameter [taskName] not allowed'
+
+        cleanup:
+        applicationContext.close()
     }
     // end::test[]
 }

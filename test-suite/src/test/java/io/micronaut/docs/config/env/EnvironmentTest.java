@@ -21,6 +21,7 @@ public class EnvironmentTest {
         assertTrue(environment.getActiveNames().contains("android"));
         // end::env[]
 
+        applicationContext.close();
     }
 
     @Test
@@ -43,5 +44,6 @@ public class EnvironmentTest {
         );
         // end::envProps[]
 
+        applicationContext.close();
     }
 }

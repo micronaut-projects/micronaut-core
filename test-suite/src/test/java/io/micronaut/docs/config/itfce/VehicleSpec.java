@@ -38,6 +38,10 @@ public class VehicleSpec {
             Vehicle vehicle = applicationContext.getBean(Vehicle.class);
             fail("Should have failed with a validation error");
         } catch (BeanInstantiationException e) {
+            if (applicationContext != null) {
+                applicationContext.close();
+            }
+
             assertTrue(
                     e.getMessage().contains("EngineConfig.getCylinders - must be greater than or equal to 1")
             );

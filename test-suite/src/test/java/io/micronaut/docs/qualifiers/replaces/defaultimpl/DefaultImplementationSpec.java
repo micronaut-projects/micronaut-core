@@ -9,7 +9,7 @@ public class DefaultImplementationSpec {
 
     @Test
     void testTheDefaultIsReplaced() {
-        BeanContext ctx = new DefaultBeanContext().start();
+        BeanContext ctx = BeanContext.run();
         Assertions.assertTrue(ctx.getBean(ResponseStrategy.class) instanceof CustomResponseStrategy);
         ctx.close();
     }

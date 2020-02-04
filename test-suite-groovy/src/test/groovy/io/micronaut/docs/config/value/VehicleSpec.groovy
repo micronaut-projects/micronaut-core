@@ -21,6 +21,9 @@ class VehicleSpec extends Specification {
 
         then:
         vehicle.start() == "Starting V8 Engine"
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test start vehicle without configuration"() {
@@ -36,5 +39,8 @@ class VehicleSpec extends Specification {
 
         then:
         vehicle.start() == "Starting V6 Engine"
+
+        cleanup:
+        applicationContext.close()
     }
 }

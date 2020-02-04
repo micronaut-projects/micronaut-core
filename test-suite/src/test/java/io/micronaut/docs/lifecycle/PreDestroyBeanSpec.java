@@ -10,7 +10,7 @@ public class PreDestroyBeanSpec {
     @Test
     public void testBeanClosingOnContextClose() {
         // tag::start[]
-        BeanContext ctx = BeanContext.build().start();
+        BeanContext ctx = BeanContext.run();
         PreDestroyBean preDestroyBean = ctx.getBean(PreDestroyBean.class);
         Connection connection = ctx.getBean(Connection.class);
         ctx.stop();

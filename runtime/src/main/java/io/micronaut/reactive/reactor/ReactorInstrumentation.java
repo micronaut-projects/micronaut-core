@@ -15,6 +15,7 @@
  */
 package io.micronaut.reactive.reactor;
 
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
@@ -60,24 +61,26 @@ class ReactorInstrumentation {
     @SuppressWarnings("unchecked")
     @PostConstruct
     void init(BeanContext beanContext, ThreadFactory threadFactory) {
-        try {
-            BeanDefinition<ExecutorService> beanDefinition = beanContext.getBeanDefinition(ExecutorService.class, Qualifiers.byName(TaskExecutors.SCHEDULED));
-            Collection<BeanCreatedEventListener> schedulerCreateListeners =
-                    beanContext.getBeansOfType(BeanCreatedEventListener.class, Qualifiers.byTypeArguments(ScheduledExecutorService.class));
+        if (beanContext instanceof ApplicationContext) {
+            try {
+                BeanDefinition<ExecutorService> beanDefinition = beanContext.getBeanDefinition(ExecutorService.class, Qualifiers.byName(TaskExecutors.SCHEDULED));
+                Collection<BeanCreatedEventListener> schedulerCreateListeners =
+                        beanContext.getBeansOfType(BeanCreatedEventListener.class, Qualifiers.byTypeArguments(ScheduledExecutorService.class));
 
-            Schedulers.addExecutorServiceDecorator(Environment.MICRONAUT, (scheduler, scheduledExecutorService) -> {
-                for (BeanCreatedEventListener schedulerCreateListener : schedulerCreateListeners) {
-                    Object newBean = schedulerCreateListener.onCreated(new BeanCreatedEvent(beanContext, beanDefinition, BeanIdentifier.of("reactor-" + scheduler.getClass().getSimpleName()), scheduledExecutorService));
-                    if (!(newBean instanceof ScheduledExecutorService)) {
-                        throw new BeanContextException("Bean creation listener [" + schedulerCreateListener + "] should return ScheduledExecutorService, but returned " + newBean);
+                Schedulers.addExecutorServiceDecorator(Environment.MICRONAUT, (scheduler, scheduledExecutorService) -> {
+                    for (BeanCreatedEventListener schedulerCreateListener : schedulerCreateListeners) {
+                        Object newBean = schedulerCreateListener.onCreated(new BeanCreatedEvent(beanContext, beanDefinition, BeanIdentifier.of("reactor-" + scheduler.getClass().getSimpleName()), scheduledExecutorService));
+                        if (!(newBean instanceof ScheduledExecutorService)) {
+                            throw new BeanContextException("Bean creation listener [" + schedulerCreateListener + "] should return ScheduledExecutorService, but returned " + newBean);
+                        }
+                        scheduledExecutorService = (ScheduledExecutorService) newBean;
                     }
-                    scheduledExecutorService = (ScheduledExecutorService) newBean;
+                    return scheduledExecutorService;
+                });
+            } catch (Exception e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Could not instrument Reactor for Tracing: " + e.getMessage(), e);
                 }
-                return scheduledExecutorService;
-            });
-        } catch (Exception e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Could not instrument Reactor for Tracing: " + e.getMessage(), e);
             }
         }
     }

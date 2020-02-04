@@ -5,12 +5,17 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
 class BasicAuthFilterSpec extends Specification {
 
+    @Shared @AutoCleanup EmbeddedServer embeddedServer =
+            ApplicationContext.run(EmbeddedServer, ["spec.name": "BasicAuthFilterSpec"])
+
     void "test the filter is applied"() {
-        ApplicationContext applicationContext = ApplicationContext.run(EmbeddedServer, ["spec.name": "BasicAuthFilterSpec"]).applicationContext
+        ApplicationContext applicationContext = embeddedServer.applicationContext
         BasicAuthClient client = applicationContext.getBean(BasicAuthClient)
 
         expect:

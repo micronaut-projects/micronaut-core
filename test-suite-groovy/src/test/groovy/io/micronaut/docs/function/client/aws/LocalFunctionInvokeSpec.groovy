@@ -26,6 +26,9 @@ class LocalFunctionInvokeSpec extends Specification {
         mathClient.rnd(1.6) == 2
         mathClient.sum(new Sum(a:5,b:10)) == 15
 
+        cleanup:
+        server.close()
+
     }
     //end::invokeLocalFunction[]
 
@@ -39,6 +42,9 @@ class LocalFunctionInvokeSpec extends Specification {
         mathClient.max().blockingGet() == Integer.MAX_VALUE.toLong()
         mathClient.rnd(1.6).blockingGet() == 2
         mathClient.sum(new Sum(a:5,b:10)).blockingGet() == 15
+
+        cleanup:
+        server.close()
 
     }
     //end::invokeRxLocalFunction[]

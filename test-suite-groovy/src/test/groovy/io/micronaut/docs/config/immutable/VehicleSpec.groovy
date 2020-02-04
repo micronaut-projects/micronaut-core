@@ -36,5 +36,8 @@ class VehicleSpec extends Specification {
         then:
         def e = thrown(DependencyInjectionException)
         e.getCause().getMessage().contains("EngineConfig.cylinders - must be greater than or equal to 1")
+
+        cleanup:
+        context.close()
     }
 }

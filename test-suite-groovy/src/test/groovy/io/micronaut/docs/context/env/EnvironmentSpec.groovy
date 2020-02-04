@@ -19,6 +19,8 @@ class EnvironmentSpec extends Specification {
         environment.getActiveNames().contains("android")
         // end::env[]
 
+        cleanup:
+        applicationContext.close()
     }
 
     void "test run environment with properties"() {
@@ -38,6 +40,9 @@ class EnvironmentSpec extends Specification {
         then:
         "foo" == environment.getProperty("micronaut.server.host", String.class).orElse("localhost")
         // end::envProps[]
+
+        cleanup:
+        applicationContext.close()
 
     }
 }
