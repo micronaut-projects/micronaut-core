@@ -250,16 +250,18 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                             List entries = getProperty(property, List.class, Collections.emptyList());
                             if (!entries.isEmpty()) {
                                 for (int i = 0; i < entries.size(); i++) {
-                                    BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
-                                    String index = String.valueOf(i);
-                                    if (primaryPrefix != null && primaryPrefix.equals(index)) {
-                                        delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
-                                    }
-                                    delegate.put("Array", index);
-                                    delegate.put(Named.class.getName(), index);
+                                    if (entries.get(i) != null) {
+                                        BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                        String index = String.valueOf(i);
+                                        if (primaryPrefix != null && primaryPrefix.equals(index)) {
+                                            delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
+                                        }
+                                        delegate.put("Array", index);
+                                        delegate.put(Named.class.getName(), index);
 
-                                    if (delegate.isEnabled(this)) {
-                                        transformedCandidates.add(delegate);
+                                        if (delegate.isEnabled(this)) {
+                                            transformedCandidates.add(delegate);
+                                        }
                                     }
                                 }
                             }
@@ -356,14 +358,16 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                         List entries = getProperty(eachProperty, List.class, Collections.emptyList());
                                         if (!entries.isEmpty()) {
                                             for (int i = 0; i < entries.size(); i++) {
-                                                BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
-                                                String index = String.valueOf(i);
-                                                delegate.put("Array", index);
-                                                delegate.put(Named.class.getName(), index);
+                                                if (entries.get(i) != null) {
+                                                    BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                                    String index = String.valueOf(i);
+                                                    delegate.put("Array", index);
+                                                    delegate.put(Named.class.getName(), index);
 
-                                                if (delegate.isEnabled(this) &&
-                                                        containsProperties(prefix.replace("*", index))) {
-                                                    transformedCandidates.add(delegate);
+                                                    if (delegate.isEnabled(this) &&
+                                                            containsProperties(prefix.replace("*", index))) {
+                                                        transformedCandidates.add(delegate);
+                                                    }
                                                 }
                                             }
                                         }

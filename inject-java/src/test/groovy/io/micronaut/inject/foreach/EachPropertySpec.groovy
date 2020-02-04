@@ -365,4 +365,24 @@ class EachPropertySpec extends Specification {
         props[0].name == "Sally"
         props[1].name == "John"
     }
+
+    void "test config array with missing indexes"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'array[0].name': 'Sally',
+                'array[4].name': 'John'
+        ]))
+        applicationContext.start()
+
+        when:
+        Collection<ArrayProperties> props = applicationContext.getBeansOfType(ArrayProperties)
+
+        then:
+        props.size() == 2
+        props[0].name == "Sally"
+        props[0].getOrder() == 0
+        props[1].name == "John"
+        props[1].getOrder() == 4
+    }
 }
