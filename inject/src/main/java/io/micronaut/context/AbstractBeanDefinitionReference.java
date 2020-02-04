@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import org.slf4j.Logger;
