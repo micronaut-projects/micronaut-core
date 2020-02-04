@@ -20,7 +20,6 @@ import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.stream.Stream;
@@ -49,7 +48,7 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
             PropertyPlaceholderResolver resolver = environment.getPlaceholderResolver();
             if (o instanceof String) {
                 String v = (String) o;
-                if (v.contains("${")) {
+                if (v.contains(resolver.getPrefix())) {
                     return resolver.resolveRequiredPlaceholders(v);
                 }
             } else if (o instanceof String[]) {

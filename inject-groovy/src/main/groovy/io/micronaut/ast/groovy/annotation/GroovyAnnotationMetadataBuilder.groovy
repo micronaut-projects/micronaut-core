@@ -51,6 +51,8 @@ import org.codehaus.groovy.control.SourceUnit
 import javax.annotation.Nonnull
 import java.lang.annotation.Annotation
 import java.lang.annotation.Repeatable
+import java.lang.annotation.Retention
+import java.lang.annotation.RetentionPolicy
 import java.lang.reflect.Array
 
 /**
@@ -95,6 +97,29 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             this.elementValidator = null
         }
 
+    }
+
+    @Override
+    protected RetentionPolicy getRetentionPolicy(@Nonnull AnnotatedNode annotation) {
+        List<AnnotationNode> annotations = annotation.getAnnotations()
+        for(ann in annotations) {
+            if (ann.classNode.name == Retention.name) {
+                def i = ann.members.values().iterator()
+                if (i.hasNext()) {
+                    def expr = i.next()
+                    if (expr instanceof PropertyExpression) {
+                        PropertyExpression pe = (PropertyExpression) expr
+                        try {
+                            return RetentionPolicy.valueOf(pe.propertyAsString)
+                        } catch (e) {
+                            // should never happen
+                            return RetentionPolicy.RUNTIME
+                        }
+                    }
+                }
+            }
+        }
+        return RetentionPolicy.RUNTIME
     }
 
     @Override

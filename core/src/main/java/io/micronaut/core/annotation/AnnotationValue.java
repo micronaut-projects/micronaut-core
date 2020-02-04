@@ -30,6 +30,7 @@ import io.micronaut.core.util.StringUtils;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
@@ -61,11 +62,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values) {
-        this.annotationName = annotationName;
-        this.convertibleValues = newConvertibleValues(values);
-        this.values = values;
-        this.defaultValues = Collections.emptyMap();
-        this.valueMapper = null;
+        this(annotationName, values, Collections.emptyMap());
     }
 
     /**
@@ -88,11 +85,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @SuppressWarnings("unchecked")
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName) {
-        this.annotationName = annotationName;
-        this.convertibleValues = ConvertibleValues.EMPTY;
-        this.values = Collections.emptyMap();
-        this.defaultValues = Collections.emptyMap();
-        this.valueMapper = null;
+        this(annotationName, Collections.emptyMap(), Collections.emptyMap());
     }
 
     /**
@@ -103,8 +96,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         this.annotationName = annotationName;
         this.convertibleValues = convertibleValues;
         Map<String, Object> existing = convertibleValues.asMap();
-        this.values = new HashMap<>(existing.size());
-        this.values.putAll(existing);
+        this.values = new HashMap<>(existing);
         this.defaultValues = Collections.emptyMap();
         this.valueMapper = null;
     }
@@ -118,12 +110,24 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @Internal
     @UsedByGeneratedCode
-    protected AnnotationValue(AnnotationValue<A> target, Map<String, Object> defaultValues, ConvertibleValues<Object> convertibleValues, Function<Object, Object> valueMapper) {
+    protected AnnotationValue(
+            AnnotationValue<A> target,
+            Map<String, Object> defaultValues,
+            ConvertibleValues<Object> convertibleValues,
+            Function<Object, Object> valueMapper) {
         this.annotationName = target.annotationName;
         this.defaultValues = defaultValues != null ? defaultValues : target.defaultValues;
         this.values = target.values;
         this.convertibleValues = convertibleValues;
         this.valueMapper = valueMapper;
+    }
+
+    /**
+     * @return The retention policy.
+     */
+    @Nonnull
+    public RetentionPolicy getRetentionPolicy() {
+        return RetentionPolicy.CLASS;
     }
 
     /**
@@ -869,6 +873,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     public static <T extends Annotation> AnnotationValueBuilder<T> builder(Class<T> annotation) {
         return new AnnotationValueBuilder<>(annotation);
+    }
+
+    /**
+     * Start building a new annotation existing value and retention policy.
+     *
+     * @param annotation The annotation name
+     * @param retentionPolicy The retention policy. Defaults to runtime.
+     * @param <T> The annotation type
+     * @return The builder
+     */
+    public static <T extends Annotation> AnnotationValueBuilder<T> builder(@Nonnull AnnotationValue<T> annotation, @Nullable RetentionPolicy retentionPolicy) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return new AnnotationValueBuilder<>(annotation, retentionPolicy);
     }
 
     /**
