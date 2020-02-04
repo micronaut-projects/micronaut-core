@@ -41,5 +41,6 @@ class EachPropertyTest : AnnotationSpec() {
                 firstConfig.url
         )
         // end::beans[]
+        applicationContext.close()
     }
 }

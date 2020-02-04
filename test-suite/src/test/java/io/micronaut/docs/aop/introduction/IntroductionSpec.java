@@ -10,15 +10,13 @@ public class IntroductionSpec {
 
     @Test
     public void testStubIntroduction() {
-        ApplicationContext applicationContext = ApplicationContext.run();
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            // tag::test[]
+            StubExample stubExample = applicationContext.getBean(StubExample.class);
 
-        // tag::test[]
-        StubExample stubExample = applicationContext.getBean(StubExample.class);
-
-        assertEquals(10, stubExample.getNumber());
-        assertNull(stubExample.getDate());
-        // end::test[]
-
-        applicationContext.stop();
+            assertEquals(10, stubExample.getNumber());
+            assertNull(stubExample.getDate());
+            // end::test[]
+        }
     }
 }

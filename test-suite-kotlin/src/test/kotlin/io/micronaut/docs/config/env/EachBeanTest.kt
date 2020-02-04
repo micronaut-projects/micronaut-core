@@ -38,5 +38,7 @@ class EachBeanTest : AnnotationSpec() {
 
         // end::beans[]
         assertNotNull(firstConfig)
+
+        applicationContext.close()
     }
 }

@@ -15,10 +15,13 @@ public class BasicAuthFilterSpec {
 
     @Test
     public void testTheFilterIsApplied() {
-        ApplicationContext applicationContext = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "BasicAuthFilterSpec")).getApplicationContext();
-        BasicAuthClient client = applicationContext.getBean(BasicAuthClient.class);
+        try (final EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, Collections.singletonMap("spec.name", "BasicAuthFilterSpec"))) {
 
-        assertEquals("user:pass", client.getMessage());
+            ApplicationContext applicationContext = server.getApplicationContext();
+            BasicAuthClient client = applicationContext.getBean(BasicAuthClient.class);
+
+            assertEquals("user:pass", client.getMessage());
+        }
     }
 
     @Requires(property = "spec.name", value = "BasicAuthFilterSpec")

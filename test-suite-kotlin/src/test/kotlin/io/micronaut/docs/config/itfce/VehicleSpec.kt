@@ -23,6 +23,8 @@ class VehicleSpec: StringSpec({
         // end::start[]
 
         vehicle.start().shouldBe("Ford Engine Starting V8 [rodLength=7.0]")
+
+        applicationContext.close()
     }
 
     "test start vehicle - invalid" {
@@ -36,6 +38,6 @@ class VehicleSpec: StringSpec({
             applicationContext.getBean(Vehicle::class.java)
         }
         exception.message.shouldContain("EngineConfig.getCylinders - must be greater than or equal to 1")
-
+        applicationContext.close()
     }
 })

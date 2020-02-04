@@ -27,6 +27,7 @@ public class VehicleSpec {
         // end::start[]
 
         assertEquals("Engine Starting V8 [sensors=2]", vehicle.start());
+        applicationContext.close();
     }
 
 }

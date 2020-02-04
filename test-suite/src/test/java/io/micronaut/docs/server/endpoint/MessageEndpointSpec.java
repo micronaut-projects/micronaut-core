@@ -29,6 +29,8 @@ public class MessageEndpointSpec {
 
         assertEquals(HttpStatus.OK.getCode(), response.code());
         assertEquals("default message", response.body());
+
+        server.close();
     }
 
     @Test
@@ -50,6 +52,8 @@ public class MessageEndpointSpec {
         response = rxClient.exchange("/message", String.class).blockingFirst();
 
         assertEquals("A new message", response.body());
+
+        server.close();
     }
 
     @Test
@@ -70,6 +74,8 @@ public class MessageEndpointSpec {
             assertEquals(404, e.getStatus().getCode());
         } catch (Exception e) {
             fail("Wrong exception thrown");
+        } finally {
+            server.close();
         }
     }
 }
