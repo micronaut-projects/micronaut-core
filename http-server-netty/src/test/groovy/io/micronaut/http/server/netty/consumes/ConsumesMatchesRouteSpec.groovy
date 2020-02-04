@@ -47,7 +47,6 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         URL url = new URL(url1.getProtocol(), url1.getHost(), url1.getPort(), url1.getFile() + "/test-consumes", null)
         URLConnection connection = url.openConnection()
         connection.setRequestMethod("POST")
-        connection.setRequestProperty('Content-Type', null)
         connection.doOutput = true
 
         def writer = new OutputStreamWriter(connection.outputStream)
@@ -83,7 +82,6 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         URL url = new URL(url1.getProtocol(), url1.getHost(), url1.getPort(), url1.getFile() + "/test-consumes-all", null)
         URLConnection connection = url.openConnection()
         connection.setRequestMethod("POST")
-        connection.setRequestProperty('Content-Type', null)
         connection.doOutput = true
 
         def writer = new OutputStreamWriter(connection.outputStream)
