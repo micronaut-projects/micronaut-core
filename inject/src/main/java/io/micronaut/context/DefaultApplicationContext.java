@@ -372,10 +372,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @Override
     protected <T> BeanDefinition<T> findConcreteCandidate(Class<T> beanType, Qualifier<T> qualifier, Collection<BeanDefinition<T>> candidates) {
         if (candidates.stream().allMatch(BeanDefinition::isIterable)) {
-            if (qualifier == null) {
-                Optional<BeanDefinition<T>> first = candidates.stream().findFirst();
-                return first.orElse(null);
-            } else if (qualifier instanceof Named) {
+            if (qualifier instanceof Named) {
                 Named named = (Named) qualifier;
                 String name = named.getName();
                 for (BeanDefinition<T> candidate : candidates) {

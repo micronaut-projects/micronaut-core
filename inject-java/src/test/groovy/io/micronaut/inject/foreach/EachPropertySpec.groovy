@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 /**
@@ -59,10 +60,17 @@ class EachPropertySpec extends Specification {
 
         applicationContext.start()
 
-        MyConfiguration bean = applicationContext.getBean(MyConfiguration)
+        when:
+        applicationContext.getBean(MyConfiguration)
+
+        then:
+        thrown(NonUniqueBeanException)
+
+        when:
+        MyConfiguration bean = applicationContext.getBean(MyConfiguration, Qualifiers.byName("one"))
         MyConfiguration bean2 = applicationContext.getBean(MyConfiguration, Qualifiers.byName("two"))
 
-        expect:
+        then:
         bean.port == 8080
         bean.anotherPort == 9090
         bean.intList == [1,2,3]
@@ -130,10 +138,17 @@ class EachPropertySpec extends Specification {
 
         applicationContext.start()
 
-        MyBean bean = applicationContext.getBean(MyBean)
+        when:
+        applicationContext.getBean(MyBean)
+
+        then:
+        thrown(NonUniqueBeanException)
+
+        when:
+        MyBean bean = applicationContext.getBean(MyBean, Qualifiers.byName("one"))
         MyBean bean2 = applicationContext.getBean(MyBean, Qualifiers.byName("two"))
 
-        expect:
+        then:
         bean != bean2
         bean.configuration.port == 8080
         bean.configuration.anotherPort == 9090
@@ -181,10 +196,17 @@ class EachPropertySpec extends Specification {
 
         applicationContext.start()
 
-        NonBeanClass bean = applicationContext.getBean(NonBeanClass)
+        when:
+        applicationContext.getBean(NonBeanClass)
+
+        then:
+        thrown(NonUniqueBeanException)
+
+        when:
+        NonBeanClass bean = applicationContext.getBean(NonBeanClass, Qualifiers.byName("one"))
         NonBeanClass bean2 = applicationContext.getBean(NonBeanClass, Qualifiers.byName("two"))
 
-        expect:
+        then:
         bean != bean2
         bean.port == 8080
         bean2.port == 8888
