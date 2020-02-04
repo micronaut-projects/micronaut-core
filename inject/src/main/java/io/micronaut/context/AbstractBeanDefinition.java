@@ -1684,7 +1684,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private String substituteWildCards(BeanResolutionContext resolutionContext, String valString) {
         if (valString.indexOf('*') > -1) {
-            Optional<String> namedBean = resolutionContext.get(Named.class.getName(), String.class);
+            Optional<String> namedBean = resolutionContext.get(Named.class.getName(), ArgumentConversionContext.STRING);
             if (namedBean.isPresent()) {
                 valString = valString.replace("*", namedBean.get());
             }
@@ -1825,7 +1825,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     if ((hasMetadata && argument.isAnnotationPresent(Parameter.class)) ||
                             (innerConfiguration && isIterable) ||
                             Qualifier.class == argument.getType()) {
-                        final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, String.class);
+                        final Optional<String> n = resolutionContext.get(NAMED_ATTRIBUTE, ArgumentConversionContext.STRING);
                         qualifier = n.map(Qualifiers::byName).orElse(null);
                     }
                 }

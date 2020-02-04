@@ -18,10 +18,7 @@ package io.micronaut.context;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.BeanIdentifier;
-import io.micronaut.inject.FieldInjectionPoint;
-import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.*;
 
 import javax.annotation.Nullable;
 import java.util.Deque;
@@ -116,7 +113,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * Represents a path taken to resolve a bean definitions dependencies.
      */
-    interface Path extends Deque<Segment> {
+    interface Path extends Deque<Segment<?>> {
         /**
          * Push an unresolved constructor call onto the queue.
          *
@@ -155,18 +152,25 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
         /**
          * @return The current path segment
          */
-        Optional<Segment> currentSegment();
+        Optional<Segment<?>> currentSegment();
     }
 
     /**
      * A segment in a path.
+     *
+     * @param <T> the bean type
      */
-    interface Segment {
+    interface Segment<T> {
 
         /**
          * @return The type requested
          */
-        BeanDefinition getDeclaringType();
+        BeanDefinition<T> getDeclaringType();
+
+        /**
+         * @return The inject point
+         */
+        InjectionPoint<T> getInjectionPoint();
 
         /**
          * @return The name of the segment. For a field this is the field name, for a method the method name and for a constructor the type name

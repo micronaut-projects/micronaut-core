@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -57,6 +58,9 @@ class ReflectionConstructorInjectionPoint<T> implements ConstructorInjectionPoin
         this.declaringComponent = beanDefinition;
         this.declaringType = declaringType;
         this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
+        if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
+            ClassUtils.REFLECTION_LOGGER.debug("Bean of type [" + beanDefinition.getBeanType() + "] defines constructor that requires the use of reflection to inject");
+        }
     }
 
     @Override

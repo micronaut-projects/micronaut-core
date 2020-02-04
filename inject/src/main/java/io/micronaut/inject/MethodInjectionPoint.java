@@ -22,12 +22,17 @@ import java.lang.reflect.Method;
 /**
  * Defines an injection point for a method.
  *
+ * @param <B> The bean type
+ * @param <T> The injectable type
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInjectionPoint extends CallableInjectionPoint, Executable {
+public interface MethodInjectionPoint<B, T> extends CallableInjectionPoint<B>, Executable<B, T> {
 
     /**
+     * Resolves the {@link Method} instance. Note that this method will cause reflection
+     * metadata to be initialized and should be avoided.
+     *
      * @return The setter to invoke to set said property
      */
     Method getMethod();
@@ -54,5 +59,5 @@ public interface MethodInjectionPoint extends CallableInjectionPoint, Executable
      * @param args     The arguments. Should match the types of getArguments()
      * @return The new value
      */
-    Object invoke(Object instance, Object... args);
+    T invoke(B instance, Object... args);
 }

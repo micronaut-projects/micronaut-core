@@ -13,29 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.factories
+package io.micronaut.docs.injectionpoint
+// tag::class[]
+class V8Engine implements Engine {
+    private final int cylinders = 8
+    private final CrankShaft crankShaft
 
-import io.micronaut.context.BeanContext
-import spock.lang.Specification
+    V8Engine(CrankShaft crankShaft) {
+        this.crankShaft = crankShaft
+    }
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
-class VehicleSpec extends Specification {
-
-    void "test start vehicle"() {
-        when:
-        // tag::start[]
-        def context = BeanContext.run()
-        Vehicle vehicle = context.getBean(Vehicle)
-        println( vehicle.start() )
-        // end::start[]
-
-        then:
-        vehicle.start() == "Starting V8"
-
-        cleanup:
-        context.close()
+    String start() {
+        return "Starting V8"
     }
 }
+// end::class[]

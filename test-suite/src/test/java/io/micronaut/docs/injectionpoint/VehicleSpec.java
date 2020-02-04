@@ -13,29 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.factories
+package io.micronaut.docs.injectionpoint;
 
-import io.micronaut.context.BeanContext
-import spock.lang.Specification
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.DefaultBeanContext;
+import org.junit.Test;
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
-class VehicleSpec extends Specification {
+import static org.junit.Assert.assertEquals;
 
-    void "test start vehicle"() {
-        when:
-        // tag::start[]
-        def context = BeanContext.run()
-        Vehicle vehicle = context.getBean(Vehicle)
-        println( vehicle.start() )
-        // end::start[]
+public class VehicleSpec {
 
-        then:
-        vehicle.start() == "Starting V8"
+    @Test
+    public void testStartVehicle() {
+        BeanContext beanContext = BeanContext.run();
+        Vehicle vehicle = beanContext.getBean(Vehicle.class);
+        System.out.println( vehicle.start() );
 
-        cleanup:
-        context.close()
+        assertEquals("Starting V6", vehicle.start());
+
+        beanContext.close();
     }
 }

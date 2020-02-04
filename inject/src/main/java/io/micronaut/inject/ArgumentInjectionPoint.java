@@ -13,29 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.factories
+package io.micronaut.inject;
 
-import io.micronaut.context.BeanContext
-import spock.lang.Specification
+import io.micronaut.core.type.Argument;
+
+import javax.annotation.Nonnull;
 
 /**
- * @author Graeme Rocher
+ * An injection point for a method or constructor argument.
+ *
+ * @param <B> The declaring bean type
+ * @param <T> The argument type
+ * @author graemerocher
  * @since 1.0
  */
-class VehicleSpec extends Specification {
+public interface ArgumentInjectionPoint<B, T> extends InjectionPoint<B> {
 
-    void "test start vehicle"() {
-        when:
-        // tag::start[]
-        def context = BeanContext.run()
-        Vehicle vehicle = context.getBean(Vehicle)
-        println( vehicle.start() )
-        // end::start[]
+    /**
+     * @return The outer injection point (method or constructor)
+     */
+    @Nonnull CallableInjectionPoint<B> getOuterInjectionPoint();
 
-        then:
-        vehicle.start() == "Starting V8"
-
-        cleanup:
-        context.close()
-    }
+    /**
+     * @return The argument that is being injected
+     */
+    @Nonnull Argument<T> getArgument();
 }
