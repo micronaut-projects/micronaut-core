@@ -20,6 +20,7 @@ public class EnvironmentTest {
         assertTrue(environment.getActiveNames().contains("test"));
         assertTrue(environment.getActiveNames().contains("android"));
         // end::env[]
+        applicationContext.close()
 
     }
 
@@ -42,6 +43,7 @@ public class EnvironmentTest {
                 environment.getProperty("micronaut.server.host", String.class).orElse("localhost")
         );
         // end::envProps[]
+        applicationContext.close()
 
     }
 }

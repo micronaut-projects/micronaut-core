@@ -20,5 +20,8 @@ class VehicleSpec extends Specification {
 
         then:
         vehicle.start() == "Engine Starting V8 [sensors=2]"
+
+        cleanup:
+        applicationContext.close()
     }
 }

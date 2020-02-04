@@ -19,6 +19,9 @@ class SampleEventListenerSpec extends Specification {
 
         then:
         listener.invocationCounter == 1
+
+        cleanup:
+        context.close()
     }
 }
 // end::class[]

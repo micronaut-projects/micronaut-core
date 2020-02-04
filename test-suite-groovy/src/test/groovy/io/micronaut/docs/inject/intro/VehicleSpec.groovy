@@ -24,14 +24,18 @@ import io.micronaut.context.BeanContext
 class VehicleSpec extends Specification {
 
     void "test start vehicle"() {
+
         when:
         // tag::start[]
-        Vehicle vehicle = BeanContext.run()
-                                     .getBean(Vehicle)
+        def context = BeanContext.run()
+        Vehicle vehicle = context.getBean(Vehicle)
         println( vehicle.start() )
         // end::start[]
 
         then:
         vehicle.start() == "Starting V8"
+
+        cleanup:
+        context.close()
     }
 }

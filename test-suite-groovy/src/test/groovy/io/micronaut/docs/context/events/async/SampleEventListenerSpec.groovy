@@ -24,6 +24,10 @@ class SampleEventListenerSpec extends Specification {
         new PollingConditions().eventually {
             listener.invocationCounter.get() == 1
         }
+
+        cleanup:
+        context.close()
+
     }
 }
 // end::class[]

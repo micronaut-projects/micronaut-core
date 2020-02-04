@@ -20,5 +20,8 @@ class VehicleSpec extends Specification {
 
         then:
         vehicle.start() == "Ford Engine Starting V8 [rodLength=6.0]"
+
+        cleanup:
+        applicationContext.close()
     }
 }
