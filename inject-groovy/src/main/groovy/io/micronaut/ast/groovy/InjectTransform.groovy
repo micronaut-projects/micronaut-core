@@ -1535,6 +1535,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         private void defineBeanDefinition(ClassNode classNode) {
             if (!beanDefinitionWriters.containsKey(classNode)) {
+                if (classNode.packageName == null) {
+                    addError("Micronaut beans cannot be in the default package", classNode)
+                    return
+                }
                 ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
                 boolean isProvider = providerGenericType != null
                 AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, classNode)

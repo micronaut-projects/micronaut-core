@@ -26,6 +26,8 @@ class SampleEventListenerSpec : AnnotationSpec() {
             println("Current value of counter: " + listener.invocationCounter.get())
             listener.invocationCounter.get().shouldBe(1)
         }
+
+        context.close()
     }
 }
 // end::class[]

@@ -16,6 +16,8 @@ class VehicleSpec: StringSpec({
         // end::start[]
 
         vehicle.start().shouldBe("Ford Engine Starting V8 [rodLength=6.0]")
+
+        applicationContext.close()
     }
 
 })

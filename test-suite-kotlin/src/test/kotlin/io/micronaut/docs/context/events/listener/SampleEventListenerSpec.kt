@@ -16,6 +16,8 @@ class SampleEventListenerSpec : AnnotationSpec() {
         listener.invocationCounter.shouldBe(0)
         emitter.publishSampleEvent()
         listener.invocationCounter.shouldBe(1)
+
+        context.close()
     }
 }
 // end::class[]

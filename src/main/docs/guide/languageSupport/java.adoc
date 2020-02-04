@@ -20,8 +20,29 @@ The `javax.annotation`, which includes `@PostConstruct`, `@PreDestroy` etc. is n
 .Adding the `javax.annotation` dependency
 [source,groovy]
 ----
-compile 'javax.annotation:javax.annotation-api:1.3.2'
+implementation 'javax.annotation:javax.annotation-api:1.3.2'
 ----
+
+== Incremental Annotation Processing with Gradle
+
+Micronaut supports https://docs.gradle.org/current/userguide/java_plugin.html#sec:incremental_annotation_processing[Gradle incremental annotation processing] which helps speed up builds by compiling only classes that have changed avoiding a full recompilation.
+
+However, the support is disabled by default since Micronaut allows the definition of custom meta-annotations (to for example define <<aop,custom AOP advice>>) that need to be configured for processing.
+
+The following example demonstrates how to enable and configure incremental annotation processing for annotations you have defined under the `com.example` package:
+
+.Enabling Incremental Annotation Processing
+[source,groovy]
+----
+tasks.withType(JavaCompile) {
+    options.compilerArgs = [
+        '-Amicronaut.processing.incremental=true',
+        '-Amicronaut.processing.annotations=com.example.*',
+    ]
+}
+----
+
+WARNING: If you do not enable processing for custom annotations you define these annotations will simple be ignored by Micronaut which may break your application.
 
 == Using Project Lombok
 

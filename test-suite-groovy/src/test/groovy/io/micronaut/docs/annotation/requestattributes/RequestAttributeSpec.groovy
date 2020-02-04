@@ -2,13 +2,16 @@ package io.micronaut.docs.annotation.requestattributes
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
 
 class RequestAttributeSpec extends Specification {
 
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+
     void "test sender attributes"() throws Exception {
         when:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
         StoryClient client = embeddedServer.getApplicationContext().getBean(StoryClient)
         StoryClientFilter filter = embeddedServer.getApplicationContext().getBean(StoryClientFilter)
 

@@ -27,14 +27,15 @@ class VehicleSpec extends Specification {
     void "test start vehicle"() {
         when:
         // tag::start[]
-        Vehicle vehicle = BeanContext.run().withCloseable {
-            Vehicle vehicle = it.getBean(Vehicle)
-            println( vehicle.start() )
-            return vehicle
-        }
+        def context = BeanContext.run()
+        Vehicle vehicle = context.getBean(Vehicle)
+        println( vehicle.start() )
         // end::start[]
 
         then:
         vehicle.start() == "Starting V8"
+
+        cleanup:
+        context.close()
     }
 }

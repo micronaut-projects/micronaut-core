@@ -37,6 +37,9 @@ class VehicleSpec extends Specification {
         then:
         def e = thrown(BeanInstantiationException)
         e.message.contains("EngineConfig.getCylinders - must be greater than or equal to 1")
+
+        cleanup:
+        context.close()
     }
 }
 

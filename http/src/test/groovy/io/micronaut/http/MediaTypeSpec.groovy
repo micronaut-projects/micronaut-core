@@ -87,5 +87,6 @@ class MediaTypeSpec extends Specification {
         "image/jpg"                  | false
         "multipart/form-data"        | false
         "application/x-json-stream"  | false
+        "invalid"                    | false
     }
 }

@@ -13,5 +13,6 @@ class PropertyInjectSpec {
         Assertions.assertEquals(config.stringParam, "Hello")
         Assertions.assertEquals(config.mapParam?.get("yyy.xxx"), "2")
         Assertions.assertEquals(config.mapParam?.get("yyy.yyy"), "3")
+        context.close()
     }
 }

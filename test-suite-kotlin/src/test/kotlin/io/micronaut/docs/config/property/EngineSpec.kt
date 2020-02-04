@@ -18,5 +18,7 @@ class EngineSpec : StringSpec({
 
         engine.manufacturer shouldBe "Honda"
         engine.cylinders() shouldBe 8
+
+        ctx.close()
     }
 })

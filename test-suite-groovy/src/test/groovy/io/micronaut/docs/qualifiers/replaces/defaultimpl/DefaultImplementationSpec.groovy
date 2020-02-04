@@ -8,7 +8,7 @@ class DefaultImplementationSpec extends Specification {
 
     void "test the default is replaced"() {
         given:
-        BeanContext ctx = new DefaultBeanContext().start()
+        BeanContext ctx = BeanContext.run()
 
         when:
         ResponseStrategy responseStrategy = ctx.getBean(ResponseStrategy)

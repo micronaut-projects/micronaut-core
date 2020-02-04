@@ -20,6 +20,7 @@ class EnvironmentSpec :  StringSpec({
         assertTrue(environment.getActiveNames().contains("test"))
         assertTrue(environment.getActiveNames().contains("android"))
         // end::env[]
+        applicationContext.close()
     }
 
     "test run environment with properties"() {
@@ -40,6 +41,6 @@ class EnvironmentSpec :  StringSpec({
                 environment.getProperty("micronaut.server.host", String::class.java).orElse("localhost")
         )
         // end::envProps[]
-
+        applicationContext.close()
     }
 })

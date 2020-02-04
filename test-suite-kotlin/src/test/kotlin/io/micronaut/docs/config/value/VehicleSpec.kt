@@ -21,6 +21,8 @@ class VehicleSpec : StringSpec({
         // end::start[]
 
         vehicle.start().shouldBe("Starting V8 Engine")
+
+        applicationContext.close()
     }
 
     "test start vehicle without configuration" {
@@ -33,6 +35,8 @@ class VehicleSpec : StringSpec({
         // end::start[]
 
         vehicle.start().shouldBe("Starting V6 Engine")
+
+        applicationContext.close()
     }
 
 })

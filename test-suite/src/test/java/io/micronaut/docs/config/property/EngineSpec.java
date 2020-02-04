@@ -20,5 +20,7 @@ public class EngineSpec {
 
         assertEquals("Honda", engine.getManufacturer());
         assertEquals(8, engine.getCylinders());
+
+        ctx.close();
     }
 }
