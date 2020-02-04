@@ -385,4 +385,23 @@ class EachPropertySpec extends Specification {
         props[1].name == "John"
         props[1].getOrder() == 4
     }
+
+    void "test array config overridden with smaller set"() {
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'array': [['name': 'Sally'], ['name': 'John']]
+        ], 100))
+        applicationContext.environment.addPropertySource(PropertySource.of('test2', [
+                'array': [['name': 'Samantha']]
+        ], 101))
+        applicationContext.start()
+
+        when:
+        Collection<ArrayProperties> props = applicationContext.getBeansOfType(ArrayProperties)
+
+        then:
+        props.size() == 1
+        props[0].name == "Samantha"
+        props[0].getOrder() == 0
+    }
 }
