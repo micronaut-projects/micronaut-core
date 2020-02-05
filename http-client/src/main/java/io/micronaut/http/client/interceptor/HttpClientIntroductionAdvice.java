@@ -661,7 +661,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         ClientKey clientKey = new ClientKey(clientAnn, filterAnnotation);
 
         return clients.computeIfAbsent(clientKey, integer -> {
-            HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(NameUtils.hyphenate(clientId))).orElse(null);
+            HttpClient clientBean = null;
+            if (clientId != null) {
+                clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(NameUtils.hyphenate(clientId))).orElse(null);
+            }
             AnnotationValue<JacksonFeatures> jacksonFeaturesAnn = context.findAnnotation(JacksonFeatures.class).orElse(null);
             Optional<Class<?>> configurationClass = clientAnn.classValue("configuration");
 
@@ -671,10 +674,25 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
-            LoadBalancer loadBalancer = loadBalancerResolver.resolve(clientId)
-                .orElseThrow(() ->
-                    new HttpClientException("Invalid service reference [" + clientId + "] specified to @Client")
+            LoadBalancer loadBalancer = null;
+            Optional<HttpClientConfiguration> clientSpecificConfig;
+            Collection<String> clientIdentifiers;
+
+            if (clientId != null) {
+                clientSpecificConfig = beanContext.findBean(
+                        HttpClientConfiguration.class,
+                        Qualifiers.byName(clientId)
                 );
+                loadBalancer = loadBalancerResolver.resolve(clientId)
+                        .orElseThrow(() ->
+                                new HttpClientException("Invalid service reference [" + clientId + "] specified to @Client")
+                        );
+                clientIdentifiers = Collections.singletonList(clientId);
+            } else {
+                clientSpecificConfig = Optional.empty();
+                clientIdentifiers = Collections.emptyList();
+            }
+
 
             String contextPath = null;
             if (StringUtils.isNotEmpty(path)) {
@@ -687,17 +705,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
-            HttpClientConfiguration configuration;
-            Optional<HttpClientConfiguration> clientSpecificConfig = beanContext.findBean(
-                HttpClientConfiguration.class,
-                Qualifiers.byName(clientId)
-            );
+
             Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>) configurationClass.orElse(HttpClientConfiguration.class);
-            configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
+            HttpClientConfiguration configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
             if (contextPath == null && configuration instanceof ClientContextPathProvider) {
                 contextPath = ((ClientContextPathProvider) configuration).getContextPath().orElse(null);
             }
-            HttpClientFilterResolver filterResolver = beanContext.createBean(HttpClientFilterResolver.class, Collections.singleton(clientId), filterAnnotation);
+            HttpClientFilterResolver filterResolver = beanContext.createBean(HttpClientFilterResolver.class, clientIdentifiers, filterAnnotation);
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath, filterResolver);
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
@@ -767,11 +781,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     private String getClientId(AnnotationValue<Client> clientAnn) {
-        String clientId = clientAnn.stringValue().orElse(null);
-        if (clientId == null) {
-            throw new HttpClientException("Either the id or value of the @Client annotation must be specified");
-        }
-        return clientId;
+        return clientAnn.stringValue().orElse(null);
     }
 
     private String appendQuery(String uri, Map<String, String> queryParams) {

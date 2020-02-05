@@ -223,7 +223,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      */
     @Inject
-    public DefaultHttpClient(@Parameter LoadBalancer loadBalancer,
+    public DefaultHttpClient(@Parameter @Nullable LoadBalancer loadBalancer,
                              @Parameter HttpClientConfiguration configuration,
                              @Parameter @Nullable String contextPath,
                              @Parameter HttpClientFilterResolver filterResolver,
@@ -330,7 +330,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     /**
      * @param loadBalancer The {@link LoadBalancer} to use for selecting servers
      */
-    public DefaultHttpClient(LoadBalancer loadBalancer) {
+    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer) {
         this(loadBalancer,
                 new DefaultHttpClientConfiguration(),
                 null,
@@ -344,6 +344,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      */
     public DefaultHttpClient(@Parameter URL url) {
         this(url, new DefaultHttpClientConfiguration());
+    }
+
+    /**
+     *
+     */
+    public DefaultHttpClient() {
+        this((LoadBalancer) null, new DefaultHttpClientConfiguration());
     }
 
     /**
@@ -371,7 +378,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param loadBalancer  The {@link LoadBalancer} to use for selecting servers
      * @param configuration The {@link HttpClientConfiguration} object
      */
-    public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
+    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
         this(loadBalancer,
                 configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
@@ -383,7 +390,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param configuration The {@link HttpClientConfiguration} object
      * @param contextPath   The base URI to prepend to request uris
      */
-    public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration, String contextPath) {
+    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration, String contextPath) {
         this(loadBalancer,
                 configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
@@ -1122,6 +1129,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             // if the request URI includes a scheme then it is fully qualified so use the direct server
             return Publishers.just(requestURI);
         } else {
+            if (loadBalancer == null) {
+                return Publishers.just(new NoHostException("Request URI specifies no host to connect to"));
+            }
 
             return Publishers.map(loadBalancer.select(getLoadBalancerDiscriminator()), server -> {
                         Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
@@ -2309,7 +2319,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             if (host == null) {
                 host = requestURI.getAuthority();
                 if (host == null) {
-                    throw new HttpClientException("URI specifies no host to connect to");
+                    throw new NoHostException("URI specifies no host to connect to");
                 }
 
                 final int i = host.indexOf(':');
