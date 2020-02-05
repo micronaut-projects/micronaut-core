@@ -426,4 +426,63 @@ class EachPropertySpec extends Specification {
         props[0].name == "Samantha"
         props[0].getOrder() == 0
     }
+
+    void "test eachproperty inner class of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer.name': 'Outer',
+                'outer.inner.sally.age': 20,
+                'outer.inner.joe.age': 30
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterProperties props = applicationContext.getBean(OuterProperties)
+
+        then:
+        props.name == 'Outer'
+        props.inner.size() == 2
+        props.inner.any { it.age == 20 }
+        props.inner.any { it.age == 30 }
+    }
+
+    void "test field injection eachproperty inner class of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer-field.name': 'Outer',
+                'outer-field.inner.sally.age': 20,
+                'outer-field.inner.joe.age': 30
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterFieldProperties props = applicationContext.getBean(OuterFieldProperties)
+
+        then:
+        props.name == 'Outer'
+        props.inner.size() == 2
+        props.inner.any { it.age == 20 }
+        props.inner.any { it.age == 30 }
+    }
+
+    void "test eachproperty list inner class of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer-list.name': 'Outer',
+                'outer-list.inner-list': [['age': 20], ['age': 30]]
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterListProperties props = applicationContext.getBean(OuterListProperties)
+
+        then:
+        props.name == 'Outer'
+        props.innerList.size() == 2
+        props.innerList.any { it.age == 20 }
+        props.innerList.any { it.age == 30 }
+    }
 }
