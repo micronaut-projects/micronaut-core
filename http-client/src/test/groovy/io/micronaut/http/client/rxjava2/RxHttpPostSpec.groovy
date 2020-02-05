@@ -180,7 +180,11 @@ class RxHttpPostSpec extends Specification {
                 Argument.of(User)
         )
         User user = flowable.onErrorResumeNext((Function){ t ->
-            Flowable.just(((HttpClientResponseException) t).response.getBody(User).get())
+            if (t instanceof HttpClientResponseException) {
+                return Flowable.just(((HttpClientResponseException) t).response.getBody(User).get())
+            } else {
+                return Flowable.error(t)
+            }
         }).blockingFirst()
 
         then:
