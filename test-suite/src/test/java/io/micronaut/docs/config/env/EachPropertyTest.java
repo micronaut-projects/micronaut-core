@@ -9,6 +9,9 @@ import org.junit.Test;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 
@@ -39,6 +42,27 @@ public class EachPropertyTest {
                 new URI("jdbc:mysql://localhost/one"),
                 firstConfig.getUrl()
         );
+        // end::beans[]
+
+        applicationContext.close();
+    }
+
+    @Test
+    public void testEachPropertyList() {
+        // tag::config[]
+        ApplicationContext applicationContext = ApplicationContext.run("ratelimiter");
+        // end::config[]
+
+        // tag::beans[]
+        List<RateLimitsConfiguration> beansOfType = applicationContext.streamOfType(RateLimitsConfiguration.class).collect(Collectors.toList());
+
+        assertEquals(
+                2,
+                beansOfType.size()
+        );
+        assertEquals(1000L, beansOfType.get(0).getLimit().longValue());
+        assertEquals(5000L, beansOfType.get(1).getLimit().longValue());
+
         // end::beans[]
 
         applicationContext.close();
