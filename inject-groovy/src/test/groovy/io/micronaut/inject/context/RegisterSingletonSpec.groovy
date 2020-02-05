@@ -60,8 +60,8 @@ class RegisterSingletonSpec extends Specification {
         // there are 2 because currently defining only @Inject results in
         // another bean definition with the primary qualifier
         context.getBeansOfType(B).size() == 2
-        b.a != null
-        b.a == context.getBean(A)
+        // no bean definition for qualifier to not injected
+        b.a == null
 
         cleanup:
         context.close()
