@@ -24,3 +24,9 @@ snippet::io.micronaut.docs.config.env.EachPropertyTest[tags="beans", indent=0, t
 
 The default behavior of ann:context.annotation.EachProperty[] is to bind from a map style of configuration where the key is the named qualifier of the bean and the value is the data to bind from. For cases where map style configuration doesn't make sense, it is possible to inform Micronaut the class should be bound from a list. Simply set the `list` member on the annotation to true.
 
+snippet::io.micronaut.docs.config.env.RateLimitsConfiguration[indent=0, title="@EachProperty List Example"]
+
+<1> The `list` member of the annotation is set to true
+<2> Implement `Ordered` if order matters when retrieving the beans
+<3> The index is injected into the constructor
+

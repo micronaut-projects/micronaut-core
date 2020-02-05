@@ -6,14 +6,14 @@ import io.micronaut.core.order.Ordered;
 
 import java.time.Duration;
 
-@EachProperty(value = "ratelimits", list = true)
-public class RateLimitsConfiguration implements Ordered {
+@EachProperty(value = "ratelimits", list = true) // <1>
+public class RateLimitsConfiguration implements Ordered { // <2>
 
     private final Integer index;
     private Duration period;
     private Integer limit;
 
-    RateLimitsConfiguration(@Parameter Integer index) {
+    RateLimitsConfiguration(@Parameter Integer index) { // <3>
         this.index = index;
     }
 

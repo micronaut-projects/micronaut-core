@@ -8,9 +8,7 @@ import org.junit.Test;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
@@ -49,11 +47,11 @@ public class EachPropertyTest {
 
     @Test
     public void testEachPropertyList() {
-        // tag::config[]
-        ApplicationContext applicationContext = ApplicationContext.run("ratelimiter");
-        // end::config[]
+        List<Map> limits = new ArrayList<>();
+        limits.add(CollectionUtils.mapOf("period", "10s", "limit", "1000"));
+        limits.add(CollectionUtils.mapOf("period", "1m", "limit", "5000"));
+        ApplicationContext applicationContext = ApplicationContext.run(Collections.singletonMap("ratelimits", limits));
 
-        // tag::beans[]
         List<RateLimitsConfiguration> beansOfType = applicationContext.streamOfType(RateLimitsConfiguration.class).collect(Collectors.toList());
 
         assertEquals(
@@ -62,8 +60,6 @@ public class EachPropertyTest {
         );
         assertEquals(1000L, beansOfType.get(0).getLimit().longValue());
         assertEquals(5000L, beansOfType.get(1).getLimit().longValue());
-
-        // end::beans[]
 
         applicationContext.close();
     }
