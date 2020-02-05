@@ -16,7 +16,8 @@
 package io.micronaut.validation.routes;
 
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
-import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.*;
+import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.RawSegment;
+import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.Segment;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.util.CollectionUtils;
@@ -29,6 +30,7 @@ import io.micronaut.validation.routes.rules.MissingParameterRule;
 import io.micronaut.validation.routes.rules.NullableParameterRule;
 import io.micronaut.validation.routes.rules.RouteValidationRule;
 
+import javax.annotation.processing.SupportedOptions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -42,8 +44,10 @@ import java.util.stream.Collectors;
  * @author James Kleeh
  * @since 1.0
  */
+@SupportedOptions(RouteValidationVisitor.VALIDATION_OPTION)
 public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMethodMapping> {
 
+    static final String VALIDATION_OPTION = "micronaut.route.validation";
     private List<RouteValidationRule> rules = new ArrayList<>();
     private boolean skipValidation = false;
     private final DefaultPropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(null, new DefaultConversionService());
@@ -61,7 +65,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
             List<UriMatchTemplate> templates = uris.stream().map(uri -> {
                 List<Segment> segments = resolver.buildSegments(uri);
                 StringBuilder uriValue = new StringBuilder();
-                for (Segment segment: segments) {
+                for (Segment segment : segments) {
                     if (segment instanceof RawSegment) {
                         uriValue.append(segment.getValue(String.class));
                     } else {
@@ -76,11 +80,11 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
                     .map(RouteParameterElement::new)
                     .toArray(RouteParameterElement[]::new);
 
-            for (RouteValidationRule rule: rules) {
+            for (RouteValidationRule rule : rules) {
                 RouteValidationResult result = rule.validate(templates, parameters, element);
 
                 if (!result.isValid()) {
-                    for (String err: result.getErrorMessages()) {
+                    for (String err : result.getErrorMessages()) {
                         context.fail(err, element);
                     }
                 }
@@ -90,7 +94,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
 
     @Override
     public void start(VisitorContext visitorContext) {
-        String prop = System.getProperty("micronaut.route.validation");
+        String prop = visitorContext.getOptions().getOrDefault(VALIDATION_OPTION, "true");
         skipValidation = prop != null && prop.equals("false");
         rules.add(new MissingParameterRule());
         rules.add(new NullableParameterRule());

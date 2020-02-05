@@ -15,11 +15,15 @@
  */
 package io.micronaut.inject.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+
+import java.util.Collections;
+import java.util.Set;
 
 /**
  * Provides a hook into the compilation process to allow user defined functionality to be created at compile time.
@@ -88,5 +92,17 @@ public interface TypeElementVisitor<C, E> extends Ordered {
      */
     default void finish(VisitorContext visitorContext) {
         // no-op
+    }
+
+    /**
+     * Called once when processor loads.
+     *
+     * Used to expose visitors custom processor options.
+     *
+     * @return Set with custom options
+     */
+    @Experimental
+    default Set<String> getSupportedOptions() {
+        return Collections.emptySet();
     }
 }

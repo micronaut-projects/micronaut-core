@@ -26,6 +26,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -246,6 +247,16 @@ public class GroovyVisitorContext implements VisitorContext {
      */
     SourceUnit getSourceUnit() {
         return sourceUnit;
+    }
+
+    /**
+     * Groovy options source are {@link System#getProperties()} based.
+     * <p><b>All properties MUST start with {@link GroovyVisitorContext#MICRONAUT_BASE_OPTION_NAME}</b></p>
+     * @return options {@link Map}
+     */
+    @Override
+    public Map<String, String> getOptions() {
+        return VisitorContextUtils.getSystemOptions();
     }
 
     private SyntaxErrorMessage buildErrorMessage(String message, Element element) {

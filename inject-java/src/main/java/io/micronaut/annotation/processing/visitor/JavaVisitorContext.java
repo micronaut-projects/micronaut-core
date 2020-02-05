@@ -28,6 +28,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 
@@ -49,6 +50,8 @@ import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The visitor context when visiting Java code.
@@ -67,19 +70,21 @@ public class JavaVisitorContext implements VisitorContext {
     private final AnnotationProcessingOutputVisitor outputVisitor;
     private final MutableConvertibleValues<Object> visitorAttributes;
     private final GenericUtils genericUtils;
-    private final ProcessingEnvironment proccessingEnv;
-    private @Nullable JavaFileManager standardFileManager;
+    private final ProcessingEnvironment processingEnv;
+    private @Nullable
+    JavaFileManager standardFileManager;
 
     /**
      * The default constructor.
-     * @param processingEnv The processing environment
-     * @param messager The messager
-     * @param elements The elements
-     * @param annotationUtils The annotation utils
-     * @param types Type types
-     * @param modelUtils The model utils
-     * @param genericUtils The generic type utils
-     * @param filer The filer
+     *
+     * @param processingEnv     The processing environment
+     * @param messager          The messager
+     * @param elements          The elements
+     * @param annotationUtils   The annotation utils
+     * @param types             Type types
+     * @param modelUtils        The model utils
+     * @param genericUtils      The generic type utils
+     * @param filer             The filer
      * @param visitorAttributes The attributes
      */
     public JavaVisitorContext(
@@ -100,7 +105,7 @@ public class JavaVisitorContext implements VisitorContext {
         this.genericUtils = genericUtils;
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.visitorAttributes = visitorAttributes;
-        this.proccessingEnv = processingEnv;
+        this.processingEnv = processingEnv;
     }
 
     @Nonnull
@@ -109,7 +114,7 @@ public class JavaVisitorContext implements VisitorContext {
         // reflective hack required because no way to get the JavaFileManager
         // from public processor API
         info("EXPERIMENTAL: Compile time resource scanning is experimental", null);
-        JavaFileManager standardFileManager = getStandardFileManager(proccessingEnv).orElse(null);
+        JavaFileManager standardFileManager = getStandardFileManager(processingEnv).orElse(null);
         if (standardFileManager != null) {
             try {
                 final ClassLoader classLoader = standardFileManager
@@ -135,7 +140,8 @@ public class JavaVisitorContext implements VisitorContext {
     }
 
     @Override
-    public @Nonnull ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
+    public @Nonnull
+    ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
         ArgumentUtils.requireNonNull("aPackage", aPackage);
         ArgumentUtils.requireNonNull("stereotypes", stereotypes);
         final PackageElement packageElement = elements.getPackageElement(aPackage);
@@ -253,10 +259,32 @@ public class JavaVisitorContext implements VisitorContext {
 
     /**
      * The generic utils object.
+     *
      * @return The generic utils
      */
     public GenericUtils getGenericUtils() {
         return genericUtils;
+    }
+
+    /**
+     * Java visitor context options from <code>javac</code> arguments and {@link System#getProperties()}
+     * <p><b>System properties has priority over arguments.</b></p>
+     *
+     * @return Java visitor context options for all visitors
+     * @see io.micronaut.inject.visitor.TypeElementVisitor
+     * @see <a href="https://docs.oracle.com/javase/8/docs/technotes/tools/windows/javac.html">javac arguments</a>
+     */
+    @Override
+    public Map<String, String> getOptions() {
+        Map<String, String> processorOptions = VisitorContextUtils.getProcessorOptions(processingEnv);
+        Map<String, String> systemPropsOptions = VisitorContextUtils.getSystemOptions();
+        // Merge both options, with system props overriding on duplications
+        return Stream.of(processorOptions, systemPropsOptions)
+                .flatMap(map -> map.entrySet().stream())
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (v1, v2) -> StringUtils.isNotEmpty(v2) ? v2 : v1));
     }
 
     @Override

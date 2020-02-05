@@ -19,17 +19,18 @@ import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.Nonnull;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
@@ -41,6 +42,7 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementScanner8;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static javax.lang.model.element.ElementKind.FIELD;
 
@@ -55,6 +57,31 @@ import static javax.lang.model.element.ElementKind.FIELD;
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
 
     private boolean executed = false;
+    private Collection<TypeElementVisitor> typeElementVisitors;
+
+    @Override
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+        this.typeElementVisitors = findTypeElementVisitors();
+    }
+
+    @Override
+    public Set<String> getSupportedOptions() {
+        Stream<String> baseOption = super.getSupportedOptions().stream();
+        Stream<String> visitorsOptions = typeElementVisitors
+                .stream()
+                .map(TypeElementVisitor::getSupportedOptions)
+                .flatMap(Collection::stream);
+        Stream<String> visitorsAnnotationsOptions = typeElementVisitors
+                .stream()
+                .filter(tev -> tev.getClass().isAnnotationPresent(SupportedOptions.class))
+                .map(TypeElementVisitor::getClass)
+                .map(cls -> cls.getAnnotation(SupportedOptions.class))
+                .flatMap((SupportedOptions supportedOptions) -> Arrays.stream(supportedOptions.value()));
+        return Stream.of(baseOption, visitorsAnnotationsOptions, visitorsOptions)
+                .flatMap(Stream::sequential)
+                .collect(Collectors.toSet());
+    }
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -63,8 +90,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             return false;
         }
 
-
-        Collection<TypeElementVisitor> typeElementVisitors = findTypeElementVisitors();
         List<LoadedVisitor> loadedVisitors = new ArrayList<>(typeElementVisitors.size());
         for (TypeElementVisitor visitor : typeElementVisitors) {
             try {
@@ -120,7 +145,8 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      *
      * @return A collection of type element visitors.
      */
-    protected @Nonnull Collection<TypeElementVisitor> findTypeElementVisitors() {
+    protected @Nonnull
+    Collection<TypeElementVisitor> findTypeElementVisitors() {
         Map<String, TypeElementVisitor> typeElementVisitors = new HashMap<>(10);
         SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, getClass().getClassLoader());
         for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
