@@ -122,6 +122,17 @@ public class Publishers {
     }
 
     /**
+     * A {@link Publisher} that completes without emitting any items.
+     *
+     * @param <T>   The value type
+     * @return The {@link Publisher}
+     * @since 2.0.0
+     */
+    public static <T> Publisher<T> empty() {
+        return new JustCompletePublisher<>();
+    }
+
+    /**
      * Map the result from a publisher using the given mapper.
      *
      * @param publisher The publisher
@@ -376,6 +387,35 @@ public class Publishers {
                     }
                     done = true;
                     subscriber.onError(error);
+                }
+
+                @Override
+                public void cancel() {
+                    done = true;
+                }
+            });
+        }
+    }
+
+    /**
+     * A publisher that completes without emitting any items.
+     *
+     * @param <T> The type
+     */
+    private static class JustCompletePublisher<T> implements Publisher<T> {
+
+        @Override
+        public void subscribe(Subscriber<? super T> subscriber) {
+            subscriber.onSubscribe(new Subscription() {
+                boolean done;
+
+                @Override
+                public void request(long n) {
+                    if (done) {
+                        return;
+                    }
+                    done = true;
+                    subscriber.onComplete();
                 }
 
                 @Override

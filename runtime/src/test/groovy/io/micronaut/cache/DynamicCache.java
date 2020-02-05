@@ -2,37 +2,37 @@ package io.micronaut.cache;
 
 import io.micronaut.core.type.Argument;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
 public class DynamicCache implements SyncCache<Map> {
 
-    @Nonnull
+    @NonNull
     @Override
-    public <T> Optional<T> get(@Nonnull Object key, @Nonnull Argument<T> requiredType) {
+    public <T> Optional<T> get(@NonNull Object key, @NonNull Argument<T> requiredType) {
         return Optional.empty();
     }
 
     @Override
-    public <T> T get(@Nonnull Object key, @Nonnull Argument<T> requiredType, @Nonnull Supplier<T> supplier) {
+    public <T> T get(@NonNull Object key, @NonNull Argument<T> requiredType, @NonNull Supplier<T> supplier) {
         return null;
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public <T> Optional<T> putIfAbsent(@Nonnull Object key, @Nonnull T value) {
+    public <T> Optional<T> putIfAbsent(@NonNull Object key, @NonNull T value) {
         return Optional.empty();
     }
 
     @Override
-    public void put(@Nonnull Object key, @Nonnull Object value) {
+    public void put(@NonNull Object key, @NonNull Object value) {
 
     }
 
     @Override
-    public void invalidate(@Nonnull Object key) {
+    public void invalidate(@NonNull Object key) {
 
     }
 

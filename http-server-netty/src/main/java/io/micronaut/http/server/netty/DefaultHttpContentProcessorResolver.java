@@ -29,7 +29,7 @@ import io.micronaut.inject.ExecutionHandle;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.Set;
@@ -67,8 +67,8 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
     }
 
     @Override
-    @Nonnull
-    public HttpContentProcessor<?> resolve(@Nonnull NettyHttpRequest<?> request, @Nonnull RouteMatch<?> route) {
+    @NonNull
+    public HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request, @NonNull RouteMatch<?> route) {
         Argument<?> bodyType = route.getBodyArgument()
                 /*
                 The getBodyArgument() method returns arguments for functions where it is
@@ -98,8 +98,8 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
     }
 
     @Override
-    @Nonnull
-    public HttpContentProcessor<?> resolve(@Nonnull NettyHttpRequest<?> request, @Nonnull Argument<?> bodyType) {
+    @NonNull
+    public HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request, @NonNull Argument<?> bodyType) {
         if (bodyType.getType() == HttpRequest.class) {
             bodyType = bodyType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
         }
@@ -108,8 +108,8 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
     }
 
     @Override
-    @Nonnull
-    public HttpContentProcessor<?> resolve(@Nonnull NettyHttpRequest<?> request) {
+    @NonNull
+    public HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request) {
         return resolve(request, false);
     }
 

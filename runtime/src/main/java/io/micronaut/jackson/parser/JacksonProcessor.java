@@ -29,7 +29,7 @@ import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentLinkedDeque;
 

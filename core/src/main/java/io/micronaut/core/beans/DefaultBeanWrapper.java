@@ -19,7 +19,7 @@ package io.micronaut.core.beans;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Objects;
 
 /**
@@ -40,20 +40,20 @@ final class DefaultBeanWrapper<T> implements BeanWrapper<T> {
      * @param bean The bean.
      * @param introspection The introspection.
      */
-    DefaultBeanWrapper(@Nonnull T bean, @Nonnull BeanIntrospection<T> introspection) {
+    DefaultBeanWrapper(@NonNull T bean, @NonNull BeanIntrospection<T> introspection) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("introspection", introspection);
         this.bean = bean;
         this.introspection = introspection;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public BeanIntrospection<T> getIntrospection() {
         return introspection;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public T getBean() {
         return bean;

@@ -39,8 +39,8 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
@@ -142,8 +142,8 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param typeArguments The type arguments
      */
     void visitProperty(
-            @Nonnull TypedElement type,
-            @Nonnull String name,
+            @NonNull TypedElement type,
+            @NonNull String name,
             @Nullable MethodElement readMethod,
             @Nullable MethodElement writeMethod,
             boolean isReadOnly,
@@ -486,11 +486,11 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * index to be created.
      */
     private class AnnotationValueIndex {
-        final @Nonnull AnnotationValue annotationValue;
-        final @Nonnull String property;
+        final @NonNull AnnotationValue annotationValue;
+        final @NonNull String property;
         final @Nullable String value;
 
-        public AnnotationValueIndex(@Nonnull AnnotationValue annotationValue, @Nonnull String property, @Nullable String value) {
+        public AnnotationValueIndex(@NonNull AnnotationValue annotationValue, @NonNull String property, @Nullable String value) {
             this.annotationValue = annotationValue;
             this.property = property;
             this.value = value;

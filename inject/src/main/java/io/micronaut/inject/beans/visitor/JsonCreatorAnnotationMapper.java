@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.Creator;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
@@ -34,7 +34,7 @@ import java.util.List;
  */
 public class JsonCreatorAnnotationMapper implements NamedAnnotationMapper {
 
-    @Nonnull
+    @NonNull
     @Override
     public String getName() {
         return "com.fasterxml.jackson.annotation.JsonCreator";

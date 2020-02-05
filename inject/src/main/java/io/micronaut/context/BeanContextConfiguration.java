@@ -16,7 +16,7 @@
 
 package io.micronaut.context;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * Configuration for the {@link BeanContext}.
@@ -30,7 +30,7 @@ public interface BeanContextConfiguration {
      * The class loader to use.
      * @return The class loader.
      */
-    default @Nonnull ClassLoader getClassLoader() {
+    default @NonNull ClassLoader getClassLoader() {
         return ApplicationContextConfiguration.class.getClassLoader();
     }
 }

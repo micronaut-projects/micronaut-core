@@ -15,6 +15,8 @@
  */
 package io.micronaut.aop.writer;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.aop.HotSwappableInterceptedProxy;
 import io.micronaut.aop.Intercepted;
 import io.micronaut.aop.InterceptedProxy;
@@ -54,8 +56,6 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -380,7 +380,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public String getBeanDefinitionReferenceClassName() {
         return proxyBeanDefinitionWriter.getBeanDefinitionReferenceClassName();

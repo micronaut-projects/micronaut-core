@@ -50,7 +50,6 @@ import io.micronaut.jackson.JacksonConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -83,7 +82,7 @@ public class BeanIntrospectionModule extends SimpleModule {
     }
 
     private PropertyMetadata newPropertyMetadata(Argument<?> argument, AnnotationMetadata annotationMetadata) {
-        final Boolean required = argument.isAnnotationPresent(Nonnull.class) ||
+        final Boolean required = argument.isNonNull() ||
                 annotationMetadata.booleanValue(JsonProperty.class, "required").orElse(false);
 
         int index = annotationMetadata.intValue(JsonProperty.class, "index").orElse(-1);

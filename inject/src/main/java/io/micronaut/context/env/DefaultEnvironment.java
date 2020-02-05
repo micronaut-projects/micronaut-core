@@ -38,8 +38,8 @@ import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.*;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
@@ -152,26 +152,26 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Deprecated
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, @Nullable Boolean deduceEnvironments, String... names) {
         this(new ApplicationContextConfiguration() {
-            @Nonnull
+            @NonNull
             @Override
             public ClassLoader getClassLoader() {
                 return resourceLoader.getClassLoader();
             }
 
-            @Nonnull
+            @NonNull
             @Override
             public List<String> getEnvironments() {
                 return Arrays.asList(names);
             }
 
-            @Nonnull
+            @NonNull
             @Override
             public ConversionService<?> getConversionService() {
                 return conversionService;
             }
 
             @Override
-            public @Nonnull ClassPathResourceLoader getResourceLoader() {
+            public @NonNull ClassPathResourceLoader getResourceLoader() {
                 return resourceLoader;
             }
 
@@ -188,7 +188,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      *
      * @param configuration The configuration
      */
-    public DefaultEnvironment(@Nonnull ApplicationContextConfiguration configuration) {
+    public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration) {
         super(configuration.getConversionService());
         this.configuration = configuration;
         Set<String> environments = new LinkedHashSet<>(3);

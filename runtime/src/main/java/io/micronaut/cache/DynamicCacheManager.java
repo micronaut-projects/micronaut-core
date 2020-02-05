@@ -15,7 +15,7 @@
  */
 package io.micronaut.cache;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * <p>A contract for a cache manager that does not have pre-defined caches.</p>
@@ -35,6 +35,6 @@ public interface DynamicCacheManager<C> {
      * @param name The name of the cache
      * @return The {@link SyncCache} instance
      */
-    @Nonnull
+    @NonNull
     SyncCache<C> getCache(String name);
 }

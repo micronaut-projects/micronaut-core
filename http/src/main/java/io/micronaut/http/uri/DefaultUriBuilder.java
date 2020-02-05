@@ -21,8 +21,8 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -145,7 +145,7 @@ class DefaultUriBuilder implements UriBuilder {
         }
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder fragment(@Nullable String fragment) {
         if (fragment != null) {
@@ -154,7 +154,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder scheme(@Nullable String scheme) {
         if (scheme != null) {
@@ -163,7 +163,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder userInfo(@Nullable String userInfo) {
         if (userInfo != null) {
@@ -172,7 +172,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder host(@Nullable String host) {
         if (host != null) {
@@ -181,7 +181,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder port(int port) {
         if (port < -1) {
@@ -191,7 +191,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder path(@Nullable String path) {
         if (StringUtils.isNotEmpty(path)) {
@@ -214,7 +214,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder replacePath(@Nullable String path) {
         if (path != null) {
@@ -224,7 +224,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public UriBuilder queryParam(String name, Object... values) {
         if (StringUtils.isNotEmpty(name) && ArrayUtils.isNotEmpty(values)) {
@@ -240,7 +240,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public URI build() {
         try {
@@ -250,7 +250,7 @@ class DefaultUriBuilder implements UriBuilder {
         }
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public URI expand(Map<String, ? super Object> values) {
         String uri = reconstructAsString(values);

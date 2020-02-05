@@ -18,7 +18,7 @@ package io.micronaut.context;
 
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -29,9 +29,9 @@ import java.util.Objects;
  * @since 1.2
  */
 public abstract class AbstractMessageSource implements MessageSource {
-    @Nonnull
+    @NonNull
     @Override
-    public String interpolate(@Nonnull String template, @Nonnull MessageContext context) {
+    public String interpolate(@NonNull String template, @NonNull MessageContext context) {
         ArgumentUtils.requireNonNull("template", template);
         ArgumentUtils.requireNonNull("context", context);
         int start = template.indexOf('{');
@@ -84,7 +84,7 @@ public abstract class AbstractMessageSource implements MessageSource {
          * @param locale The locale
          * @param code The code
          */
-        public MessageKey(@Nonnull Locale locale, @Nonnull String code) {
+        public MessageKey(@NonNull Locale locale, @NonNull String code) {
             this.locale = locale;
             this.code = code;
         }

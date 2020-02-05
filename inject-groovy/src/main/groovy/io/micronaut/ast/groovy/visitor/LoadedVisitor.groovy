@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor
 
+import edu.umd.cs.findbugs.annotations.Nullable
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -33,8 +34,6 @@ import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
-
-import javax.annotation.Nullable
 
 /**
  * Used to store a reference to an underlying {@link TypeElementVisitor} and

@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -107,7 +107,7 @@ public class FileWatchConfiguration implements Toggleable {
      * Sets the watch paths to use.
      * @param paths The watch paths
      */
-    public void setPaths(@Nonnull List<Path> paths) {
+    public void setPaths(@NonNull List<Path> paths) {
         ArgumentUtils.requireNonNull("paths", paths);
         this.paths = paths;
     }
@@ -116,7 +116,7 @@ public class FileWatchConfiguration implements Toggleable {
      * The interval to wait between checks.
      * @return The interval to wait.
      */
-    public @Nonnull Duration getCheckInterval() {
+    public @NonNull Duration getCheckInterval() {
         return checkInterval;
     }
 
@@ -125,7 +125,7 @@ public class FileWatchConfiguration implements Toggleable {
      *
      * @param checkInterval The check interval
      */
-    public void setCheckInterval(@Nonnull Duration checkInterval) {
+    public void setCheckInterval(@NonNull Duration checkInterval) {
         ArgumentUtils.requireNonNull("checkInterval", checkInterval);
         this.checkInterval = checkInterval;
     }

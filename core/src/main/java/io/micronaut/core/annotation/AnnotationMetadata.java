@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.annotation;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -24,9 +26,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.annotation.concurrent.Immutable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
@@ -50,7 +49,6 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Immutable
 public interface AnnotationMetadata extends AnnotationSource {
     /**
      * A constant for representing empty metadata.
@@ -73,7 +71,8 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param stereotype The annotation names
      * @return A set of annotation names
      */
-    default @Nonnull List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
+    default @NonNull
+    List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
         return Collections.emptyList();
     }
 
@@ -82,7 +81,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      *
      * @return All the annotation names this metadata declares
      */
-    default @Nonnull Set<String> getAnnotationNames() {
+    default @NonNull Set<String> getAnnotationNames() {
         return Collections.emptySet();
     }
 
@@ -91,7 +90,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      *
      * @return All the declared annotation names this metadata declares
      */
-    default @Nonnull Set<String> getDeclaredAnnotationNames() {
+    default @NonNull Set<String> getDeclaredAnnotationNames() {
         return Collections.emptySet();
     }
 
@@ -101,7 +100,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param stereotype The stereotype
      * @return The declared annotations
      */
-    default @Nonnull List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
+    default @NonNull List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
         return Collections.emptyList();
     }
 
@@ -113,7 +112,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>        Generic type
      * @return The {@link OptionalValues}
      */
-    default @Nonnull <T> OptionalValues<T> getValues(@Nonnull String annotation, @Nonnull Class<T> valueType) {
+    default @NonNull <T> OptionalValues<T> getValues(@NonNull String annotation, @NonNull Class<T> valueType) {
         return OptionalValues.empty();
     }
 
@@ -126,7 +125,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          The required generic type
      * @return An optional value
      */
-    default <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
+    default <T> Optional<T> getDefaultValue(@NonNull String annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
         return Optional.empty();
     }
 
@@ -137,7 +136,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T> The annotation type
      * @return A list of values
      */
-    default @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@Nonnull Class<T> annotationType) {
+    default @NonNull <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@NonNull Class<T> annotationType) {
         return Collections.emptyList();
     }
 
@@ -148,7 +147,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T> The annotation type
      * @return A list of values
      */
-    default @Nonnull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@Nonnull Class<T> annotationType) {
+    default @NonNull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
         return Collections.emptyList();
     }
 
@@ -231,7 +230,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation name
      * @return The default values
      */
-    default @Nonnull Map<String, Object> getDefaultValues(@Nonnull String annotation) {
+    default @NonNull Map<String, Object> getDefaultValues(@NonNull String annotation) {
         return Collections.emptyMap();
     }
 
@@ -244,7 +243,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          The required generic type
      * @return An optional value
      */
-    default <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
+    default <T> Optional<T> getDefaultValue(@NonNull String annotation, @NonNull String member, @NonNull Class<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
@@ -261,7 +260,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          The required generic type
      * @return An optional value
      */
-    default <T> Optional<T> getDefaultValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
+    default <T> Optional<T> getDefaultValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
@@ -273,7 +272,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @see AnnotationSource#isAnnotationPresent(Class)
      */
     @Override
-    default boolean isAnnotationPresent(@Nonnull Class<? extends Annotation> annotationClass) {
+    default boolean isAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
         //noinspection ConstantConditions
         if (annotationClass == null) {
             return false;
@@ -285,7 +284,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @see AnnotationSource#isAnnotationPresent(Class)
      */
     @Override
-    default boolean isDeclaredAnnotationPresent(@Nonnull Class<? extends Annotation> annotationClass) {
+    default boolean isDeclaredAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
         //noinspection ConstantConditions
         if (annotationClass == null) {
             return false;
@@ -302,7 +301,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          The required generic type
      * @return An optional value
      */
-    default <T> Optional<T> getDefaultValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
+    default <T> Optional<T> getDefaultValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, @NonNull Class<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return getDefaultValue(annotation.getName(), member, requiredType);
     }
@@ -316,7 +315,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          The value
      * @return An {@link Optional} of the value
      */
-    default <T> Optional<T> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
+    default <T> Optional<T> getValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, @NonNull Class<T> requiredType) {
         ArgumentUtils.requireNonNull("requiredType", requiredType);
         return getValue(annotation, member, Argument.of(requiredType));
     }
@@ -331,7 +330,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          The value
      * @return An {@link Optional} of the value
      */
-    default <T> Optional<T> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
+    default <T> Optional<T> getValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
@@ -383,7 +382,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param stereotype The stereotype
      * @return The annotation name
      */
-    default Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
+    default Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(@NonNull Class<? extends Annotation> stereotype) {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
 
         return getAnnotationTypeByStereotype(stereotype.getName());
@@ -395,7 +394,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param stereotype The stereotype
      * @return The annotation name
      */
-    default Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
+    default Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(@NonNull Class<? extends Annotation> stereotype) {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
         return getDeclaredAnnotationTypeByStereotype(stereotype.getName());
     }
@@ -415,7 +414,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param name The type name
      * @return The type if present
      */
-    default Optional<Class<? extends Annotation>> getAnnotationType(@Nonnull String name) {
+    default Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
         ArgumentUtils.requireNonNull("name", name);
         final Optional<Class> aClass = ClassUtils.forName(name, getClass().getClassLoader());
         return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
@@ -443,7 +442,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param stereotype The stereotype
      * @return The annotation name
      */
-    default Optional<String> getAnnotationNameByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
+    default Optional<String> getAnnotationNameByStereotype(@NonNull Class<? extends Annotation> stereotype) {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
         return getAnnotationNameByStereotype(stereotype.getName());
     }
@@ -456,7 +455,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>        Generic type
      * @return The {@link OptionalValues}
      */
-    default @Nonnull <T> OptionalValues<T> getValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull Class<T> valueType) {
+    default @NonNull <T> OptionalValues<T> getValues(@NonNull Class<? extends Annotation> annotation, @NonNull Class<T> valueType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("valueType", valueType);
 
@@ -469,7 +468,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param stereotype The annotation names
      * @return A set of annotation names
      */
-    default @Nonnull List<String> getAnnotationNamesByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
+    default @NonNull List<String> getAnnotationNamesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
         return getAnnotationNamesByStereotype(stereotype.getName());
     }
@@ -480,7 +479,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param stereotype The annotation names
      * @return A set of annotation names
      */
-    default @Nonnull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
+    default @NonNull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@NonNull Class<? extends Annotation> stereotype) {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
 
         List<String> names = getAnnotationNamesByStereotype(stereotype.getName());
@@ -498,7 +497,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return The {@link AnnotationValue}
      */
     @Override
-    default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@Nonnull Class<T> annotationClass) {
+    default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         Repeatable repeatable = annotationClass.getAnnotation(Repeatable.class);
         if (repeatable != null) {
@@ -517,7 +516,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * {@inheritDoc}
      */
     @Override
-    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@Nonnull Class<T> annotationClass) {
+    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         Repeatable repeatable = annotationClass.getAnnotation(Repeatable.class);
         if (repeatable != null) {
@@ -541,7 +540,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          The value
      * @return An {@link Optional} of the value
      */
-    default <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
+    default <T> Optional<T> getValue(@NonNull String annotation, @NonNull String member, @NonNull Class<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
@@ -558,7 +557,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          The value
      * @return An {@link Optional} of the value
      */
-    default <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
+    default <T> Optional<T> getValue(@NonNull String annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
@@ -579,7 +578,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return THe {@link OptionalLong} value
      */
-    default OptionalLong longValue(@Nonnull String annotation, @Nonnull String member) {
+    default OptionalLong longValue(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -594,7 +593,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return THe {@link OptionalLong} value
      */
-    default OptionalLong longValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default OptionalLong longValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return longValue(annotation.getName(), member);
     }
@@ -607,7 +606,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An {@link Optional} enum value
      */
-    default <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, Class<E> enumType) {
+    default <E extends Enum> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return enumValue(annotation, VALUE_MEMBER, enumType);
     }
@@ -621,7 +620,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An {@link Optional} class
      */
-    default <E extends Enum> Optional<E> enumValue(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+    default <E extends Enum> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -636,7 +635,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An {@link Optional} class
      */
-    default <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, Class<E> enumType) {
+    default <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
 
         return enumValue(annotation, VALUE_MEMBER, enumType);
@@ -651,7 +650,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An {@link Optional} class
      */
-    default <E extends Enum> Optional<E> enumValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+    default <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -667,7 +666,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An array of enum values
      */
-    default <E extends Enum> E[] enumValues(@Nonnull String annotation, Class<E> enumType) {
+    default <E extends Enum> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return enumValues(annotation, VALUE_MEMBER, enumType);
     }
@@ -681,7 +680,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An array of enum values
      */
-    default <E extends Enum> E[] enumValues(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+    default <E extends Enum> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -696,7 +695,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An array of enum values
      */
-    default <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, Class<E> enumType) {
+    default <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
 
         return enumValues(annotation, VALUE_MEMBER, enumType);
@@ -711,7 +710,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An array of enum values
      */
-    default <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+    default <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -725,7 +724,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @Nonnull <T> Class<T>[] classValues(@Nonnull String annotation) {
+    default @NonNull <T> Class<T>[] classValues(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return classValues(annotation, VALUE_MEMBER);
     }
@@ -738,7 +737,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @Nonnull <T> Class<T>[] classValues(@Nonnull String annotation, @Nonnull String member) {
+    default @NonNull <T> Class<T>[] classValues(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -752,7 +751,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @Nonnull <T> Class<T>[] classValues(@Nonnull Class<? extends Annotation> annotation) {
+    default @NonNull <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
 
         return classValues(annotation, VALUE_MEMBER);
@@ -766,7 +765,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} class
      * @param <T> The type of the class
      */
-    default @Nonnull <T> Class<T>[] classValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default @NonNull <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -779,7 +778,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return An {@link Optional} class
      */
-    default Optional<Class> classValue(@Nonnull String annotation) {
+    default Optional<Class> classValue(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return classValue(annotation, VALUE_MEMBER);
     }
@@ -791,7 +790,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return An {@link Optional} class
      */
-    default Optional<Class> classValue(@Nonnull String annotation, @Nonnull String member) {
+    default Optional<Class> classValue(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -806,7 +805,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return An {@link Optional} class
      */
-    default Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation) {
+    default Optional<Class> classValue(@NonNull Class<? extends Annotation> annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
 
         return classValue(annotation, VALUE_MEMBER);
@@ -819,7 +818,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return An {@link Optional} class
      */
-    default Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default Optional<Class> classValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -835,7 +834,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return THe {@link OptionalInt} value
      */
-    default OptionalInt intValue(@Nonnull String annotation, @Nonnull String member) {
+    default OptionalInt intValue(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -850,7 +849,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return THe {@link OptionalInt} value
      */
-    default OptionalInt intValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default OptionalInt intValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return intValue(annotation.getName(), member);
     }
@@ -861,7 +860,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return THe {@link OptionalInt} value
      */
-    default OptionalInt intValue(@Nonnull Class<? extends Annotation> annotation) {
+    default OptionalInt intValue(@NonNull Class<? extends Annotation> annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return intValue(annotation, VALUE_MEMBER);
     }
@@ -873,7 +872,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return The string value if it is present
      */
-    default Optional<String> stringValue(@Nonnull String annotation, @Nonnull String member) {
+    default Optional<String> stringValue(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -887,7 +886,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return The string value if it is present
      */
-    default Optional<String> stringValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default Optional<String> stringValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return stringValue(annotation.getName(), member);
     }
@@ -898,7 +897,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return The string value if it is present
      */
-    default @Nonnull Optional<String> stringValue(@Nonnull Class<? extends Annotation> annotation) {
+    default @NonNull Optional<String> stringValue(@NonNull Class<? extends Annotation> annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return stringValue(annotation, VALUE_MEMBER);
     }
@@ -909,7 +908,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return The string value if it is present
      */
-    default @Nonnull Optional<String> stringValue(@Nonnull String annotation) {
+    default @NonNull Optional<String> stringValue(@NonNull String annotation) {
         return stringValue(annotation, VALUE_MEMBER);
     }
 
@@ -920,7 +919,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return The string value if it is present
      */
-    default Optional<Boolean> booleanValue(@Nonnull String annotation, @Nonnull String member) {
+    default Optional<Boolean> booleanValue(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -934,7 +933,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return The string value if it is present
      */
-    default Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default Optional<Boolean> booleanValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return booleanValue(annotation.getName(), member);
     }
@@ -945,7 +944,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return The string value if it is present
      */
-    default @Nonnull Optional<Boolean> booleanValue(@Nonnull Class<? extends Annotation> annotation) {
+    default @NonNull Optional<Boolean> booleanValue(@NonNull Class<? extends Annotation> annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return booleanValue(annotation, VALUE_MEMBER);
     }
@@ -956,7 +955,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return The string value if it is present
      */
-    default @Nonnull Optional<Boolean> booleanValue(@Nonnull String annotation) {
+    default @NonNull Optional<Boolean> booleanValue(@NonNull String annotation) {
         return booleanValue(annotation, VALUE_MEMBER);
     }
 
@@ -967,7 +966,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return The string values if it is present
      */
-    default @Nonnull String[] stringValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default @NonNull String[] stringValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         return StringUtils.EMPTY_STRING_ARRAY;
     }
 
@@ -977,7 +976,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return The string values if it is present
      */
-    default @Nonnull String[] stringValues(@Nonnull Class<? extends Annotation> annotation) {
+    default @NonNull String[] stringValues(@NonNull Class<? extends Annotation> annotation) {
         return stringValues(annotation, VALUE_MEMBER);
     }
 
@@ -988,7 +987,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return THe {@link OptionalDouble} value
      */
-    default @Nonnull OptionalDouble doubleValue(@Nonnull String annotation, @Nonnull String member) {
+    default @NonNull OptionalDouble doubleValue(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -1003,7 +1002,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The member
      * @return THe {@link OptionalDouble} value
      */
-    default @Nonnull OptionalDouble doubleValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default @NonNull OptionalDouble doubleValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return doubleValue(annotation.getName(), member);
     }
@@ -1014,7 +1013,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation
      * @return THe {@link OptionalDouble} value
      */
-    default @Nonnull OptionalDouble doubleValue(@Nonnull Class<? extends Annotation> annotation) {
+    default @NonNull OptionalDouble doubleValue(@NonNull Class<? extends Annotation> annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return doubleValue(annotation, VALUE_MEMBER);
     }
@@ -1027,7 +1026,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          The value
      * @return An {@link Optional} of the value
      */
-    default @Nonnull <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull Class<T> requiredType) {
+    default @NonNull <T> Optional<T> getValue(@NonNull String annotation, @NonNull Class<T> requiredType) {
         return getValue(annotation, VALUE_MEMBER, requiredType);
     }
 
@@ -1038,7 +1037,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return An {@link Optional} of the value
      */
-    default @Nonnull Optional<Object> getValue(@Nonnull String annotation, @Nonnull String member) {
+    default @NonNull Optional<Object> getValue(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -1052,7 +1051,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return An {@link Optional} of the value
      */
-    default @Nonnull Optional<Object> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default @NonNull Optional<Object> getValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -1066,7 +1065,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return True if the value is true
      */
-    default boolean isTrue(@Nonnull String annotation, @Nonnull String member) {
+    default boolean isTrue(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -1080,7 +1079,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return True if the value is true
      */
-    default boolean isTrue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default boolean isTrue(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -1094,7 +1093,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return True if the value is true
      */
-    default boolean isPresent(@Nonnull String annotation, @Nonnull String member) {
+    default boolean isPresent(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -1108,7 +1107,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return True if the value is true
      */
-    default boolean isPresent(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default boolean isPresent(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -1122,7 +1121,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return True if the value is true
      */
-    default boolean isFalse(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
+    default boolean isFalse(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -1136,7 +1135,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param member     The annotation member
      * @return True if the value is true
      */
-    default boolean isFalse(@Nonnull String annotation, @Nonnull String member) {
+    default boolean isFalse(@NonNull String annotation, @NonNull String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -1149,7 +1148,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation class
      * @return An {@link Optional} of the value
      */
-    default @Nonnull Optional<Object> getValue(@Nonnull String annotation) {
+    default @NonNull Optional<Object> getValue(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
 
         return getValue(annotation, Object.class);
@@ -1161,7 +1160,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation class
      * @return An {@link Optional} of the value
      */
-    default @Nonnull Optional<Object> getValue(@Nonnull Class<? extends Annotation> annotation) {
+    default @NonNull Optional<Object> getValue(@NonNull Class<? extends Annotation> annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return getValue(annotation, AnnotationMetadata.VALUE_MEMBER, Object.class);
     }
@@ -1174,7 +1173,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          Generic type
      * @return An {@link Optional} of the value
      */
-    default @Nonnull <T> Optional<T> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull Class<T> requiredType) {
+    default @NonNull <T> Optional<T> getValue(@NonNull Class<? extends Annotation> annotation, @NonNull Class<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
 
@@ -1189,7 +1188,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          Generic type
      * @return An {@link Optional} of the value
      */
-    default @Nonnull <T> Optional<T> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull Argument<T> requiredType) {
+    default @NonNull <T> Optional<T> getValue(@NonNull Class<? extends Annotation> annotation, @NonNull Argument<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
 
@@ -1204,7 +1203,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T>          Generic type
      * @return An {@link Optional} of the value
      */
-    default @Nonnull <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull Argument<T> requiredType) {
+    default @NonNull <T> Optional<T> getValue(@NonNull String annotation, @NonNull Argument<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
 

@@ -6,8 +6,31 @@ In Micronaut 1.x the ann:context.annotation.Executable[] annotation was a meta-a
 
 In Micronaut 2.x and above this is no longer the case and if you need an api:inject.ExecutableMethod[] generated you should add the ann:context.annotation.Executable[] annotation to any custom AOP advice you specify otherwise the method will not be available via the api:inject.BeanDefinition[] interface (using for example the api:BeanDefinition.getExecutableMethods[] method).
 
+=== Spot Bugs Instead of JSR-305 Nullable/NonNull Annotations
+
+The JSR-305 annotations library (`com.google.code.findbugs:jsr305`) is no longer a dependency (replaced by `spotbugs-annotations`). If you need this library you will need to add it manually.
+
 === Source Retention Annotations No Longer Retained in Runtime Metadata
 
 In Micronaut 1.x annotations specified as source retention were still retained in the api:core.annotation.AnnotationMetadata[] interface. As of Micronaut 2.x this is no longer the case with source retention annotations only available within the compiler APIs.
 
 If you wish to retain a particular source level annotation when upgrading you can write an api:inject.annotation.AnnotationTransformer[] that alters the `RetentionPolicy` of the annotation.
+
+=== Iterable Beans No Longer Have An Implicit Primary
+
+In Micronaut 1.x injecting a single instance of an iterable bean without qualifiers would inject the first bean. An iterable bean is typically anything annotated with `@EachProperty` or `@EachBean`. Those beans typically are referenced from configuration. The first bean in this context is the first item in configuration that matches what the annotation expects.
+
+For example if you created a bean with `@EachProperty("cars")`, then specified the following in your config:
+
+[source,yaml]
+----
+cars:
+    ford:
+        cylinders: 8
+    subaru:
+        cylinders: 4
+----
+
+Requesting a single instance of that bean would result in the "ford" instance being injected. Because that behavior is surprising and inconsistent with other types of beans, that is no longer the case and a `NonUniqueBeanException` will be thrown.
+
+NOTE: This change does not apply to an explicit primary defined in the annotation (`@EachProperty(value = "cars", primary = "ford")`), nor requesting the instance by a qualifier (`@Named("ford") CarConfig carConfig`).

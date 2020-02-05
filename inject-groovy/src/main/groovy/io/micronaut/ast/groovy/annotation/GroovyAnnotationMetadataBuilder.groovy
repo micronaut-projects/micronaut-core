@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.annotation
 
+import edu.umd.cs.findbugs.annotations.NonNull
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
@@ -48,7 +49,6 @@ import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.SourceUnit
 
-import javax.annotation.Nonnull
 import java.lang.annotation.Annotation
 import java.lang.annotation.Repeatable
 import java.lang.annotation.Retention
@@ -100,7 +100,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
-    protected RetentionPolicy getRetentionPolicy(@Nonnull AnnotatedNode annotation) {
+    protected RetentionPolicy getRetentionPolicy(@NonNull AnnotatedNode annotation) {
         List<AnnotationNode> annotations = annotation.getAnnotations()
         for(ann in annotations) {
             if (ann.classNode.name == Retention.name) {
@@ -128,7 +128,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
-    protected void addError(@Nonnull AnnotatedNode originatingElement, @Nonnull String error) {
+    protected void addError(@NonNull AnnotatedNode originatingElement, @NonNull String error) {
         AstMessageUtils.error(sourceUnit, originatingElement, error)
     }
 
@@ -138,7 +138,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
-    protected String getDeclaringType(@Nonnull AnnotatedNode element) {
+    protected String getDeclaringType(@NonNull AnnotatedNode element) {
         if (element instanceof ClassNode) {
             return element.name
         }

@@ -23,8 +23,8 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.HttpServerConfiguration.HostResolutionConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.net.URI;
@@ -52,7 +52,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         this.embeddedServer = embeddedServer;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public String resolve(@Nullable HttpRequest request) {
         if (request != null) {

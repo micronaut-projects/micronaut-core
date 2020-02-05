@@ -23,8 +23,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.inject.ExecutableMethod;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Optional;
 
 /**
@@ -101,7 +101,7 @@ class AbstractExecutor<C> {
      *
      * @return The {@link ApplicationContextBuilder}
      */
-    protected @Nonnull ApplicationContextBuilder newApplicationContextBuilder() {
+    protected @NonNull ApplicationContextBuilder newApplicationContextBuilder() {
         return ApplicationContext.build(Environment.FUNCTION);
     }
 

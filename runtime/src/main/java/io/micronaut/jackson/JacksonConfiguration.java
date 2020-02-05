@@ -28,7 +28,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.*;
 
 /**
@@ -314,7 +314,7 @@ public class JacksonConfiguration {
      * @param <T> The generic type
      * @return The JavaType
      */
-    public static <T> JavaType constructType(@Nonnull Argument<T> type, @Nonnull TypeFactory typeFactory) {
+    public static <T> JavaType constructType(@NonNull Argument<T> type, @NonNull TypeFactory typeFactory) {
         ArgumentUtils.requireNonNull("type", type);
         ArgumentUtils.requireNonNull("typeFactory", typeFactory);
         Map<String, Argument<?>> typeVariables = type.getTypeVariables();

@@ -34,8 +34,8 @@ import io.micronaut.core.value.PropertyResolver;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -176,7 +176,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     @Override
-    public @Nonnull Map<String, Object> getProperties(String name, StringConvention keyFormat) {
+    public @NonNull Map<String, Object> getProperties(String name, StringConvention keyFormat) {
         if (!StringUtils.isEmpty(name)) {
             Map<String, Object> entries = resolveEntriesForKey(name, false, keyFormat);
             if (entries != null) {
@@ -211,7 +211,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     @Override
-    public <T> Optional<T> getProperty(@Nonnull String name, @Nonnull ArgumentConversionContext<T> conversionContext) {
+    public <T> Optional<T> getProperty(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext) {
         if (StringUtils.isEmpty(name)) {
             return Optional.empty();
         } else {
@@ -316,7 +316,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     @NotNull
-    private <T> String cacheKey(@Nonnull String name, Class<T> requiredType) {
+    private <T> String cacheKey(@NonNull String name, Class<T> requiredType) {
         return name + '|' + requiredType.getSimpleName();
     }
 
@@ -433,7 +433,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      * @param transformation The map transformation to apply
      * @return The resulting map
      */
-    @Nonnull
+    @NonNull
     protected Map<String, Object> resolveSubMap(
             String name,
             Map<String, Object> entries,

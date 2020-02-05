@@ -25,8 +25,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;
@@ -110,37 +110,37 @@ public class DefaultRouter implements Router {
     }
 
     @SuppressWarnings("unchecked")
-    @Nonnull
+    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri) {
         return this.<T, R>find(httpMethod.name(), uri).stream();
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpRequest request, @Nonnull CharSequence uri) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest request, @NonNull CharSequence uri) {
         return this.<T, R>find(request.getMethodName(), uri).stream();
     }
 
-    @Nonnull
+    @NonNull
     @Deprecated
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull URI uri) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri) {
         return this.<T, R>find(httpMethod.name(), uri.toString()).stream();
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpRequest<?> request) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request) {
         boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
         return this.<T, R>find(request, request.getPath())
                 .filter((match) -> match.test(request) && (!permitsBody || match.accept(request.getContentType().orElse(null))));
     }
 
     @SuppressWarnings("unchecked")
-    @Nonnull
+    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
         return find(httpMethod, uri);
     }
 
@@ -149,9 +149,9 @@ public class DefaultRouter implements Router {
         return routesByMethod.values().stream().flatMap(List::stream);
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(@Nonnull HttpRequest<?> request) {
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(@NonNull HttpRequest<?> request) {
         final HttpMethod httpMethod = request.getMethod();
         final MediaType contentType = request.getContentType().orElse(null);
         boolean permitsBody = HttpMethod.permitsRequestBody(httpMethod);
@@ -209,9 +209,9 @@ public class DefaultRouter implements Router {
         return uriRoutes;
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public <T, R> Optional<UriRouteMatch<T, R>> route(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri) {
+    public <T, R> Optional<UriRouteMatch<T, R>> route(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri) {
         List<UriRoute> routes = routesByMethod.getOrDefault(httpMethod.name(), Collections.emptyList());
         Optional<UriRouteMatch> result = routes.stream()
             .map((route -> route.match(uri.toString())))
@@ -224,7 +224,7 @@ public class DefaultRouter implements Router {
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@Nonnull HttpStatus status) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull HttpStatus status) {
         for (StatusRoute statusRoute : statusRoutes) {
             if (statusRoute.originatingType() == null) {
                 Optional<RouteMatch<R>> match = statusRoute.match(status);
@@ -237,7 +237,7 @@ public class DefaultRouter implements Router {
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@Nonnull Class originatingClass, @Nonnull HttpStatus status) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull HttpStatus status) {
         for (StatusRoute statusRoute : statusRoutes) {
             Optional<RouteMatch<R>> match = statusRoute.match(originatingClass, status);
             if (match.isPresent()) {
@@ -248,7 +248,7 @@ public class DefaultRouter implements Router {
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@Nonnull Class originatingClass, @Nonnull Throwable error) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull Throwable error) {
         Map<ErrorRoute, RouteMatch<R>> matchedRoutes = new LinkedHashMap<>();
         for (ErrorRoute errorRoute : errorRoutes) {
             Optional<RouteMatch<R>> match = errorRoute.match(originatingClass, error);
@@ -260,7 +260,7 @@ public class DefaultRouter implements Router {
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@Nonnull Throwable error) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Throwable error) {
         Map<ErrorRoute, RouteMatch<R>> matchedRoutes = new LinkedHashMap<>();
         for (ErrorRoute errorRoute : errorRoutes) {
             if (errorRoute.originatingType() == null) {
@@ -272,9 +272,9 @@ public class DefaultRouter implements Router {
         return findRouteMatch(matchedRoutes, error);
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public List<HttpFilter> findFilters(@Nonnull HttpRequest<?> request) {
+    public List<HttpFilter> findFilters(@NonNull HttpRequest<?> request) {
         List<HttpFilter> httpFilters = new ArrayList<>(filterRoutes.size());
         HttpMethod method = request.getMethod();
         URI uri = request.getUri();
@@ -292,16 +292,16 @@ public class DefaultRouter implements Router {
 
     @SuppressWarnings("unchecked")
     @Deprecated
-    @Nonnull
+    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri) {
+    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri) {
         return findAny(uri, null);
     }
 
     @SuppressWarnings("unchecked")
-    @Nonnull
+    @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
+    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
         List matchedRoutes = new ArrayList<>(5);
         final String uriStr = uri.toString();
         for (List<UriRoute> routes : routesByMethod.values()) {

@@ -18,8 +18,8 @@ package io.micronaut.core.util;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.lang.reflect.Constructor;
 import java.util.*;
 
@@ -162,7 +162,7 @@ public class CollectionUtils {
      * @param <T>         The type
      * @return The set
      */
-    public static @Nonnull <T> Iterable<T> enumerationToIterable(@Nullable Enumeration<T> enumeration) {
+    public static @NonNull <T> Iterable<T> enumerationToIterable(@Nullable Enumeration<T> enumeration) {
         if (enumeration == null) {
             return Collections.emptyList();
         }
@@ -286,7 +286,7 @@ public class CollectionUtils {
      * @param <T> The generic type
      * @return A non-null unmodifiable list
      */
-    public static @Nonnull <T> List<T> unmodifiableList(@Nullable List<T> list) {
+    public static @NonNull <T> List<T> unmodifiableList(@Nullable List<T> list) {
         if (isEmpty(list)) {
             return Collections.emptyList();
         }
@@ -300,7 +300,7 @@ public class CollectionUtils {
      * @param <T> The generic type
      * @return The last element of a collection or null
      */
-    public static @Nullable <T> T last(@Nonnull Collection<T> collection) {
+    public static @Nullable <T> T last(@NonNull Collection<T> collection) {
         if (collection instanceof List) {
             List<T> list = (List<T>) collection;
             final int s = list.size();

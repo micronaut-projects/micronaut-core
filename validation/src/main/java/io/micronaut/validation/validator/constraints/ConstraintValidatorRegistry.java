@@ -15,7 +15,7 @@
  */
 package io.micronaut.validation.validator.constraints;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.validation.ValidationException;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
@@ -36,10 +36,10 @@ public interface ConstraintValidatorRegistry {
      * @param <T> The target type
      * @return The validator
      */
-    @Nonnull
+    @NonNull
     <A extends Annotation, T> Optional<ConstraintValidator<A, T>> findConstraintValidator(
-            @Nonnull Class<A> constraintType,
-            @Nonnull Class<T> targetType);
+            @NonNull Class<A> constraintType,
+            @NonNull Class<T> targetType);
 
     /**
      * Finds a constraint validator for the given type and target type.
@@ -50,10 +50,10 @@ public interface ConstraintValidatorRegistry {
      * @return The validator
      * @throws ValidationException if no validator is present
      */
-    @Nonnull
+    @NonNull
     default <A extends Annotation, T> ConstraintValidator<A, T> getConstraintValidator(
-            @Nonnull Class<A> constraintType,
-            @Nonnull Class<T> targetType) {
+            @NonNull Class<A> constraintType,
+            @NonNull Class<T> targetType) {
         return findConstraintValidator(constraintType, targetType)
                 .orElseThrow(() -> new ValidationException("No constraint validator present able to validate constraint [" + constraintType + "] on type: " + targetType));
     }

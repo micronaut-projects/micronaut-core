@@ -30,8 +30,8 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -424,7 +424,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             return Optional.ofNullable(readMethod);
         }
 
-        @Nonnull
+        @NonNull
         @Override
         public ClassElement getType() {
             return type;
@@ -435,7 +435,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             return declaringType;
         }
 
-        @Nonnull
+        @NonNull
         @Override
         public String getName() {
             return name;
@@ -452,7 +452,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
 
         @SuppressWarnings("ConstantConditions")
-        @Nonnull
+        @NonNull
         @Override
         public Object getNativeType() {
             throw null;

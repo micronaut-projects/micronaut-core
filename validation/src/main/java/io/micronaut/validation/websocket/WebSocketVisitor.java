@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.*;
 import io.micronaut.websocket.annotation.*;
 
+import javax.annotation.processing.SupportedOptions;
 import java.util.*;
 
 /**
@@ -32,8 +33,10 @@ import java.util.*;
  * @author graemerocher
  * @since 1.0
  */
+@SupportedOptions(WebSocketVisitor.VALIDATION_OPTION)
 public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, WebSocketMapping> {
 
+    static final String VALIDATION_OPTION = "micronaut.websocket.validation";
     private static final String WEB_SOCKET_COMPONENT = "io.micronaut.websocket.annotation.WebSocketComponent";
     private static final String WEB_SOCKET_SESSION = "io.micronaut.websocket.WebSocketSession";
     private static final String HTTP_REQUEST = "io.micronaut.http.HttpRequest";
@@ -97,7 +100,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
 
     @Override
     public void start(VisitorContext visitorContext) {
-        String prop = System.getProperty("micronaut.websocket.validation");
+        String prop = visitorContext.getOptions().getOrDefault(VALIDATION_OPTION, "true");
         skipValidation = prop != null && prop.equals("false");
     }
 

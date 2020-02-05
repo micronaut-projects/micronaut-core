@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.convert.value;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Map;
 
 /**

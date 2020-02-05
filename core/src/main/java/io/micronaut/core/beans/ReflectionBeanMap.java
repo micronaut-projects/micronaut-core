@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ReflectionUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Map;
@@ -56,7 +56,7 @@ class ReflectionBeanMap<T> implements BeanMap<T> {
     }
 
     @Override
-    public @Nonnull Class<T> getBeanType() {
+    public @NonNull Class<T> getBeanType() {
         return beanInfo.getBeanClass();
     }
 

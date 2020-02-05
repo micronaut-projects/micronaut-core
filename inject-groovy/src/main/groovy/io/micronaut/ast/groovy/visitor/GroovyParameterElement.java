@@ -25,8 +25,8 @@ import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * Implementation of {@link ParameterElement} for Groovy.
@@ -84,7 +84,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
         return parameter;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public ClassElement getType() {
         ClassNode t = parameter.getType();

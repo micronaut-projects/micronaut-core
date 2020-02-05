@@ -17,7 +17,7 @@ package io.micronaut.http;
 
 import io.micronaut.http.exceptions.UriSyntaxException;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Set;

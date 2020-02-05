@@ -19,7 +19,7 @@ package io.micronaut.discovery.vault.config;
 import io.micronaut.http.annotation.Header;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * A contract for an HTTP client to read configuration from Vault.
@@ -43,8 +43,8 @@ public interface VaultConfigHttpClient<T extends AbstractVaultResponse> {
      * @param vaultKey The vault key
      * @return A publisher of the response body
      */
-    Publisher<T> readConfigurationValues(@Nonnull @Header("X-Vault-Token") String token,
-                                         @Nonnull String backend,
-                                         @Nonnull String vaultKey);
+    Publisher<T> readConfigurationValues(@NonNull @Header("X-Vault-Token") String token,
+                                         @NonNull String backend,
+                                         @NonNull String vaultKey);
 
 }

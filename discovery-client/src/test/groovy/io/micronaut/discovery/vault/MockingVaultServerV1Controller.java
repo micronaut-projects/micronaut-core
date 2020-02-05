@@ -22,7 +22,7 @@ import io.micronaut.http.annotation.Get;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,8 +39,8 @@ public class MockingVaultServerV1Controller {
     public static final String ENABLED = "enable.mock.vault-config-v1";
 
     @Get("/v1/{backend}/{vaultKey:.*}")
-    public Publisher<VaultResponseV1> readConfigurationValuesV1(@Nonnull String backend,
-                                                                @Nonnull String vaultKey) {
+    public Publisher<VaultResponseV1> readConfigurationValuesV1(@NonNull String backend,
+                                                                @NonNull String vaultKey) {
         Map<String, Object> properties = new HashMap<>();
 
         if (vaultKey.equals("myapp/second")) {

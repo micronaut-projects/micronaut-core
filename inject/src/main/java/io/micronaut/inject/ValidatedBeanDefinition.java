@@ -20,8 +20,8 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * A bean definition that is validated with javax.validation.
@@ -57,9 +57,9 @@ public interface ValidatedBeanDefinition<T> extends BeanDefinition<T> {
      * @throws BeanInstantiationException if the bean is invalid
      */
     default <V> void validateBeanArgument(
-            @Nonnull BeanResolutionContext resolutionContext,
-            @Nonnull InjectionPoint injectionPoint,
-            @Nonnull Argument<V> argument,
+            @NonNull BeanResolutionContext resolutionContext,
+            @NonNull InjectionPoint injectionPoint,
+            @NonNull Argument<V> argument,
             int index,
             @Nullable V value) throws BeanInstantiationException {
         BeanDefinitionValidator validator = resolutionContext.getContext().getBeanValidator();

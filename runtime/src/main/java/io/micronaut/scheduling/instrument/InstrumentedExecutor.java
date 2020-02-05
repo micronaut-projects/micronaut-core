@@ -15,7 +15,7 @@
  */
 package io.micronaut.scheduling.instrument;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.concurrent.Executor;
 
 /**
@@ -35,7 +35,7 @@ public interface InstrumentedExecutor extends Executor, RunnableInstrumenter {
     Executor getTarget();
 
     @Override
-    default void execute(@Nonnull Runnable command) {
+    default void execute(@NonNull Runnable command) {
         getTarget().execute(instrument(command));
     }
 

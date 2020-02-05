@@ -17,7 +17,6 @@ package io.micronaut.cli.profile
 
 import io.micronaut.cli.io.support.Resource
 import org.eclipse.aether.artifact.Artifact
-import org.eclipse.aether.graph.Dependency
 
 import javax.annotation.Nullable
 

@@ -23,7 +23,7 @@ import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Collections;

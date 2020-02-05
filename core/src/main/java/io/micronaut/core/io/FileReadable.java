@@ -18,7 +18,7 @@ package io.micronaut.core.io;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -38,12 +38,12 @@ class FileReadable implements Readable {
      * Default constructor.
      * @param file The file
      */
-    FileReadable(@Nonnull File file) {
+    FileReadable(@NonNull File file) {
         ArgumentUtils.requireNonNull("file", file);
         this.file = file;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public InputStream asInputStream() throws IOException {
         return Files.newInputStream(file.toPath());

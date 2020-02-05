@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,7 +48,7 @@ class UrlReadable implements Readable {
         this.url = url;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public InputStream asInputStream() throws IOException {
         URLConnection con = this.url.openConnection();

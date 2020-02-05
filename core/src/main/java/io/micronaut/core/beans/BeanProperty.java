@@ -25,8 +25,8 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.concurrent.Immutable;
 import java.util.Optional;
 
@@ -49,7 +49,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
     /**
      * @return The declaring bean introspection.
      */
-    @Nonnull BeanIntrospection<B> getDeclaringBean();
+    @NonNull BeanIntrospection<B> getDeclaringBean();
 
     /**
      * Read the bean value.
@@ -57,7 +57,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @return The value
      * @throws IllegalArgumentException If the bean instance if not of the correct type
      */
-    @Nullable T get(@Nonnull B bean);
+    @Nullable T get(@NonNull B bean);
 
     /**
      * Read the value and try to convert it to the given type.
@@ -66,7 +66,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
-    default @Nonnull <T2> Optional<T2> get(@Nonnull B bean, @Nonnull Class<T2> type) {
+    default @NonNull <T2> Optional<T2> get(@NonNull B bean, @NonNull Class<T2> type) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("type", type);
         final Argument<T2> argument = Argument.of(type);
@@ -80,7 +80,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
-    default <T2> Optional<T2> get(@Nonnull B bean, @Nonnull Argument<T2> argument) {
+    default <T2> Optional<T2> get(@NonNull B bean, @NonNull Argument<T2> argument) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("type", argument);
 
@@ -95,7 +95,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
-    default <T2> Optional<T2> get(@Nonnull B bean, @Nonnull ArgumentConversionContext<T2> conversionContext) {
+    default <T2> Optional<T2> get(@NonNull B bean, @NonNull ArgumentConversionContext<T2> conversionContext) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("conversionContext", conversionContext);
 
@@ -111,7 +111,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param <T2> The generic type
      * @return The value if conversion was possible.
      */
-    default @Nullable <T2> T2 get(@Nonnull B bean, @Nonnull Class<T2> type, @Nullable T2 defaultValue) {
+    default @Nullable <T2> T2 get(@NonNull B bean, @NonNull Class<T2> type, @Nullable T2 defaultValue) {
         ArgumentUtils.requireNonNull("bean", bean);
         //noinspection ConstantConditions
         if (type == null) {
@@ -128,7 +128,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param value The value to write
      * @throws IllegalArgumentException If either the bean type or value type are not correct
      */
-    default void set(@Nonnull B bean, @Nullable T value) {
+    default void set(@NonNull B bean, @Nullable T value) {
         if (isReadOnly()) {
             throw new UnsupportedOperationException("Cannot write read-only property: " + getName());
         } else {
@@ -143,7 +143,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
      * @param value The value
      * @throws io.micronaut.core.convert.exceptions.ConversionErrorException If the value couldn't be converted
      */
-    default void convertAndSet(@Nonnull B bean, @Nullable Object value) {
+    default void convertAndSet(@NonNull B bean, @Nullable Object value) {
         ArgumentUtils.requireNonNull("bean", bean);
         if (value != null) {
             final Argument<T> argument = asArgument();
@@ -162,7 +162,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
     /**
      * @return The property type.
      */
-    @Nonnull Class<T> getType();
+    @NonNull Class<T> getType();
 
     /**
      * Represent the type as an argument, including any generic type information.

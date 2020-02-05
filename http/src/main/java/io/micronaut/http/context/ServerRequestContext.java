@@ -19,8 +19,8 @@ import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 import io.micronaut.http.HttpRequest;
 
@@ -57,7 +57,7 @@ public final class ServerRequestContext {
      * @param request  The request
      * @param runnable The runnable
      */
-    public static void with(@Nullable HttpRequest request, @Nonnull Runnable runnable) {
+    public static void with(@Nullable HttpRequest request, @NonNull Runnable runnable) {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {
@@ -80,7 +80,7 @@ public final class ServerRequestContext {
      * @param runnable The runnable
      * @return The newly instrumented runnable
      */
-    public static Runnable instrument(@Nullable HttpRequest request, @Nonnull Runnable runnable) {
+    public static Runnable instrument(@Nullable HttpRequest request, @NonNull Runnable runnable) {
         return () -> with(request, runnable);
     }
 
@@ -92,7 +92,7 @@ public final class ServerRequestContext {
      * @param <T>      The return type of the callable
      * @return The return value of the callable
      */
-    public static <T> T with(@Nullable HttpRequest request, @Nonnull Supplier<T> callable) {
+    public static <T> T with(@Nullable HttpRequest request, @NonNull Supplier<T> callable) {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {
@@ -117,7 +117,7 @@ public final class ServerRequestContext {
      * @return The return value of the callable
      * @throws Exception If the callable throws an exception
      */
-    public static <T> T with(@Nullable HttpRequest request, @Nonnull Callable<T> callable) throws Exception {
+    public static <T> T with(@Nullable HttpRequest request, @NonNull Callable<T> callable) throws Exception {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {

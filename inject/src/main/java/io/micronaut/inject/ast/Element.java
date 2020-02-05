@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -37,7 +37,7 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
      * @return The name of the element.
      */
     @Override
-    @Nonnull String getName();
+    @NonNull String getName();
 
     /**
      * @return True if the element is protected.
@@ -55,7 +55,7 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
      *
      * @return The native type
      */
-    @Nonnull Object getNativeType();
+    @NonNull Object getNativeType();
 
     /**
      * Annotate this element with the given annotation type. If the annotation is already present then
@@ -66,8 +66,8 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
      * @param <T> The annotation generic type
      * @return This element
      */
-    @Nonnull
-    default <T extends Annotation> Element annotate(@Nonnull String annotationType, @Nonnull Consumer<AnnotationValueBuilder<T>> consumer) {
+    @NonNull
+    default <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
     }
 
@@ -79,8 +79,8 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
      * @param <T> The annotation generic type
      * @return This element
      */
-    @Nonnull
-    default <T extends Annotation> Element annotate(@Nonnull String annotationType) {
+    @NonNull
+    default <T extends Annotation> Element annotate(@NonNull String annotationType) {
         return annotate(annotationType, (Consumer<AnnotationValueBuilder<T>>) annotationValueBuilder -> { });
     }
 
@@ -93,8 +93,8 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
      * @param <T> The annotation generic type
      * @return The {@link AnnotationValueBuilder}
      */
-    @Nonnull
-    default <T extends Annotation> Element annotate(@Nonnull Class<T> annotationType, @Nonnull Consumer<AnnotationValueBuilder<T>> consumer) {
+    @NonNull
+    default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         ArgumentUtils.requireNonNull("consumer", consumer);
         return annotate(annotationType.getName(), consumer);
@@ -108,8 +108,8 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
      * @param <T> The annotation generic type
      * @return The {@link AnnotationValueBuilder}
      */
-    @Nonnull
-    default <T extends Annotation> Element annotate(@Nonnull Class<T> annotationType) {
+    @NonNull
+    default <T extends Annotation> Element annotate(@NonNull Class<T> annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         return annotate(annotationType.getName(), annotationValueBuilder -> { });
     }
@@ -119,7 +119,7 @@ public interface Element extends AnnotationMetadataDelegate, AnnotatedElement {
      *
      * @return The simple name
      */
-    default @Nonnull String getSimpleName() {
+    default @NonNull String getSimpleName() {
         return getName();
     }
 

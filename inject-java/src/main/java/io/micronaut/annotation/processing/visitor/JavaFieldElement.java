@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -64,7 +64,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         this.declaringElement = declaringElement;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public ClassElement getType() {
         TypeMirror returnType = variableElement.asType();

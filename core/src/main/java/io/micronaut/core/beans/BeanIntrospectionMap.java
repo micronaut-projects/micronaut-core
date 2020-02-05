@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -65,7 +65,7 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
     }
 
     @Override
-    public @Nonnull Class<T> getBeanType() {
+    public @NonNull Class<T> getBeanType() {
         return beanIntrospection.getBeanType();
     }
 

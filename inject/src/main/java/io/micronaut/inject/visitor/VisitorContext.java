@@ -22,10 +22,11 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URL;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -36,7 +37,7 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface VisitorContext extends MutableConvertibleValues<Object>, ClassWriterOutputVisitor {
-
+    String MICRONAUT_BASE_OPTION_NAME = "micronaut";
     /**
      * Allows printing informational messages.
      *
@@ -94,7 +95,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return An iterable of resources
      */
     @Experimental
-    default @Nonnull Iterable<URL> getClasspathResources(@Nonnull String path) {
+    default @NonNull Iterable<URL> getClasspathResources(@NonNull String path) {
         return Collections.emptyList();
     }
 
@@ -127,7 +128,18 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @param stereotypes The stereotypes
      * @return The class elements
      */
-    default @Nonnull ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
+    default @NonNull ClassElement[] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
         return new ClassElement[0];
+    }
+
+    /**
+     * The annotation processor environment custom options.
+     * <p><b>All options names MUST start with {@link VisitorContext#MICRONAUT_BASE_OPTION_NAME}</b></p>
+     * @return A Map with annotation processor runtime options
+     * @see javax.annotation.processing.ProcessingEnvironment#getOptions()
+     */
+    @Experimental
+    default Map<String, String> getOptions() {
+        return Collections.emptyMap();
     }
 }

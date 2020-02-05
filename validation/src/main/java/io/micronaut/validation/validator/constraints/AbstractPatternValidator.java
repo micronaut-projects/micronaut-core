@@ -17,7 +17,7 @@ package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.validation.ValidationException;
 import javax.validation.constraints.Pattern;
 import java.lang.annotation.Annotation;
@@ -46,7 +46,7 @@ abstract class AbstractPatternValidator<A extends Annotation> implements Constra
      * @return The pattern
      */
     java.util.regex.Pattern getPattern(
-            @Nonnull AnnotationValue<?> annotationMetadata,
+            @NonNull AnnotationValue<?> annotationMetadata,
             boolean isOptional) {
         final Optional<String> regexp = annotationMetadata.get("regexp", String.class);
         final String pattern;

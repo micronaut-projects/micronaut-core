@@ -20,7 +20,7 @@ import io.micronaut.discovery.ServiceInstanceList;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * @author Graeme Rocher

@@ -23,7 +23,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import org.slf4j.Logger;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,9 +46,9 @@ class DefaultBeanIntrospector implements BeanIntrospector {
 
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
 
-    @Nonnull
+    @NonNull
     @Override
-    public Collection<BeanIntrospection<Object>> findIntrospections(@Nonnull Predicate<? super BeanIntrospectionReference> filter) {
+    public Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference> filter) {
         ArgumentUtils.requireNonNull("filter", filter);
         return getIntrospections()
                 .values()
@@ -58,9 +58,9 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 .collect(Collectors.toList());
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public <T> Optional<BeanIntrospection<T>> findIntrospection(@Nonnull Class<T> beanType) {
+    public <T> Optional<BeanIntrospection<T>> findIntrospection(@NonNull Class<T> beanType) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         final BeanIntrospectionReference reference = getIntrospections().get(beanType.getName());
         try {

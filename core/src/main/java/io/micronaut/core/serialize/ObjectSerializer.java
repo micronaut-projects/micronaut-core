@@ -17,7 +17,7 @@ package io.micronaut.core.serialize;
 
 import io.micronaut.core.serialize.exceptions.SerializationException;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

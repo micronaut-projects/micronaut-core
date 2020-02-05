@@ -15,7 +15,7 @@
  */
 package io.micronaut.cache;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Set;
 
 /**
@@ -31,7 +31,7 @@ public interface CacheManager<C> {
     /**
      * @return The names of the active caches
      */
-    @Nonnull
+    @NonNull
     Set<String> getCacheNames();
 
     /**
@@ -41,5 +41,5 @@ public interface CacheManager<C> {
      * @return The {@link SyncCache} instance
      * @throws io.micronaut.context.exceptions.ConfigurationException If no cache is found for the given name
      */
-    @Nonnull SyncCache<C> getCache(String name);
+    @NonNull SyncCache<C> getCache(String name);
 }

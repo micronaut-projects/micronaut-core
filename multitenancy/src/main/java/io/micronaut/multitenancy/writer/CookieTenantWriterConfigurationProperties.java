@@ -17,8 +17,8 @@ package io.micronaut.multitenancy.writer;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.time.Duration;
 import java.time.temporal.TemporalAmount;
 import java.util.Optional;
@@ -62,7 +62,7 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
     @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_COOKIEPATH = "/";
 
-    @Nonnull
+    @NonNull
     private String cookiename = DEFAULT_COOKIENAME;
 
     @Nullable
@@ -101,13 +101,13 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
      *
      * @return an HTTP Header name. e.g. Authorization
      */
-    @Nonnull
+    @NonNull
     @Override
     public String getCookiename() {
         return this.cookiename;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public String getCookieName() {
         return this.cookiename;

@@ -19,7 +19,7 @@ import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Arrays;
@@ -41,14 +41,14 @@ public class ResourceResolver {
     /**
      * @param resourceLoaders The resource loaders
      */
-    public ResourceResolver(@Nonnull ResourceLoader[] resourceLoaders) {
+    public ResourceResolver(@NonNull ResourceLoader[] resourceLoaders) {
         this(Arrays.asList(resourceLoaders));
     }
 
     /**
      * @param resourceLoaders The resource loaders
      */
-    public ResourceResolver(@Nonnull List<ResourceLoader> resourceLoaders) {
+    public ResourceResolver(@NonNull List<ResourceLoader> resourceLoaders) {
         ArgumentUtils.requireNonNull("resourceLoaders", resourceLoaders);
         this.resourceLoaders = resourceLoaders;
     }
@@ -69,7 +69,7 @@ public class ResourceResolver {
      * @param <T>          The type
      * @return An optional resource loader
      */
-    public @Nonnull <T extends ResourceLoader> Optional<T> getLoader(@Nonnull Class<T> resolverType) {
+    public @NonNull <T extends ResourceLoader> Optional<T> getLoader(@NonNull Class<T> resolverType) {
         ArgumentUtils.requireNonNull("resolverType", resolverType);
         return resourceLoaders.stream()
             .filter(rl -> resolverType.isAssignableFrom(rl.getClass()))
@@ -83,7 +83,7 @@ public class ResourceResolver {
      * @param prefix The prefix the loader should support. (classpath:, file:, etc)
      * @return An optional resource loader
      */
-    public @Nonnull  Optional<ResourceLoader> getSupportingLoader(@Nonnull String prefix) {
+    public @NonNull  Optional<ResourceLoader> getSupportingLoader(@NonNull String prefix) {
         ArgumentUtils.requireNonNull("prefix", prefix);
         return resourceLoaders.stream()
             .filter(rl -> rl.supportsPrefix(prefix))
@@ -97,7 +97,7 @@ public class ResourceResolver {
      * @param basePath The path to load resources from
      * @return An optional resource loader
      */
-    public @Nonnull Optional<ResourceLoader> getLoaderForBasePath(@Nonnull String basePath) {
+    public @NonNull Optional<ResourceLoader> getLoaderForBasePath(@NonNull String basePath) {
         ArgumentUtils.requireNonNull("basePath", basePath);
         Optional<ResourceLoader> resourceLoader = getSupportingLoader(basePath);
         return resourceLoader.map(rl -> rl.forBase(basePath));
@@ -109,7 +109,7 @@ public class ResourceResolver {
      * @param path The path to the resource
      * @return An optional input stream
      */
-    public @Nonnull Optional<InputStream> getResourceAsStream(@Nonnull String path) {
+    public @NonNull Optional<InputStream> getResourceAsStream(@NonNull String path) {
         ArgumentUtils.requireNonNull("path", path);
         Optional<ResourceLoader> resourceLoader = getSupportingLoader(path);
         if (resourceLoader.isPresent()) {
@@ -124,7 +124,7 @@ public class ResourceResolver {
      * @param path The path to the resource
      * @return An optional URL
      */
-    public @Nonnull Optional<URL> getResource(@Nonnull String path) {
+    public @NonNull Optional<URL> getResource(@NonNull String path) {
         ArgumentUtils.requireNonNull("path", path);
         Optional<ResourceLoader> resourceLoader = getSupportingLoader(path);
         if (resourceLoader.isPresent()) {
@@ -139,7 +139,7 @@ public class ResourceResolver {
      * @param path The path to the resource
      * @return A stream of URLs
      */
-    public @Nonnull Stream<URL> getResources(@Nonnull String path) {
+    public @NonNull Stream<URL> getResources(@NonNull String path) {
         ArgumentUtils.requireNonNull("path", path);
         Optional<ResourceLoader> resourceLoader = getSupportingLoader(path);
         if (resourceLoader.isPresent()) {

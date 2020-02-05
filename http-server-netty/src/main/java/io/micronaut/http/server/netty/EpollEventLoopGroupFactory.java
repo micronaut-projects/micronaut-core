@@ -18,7 +18,7 @@ package io.micronaut.http.server.netty;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Singleton;
 
 import io.micronaut.context.annotation.Requires;

@@ -25,8 +25,8 @@ import io.micronaut.validation.validator.ReactiveValidator;
 import io.micronaut.validation.validator.Validator;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.Constraint;
@@ -165,7 +165,7 @@ public class ValidatingInterceptor implements MethodInterceptor {
         }
     }
 
-    private Object validateReturnValue(@Nonnull ExecutableValidator validator, MethodInvocationContext context, Object target, Method targetMethod, Object result) {
+    private Object validateReturnValue(@NonNull ExecutableValidator validator, MethodInvocationContext context, Object target, Method targetMethod, Object result) {
         Set<ConstraintViolation<Object>> constraintViolations;
         if (context.hasStereotype(Valid.class)) {
             constraintViolations = validator.validateReturnValue(

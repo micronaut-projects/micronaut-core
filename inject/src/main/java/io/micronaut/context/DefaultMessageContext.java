@@ -2,8 +2,8 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
@@ -30,7 +30,7 @@ class DefaultMessageContext implements MessageSource.MessageContext {
         this.variables = variables;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Map<String, Object> getVariables() {
         if (variables != null) {
@@ -39,7 +39,7 @@ class DefaultMessageContext implements MessageSource.MessageContext {
         return Collections.emptyMap();
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Locale getLocale() {
         if (locale != null) {

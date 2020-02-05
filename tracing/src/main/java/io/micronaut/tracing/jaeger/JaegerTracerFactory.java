@@ -25,7 +25,7 @@ import io.micronaut.context.annotation.Requires;
 import io.opentracing.Tracer;
 import io.opentracing.util.GlobalTracer;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;

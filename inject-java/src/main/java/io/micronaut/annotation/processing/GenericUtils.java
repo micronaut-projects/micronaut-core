@@ -21,8 +21,8 @@ import static javax.lang.model.type.TypeKind.VOID;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.lang.model.util.Elements;
@@ -70,7 +70,7 @@ public class GenericUtils {
      * @param element The element
      * @return The type argument information
      */
-    public Map<String, Map<String, Object>> buildGenericTypeArgumentInfo(@Nonnull Element element) {
+    public Map<String, Map<String, Object>> buildGenericTypeArgumentInfo(@NonNull Element element) {
         return buildGenericTypeArgumentInfo(element, null);
     }
 
@@ -80,7 +80,7 @@ public class GenericUtils {
      * @param element The element
      * @return The type argument information
      */
-    public Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentElementInfo(@Nonnull Element element) {
+    public Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentElementInfo(@NonNull Element element) {
         Map<String, Map<String, Object>> data = buildGenericTypeArgumentInfo(element, null);
         Map<String, Map<String, TypeMirror>> elements = new HashMap<>(data.size());
         for (Map.Entry<String, Map<String, Object>> entry : data.entrySet()) {
@@ -104,7 +104,7 @@ public class GenericUtils {
      * @param dt The declared type
      * @return The type argument information
      */
-    private Map<String, Map<String, Object>> buildGenericTypeArgumentInfo(@Nonnull Element element, @Nullable DeclaredType dt) {
+    private Map<String, Map<String, Object>> buildGenericTypeArgumentInfo(@NonNull Element element, @Nullable DeclaredType dt) {
 
         Map<String, Map<String, Object>> beanTypeArguments = new HashMap<>();
         if (dt != null) {

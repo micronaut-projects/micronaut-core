@@ -21,7 +21,7 @@ import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URL;
 
 /**

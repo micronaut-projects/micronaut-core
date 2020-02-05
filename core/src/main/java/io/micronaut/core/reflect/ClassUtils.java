@@ -23,8 +23,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.NOPLogger;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
@@ -166,7 +166,7 @@ public class ClassUtils {
      * @param type The type
      * @return The logger
      */
-    public static @Nonnull Logger getLogger(@Nonnull Class type) {
+    public static @NonNull Logger getLogger(@NonNull Class type) {
         if (ENABLE_CLASS_LOADER_LOGGING) {
             return LoggerFactory.getLogger(type);
         } else {
@@ -179,7 +179,7 @@ public class ClassUtils {
      * @param primitiveType The primitive type name
      * @return The array type
      */
-    public static @Nonnull Optional<Class> arrayTypeForPrimitive(String primitiveType) {
+    public static @NonNull Optional<Class> arrayTypeForPrimitive(String primitiveType) {
         if (primitiveType != null) {
             return Optional.ofNullable(PRIMITIVE_ARRAY_MAP.get(primitiveType));
         }

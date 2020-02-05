@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.annotation;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 
@@ -32,7 +32,7 @@ public interface AnnotationMetadataProvider extends AnnotationSource {
      *
      * @return The {@link AnnotationMetadata}
      */
-    @Nonnull
+    @NonNull
     default AnnotationMetadata getAnnotationMetadata() {
         return AnnotationMetadata.EMPTY_METADATA;
     }

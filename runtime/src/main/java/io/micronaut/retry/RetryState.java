@@ -15,7 +15,7 @@
  */
 package io.micronaut.retry;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalDouble;

@@ -33,7 +33,7 @@ import io.micronaut.inject.ExecutableMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -147,13 +147,13 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
                                 return argument.getTypeVariables();
                             }
 
-                            @Nonnull
+                            @NonNull
                             @Override
                             public String getName() {
                                 return argument.getName();
                             }
 
-                            @Nonnull
+                            @NonNull
                             @Override
                             public Class<Object> getType() {
                                 return argument.getType();

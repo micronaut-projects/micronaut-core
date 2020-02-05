@@ -33,7 +33,7 @@ import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpFilterResolver;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.*;
 import java.util.stream.Collectors;
 

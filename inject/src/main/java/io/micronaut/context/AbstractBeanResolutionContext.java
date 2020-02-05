@@ -22,8 +22,8 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.*;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.*;
 
 /**
@@ -292,13 +292,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public InjectionPoint getInjectionPoint() {
             ConstructorInjectionPoint constructorInjectionPoint = getDeclaringType().getConstructor();
             return new ArgumentInjectionPoint() {
-                @Nonnull
+                @NonNull
                 @Override
                 public CallableInjectionPoint getOuterInjectionPoint() {
                     return constructorInjectionPoint;
                 }
 
-                @Nonnull
+                @NonNull
                 @Override
                 public Argument getArgument() {
                     return ConstructorSegment.this.getArgument();
@@ -350,13 +350,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         public InjectionPoint getInjectionPoint() {
             return new ArgumentInjectionPoint() {
-                @Nonnull
+                @NonNull
                 @Override
                 public CallableInjectionPoint getOuterInjectionPoint() {
                     return methodInjectionPoint;
                 }
 
-                @Nonnull
+                @NonNull
                 @Override
                 public Argument getArgument() {
                     return MethodSegment.this.getArgument();

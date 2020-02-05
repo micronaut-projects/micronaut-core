@@ -26,8 +26,8 @@ import io.micronaut.discovery.consul.client.v1.ServiceEntry;
 import io.micronaut.discovery.exceptions.DiscoveryException;
 import io.micronaut.health.HealthStatus;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -56,7 +56,7 @@ public class ConsulServiceInstance implements ServiceInstance {
      * @param healthEntry The health entry
      * @param scheme      The scheme
      */
-    public ConsulServiceInstance(@Nonnull HealthEntry healthEntry, @Nullable String scheme) {
+    public ConsulServiceInstance(@NonNull HealthEntry healthEntry, @Nullable String scheme) {
         Objects.requireNonNull(healthEntry, "HealthEntry cannot be null");
         this.healthEntry = healthEntry;
         ServiceEntry service = healthEntry.getService();

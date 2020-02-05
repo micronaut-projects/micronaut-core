@@ -17,8 +17,8 @@ package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.validation.constraints.Size;
 
 /**
@@ -31,7 +31,7 @@ import javax.validation.constraints.Size;
 @FunctionalInterface
 public interface SizeValidator<T> extends ConstraintValidator<Size, T> {
     @Override
-    default boolean isValid(@Nullable T value, @Nonnull AnnotationValue<Size> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    default boolean isValid(@Nullable T value, @NonNull AnnotationValue<Size> annotationMetadata, @NonNull ConstraintValidatorContext context) {
         if (value == null) {
             return true; // null considered valid according to spec
         }
@@ -46,5 +46,5 @@ public interface SizeValidator<T> extends ConstraintValidator<Size, T> {
      * @param value The value
      * @return The size
      */
-    int getSize(@Nonnull T value);
+    int getSize(@NonNull T value);
 }

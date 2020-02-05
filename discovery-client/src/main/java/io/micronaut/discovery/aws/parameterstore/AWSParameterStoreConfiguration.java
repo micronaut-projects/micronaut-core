@@ -23,7 +23,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * This is the configuration class for the AWSParameterStoreConfigClient for AWS Parameter Store based configuration.
@@ -77,7 +77,7 @@ public class AWSParameterStoreConfiguration extends AWSClientConfiguration imple
      *
      * @return root level of parameter hierarchy
      */
-    @Nonnull
+    @NonNull
     public String getRootHierarchyPath() {
         return rootHierarchyPath;
     }
@@ -87,7 +87,7 @@ public class AWSParameterStoreConfiguration extends AWSClientConfiguration imple
      *
      * @param rootHierarchyPath root prefix used for all calls to get Parameter store values
      */
-    public void setRootHierarchyPath(@Nonnull String rootHierarchyPath) {
+    public void setRootHierarchyPath(@NonNull String rootHierarchyPath) {
         this.rootHierarchyPath = rootHierarchyPath;
     }
 

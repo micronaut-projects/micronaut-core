@@ -24,7 +24,7 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MemberElement;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
@@ -60,9 +60,9 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         this.visitorContext = visitorContext;
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(@Nonnull String annotationType, @Nonnull Consumer<AnnotationValueBuilder<T>> consumer) {
+    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         ArgumentUtils.requireNonNull("consumer", consumer);
 
@@ -138,7 +138,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @param declaredGenericInfo The declared generic info
      * @return The class element
      */
-    protected @Nonnull ClassElement parameterizedClassElement(
+    protected @NonNull ClassElement parameterizedClassElement(
             TypeMirror typeMirror,
             JavaVisitorContext visitorContext,
             Map<String, Map<String, TypeMirror>> declaredGenericInfo) {
@@ -156,7 +156,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @param visitorContext The visitor context
      * @return The class element
      */
-    protected @Nonnull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext) {
+    protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext) {
         return mirrorToClassElement(returnType, visitorContext, Collections.emptyMap());
     }
 
@@ -168,7 +168,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
      * @param genericsInfo The generic informatino
      * @return The class element
      */
-    protected @Nonnull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {
+    protected @NonNull ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext, Map<String, Map<String, TypeMirror>> genericsInfo) {
         if (genericsInfo == null) {
             genericsInfo = Collections.emptyMap();
         }

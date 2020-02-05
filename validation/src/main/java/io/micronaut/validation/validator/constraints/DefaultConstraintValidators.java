@@ -30,8 +30,8 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.ValidationException;
@@ -380,9 +380,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     }
 
     @SuppressWarnings("unchecked")
-    @Nonnull
+    @NonNull
     @Override
-    public <A extends Annotation, T> Optional<ConstraintValidator<A, T>> findConstraintValidator(@Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
+    public <A extends Annotation, T> Optional<ConstraintValidator<A, T>> findConstraintValidator(@NonNull Class<A> constraintType, @NonNull Class<T> targetType) {
         ArgumentUtils.requireNonNull("constraintType", constraintType);
         ArgumentUtils.requireNonNull("targetType", targetType);
         final ValidatorKey key = new ValidatorKey(constraintType, targetType);
@@ -838,7 +838,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
      * @return The validator if present
      */
     protected <A extends Annotation, T> Optional<ConstraintValidator> findLocalConstraintValidator(
-            @Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
+            @NonNull Class<A> constraintType, @NonNull Class<T> targetType) {
         return Optional.empty();
     }
 
@@ -885,7 +885,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
      * @param bigDecimal The big decimal
      * @return The result
      */
-    private static int compareNumber(@Nonnull Number value, @Nonnull BigDecimal bigDecimal) {
+    private static int compareNumber(@NonNull Number value, @NonNull BigDecimal bigDecimal) {
         int result;
         if (value instanceof BigDecimal) {
             result = ((BigDecimal) value).compareTo(bigDecimal);
@@ -911,7 +911,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
          * @param constraintType THe constraint type
          * @param targetType The target type
          */
-        public ValidatorKey(@Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
+        public ValidatorKey(@NonNull Class<A> constraintType, @NonNull Class<T> targetType) {
             this.constraintType = constraintType;
             this.targetType = targetType;
         }

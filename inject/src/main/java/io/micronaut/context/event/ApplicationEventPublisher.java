@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.event;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * <p>Interface for classes that publish events received by {@link ApplicationEventListener} instances.</p>
@@ -33,5 +33,5 @@ public interface ApplicationEventPublisher {
      *
      * @param event The event to publish
      */
-    void publishEvent(@Nonnull Object event);
+    void publishEvent(@NonNull Object event);
 }

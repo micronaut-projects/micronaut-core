@@ -21,8 +21,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.InjectionPoint;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * Interface to integrate bean validation into the construction of beans within the {@link io.micronaut.context.BeanContext}.
@@ -49,9 +49,9 @@ public interface BeanDefinitionValidator {
      * @throws BeanInstantiationException if the bean is invalid
      */
     default <T> void validateBeanArgument(
-            @Nonnull BeanResolutionContext resolutionContext,
-            @Nonnull InjectionPoint injectionPoint,
-            @Nonnull Argument<T> argument,
+            @NonNull BeanResolutionContext resolutionContext,
+            @NonNull InjectionPoint injectionPoint,
+            @NonNull Argument<T> argument,
             int index,
             @Nullable T value)
             throws BeanInstantiationException {
@@ -68,9 +68,9 @@ public interface BeanDefinitionValidator {
      * @throws BeanInstantiationException if the bean is invalid
      */
     default <T> void validateBean(
-            @Nonnull BeanResolutionContext resolutionContext,
-            @Nonnull BeanDefinition<T> definition,
-            @Nonnull T bean)
+            @NonNull BeanResolutionContext resolutionContext,
+            @NonNull BeanDefinition<T> definition,
+            @NonNull T bean)
             throws BeanInstantiationException {
         // no-op
     }

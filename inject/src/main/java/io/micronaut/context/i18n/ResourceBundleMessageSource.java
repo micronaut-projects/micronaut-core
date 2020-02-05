@@ -22,8 +22,8 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -47,7 +47,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      * Default constructor.
      * @param baseName The base name of the message bundle
      */
-    public ResourceBundleMessageSource(@Nonnull String baseName) {
+    public ResourceBundleMessageSource(@NonNull String baseName) {
         this(baseName, null);
     }
 
@@ -56,7 +56,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      * @param baseName The base name of the message bundle
      * @param defaultLocale The default locale to use if no message is found for the given locale
      */
-    public ResourceBundleMessageSource(@Nonnull String baseName, @Nullable Locale defaultLocale) {
+    public ResourceBundleMessageSource(@NonNull String baseName, @Nullable Locale defaultLocale) {
         ArgumentUtils.requireNonNull("baseName", baseName);
         this.baseName = baseName;
         ResourceBundle defaultBundle;
@@ -75,9 +75,9 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
         this.defaultBundle = defaultBundle;
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public Optional<String> getMessage(@Nonnull String code, @Nonnull MessageContext context) {
+    public Optional<String> getMessage(@NonNull String code, @NonNull MessageContext context) {
         final Locale locale = context.getLocale();
         MessageKey messageKey = new MessageKey(locale, code);
         Optional<String> opt = messageCache.get(messageKey);
@@ -112,7 +112,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      * Build the cache used to store resolved messages.
      * @return The cache.
      */
-    @Nonnull
+    @NonNull
     protected Map<MessageKey, Optional<String>> buildMessageCache() {
         return new ConcurrentLinkedHashMap.Builder<MessageKey, Optional<String>>()
                 .maximumWeightedCapacity(100)
@@ -124,13 +124,13 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      *
      * @return The cache.
      */
-    @Nonnull
+    @NonNull
     protected Map<MessageKey, Optional<ResourceBundle>> buildBundleCache() {
         return new ConcurrentHashMap<>(18);
     }
 
-    @Nonnull
-    private Optional<String> resolveDefault(@Nonnull String code) {
+    @NonNull
+    private Optional<String> resolveDefault(@NonNull String code) {
         Optional<String> opt;
         if (defaultBundle != null) {
             try {

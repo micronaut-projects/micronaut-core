@@ -28,8 +28,8 @@ import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Provider;
 import java.util.*;
 
@@ -255,7 +255,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         }
 
         @Override
-        default <V> void validateBeanArgument(@Nonnull BeanResolutionContext resolutionContext, @Nonnull InjectionPoint injectionPoint, @Nonnull Argument<V> argument, int index, @Nullable V value) {
+        default <V> void validateBeanArgument(@NonNull BeanResolutionContext resolutionContext, @NonNull InjectionPoint injectionPoint, @NonNull Argument<V> argument, int index, @Nullable V value) {
             BeanDefinition<T> definition = getTarget();
             if (definition instanceof ValidatedBeanDefinition) {
                 ((ValidatedBeanDefinition<T>) definition).validateBeanArgument(

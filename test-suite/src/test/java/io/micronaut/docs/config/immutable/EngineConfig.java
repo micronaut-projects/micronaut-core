@@ -4,7 +4,7 @@ package io.micronaut.docs.config.immutable;
 // tag::imports[]
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.bind.annotation.Bindable;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.validation.constraints.*;
 import java.util.Optional;
 // end::imports[]

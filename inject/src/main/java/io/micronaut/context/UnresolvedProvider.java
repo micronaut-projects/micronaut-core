@@ -17,7 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Provider;
 
 /**

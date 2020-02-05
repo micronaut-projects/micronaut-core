@@ -18,7 +18,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Optional;
 
 /**
@@ -40,7 +40,7 @@ public interface PropertyPlaceholderResolver {
     /**
      * @return The prefix used
      */
-    default @Nonnull String getPrefix() {
+    default @NonNull String getPrefix() {
         return DefaultPropertyPlaceholderResolver.PREFIX;
     }
 
@@ -51,7 +51,7 @@ public interface PropertyPlaceholderResolver {
      * @return The optional string or {@link Optional#empty()} if resolution was not possible
      * @throws ConfigurationException If the placeholders could not be resolved
      */
-    default @Nonnull String resolveRequiredPlaceholders(String str) throws ConfigurationException {
+    default @NonNull String resolveRequiredPlaceholders(String str) throws ConfigurationException {
         return resolvePlaceholders(str).orElseThrow(() -> new ConfigurationException("Unable to resolve placeholders for property: " + str));
     }
 
@@ -65,7 +65,7 @@ public interface PropertyPlaceholderResolver {
      * @throws ConfigurationException If multiple placeholders are found or
      * if the placeholder could not be converted to the requested type
      */
-    default @Nonnull <T> T resolveRequiredPlaceholder(String str, Class<T> type) throws ConfigurationException {
+    default @NonNull <T> T resolveRequiredPlaceholder(String str, Class<T> type) throws ConfigurationException {
         throw new ConfigurationException("Unsupported operation");
     }
 }

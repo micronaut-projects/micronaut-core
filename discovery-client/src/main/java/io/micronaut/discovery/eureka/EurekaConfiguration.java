@@ -30,8 +30,8 @@ import io.micronaut.discovery.eureka.client.v2.LeaseInfo;
 import io.micronaut.discovery.registration.RegistrationConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -95,7 +95,7 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
      * @return The default discovery configuration
      */
     @Override
-    @Nonnull
+    @NonNull
     public EurekaDiscoveryConfiguration getDiscovery() {
         return discovery;
     }
