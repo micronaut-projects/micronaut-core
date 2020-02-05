@@ -1,6 +1,7 @@
 package io.micronaut.tracing.instrument.util
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.scheduling.instrument.InvocationInstrumenter
 import org.slf4j.MDC
 import spock.lang.AutoCleanup
@@ -111,7 +112,7 @@ class MdcInstrumenterSpec extends Specification {
 
         given:
             MDC.setContextMap(foo:'bar')
-            ExecutorService executor = applicationContext.getBean(ExecutorService)
+            ExecutorService executor = applicationContext.getBean(ExecutorService, Qualifiers.byName("io"))
             String val = null
 
         when:
