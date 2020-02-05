@@ -1,5 +1,9 @@
 This section will document breaking changes that may happen during milestone or release candidate releases, as well as major releases eg (1.x.x -> 2.x.x).
 
+==== 1.2.9
+
+* The data format was changed for multiline server sent event data payloads to conform to the specification. Previously multiline data did not have the required `data:` prefix on each line and now it does.
+
 ==== 1.2.0
 
 The following changes could potentially be considered to be breaking changes, however the likelihood of any negative impact is low.
