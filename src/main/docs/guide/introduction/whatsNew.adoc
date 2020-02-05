@@ -3,4 +3,3 @@ Micronaut {version} includes the following changes:
 === Clients With No Base Path
 
 For the situations when the host of a client call is variable, it is no longer required to pass a service id or URL to ann:http.client.annotation.Client[]. If no host is provided at the time of a request, a api:http.client.exceptions.NoHostException[] will be thrown.
-
