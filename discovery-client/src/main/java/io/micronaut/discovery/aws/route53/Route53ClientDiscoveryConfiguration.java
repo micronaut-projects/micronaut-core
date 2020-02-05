@@ -25,8 +25,8 @@ import io.micronaut.discovery.aws.route53.client.Route53AutoNamingClient;
 import io.micronaut.discovery.client.DiscoveryClientConfiguration;
 import io.micronaut.discovery.registration.RegistrationConfiguration;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * Configuration for AWS Route 53 discovery.
@@ -77,7 +77,7 @@ public class Route53ClientDiscoveryConfiguration extends DiscoveryClientConfigur
      * Gets the discovery configuration.
      * @return configuration
      */
-    @Nonnull
+    @NonNull
     @Override
     public DiscoveryConfiguration getDiscovery() {
         return new Route53DiscoveryConfiguration();

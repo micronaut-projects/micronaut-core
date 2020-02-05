@@ -29,8 +29,8 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -90,13 +90,13 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
     @Override
     public Publisher<CacheInfo> getCacheInfo() {
         return Flowable.just(new CacheInfo() {
-            @Nonnull
+            @NonNull
             @Override
             public String getName() {
                 return cacheConfiguration.getCacheName();
             }
 
-            @Nonnull
+            @NonNull
             @Override
             public Map<String, Object> get() {
                 Map<String, Object> data = new LinkedHashMap<>(2);
@@ -157,7 +157,7 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
      */
     @SuppressWarnings("unchecked")
     @Override
-    public void put(@Nonnull Object key, @Nullable Object value) {
+    public void put(@NonNull Object key, @Nullable Object value) {
         if (value == null) {
             // null is the same as removal
             cache.invalidate(key);

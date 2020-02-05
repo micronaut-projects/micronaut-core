@@ -26,7 +26,7 @@ import io.micronaut.inject.BeanContextConditional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * Abstract implementation of the {@link BeanContextConditional} interface.
@@ -40,7 +40,7 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
     static final Logger LOG = LoggerFactory.getLogger(Condition.class);
 
     @Override
-    public boolean isEnabled(@Nonnull BeanContext context) {
+    public boolean isEnabled(@NonNull BeanContext context) {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
         DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(context, this);

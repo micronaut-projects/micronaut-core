@@ -19,7 +19,7 @@ package io.micronaut.cache;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.naming.Named;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 
 /**
@@ -34,7 +34,7 @@ public interface CacheInfo extends Named {
      * A publisher that emits a single result containing the cache data.
      * @return Cache data
      */
-    @Nonnull
+    @NonNull
     @SingleResult
     Map<String, Object> get();
 }

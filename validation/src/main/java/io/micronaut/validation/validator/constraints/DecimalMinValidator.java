@@ -18,8 +18,8 @@ package io.micronaut.validation.validator.constraints;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.validation.ValidationException;
 import javax.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
@@ -35,7 +35,7 @@ import java.math.BigDecimal;
 public interface DecimalMinValidator<T> extends ConstraintValidator<DecimalMin, T> {
 
     @Override
-    default boolean isValid(@Nullable T value, @Nonnull AnnotationValue<DecimalMin> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    default boolean isValid(@Nullable T value, @NonNull AnnotationValue<DecimalMin> annotationMetadata, @NonNull ConstraintValidatorContext context) {
         if (value == null) {
             // null considered valid according to spec
             return true;
@@ -65,5 +65,5 @@ public interface DecimalMinValidator<T> extends ConstraintValidator<DecimalMin, 
      * @param bigDecimal The big decimal
      * @return The result
      */
-    int doComparison(@Nonnull T value, @Nonnull BigDecimal bigDecimal);
+    int doComparison(@NonNull T value, @NonNull BigDecimal bigDecimal);
 }

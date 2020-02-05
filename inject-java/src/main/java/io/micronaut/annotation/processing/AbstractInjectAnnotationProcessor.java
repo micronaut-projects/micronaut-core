@@ -22,7 +22,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -246,7 +246,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
      * @param processingEnv The processing environment.
      * @return True if it is
      */
-    protected boolean isIncremental(@Nonnull ProcessingEnvironment processingEnv) {
+    protected boolean isIncremental(@NonNull ProcessingEnvironment processingEnv) {
         final Map<String, String> options = processingEnv.getOptions();
         final String v = options.get(MICRONAUT_PROCESSING_INCREMENTAL);
         if (v != null) {

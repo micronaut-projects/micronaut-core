@@ -15,8 +15,9 @@
  */
 package io.micronaut.core.annotation;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
+
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.HashMap;
@@ -85,11 +86,11 @@ public class AnnotationValueBuilder<T extends Annotation> {
      *
      * @return The {@link AnnotationValue}
      */
-    public @Nonnull AnnotationValue<T> build() {
+    public @NonNull AnnotationValue<T> build() {
         if (retentionPolicy != RetentionPolicy.RUNTIME) {
             //noinspection unchecked
             return new AnnotationValue(annotationName, values) {
-                @Nonnull
+                @NonNull
                 @Override
                 public RetentionPolicy getRetentionPolicy() {
                     return retentionPolicy;

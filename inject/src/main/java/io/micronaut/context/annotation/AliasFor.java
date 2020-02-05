@@ -28,7 +28,7 @@ import java.lang.annotation.*;
  * @since 1.0
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD})
 @Documented
 @Repeatable(Aliases.class)
 public @interface AliasFor {

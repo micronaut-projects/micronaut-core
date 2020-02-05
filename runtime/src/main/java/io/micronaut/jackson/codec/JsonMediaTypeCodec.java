@@ -21,7 +21,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Named;
 import javax.inject.Singleton;
 

@@ -29,7 +29,7 @@ import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -103,7 +103,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         return methodNode;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public ClassElement getGenericReturnType() {
         ClassNode returnType = methodNode.getReturnType();
@@ -118,8 +118,8 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
      * @param rawElement The raw element
      * @return The class element
      */
-    @Nonnull
-    ClassElement getGenericElement(@Nonnull ClassNode type, @Nonnull ClassElement rawElement) {
+    @NonNull
+    ClassElement getGenericElement(@NonNull ClassNode type, @NonNull ClassElement rawElement) {
         Map<String, ClassNode> genericsSpec = getGenericsSpec();
 
         return getGenericElement(sourceUnit, type, rawElement, genericsSpec);
@@ -130,7 +130,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
      *
      * @return The generic spec
      */
-    @Nonnull
+    @NonNull
     Map<String, ClassNode> getGenericsSpec() {
         if (genericsSpec == null) {
             Map<String, Map<String, ClassNode>> info = declaringClass.getGenericTypeInfo();
@@ -150,7 +150,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public ClassElement getReturnType() {
         ClassNode returnType = methodNode.getReturnType();
         if (returnType.isEnum()) {

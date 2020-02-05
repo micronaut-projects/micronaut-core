@@ -42,8 +42,8 @@ import org.codehaus.groovy.control.messages.SimpleMessage;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -76,9 +76,9 @@ public class GroovyVisitorContext implements VisitorContext {
         this.attributes = VISITOR_ATTRIBUTES;
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public Iterable<URL> getClasspathResources(@Nonnull String path) {
+    public Iterable<URL> getClasspathResources(@NonNull String path) {
         try {
             final Enumeration<URL> resources = compilationUnit.getClassLoader().getResources(path);
             return CollectionUtils.enumerationToIterable(resources);
@@ -107,9 +107,9 @@ public class GroovyVisitorContext implements VisitorContext {
         );
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
+    public ClassElement[] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
         ArgumentUtils.requireNonNull("aPackage", aPackage);
         ArgumentUtils.requireNonNull("stereotypes", stereotypes);
 

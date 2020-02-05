@@ -22,8 +22,8 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
@@ -53,9 +53,9 @@ public final class CompositeMessageSource extends AbstractMessageSource {
         }
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public Optional<String> getMessage(@Nonnull String code, @Nonnull MessageContext context) {
+    public Optional<String> getMessage(@NonNull String code, @NonNull MessageContext context) {
         ArgumentUtils.requireNonNull("code", code);
         ArgumentUtils.requireNonNull("context", context);
         for (MessageSource messageSource : messageSources) {

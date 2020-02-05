@@ -19,7 +19,7 @@ package io.micronaut.core.beans;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 
 /**
@@ -56,7 +56,7 @@ public abstract class AbstractBeanIntrospectionReference<T> implements BeanIntro
         return present;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public String getName() {
         return getBeanType().getName();

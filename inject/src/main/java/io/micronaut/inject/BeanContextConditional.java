@@ -17,7 +17,7 @@ package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * Interface for other types that are conditional within a context.
@@ -34,5 +34,5 @@ public interface BeanContextConditional {
      * @param context The context
      * @return True if it is
      */
-    boolean isEnabled(@Nonnull BeanContext context);
+    boolean isEnabled(@NonNull BeanContext context);
 }

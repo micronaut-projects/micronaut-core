@@ -18,7 +18,7 @@ package io.micronaut.core.io;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.concurrent.Immutable;
 import java.io.*;
 import java.net.URL;
@@ -41,7 +41,7 @@ public interface Readable extends Named {
      * @return The input stream
      * @throws IOException if an I/O exception occurs
      */
-    @Nonnull InputStream asInputStream() throws IOException;
+    @NonNull InputStream asInputStream() throws IOException;
 
     /**
      * Does the underlying readable resource exist.
@@ -78,7 +78,7 @@ public interface Readable extends Named {
      * @param url The URL
      * @return The readable.
      */
-    static @Nonnull Readable of(@Nonnull URL url) {
+    static @NonNull Readable of(@NonNull URL url) {
         return new UrlReadable(url);
     }
 
@@ -88,7 +88,7 @@ public interface Readable extends Named {
      * @param file The file
      * @return The readable.
      */
-    static @Nonnull Readable of(@Nonnull File file) {
+    static @NonNull Readable of(@NonNull File file) {
         ArgumentUtils.requireNonNull("file", file);
         return new FileReadable(file);
     }
@@ -99,7 +99,7 @@ public interface Readable extends Named {
      * @param path The path
      * @return The readable.
      */
-    static @Nonnull Readable of(@Nonnull Path path) {
+    static @NonNull Readable of(@NonNull Path path) {
         ArgumentUtils.requireNonNull("path", path);
         return new FileReadable(path.toFile());
     }

@@ -126,6 +126,11 @@ ext {
                     group  : 'com.google.code.findbugs',
                     name   : 'jsr305'
             ],
+            spotbugs                   : [
+                    version: spotbugsVersion,
+                    group  : 'com.github.spotbugs',
+                    name   : 'spotbugs-annotations'
+            ],
             'micronaut.kafka': [
                     version:micronautKafkaVersion,
                     group:'io.micronaut.configuration',

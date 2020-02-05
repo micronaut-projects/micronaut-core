@@ -26,7 +26,7 @@ import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
 import io.micronaut.validation.validator.constraints.DefaultConstraintValidators;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -60,7 +60,7 @@ public class DefaultAnnotatedElementValidator extends DefaultValidator implement
         private Map<ValidatorKey, ConstraintValidator> validatorMap;
 
         @Override
-        protected <A extends Annotation, T> Optional<ConstraintValidator> findLocalConstraintValidator(@Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
+        protected <A extends Annotation, T> Optional<ConstraintValidator> findLocalConstraintValidator(@NonNull Class<A> constraintType, @NonNull Class<T> targetType) {
             return findConstraintValidatorFromServiceLoader(constraintType, targetType);
         }
 

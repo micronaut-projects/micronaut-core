@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Internal;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.concurrent.Immutable;
 import java.util.Collections;
 import java.util.Map;
@@ -55,7 +55,7 @@ public class ConfigServerPropertySource {
      *
      * @return the name of the property source
      */
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
         return name;
     }
 
@@ -64,7 +64,7 @@ public class ConfigServerPropertySource {
      *
      * @return the map containing the configuration entries
      */
-    public @Nonnull Map<String, Object> getSource() {
+    public @NonNull Map<String, Object> getSource() {
         return source;
     }
 

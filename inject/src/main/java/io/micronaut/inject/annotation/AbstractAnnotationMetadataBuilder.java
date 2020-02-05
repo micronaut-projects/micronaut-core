@@ -27,8 +27,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Scope;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
@@ -237,8 +237,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param element The element
      * @return The declaring type
      */
-    protected abstract @Nonnull
-    String getDeclaringType(@Nonnull T element);
+    protected abstract @NonNull
+    String getDeclaringType(@NonNull T element);
 
     /**
      * Build the meta data for the given method element excluding any class metadata.
@@ -409,7 +409,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
 
                 final Set<String> errors = elementValidator.validatedAnnotatedElement(new AnnotatedElement() {
-                    @Nonnull
+                    @NonNull
                     @Override
                     public String getName() {
                         return memberName;
@@ -448,7 +448,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param originatingElement The originating element
      * @param error              The error
      */
-    protected abstract void addError(@Nonnull T originatingElement, @Nonnull String error);
+    protected abstract void addError(@NonNull T originatingElement, @NonNull String error);
 
     /**
      * Read the given member and value, applying conversions if necessary, and place the data in the given map.
@@ -835,8 +835,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param annotation The annotation
      * @return The retention policy
      */
-    protected abstract @Nonnull
-    RetentionPolicy getRetentionPolicy(@Nonnull T annotation);
+    protected abstract @NonNull
+    RetentionPolicy getRetentionPolicy(@NonNull T annotation);
 
     private AnnotationMetadata buildInternal(T parent, T element, DefaultAnnotationMetadata annotationMetadata, boolean inheritTypeAnnotations, boolean declaredOnly) {
         List<T> hierarchy = buildHierarchy(element, inheritTypeAnnotations, declaredOnly);

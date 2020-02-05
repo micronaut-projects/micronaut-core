@@ -17,8 +17,8 @@ package io.micronaut.cache;
 
 import io.micronaut.core.type.Argument;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
@@ -49,8 +49,8 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T>          The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    @Nonnull
-    <T> Optional<T> get(@Nonnull Object key, @Nonnull Argument<T> requiredType);
+    @NonNull
+    <T> Optional<T> get(@NonNull Object key, @NonNull Argument<T> requiredType);
 
     /**
      * Resolve the given value for the given key. If the value is not found the specified {@link Supplier} will
@@ -62,7 +62,7 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T>          The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    <T> T get(@Nonnull Object key, @Nonnull Argument<T> requiredType, @Nonnull Supplier<T> supplier);
+    <T> T get(@NonNull Object key, @NonNull Argument<T> requiredType, @NonNull Supplier<T> supplier);
 
     /**
      * <p>Cache the specified value using the specified key if it is not already present.</p>
@@ -72,8 +72,8 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T>   The concrete type
      * @return An optional of the existing value or {@link Optional#empty()} if the specified value parameter was cached
      */
-    @Nonnull
-    <T> Optional<T> putIfAbsent(@Nonnull Object key, @Nonnull T value);
+    @NonNull
+    <T> Optional<T> putIfAbsent(@NonNull Object key, @NonNull T value);
 
     /**
      * <p>Cache the supplied value using the specified key if it is not already present.</p>
@@ -83,8 +83,8 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T>   The concrete type
      * @return An optional of the existing value or the new value returned by the supplier
      */
-    @Nonnull
-    default <T> T putIfAbsent(@Nonnull Object key, @Nonnull Supplier<T> value) {
+    @NonNull
+    default <T> T putIfAbsent(@NonNull Object key, @NonNull Supplier<T> value) {
         T val = value.get();
         return putIfAbsent(key, val).orElse(val);
     }
@@ -95,14 +95,14 @@ public interface SyncCache<C> extends Cache<C> {
      * @param key   the key with which the specified value is to be associated
      * @param value the value to be associated with the specified key
      */
-    void put(@Nonnull Object key, @Nonnull Object value);
+    void put(@NonNull Object key, @NonNull Object value);
 
     /**
      * Invalidate the value for the given key.
      *
      * @param key The key to invalid
      */
-    void invalidate(@Nonnull Object key);
+    void invalidate(@NonNull Object key);
 
     /**
      * Invalidate all cached values within this cache.
@@ -119,7 +119,7 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T>          The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    default <T> T get(@Nonnull Object key, @Nonnull Class<T> requiredType, @Nonnull Supplier<T> supplier) {
+    default <T> T get(@NonNull Object key, @NonNull Class<T> requiredType, @NonNull Supplier<T> supplier) {
         return get(key, Argument.of(requiredType), supplier);
     }
 
@@ -131,8 +131,8 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T>          The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    @Nonnull
-    default <T> Optional<T> get(@Nonnull Object key, @Nonnull Class<T> requiredType) {
+    @NonNull
+    default <T> Optional<T> get(@NonNull Object key, @NonNull Class<T> requiredType) {
         return get(key, Argument.of(requiredType));
     }
 
@@ -154,7 +154,7 @@ public interface SyncCache<C> extends Cache<C> {
      *
      * @return The {@link AsyncCache} implementation for this cache
      */
-    @Nonnull
+    @NonNull
     default AsyncCache<C> async() {
         ExecutorService executorService = getExecutorService();
         if (executorService == null) {

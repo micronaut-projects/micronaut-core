@@ -26,7 +26,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.processing.JavaModelUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.lang.model.element.*;
 import javax.lang.model.element.Element;
 import javax.lang.model.type.DeclaredType;
@@ -81,9 +81,9 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         this.genericTypeInfo = genericsInfo;
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public Map<String, ClassElement> getTypeArguments(@Nonnull String type) {
+    public Map<String, ClassElement> getTypeArguments(@NonNull String type) {
         if (StringUtils.isNotEmpty(type)) {
             Map<String, Map<String, Object>> data = visitorContext.getGenericUtils().buildGenericTypeArgumentInfo(classElement);
             Map<String, Object> forType = data.get(type);
@@ -314,7 +314,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
-    public List<FieldElement> getFields(@Nonnull Predicate<Set<ElementModifier>> modifierFilter) {
+    public List<FieldElement> getFields(@NonNull Predicate<Set<ElementModifier>> modifierFilter) {
         List<FieldElement> fields = new ArrayList<>();
         classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext.getTypes()) {
             @Override
@@ -361,7 +361,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         return super.getAnnotationMetadata();
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Optional<MethodElement> getPrimaryConstructor() {
         final AnnotationUtils annotationUtils = visitorContext.getAnnotationUtils();
@@ -397,7 +397,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
-    public @Nonnull
+    public @NonNull
     Map<String, ClassElement> getTypeArguments() {
         List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
         Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();

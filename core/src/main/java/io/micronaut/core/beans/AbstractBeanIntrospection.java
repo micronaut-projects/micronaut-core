@@ -25,8 +25,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
 
@@ -58,7 +58,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
      */
     @UsedByGeneratedCode
     protected AbstractBeanIntrospection(
-            @Nonnull Class<T> beanType,
+            @NonNull Class<T> beanType,
             @Nullable AnnotationMetadata annotationMetadata,
             int propertyCount) {
         ArgumentUtils.requireNonNull("beanType", beanType);
@@ -68,9 +68,9 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
         this.beanProperties = new LinkedHashMap<>(propertyCount);
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public Optional<BeanProperty<T, Object>> getIndexedProperty(@Nonnull Class<? extends Annotation> annotationType, @Nonnull String annotationValue) {
+    public Optional<BeanProperty<T, Object>> getIndexedProperty(@NonNull Class<? extends Annotation> annotationType, @NonNull String annotationValue) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         if (indexedValues != null && StringUtils.isNotEmpty(annotationValue)) {
             return Optional.ofNullable(
@@ -80,7 +80,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
         return Optional.empty();
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public T instantiate(boolean strictNullable, Object... arguments) throws InstantiationException {
         ArgumentUtils.requireNonNull("arguments", arguments);
@@ -112,16 +112,16 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
         return instantiateInternal(arguments);
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public Optional<BeanProperty<T, Object>> getProperty(@Nonnull String name) {
+    public Optional<BeanProperty<T, Object>> getProperty(@NonNull String name) {
         ArgumentUtils.requireNonNull("name", name);
         return Optional.ofNullable(beanProperties.get(name));
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public Collection<BeanProperty<T, Object>> getIndexedProperties(@Nonnull Class<? extends Annotation> annotationType) {
+    public Collection<BeanProperty<T, Object>> getIndexedProperties(@NonNull Class<? extends Annotation> annotationType) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         if (indexed != null) {
             final List<BeanProperty<T, Object>> indexed = this.indexed.get(annotationType);
@@ -137,13 +137,13 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
         return annotationMetadata;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Collection<BeanProperty<T, Object>> getBeanProperties() {
         return Collections.unmodifiableCollection(beanProperties.values());
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Class<T> getBeanType() {
         return beanType;
@@ -167,7 +167,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    protected final void addProperty(@Nonnull BeanProperty<T, Object> property) {
+    protected final void addProperty(@NonNull BeanProperty<T, Object> property) {
         ArgumentUtils.requireNonNull("property", property);
         beanProperties.put(property.getName(), property);
     }
@@ -182,7 +182,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
     @SuppressWarnings("unused")
     @Internal
     @UsedByGeneratedCode
-    protected final void indexProperty(@Nonnull Class<? extends Annotation> annotationType, @Nonnull String propertyName) {
+    protected final void indexProperty(@NonNull Class<? extends Annotation> annotationType, @NonNull String propertyName) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         if (StringUtils.isNotEmpty(propertyName)) {
             final BeanProperty<T, Object> property = beanProperties.get(propertyName);
@@ -210,9 +210,9 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
     @Internal
     @UsedByGeneratedCode
     protected final void indexProperty(
-            @Nonnull Class<? extends Annotation> annotationType,
-            @Nonnull String propertyName,
-            @Nonnull String annotationValue) {
+            @NonNull Class<? extends Annotation> annotationType,
+            @NonNull String propertyName,
+            @NonNull String annotationValue) {
         indexProperty(annotationType, propertyName);
         if (StringUtils.isNotEmpty(annotationValue) && StringUtils.isNotEmpty(propertyName)) {
             if (indexedValues == null) {
@@ -251,10 +251,10 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
      * Used as a key to lookup indexed annotation values.
      */
     private final class AnnotationValueKey {
-        final @Nonnull Class<? extends Annotation> type;
-        final @Nonnull String value;
+        final @NonNull Class<? extends Annotation> type;
+        final @NonNull String value;
 
-        AnnotationValueKey(@Nonnull Class<? extends Annotation> type, @Nonnull String value) {
+        AnnotationValueKey(@NonNull Class<? extends Annotation> type, @NonNull String value) {
             this.type = type;
             this.value = value;
         }

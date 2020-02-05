@@ -18,7 +18,7 @@ package io.micronaut.inject.foreach;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 @EachProperty("someconf")
 public class SomeConfiguration {

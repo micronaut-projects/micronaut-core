@@ -39,4 +39,18 @@ public interface AnnotatedElement extends AnnotationMetadataProvider, Named {
     default boolean isNullable() {
         return getAnnotationMetadata().hasAnnotation(AnnotationUtil.NULLABLE);
     }
+
+    /**
+     * @return Whether the element is declared as not being null
+     */
+    default boolean isNonNull() {
+        return getAnnotationMetadata().hasAnnotation(AnnotationUtil.NON_NULL);
+    }
+
+    /**
+     * @return Whether the element is declared as not being null
+     */
+    default boolean isDeclaredNonNull() {
+        return getAnnotationMetadata().hasDeclaredAnnotation(AnnotationUtil.NON_NULL);
+    }
 }

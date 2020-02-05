@@ -23,8 +23,8 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -65,7 +65,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @SuppressWarnings("unchecked")
     @Override
-    public @Nullable <T extends Annotation> T synthesize(@Nonnull Class<T> annotationClass) {
+    public @Nullable <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         if (annotationMap == null) {
             return null;
@@ -83,7 +83,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @SuppressWarnings("unchecked")
     @Override
-    public @Nullable <T extends Annotation> T synthesizeDeclared(@Nonnull Class<T> annotationClass) {
+    public @Nullable <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         if (declaredAnnotationMap == null) {
             return null;
@@ -100,7 +100,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public @Nonnull Annotation[] synthesizeAll() {
+    public @NonNull Annotation[] synthesizeAll() {
         if (annotationMap == null) {
             return AnnotationUtil.ZERO_ANNOTATIONS;
         }
@@ -118,7 +118,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public @Nonnull Annotation[] synthesizeDeclared() {
+    public @NonNull Annotation[] synthesizeDeclared() {
         if (declaredAnnotationMap == null) {
             return AnnotationUtil.ZERO_ANNOTATIONS;
         }

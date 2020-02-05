@@ -20,7 +20,7 @@ import io.micronaut.context.condition.Failure;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -59,7 +59,7 @@ class DefaultConditionContext<T extends AnnotationMetadataProvider> implements C
     }
 
     @Override
-    public ConditionContext<T> fail(@Nonnull Failure failure) {
+    public ConditionContext<T> fail(@NonNull Failure failure) {
         failures.add(failure);
         return this;
     }

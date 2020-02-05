@@ -17,7 +17,7 @@ package io.micronaut.http.simple.cookies;
 
 import io.micronaut.http.cookie.Cookie;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Objects;
 
 /**
@@ -48,12 +48,12 @@ public class SimpleCookie implements Cookie {
     }
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
         return name;
     }
 
     @Override
-    public @Nonnull String getValue() {
+    public @NonNull String getValue() {
         return value;
     }
 
@@ -83,37 +83,37 @@ public class SimpleCookie implements Cookie {
     }
 
     @Override
-    public @Nonnull Cookie maxAge(long maxAge) {
+    public @NonNull Cookie maxAge(long maxAge) {
         this.maxAge = maxAge;
         return this;
     }
 
     @Override
-    public @Nonnull Cookie value(@Nonnull String value) {
+    public @NonNull Cookie value(@NonNull String value) {
         this.value = value;
         return this;
     }
 
     @Override
-    public @Nonnull Cookie domain(String domain) {
+    public @NonNull Cookie domain(String domain) {
         this.domain = domain;
         return this;
     }
 
     @Override
-    public @Nonnull Cookie path(String path) {
+    public @NonNull Cookie path(String path) {
         this.path = path;
         return this;
     }
 
     @Override
-    public @Nonnull Cookie secure(boolean secure) {
+    public @NonNull Cookie secure(boolean secure) {
         this.secure = secure;
         return this;
     }
 
     @Override
-    public @Nonnull Cookie httpOnly(boolean httpOnly) {
+    public @NonNull Cookie httpOnly(boolean httpOnly) {
         this.httpOnly = httpOnly;
         return this;
     }

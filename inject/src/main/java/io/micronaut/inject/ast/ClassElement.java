@@ -17,7 +17,7 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArgumentUtils;
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -52,7 +52,7 @@ public interface ClassElement extends TypedElement {
      *
      * @return The primary constructor if one is present
      */
-    default @Nonnull Optional<MethodElement> getPrimaryConstructor() {
+    default @NonNull Optional<MethodElement> getPrimaryConstructor() {
         return Optional.empty();
     }
 
@@ -62,7 +62,7 @@ public interface ClassElement extends TypedElement {
      *
      * @return The default constructor if one is present
      */
-    default @Nonnull Optional<MethodElement> getDefaultConstructor() {
+    default @NonNull Optional<MethodElement> getDefaultConstructor() {
         return Optional.empty();
     }
 
@@ -75,7 +75,7 @@ public interface ClassElement extends TypedElement {
         return Optional.empty();
     }
 
-    @Nonnull
+    @NonNull
     @Override
     default ClassElement getType() {
         return this;
@@ -124,7 +124,7 @@ public interface ClassElement extends TypedElement {
      * @param modifierFilter Can be used to filter fields by modifier
      * @return The fields
      */
-    default List<FieldElement> getFields(@Nonnull Predicate<Set<ElementModifier>> modifierFilter) {
+    default List<FieldElement> getFields(@NonNull Predicate<Set<ElementModifier>> modifierFilter) {
         return Collections.emptyList();
     }
 
@@ -166,7 +166,7 @@ public interface ClassElement extends TypedElement {
      * @return The type arguments for this class element
      * @since 1.1.1
      */
-    default @Nonnull Map<String, ClassElement> getTypeArguments(@Nonnull String type) {
+    default @NonNull Map<String, ClassElement> getTypeArguments(@NonNull String type) {
         return Collections.emptyMap();
     }
 
@@ -176,7 +176,7 @@ public interface ClassElement extends TypedElement {
      * @param type The type to retrieve type arguments for
      * @return The type arguments for this class element
      */
-    default @Nonnull Map<String, ClassElement> getTypeArguments(@Nonnull Class<?> type) {
+    default @NonNull Map<String, ClassElement> getTypeArguments(@NonNull Class<?> type) {
         ArgumentUtils.requireNonNull("type", type);
         return getTypeArguments(type.getName());
     }
@@ -184,7 +184,7 @@ public interface ClassElement extends TypedElement {
     /**
      * @return The type arguments for this class element
      */
-    default @Nonnull Map<String, ClassElement> getTypeArguments() {
+    default @NonNull Map<String, ClassElement> getTypeArguments() {
         return Collections.emptyMap();
     }
 

@@ -25,7 +25,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanConfiguration;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;

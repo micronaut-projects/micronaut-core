@@ -18,8 +18,8 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Set;
 
 /**
@@ -38,8 +38,8 @@ public interface AnnotatedElementValidator {
      *
      * @return The error messages
      */
-    @Nonnull
+    @NonNull
     Set<String> validatedAnnotatedElement(
-            @Nonnull AnnotatedElement element,
+            @NonNull AnnotatedElement element,
             @Nullable Object value);
 }

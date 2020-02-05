@@ -25,7 +25,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.scheduling.TaskExecutors;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.cache.Cache;
 import javax.cache.CacheManager;
 import javax.inject.Named;
@@ -61,22 +61,22 @@ public class JCacheManager implements io.micronaut.cache.CacheManager<Cache> {
      * @param conversionService The conversion service
      */
     protected JCacheManager(
-            @Nonnull CacheManager cacheManager,
-            @Nonnull @Named(TaskExecutors.IO) ExecutorService executorService,
-            @Nonnull ConversionService<?> conversionService) {
+            @NonNull CacheManager cacheManager,
+            @NonNull @Named(TaskExecutors.IO) ExecutorService executorService,
+            @NonNull ConversionService<?> conversionService) {
         this.cacheManager = cacheManager;
         this.conversionService = conversionService;
         this.executorService = executorService;
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public Set<String> getCacheNames() {
         return CollectionUtils.iterableToSet(cacheManager.getCacheNames());
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public SyncCache<Cache> getCache(String name) {
         final Cache<Object, Object> cache = cacheManager.getCache(name);
         if (cache == null) {
@@ -88,7 +88,7 @@ public class JCacheManager implements io.micronaut.cache.CacheManager<Cache> {
     /**
      * @return The JCache cache manager.
      */
-    @Nonnull
+    @NonNull
     public CacheManager getCacheManager() {
         return cacheManager;
     }

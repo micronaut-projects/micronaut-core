@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.cookie.Cookie;
 import io.netty.handler.codec.http.cookie.DefaultCookie;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Objects;
 
 /**
@@ -59,12 +59,12 @@ public class NettyCookie implements Cookie {
     }
 
     @Override
-    public @Nonnull String getName() {
+    public @NonNull String getName() {
         return nettyCookie.name();
     }
 
     @Override
-    public @Nonnull String getValue() {
+    public @NonNull String getValue() {
         return nettyCookie.value();
     }
 
@@ -94,37 +94,37 @@ public class NettyCookie implements Cookie {
     }
 
     @Override
-    public @Nonnull Cookie maxAge(long maxAge) {
+    public @NonNull Cookie maxAge(long maxAge) {
         nettyCookie.setMaxAge(maxAge);
         return this;
     }
 
     @Override
-    public @Nonnull Cookie value(@Nonnull String value) {
+    public @NonNull Cookie value(@NonNull String value) {
         nettyCookie.setValue(value);
         return this;
     }
 
     @Override
-    public @Nonnull Cookie domain(String domain) {
+    public @NonNull Cookie domain(String domain) {
         nettyCookie.setDomain(domain);
         return this;
     }
 
     @Override
-    public @Nonnull Cookie path(String path) {
+    public @NonNull Cookie path(String path) {
         nettyCookie.setPath(path);
         return this;
     }
 
     @Override
-    public @Nonnull Cookie secure(boolean secure) {
+    public @NonNull Cookie secure(boolean secure) {
         nettyCookie.setSecure(secure);
         return this;
     }
 
     @Override
-    public @Nonnull Cookie httpOnly(boolean httpOnly) {
+    public @NonNull Cookie httpOnly(boolean httpOnly) {
         nettyCookie.setHttpOnly(httpOnly);
         return this;
     }

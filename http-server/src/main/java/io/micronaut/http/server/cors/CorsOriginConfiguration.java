@@ -17,7 +17,7 @@ package io.micronaut.http.server.cors;
 
 import io.micronaut.http.HttpMethod;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Collections;
 import java.util.List;
 

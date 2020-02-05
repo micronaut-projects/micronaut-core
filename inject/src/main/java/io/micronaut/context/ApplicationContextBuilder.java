@@ -18,8 +18,8 @@ package io.micronaut.context;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Map;
 
 /**
@@ -36,7 +36,7 @@ public interface ApplicationContextBuilder {
      * @param beans The beans
      * @return This builder
      */
-    @Nonnull ApplicationContextBuilder singletons(@Nullable Object... beans);
+    @NonNull ApplicationContextBuilder singletons(@Nullable Object... beans);
 
     /**
      * Whether to deduce environments.
@@ -44,7 +44,7 @@ public interface ApplicationContextBuilder {
      * @param deduceEnvironment The boolean
      * @return This builder
      */
-    @Nonnull ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironment);
+    @NonNull ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironment);
 
     /**
      * The environments to use.
@@ -52,7 +52,7 @@ public interface ApplicationContextBuilder {
      * @param environments The environments
      * @return This builder
      */
-    @Nonnull ApplicationContextBuilder environments(@Nullable String... environments);
+    @NonNull ApplicationContextBuilder environments(@Nullable String... environments);
 
     /**
      * The packages to include for package scanning.
@@ -60,7 +60,7 @@ public interface ApplicationContextBuilder {
      * @param packages The packages
      * @return This builder
      */
-    @Nonnull ApplicationContextBuilder packages(@Nullable String... packages);
+    @NonNull ApplicationContextBuilder packages(@Nullable String... packages);
 
     /**
      * Properties to override from the environment.
@@ -68,7 +68,7 @@ public interface ApplicationContextBuilder {
      * @param properties The properties
      * @return This builder
      */
-    @Nonnull ApplicationContextBuilder properties(@Nullable Map<String, Object> properties);
+    @NonNull ApplicationContextBuilder properties(@Nullable Map<String, Object> properties);
 
     /**
      * Additional property sources.
@@ -76,7 +76,7 @@ public interface ApplicationContextBuilder {
      * @param propertySources The property sources to include
      * @return This builder
      */
-    @Nonnull ApplicationContextBuilder propertySources(@Nullable PropertySource... propertySources);
+    @NonNull ApplicationContextBuilder propertySources(@Nullable PropertySource... propertySources);
 
     /**
      * Set whether environment variables should contribute to configuration.
@@ -84,7 +84,7 @@ public interface ApplicationContextBuilder {
      * @param environmentPropertySource The boolean
      * @return This builder
      */
-    @Nonnull ApplicationContextBuilder environmentPropertySource(boolean environmentPropertySource);
+    @NonNull ApplicationContextBuilder environmentPropertySource(boolean environmentPropertySource);
 
     /**
      * Which environment variables should contribute to configuration.
@@ -92,7 +92,7 @@ public interface ApplicationContextBuilder {
      * @param environmentVariables The environment variables
      * @return This builder
      */
-    @Nonnull ApplicationContextBuilder environmentVariableIncludes(@Nullable String... environmentVariables);
+    @NonNull ApplicationContextBuilder environmentVariableIncludes(@Nullable String... environmentVariables);
 
     /**
      * Which environment variables should not contribute to configuration.
@@ -100,7 +100,7 @@ public interface ApplicationContextBuilder {
      * @param environmentVariables The environment variables
      * @return This builder
      */
-    @Nonnull ApplicationContextBuilder environmentVariableExcludes(@Nullable String... environmentVariables);
+    @NonNull ApplicationContextBuilder environmentVariableExcludes(@Nullable String... environmentVariables);
 
     /**
      * The main class used by this application.
@@ -108,7 +108,7 @@ public interface ApplicationContextBuilder {
      * @param mainClass The main class
      * @return This builder
      */
-    @Nonnull ApplicationContextBuilder mainClass(@Nullable Class mainClass);
+    @NonNull ApplicationContextBuilder mainClass(@Nullable Class mainClass);
 
     /**
      * The class loader to be used.
@@ -116,14 +116,14 @@ public interface ApplicationContextBuilder {
      * @param classLoader The classloader
      * @return This builder
      */
-    @Nonnull ApplicationContextBuilder classLoader(@Nullable ClassLoader classLoader);
+    @NonNull ApplicationContextBuilder classLoader(@Nullable ClassLoader classLoader);
 
     /**
      * Builds the {@link ApplicationContext}, but does not start it.
      *
      * @return The built, but not running {@link ApplicationContext}
      */
-    @Nonnull ApplicationContext build();
+    @NonNull ApplicationContext build();
 
     /**
      * Allow customizing the configurations that will be loaded.
@@ -131,7 +131,7 @@ public interface ApplicationContextBuilder {
      * @param configurations The configurations to include
      * @return This application
      */
-    @Nonnull ApplicationContextBuilder include(@Nullable String... configurations);
+    @NonNull ApplicationContextBuilder include(@Nullable String... configurations);
 
     /**
      * Allow customizing the configurations that will be loaded.
@@ -139,7 +139,7 @@ public interface ApplicationContextBuilder {
      * @param configurations The configurations to exclude
      * @return This application
      */
-    @Nonnull ApplicationContextBuilder exclude(@Nullable String... configurations);
+    @NonNull ApplicationContextBuilder exclude(@Nullable String... configurations);
 
     /**
      * Set the command line arguments.
@@ -147,7 +147,7 @@ public interface ApplicationContextBuilder {
      * @param args The arguments
      * @return This application
      */
-    default  @Nonnull ApplicationContextBuilder args(@Nullable String... args) {
+    default  @NonNull ApplicationContextBuilder args(@Nullable String... args) {
         return this;
     }
 
@@ -156,7 +156,7 @@ public interface ApplicationContextBuilder {
      *
      * @return The running {@link ApplicationContext}
      */
-    default @Nonnull ApplicationContext start() {
+    default @NonNull ApplicationContext start() {
         return build().start();
     }
 
@@ -168,7 +168,7 @@ public interface ApplicationContextBuilder {
      * @param <T>          The type, a subclass of {@link AutoCloseable}. The close method of the implementation should shutdown the context.
      * @return The running bean
      */
-    default @Nonnull <T extends AutoCloseable> T run(@Nonnull Class<T> type) {
+    default @NonNull <T extends AutoCloseable> T run(@NonNull Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         ApplicationContext applicationContext = start();
         T bean = applicationContext.getBean(type);

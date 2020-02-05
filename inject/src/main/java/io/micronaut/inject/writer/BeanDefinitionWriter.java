@@ -50,8 +50,8 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.signature.SignatureWriter;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -285,7 +285,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @return The name of the bean definition reference class.
      */
     @Override
-    @Nonnull
+    @NonNull
     public String getBeanDefinitionReferenceClassName() {
         return beanDefinitionName + BeanDefinitionReferenceWriter.REF_SUFFIX;
     }

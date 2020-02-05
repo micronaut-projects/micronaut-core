@@ -29,7 +29,7 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;

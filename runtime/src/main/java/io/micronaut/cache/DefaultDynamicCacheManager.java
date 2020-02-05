@@ -21,7 +21,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Singleton;
 
 /**
@@ -51,7 +51,7 @@ public class DefaultDynamicCacheManager implements DynamicCacheManager<com.githu
         this.applicationConfiguration = applicationConfiguration;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public SyncCache<com.github.benmanes.caffeine.cache.Cache> getCache(String name) {
         return new DefaultSyncCache(new DefaultCacheConfiguration(name, applicationConfiguration), applicationContext, conversionService);

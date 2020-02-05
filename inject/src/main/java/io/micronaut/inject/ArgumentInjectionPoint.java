@@ -17,7 +17,7 @@ package io.micronaut.inject;
 
 import io.micronaut.core.type.Argument;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * An injection point for a method or constructor argument.
@@ -32,10 +32,10 @@ public interface ArgumentInjectionPoint<B, T> extends InjectionPoint<B> {
     /**
      * @return The outer injection point (method or constructor)
      */
-    @Nonnull CallableInjectionPoint<B> getOuterInjectionPoint();
+    @NonNull CallableInjectionPoint<B> getOuterInjectionPoint();
 
     /**
      * @return The argument that is being injected
      */
-    @Nonnull Argument<T> getArgument();
+    @NonNull Argument<T> getArgument();
 }

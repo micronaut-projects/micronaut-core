@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.cookie;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
@@ -30,7 +30,7 @@ public interface CookieConfiguration {
     /**
      * @return The name of the cookie
      */
-    @Nonnull
+    @NonNull
     String getCookieName();
 
     /**

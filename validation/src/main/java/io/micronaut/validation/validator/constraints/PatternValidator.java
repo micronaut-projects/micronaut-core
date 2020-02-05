@@ -17,8 +17,8 @@ package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Singleton;
 import javax.validation.constraints.Pattern;
 
@@ -32,7 +32,7 @@ import javax.validation.constraints.Pattern;
 public class PatternValidator extends AbstractPatternValidator<Pattern> {
 
     @Override
-    public boolean isValid(@Nullable CharSequence value, @Nonnull AnnotationValue<Pattern> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    public boolean isValid(@Nullable CharSequence value, @NonNull AnnotationValue<Pattern> annotationMetadata, @NonNull ConstraintValidatorContext context) {
         if (value == null) {
             // null valid according to spec
             return true;

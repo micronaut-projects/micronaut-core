@@ -23,7 +23,7 @@ import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.reflect.Modifier;
 
 /**
@@ -94,7 +94,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
         return variable;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public ClassElement getType() {
         return new GroovyClassElement(sourceUnit, compilationUnit, variable.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, variable.getType()));

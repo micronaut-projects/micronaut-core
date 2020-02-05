@@ -19,7 +19,7 @@ package io.micronaut.http.context.event;
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.http.HttpRequest;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * An event fired when an {@link HttpRequest} is received by the server. Not that the event is fired in a
@@ -34,12 +34,12 @@ public class HttpRequestReceivedEvent extends ApplicationEvent {
     /**
      * @param request The request. Never null.
      */
-    public HttpRequestReceivedEvent(@Nonnull HttpRequest<?> request) {
+    public HttpRequestReceivedEvent(@NonNull HttpRequest<?> request) {
         super(request);
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public HttpRequest<?> getSource() {
         return (HttpRequest<?>) super.getSource();
     }

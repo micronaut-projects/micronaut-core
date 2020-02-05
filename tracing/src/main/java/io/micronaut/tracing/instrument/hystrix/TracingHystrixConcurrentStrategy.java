@@ -27,7 +27,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.concurrent.BlockingQueue;

@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.value;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;

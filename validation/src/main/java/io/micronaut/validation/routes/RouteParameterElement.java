@@ -21,7 +21,7 @@ import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * Models a route parameter.
@@ -48,7 +48,7 @@ class RouteParameterElement implements ParameterElement, AnnotationMetadataDeleg
         return delegate;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public ClassElement getType() {
         return delegate.getType();

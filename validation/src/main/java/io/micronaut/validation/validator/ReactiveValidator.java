@@ -18,7 +18,7 @@ package io.micronaut.validation.validator;
 
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -38,7 +38,7 @@ public interface ReactiveValidator {
      * @param <T> The generic type
      * @return The publisher
      */
-    @Nonnull <T> Publisher<T> validatePublisher(@Nonnull Publisher<T> publisher, Class<?>... groups);
+    @NonNull <T> Publisher<T> validatePublisher(@NonNull Publisher<T> publisher, Class<?>... groups);
 
 
     /**
@@ -50,5 +50,5 @@ public interface ReactiveValidator {
      * @param <T> The generic type
      * @return The publisher
      */
-    @Nonnull <T> CompletionStage<T> validateCompletionStage(@Nonnull CompletionStage<T> completionStage, Class<?>... groups);
+    @NonNull <T> CompletionStage<T> validateCompletionStage(@NonNull CompletionStage<T> completionStage, Class<?>... groups);
 }

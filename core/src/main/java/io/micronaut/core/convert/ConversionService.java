@@ -17,7 +17,7 @@ package io.micronaut.core.convert;
 
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Optional;
 import java.util.function.Function;
 

@@ -18,8 +18,8 @@ package io.micronaut.validation.validator.constraints;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Indexed;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.concurrent.Immutable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.validation.ClockProvider;
@@ -59,14 +59,14 @@ public interface ConstraintValidator<A extends Annotation, T> extends javax.vali
      */
     boolean isValid(
             @Nullable T value,
-            @Nonnull AnnotationValue<A> annotationMetadata,
-            @Nonnull ConstraintValidatorContext context);
+            @NonNull AnnotationValue<A> annotationMetadata,
+            @NonNull ConstraintValidatorContext context);
 
     @Override
     default boolean isValid(T value, javax.validation.ConstraintValidatorContext context) {
         // simply adapt the interfaces for now.
         return isValid(value, new AnnotationValue(Constraint.class.getName()), new ConstraintValidatorContext() {
-            @Nonnull
+            @NonNull
             @Override
             public ClockProvider getClockProvider() {
                 return context.getClockProvider();

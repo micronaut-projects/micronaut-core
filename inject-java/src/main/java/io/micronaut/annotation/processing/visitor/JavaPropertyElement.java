@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.lang.model.element.ExecutableElement;
 
 /**
@@ -72,7 +72,7 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
         return name;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public ClassElement getType() {
         return type;

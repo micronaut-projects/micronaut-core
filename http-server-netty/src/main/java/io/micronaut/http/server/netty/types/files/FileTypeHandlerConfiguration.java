@@ -17,7 +17,7 @@ package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * Allows configuration of properties for the {@link FileTypeHandler}.
@@ -90,7 +90,7 @@ public class FileTypeHandlerConfiguration {
         /**
          * @return True if the cache control should be public
          */
-        @Nonnull
+        @NonNull
         public boolean getPublic() {
             return publicCache;
         }

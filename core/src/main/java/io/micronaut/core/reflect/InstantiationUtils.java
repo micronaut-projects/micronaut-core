@@ -27,7 +27,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.function.Function;
@@ -72,7 +72,7 @@ public class InstantiationUtils {
      * @return The instantiated instance or {@link Optional#empty()}
      * @throws InstantiationException When an error occurs
      */
-    public static @Nonnull <T> Optional<T> tryInstantiate(@Nonnull Class<T> type, Map propertiesMap, ConversionContext context) {
+    public static @NonNull <T> Optional<T> tryInstantiate(@NonNull Class<T> type, Map propertiesMap, ConversionContext context) {
         ArgumentUtils.requireNonNull("type", type);
         if (propertiesMap.isEmpty()) {
             return tryInstantiate(type);
@@ -135,7 +135,7 @@ public class InstantiationUtils {
      * @param <T>  The generic type
      * @return The instantiated instance or {@link Optional#empty()}
      */
-    public static @Nonnull <T> Optional<T> tryInstantiate(@Nonnull Class<T> type) {
+    public static @NonNull <T> Optional<T> tryInstantiate(@NonNull Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         final Supplier<T> reflectionFallback = () -> {
             final Logger logger = ClassUtils.REFLECTION_LOGGER;
@@ -181,7 +181,7 @@ public class InstantiationUtils {
      * @param <T>  The generic type
      * @return The instantiated instance or {@link Optional#empty()}
      */
-    public static @Nonnull <T> Optional<T> tryInstantiate(@Nonnull Constructor<T> type, Object... args) {
+    public static @NonNull <T> Optional<T> tryInstantiate(@NonNull Constructor<T> type, Object... args) {
         try {
             return Optional.of(type.newInstance(args));
         } catch (Throwable e) {

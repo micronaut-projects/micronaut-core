@@ -20,7 +20,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -53,9 +53,9 @@ public abstract class AbstractMapBasedSyncCache<C extends Map<Object, Object>> i
         return conversionService;
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public <T> Optional<T> get(@Nonnull Object key, @Nonnull Argument<T> requiredType) {
+    public <T> Optional<T> get(@NonNull Object key, @NonNull Argument<T> requiredType) {
         ArgumentUtils.requireNonNull("key", key);
         Object value = nativeCache.get(key);
         if (value != null) {
@@ -65,7 +65,7 @@ public abstract class AbstractMapBasedSyncCache<C extends Map<Object, Object>> i
     }
 
     @Override
-    public <T> T get(@Nonnull Object key, @Nonnull Argument<T> requiredType, @Nonnull Supplier<T> supplier) {
+    public <T> T get(@NonNull Object key, @NonNull Argument<T> requiredType, @NonNull Supplier<T> supplier) {
         ArgumentUtils.requireNonNull("key", key);
         Optional<T> existingValue = get(key, requiredType);
         if (existingValue.isPresent()) {
@@ -78,9 +78,9 @@ public abstract class AbstractMapBasedSyncCache<C extends Map<Object, Object>> i
     }
 
     @SuppressWarnings("unchecked")
-    @Nonnull
+    @NonNull
     @Override
-    public <T> Optional<T> putIfAbsent(@Nonnull Object key, @Nonnull T value) {
+    public <T> Optional<T> putIfAbsent(@NonNull Object key, @NonNull T value) {
         ArgumentUtils.requireNonNull("key", key);
         ArgumentUtils.requireNonNull("value", value);
         final T v = (T) nativeCache.putIfAbsent(key, value);
@@ -88,9 +88,9 @@ public abstract class AbstractMapBasedSyncCache<C extends Map<Object, Object>> i
         return conversionService.convert(v, aClass);
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public <T> T putIfAbsent(@Nonnull Object key, @Nonnull Supplier<T> value) {
+    public <T> T putIfAbsent(@NonNull Object key, @NonNull Supplier<T> value) {
         ArgumentUtils.requireNonNull("key", key);
         ArgumentUtils.requireNonNull("value", value);
         final Object v = nativeCache.get(key);
@@ -102,14 +102,14 @@ public abstract class AbstractMapBasedSyncCache<C extends Map<Object, Object>> i
     }
 
     @Override
-    public void put(@Nonnull Object key, @Nonnull Object value) {
+    public void put(@NonNull Object key, @NonNull Object value) {
         ArgumentUtils.requireNonNull("key", key);
         ArgumentUtils.requireNonNull("value", value);
         nativeCache.put(key, value);
     }
 
     @Override
-    public void invalidate(@Nonnull Object key) {
+    public void invalidate(@NonNull Object key) {
         ArgumentUtils.requireNonNull("key", key);
         nativeCache.remove(key);
     }

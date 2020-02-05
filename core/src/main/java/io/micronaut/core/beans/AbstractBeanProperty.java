@@ -23,8 +23,8 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Objects;
 
 /**
@@ -59,9 +59,9 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     @Internal
     @UsedByGeneratedCode
     protected AbstractBeanProperty(
-            @Nonnull BeanIntrospection<B> introspection,
-            @Nonnull Class<P> type,
-            @Nonnull String name,
+            @NonNull BeanIntrospection<B> introspection,
+            @NonNull Class<P> type,
+            @NonNull String name,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Argument[] typeArguments) {
         this.introspection = introspection;
@@ -72,11 +72,11 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         this.typeArguments = typeArguments;
     }
 
-    @Override public @Nonnull String getName() {
+    @Override public @NonNull String getName() {
         return name;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Class<P> getType() {
         return type;
@@ -91,7 +91,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         }
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public BeanIntrospection<B> getDeclaringBean() {
         return introspection;
@@ -104,7 +104,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
 
     @Nullable
     @Override
-    public final P get(@Nonnull B bean) {
+    public final P get(@NonNull B bean) {
         ArgumentUtils.requireNonNull("bean", bean);
 
         if (!beanType.isInstance(bean)) {
@@ -117,7 +117,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     }
 
     @Override
-    public final void set(@Nonnull B bean, @Nullable P value) {
+    public final void set(@NonNull B bean, @Nullable P value) {
         ArgumentUtils.requireNonNull("bean", bean);
 
         if (!beanType.isInstance(bean)) {
@@ -141,7 +141,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     @SuppressWarnings("WeakerAccess")
     @UsedByGeneratedCode
     @Internal
-    protected abstract void writeInternal(@Nonnull B bean, @Nullable P value);
+    protected abstract void writeInternal(@NonNull B bean, @Nullable P value);
 
     /**
      * Reads the bean property.
@@ -151,7 +151,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     @SuppressWarnings("WeakerAccess")
     @UsedByGeneratedCode
     @Internal
-    protected abstract P readInternal(@Nonnull B bean);
+    protected abstract P readInternal(@NonNull B bean);
 
     @Override
     public boolean equals(Object o) {

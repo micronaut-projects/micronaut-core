@@ -32,7 +32,7 @@ import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Inject;
 import java.lang.reflect.Modifier;
 import java.util.*;
@@ -100,7 +100,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         return Optional.empty();
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Optional<MethodElement> getPrimaryConstructor() {
         MethodNode method = findStaticCreator();
@@ -111,7 +111,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         return createMethodElement(method);
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Optional<MethodElement> getDefaultConstructor() {
         MethodNode method = findDefaultStaticCreator();
@@ -145,9 +145,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         return genericInfo;
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public Map<String, ClassElement> getTypeArguments(@Nonnull String type) {
+    public Map<String, ClassElement> getTypeArguments(@NonNull String type) {
         Map<String, Map<String, ClassNode>> allData = getGenericTypeInfo();
 
         Map<String, ClassNode> thisSpec = allData.get(getName());
@@ -174,7 +174,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     }
 
     @Override
-    public @Nonnull
+    public @NonNull
     Map<String, ClassElement> getTypeArguments() {
         Map<String, Map<String, ClassNode>> genericInfo = getGenericTypeInfo();
         Map<String, ClassNode> info = genericInfo.get(classNode.getName());
@@ -241,7 +241,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                         readOnly,
                         propertyNode
                 ) {
-                    @Nonnull
+                    @NonNull
                     @Override
                     public ClassElement getType() {
                         ClassNode type = propertyNode.getType();
@@ -383,7 +383,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                             return Optional.empty();
                         }
 
-                        @Nonnull
+                        @NonNull
                         @Override
                         public ClassElement getType() {
                             return value.type;

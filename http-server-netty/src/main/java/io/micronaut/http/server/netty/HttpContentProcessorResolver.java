@@ -19,7 +19,7 @@ import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.core.type.Argument;
 import io.micronaut.web.router.RouteMatch;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * Responsible for determining which {@link HttpContentProcessor} to use to process
@@ -38,8 +38,8 @@ public interface HttpContentProcessorResolver {
      * @param route   The matched route
      * @return The content processor
      */
-    @Nonnull
-    HttpContentProcessor<?> resolve(@Nonnull NettyHttpRequest<?> request, @Nonnull RouteMatch<?> route);
+    @NonNull
+    HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request, @NonNull RouteMatch<?> route);
 
     /**
      * Resolves the processor for the given request and body argument.
@@ -48,8 +48,8 @@ public interface HttpContentProcessorResolver {
      * @param bodyType The body argument
      * @return The content processor
      */
-    @Nonnull
-    HttpContentProcessor<?> resolve(@Nonnull NettyHttpRequest<?> request, @Nonnull Argument<?> bodyType);
+    @NonNull
+    HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request, @NonNull Argument<?> bodyType);
 
     /**
      * Resolves the processor for the given request.
@@ -57,6 +57,6 @@ public interface HttpContentProcessorResolver {
      * @param request  The request
      * @return The content processor
      */
-    @Nonnull
-    HttpContentProcessor<?> resolve(@Nonnull NettyHttpRequest<?> request);
+    @NonNull
+    HttpContentProcessor<?> resolve(@NonNull NettyHttpRequest<?> request);
 }

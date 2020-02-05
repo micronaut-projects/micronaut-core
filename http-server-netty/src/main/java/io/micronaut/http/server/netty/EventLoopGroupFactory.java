@@ -22,7 +22,7 @@ import java.util.concurrent.ThreadFactory;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * Factory for EventLoopGroup.

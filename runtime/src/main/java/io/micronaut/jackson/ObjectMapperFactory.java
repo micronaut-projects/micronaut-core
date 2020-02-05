@@ -24,7 +24,7 @@ import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.reflect.GenericTypeUtils;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;

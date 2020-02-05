@@ -18,7 +18,7 @@ package io.micronaut.context.condition;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Collections;
 import java.util.List;
 
@@ -49,7 +49,7 @@ public interface ConditionContext<T extends AnnotationMetadataProvider> {
      * @param failure The failure
      * @return The {@link ConditionContext}
      */
-    ConditionContext<T> fail(@Nonnull Failure failure);
+    ConditionContext<T> fail(@NonNull Failure failure);
 
     /**
      * Fail the condition with the given message.
@@ -57,7 +57,7 @@ public interface ConditionContext<T extends AnnotationMetadataProvider> {
      * @param failure The failure
      * @return The {@link ConditionContext}
      */
-    default ConditionContext<T> fail(@Nonnull String failure) {
+    default ConditionContext<T> fail(@NonNull String failure) {
         return fail(Failure.simple(failure));
     }
 

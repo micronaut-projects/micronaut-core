@@ -16,7 +16,7 @@
 
 package io.micronaut.web.router.version;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * Defines a provider of a default Version.
@@ -30,6 +30,6 @@ public interface DefaultVersionProvider {
      *
      * @return Resolves a default Version
      */
-    @Nonnull
+    @NonNull
     String resolveDefaultVersion();
 }

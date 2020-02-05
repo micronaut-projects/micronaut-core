@@ -21,7 +21,7 @@ import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Inject;
 import java.util.Optional;
 
@@ -68,21 +68,21 @@ public class SpringCloudClientConfiguration extends HttpClientConfiguration {
     }
 
     @Override
-    public @Nonnull ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+    public @NonNull ConnectionPoolConfiguration getConnectionPoolConfiguration() {
         return springCloudConnectionPoolConfiguration;
     }
 
     /**
      * @return The configuration discovery configuration
      */
-    public @Nonnull SpringConfigDiscoveryConfiguration getConfiguration() {
+    public @NonNull SpringConfigDiscoveryConfiguration getConfiguration() {
         return springConfigDiscoveryConfiguration;
     }
 
     /**
      * @return The spring cloud config server uri
      */
-    public @Nonnull Optional<String> getUri() {
+    public @NonNull Optional<String> getUri() {
         return uri != null ? Optional.of(uri) : Optional.empty();
     }
 

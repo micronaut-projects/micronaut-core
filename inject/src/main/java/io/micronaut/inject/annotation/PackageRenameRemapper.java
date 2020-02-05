@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Collections;
 import java.util.List;
 
@@ -36,7 +36,7 @@ public interface PackageRenameRemapper extends AnnotationRemapper {
     /**
      * @return The target package name.
      */
-    @Nonnull String getTargetPackage();
+    @NonNull String getTargetPackage();
 
     @Override
     default List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {

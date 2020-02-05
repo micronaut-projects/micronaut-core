@@ -26,7 +26,7 @@ class NullableParameterRuleSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -163,7 +163,7 @@ class Foo {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -187,7 +187,7 @@ class Foo {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -209,7 +209,7 @@ class Foo {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -273,7 +273,7 @@ class Foo {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {
@@ -315,7 +315,7 @@ class Foo {
 package test;
 
 import io.micronaut.http.annotation.*;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 @Controller("/foo")
 class Foo {

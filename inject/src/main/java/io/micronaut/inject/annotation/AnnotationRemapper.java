@@ -18,7 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.List;
 
 /**
@@ -42,7 +42,7 @@ public interface AnnotationRemapper {
     /**
      * @return The package name of the annotation.
      */
-    @Nonnull String getPackageName();
+    @NonNull String getPackageName();
 
     /**
      * The map method will be called for each instances of the annotation returned via this method.
@@ -51,6 +51,6 @@ public interface AnnotationRemapper {
      * @param visitorContext The context that is being visited
      * @return A list of zero or many annotations and values to map to
      */
-    @Nonnull List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext);
+    @NonNull List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext);
 
 }

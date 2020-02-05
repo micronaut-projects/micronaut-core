@@ -20,7 +20,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -116,7 +116,7 @@ public class ProxyHeaderParser {
     /**
      * @return The client addresses
      */
-    @Nonnull
+    @NonNull
     public List<String> getFor() {
         return forwardedFor;
     }

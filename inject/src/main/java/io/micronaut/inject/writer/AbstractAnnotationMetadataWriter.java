@@ -26,7 +26,7 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -92,7 +92,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      * @param classWriter The class writer
      * @return The generator adapter
      */
-    protected @Nonnull
+    protected @NonNull
     GeneratorAdapter beginAnnotationMetadataMethod(ClassWriter classWriter) {
         return startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
     }

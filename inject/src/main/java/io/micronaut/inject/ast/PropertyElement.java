@@ -17,7 +17,7 @@ package io.micronaut.inject.ast;
 
 import org.jetbrains.annotations.NotNull;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Optional;
 
 /**
@@ -31,7 +31,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
      * @return The type of the property
      */
     @NotNull
-    @Nonnull
+    @NonNull
     @Override
     ClassElement getType();
 

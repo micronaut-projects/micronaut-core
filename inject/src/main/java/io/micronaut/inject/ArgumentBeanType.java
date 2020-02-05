@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 
 /**
@@ -38,7 +38,7 @@ public final class ArgumentBeanType<T> implements BeanType<T>, Argument<T> {
      * Default constructor.
      * @param argument The argument
      */
-    public ArgumentBeanType(@Nonnull Argument<T> argument) {
+    public ArgumentBeanType(@NonNull Argument<T> argument) {
         ArgumentUtils.requireNonNull("argument", argument);
         this.argument = argument;
     }

@@ -31,7 +31,7 @@ import io.opentracing.noop.NoopTracer;
 import io.opentracing.propagation.Format;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * An HTTP server instrumentation filter that uses Open Tracing.
@@ -76,14 +76,14 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
             Tracer.SpanBuilder spanBuilder = newSpan(request, spanContext);
             return new TracingPublisher(responsePublisher, tracer, spanBuilder) {
                 @Override
-                protected void doOnSubscribe(@Nonnull Span span) {
+                protected void doOnSubscribe(@NonNull Span span) {
                     span.setTag(TAG_HTTP_SERVER, true);
                     request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
 
                 }
 
                 @Override
-                protected void doOnNext(@Nonnull Object object, @Nonnull Span span) {
+                protected void doOnNext(@NonNull Object object, @NonNull Span span) {
                     if (object instanceof HttpResponse) {
                         HttpResponse<?> response = (HttpResponse<?>) object;
                         tracer.inject(

@@ -1,9 +1,10 @@
 package io.micronaut.docs.ioc.validation.custom;
 
 // tag::imports[]
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.validation.validator.constraints.*;
-import javax.annotation.*;
 // end::imports[]
 
 // tag::class[]
@@ -11,8 +12,8 @@ public class DurationPatternValidator implements ConstraintValidator<DurationPat
     @Override
     public boolean isValid(
             @Nullable CharSequence value,
-            @Nonnull AnnotationValue<DurationPattern> annotationMetadata,
-            @Nonnull ConstraintValidatorContext context) {
+            @NonNull AnnotationValue<DurationPattern> annotationMetadata,
+            @NonNull ConstraintValidatorContext context) {
         return value == null || value.toString().matches("^PT?[\\d]+[SMHD]{1}$");
     }
 }

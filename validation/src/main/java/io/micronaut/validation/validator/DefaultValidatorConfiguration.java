@@ -25,8 +25,8 @@ import io.micronaut.validation.validator.extractors.DefaultValueExtractors;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 import io.micronaut.validation.validator.messages.DefaultValidationMessages;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.validation.*;
 import javax.validation.Validator;
@@ -63,7 +63,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     private boolean enabled = true;
 
     @Override
-    @Nonnull
+    @NonNull
     public ConstraintValidatorRegistry getConstraintValidatorRegistry() {
         if (constraintValidatorRegistry != null) {
             return constraintValidatorRegistry;
@@ -99,7 +99,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public ValueExtractorRegistry getValueExtractorRegistry() {
         if (valueExtractorRegistry != null) {
             return valueExtractorRegistry;
@@ -119,7 +119,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public ClockProvider getClockProvider() {
         if (clockProvider != null) {
             return clockProvider;
@@ -140,7 +140,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public TraversableResolver getTraversableResolver() {
         if (traversableResolver != null) {
             return traversableResolver;
@@ -171,7 +171,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public MessageSource getMessageSource() {
         if (messageSource != null) {
             return messageSource;
@@ -192,7 +192,7 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public ExecutionHandleLocator getExecutionHandleLocator() {
         if (executionHandleLocator != null) {
             return executionHandleLocator;

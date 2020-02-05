@@ -17,8 +17,8 @@ package io.micronaut.http;
 
 import io.micronaut.http.cookie.Cookies;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
@@ -40,28 +40,28 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * @return The {@link Cookies} instance
      */
-    @Nonnull Cookies getCookies();
+    @NonNull Cookies getCookies();
 
     /**
      * @return The HTTP parameters contained with the URI query string
      */
-    @Nonnull HttpParameters getParameters();
+    @NonNull HttpParameters getParameters();
 
     /**
      * @return The request method
      */
-    @Nonnull HttpMethod getMethod();
+    @NonNull HttpMethod getMethod();
 
     /**
      * @return The full request URI
      */
-    @Nonnull URI getUri();
+    @NonNull URI getUri();
 
     /**
      *
      * @return The name of the method (same as {@link HttpMethod} value for standard http methods).
      */
-    default @Nonnull String getMethodName() {
+    default @NonNull String getMethodName() {
         return getMethod().name();
     }
 
@@ -71,7 +71,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The principal
      * @since 1.0.4
      */
-    default @Nonnull Optional<Principal> getUserPrincipal() {
+    default @NonNull Optional<Principal> getUserPrincipal() {
         return getAttribute(HttpAttributes.PRINCIPAL, Principal.class);
     }
 
@@ -83,28 +83,28 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @param <T> The principal type
      * @since 1.0.4
      */
-    default @Nonnull <T extends Principal> Optional<T> getUserPrincipal(Class<T> principalType) {
+    default @NonNull <T extends Principal> Optional<T> getUserPrincipal(Class<T> principalType) {
         return getAttribute(HttpAttributes.PRINCIPAL, principalType);
     }
 
     /**
      * @return Get the path without any parameters
      */
-    default @Nonnull String getPath() {
+    default @NonNull String getPath() {
         return getUri().getPath();
     }
 
     /**
      * @return Obtain the remote address
      */
-    default @Nonnull InetSocketAddress getRemoteAddress() {
+    default @NonNull InetSocketAddress getRemoteAddress() {
         return getServerAddress();
     }
 
     /**
      * @return Obtain the server address
      */
-    default @Nonnull InetSocketAddress getServerAddress() {
+    default @NonNull InetSocketAddress getServerAddress() {
         String host = getUri().getHost();
         int port = getUri().getPort();
         return new InetSocketAddress(host != null ? host : "localhost", port > -1 ? port : 80);

@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import kotlin.coroutines.intrinsics.IntrinsicsKt;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * <p>Internal Utility methods for working with Kotlin <code>suspend</code> functions</p>.

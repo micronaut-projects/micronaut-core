@@ -26,8 +26,8 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
@@ -56,7 +56,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @return Run this {@link Micronaut}
      */
     @Override
-    public @Nonnull ApplicationContext start() {
+    public @NonNull ApplicationContext start() {
         long start = System.currentTimeMillis();
         ApplicationContext applicationContext = super.build();
 
@@ -157,12 +157,12 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public @Nonnull Micronaut include(@Nullable String... configurations) {
+    public @NonNull Micronaut include(@Nullable String... configurations) {
         return (Micronaut) super.include(configurations);
     }
 
     @Override
-    public @Nonnull Micronaut exclude(@Nullable String... configurations) {
+    public @NonNull Micronaut exclude(@Nullable String... configurations) {
         return (Micronaut) super.exclude(configurations);
     }
 
@@ -172,7 +172,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @param classes The application
      * @return The classes
      */
-    public @Nonnull Micronaut classes(@Nullable Class... classes) {
+    public @NonNull Micronaut classes(@Nullable Class... classes) {
         if (classes != null) {
             for (Class aClass : classes) {
                 packages(aClass.getPackage().getName());
@@ -182,57 +182,57 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public @Nonnull Micronaut properties(@Nullable Map<String, Object> properties) {
+    public @NonNull Micronaut properties(@Nullable Map<String, Object> properties) {
         return (Micronaut) super.properties(properties);
     }
 
     @Override
-    public @Nonnull Micronaut singletons(Object... beans) {
+    public @NonNull Micronaut singletons(Object... beans) {
         return (Micronaut) super.singletons(beans);
     }
 
     @Override
-    public @Nonnull Micronaut propertySources(@Nullable PropertySource... propertySources) {
+    public @NonNull Micronaut propertySources(@Nullable PropertySource... propertySources) {
         return (Micronaut) super.propertySources(propertySources);
     }
 
     @Override
-    public @Nonnull Micronaut environmentPropertySource(boolean environmentPropertySource) {
+    public @NonNull Micronaut environmentPropertySource(boolean environmentPropertySource) {
         return (Micronaut) super.environmentPropertySource(environmentPropertySource);
     }
 
     @Override
-    public @Nonnull Micronaut environmentVariableIncludes(@Nullable String... environmentVariables) {
+    public @NonNull Micronaut environmentVariableIncludes(@Nullable String... environmentVariables) {
         return (Micronaut) super.environmentVariableIncludes(environmentVariables);
     }
 
     @Override
-    public @Nonnull Micronaut environmentVariableExcludes(@Nullable String... environmentVariables) {
+    public @NonNull Micronaut environmentVariableExcludes(@Nullable String... environmentVariables) {
         return (Micronaut) super.environmentVariableExcludes(environmentVariables);
     }
 
     @Override
-    public @Nonnull Micronaut mainClass(Class mainClass) {
+    public @NonNull Micronaut mainClass(Class mainClass) {
         return (Micronaut) super.mainClass(mainClass);
     }
 
     @Override
-    public @Nonnull Micronaut classLoader(ClassLoader classLoader) {
+    public @NonNull Micronaut classLoader(ClassLoader classLoader) {
         return (Micronaut) super.classLoader(classLoader);
     }
 
     @Override
-    public @Nonnull Micronaut args(@Nullable String... args) {
+    public @NonNull Micronaut args(@Nullable String... args) {
         return (Micronaut) super.args(args);
     }
 
     @Override
-    public @Nonnull Micronaut environments(@Nullable String... environments) {
+    public @NonNull Micronaut environments(@Nullable String... environments) {
         return (Micronaut) super.environments(environments);
     }
 
     @Override
-    public @Nonnull Micronaut packages(@Nullable String... packages) {
+    public @NonNull Micronaut packages(@Nullable String... packages) {
         return (Micronaut) super.packages(packages);
     }
 

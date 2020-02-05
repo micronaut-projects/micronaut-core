@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.util;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * Utility methods for checking method argument values.
@@ -33,7 +33,7 @@ public class ArgumentUtils {
      * @throws IllegalArgumentException if the argument is not positive
      * @return The value
      */
-    public static @Nonnull Number requirePositive(String name, Number value) {
+    public static @NonNull Number requirePositive(String name, Number value) {
         requireNonNull(name, value);
         requirePositive(name, value.intValue());
         return value;

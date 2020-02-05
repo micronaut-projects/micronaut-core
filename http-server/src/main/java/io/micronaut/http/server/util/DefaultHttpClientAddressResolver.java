@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Singleton;
 import java.util.List;
 
@@ -44,7 +44,7 @@ public class DefaultHttpClientAddressResolver implements HttpClientAddressResolv
     }
 
     @Override
-    public String resolve(@Nonnull HttpRequest request) {
+    public String resolve(@NonNull HttpRequest request) {
         String configuredHeader = serverConfiguration.getClientAddressHeader();
         if (configuredHeader != null) {
             return request.getHeaders().get(configuredHeader);

@@ -19,8 +19,8 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
@@ -85,7 +85,7 @@ public abstract class ConfigurationMetadataBuilder<T> {
      * @param annotationMetadata the annotation metadata
      * @return This {@link ConfigurationMetadata}
      */
-    public ConfigurationMetadata visitProperties(T type, @Nullable String description, @Nonnull AnnotationMetadata annotationMetadata) {
+    public ConfigurationMetadata visitProperties(T type, @Nullable String description, @NonNull AnnotationMetadata annotationMetadata) {
         String path = buildTypePath(type, type, annotationMetadata);
         ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
         configurationMetadata.name = NameUtils.hyphenate(path, true);

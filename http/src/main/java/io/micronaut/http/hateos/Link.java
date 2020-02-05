@@ -17,7 +17,7 @@ package io.micronaut.http.hateos;
 
 import io.micronaut.http.MediaType;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URI;
 
 /**

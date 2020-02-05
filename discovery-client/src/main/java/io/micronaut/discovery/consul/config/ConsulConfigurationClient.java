@@ -44,7 +44,7 @@ import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;

@@ -15,8 +15,9 @@
  */
 package io.micronaut.core.annotation;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * An interface for types capable of resolving {@link AnnotationMetadata}.
@@ -38,7 +39,7 @@ public interface AnnotationMetadataResolver {
      * @param type The type
      * @return The {@link AnnotationMetadata}
      */
-    default @Nonnull AnnotationMetadata resolveMetadata(@Nullable Class<?> type) {
+    default @NonNull AnnotationMetadata resolveMetadata(@Nullable Class<?> type) {
         return AnnotationMetadata.EMPTY_METADATA;
     }
 
@@ -48,7 +49,7 @@ public interface AnnotationMetadataResolver {
      * @param object The object
      * @return The {@link AnnotationMetadata}
      */
-    default @Nonnull AnnotationMetadata resolveMetadata(Object object) {
+    default @NonNull AnnotationMetadata resolveMetadata(Object object) {
         return resolveMetadata(object != null ? object.getClass() : null);
     }
 }

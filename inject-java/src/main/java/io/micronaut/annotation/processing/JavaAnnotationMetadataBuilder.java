@@ -25,8 +25,8 @@ import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
@@ -83,7 +83,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected void addError(@Nonnull Element originatingElement, @Nonnull String error) {
+    protected void addError(@NonNull Element originatingElement, @NonNull String error) {
         messager.printMessage(Diagnostic.Kind.ERROR, error, originatingElement);
     }
 
@@ -132,9 +132,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return annotationUtils.newVisitorContext();
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    protected RetentionPolicy getRetentionPolicy(@Nonnull Element annotation) {
+    protected RetentionPolicy getRetentionPolicy(@NonNull Element annotation) {
         final List<? extends AnnotationMirror> annotationMirrors = annotation.getAnnotationMirrors();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             final String annotationTypeName = getAnnotationTypeName(annotationMirror);
@@ -159,9 +159,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return element instanceof TypeElement || element instanceof ExecutableElement;
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    protected String getDeclaringType(@Nonnull Element element) {
+    protected String getDeclaringType(@NonNull Element element) {
         TypeElement typeElement = modelUtils.classElementFor(element);
         if (typeElement != null) {
             return typeElement.getQualifiedName().toString();

@@ -17,7 +17,7 @@ package io.micronaut.core.io.scan;
 
 import io.micronaut.core.io.ResourceLoader;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * Abstraction to load resources from the the classpath.

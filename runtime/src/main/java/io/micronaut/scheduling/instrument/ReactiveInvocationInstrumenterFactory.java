@@ -17,7 +17,7 @@ package io.micronaut.scheduling.instrument;
 
 import io.micronaut.core.annotation.Indexed;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * An factory interface for reactive invocation instrumentation, factory method decides if instrumentation is needed.
