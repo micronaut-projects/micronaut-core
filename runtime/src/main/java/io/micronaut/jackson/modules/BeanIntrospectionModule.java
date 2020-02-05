@@ -50,7 +50,6 @@ import io.micronaut.jackson.JacksonConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.lang.annotation.Annotation;

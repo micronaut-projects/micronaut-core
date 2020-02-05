@@ -80,7 +80,11 @@ public final class Parser {
      */
     public static Iterable<? extends Element> parse(JavaFileObject... sources) {
         JavaParser javaParser = new JavaParser();
-        return javaParser.parse(sources);
+        try {
+            return javaParser.parse(sources);
+        } finally {
+            javaParser.close();
+        }
     }
 
     /**
@@ -106,7 +110,12 @@ public final class Parser {
      * @param sources The sources
      */
     public static Iterable<? extends JavaFileObject> generate(JavaFileObject... sources) {
-        return new JavaParser().generate(sources);
+        final JavaParser javaParser = new JavaParser();
+        try {
+            return javaParser.generate(sources);
+        } finally {
+            javaParser.close();
+        }
     }
 
     private static boolean isTrue(Boolean p) {

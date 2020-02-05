@@ -44,11 +44,7 @@ import java.io.IOException;
 import java.util.*;
 import javax.annotation.processing.Processor;
 import javax.lang.model.element.Element;
-import javax.tools.Diagnostic;
-import javax.tools.DiagnosticCollector;
-import javax.tools.JavaCompiler;
-import javax.tools.JavaFileObject;
-import javax.tools.ToolProvider;
+import javax.tools.*;
 
 /** Methods to parse Java source files. */
 public final class Parser {
@@ -110,9 +106,10 @@ public final class Parser {
     public static Iterable<? extends JavaFileObject> generate(JavaFileObject... sources) {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
+        final StandardJavaFileManager standardFileManager = compiler.getStandardFileManager(diagnosticCollector, Locale.getDefault(), UTF_8);
         InMemoryJavaFileManager fileManager =
                 new InMemoryJavaFileManager(
-                        compiler.getStandardFileManager(diagnosticCollector, Locale.getDefault(), UTF_8));
+                        standardFileManager);
         Context context = new Context();
         JavacTask task =
                 ((JavacTool) compiler)
@@ -147,6 +144,18 @@ public final class Parser {
             return fileManager.getOutputFiles();
         } catch (IOException e) {
             throw new RuntimeException(e);
+        } finally {
+
+            try {
+                ((com.sun.tools.javac.main.JavaCompiler) compiler).close();
+            } catch (Exception e) {
+                // ignore
+            }
+            try {
+                standardFileManager.close();
+            } catch (IOException e) {
+                // ignore
+            }
         }
     }
     /**

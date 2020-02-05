@@ -28,6 +28,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.processing.Processor;
 import javax.lang.model.element.Element;
 import javax.tools.*;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
@@ -41,7 +42,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * @author graemerocher
  * @since 1.1
  */
-public class JavaParser {
+public class JavaParser implements Closeable {
 
     private final JavaCompiler compiler;
     private final InMemoryJavaFileManager fileManager;
@@ -207,4 +208,21 @@ public class JavaParser {
         return new TypeElementVisitorProcessor();
     }
 
+    @Override
+    public void close() {
+        if (compiler != null) {
+            try {
+                ((com.sun.tools.javac.main.JavaCompiler) compiler).close();
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+        if (fileManager != null) {
+            try {
+                fileManager.close();
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+    }
 }
