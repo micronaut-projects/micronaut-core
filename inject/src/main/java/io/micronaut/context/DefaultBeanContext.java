@@ -2710,8 +2710,13 @@ public class DefaultBeanContext implements BeanContext {
         if (candidate.isSingleton()) {
             synchronized (singletonObjects) {
                 try (BeanResolutionContext context = newResolutionContext(candidate, resolutionContext)) {
-                    bean = doCreateBean(context, candidate, qualifier, true, null);
-                    registerSingletonBean(candidate, beanType, bean, qualifier, singleCandidate);
+                    if (candidate instanceof NoInjectionBeanDefinition) {
+                        NoInjectionBeanDefinition noibd = (NoInjectionBeanDefinition) candidate;
+                        bean = (T) singletonObjects.get(new BeanKey(noibd.singletonClass, noibd.qualifier));
+                    } else {
+                        bean = doCreateBean(context, candidate, qualifier, true, null);
+                        registerSingletonBean(candidate, beanType, bean, qualifier, singleCandidate);
+                    }
                 }
             }
         } else {
