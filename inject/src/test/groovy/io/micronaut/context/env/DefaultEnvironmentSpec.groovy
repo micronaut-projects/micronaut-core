@@ -232,7 +232,6 @@ class DefaultEnvironmentSpec extends Specification {
         System.clearProperty("foo.bar")
         System.clearProperty("foo.baz")
         System.clearProperty("micronaut.config.files")
-
     }
 
     void "test loading property sources from both system and env"() {
@@ -269,6 +268,17 @@ class DefaultEnvironmentSpec extends Specification {
         System.clearProperty("foo.test")
         System.clearProperty("foo.baz")
         System.clearProperty("micronaut.config.files")
+    }
+
+    @RestoreSystemProperties
+    void "test invalid config file location"() {
+        when: "loading properties sources from both system properties and environment variables"
+        System.setProperty("micronaut.config.files", "/does/not/exist.yaml")
+        new DefaultEnvironment("test").start()
+
+        then:
+        def ex = thrown(ConfigurationException)
+        ex.message == "Failed to read configuration file: /does/not/exist.yaml"
     }
 
     def "constructor(String... names) should preserve order specified in micronaut.environments system property"() {

@@ -34,3 +34,7 @@ cars:
 Requesting a single instance of that bean would result in the "ford" instance being injected. Because that behavior is surprising and inconsistent with other types of beans, that is no longer the case and a `NonUniqueBeanException` will be thrown.
 
 NOTE: This change does not apply to an explicit primary defined in the annotation (`@EachProperty(value = "cars", primary = "ford")`), nor requesting the instance by a qualifier (`@Named("ford") CarConfig carConfig`).
+
+=== Invalid Configuration File Locations
+
+Specifying a file with `micronaut.config.files`, either through the system property or environment variable, that does not exist or cannot be read will now result in the application failing to startup. In previous version of Micronaut a warning would be logged and the file would be ignored.
