@@ -28,6 +28,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.HttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.inject.BeanDefinition;
@@ -93,9 +94,7 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
         if (!(provider instanceof ParametrizedProvider)) {
             throw new DependencyInjectionException(resolutionContext, argument, "ClientScope called with invalid bean provider");
         }
-        String value = annotation.stringValue().orElseThrow(() ->
-                new DependencyInjectionException(resolutionContext, argument, "No value specified for @Client")
-        );
+        String value = annotation.stringValue().orElse(null);
 
         AnnotationMetadata metadata = argument.getAnnotationMetadata();
         Optional<AnnotationValue> filterAnnotation = metadata
@@ -105,17 +104,33 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
         //noinspection unchecked
         return (T) clients.computeIfAbsent(new ClientKey(identifier, value, filterAnnotation.orElse(null)), clientKey -> {
             String path = annotation.get("path", String.class).orElse(null);
-            HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(value)).orElse(null);
+            HttpClient clientBean = null;
+            if (value != null) {
+                clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(value)).orElse(null);
+            }
             Optional<Class<?>> configurationClass = annotation.classValue("configuration");
 
             if (clientBean != null && path == null && !configurationClass.isPresent() && !filterAnnotation.isPresent()) {
                 return clientBean;
             }
 
-            LoadBalancer loadBalancer = loadBalancerResolver.resolve(value)
-                    .orElseThrow(() ->
-                            new DependencyInjectionException(resolutionContext, argument, "Invalid service reference [" + value + "] specified to @Client")
-                    );
+            LoadBalancer loadBalancer = null;
+            Optional<HttpClientConfiguration> clientSpecificConfig;
+            Collection<String> clientIdentifiers;
+
+            if (value != null) {
+                clientSpecificConfig = beanContext.findBean(
+                        HttpClientConfiguration.class,
+                        Qualifiers.byName(value)
+                );
+                loadBalancer = loadBalancerResolver.resolve(value)
+                        .orElseThrow(() ->
+                                new DependencyInjectionException(resolutionContext, argument, "Invalid service reference [" + value + "] specified to @Client"));
+                clientIdentifiers = Collections.singletonList(value);
+            } else {
+                clientSpecificConfig = Optional.empty();
+                clientIdentifiers = Collections.emptyList();
+            }
 
             String contextPath = null;
             if (StringUtils.isNotEmpty(path)) {
@@ -129,10 +144,6 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
             }
 
             HttpClientConfiguration configuration;
-            Optional<HttpClientConfiguration> clientSpecificConfig = beanContext.findBean(
-                    HttpClientConfiguration.class,
-                    Qualifiers.byName(value)
-            );
             Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>) configurationClass.orElse(HttpClientConfiguration.class);
             configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
 
@@ -141,7 +152,7 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
             }
 
             HttpClientFilterResolver filterResolver = beanContext.createBean(HttpClientFilterResolver.class,
-                    Collections.singleton(value),
+                    clientIdentifiers,
                     filterAnnotation.orElse(null));
 
             return (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration, contextPath, filterResolver);

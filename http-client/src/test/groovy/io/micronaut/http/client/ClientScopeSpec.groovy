@@ -24,6 +24,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
+import io.micronaut.http.client.exceptions.NoHostException
 import io.micronaut.jackson.annotation.JacksonFeatures
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Get
@@ -137,6 +138,34 @@ class ClientScopeSpec extends Specification {
         client.name() == "success"
     }
 
+    void "test no base path with the declarative client"() {
+        NoBasePathService client = context.getBean(NoBasePathService)
+
+        expect:
+        client.name("http://localhost:${port}/scope") == "success"
+
+        when:
+        client.name("/scope")
+
+        then:
+        def ex = thrown(NoHostException)
+        ex.message == "Request URI specifies no host to connect to"
+    }
+
+    void "test no base path with client scope"() {
+        RxHttpClient client = context.getBean(MyService).noIdClient
+
+        expect:
+        client.toBlocking().retrieve("http://localhost:${port}/scope") == "success"
+
+        when:
+        client.toBlocking().retrieve("/scope")
+
+        then:
+        def ex = thrown(NoHostException)
+        ex.message == "Request URI specifies no host to connect to"
+    }
+
     @Controller('/scope')
     static class ScopeController {
         @Get(produces = MediaType.TEXT_PLAIN)
@@ -156,6 +185,9 @@ class ClientScopeSpec extends Specification {
 
         @Inject @Client(id = 'myService', path = '/scope')
         RxHttpClient pathClient
+
+        @Inject @Client
+        RxHttpClient noIdClient
 
         String get() {
             rxHttpClient != null
@@ -228,5 +260,13 @@ class ClientScopeSpec extends Specification {
 
         @Get
         String name()
+    }
+
+    @Requires(property = 'spec.name', value = "ClientScopeSpec")
+    @Client
+    static interface NoBasePathService {
+
+        @Get("{+uri}")
+        String name(String uri)
     }
 }
