@@ -774,7 +774,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 Class argumentType;
                 boolean isCollection = false;
                 if (Collection.class.isAssignableFrom(argument.getType())) {
-                    argumentType = argument.getFirstTypeVariable().map(Argument::getType).orElse((Class)Object.class);
+                    argumentType = argument.getFirstTypeVariable().map(Argument::getType).orElse((Class) Object.class);
                     isCollection = true;
                 } else {
                     argumentType = argument.getType();
@@ -1222,7 +1222,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 Class argumentType;
                 boolean isCollection = false;
                 if (Collection.class.isAssignableFrom(injectionPoint.getType())) {
-                    argumentType = fieldArgument.getFirstTypeVariable().map(Argument::getType).orElse((Class)Object.class);
+                    argumentType = fieldArgument.getFirstTypeVariable().map(Argument::getType).orElse((Class) Object.class);
                     isCollection = true;
                 } else {
                     argumentType = fieldArgument.getType();
