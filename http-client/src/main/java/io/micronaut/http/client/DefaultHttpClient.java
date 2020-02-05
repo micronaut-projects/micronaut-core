@@ -350,7 +350,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      *
      */
     public DefaultHttpClient() {
-        this((LoadBalancer)null, new DefaultHttpClientConfiguration());
+        this((LoadBalancer) null, new DefaultHttpClientConfiguration());
     }
 
     /**

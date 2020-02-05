@@ -28,7 +28,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
-import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.HttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.inject.BeanDefinition;
