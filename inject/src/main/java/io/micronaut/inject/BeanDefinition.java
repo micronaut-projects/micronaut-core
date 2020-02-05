@@ -22,8 +22,8 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
@@ -176,7 +176,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      *
      * @return The type arguments
      */
-    default @Nonnull List<Argument<?>> getTypeArguments() {
+    default @NonNull List<Argument<?>> getTypeArguments() {
         return getTypeArguments(getBeanType());
     }
 
@@ -186,7 +186,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @param type The super class or interface type
      * @return The type arguments
      */
-    default @Nonnull List<Argument<?>> getTypeArguments(Class<?> type) {
+    default @NonNull List<Argument<?>> getTypeArguments(Class<?> type) {
         if (type == null) {
             return Collections.emptyList();
         }
@@ -198,7 +198,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @param type The type
      * @return The type parameters
      */
-    default @Nonnull Class[] getTypeParameters(@Nullable Class<?> type) {
+    default @NonNull Class[] getTypeParameters(@Nullable Class<?> type) {
         if (type == null) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         } else {
@@ -213,7 +213,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      *
      * @return The type parameters for the bean type as a class array.
      */
-    default @Nonnull Class[] getTypeParameters() {
+    default @NonNull Class[] getTypeParameters() {
         return getTypeParameters(getBeanType());
     }
 
@@ -223,7 +223,7 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      * @param type The super class or interface type
      * @return The type arguments
      */
-    default @Nonnull List<Argument<?>> getTypeArguments(String type) {
+    default @NonNull List<Argument<?>> getTypeArguments(String type) {
         return Collections.emptyList();
     }
 

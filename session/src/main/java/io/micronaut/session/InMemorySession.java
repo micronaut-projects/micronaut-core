@@ -18,7 +18,7 @@ package io.micronaut.session;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -68,13 +68,13 @@ public class InMemorySession implements Session {
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public String getId() {
         return id;
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public Instant getLastAccessedTime() {
         return lastAccessTime;
     }
@@ -111,7 +111,7 @@ public class InMemorySession implements Session {
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public Instant getCreationTime() {
         return creationTime;
     }

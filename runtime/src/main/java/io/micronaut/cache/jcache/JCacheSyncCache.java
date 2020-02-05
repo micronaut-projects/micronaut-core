@@ -20,7 +20,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.cache.Cache;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -46,7 +46,7 @@ class JCacheSyncCache implements SyncCache<Cache> {
      * @param ioExecutor The IO executor
      */
     JCacheSyncCache(
-            @Nonnull Cache<?, ?> nativeCache,
+            @NonNull Cache<?, ?> nativeCache,
             ConversionService<?> conversionService,
             ExecutorService ioExecutor) {
         ArgumentUtils.requireNonNull("nativeCache", nativeCache);

@@ -18,7 +18,7 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.value.ValueResolver;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.*;
 
 /**
@@ -36,7 +36,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An {@link Optional} of the enum value
      * @param <E> The enum type
      */
-    <E extends Enum> Optional<E> enumValue(@Nonnull String member, @Nonnull Class<E> enumType);
+    <E extends Enum> Optional<E> enumValue(@NonNull String member, @NonNull Class<E> enumType);
 
     /**
      * Return the enum value of the given member of the given enum type.
@@ -45,7 +45,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An {@link Optional} of the enum value
      * @param <E> The enum type
      */
-    default <E extends Enum> Optional<E> enumValue(@Nonnull Class<E> enumType) {
+    default <E extends Enum> Optional<E> enumValue(@NonNull Class<E> enumType) {
         return enumValue(AnnotationMetadata.VALUE_MEMBER, enumType);
     }
 
@@ -57,7 +57,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An {@link Optional} of the enum value
      * @param <E> The enum type
      */
-    <E extends Enum> E[] enumValues(@Nonnull String member, @Nonnull Class<E> enumType);
+    <E extends Enum> E[] enumValues(@NonNull String member, @NonNull Class<E> enumType);
 
     /**
      * Return the enum value of the given member of the given enum type.
@@ -66,7 +66,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An {@link Optional} of the enum value
      * @param <E> The enum type
      */
-    default <E extends Enum> E[] enumValues(@Nonnull Class<E> enumType) {
+    default <E extends Enum> E[] enumValues(@NonNull Class<E> enumType) {
         return enumValues(AnnotationMetadata.VALUE_MEMBER, enumType);
     }
 
@@ -85,14 +85,14 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An {@link Optional} class
      */
-    Optional<Class<?>> classValue(@Nonnull String member);
+    Optional<Class<?>> classValue(@NonNull String member);
 
     /**
      * The value of the annotation as a Class.
      *
      * @return An array of classes
      */
-    @Nonnull
+    @NonNull
     default Class<?>[] classValues() {
         return classValues(AnnotationMetadata.VALUE_MEMBER);
     }
@@ -103,7 +103,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An array of classes
      */
-    @Nonnull Class<?>[] classValues(@Nonnull String member);
+    @NonNull Class<?>[] classValues(@NonNull String member);
 
 
     /**
@@ -113,7 +113,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An array of class values
      */
-    @Nonnull AnnotationClassValue<?>[] annotationClassValues(@Nonnull String member);
+    @NonNull AnnotationClassValue<?>[] annotationClassValues(@NonNull String member);
 
     /**
      * The {@link AnnotationClassValue} instance for the given member.
@@ -121,7 +121,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An annotation class value
      */
-    Optional<AnnotationClassValue<?>> annotationClassValue(@Nonnull String member);
+    Optional<AnnotationClassValue<?>> annotationClassValue(@NonNull String member);
 
     /**
      * The integer value of the given member.
@@ -129,7 +129,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An {@link OptionalInt}
      */
-    OptionalInt intValue(@Nonnull String member);
+    OptionalInt intValue(@NonNull String member);
 
     /**
      * The integer value of the given member.
@@ -146,7 +146,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An {@link OptionalLong}
      */
-    OptionalLong longValue(@Nonnull String member);
+    OptionalLong longValue(@NonNull String member);
 
     /**
      * The integer value of the given member.
@@ -163,7 +163,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An {@link OptionalDouble}
      */
-    OptionalDouble doubleValue(@Nonnull String member);
+    OptionalDouble doubleValue(@NonNull String member);
 
     /**
      * The double value of the given member.
@@ -180,7 +180,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An {@link OptionalInt}
      */
-    Optional<String> stringValue(@Nonnull String member);
+    Optional<String> stringValue(@NonNull String member);
 
     /**
      * The string value of the given member.
@@ -197,7 +197,7 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An {@link Optional} boolean
      */
-    Optional<Boolean> booleanValue(@Nonnull String member);
+    Optional<Boolean> booleanValue(@NonNull String member);
 
     /**
      * The Boolean value of the given member.
@@ -215,14 +215,14 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @param member The annotation member
      * @return An {@link OptionalInt}
      */
-    @Nonnull String[] stringValues(@Nonnull String member);
+    @NonNull String[] stringValues(@NonNull String member);
 
     /**
      * The double value of the given member.
      *
      * @return An {@link OptionalInt}
      */
-    default @Nonnull String[] stringValues() {
+    default @NonNull String[] stringValues() {
         return stringValues(AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -269,11 +269,11 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
      * @return An {@link Optional} class
      * @param <T> The required type
      */
-    <T> Optional<Class<? extends T>> classValue(@Nonnull String member, @Nonnull Class<T> requiredType);
+    <T> Optional<Class<? extends T>> classValue(@NonNull String member, @NonNull Class<T> requiredType);
 
     /**
      * @return The attribute values
      */
-    @Nonnull
+    @NonNull
     Map<CharSequence, Object> getValues();
 }

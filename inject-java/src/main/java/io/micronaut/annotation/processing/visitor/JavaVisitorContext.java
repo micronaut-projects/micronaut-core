@@ -32,8 +32,8 @@ import io.micronaut.inject.util.VisitorContextUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -108,9 +108,9 @@ public class JavaVisitorContext implements VisitorContext {
         this.processingEnv = processingEnv;
     }
 
-    @Nonnull
+    @NonNull
     @Override
-    public Iterable<URL> getClasspathResources(@Nonnull String path) {
+    public Iterable<URL> getClasspathResources(@NonNull String path) {
         // reflective hack required because no way to get the JavaFileManager
         // from public processor API
         info("EXPERIMENTAL: Compile time resource scanning is experimental", null);
@@ -140,8 +140,8 @@ public class JavaVisitorContext implements VisitorContext {
     }
 
     @Override
-    public @Nonnull
-    ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
+    public @NonNull
+    ClassElement[] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
         ArgumentUtils.requireNonNull("aPackage", aPackage);
         ArgumentUtils.requireNonNull("stereotypes", stereotypes);
         final PackageElement packageElement = elements.getPackageElement(aPackage);
@@ -320,7 +320,7 @@ public class JavaVisitorContext implements VisitorContext {
         return visitorAttributes.get(name, conversionContext);
     }
 
-    private void populateClassElements(@Nonnull String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
+    private void populateClassElements(@NonNull String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
         final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
 
         for (Element enclosedElement : enclosedElements) {

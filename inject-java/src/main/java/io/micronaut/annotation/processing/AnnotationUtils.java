@@ -27,7 +27,7 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;

@@ -23,8 +23,8 @@ package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Singleton;
 import javax.validation.constraints.Email;
 import java.util.regex.Matcher;
@@ -58,8 +58,8 @@ public class EmailValidator extends AbstractPatternValidator<Email> {
     @Override
     public boolean isValid(
             @Nullable CharSequence value,
-            @Nonnull AnnotationValue<Email> annotationMetadata,
-            @Nonnull ConstraintValidatorContext context) {
+            @NonNull AnnotationValue<Email> annotationMetadata,
+            @NonNull ConstraintValidatorContext context) {
         if (value == null) {
             return true;
         }

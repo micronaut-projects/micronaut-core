@@ -34,7 +34,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.Map;
@@ -128,7 +128,7 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
         return Optional.ofNullable(bean);
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public RequestCustomScope stop() {
         ServerRequestContext.currentRequest().ifPresent(this::destroyBeans);

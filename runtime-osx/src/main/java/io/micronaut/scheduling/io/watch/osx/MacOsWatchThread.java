@@ -27,7 +27,7 @@ import io.micronaut.scheduling.io.watch.DefaultWatchThread;
 import io.micronaut.scheduling.io.watch.FileWatchCondition;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -63,7 +63,7 @@ public class MacOsWatchThread extends DefaultWatchThread {
     }
 
     @Override
-    protected @Nonnull WatchKey registerPath(@Nonnull Path dir) throws IOException {
+    protected @NonNull WatchKey registerPath(@NonNull Path dir) throws IOException {
         WatchablePath watchPath = new WatchablePath(dir);
         return watchPath.register(
                 getWatchService(),

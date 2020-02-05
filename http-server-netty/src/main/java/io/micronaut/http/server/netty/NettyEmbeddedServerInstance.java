@@ -27,7 +27,7 @@ import io.micronaut.discovery.metadata.ServiceInstanceMetadataContributor;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.List;

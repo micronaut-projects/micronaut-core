@@ -18,7 +18,7 @@ package io.micronaut.scheduling.io.watch.event;
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.concurrent.Immutable;
 import java.nio.file.Path;
 import java.nio.file.WatchEvent;
@@ -41,7 +41,7 @@ public class FileChangedEvent extends ApplicationEvent {
      * @param path The path
      * @param eventType The event type
      */
-    public FileChangedEvent(@Nonnull Path path, @Nonnull WatchEventType eventType) {
+    public FileChangedEvent(@NonNull Path path, @NonNull WatchEventType eventType) {
         super(path);
         ArgumentUtils.requireNonNull("path", path);
         ArgumentUtils.requireNonNull("eventType", eventType);
@@ -55,12 +55,12 @@ public class FileChangedEvent extends ApplicationEvent {
      * @param path The path
      * @param eventType The event type
      */
-    public FileChangedEvent(@Nonnull Path path, @Nonnull WatchEvent.Kind eventType) {
+    public FileChangedEvent(@NonNull Path path, @NonNull WatchEvent.Kind eventType) {
         this(path, WatchEventType.of(eventType));
     }
 
     @Override
-    public @Nonnull Path getSource() {
+    public @NonNull Path getSource() {
         return (Path) super.getSource();
     }
 
@@ -69,7 +69,7 @@ public class FileChangedEvent extends ApplicationEvent {
      *
      * @return The path
      */
-    public @Nonnull Path getPath() {
+    public @NonNull Path getPath() {
         return path;
     }
 
@@ -77,7 +77,7 @@ public class FileChangedEvent extends ApplicationEvent {
      * The watch event type.
      * @return The event type
      */
-    public @Nonnull WatchEventType getEventType() {
+    public @NonNull WatchEventType getEventType() {
         return eventType;
     }
 }

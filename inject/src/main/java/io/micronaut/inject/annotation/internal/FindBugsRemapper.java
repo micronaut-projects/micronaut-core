@@ -23,7 +23,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.annotation.AnnotationRemapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Collections;
 import java.util.List;
 
@@ -37,12 +37,12 @@ import java.util.List;
 public final class FindBugsRemapper implements AnnotationRemapper {
 
     @Override
-    @Nonnull public String getPackageName() {
+    @NonNull public String getPackageName() {
         return "edu.umd.cs.findbugs.annotations";
     }
 
     @Override
-    @Nonnull public List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
+    @NonNull public List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
         String simpleName = NameUtils.getSimpleName(annotation.getAnnotationName());
         if ("nullable".equalsIgnoreCase(simpleName)) {
             return Collections.singletonList(

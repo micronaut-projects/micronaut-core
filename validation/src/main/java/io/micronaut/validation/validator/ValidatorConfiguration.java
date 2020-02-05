@@ -20,7 +20,7 @@ import io.micronaut.context.MessageSource;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.concurrent.Immutable;
 import javax.validation.ClockProvider;
 import javax.validation.TraversableResolver;
@@ -47,37 +47,37 @@ public interface ValidatorConfiguration {
     /**
      * @return The constraint registry to use.
      */
-    @Nonnull
+    @NonNull
     ConstraintValidatorRegistry getConstraintValidatorRegistry();
 
     /**
      * @return The value extractor registry
      */
-    @Nonnull
+    @NonNull
     ValueExtractorRegistry getValueExtractorRegistry();
 
     /**
      * @return The clock provider
      */
-    @Nonnull
+    @NonNull
     ClockProvider getClockProvider();
 
     /**
      * @return The traversable resolver to use
      */
-    @Nonnull
+    @NonNull
     TraversableResolver getTraversableResolver();
 
     /**
      * @return The message source
      */
-    @Nonnull
+    @NonNull
     MessageSource getMessageSource();
 
     /**
      * The execution handler locator to use.
      * @return The locator
      */
-    @Nonnull
+    @NonNull
     ExecutionHandleLocator getExecutionHandleLocator();
 }

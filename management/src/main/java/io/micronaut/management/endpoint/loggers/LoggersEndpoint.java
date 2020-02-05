@@ -24,7 +24,7 @@ import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.management.endpoint.annotation.Write;
 import io.reactivex.Single;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.validation.constraints.NotBlank;
 import java.util.Map;
 

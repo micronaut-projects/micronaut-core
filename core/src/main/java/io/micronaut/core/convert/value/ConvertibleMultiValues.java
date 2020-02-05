@@ -21,7 +21,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;

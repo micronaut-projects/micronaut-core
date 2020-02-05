@@ -35,7 +35,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
@@ -413,7 +413,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @param type The element type
      * @return The type
      */
-    protected Type getTypeForElement(@Nonnull TypedElement type) {
+    protected Type getTypeForElement(@NonNull TypedElement type) {
         Type propertyType;
         final Optional<Class> pt;
         final String typeName = type.getName();

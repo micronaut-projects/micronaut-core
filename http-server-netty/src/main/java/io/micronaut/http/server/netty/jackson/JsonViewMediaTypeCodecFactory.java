@@ -25,8 +25,8 @@ import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.Map;
@@ -73,7 +73,7 @@ public class JsonViewMediaTypeCodecFactory implements JsonViewCodecResolver {
      * @return The codec
      */
     @Override
-    public @Nonnull JsonMediaTypeCodec resolveJsonViewCodec(@Nonnull Class<?> viewClass) {
+    public @NonNull JsonMediaTypeCodec resolveJsonViewCodec(@NonNull Class<?> viewClass) {
         ArgumentUtils.requireNonNull("viewClass", viewClass);
         JsonMediaTypeCodec codec = jsonViewCodecs.get(viewClass);
         if (codec == null) {

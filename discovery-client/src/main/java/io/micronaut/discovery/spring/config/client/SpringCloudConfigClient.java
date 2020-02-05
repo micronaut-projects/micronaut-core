@@ -23,8 +23,8 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * A non-blocking HTTP client for Spring Cloud Config Client.
@@ -52,7 +52,7 @@ public interface SpringCloudConfigClient {
             delay = "${" + SpringCloudClientConfiguration.SpringConfigDiscoveryConfiguration.PREFIX + ".retry-delay:1s}"
     )
     Publisher<ConfigServerResponse> readValues(
-            @Nonnull String applicationName,
+            @NonNull String applicationName,
             @Nullable String profiles);
 
     /**
@@ -70,7 +70,7 @@ public interface SpringCloudConfigClient {
             delay = "${" + SpringCloudClientConfiguration.SpringConfigDiscoveryConfiguration.PREFIX + ".retry-delay:1s}"
     )
     Publisher<ConfigServerResponse> readValues(
-            @Nonnull String applicationName,
+            @NonNull String applicationName,
             @Nullable String profiles,
             @Nullable String label);
 

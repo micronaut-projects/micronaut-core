@@ -24,7 +24,7 @@ import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Map;

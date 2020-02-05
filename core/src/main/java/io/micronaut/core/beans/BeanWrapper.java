@@ -25,8 +25,8 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Collection;
 import java.util.Optional;
 
@@ -42,19 +42,19 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
     /**
      * @return The introspection.
      */
-    @Nonnull BeanIntrospection<T> getIntrospection();
+    @NonNull BeanIntrospection<T> getIntrospection();
 
     /**
      * @return The bean;
      */
-    @Nonnull T getBean();
+    @NonNull T getBean();
 
     /**
      * The property names.
      *
      * @return The property names
      */
-    default @Nonnull String[] getPropertyNames() {
+    default @NonNull String[] getPropertyNames() {
         return getIntrospection().getPropertyNames();
     }
 
@@ -62,7 +62,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * The properties.
      * @return The properties
      */
-    default @Nonnull Collection<BeanProperty<T, Object>> getBeanProperties() {
+    default @NonNull Collection<BeanProperty<T, Object>> getBeanProperties() {
         return getIntrospection().getBeanProperties();
     }
 
@@ -76,7 +76,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @throws IntrospectionException if no property exists
      * @throws ConversionErrorException if the property cannot be converted to the given type
      */
-    default @Nonnull <P> P getRequiredProperty(@Nonnull String name, @Nonnull Class<P> type) {
+    default @NonNull <P> P getRequiredProperty(@NonNull String name, @NonNull Class<P> type) {
         ArgumentUtils.requireNonNull("name", name);
         ArgumentUtils.requireNonNull("type", type);
         final Argument<P> argument = Argument.of(type);
@@ -93,7 +93,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @throws IntrospectionException if no property exists
      * @throws ConversionErrorException if the property cannot be converted to the given type
      */
-    default <P> P getRequiredProperty(@Nonnull String name, @Nonnull Argument<P> argument) {
+    default <P> P getRequiredProperty(@NonNull String name, @NonNull Argument<P> argument) {
         ArgumentUtils.requireNonNull("name", name);
         ArgumentUtils.requireNonNull("argument", argument);
 
@@ -110,7 +110,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @throws IntrospectionException if no property exists
      * @throws ConversionErrorException if the property cannot be converted to the given type
      */
-    default @Nonnull <P> P getRequiredProperty(@Nonnull String name, @Nonnull ArgumentConversionContext<P> context) {
+    default @NonNull <P> P getRequiredProperty(@NonNull String name, @NonNull ArgumentConversionContext<P> context) {
         ArgumentUtils.requireNonNull("name", name);
         ArgumentUtils.requireNonNull("type", context);
 
@@ -143,7 +143,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @param <P> The required generic type
      * @return The property if found and can be converted to the given type
      */
-    default @Nonnull <P> Optional<P> getProperty(@Nonnull String name, @Nonnull Class<P> type) {
+    default @NonNull <P> Optional<P> getProperty(@NonNull String name, @NonNull Class<P> type) {
         ArgumentUtils.requireNonNull("name", name);
         ArgumentUtils.requireNonNull("type", type);
         final Argument<P> argument = Argument.of(type);
@@ -157,7 +157,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @param <P> The required generic type
      * @return The property if found and can be converted to the given type
      */
-    default <P> Optional<P> getProperty(@Nonnull String name, Argument<P> type) {
+    default <P> Optional<P> getProperty(@NonNull String name, Argument<P> type) {
         ArgumentUtils.requireNonNull("name", name);
         ArgumentUtils.requireNonNull("type", type);
         final ArgumentConversionContext<P> context = ConversionContext.of(type);
@@ -171,7 +171,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @param <P> The required generic type
      * @return The property if found and can be converted to the given type
      */
-    default <P> Optional<P> getProperty(@Nonnull String name, ArgumentConversionContext<P> context) {
+    default <P> Optional<P> getProperty(@NonNull String name, ArgumentConversionContext<P> context) {
         ArgumentUtils.requireNonNull("name", name);
         ArgumentUtils.requireNonNull("context", context);
 
@@ -186,7 +186,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @return This wrapper
      * @throws ConversionErrorException if the value cannot be converted to the underlying property type.
      */
-    default BeanWrapper<T> setProperty(@Nonnull String name, @Nullable Object value) {
+    default BeanWrapper<T> setProperty(@NonNull String name, @Nullable Object value) {
         ArgumentUtils.requireNonNull("name", name);
 
         getIntrospection()
@@ -202,7 +202,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @return The wrapper
      * @throws io.micronaut.core.beans.exceptions.IntrospectionException If the wrapper cannot be created
      */
-    static @Nonnull <T2>  BeanWrapper<T2> getWrapper(@Nonnull T2 bean) {
+    static @NonNull <T2>  BeanWrapper<T2> getWrapper(@NonNull T2 bean) {
         ArgumentUtils.requireNonNull("bean", bean);
         @SuppressWarnings("unchecked") final Class<T2> aClass = (Class<T2>) bean.getClass();
         final BeanIntrospection<T2> introspection = BeanIntrospection.getIntrospection(aClass);
@@ -218,7 +218,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @throws io.micronaut.core.beans.exceptions.IntrospectionException If the wrapper cannot be created
      */
     @SuppressWarnings("unchecked")
-    static @Nonnull <T2>  Optional<BeanWrapper<T2>> findWrapper(@Nonnull T2 bean) {
+    static @NonNull <T2>  Optional<BeanWrapper<T2>> findWrapper(@NonNull T2 bean) {
         ArgumentUtils.requireNonNull("bean", bean);
         @SuppressWarnings("unchecked") final Class<T2> aClass = (Class<T2>) bean.getClass();
         return BeanIntrospector.SHARED.findIntrospection(aClass).map(i ->
@@ -235,7 +235,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @throws io.micronaut.core.beans.exceptions.IntrospectionException If the wrapper cannot be created
      */
     @SuppressWarnings("unchecked")
-    static @Nonnull <T2>  Optional<BeanWrapper<T2>> findWrapper(Class<T2> type, @Nonnull T2 bean) {
+    static @NonNull <T2>  Optional<BeanWrapper<T2>> findWrapper(Class<T2> type, @NonNull T2 bean) {
         ArgumentUtils.requireNonNull("type", type);
         ArgumentUtils.requireNonNull("bean", bean);
         return BeanIntrospector.SHARED.findIntrospection(type).map(i ->
@@ -251,7 +251,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @return The wrapper
      * @throws io.micronaut.core.beans.exceptions.IntrospectionException If the wrapper cannot be created
      */
-    static @Nonnull <T2>  BeanWrapper<T2> getWrapper(Class<T2> type, @Nonnull T2 bean) {
+    static @NonNull <T2>  BeanWrapper<T2> getWrapper(Class<T2> type, @NonNull T2 bean) {
         ArgumentUtils.requireNonNull("type", type);
         ArgumentUtils.requireNonNull("bean", bean);
         final BeanIntrospection<T2> introspection = BeanIntrospection.getIntrospection(type);

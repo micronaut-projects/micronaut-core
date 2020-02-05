@@ -24,7 +24,7 @@ import io.micronaut.http.annotation.UriMapping;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.web.router.RouteBuilder;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Singleton;
 
 /**
@@ -42,7 +42,7 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
     }
 
     @Override
-    public @Nonnull String resolveUri(BeanDefinition<?> beanDefinition) {
+    public @NonNull String resolveUri(BeanDefinition<?> beanDefinition) {
         String uri = beanDefinition.stringValue(UriMapping.class).orElseGet(() ->
                 beanDefinition.stringValue(Controller.class).orElse(UriMapping.DEFAULT_URI)
         );
@@ -50,7 +50,7 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
     }
 
     @Override
-    public @Nonnull String resolveUri(String property) {
+    public @NonNull String resolveUri(String property) {
         if (StringUtils.isEmpty(property)) {
             return "/";
         }

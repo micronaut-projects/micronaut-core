@@ -35,7 +35,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -89,7 +89,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         return executableMethod.getTarget();
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public ExecutableMethod<?, R> getExecutableMethod() {
         return executableMethod.getExecutableMethod();

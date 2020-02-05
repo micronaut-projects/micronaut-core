@@ -6,6 +6,14 @@ In Micronaut 1.x the ann:context.annotation.Executable[] annotation was a meta-a
 
 In Micronaut 2.x and above this is no longer the case and if you need an api:inject.ExecutableMethod[] generated you should add the ann:context.annotation.Executable[] annotation to any custom AOP advice you specify otherwise the method will not be available via the api:inject.BeanDefinition[] interface (using for example the api:BeanDefinition.getExecutableMethods[] method).
 
+=== Spot Bugs Instead of JSR-305 Nullable/NonNull Annotations
+
+In Micronaut 1.x the Google distributed JSR-305 annotations library (`com.google.code.findbugs:jsr305`) was used to specify `@Nullable` and `@NonNull` on interfaces of the Micronaut API using the annotations contained within the `javax.annotation` package.
+
+Due to the fact that JSR-305 has been cancelled and that this dependency has potential licensing issues (by using the `javax` namespace) as well as problems with the cross packages on Java 9+ with the module system Micronaut 2.x switches to the `spotbugs-annotations` module provided by the https://spotbugs.github.io/[SpotBugs project].
+
+It is recommended users of Micronaut use this API instead (although the `javax.annotation.Nullable` and `javax.annotation.NotNull` annotations continue to be supported).
+
 === Source Retention Annotations No Longer Retained in Runtime Metadata
 
 In Micronaut 1.x annotations specified as source retention were still retained in the api:core.annotation.AnnotationMetadata[] interface. As of Micronaut 2.x this is no longer the case with source retention annotations only available within the compiler APIs.

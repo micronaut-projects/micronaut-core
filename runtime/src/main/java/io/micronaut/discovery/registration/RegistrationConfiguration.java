@@ -17,7 +17,7 @@ package io.micronaut.discovery.registration;
 
 import io.micronaut.core.util.Toggleable;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;

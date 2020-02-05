@@ -18,7 +18,7 @@ package io.micronaut.session;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.scheduling.TaskExecutors;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;

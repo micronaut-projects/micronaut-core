@@ -18,8 +18,8 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.core.beans.BeanIntrospection;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.validation.ConstraintViolation;
 import java.util.Set;
 
@@ -38,11 +38,11 @@ public interface Validator extends javax.validation.Validator {
      * @return The validator
      */
     @Override
-    @Nonnull ExecutableMethodValidator forExecutables();
+    @NonNull ExecutableMethodValidator forExecutables();
 
     @Override
-    @Nonnull <T> Set<ConstraintViolation<T>> validate(
-            @Nonnull T object,
+    @NonNull <T> Set<ConstraintViolation<T>> validate(
+            @NonNull T object,
             Class<?>... groups
     );
 
@@ -54,22 +54,22 @@ public interface Validator extends javax.validation.Validator {
      * @param <T> The object type
      * @return The constraint violations
      */
-    @Nonnull
+    @NonNull
     <T> Set<ConstraintViolation<T>> validate(
-            @Nonnull BeanIntrospection<T> introspection,
-            @Nonnull T object, @Nullable Class<?>... groups);
+            @NonNull BeanIntrospection<T> introspection,
+            @NonNull T object, @Nullable Class<?>... groups);
 
     @Override
-    @Nonnull <T> Set<ConstraintViolation<T>> validateProperty(
-            @Nonnull T object,
-            @Nonnull String propertyName,
+    @NonNull <T> Set<ConstraintViolation<T>> validateProperty(
+            @NonNull T object,
+            @NonNull String propertyName,
             Class<?>... groups
     );
 
     @Override
-    @Nonnull <T> Set<ConstraintViolation<T>> validateValue(
-            @Nonnull Class<T> beanType,
-            @Nonnull String propertyName,
+    @NonNull <T> Set<ConstraintViolation<T>> validateValue(
+            @NonNull Class<T> beanType,
+            @NonNull String propertyName,
             @Nullable Object value,
             Class<?>... groups
     );
@@ -81,7 +81,7 @@ public interface Validator extends javax.validation.Validator {
      *
      * @return The validator.
      */
-    static @Nonnull Validator getInstance() {
+    static @NonNull Validator getInstance() {
         return new DefaultValidator(
                 new DefaultValidatorConfiguration()
         );

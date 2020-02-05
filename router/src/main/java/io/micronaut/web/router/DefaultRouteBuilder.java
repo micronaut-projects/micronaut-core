@@ -41,8 +41,8 @@ import io.micronaut.web.router.exceptions.RoutingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Qualifier;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -72,12 +72,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     @Deprecated
     public static final UriNamingStrategy HYPHENATED_NAMING_STRATEGY = new UriNamingStrategy() {
         @Override
-        public @Nonnull String resolveUri(Class type) {
+        public @NonNull String resolveUri(Class type) {
             return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
         }
 
         @Override
-        public @Nonnull String resolveUri(String property) {
+        public @NonNull String resolveUri(String property) {
             if (StringUtils.isEmpty(property)) {
                 return "/";
             }

@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.ExecutableMethod;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.reflect.Method;
 
 /**
@@ -103,7 +103,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         return executionHandle.toString();
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public ExecutableMethod<T, R> getExecutableMethod() {
         return executionHandle;

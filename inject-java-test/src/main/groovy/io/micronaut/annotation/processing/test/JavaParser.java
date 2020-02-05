@@ -23,8 +23,8 @@ import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
 import io.micronaut.annotation.processing.PackageConfigurationInjectProcessor;
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.processing.Processor;
 import javax.lang.model.element.Element;
 import javax.tools.*;
@@ -126,7 +126,7 @@ public class JavaParser {
      * @return The generated file
      * @throws IOException when an error occurs reading the file
      */
-    public @Nullable Reader readGenerated(@Nonnull String filePath, String className, String code) throws IOException {
+    public @Nullable Reader readGenerated(@NonNull String filePath, String className, String code) throws IOException {
         final String computedPath = fileManager.getMetaInfPath(filePath);
         final Iterable<? extends JavaFileObject> generatedFiles = generate(JavaFileObjects.forSourceString(className, code));
         for (JavaFileObject generatedFile : generatedFiles) {
@@ -182,7 +182,7 @@ public class JavaParser {
      * The list of processors to use.
      * @return The processor list
      */
-    protected @Nonnull List<Processor> getAnnotationProcessors() {
+    protected @NonNull List<Processor> getAnnotationProcessors() {
         List<Processor> processors = new ArrayList<>();
         processors.add(getTypeElementVisitorProcessor());
         processors.add(new PackageConfigurationInjectProcessor());
@@ -194,7 +194,7 @@ public class JavaParser {
      * The {@link BeanDefinitionInjectProcessor} to use.
      * @return The {@link BeanDefinitionInjectProcessor}
      */
-    protected @Nonnull BeanDefinitionInjectProcessor getBeanDefinitionInjectProcessor() {
+    protected @NonNull BeanDefinitionInjectProcessor getBeanDefinitionInjectProcessor() {
         return new BeanDefinitionInjectProcessor();
     }
 
@@ -203,7 +203,7 @@ public class JavaParser {
      *
      * @return The type element visitor processor
      */
-    protected @Nonnull TypeElementVisitorProcessor getTypeElementVisitorProcessor() {
+    protected @NonNull TypeElementVisitorProcessor getTypeElementVisitorProcessor() {
         return new TypeElementVisitorProcessor();
     }
 

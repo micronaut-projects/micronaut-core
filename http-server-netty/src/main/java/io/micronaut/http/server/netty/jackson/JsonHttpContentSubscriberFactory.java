@@ -28,7 +28,7 @@ import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Singleton;
 
 /**

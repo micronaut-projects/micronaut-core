@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * Stores data about an element that references a method.
@@ -28,7 +28,7 @@ public interface MethodElement extends MemberElement {
     /**
      * @return The return type of the method
      */
-    @Nonnull
+    @NonNull
     ClassElement getReturnType();
 
     /**
@@ -42,7 +42,7 @@ public interface MethodElement extends MemberElement {
      * @return The return type of the method
      * @since 1.1.1
      */
-    default @Nonnull ClassElement getGenericReturnType() {
+    default @NonNull ClassElement getGenericReturnType() {
         return getReturnType();
     }
 }

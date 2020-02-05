@@ -15,7 +15,7 @@
  */
 package io.micronaut.validation.validator.constraints;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.validation.ClockProvider;
 
 /**
@@ -37,5 +37,5 @@ public interface ConstraintValidatorContext {
      *
      * @since 2.0
      */
-    @Nonnull ClockProvider getClockProvider();
+    @NonNull ClockProvider getClockProvider();
 }

@@ -18,8 +18,8 @@ package io.micronaut.http.server.util;
 import io.micronaut.context.annotation.DefaultImplementation;
 import io.micronaut.http.HttpRequest;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * Resolves the host name of the current server.
@@ -37,6 +37,6 @@ public interface HttpHostResolver {
      * @param request The current request
      * @return The host information
      */
-    @Nonnull
+    @NonNull
     String resolve(@Nullable HttpRequest request);
 }

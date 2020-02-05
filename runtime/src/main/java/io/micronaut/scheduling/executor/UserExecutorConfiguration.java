@@ -18,7 +18,7 @@ package io.micronaut.scheduling.executor;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.validation.constraints.Min;
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;

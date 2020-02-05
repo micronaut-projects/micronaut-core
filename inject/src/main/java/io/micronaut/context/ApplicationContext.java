@@ -25,8 +25,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 import org.jetbrains.annotations.NotNull;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Collections;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -63,12 +63,12 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
     /**
      * @return The default conversion service
      */
-    @Nonnull ConversionService<?> getConversionService();
+    @NonNull ConversionService<?> getConversionService();
 
     /**
      * @return The application environment
      */
-    @Nonnull Environment getEnvironment();
+    @NonNull Environment getEnvironment();
 
     /**
      * Starts the application context.
@@ -76,7 +76,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The application context
      */
     @Override
-    @Nonnull ApplicationContext start();
+    @NonNull ApplicationContext start();
 
     /**
      * Stops the application context.
@@ -84,24 +84,24 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The application context
      */
     @Override
-    @Nonnull ApplicationContext stop();
+    @NonNull ApplicationContext stop();
 
     @Override
-    @Nonnull <T> ApplicationContext registerSingleton(@Nonnull Class<T> type, @Nonnull T singleton, @Nullable Qualifier<T> qualifier, boolean inject);
+    @NonNull <T> ApplicationContext registerSingleton(@NonNull Class<T> type, @NonNull T singleton, @Nullable Qualifier<T> qualifier, boolean inject);
 
     @Override
-    default @Nonnull <T> ApplicationContext registerSingleton(@Nonnull Class<T> type, @Nonnull T singleton, @Nullable Qualifier<T> qualifier) {
+    default @NonNull <T> ApplicationContext registerSingleton(@NonNull Class<T> type, @NonNull T singleton, @Nullable Qualifier<T> qualifier) {
         return registerSingleton(type, singleton, qualifier, true);
     }
 
     @Override
-    default @Nonnull <T> ApplicationContext registerSingleton(@Nonnull Class<T> type, @Nonnull T singleton) {
+    default @NonNull <T> ApplicationContext registerSingleton(@NonNull Class<T> type, @NonNull T singleton) {
         return registerSingleton(type, singleton, null, true);
     }
 
     @NotNull
     @Override
-    default @Nonnull ApplicationContext registerSingleton(@NotNull Object singleton, boolean inject) {
+    default @NonNull ApplicationContext registerSingleton(@NotNull Object singleton, boolean inject) {
         return (ApplicationContext) BeanContext.super.registerSingleton(singleton, inject);
     }
 
@@ -111,14 +111,14 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param consumer The consumer
      * @return This context
      */
-    default @Nonnull ApplicationContext environment(@Nonnull Consumer<Environment> consumer) {
+    default @NonNull ApplicationContext environment(@NonNull Consumer<Environment> consumer) {
         ArgumentUtils.requireNonNull("consumer", consumer);
         consumer.accept(getEnvironment());
         return this;
     }
 
     @Override
-    default @Nonnull ApplicationContext registerSingleton(@Nonnull Object singleton) {
+    default @NonNull ApplicationContext registerSingleton(@NonNull Object singleton) {
         ArgumentUtils.requireNonNull("singleton", singleton);
         Class type = singleton.getClass();
         return registerSingleton(type, singleton);
@@ -131,7 +131,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environments to use
      * @return The running {@link ApplicationContext}
      */
-    static @Nonnull ApplicationContext run(@Nonnull String... environments) {
+    static @NonNull ApplicationContext run(@NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         return build(environments).start();
     }
@@ -142,7 +142,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      *
      * @return The running {@link ApplicationContext}
      */
-    static @Nonnull ApplicationContext run() {
+    static @NonNull ApplicationContext run() {
         return run(StringUtils.EMPTY_STRING_ARRAY);
     }
 
@@ -156,7 +156,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environment names
      * @return The running {@link ApplicationContext}
      */
-    static @Nonnull ApplicationContext run(@Nonnull Map<String, Object> properties, @Nonnull String... environments) {
+    static @NonNull ApplicationContext run(@NonNull Map<String, Object> properties, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("properties", properties);
         PropertySource propertySource = PropertySource.of(PropertySource.CONTEXT, properties, SystemPropertiesPropertySource.POSITION + 100);
@@ -173,7 +173,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environment names
      * @return The running {@link ApplicationContext}
      */
-    static @Nonnull ApplicationContext run(@Nonnull PropertySource properties, @Nonnull String... environments) {
+    static @NonNull ApplicationContext run(@NonNull PropertySource properties, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("properties", properties);
         return build(environments)
@@ -192,7 +192,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param <T>          The type
      * @return The running bean
      */
-    static @Nonnull <T extends AutoCloseable> T run(@Nonnull Class<T> type, @Nonnull String... environments) {
+    static @NonNull <T extends AutoCloseable> T run(@NonNull Class<T> type, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("type", type);
         ArgumentUtils.requireNonNull("environments", environments);
         return run(type, Collections.emptyMap(), environments);
@@ -210,7 +210,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param <T>          The type
      * @return The running bean
      */
-    static @Nonnull <T extends AutoCloseable> T run(@Nonnull Class<T> type, @Nonnull Map<String, Object> properties, @Nonnull String... environments) {
+    static @NonNull <T extends AutoCloseable> T run(@NonNull Class<T> type, @NonNull Map<String, Object> properties, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("properties", properties);
         ArgumentUtils.requireNonNull("type", type);
@@ -230,7 +230,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param <T>            The type
      * @return The running {@link BeanContext}
      */
-    static @Nonnull <T extends AutoCloseable> T run(@Nonnull  Class<T> type, @Nonnull  PropertySource propertySource, @Nonnull String... environments) {
+    static @NonNull <T extends AutoCloseable> T run(@NonNull  Class<T> type, @NonNull  PropertySource propertySource, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("propertySource", propertySource);
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("type", type);
@@ -258,7 +258,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environments to use
      * @return The built, but not yet running {@link ApplicationContext}
      */
-    static @Nonnull ApplicationContextBuilder build(@Nonnull String... environments) {
+    static @NonNull ApplicationContextBuilder build(@NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         return new DefaultApplicationContextBuilder()
             .environments(environments);
@@ -271,7 +271,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environments to use
      * @return The built, but not yet running {@link ApplicationContext}
      */
-    static @Nonnull ApplicationContextBuilder build(@Nonnull Map<String, Object> properties, @Nonnull String... environments) {
+    static @NonNull ApplicationContextBuilder build(@NonNull Map<String, Object> properties, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("properties", properties);
         return new DefaultApplicationContextBuilder()
@@ -284,7 +284,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      *
      * @return The built, but not yet running {@link ApplicationContext}
      */
-    static @Nonnull ApplicationContextBuilder build() {
+    static @NonNull ApplicationContextBuilder build() {
         return new DefaultApplicationContextBuilder();
     }
 
@@ -295,7 +295,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environments to use
      * @return The running {@link ApplicationContext}
      */
-    static @Nonnull ApplicationContext run(@Nonnull ClassLoader classLoader, @Nonnull String... environments) {
+    static @NonNull ApplicationContext run(@NonNull ClassLoader classLoader, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("classLoader", classLoader);
         return build(classLoader, environments).start();
@@ -308,7 +308,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environment to use
      * @return The built, but not yet running {@link ApplicationContext}
      */
-    static @Nonnull ApplicationContextBuilder build(@Nonnull ClassLoader classLoader, @Nonnull String... environments) {
+    static @NonNull ApplicationContextBuilder build(@NonNull ClassLoader classLoader, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("classLoader", classLoader);
 
@@ -323,7 +323,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environment to use
      * @return The built, but not yet running {@link ApplicationContext}
      */
-    static @Nonnull ApplicationContextBuilder build(@Nonnull Class mainClass, @Nonnull String... environments) {
+    static @NonNull ApplicationContextBuilder build(@NonNull Class mainClass, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("mainClass", mainClass);
 

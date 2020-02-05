@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 
 /**

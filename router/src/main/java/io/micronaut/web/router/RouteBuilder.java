@@ -30,8 +30,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -1172,7 +1172,7 @@ public interface RouteBuilder {
          * @param beanDefinition The type
          * @return The URI to use
          */
-        default @Nonnull
+        default @NonNull
         String resolveUri(BeanDefinition<?> beanDefinition) {
             String uri = beanDefinition.stringValue(UriMapping.class).orElseGet(() ->
                     beanDefinition.stringValue(Controller.class).orElse(UriMapping.DEFAULT_URI)
@@ -1197,7 +1197,7 @@ public interface RouteBuilder {
          * @param property The property
          * @return The URI to use
          */
-        default @Nonnull
+        default @NonNull
         String resolveUri(String property) {
             if (StringUtils.isEmpty(property)) {
                 return "/";
@@ -1215,7 +1215,7 @@ public interface RouteBuilder {
          * @param id   the route id
          * @return The URI to use
          */
-        default @Nonnull String resolveUri(Class type, PropertyConvention id) {
+        default @NonNull String resolveUri(Class type, PropertyConvention id) {
             return resolveUri(type) + "/{" + id.lowerCaseName() + "}";
         }
 

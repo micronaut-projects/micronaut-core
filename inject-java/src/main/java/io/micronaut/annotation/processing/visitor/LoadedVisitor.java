@@ -23,7 +23,7 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;

@@ -17,7 +17,7 @@ package io.micronaut.http.sse;
 
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.time.Duration;
 
 /**

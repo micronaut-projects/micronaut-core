@@ -26,7 +26,7 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  *  A non-blocking HTTP client for Vault - KV v2.
@@ -59,9 +59,9 @@ public interface VaultConfigHttpClientV1 extends VaultConfigHttpClient<VaultResp
     )
     @Override
     Publisher<VaultResponseV1> readConfigurationValues(
-            @Nonnull @Header("X-Vault-Token") String token,
-            @Nonnull String backend,
-            @Nonnull String vaultKey);
+            @NonNull @Header("X-Vault-Token") String token,
+            @NonNull String backend,
+            @NonNull String vaultKey);
 
     @Override
     default String getDescription() {

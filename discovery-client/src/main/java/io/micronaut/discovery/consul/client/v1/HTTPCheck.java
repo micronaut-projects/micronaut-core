@@ -24,7 +24,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.http.HttpMethod;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URL;
 import java.time.Duration;
 import java.util.List;

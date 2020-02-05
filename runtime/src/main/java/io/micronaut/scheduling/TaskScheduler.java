@@ -15,7 +15,7 @@
  */
 package io.micronaut.scheduling;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledFuture;

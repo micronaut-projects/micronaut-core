@@ -19,8 +19,8 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.util.CollectionUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
@@ -90,13 +90,13 @@ public class DefaultCacheManager<C> implements CacheManager<C> {
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public Set<String> getCacheNames() {
         return cacheMap.keySet();
     }
 
     @Override
-    @Nonnull
+    @NonNull
     public SyncCache<C> getCache(String name) {
         SyncCache<C> cache = cacheMap.get(name);
         if (cache == null) {

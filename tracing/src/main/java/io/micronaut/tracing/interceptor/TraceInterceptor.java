@@ -36,7 +36,7 @@ import io.opentracing.Tracer;
 import io.opentracing.log.Fields;
 import org.reactivestreams.Publisher;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Optional;
@@ -107,7 +107,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
 
                     resultFlowable = new TracingPublisher(resultFlowable, tracer) {
                         @Override
-                        protected void doOnSubscribe(@Nonnull Span span) {
+                        protected void doOnSubscribe(@NonNull Span span) {
                             tagArguments(span, context);
                         }
                     };
@@ -148,7 +148,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
 
                     resultPublisher = new TracingPublisher(resultPublisher, tracer, builder) {
                         @Override
-                        protected void doOnSubscribe(@Nonnull Span span) {
+                        protected void doOnSubscribe(@NonNull Span span) {
                             populateTags(context, hystrixCommand, span);
                         }
                     };

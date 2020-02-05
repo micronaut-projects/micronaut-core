@@ -32,7 +32,7 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.tracing.brave.sender.HttpClientSender;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 
 /**

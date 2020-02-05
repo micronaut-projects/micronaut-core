@@ -16,7 +16,7 @@
 
 package io.micronaut.inject.beans.visitor;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * Handle mapped super class.
@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
  * @since 1.1.2
  */
 public class MappedSuperClassIntrospectionMapper extends EntityIntrospectedAnnotationMapper {
-    @Nonnull
+    @NonNull
     @Override
     public String getName() {
         return "javax.persistence.MappedSuperclass";

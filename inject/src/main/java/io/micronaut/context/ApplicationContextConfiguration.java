@@ -18,8 +18,8 @@ package io.micronaut.context;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,7 +35,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     /**
      * @return The environment names
      */
-    @Nonnull List<String> getEnvironments();
+    @NonNull List<String> getEnvironments();
 
     /**
      * @return True if the environments should be deduced
@@ -70,7 +70,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      *
      * @return The conversion service
      */
-    default @Nonnull ConversionService<?> getConversionService() {
+    default @NonNull ConversionService<?> getConversionService() {
         return ConversionService.SHARED;
     }
 
@@ -79,7 +79,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      *
      * @return The classpath resource loader
      */
-    default @Nonnull ClassPathResourceLoader getResourceLoader() {
+    default @NonNull ClassPathResourceLoader getResourceLoader() {
         return ClassPathResourceLoader.defaultLoader(getClassLoader());
     }
 

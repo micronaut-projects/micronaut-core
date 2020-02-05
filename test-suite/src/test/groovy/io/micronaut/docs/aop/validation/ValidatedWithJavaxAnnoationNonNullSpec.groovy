@@ -15,11 +15,11 @@
  */
 package io.micronaut.docs.aop.validation
 
+import edu.umd.cs.findbugs.annotations.NonNull
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
 import io.micronaut.validation.Validated
-import javax.annotation.Nonnull
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -60,7 +60,7 @@ class ValidatedWithJavaxAnnoationNonNullSpec extends Specification {
     @Validated
     static class NonNullService {
 
-        String sayHello(@Nonnull String name) {
+        String sayHello(@NonNull String name) {
             name ? "Hello $name" : "Hello"
         }
     }
@@ -70,7 +70,7 @@ class ValidatedWithJavaxAnnoationNonNullSpec extends Specification {
     @Validated
     static class NonNullAndNotNullService {
 
-        String sayHello(@NotNull @Nonnull String name) {
+        String sayHello(@NotNull @NonNull String name) {
             name ? "Hello $name" : "Hello"
         }
     }

@@ -25,7 +25,7 @@ import io.micronaut.scheduling.io.watch.event.FileChangedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
@@ -149,7 +149,7 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
     /**
      * @return The watch service used.
      */
-    public @Nonnull WatchService getWatchService() {
+    public @NonNull WatchService getWatchService() {
         return watchService;
     }
 
@@ -173,7 +173,7 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
      * @return The watch key
      * @throws IOException if an error occurs.
      */
-    protected @Nonnull WatchKey registerPath(@Nonnull Path dir) throws IOException {
+    protected @NonNull WatchKey registerPath(@NonNull Path dir) throws IOException {
         return dir.register(watchService,
                 StandardWatchEventKinds.ENTRY_CREATE,
                 StandardWatchEventKinds.ENTRY_DELETE,

@@ -28,7 +28,7 @@ import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URL;
@@ -74,7 +74,7 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @BootstrapContextCompatible
-    protected @Nonnull ClassPathResourceLoader getClassPathResourceLoader() {
+    protected @NonNull ClassPathResourceLoader getClassPathResourceLoader() {
         return new DefaultClassPathResourceLoader(classLoader);
     }
 
@@ -83,7 +83,7 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @BootstrapContextCompatible
-    protected @Nonnull FileSystemResourceLoader fileSystemResourceLoader() {
+    protected @NonNull FileSystemResourceLoader fileSystemResourceLoader() {
         return new DefaultFileSystemResourceLoader();
     }
 
@@ -93,7 +93,7 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @BootstrapContextCompatible
-    protected @Nonnull ResourceResolver resourceResolver(@Nonnull List<ResourceLoader> resourceLoaders) {
+    protected @NonNull ResourceResolver resourceResolver(@NonNull List<ResourceLoader> resourceLoaders) {
         return new ResourceResolver(resourceLoaders);
     }
 
@@ -104,7 +104,7 @@ public class ResourceLoaderFactory {
      * @since 1.1.0
      */
     @Singleton
-    protected @Nonnull TypeConverter<CharSequence, Readable> readableTypeConverter(ResourceResolver resourceResolver) {
+    protected @NonNull TypeConverter<CharSequence, Readable> readableTypeConverter(ResourceResolver resourceResolver) {
         return (object, targetType, context) -> {
             String pathStr = object.toString();
             Optional<ResourceLoader> supportingLoader = resourceResolver.getSupportingLoader(pathStr);

@@ -19,7 +19,7 @@ package io.micronaut.inject.factory.parameterizedfactory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 
 @Prototype

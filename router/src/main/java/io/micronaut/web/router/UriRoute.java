@@ -21,7 +21,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatcher;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URI;
 import java.util.Optional;
 import java.util.function.Predicate;

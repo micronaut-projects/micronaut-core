@@ -17,7 +17,7 @@ package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * An injection point as a point in a class definition where dependency injection is required.
@@ -31,7 +31,7 @@ public interface InjectionPoint<T> extends AnnotationMetadataProvider {
     /**
      * @return The bean that declares this injection point
      */
-    @Nonnull BeanDefinition<T> getDeclaringBean();
+    @NonNull BeanDefinition<T> getDeclaringBean();
 
     /**
      * @return Whether reflection is required to satisfy the injection point

@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
@@ -79,7 +79,7 @@ public interface MethodReference<T, R> extends AnnotationMetadataDelegate, Annot
             .toArray(String[]::new);
     }
 
-    @Nonnull
+    @NonNull
     @Override
     default String getName() {
         return getMethodName();

@@ -20,8 +20,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
@@ -71,7 +71,7 @@ public interface BeanDefinitionVisitor {
     /**
      * @return The name of the bean definition reference class.
      */
-    @Nonnull
+    @NonNull
     String getBeanDefinitionReferenceClassName();
 
     /**

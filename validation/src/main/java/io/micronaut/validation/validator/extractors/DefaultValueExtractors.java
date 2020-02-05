@@ -24,8 +24,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.valueextraction.UnwrapByDefault;
@@ -296,9 +296,9 @@ public class DefaultValueExtractors implements ValueExtractorRegistry {
     }
 
     @SuppressWarnings("unchecked")
-    @Nonnull
+    @NonNull
     @Override
-    public <T> Optional<ValueExtractor<T>> findValueExtractor(@Nonnull Class<T> targetType) {
+    public <T> Optional<ValueExtractor<T>> findValueExtractor(@NonNull Class<T> targetType) {
         final ValueExtractor valueExtractor = valueExtractors.get(targetType);
         if (valueExtractor != null) {
             return Optional.of(valueExtractor);
@@ -311,9 +311,9 @@ public class DefaultValueExtractors implements ValueExtractorRegistry {
     }
 
     @SuppressWarnings("unchecked")
-    @Nonnull
+    @NonNull
     @Override
-    public <T> Optional<ValueExtractor<T>> findUnwrapValueExtractor(@Nonnull Class<T> targetType) {
+    public <T> Optional<ValueExtractor<T>> findUnwrapValueExtractor(@NonNull Class<T> targetType) {
         if (unwrapByDefaultTypes.contains(targetType)) {
             return Optional.ofNullable(valueExtractors.get(targetType));
         }

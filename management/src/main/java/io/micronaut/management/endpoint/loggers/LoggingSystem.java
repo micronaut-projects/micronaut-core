@@ -15,7 +15,7 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.util.Collection;
@@ -33,7 +33,7 @@ public interface LoggingSystem extends io.micronaut.logging.LoggingSystem {
      *
      * @return A {@link Collection} of {@link LoggerConfiguration} instances for all existing loggers
      */
-    @Nonnull Collection<LoggerConfiguration> getLoggers();
+    @NonNull Collection<LoggerConfiguration> getLoggers();
 
     /**
      * Returns a {@link LoggerConfiguration} for the logger found by name (or created if not found).
@@ -41,7 +41,7 @@ public interface LoggingSystem extends io.micronaut.logging.LoggingSystem {
      * @param name the logger name
      * @return the logger configuration
      */
-    @Nonnull LoggerConfiguration getLogger(@NotBlank String name);
+    @NonNull LoggerConfiguration getLogger(@NotBlank String name);
 
     /**
      * Set the log level for the logger found by name (or created if not found).

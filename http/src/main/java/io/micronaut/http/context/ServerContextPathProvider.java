@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.context;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
  * A contract for providing a context path to a server.

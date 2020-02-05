@@ -39,8 +39,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Provider;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -65,9 +65,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      *
      * @param environmentNames The environment names
      */
-    public DefaultApplicationContext(@Nonnull String... environmentNames) {
+    public DefaultApplicationContext(@NonNull String... environmentNames) {
         this(new ApplicationContextConfiguration() {
-            @Nonnull
+            @NonNull
             @Override
             public List<String> getEnvironments() {
                 ArgumentUtils.requireNonNull("environmentNames", environmentNames);
@@ -82,22 +82,22 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames   The environment names
      * @param resourceLoader     The class loader
      */
-    public DefaultApplicationContext(@Nonnull ClassPathResourceLoader resourceLoader, @Nonnull String... environmentNames) {
+    public DefaultApplicationContext(@NonNull ClassPathResourceLoader resourceLoader, @NonNull String... environmentNames) {
         this(new ApplicationContextConfiguration() {
 
-            @Nonnull
+            @NonNull
             @Override
             public ClassLoader getClassLoader() {
                 return getResourceLoader().getClassLoader();
             }
 
             @Override
-            public @Nonnull ClassPathResourceLoader getResourceLoader() {
+            public @NonNull ClassPathResourceLoader getResourceLoader() {
                 ArgumentUtils.requireNonNull("resourceLoader", resourceLoader);
                 return resourceLoader;
             }
 
-            @Nonnull
+            @NonNull
             @Override
             public List<String> getEnvironments() {
                 ArgumentUtils.requireNonNull("environmentNames", environmentNames);
@@ -112,7 +112,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      *
      * @param configuration    The application context configuration
      */
-    public DefaultApplicationContext(@Nonnull ApplicationContextConfiguration configuration) {
+    public DefaultApplicationContext(@NonNull ApplicationContextConfiguration configuration) {
         super(configuration);
         ArgumentUtils.requireNonNull("configuration", configuration);
         this.conversionService = createConversionService();
@@ -121,12 +121,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    public @Nonnull <T> ApplicationContext registerSingleton(@Nonnull Class<T> type, @Nonnull T singleton, @Nullable Qualifier<T> qualifier, boolean inject) {
+    public @NonNull <T> ApplicationContext registerSingleton(@NonNull Class<T> type, @NonNull T singleton, @Nullable Qualifier<T> qualifier, boolean inject) {
         return (ApplicationContext) super.registerSingleton(type, singleton, qualifier, inject);
     }
 
     @Override
-    protected @Nonnull Iterable<BeanConfiguration> resolveBeanConfigurations() {
+    protected @NonNull Iterable<BeanConfiguration> resolveBeanConfigurations() {
         if (resolvedConfigurations != null) {
             return resolvedConfigurations;
         }
@@ -134,7 +134,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected @Nonnull List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+    protected @NonNull List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
         if (resolvedBeanReferences != null) {
             return resolvedBeanReferences;
         }
@@ -149,7 +149,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @return The environment instance
      */
     @Deprecated
-    protected @Nonnull DefaultEnvironment createEnvironment(@Nonnull String... environmentNames) {
+    protected @NonNull DefaultEnvironment createEnvironment(@NonNull String... environmentNames) {
         return createEnvironment(() -> Arrays.asList(environmentNames));
     }
 
@@ -159,7 +159,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param configuration The application context configuration
      * @return The environment instance
      */
-    protected @Nonnull DefaultEnvironment createEnvironment(@Nonnull ApplicationContextConfiguration configuration) {
+    protected @NonNull DefaultEnvironment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
         return new RuntimeConfiguredEnvironment(configuration);
     }
 
@@ -168,28 +168,28 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      *
      * @return The conversion service
      */
-    protected @Nonnull ConversionService createConversionService() {
+    protected @NonNull ConversionService createConversionService() {
         return ConversionService.SHARED;
     }
 
     @Override
-    public @Nonnull ConversionService<?> getConversionService() {
+    public @NonNull ConversionService<?> getConversionService() {
         return conversionService;
     }
 
     @Override
-    public @Nonnull Environment getEnvironment() {
+    public @NonNull Environment getEnvironment() {
         return environment;
     }
 
     @Override
-    public synchronized @Nonnull ApplicationContext start() {
+    public synchronized @NonNull ApplicationContext start() {
         startEnvironment();
         return (ApplicationContext) super.start();
     }
 
     @Override
-    public synchronized @Nonnull ApplicationContext stop() {
+    public synchronized @NonNull ApplicationContext stop() {
         return (ApplicationContext) super.stop();
     }
 
@@ -208,7 +208,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return getEnvironment().getProperty(name, conversionContext);
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
         return getEnvironment().getProperties(name, keyFormat);
@@ -488,25 +488,25 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     return Optional.of(false);
                 }
 
-                @Nonnull
+                @NonNull
                 @Override
                 public ClassLoader getClassLoader() {
                     return resourceLoader.getClassLoader();
                 }
 
-                @Nonnull
+                @NonNull
                 @Override
                 public List<String> getEnvironments() {
                     return Arrays.asList(activeEnvironments);
                 }
 
-                @Nonnull
+                @NonNull
                 @Override
                 public ConversionService<?> getConversionService() {
                     return conversionService;
                 }
 
-                @Nonnull
+                @NonNull
                 @Override
                 public ClassPathResourceLoader getResourceLoader() {
                     return resourceLoader;
@@ -552,23 +552,23 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         @Override
-        public @Nonnull Environment getEnvironment() {
+        public @NonNull Environment getEnvironment() {
             return bootstrapEnvironment;
         }
 
         @Override
-        protected @Nonnull BootstrapEnvironment createEnvironment(@Nonnull String... environmentNames) {
+        protected @NonNull BootstrapEnvironment createEnvironment(@NonNull String... environmentNames) {
             return bootstrapEnvironment;
         }
 
-        @Nonnull
+        @NonNull
         @Override
-        protected BootstrapEnvironment createEnvironment(@Nonnull ApplicationContextConfiguration configuration) {
+        protected BootstrapEnvironment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
             return bootstrapEnvironment;
         }
 
         @Override
-        protected @Nonnull List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+        protected @NonNull List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
             List<BeanDefinitionReference> refs = super.resolveBeanDefinitionReferences();
             // we cache the resolved beans in a local field to avoid the I/O cost of resolving them twice
             // once for the bootstrap context and again for the main context
@@ -579,7 +579,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         @Override
-        protected @Nonnull Iterable<BeanConfiguration> resolveBeanConfigurations() {
+        protected @NonNull Iterable<BeanConfiguration> resolveBeanConfigurations() {
             Iterable<BeanConfiguration> beanConfigurations = super.resolveBeanConfigurations();
             // we cache the resolved configurations in a local field to avoid the I/O cost of resolving them twice
             // once for the bootstrap context and again for the main context
@@ -608,7 +608,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         @Override
-        public void publishEvent(@Nonnull Object event) {
+        public void publishEvent(@NonNull Object event) {
             // no-op .. the bootstrap context shouldn't publish events
         }
 

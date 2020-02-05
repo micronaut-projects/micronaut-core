@@ -17,7 +17,7 @@ package io.micronaut.session;
 
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -36,7 +36,7 @@ public interface Session extends MutableConvertibleValues<Object> {
      * @return An {@link Instant} instance
      * @throws IllegalStateException if this method is called on an invalidated session
      */
-    @Nonnull
+    @NonNull
     Instant getCreationTime();
 
     /**
@@ -44,7 +44,7 @@ public interface Session extends MutableConvertibleValues<Object> {
      *
      * @return The id of the session
      */
-    @Nonnull
+    @NonNull
     String getId();
 
     /**
@@ -56,7 +56,7 @@ public interface Session extends MutableConvertibleValues<Object> {
      * @return An {@link Instant} representing the time the session was last accessed
      * @throws IllegalStateException if this method is called on an invalidated session
      */
-    @Nonnull
+    @NonNull
     Instant getLastAccessedTime();
 
     /**

@@ -57,8 +57,8 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Scope;
@@ -202,7 +202,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     @Override
-    public @Nonnull List<Argument<?>> getTypeArguments(String type) {
+    public @NonNull List<Argument<?>> getTypeArguments(String type) {
         if (type == null) {
             return Collections.emptyList();
         }

@@ -25,7 +25,7 @@ import io.micronaut.retry.exception.CircuitOpenException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalDouble;

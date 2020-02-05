@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.reflect.Method;
 
 /**
@@ -73,7 +73,7 @@ public interface ExecutionHandle<T, R> extends AnnotationMetadataDelegate {
      */
     static <T2, R2> MethodExecutionHandle<T2, R2> of(T2 bean, ExecutableMethod<T2, R2> method) {
         return new MethodExecutionHandle<T2, R2>() {
-            @Nonnull
+            @NonNull
             @Override
             public ExecutableMethod<?, R2> getExecutableMethod() {
                 return method;

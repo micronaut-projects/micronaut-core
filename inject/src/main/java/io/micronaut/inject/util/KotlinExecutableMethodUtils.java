@@ -20,7 +20,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import kotlin.Unit;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
@@ -38,7 +38,7 @@ public class KotlinExecutableMethodUtils {
      * @param method method to be checked
      * @return True if given <code>suspend</code> function's return type is <code>Unit</code>.
      */
-    public static boolean isKotlinFunctionReturnTypeUnit(@Nonnull ExecutableMethod method) {
+    public static boolean isKotlinFunctionReturnTypeUnit(@NonNull ExecutableMethod method) {
         if (KOTLIN_COROUTINES_SUPPORTED) {
             final Argument[] arguments = method.getArguments();
             final int argumentsLength = arguments.length;

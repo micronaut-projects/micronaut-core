@@ -30,7 +30,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
@@ -370,7 +370,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         }
     }
 
-    @Nonnull
+    @NonNull
     @Override
     protected final GeneratorAdapter beginAnnotationMetadataMethod(ClassWriter classWriter) {
         return startProtectedMethod(classWriter, "resolveAnnotationMetadata", AnnotationMetadata.class.getName());

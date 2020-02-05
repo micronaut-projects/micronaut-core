@@ -37,8 +37,8 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collections;
@@ -85,10 +85,10 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
      * @param typeArguments The type arguments for the property
      */
     BeanPropertyWriter(
-            @Nonnull BeanIntrospectionWriter introspectionWriter,
-            @Nonnull TypedElement typeElement,
-            @Nonnull Type propertyType,
-            @Nonnull String propertyName,
+            @NonNull BeanIntrospectionWriter introspectionWriter,
+            @NonNull TypedElement typeElement,
+            @NonNull Type propertyType,
+            @NonNull String propertyName,
             @Nullable MethodElement readMethod,
             @Nullable MethodElement writeMethod,
             boolean isReadOnly,
@@ -116,7 +116,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public String getName() {
         return type.getClassName();
@@ -125,7 +125,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     /**
      * @return The property name
      */
-    @Nonnull
+    @NonNull
     public String getPropertyName() {
         return propertyName;
     }

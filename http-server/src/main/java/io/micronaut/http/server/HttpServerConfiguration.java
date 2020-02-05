@@ -24,8 +24,8 @@ import io.micronaut.http.server.cors.CorsOriginConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.executor.ThreadSelection;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import java.io.File;
 import java.nio.charset.Charset;
@@ -146,7 +146,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     /**
      * @return The {@link ThreadSelection} model to use for the server.
      */
-    public @Nonnull ThreadSelection getThreadSelection() {
+    public @NonNull ThreadSelection getThreadSelection() {
         return threadSelection;
     }
 

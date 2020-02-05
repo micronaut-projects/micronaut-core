@@ -17,7 +17,7 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.util.ArgumentUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 
 /**
@@ -32,7 +32,7 @@ public interface BeanMap<T> extends Map<String, Object> {
     /**
      * @return The bean type
      */
-    @Nonnull Class<T> getBeanType();
+    @NonNull Class<T> getBeanType();
 
     /**
      * Creates a {@link BeanMap} for the given bean.
@@ -42,7 +42,7 @@ public interface BeanMap<T> extends Map<String, Object> {
      * @return The bean map
      */
     @SuppressWarnings({"unchecked", "deprecation"})
-    static @Nonnull <B> BeanMap<B> of(@Nonnull B bean) {
+    static @NonNull <B> BeanMap<B> of(@NonNull B bean) {
         ArgumentUtils.requireNonNull("bean", bean);
         return BeanIntrospector.SHARED.findIntrospection(bean.getClass())
                 .map(i -> (BeanMap<B>) new BeanIntrospectionMap<>((BeanIntrospection<B>) i, bean))

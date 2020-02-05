@@ -18,8 +18,8 @@ package io.micronaut.validation.validator.constraints;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.validation.ValidationException;
 import javax.validation.constraints.DecimalMax;
 import java.math.BigDecimal;
@@ -34,7 +34,7 @@ import java.math.BigDecimal;
 public interface DecimalMaxValidator<T> extends ConstraintValidator<DecimalMax, T> {
 
     @Override
-    default boolean isValid(@Nullable T value, @Nonnull AnnotationValue<DecimalMax> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    default boolean isValid(@Nullable T value, @NonNull AnnotationValue<DecimalMax> annotationMetadata, @NonNull ConstraintValidatorContext context) {
         if (value == null) {
             // null considered valid according to spec
             return true;
@@ -65,5 +65,5 @@ public interface DecimalMaxValidator<T> extends ConstraintValidator<DecimalMax, 
      * @param bigDecimal The big decimal
      * @return The result
      */
-    int doComparison(@Nonnull T value, @Nonnull BigDecimal bigDecimal);
+    int doComparison(@NonNull T value, @NonNull BigDecimal bigDecimal);
 }

@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * Represents an execution handle that invokes a method.
@@ -31,6 +31,6 @@ public interface MethodExecutionHandle<T, R> extends ExecutionHandle<T, R>, Meth
      *
      * @return The underlying method reference.
      */
-    @Nonnull
+    @NonNull
     ExecutableMethod<?, R> getExecutableMethod();
 }

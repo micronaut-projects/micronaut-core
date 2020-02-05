@@ -35,7 +35,7 @@ import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.HashMap;
@@ -77,7 +77,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
 
     @CompileStatic
     @Override
-    public <T extends Annotation> Element annotate(@Nonnull String annotationType, @Nonnull Consumer<AnnotationValueBuilder<T>> consumer) {
+    public <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
         ArgumentUtils.requireNonNull("annotationType", annotationType);
         AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
         //noinspection ConstantConditions
@@ -109,9 +109,9 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
      * @return The new generic spec
      */
     protected Map<String, ClassNode> alignNewGenericsInfo(
-            @Nonnull GenericsType[] genericsTypes,
-            @Nonnull GenericsType[] redirectTypes,
-            @Nonnull Map<String, ClassNode> genericsSpec) {
+            @NonNull GenericsType[] genericsTypes,
+            @NonNull GenericsType[] redirectTypes,
+            @NonNull Map<String, ClassNode> genericsSpec) {
         if (redirectTypes.length != genericsTypes.length) {
             return Collections.emptyMap();
         } else {
@@ -160,12 +160,12 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
      * @param genericsSpec The generics spec
      * @return The element, never null.
      */
-    @Nonnull
+    @NonNull
     protected ClassElement getGenericElement(
-            @Nonnull SourceUnit sourceUnit,
-            @Nonnull ClassNode type,
-            @Nonnull ClassElement rawElement,
-            @Nonnull Map<String, ClassNode> genericsSpec) {
+            @NonNull SourceUnit sourceUnit,
+            @NonNull ClassNode type,
+            @NonNull ClassElement rawElement,
+            @NonNull Map<String, ClassNode> genericsSpec) {
         if (CollectionUtils.isNotEmpty(genericsSpec)) {
             ClassElement classNode = resolveGenericType(sourceUnit, genericsSpec, type);
             if (classNode != null) {
@@ -190,7 +190,7 @@ public abstract class AbstractGroovyElement implements AnnotationMetadataDelegat
         return rawElement;
     }
 
-    private ClassElement resolveGenericType(@Nonnull SourceUnit sourceUnit, Map<String, ClassNode> typeGenericInfo, ClassNode returnType) {
+    private ClassElement resolveGenericType(@NonNull SourceUnit sourceUnit, Map<String, ClassNode> typeGenericInfo, ClassNode returnType) {
         if (returnType.isGenericsPlaceHolder()) {
             String unresolvedName = returnType.getUnresolvedName();
             ClassNode classNode = typeGenericInfo.get(unresolvedName);

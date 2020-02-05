@@ -25,8 +25,8 @@ import io.micronaut.discovery.registration.RegistrationConfiguration;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -186,7 +186,7 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     /**
      * @return The Discovery server instance host name. Defaults to 'localhost'.
      **/
-    @Nonnull
+    @NonNull
     public String getHost() {
         return host;
     }
@@ -217,7 +217,7 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     /**
      * @return The default discovery configuration
      */
-    @Nonnull
+    @NonNull
     public abstract DiscoveryConfiguration getDiscovery();
 
     /**

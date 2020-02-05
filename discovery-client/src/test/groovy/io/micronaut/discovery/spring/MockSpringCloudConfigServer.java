@@ -29,8 +29,8 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.*;
 
 @Controller("/")
@@ -43,14 +43,14 @@ public class MockSpringCloudConfigServer {
 
     @Get("/{applicationName}{/profiles}")
     @Produces(single = true)
-    public Publisher<ConfigServerResponse> readValues(@Nonnull String applicationName,
+    public Publisher<ConfigServerResponse> readValues(@NonNull String applicationName,
                                                       @Nullable String profiles) {
         return getConfigServerResponse(applicationName, profiles, null);
     }
 
     @Get("/{applicationName}{/profiles}{/label}")
     @Produces(single = true)
-    public Publisher<ConfigServerResponse> readValues(@Nonnull String applicationName,
+    public Publisher<ConfigServerResponse> readValues(@NonNull String applicationName,
                                                       @Nullable String profiles,
                                                       @Nullable String label) {
         return getConfigServerResponse(applicationName, profiles, label);

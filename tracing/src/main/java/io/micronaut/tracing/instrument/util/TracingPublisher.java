@@ -26,7 +26,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 import java.util.Optional;
 
@@ -200,7 +200,7 @@ public class TracingPublisher<T> implements Publisher<T> {
      * @param object The object
      * @param span The span
      */
-    protected void doOnNext(@Nonnull T object, @Nonnull Span span) {
+    protected void doOnNext(@NonNull T object, @NonNull Span span) {
         // no-op
     }
 
@@ -209,7 +209,7 @@ public class TracingPublisher<T> implements Publisher<T> {
      *
      * @param span The span
      */
-    protected void doOnSubscribe(@Nonnull Span span) {
+    protected void doOnSubscribe(@NonNull Span span) {
         // no-op
     }
 
@@ -220,7 +220,7 @@ public class TracingPublisher<T> implements Publisher<T> {
      * @param span The span
      */
     @SuppressWarnings("WeakerAccess")
-    protected void doOnFinish(@Nonnull Span span) {
+    protected void doOnFinish(@NonNull Span span) {
         // no-op
     }
 
@@ -230,7 +230,7 @@ public class TracingPublisher<T> implements Publisher<T> {
      * @param throwable The error
      * @param span The span
      */
-    protected void doOnError(@Nonnull Throwable throwable, @Nonnull Span span) {
+    protected void doOnError(@NonNull Throwable throwable, @NonNull Span span) {
         // no-op
     }
 

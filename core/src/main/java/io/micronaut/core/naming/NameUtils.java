@@ -18,7 +18,7 @@ package io.micronaut.core.naming;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -229,7 +229,7 @@ public class NameUtils {
      * @param propertyName The property name
      * @return The setter name
      */
-    public static @Nonnull String setterNameFor(@Nonnull String propertyName) {
+    public static @NonNull String setterNameFor(@NonNull String propertyName) {
         ArgumentUtils.requireNonNull("propertyName", propertyName);
         return nameFor(PREFIX_SET, propertyName);
     }
@@ -282,7 +282,7 @@ public class NameUtils {
      * @param propertyName The property name
      * @return The getter name
      */
-    public static @Nonnull String getterNameFor(@Nonnull String propertyName) {
+    public static @NonNull String getterNameFor(@NonNull String propertyName) {
         ArgumentUtils.requireNonNull("propertyName", propertyName);
         return nameFor(PREFIX_GET, propertyName);
     }
@@ -294,7 +294,7 @@ public class NameUtils {
      * @param type The type of the property
      * @return The getter name
      */
-    public static @Nonnull String getterNameFor(@Nonnull String propertyName, @Nonnull Class<?> type) {
+    public static @NonNull String getterNameFor(@NonNull String propertyName, @NonNull Class<?> type) {
         ArgumentUtils.requireNonNull("propertyName", propertyName);
         final boolean isBoolean = type == boolean.class;
         return getterNameFor(propertyName, isBoolean);
@@ -307,11 +307,11 @@ public class NameUtils {
      * @param isBoolean Is the property a boolean
      * @return The getter name
      */
-    public static String getterNameFor(@Nonnull String propertyName, boolean isBoolean) {
+    public static String getterNameFor(@NonNull String propertyName, boolean isBoolean) {
         return nameFor(isBoolean ? "is" : PREFIX_GET, propertyName);
     }
 
-    private static String nameFor(String prefix, @Nonnull String propertyName) {
+    private static String nameFor(String prefix, @NonNull String propertyName) {
         final int len = propertyName.length();
         switch (len) {
             case 0:

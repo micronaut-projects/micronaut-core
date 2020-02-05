@@ -20,7 +20,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
@@ -163,7 +163,7 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
-    default @Nonnull List<Argument<?>> getTypeArguments(String type) {
+    default @NonNull List<Argument<?>> getTypeArguments(String type) {
         return getTarget().getTypeArguments(type);
     }
 }

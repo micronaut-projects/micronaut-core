@@ -26,7 +26,7 @@ import io.micronaut.inject.ConstructorInjectionPoint;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
-import javax.annotation.Nullable;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.Objects;

@@ -29,7 +29,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
-import javax.annotation.Nonnull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
@@ -145,7 +145,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      *
      * @return A collection of type element visitors.
      */
-    protected @Nonnull
+    protected @NonNull
     Collection<TypeElementVisitor> findTypeElementVisitors() {
         Map<String, TypeElementVisitor> typeElementVisitors = new HashMap<>(10);
         SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, getClass().getClassLoader());
