@@ -137,10 +137,10 @@ class ClientScopeSpec extends Specification {
     }
 
     void "test no base path with the declarative client"() {
-        NoBasePathService client = context.getBean(NoBasePathService)
+        NoBasePathService client = applicationContext.getBean(NoBasePathService)
 
         expect:
-        client.name("http://localhost:${port}/scope") == "success"
+        client.name("http://localhost:${embeddedServer.port}/scope") == "success"
 
         when:
         client.name("/scope")
@@ -151,10 +151,10 @@ class ClientScopeSpec extends Specification {
     }
 
     void "test no base path with client scope"() {
-        RxHttpClient client = context.getBean(MyService).noIdClient
+        RxHttpClient client = applicationContext.getBean(MyService).noIdClient
 
         expect:
-        client.toBlocking().retrieve("http://localhost:${port}/scope") == "success"
+        client.toBlocking().retrieve("http://localhost:${embeddedServer.port}/scope") == "success"
 
         when:
         client.toBlocking().retrieve("/scope")
