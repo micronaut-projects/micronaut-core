@@ -241,12 +241,16 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
             for (BeanDefinition candidate : candidates) {
                 if (candidate.hasDeclaredStereotype(EachProperty.class)) {
-
-                    String property = candidate.stringValue(EachProperty.class).orElse(null);
+                    boolean isList = candidate.booleanValue(EachProperty.class, "list").orElse(false);
+                    String property = candidate.stringValue(ConfigurationReader.class, "prefix")
+                            .map(prefix ->
+                                    //strip the .* or [*]
+                                    prefix.substring(0, prefix.length() - (isList ? 3 : 2)))
+                            .orElseGet(() -> candidate.stringValue(EachProperty.class).orElse(null));
                     String primaryPrefix = candidate.stringValue(EachProperty.class, "primary").orElse(null);
 
                     if (StringUtils.isNotEmpty(property)) {
-                        if (candidate.booleanValue(EachProperty.class, "list").orElse(false)) {
+                        if (isList) {
                             List entries = getProperty(property, List.class, Collections.emptyList());
                             if (!entries.isEmpty()) {
                                 for (int i = 0; i < entries.size(); i++) {
