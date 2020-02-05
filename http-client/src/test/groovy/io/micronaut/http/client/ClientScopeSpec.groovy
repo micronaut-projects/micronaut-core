@@ -18,19 +18,16 @@ package io.micronaut.http.client
 import com.fasterxml.jackson.databind.DeserializationFeature
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.jackson.annotation.JacksonFeatures
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.http.annotation.Get
 import io.reactivex.Flowable
-import spock.lang.AutoCleanup
 import spock.lang.Retry
-import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -43,31 +40,32 @@ import javax.inject.Singleton
 @Retry(mode = Retry.Mode.SETUP_FEATURE_CLEANUP)
 class ClientScopeSpec extends Specification {
 
-    ApplicationContext context
-    int port
+    EmbeddedServer embeddedServer
+    ApplicationContext applicationContext
 
     void setup() {
-        port = SocketUtils.findAvailableTcpPort()
-        context = ApplicationContext.run(EmbeddedServer, [
+        embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': 'ClientScopeSpec',
                 'from.config': '/',
-                'micronaut.server.port':port,
-                'micronaut.http.services.my-service.url': "http://localhost:$port",
-                'micronaut.http.services.my-service-declared.url': "http://my-service-declared:$port",
+                'micronaut.server.port':'${random.port}',
+                'micronaut.http.services.my-service.url': 'http://localhost:${micronaut.server.port}',
+                'micronaut.http.services.my-service-declared.url': 'http://my-service-declared:${micronaut.server.port}',
                 'micronaut.http.services.my-service-declared.path': "/my-declarative-client-path",
-                'micronaut.http.services.other-service.url': "http://localhost:$port",
-                'micronaut.http.services.other-service.path': "/scope"]).applicationContext
+                'micronaut.http.services.other-service.url': 'http://localhost:${micronaut.server.port}',
+                'micronaut.http.services.other-service.path': "/scope"])
+
+        applicationContext = embeddedServer.applicationContext
     }
 
     void cleanup() {
-        context.close()
+        embeddedServer.close()
     }
 
     void "test client scope annotation method injection"() {
         given:
-        MyService myService = context.getBean(MyService)
+        MyService myService = applicationContext.getBean(MyService)
 
-        MyJavaService myJavaService = context.getBean(MyJavaService)
+        MyJavaService myJavaService = applicationContext.getBean(MyJavaService)
 
         expect:
         myService.get() == 'success'
@@ -75,14 +73,14 @@ class ClientScopeSpec extends Specification {
         myJavaService.rxHttpClient == myService.rxHttpClient
 
         cleanup:
-        context.close()
+        embeddedServer.close()
     }
 
     void "test client scope annotation field injection"() {
         given:
-        MyServiceField myService = context.getBean(MyServiceField)
+        MyServiceField myService = applicationContext.getBean(MyServiceField)
 
-        MyJavaService myJavaService = context.getBean(MyJavaService)
+        MyJavaService myJavaService = applicationContext.getBean(MyJavaService)
 
         expect:
         myService.get() == 'success'
@@ -92,9 +90,9 @@ class ClientScopeSpec extends Specification {
 
     void "test client scope annotation constructor injection"() {
         given:
-        MyServiceConstructor myService = context.getBean(MyServiceConstructor)
+        MyServiceConstructor myService = applicationContext.getBean(MyServiceConstructor)
 
-        MyJavaService myJavaService = context.getBean(MyJavaService)
+        MyJavaService myJavaService = applicationContext.getBean(MyJavaService)
 
         expect:
         myService.get() == 'success'
@@ -104,8 +102,8 @@ class ClientScopeSpec extends Specification {
 
     void "test client scope with path in annotation"() {
         given:
-        MyService myService = context.getBean(MyService)
-        MyServiceField myServiceField = context.getBean(MyServiceField)
+        MyService myService = applicationContext.getBean(MyService)
+        MyServiceField myServiceField = applicationContext.getBean(MyServiceField)
 
         expect:
         myService.getPath() == 'success'
@@ -114,7 +112,7 @@ class ClientScopeSpec extends Specification {
 
     void "test injection after declarative client"() {
         given:
-        MyDeclarativeService client = context.getBean(MyDeclarativeService)
+        MyDeclarativeService client = applicationContext.getBean(MyDeclarativeService)
 
         when:
         client.name()
@@ -123,15 +121,15 @@ class ClientScopeSpec extends Specification {
         thrown(HttpClientException)
 
         when:
-        MyJavaService myJavaService = context.getBean(MyJavaService)
+        MyJavaService myJavaService = applicationContext.getBean(MyJavaService)
 
         then:
         Flowable.fromPublisher(((DefaultHttpClient) myJavaService.client)
-                .resolveRequestURI(HttpRequest.GET("/foo"))).blockingFirst().toString() == "http://localhost:${port}/foo"
+                .resolveRequestURI(HttpRequest.GET("/foo"))).blockingFirst().toString() == "http://localhost:${embeddedServer.port}/foo"
     }
 
     void "test service definition with declarative client with jackson features"() {
-        MyServiceJacksonFeatures client = context.getBean(MyServiceJacksonFeatures)
+        MyServiceJacksonFeatures client = applicationContext.getBean(MyServiceJacksonFeatures)
 
         expect:
         client.name() == "success"
