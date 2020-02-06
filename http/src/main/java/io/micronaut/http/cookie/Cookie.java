@@ -21,7 +21,6 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
 import java.time.Duration;
-import java.time.temporal.TemporalAmount;
 
 /**
  * An interface representing a Cookie. See https://tools.ietf.org/html/rfc6265.

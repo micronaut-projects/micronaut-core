@@ -17,10 +17,7 @@ package io.micronaut.spring.core.env;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ClassUtils;
 import org.springframework.core.env.PropertyResolver;
-
-import java.util.Optional;
 
 /**
  * Adapts a {@link io.micronaut.core.value.PropertyResolver} to a Spring {@link org.springframework.core.env.PropertyResolver}.

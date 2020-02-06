@@ -34,7 +34,7 @@ class YamlPropertySourceLoaderSpec extends Specification {
         serviceDefinition.isPresent() >> true
         serviceDefinition.load() >> new YamlPropertySourceLoader()
 
-        Environment env = new DefaultEnvironment(["test"] as String[]) {
+        Environment env = new DefaultEnvironment({ ["test"] }) {
             @Override
             protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
                 GroovyClassLoader gcl = new GroovyClassLoader()
@@ -87,7 +87,7 @@ dataSource:
         serviceDefinition.isPresent() >> true
         serviceDefinition.load() >> new YamlPropertySourceLoader()
 
-        Environment env = new DefaultEnvironment(["test"] as String[]) {
+        Environment env = new DefaultEnvironment({ ["test"] }) {
             @Override
             protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
                 GroovyClassLoader gcl = new GroovyClassLoader()

@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.types.files;
 
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.server.types.CustomizableResponseType;
 

@@ -271,10 +271,8 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         type                                      | expected
         NettySystemFileCustomizableResponseType   | true
         NettyStreamedFileCustomizableResponseType | true
-        SystemFileCustomizableResponseType        | true
         StreamedFile                              | true
         File                                      | true
-        AttachedFile                              | true
         SystemFile                                | true
     }
 
@@ -344,12 +342,12 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
         @Get('/download')
         StreamedFile download() {
-            new StreamedFile(Files.newInputStream(tempFile.toPath()), "abc.html").attach("fileTypeHandlerSpec.html")
+            new StreamedFile(Files.newInputStream(tempFile.toPath()), MediaType.TEXT_HTML_TYPE).attach("fileTypeHandlerSpec.html")
         }
 
         @Get('/custom-content-type')
         HttpResponse<StreamedFile> customContentType() {
-            HttpResponse.ok(new StreamedFile(Files.newInputStream(tempFile.toPath()), "abc.html").attach("temp.html"))
+            HttpResponse.ok(new StreamedFile(Files.newInputStream(tempFile.toPath()), MediaType.TEXT_HTML_TYPE).attach("temp.html"))
                     .contentType(MediaType.TEXT_PLAIN_TYPE)
         }
 

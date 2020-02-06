@@ -78,7 +78,7 @@ class JsonPropertySourceLoaderSpec extends Specification {
         serviceDefinition.isPresent() >> true
         serviceDefinition.load() >> new JsonPropertySourceLoader()
 
-        Environment env = new DefaultEnvironment(["test"] as String[]) {
+        Environment env = new DefaultEnvironment({ ["test"] }) {
             @Override
             protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
                 GroovyClassLoader gcl = new GroovyClassLoader()

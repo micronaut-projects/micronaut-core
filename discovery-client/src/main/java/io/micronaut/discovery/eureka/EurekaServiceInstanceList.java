@@ -15,7 +15,6 @@
  */
 package io.micronaut.discovery.eureka;
 
-import io.micronaut.discovery.client.DiscoveryClientConfiguration;
 import io.micronaut.discovery.client.DiscoveryServerInstanceList;
 import io.micronaut.discovery.eureka.client.v2.EurekaClient;
 import io.micronaut.discovery.eureka.condition.RequiresEureka;

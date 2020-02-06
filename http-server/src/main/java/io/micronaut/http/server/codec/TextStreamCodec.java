@@ -25,7 +25,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.ApplicationConfiguration;
 

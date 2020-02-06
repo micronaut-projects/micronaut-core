@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
 @Requires(beans = LoggersEndpoint.class)
 @Requires(classes = ch.qos.logback.classic.LoggerContext.class)
 @Replaces(io.micronaut.logging.impl.LogbackLoggingSystem.class)
-public class LogbackLoggingSystem implements LoggingSystem {
+public class LogbackLoggingSystem implements LoggingSystem, io.micronaut.logging.LoggingSystem {
 
     @Override
     @NonNull

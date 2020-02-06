@@ -30,8 +30,6 @@ import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.Retryable;
 import io.micronaut.retry.event.RetryEvent;
 import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.executor.ExecutorType;
-import io.micronaut.scheduling.executor.UserExecutorConfiguration;
 import io.reactivex.Flowable;
 import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;

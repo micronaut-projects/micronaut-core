@@ -26,7 +26,6 @@ import io.micronaut.web.router.UriRouteMatch;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;

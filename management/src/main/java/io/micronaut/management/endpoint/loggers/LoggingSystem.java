@@ -16,10 +16,8 @@
 package io.micronaut.management.endpoint.loggers;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.micronaut.logging.LogLevel;
 
 import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 import java.util.Collection;
 
 /**
@@ -28,6 +26,7 @@ import java.util.Collection;
  * @author Matthew Moss
  * @since 1.0
  */
+@Deprecated
 public interface LoggingSystem extends io.micronaut.logging.LoggingSystem {
 
     /**

@@ -18,7 +18,6 @@ package io.micronaut.context.env;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.Toggleable;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Optional;
 
 /**
