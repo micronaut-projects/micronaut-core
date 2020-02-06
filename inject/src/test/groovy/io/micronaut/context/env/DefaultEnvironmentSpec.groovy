@@ -298,7 +298,7 @@ class DefaultEnvironmentSpec extends Specification {
     @RestoreSystemProperties
     void "test environments supplied should be a higher priority than deduced and system property"() {
         when:
-        def env = new DefaultEnvironment()
+        def env = new DefaultEnvironment({ [] })
 
         then:
         env.activeNames.size() == 1
@@ -458,7 +458,7 @@ class DefaultEnvironmentSpec extends Specification {
         env.getRequiredProperty("config.prop", String.class) == "application-first.yml"
 
         when:
-        env = new DefaultEnvironment().start()
+        env = new DefaultEnvironment({[]}).start()
 
         then: "Normal application files have the least precedence"
         env.getRequiredProperty("config.prop", String.class) == "application.yml"

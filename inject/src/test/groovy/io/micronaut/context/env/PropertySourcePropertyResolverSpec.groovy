@@ -17,6 +17,7 @@ package io.micronaut.context.env
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.value.MapPropertyResolver
@@ -223,7 +224,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         String template = "Hello \${foo}!"
         Map<String, Object> parameters = [foo: "bar"]
         PropertyResolver propertyResolver = new MapPropertyResolver(parameters)
-        DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(propertyResolver)
+        DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(propertyResolver, ConversionService.SHARED)
         List<DefaultPropertyPlaceholderResolver.Segment> segments = propertyPlaceholderResolver.buildSegments("Hello \${foo} \${bar:test}!")
 
         expect:
