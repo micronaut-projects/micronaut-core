@@ -22,7 +22,9 @@ import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 
 /**
@@ -49,9 +51,21 @@ public class JsonMediaTypeCodec extends JacksonMediaTypeCodec {
         super(objectMapper, applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
     }
 
+    /**
+     * @param objectMapper             To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration       The configuration for the codec
+     */
+    @Inject
+    public JsonMediaTypeCodec(Provider<ObjectMapper> objectMapper,
+                              ApplicationConfiguration applicationConfiguration,
+                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
+        super(objectMapper, applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
+    }
+
     @Override
     public JacksonMediaTypeCodec cloneWithFeatures(JacksonFeatures jacksonFeatures) {
-        ObjectMapper objectMapper = this.objectMapper.copy();
+        ObjectMapper objectMapper = getObjectMapper().copy();
         jacksonFeatures.getDeserializationFeatures().forEach(objectMapper::configure);
         jacksonFeatures.getSerializationFeatures().forEach(objectMapper::configure);
 
