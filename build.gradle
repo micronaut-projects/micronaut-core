@@ -735,7 +735,7 @@ subprojects { Project subproject ->
         testImplementation "cglib:cglib-nodep:3.3.0"
         testImplementation "org.objenesis:objenesis:3.1"
 
-        testRuntimeOnly "ch.qos.logback:logback-classic:$logbackVersion"
+        testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
         testImplementation "org.codehaus.groovy:groovy-test:$groovyVersion"
         compileOnly "org.ow2.asm:asm:$asmVersion"
         compileOnly "org.ow2.asm:asm-commons:$asmVersion"
