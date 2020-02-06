@@ -263,6 +263,11 @@ ext {
                     name   : 'junit-jupiter-api',
                     modules: ['junit-jupiter-engine', 'junit-jupiter-params']
             ],
+            'junitVintage'         : [
+                    version: junit5Version,
+                    group  : 'org.junit.vintage',
+                    name   : 'junit-vintage-engine'
+            ],
             'micronaut.xml':[
                 version:micronautXmlVersion,
                 group:'io.micronaut.xml',
@@ -730,7 +735,7 @@ subprojects { Project subproject ->
         testImplementation "cglib:cglib-nodep:3.3.0"
         testImplementation "org.objenesis:objenesis:3.1"
 
-        testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
+        testRuntimeOnly "ch.qos.logback:logback-classic:$logbackVersion"
         testImplementation "org.codehaus.groovy:groovy-test:$groovyVersion"
         compileOnly "org.ow2.asm:asm:$asmVersion"
         compileOnly "org.ow2.asm:asm-commons:$asmVersion"
