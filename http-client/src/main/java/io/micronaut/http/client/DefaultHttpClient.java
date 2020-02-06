@@ -103,6 +103,7 @@ import io.netty.util.concurrent.Future;
 import io.reactivex.*;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Cancellable;
+import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
@@ -1375,6 +1376,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param requestURI         The URI of the request
      * @param requestContentType The request content type
      * @param permitsBody        Whether permits body
+     * @param onError            Called when the body publisher encounters an error
      * @return A {@link NettyRequestWriter}
      * @throws HttpPostRequestEncoder.ErrorDataEncoderException if there is an encoder exception
      */
@@ -1382,7 +1384,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             io.micronaut.http.MutableHttpRequest request,
             URI requestURI,
             MediaType requestContentType,
-            boolean permitsBody) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+            boolean permitsBody,
+            Consumer<? super Throwable> onError) throws HttpPostRequestEncoder.ErrorDataEncoderException {
 
         io.netty.handler.codec.http.HttpRequest nettyRequest;
         NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) request;
@@ -1434,6 +1437,17 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                     log.trace("Sending Bytes Chunk. Length: {}", bodyBytes.length);
                                 }
                                 return new DefaultHttpContent(Unpooled.wrappedBuffer(bodyBytes));
+                            } else if (o instanceof ByteBuffer) {
+                                ByteBuffer<?> byteBuffer = (ByteBuffer<?>) o;
+                                Object nativeBuffer = byteBuffer.asNativeBuffer();
+                                if (log.isTraceEnabled()) {
+                                    log.trace("Sending Bytes Chunk. Length: {}", byteBuffer.readableBytes());
+                                }
+                                if (nativeBuffer instanceof ByteBuf) {
+                                    return new DefaultHttpContent((ByteBuf) nativeBuffer);
+                                } else {
+                                    return new DefaultHttpContent(Unpooled.wrappedBuffer(byteBuffer.toByteArray()));
+                                }
                             } else if (mediaTypeCodecRegistry != null) {
                                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
                                 ByteBuf encoded = registeredCodec.map(codec -> (ByteBuf) codec.encode(o, byteBufferFactory).asNativeBuffer())
@@ -1468,6 +1482,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                     Flowable.fromCallable(HttpContentUtil::closeBracket)
                             );
                         }
+
+                        requestBodyPublisher = requestBodyPublisher.doOnError(onError);
 
                         nettyRequest = clientHttpRequest.getStreamedRequest(
                                 requestBodyPublisher
@@ -1520,7 +1536,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(finalRequest.getMethod());
 
         NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) finalRequest;
-        NettyRequestWriter requestWriter = buildNettyRequest(clientHttpRequest, requestURI, requestContentType, permitsBody);
+        NettyRequestWriter requestWriter = buildNettyRequest(clientHttpRequest, requestURI, requestContentType, permitsBody, emitter::tryOnError);
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
 
         prepareHttpHeaders(
@@ -1555,7 +1571,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             FlowableEmitter<io.micronaut.http.HttpResponse<Object>> emitter,
             Channel channel) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        NettyRequestWriter requestWriter = prepareRequest(requestWrapper.get(), requestURI);
+        NettyRequestWriter requestWriter = prepareRequest(requestWrapper.get(), requestURI, emitter);
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
         ChannelPipeline pipeline = channel.pipeline();
         pipeline.addLast(HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandler<StreamedHttpResponse>() {
@@ -2071,14 +2087,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         );
     }
 
-    private <I> NettyRequestWriter prepareRequest(io.micronaut.http.HttpRequest<I> request, URI requestURI) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+    private <I> NettyRequestWriter prepareRequest(io.micronaut.http.HttpRequest<I> request, URI requestURI, FlowableEmitter<io.micronaut.http.HttpResponse<Object>> emitter) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         MediaType requestContentType = request
                 .getContentType()
                 .orElse(MediaType.APPLICATION_JSON_TYPE);
 
         boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod());
         NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) request;
-        NettyRequestWriter requestWriter = buildNettyRequest(clientHttpRequest, requestURI, requestContentType, permitsBody);
+        NettyRequestWriter requestWriter = buildNettyRequest(clientHttpRequest, requestURI, requestContentType, permitsBody, emitter::tryOnError);
         io.netty.handler.codec.http.HttpRequest nettyRequest = requestWriter.getNettyRequest();
         prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody, true);
         return requestWriter;

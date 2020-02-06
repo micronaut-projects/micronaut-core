@@ -31,12 +31,15 @@ import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
+
+import javax.inject.Provider;
 
 /**
  * A {@link MediaTypeCodec} Jackson based implementations.
@@ -47,23 +50,24 @@ import io.micronaut.runtime.ApplicationConfiguration;
  */
 public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
 
-    protected final ObjectMapper objectMapper;
     protected final ApplicationConfiguration applicationConfiguration;
     protected final List<MediaType> additionalTypes;
     protected final CodecConfiguration codecConfiguration;
     protected final MediaType mediaType;
+    private final Provider<ObjectMapper> objectMapperProvider;
+    private ObjectMapper objectMapper;
 
     /**
-     * @param objectMapper             To read/write JSON
+     * @param objectMapperProvider     To read/write JSON
      * @param applicationConfiguration The common application configurations
      * @param codecConfiguration       The configuration for the codec
      * @param mediaType                Client request/response media type
      */
-    public JacksonMediaTypeCodec(ObjectMapper objectMapper,
+    public JacksonMediaTypeCodec(Provider<ObjectMapper> objectMapperProvider,
                                  ApplicationConfiguration applicationConfiguration,
                                  CodecConfiguration codecConfiguration,
                                  MediaType mediaType) {
-        this.objectMapper = objectMapper;
+        this.objectMapperProvider = objectMapperProvider;
         this.applicationConfiguration = applicationConfiguration;
         this.codecConfiguration = codecConfiguration;
         this.mediaType = mediaType;
@@ -75,9 +79,34 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
     }
 
     /**
+     * @param objectMapper             To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration       The configuration for the codec
+     * @param mediaType                Client request/response media type
+     */
+    public JacksonMediaTypeCodec(ObjectMapper objectMapper,
+                                 ApplicationConfiguration applicationConfiguration,
+                                 CodecConfiguration codecConfiguration,
+                                 MediaType mediaType) {
+        this(() -> objectMapper, applicationConfiguration, codecConfiguration, mediaType);
+        ArgumentUtils.requireNonNull("objectMapper", objectMapper);
+        this.objectMapper = objectMapper;
+    }
+
+    /**
      * @return The object mapper
      */
     public ObjectMapper getObjectMapper() {
+        ObjectMapper objectMapper = this.objectMapper;
+        if (objectMapper == null) {
+            synchronized (this) { // double check
+                objectMapper = this.objectMapper;
+                if (objectMapper == null) {
+                    objectMapper = objectMapperProvider.get();
+                    this.objectMapper = objectMapper;
+                }
+            }
+        }
         return objectMapper;
     }
 
@@ -108,9 +137,9 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
         try {
             if (type.hasTypeVariables()) {
                 JavaType javaType = constructJavaType(type);
-                return objectMapper.readValue(inputStream, javaType);
+                return getObjectMapper().readValue(inputStream, javaType);
             } else {
-                return objectMapper.readValue(inputStream, type.getType());
+                return getObjectMapper().readValue(inputStream, type.getType());
             }
         } catch (IOException e) {
             throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage());
@@ -122,13 +151,13 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
      *
      * @param type The type
      * @param node The Json Node
-     * @param <T> The generic type
+     * @param <T>  The generic type
      * @return The decoded object
      * @throws CodecException When object cannot be decoded
      */
     public <T> T decode(Argument<T> type, JsonNode node) throws CodecException {
         try {
-            return objectMapper.treeToValue(node, type.getType());
+            return getObjectMapper().treeToValue(node, type.getType());
         } catch (IOException e) {
             throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
@@ -141,9 +170,9 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
                 return (T) buffer.toString(applicationConfiguration.getDefaultCharset());
             } else if (type.hasTypeVariables()) {
                 JavaType javaType = constructJavaType(type);
-                return objectMapper.readValue(buffer.toByteArray(), javaType);
+                return getObjectMapper().readValue(buffer.toByteArray(), javaType);
             } else {
-                return objectMapper.readValue(buffer.toByteArray(), type.getType());
+                return getObjectMapper().readValue(buffer.toByteArray(), type.getType());
             }
         } catch (IOException e) {
             throw new CodecException("Error decoding stream for type [" + type.getType() + "]: " + e.getMessage(), e);
@@ -156,9 +185,9 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
         try {
             if (type.hasTypeVariables()) {
                 JavaType javaType = constructJavaType(type);
-                return objectMapper.readValue(data, javaType);
+                return getObjectMapper().readValue(data, javaType);
             } else {
-                return objectMapper.readValue(data, type.getType());
+                return getObjectMapper().readValue(data, type.getType());
             }
         } catch (IOException e) {
             throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
@@ -168,7 +197,7 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
     @Override
     public <T> void encode(T object, OutputStream outputStream) throws CodecException {
         try {
-            objectMapper.writeValue(outputStream, object);
+            getObjectMapper().writeValue(outputStream, object);
         } catch (IOException e) {
             throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
         }
@@ -180,7 +209,7 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
             if (object instanceof byte[]) {
                 return (byte[]) object;
             } else {
-                return objectMapper.writeValueAsBytes(object);
+                return getObjectMapper().writeValueAsBytes(object);
             }
         } catch (JsonProcessingException e) {
             throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
@@ -194,7 +223,7 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
     }
 
     private <T> JavaType constructJavaType(Argument<T> type) {
-        TypeFactory typeFactory = objectMapper.getTypeFactory();
+        TypeFactory typeFactory = getObjectMapper().getTypeFactory();
         return JacksonConfiguration.constructType(type, typeFactory);
     }
 
