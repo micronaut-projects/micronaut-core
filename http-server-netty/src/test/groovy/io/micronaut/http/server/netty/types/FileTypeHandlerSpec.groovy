@@ -292,7 +292,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
         @Get('/download')
         SystemFile download() {
-            new SystemFile(tempFile)
+            new SystemFile(tempFile).attach("fileTypeHandlerSpec ")
         }
 
         @Get('/custom-cache-control')

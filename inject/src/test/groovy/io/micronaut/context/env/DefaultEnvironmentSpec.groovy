@@ -36,7 +36,7 @@ class DefaultEnvironmentSpec extends Specification {
     void "test environment system property resolve"() {
         given:
         System.setProperty("test.foo.bar", "10")
-        Environment env = new DefaultEnvironment("test").start()
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
 
         expect:
         env.getProperty("test.foo.bar", Integer).get() == 10
@@ -49,7 +49,7 @@ class DefaultEnvironmentSpec extends Specification {
         System.setProperty("test.foo.bar", "10")
         System.setProperty("test.bar.foo", "30")
         System.setProperty("test.foo.baz", "20")
-        Environment env = new DefaultEnvironment("test").start()
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
 
         expect:
         env.getProperty("test.foo", Map.class).get() == [bar: "10", baz: "20"]
@@ -58,7 +58,7 @@ class DefaultEnvironmentSpec extends Specification {
     void "test environment system property refresh"() {
         when:
         System.setProperty("test.foo.bar", "10")
-        Environment env = new DefaultEnvironment("test").start()
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
 
         then:
         env.getProperty("test.foo.bar", Integer).get() == 10
@@ -78,7 +78,7 @@ class DefaultEnvironmentSpec extends Specification {
     void "test getting environments from a system property"() {
         when:
         System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "foo ,x")
-        Environment env = new DefaultEnvironment("test").start()
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
 
         then:
         env.activeNames.contains("foo")
@@ -88,7 +88,7 @@ class DefaultEnvironmentSpec extends Specification {
 
         when:
         System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "")
-        env = new DefaultEnvironment("test").start()
+        env = new DefaultEnvironment({ ["test"] }).start()
 
         then:
         !env.activeNames.contains("foo")
@@ -103,7 +103,7 @@ class DefaultEnvironmentSpec extends Specification {
         System.setProperty("micronaut.config.files", "${configPropertiesFile.absolutePath}")
 
         when: "load the property sources"
-        Environment env = new DefaultEnvironment("test").start()
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
 
         then: "should be loaded from property source"
         env.getProperty("foo", String).get() == "bar"
@@ -142,7 +142,7 @@ class DefaultEnvironmentSpec extends Specification {
         System.setProperty("micronaut.config.files", "${configPropertiesFile.absolutePath}")
 
         and:
-        env = new DefaultEnvironment("test").start()
+        env = new DefaultEnvironment({ ["test"] }).start()
 
         then:
         env.getProperty("foo.baz", Integer).get() == 10
@@ -151,7 +151,7 @@ class DefaultEnvironmentSpec extends Specification {
         System.setProperty("micronaut.config.files", "")
 
         then: "should start normally"
-        new DefaultEnvironment("test").start()
+        new DefaultEnvironment({ ["test"] }).start()
 
         when: "file is is passed as file:path"
         System.clearProperty("foo.baz")
@@ -160,7 +160,7 @@ class DefaultEnvironmentSpec extends Specification {
         System.setProperty("micronaut.config.files", "file:${configPropertiesFile.absolutePath}")
 
         and:
-        env = new DefaultEnvironment("test").start()
+        env = new DefaultEnvironment({ ["test"] }).start()
 
         then: "property is set"
         env.getProperty("foo.baz", Integer).get() == 100
@@ -274,7 +274,7 @@ class DefaultEnvironmentSpec extends Specification {
     void "test invalid config file location"() {
         when: "loading properties sources from both system properties and environment variables"
         System.setProperty("micronaut.config.files", "/does/not/exist.yaml")
-        new DefaultEnvironment("test").start()
+        new DefaultEnvironment({ ["test"] }).start()
 
         then:
         def ex = thrown(ConfigurationException)
@@ -286,7 +286,7 @@ class DefaultEnvironmentSpec extends Specification {
         System.setProperty('micronaut.environments', 'cloud, ec2, foo, bar, foo,baz,ec2,cloud,cloud')
 
         and: "setup environment"
-        def env = new DefaultEnvironment("x", "x", "y")
+        def env = new DefaultEnvironment({ ["x", "x", "y"] })
 
         when: "create environment and fetch active env names"
         def envNames = env.getActiveNames().toList()
@@ -305,7 +305,7 @@ class DefaultEnvironmentSpec extends Specification {
         env.activeNames[0] == "test"
 
         when:
-        env = new DefaultEnvironment("explicit")
+        env = new DefaultEnvironment({ ["explicit"] })
 
         then:
         env.activeNames.size() == 2
@@ -314,7 +314,7 @@ class DefaultEnvironmentSpec extends Specification {
 
         when:
         System.setProperty("micronaut.environments", "system,property")
-        env = new DefaultEnvironment("explicit")
+        env = new DefaultEnvironment({["explicit"]})
 
         then:
         env.activeNames.size() == 4
@@ -362,7 +362,7 @@ class DefaultEnvironmentSpec extends Specification {
 
     void "test add and remove property sources"() {
         given:
-        Environment env = new DefaultEnvironment("test").start()
+        Environment env = new DefaultEnvironment({["test"]}).start()
         PropertySource propertySource = PropertySource.of("test", [foo: 'bar'])
 
         when:
@@ -395,7 +395,7 @@ class DefaultEnvironmentSpec extends Specification {
     }
 
     void "test custom property source is not removed after refresh 2"() {
-        def env = new DefaultEnvironment("test")
+        def env = new DefaultEnvironment({["test"]})
         env.addPropertySource(new MapPropertySource('static', [static: true]))
         env.start()
 
@@ -418,41 +418,41 @@ class DefaultEnvironmentSpec extends Specification {
         System.setProperty("micronaut.config.files", "classpath:config-files.yml,classpath:config-files2.yml")
         System.setProperty("config.prop", "system-property")
         environmentVariables.set("CONFIG_PROP", "env-var")
-        Environment env = new DefaultEnvironment("first", "second").start()
+        Environment env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "System properties have highest precedence"
         env.getRequiredProperty("config.prop", String.class) == "system-property"
 
         when:
         System.clearProperty("config.prop")
-        env = new DefaultEnvironment("first", "second").start()
+        env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "Environment variables have next highest precedence"
         env.getRequiredProperty("config.prop", String.class) == "env-var"
 
         when:
         environmentVariables.clear("CONFIG_PROP")
-        env = new DefaultEnvironment("first", "second").start()
+        env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "Config files last in the list have precedence over those first in the list"
         env.getRequiredProperty("config.prop", String.class) == "config-files2.yml"
 
         when:
         System.setProperty("micronaut.config.files", "classpath:config-files.yml")
-        env = new DefaultEnvironment("first", "second").start()
+        env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "Config files have precedence over application-*.* files"
         env.getRequiredProperty("config.prop", String.class) == "config-files.yml"
 
         when:
         System.clearProperty("micronaut.config.files")
-        env = new DefaultEnvironment("first", "second").start()
+        env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "Environments last in the list have precedence over those first in the list"
         env.getRequiredProperty("config.prop", String.class) == "application-second.yml"
 
         when:
-        env = new DefaultEnvironment("first").start()
+        env = new DefaultEnvironment({["first"]}).start()
 
         then: "Environments files have precedence over normal files"
         env.getRequiredProperty("config.prop", String.class) == "application-first.yml"
@@ -465,7 +465,7 @@ class DefaultEnvironmentSpec extends Specification {
     }
 
     private static Environment startEnv(String files) {
-        new DefaultEnvironment("test") {
+        new DefaultEnvironment({["test"]}) {
             protected String readPropertySourceListKeyFromEnvironment() {
                 files
             }
