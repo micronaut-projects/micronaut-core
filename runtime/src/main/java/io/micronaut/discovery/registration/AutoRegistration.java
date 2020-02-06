@@ -18,8 +18,8 @@ package io.micronaut.discovery.registration;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.event.AbstractServiceInstanceEvent;
-import io.micronaut.discovery.event.ServiceShutdownEvent;
-import io.micronaut.discovery.event.ServiceStartedEvent;
+import io.micronaut.discovery.event.ServiceStoppedEvent;
+import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.discovery.exceptions.DiscoveryException;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatEvent;
@@ -54,9 +54,9 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
     @Override
     public void onApplicationEvent(AbstractServiceInstanceEvent event) {
         if (registrationConfiguration.isEnabled()) {
-            if (event instanceof ServiceStartedEvent) {
+            if (event instanceof ServiceReadyEvent) {
                 register(event.getSource());
-            } else if (event instanceof ServiceShutdownEvent) {
+            } else if (event instanceof ServiceStoppedEvent) {
                 if (registrationConfiguration.isDeregister()) {
                     deregister(event.getSource());
                 }

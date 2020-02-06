@@ -770,11 +770,24 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             // can't use orElseThrow here due to compiler bug
             try {
                 String valueAnnStr = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
-                Class argumentType = argument.getType();
+
+                Class argumentType;
+                boolean isCollection = false;
+                if (Collection.class.isAssignableFrom(argument.getType())) {
+                    argumentType = argument.getFirstTypeVariable().map(Argument::getType).orElse((Class) Object.class);
+                    isCollection = true;
+                } else {
+                    argumentType = argument.getType();
+                }
 
                 if (isInnerConfiguration(argumentType)) {
                     Qualifier qualifier = resolveQualifier(resolutionContext, argument, true);
-                    return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+                    if (isCollection) {
+                        Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
+                        return coerceCollectionToCorrectType(argument.getType(), beans);
+                    } else {
+                        return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+                    }
                 } else {
                     String argumentName = argument.getName();
                     String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);
@@ -826,7 +839,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class type = argument.getType();
             boolean isConfigProps = type.isAnnotationPresent(ConfigurationProperties.class);
-            boolean result = isConfigProps || Map.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
+            boolean result = isConfigProps || Map.class.isAssignableFrom(type) || Collection.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
             if (!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(argument.getName());
                 if (cliOption != null) {
@@ -999,7 +1012,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pushConstructorResolve(this, argument);
                 try {
                     Object bean;
-                    Qualifier qualifier = resolveQualifier(resolutionContext, argument, isInnerConfiguration(argumentType));
+                    Qualifier qualifier = resolveQualifier(resolutionContext, argument, isInnerConfiguration(argument.getType()));
                     if (Qualifier.class.isAssignableFrom(argumentType)) {
                         bean = qualifier;
                     } else {
@@ -1204,16 +1217,29 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             if (context instanceof PropertyResolver) {
                 final AnnotationMetadata annotationMetadata = injectionPoint.getAnnotationMetadata();
                 String valueAnnVal = annotationMetadata.stringValue(Value.class).orElse(null);
-                Class<?> fieldType = injectionPoint.getType();
-                if (isInnerConfiguration(fieldType)) {
-                    Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint.asArgument(), true);
-                    return ((DefaultBeanContext) context).getBean(resolutionContext, fieldType, qualifier);
+                Argument<?> fieldArgument = injectionPoint.asArgument();
+
+                Class argumentType;
+                boolean isCollection = false;
+                if (Collection.class.isAssignableFrom(injectionPoint.getType())) {
+                    argumentType = fieldArgument.getFirstTypeVariable().map(Argument::getType).orElse((Class) Object.class);
+                    isCollection = true;
+                } else {
+                    argumentType = fieldArgument.getType();
+                }
+                if (isInnerConfiguration(argumentType)) {
+                    Qualifier qualifier = resolveQualifier(resolutionContext, fieldArgument, true);
+                    if (isCollection) {
+                        Collection beans = ((DefaultBeanContext) context).getBeansOfType(resolutionContext, argumentType, qualifier);
+                        return coerceCollectionToCorrectType(fieldArgument.getType(), beans);
+                    } else {
+                        return ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+                    }
                 } else {
                     String valString = resolvePropertyValueName(resolutionContext, injectionPoint, valueAnnVal, annotationMetadata);
-                    Argument fieldArgument = injectionPoint.asArgument();
                     ArgumentConversionContext conversionContext = ConversionContext.of(fieldArgument);
                     Optional value = resolveValue((ApplicationContext) context, conversionContext, valueAnnVal != null, valString);
-                    if (fieldType == Optional.class) {
+                    if (argumentType == Optional.class) {
                         return resolveOptionalObject(value);
                     } else {
                         if (value.isPresent()) {
@@ -1311,7 +1337,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class fieldType = injectionPoint.getType();
             boolean isConfigProps = fieldType.isAnnotationPresent(ConfigurationProperties.class);
-            boolean result = isConfigProps || Map.class.isAssignableFrom(fieldType) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
+            boolean result = isConfigProps || Map.class.isAssignableFrom(fieldType) || Collection.class.isAssignableFrom(fieldType) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
             if (!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(injectionPoint.getName());
                 if (cliOption != null) {

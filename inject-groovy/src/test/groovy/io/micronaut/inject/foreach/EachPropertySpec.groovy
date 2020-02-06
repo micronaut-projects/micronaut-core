@@ -21,8 +21,10 @@ import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.EachBean
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
+import io.micronaut.core.order.Ordered
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
@@ -161,7 +163,6 @@ class EachPropertySpec extends Specification {
         bean2.defaultValue == 9999
         bean2.primitiveDefaultValue == 9999
         bean2.inner.enabled == 'false'
-
     }
 
     void "test configuration properties binding by bean type"() {
@@ -375,6 +376,82 @@ class EachPropertySpec extends Specification {
         applicationContext.streamOfType(MyConfiguration).count() == 0
     }
 
+    void "test configuration properties array"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'array': [['name': 'Sally'], ['name': 'John']]
+        ]))
+        applicationContext.start()
+
+        when:
+        Collection<ArrayProperties> props = applicationContext.getBeansOfType(ArrayProperties)
+
+        then:
+        props.size() == 2
+        props[0].name == "Sally"
+        props[1].name == "John"
+    }
+
+    void "test eachproperty inner class of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer.name': 'Outer',
+                'outer.inner.sally.age': 20,
+                'outer.inner.joe.age': 30
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterProperties props = applicationContext.getBean(OuterProperties)
+
+        then:
+        props.name == 'Outer'
+        props.inner.size() == 2
+        props.inner.any { it.age == 20 }
+        props.inner.any { it.age == 30 }
+    }
+
+    void "test field injection eachproperty inner class of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer-field.name': 'Outer',
+                'outer-field.inner.sally.age': 20,
+                'outer-field.inner.joe.age': 30
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterFieldProperties props = applicationContext.getBean(OuterFieldProperties)
+
+        then:
+        props.name == 'Outer'
+        props.inner.size() == 2
+        props.inner.any { it.age == 20 }
+        props.inner.any { it.age == 30 }
+    }
+
+    void "test eachproperty list inner class of config props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of('test', [
+                'outer-list.name': 'Outer',
+                'outer-list.inner-list': [['age': 20], ['age': 30]]
+        ]))
+        applicationContext.start()
+
+        when:
+        OuterListProperties props = applicationContext.getBean(OuterListProperties)
+
+        then:
+        props.name == 'Outer'
+        props.innerList.size() == 2
+        props.innerList.any { it.age == 20 }
+        props.innerList.any { it.age == 30 }
+    }
+
 }
 
 @EachBean(MyConfiguration)
@@ -454,6 +531,57 @@ class MyConfigurationWithPrimary {
     @ConfigurationProperties("inner")
     static class Inner {
         String enabled
+    }
+}
+
+@EachProperty(value = "array", list = true)
+class ArrayProperties implements Ordered {
+    String name
+    private final int index
+
+    ArrayProperties(@Parameter Integer index) {
+        this.index = index
+    }
+
+    @Override
+    int getOrder() {
+        index
+    }
+}
+
+@ConfigurationProperties("outer")
+class OuterProperties {
+
+    String name
+    List<InnerEach> inner
+
+    @EachProperty("inner")
+    static class InnerEach {
+        Integer age
+    }
+}
+
+@ConfigurationProperties("outer-field")
+class OuterFieldProperties {
+
+    String name
+    protected List<InnerEach> inner
+
+    @EachProperty("inner")
+    static class InnerEach {
+        Integer age
+    }
+}
+
+@ConfigurationProperties("outer-list")
+class OuterListProperties {
+
+    String name
+    List<InnerEachList> innerList
+
+    @EachProperty(value = "inner-list", list = true)
+    static class InnerEachList {
+        Integer age
     }
 }
 

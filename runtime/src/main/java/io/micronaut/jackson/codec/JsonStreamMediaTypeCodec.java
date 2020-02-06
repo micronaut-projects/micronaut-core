@@ -22,7 +22,9 @@ import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -49,6 +51,23 @@ public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
      * @param codecConfiguration       The configuration for the codec
      */
     public JsonStreamMediaTypeCodec(ObjectMapper objectMapper,
+                                    ApplicationConfiguration applicationConfiguration,
+                                    @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
+        super(objectMapper, applicationConfiguration, null);
+        if (codecConfiguration != null) {
+            this.additionalTypes = codecConfiguration.getAdditionalTypes();
+        } else {
+            this.additionalTypes = Collections.emptyList();
+        }
+    }
+
+    /**
+     * @param objectMapper             To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration       The configuration for the codec
+     */
+    @Inject
+    public JsonStreamMediaTypeCodec(Provider<ObjectMapper> objectMapper,
                                     ApplicationConfiguration applicationConfiguration,
                                     @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         super(objectMapper, applicationConfiguration, null);

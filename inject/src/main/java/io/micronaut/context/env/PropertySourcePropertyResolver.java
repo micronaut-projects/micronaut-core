@@ -140,7 +140,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     if (entries == null) {
                         return false;
                     } else {
-
                         return entries.containsKey(finalName);
                     }
                 });
@@ -162,7 +161,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 if (entries == null) {
                     return false;
                 } else {
-
                     if (entries.containsKey(trimmedName)) {
                         return true;
                     } else {
@@ -494,13 +492,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     int i = resolvedProperty.indexOf('[');
                     if (i > -1) {
                         String propertyName = resolvedProperty.substring(0, i);
-                        Map entries = resolveEntriesForKey(propertyName, true, null);
+                        Map<String, Object> entries = resolveEntriesForKey(propertyName, true, null);
                         if (entries != null) {
-                            processProperty(resolvedProperty.substring(i), val -> entries.put(propertyName, val), () -> entries.get(propertyName), value);
+                            entries.put(resolvedProperty, value);
+                            expandProperty(resolvedProperty.substring(i), val -> entries.put(propertyName, val), () -> entries.get(propertyName), value);
                         }
                     } else {
-                        Map entries = resolveEntriesForKey(resolvedProperty, true, null);
+                        Map<String, Object> entries = resolveEntriesForKey(resolvedProperty, true, null);
                         if (entries != null) {
+                            if (value instanceof List || value instanceof Map) {
+                                collapseProperty(resolvedProperty, entries, value);
+                            }
                             entries.put(resolvedProperty, value);
                         }
                     }
@@ -514,7 +516,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         }
     }
 
-    private void processProperty(String property, Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
+    private void expandProperty(String property, Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
         if (StringUtils.isEmpty(property)) {
             containerSet.accept(actualValue);
             return;
@@ -536,7 +538,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 }
                 fill(list, number, null);
 
-                processProperty(propertyRest, val -> list.set(number, val), () -> list.get(number), actualValue);
+                expandProperty(propertyRest, val -> list.set(number, val), () -> list.get(number), actualValue);
             } else {
                 Map map;
                 if (container instanceof Map) {
@@ -546,7 +548,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     containerSet.accept(map);
                 }
 
-                processProperty(propertyRest, val -> map.put(propertyIndex, val), () -> map.get(propertyIndex), actualValue);
+                expandProperty(propertyRest, val -> map.put(propertyIndex, val), () -> map.get(propertyIndex), actualValue);
             }
         } else if (property.startsWith(".")) {
             String propertyName;
@@ -566,7 +568,27 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 map = new LinkedHashMap(10);
                 containerSet.accept(map);
             }
-            processProperty(propertyRest, val -> map.put(propertyName, val), () -> map.get(propertyName), actualValue);
+            expandProperty(propertyRest, val -> map.put(propertyName, val), () -> map.get(propertyName), actualValue);
+        }
+    }
+
+    private void collapseProperty(String prefix, Map<String, Object> entries, Object value) {
+        if (value instanceof List) {
+            for (int i = 0; i < ((List) value).size(); i++) {
+                Object item = ((List) value).get(i);
+                if (item != null) {
+                    collapseProperty(prefix + "[" + i + "]", entries, item);
+                }
+            }
+        } else if (value instanceof Map) {
+            for (Map.Entry<?, ?> entry: ((Map<?, ?>) value).entrySet()) {
+                Object key = entry.getKey();
+                if (key instanceof CharSequence) {
+                    collapseProperty(prefix + "." + ((CharSequence) key).toString(), entries, entry.getValue());
+                }
+            }
+        } else {
+            entries.put(prefix, value);
         }
     }
 
@@ -773,7 +795,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     private String trimIndex(String name) {
-        int i = name.indexOf('[');
+        int i = name.lastIndexOf('[');
         if (i > -1 && name.endsWith("]")) {
             name = name.substring(0, i);
         }
