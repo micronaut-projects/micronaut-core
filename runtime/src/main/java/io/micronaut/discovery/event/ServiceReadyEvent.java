@@ -18,12 +18,12 @@ package io.micronaut.discovery.event;
 import io.micronaut.discovery.ServiceInstance;
 
 /**
- * An event fired when registering a service.
+ * An event fired when a service has completed starting and is ready to service requests.
  *
  * @author graemerocher
  * @since 1.0
  */
-public class ServiceStartedEvent extends AbstractServiceInstanceEvent {
+public class ServiceReadyEvent extends AbstractServiceInstanceEvent {
 
     /**
      * Constructs a prototypical Event.
@@ -32,7 +32,7 @@ public class ServiceStartedEvent extends AbstractServiceInstanceEvent {
      * @throws IllegalArgumentException if source is null.
      */
 
-    public ServiceStartedEvent(ServiceInstance source) {
+    public ServiceReadyEvent(ServiceInstance source) {
         super(source);
     }
 }

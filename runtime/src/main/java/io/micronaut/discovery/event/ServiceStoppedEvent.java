@@ -18,12 +18,12 @@ package io.micronaut.discovery.event;
 import io.micronaut.discovery.ServiceInstance;
 
 /**
- * An event triggered when de-registering a {@link ServiceInstance}.
+ * An event triggered when a {@link ServiceInstance} has shutdown and will no longer service requests.
  *
  * @author graemerocher
  * @since 1.0
  */
-public class ServiceShutdownEvent extends AbstractServiceInstanceEvent {
+public class ServiceStoppedEvent extends AbstractServiceInstanceEvent {
 
     /**
      * Constructs a prototypical Event.
@@ -31,7 +31,7 @@ public class ServiceShutdownEvent extends AbstractServiceInstanceEvent {
      * @param source The object on which the Event initially occurred.
      * @throws IllegalArgumentException if source is null.
      */
-    public ServiceShutdownEvent(ServiceInstance source) {
+    public ServiceStoppedEvent(ServiceInstance source) {
         super(source);
     }
 }

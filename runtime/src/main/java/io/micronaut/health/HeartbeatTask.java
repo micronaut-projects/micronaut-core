@@ -18,7 +18,7 @@ package io.micronaut.health;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.event.ServiceStartedEvent;
+import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.scheduling.annotation.Scheduled;
 
 import javax.inject.Singleton;
@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 @Singleton
 @HeartbeatEnabled
-public class HeartbeatTask implements ApplicationEventListener<ServiceStartedEvent> {
+public class HeartbeatTask implements ApplicationEventListener<ServiceReadyEvent> {
 
     private AtomicReference<ServiceInstance> eventReference = new AtomicReference<>();
 
@@ -64,7 +64,7 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceStartedEve
     }
 
     @Override
-    public void onApplicationEvent(ServiceStartedEvent event) {
+    public void onApplicationEvent(ServiceReadyEvent event) {
         eventReference.set(event.getSource());
     }
 }

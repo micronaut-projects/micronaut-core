@@ -26,8 +26,8 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.discovery.event.ServiceShutdownEvent;
-import io.micronaut.discovery.event.ServiceStartedEvent;
+import io.micronaut.discovery.event.ServiceStoppedEvent;
+import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
@@ -507,7 +507,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         applicationContext.publishEvent(new ServerStartupEvent(this));
         applicationName.ifPresent(id -> {
             this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-            applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
+            applicationContext.publishEvent(new ServiceReadyEvent(serviceInstance));
         });
     }
 
@@ -529,7 +529,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             webSocketSessions.close();
             applicationContext.publishEvent(new ServerShutdownEvent(this));
             if (serviceInstance != null) {
-                applicationContext.publishEvent(new ServiceShutdownEvent(serviceInstance));
+                applicationContext.publishEvent(new ServiceStoppedEvent(serviceInstance));
             }
             if (applicationContext.isRunning()) {
                 applicationContext.stop();

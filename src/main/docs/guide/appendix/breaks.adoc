@@ -10,6 +10,20 @@ In Micronaut 2.x and above this is no longer the case and if you need an api:inj
 
 The JSR-305 annotations library (`com.google.code.findbugs:jsr305`) is no longer a dependency (replaced by `spotbugs-annotations`). If you need this library you will need to add it manually.
 
+=== Events Renamed
+
+The following events were renamed to avoid confusion with other events of similar names:
+
+|===
+| Old Name|New Name
+
+| `io.micronaut.discovery.event.ServiceStartedEvent`
+| api:discovery.event.ServiceReadyEvent[]
+
+| `io.micronaut.discovery.event.ServiceShutdownEvent`
+| api:discovery.event.ServiceStoppedEvent[]
+|===
+
 === Source Retention Annotations No Longer Retained in Runtime Metadata
 
 In Micronaut 1.x annotations specified as source retention were still retained in the api:core.annotation.AnnotationMetadata[] interface. As of Micronaut 2.x this is no longer the case with source retention annotations only available within the compiler APIs.
