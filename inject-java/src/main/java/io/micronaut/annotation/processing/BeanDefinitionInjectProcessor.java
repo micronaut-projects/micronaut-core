@@ -1251,7 +1251,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     if (!isAnnotationReference && executableMethodWriter != null) {
                         aroundMethodMetadata = new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata);
                     } else {
-                        aroundMethodMetadata = methodAnnotationMetadata;
+                        if (methodAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
+                            aroundMethodMetadata = methodAnnotationMetadata;
+                        } else {
+                            aroundMethodMetadata = new AnnotationMetadataHierarchy(concreteClassMetadata, methodAnnotationMetadata);
+                        }
                     }
 
                     if (modelUtils.isFinal(method)) {
