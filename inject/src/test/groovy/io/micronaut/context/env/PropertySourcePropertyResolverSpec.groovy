@@ -32,7 +32,6 @@ import spock.lang.Unroll
  */
 class PropertySourcePropertyResolverSpec extends Specification {
 
-
     @Rule
     private final EnvironmentVariables environmentVariables = new EnvironmentVariables()
 
@@ -417,6 +416,36 @@ class PropertySourcePropertyResolverSpec extends Specification {
             custom[0][0]['key2'] == 'xyz'
             micronaut['security']['intercept-url-map'][0]['access'][0] == '/some-path'
             micronaut['security']['intercept-url-map'][0]['access'][1] == '/some-path-x'
+    }
+    
+    void "test map and list values are collapsed"() {
+        given:
+        def values = new HashMap()
+        values.put("foo", [[bar: ['foo0Bar0', 'foo0Bar1', null, 'foo0Bar2']], [bar: [abx: 'foo1Bar0', xyz: 'foo1Bar1']]])
+        values.put("custom", [[[key: [null, null, null, null, 'ohh', 'ehh'], key2: 'xyz']]])
+        values.put("micronaut.security.intercept-url-map", [[access:['/some-path']]])
+        values.put("micronaut.security.interceptUrlMap", [[access:[null, '/some-path-x']]])
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+        
+        expect:
+        resolver.getRequiredProperty('foo[0].bar[0]', String) == "foo0Bar0"
+        resolver.getRequiredProperty('foo[0].bar[1]', String) == 'foo0Bar1'
+        !resolver.containsProperty('foo[0].bar[2]')
+        resolver.getRequiredProperty('foo[0].bar[3]', String) == 'foo0Bar2'
+        resolver.getRequiredProperty('foo[1].bar.abx', String) == 'foo1Bar0'
+        resolver.getRequiredProperty('foo[1].bar.xyz', String) == 'foo1Bar1'
+        !resolver.containsProperty('custom[0][0].key[0]')
+        !resolver.containsProperty('custom[0][0].key[1]')
+        !resolver.containsProperty('custom[0][0].key[2]')
+        !resolver.containsProperty('custom[0][0].key[3]')
+        resolver.getRequiredProperty('custom[0][0].key[4]', String) == 'ohh'
+        resolver.getRequiredProperty('custom[0][0].key[5]', String) == 'ehh'
+        resolver.getRequiredProperty('custom[0][0].key2', String) == 'xyz'
+        resolver.getRequiredProperty('micronaut.security.intercept-url-map[0].access[0]', String) == '/some-path'
+        resolver.getRequiredProperty('micronaut.security.intercept-url-map[0].access[1]', String) == '/some-path-x'
     }
 
 }

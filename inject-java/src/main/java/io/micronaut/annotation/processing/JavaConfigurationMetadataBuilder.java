@@ -142,7 +142,11 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
     private Function<String, String> pathEvaluationFunctionForMetadata(AnnotationMetadata annotationMetadata) {
         return path -> {
             if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
-                return path + ".*";
+                if (annotationMetadata.booleanValue(EachProperty.class, "list").orElse(false)) {
+                    return path + "[*]";
+                } else {
+                    return path + ".*";
+                }
             }
             String prefix = annotationMetadata.getValue(ConfigurationReader.class, "prefix", String.class)
                 .orElse(null);

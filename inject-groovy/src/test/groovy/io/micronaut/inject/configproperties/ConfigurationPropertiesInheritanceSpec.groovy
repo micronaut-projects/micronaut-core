@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
+import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
 /**
@@ -69,6 +70,55 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
         config.port == 55
         config.otherProperty == 'x'
         config.onlySetter == 'y'
+    }
+
+
+
+    void "test EachProperty array inner ConfigurationProperties with setter"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'teams': [['wins': 5, 'manager': ['age': 40]], ['wins': 6]]
+        ])
+
+        when:
+        Collection teams = context.getBeansOfType(ParentArrayEachProps)
+
+        then:
+        teams[0].wins == 5
+        teams[0].manager.age == 40
+        teams[1].wins == 6
+        teams[1].manager == null
+
+        when:
+        Collection<ParentArrayEachProps.ManagerProps> managers = context.getBeansOfType(ParentArrayEachProps.ManagerProps)
+
+        then: "The instance is the same"
+        managers.size() == 1
+        managers[0].is(teams[0].manager)
+    }
+
+    void "test EachProperty array inner ConfigurationProperties with constructor"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'teams': [['wins': 5, 'manager': ['age': 40]], ['wins': 6]]
+
+        ])
+
+        when:
+        Collection teams = context.getBeansOfType(ParentArrayEachPropsCtor)
+
+        then:
+        teams[0].wins == 5
+        teams[0].manager.age == 40
+        teams[1].wins == 6
+        teams[1].manager == null
+
+        when:
+        Collection<ParentArrayEachPropsCtor.ManagerProps> managers = context.getBeansOfType(ParentArrayEachPropsCtor.ManagerProps)
+
+        then: "The instance is the same"
+        managers.size() == 1
+        managers[0].is(teams[0].manager)
     }
 
     @ConfigurationProperties('foo.bar')

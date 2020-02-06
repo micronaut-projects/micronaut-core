@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery.consul
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Value
 import io.micronaut.core.async.publisher.Publishers
@@ -33,22 +34,21 @@ import org.reactivestreams.Publisher
  * @since 1.0
  */
 @Filter('/v1/**')
-@Requires('consul.client.asl-token')
+@Requires(property = 'consul.client.asl-token')
 class MockConsulAuth implements HttpServerFilter, Toggleable{
 
-    final Optional<String> token
+    final String token
 
-    MockConsulAuth(@Value('${consul.client.asl-token}') Optional<String> token) {
+    MockConsulAuth(@Property(name = 'consul.client.asl-token') String token) {
         this.token = token
     }
 
     @Override
     Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         def token = request.headers.get('X-Consul-Token', String)
-        if(this.token.isPresent() && (!token.isPresent() || token.get() != this.token.get())) {
+        if (!token.isPresent() || token.get() != this.token) {
             return Publishers.just(HttpResponse.status(HttpStatus.FORBIDDEN))
-        }
-        else {
+        } else {
             return chain.proceed(request)
         }
     }

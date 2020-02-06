@@ -15,10 +15,7 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.*;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
 import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
@@ -244,23 +241,48 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
             for (BeanDefinition candidate : candidates) {
                 if (candidate.hasDeclaredStereotype(EachProperty.class)) {
-
-                    String property = candidate.stringValue(EachProperty.class).orElse(null);
+                    boolean isList = candidate.booleanValue(EachProperty.class, "list").orElse(false);
+                    String property = candidate.stringValue(ConfigurationReader.class, "prefix")
+                            .map(prefix ->
+                                    //strip the .* or [*]
+                                    prefix.substring(0, prefix.length() - (isList ? 3 : 2)))
+                            .orElseGet(() -> candidate.stringValue(EachProperty.class).orElse(null));
                     String primaryPrefix = candidate.stringValue(EachProperty.class, "primary").orElse(null);
 
                     if (StringUtils.isNotEmpty(property)) {
-                        Map entries = getProperty(property, Map.class, Collections.emptyMap());
-                        if (!entries.isEmpty()) {
-                            for (Object key : entries.keySet()) {
-                                BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
-                                if (primaryPrefix != null && primaryPrefix.equals(key.toString())) {
-                                    delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
-                                }
-                                delegate.put(EachProperty.class.getName(), delegate.getBeanType());
-                                delegate.put(Named.class.getName(), key.toString());
+                        if (isList) {
+                            List entries = getProperty(property, List.class, Collections.emptyList());
+                            if (!entries.isEmpty()) {
+                                for (int i = 0; i < entries.size(); i++) {
+                                    if (entries.get(i) != null) {
+                                        BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                        String index = String.valueOf(i);
+                                        if (primaryPrefix != null && primaryPrefix.equals(index)) {
+                                            delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
+                                        }
+                                        delegate.put("Array", index);
+                                        delegate.put(Named.class.getName(), index);
 
-                                if (delegate.isEnabled(this)) {
-                                    transformedCandidates.add(delegate);
+                                        if (delegate.isEnabled(this)) {
+                                            transformedCandidates.add(delegate);
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            Map entries = getProperty(property, Map.class, Collections.emptyMap());
+                            if (!entries.isEmpty()) {
+                                for (Object key : entries.keySet()) {
+                                    BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                    if (primaryPrefix != null && primaryPrefix.equals(key.toString())) {
+                                        delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
+                                    }
+                                    delegate.put(EachProperty.class.getName(), delegate.getBeanType());
+                                    delegate.put(Named.class.getName(), key.toString());
+
+                                    if (delegate.isEnabled(this)) {
+                                        transformedCandidates.add(delegate);
+                                    }
                                 }
                             }
                         }
@@ -321,35 +343,58 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     }
                 } else {
                     if (candidate.hasStereotype(ConfigurationReader.class)) {
-
                         final String prefix = candidate.stringValue(ConfigurationReader.class, "prefix").orElse(null);
                         if (prefix != null) {
-                            int starIndex = prefix.indexOf("*");
-                            if (starIndex > -1) {
-                                String eachProperty = prefix.substring(0, starIndex);
+                            int mapIndex = prefix.indexOf("*");
+                            int arrIndex = prefix.indexOf("[*]");
+                            boolean isList = arrIndex > -1;
+                            boolean isMap = mapIndex > -1;
+                            if (isList || isMap) {
+                                int startIndex = isList ? arrIndex : mapIndex;
+                                String eachProperty = prefix.substring(0, startIndex);
                                 if (eachProperty.endsWith(".")) {
                                     eachProperty = eachProperty.substring(0, eachProperty.length() - 1);
                                 }
 
                                 if (StringUtils.isNotEmpty(eachProperty)) {
-                                    Map entries = getProperty(eachProperty, Map.class, Collections.emptyMap());
-                                    if (!entries.isEmpty()) {
-                                        for (Object key : entries.keySet()) {
 
-                                            BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
-                                            delegate.put(EachProperty.class.getName(), delegate.getBeanType());
-                                            delegate.put(Named.class.getName(), key.toString());
+                                    if (isList) {
+                                        List entries = getProperty(eachProperty, List.class, Collections.emptyList());
+                                        if (!entries.isEmpty()) {
+                                            for (int i = 0; i < entries.size(); i++) {
+                                                if (entries.get(i) != null) {
+                                                    BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                                    String index = String.valueOf(i);
+                                                    delegate.put("Array", index);
+                                                    delegate.put(Named.class.getName(), index);
 
-                                            if (delegate.isEnabled(this) &&
-                                                    containsProperties(prefix.replace("*", key.toString()))) {
-                                                transformedCandidates.add(delegate);
+                                                    if (delegate.isEnabled(this) &&
+                                                            containsProperties(prefix.replace("*", index))) {
+                                                        transformedCandidates.add(delegate);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        Map entries = getProperty(eachProperty, Map.class, Collections.emptyMap());
+                                        if (!entries.isEmpty()) {
+                                            for (Object key : entries.keySet()) {
+
+                                                BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
+                                                delegate.put(EachProperty.class.getName(), delegate.getBeanType());
+                                                delegate.put(Named.class.getName(), key.toString());
+
+                                                if (delegate.isEnabled(this) &&
+                                                        containsProperties(prefix.replace("*", key.toString()))) {
+                                                    transformedCandidates.add(delegate);
+                                                }
                                             }
                                         }
                                     }
+
                                 } else {
                                     throw new IllegalArgumentException("Blank value specified to @Each property for bean: " + candidate);
                                 }
-
                             } else {
                                 transformedCandidates.add(candidate);
                             }

@@ -107,4 +107,10 @@ public @interface EachProperty {
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "excludes")
     String[] excludes() default {};
+
+    /**
+     * @return True if the beans should be bound from a list. By default {@link EachProperty} binds to a map where
+     * the key is a string and the value is an instance of the annotated class.
+     */
+    boolean list() default false;
 }
