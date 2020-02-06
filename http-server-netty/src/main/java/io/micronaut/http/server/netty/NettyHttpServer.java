@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.env.Environment;
@@ -27,7 +28,6 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.event.ServiceShutdownEvent;
-import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
@@ -72,7 +72,6 @@ import io.netty.util.concurrent.GlobalEventExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.File;
@@ -503,12 +502,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     }
 
     private void fireStartupEvents() {
-        Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         applicationContext.publishEvent(new ServerStartupEvent(this));
-        applicationName.ifPresent(id -> {
-            this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-            applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
-        });
     }
 
     private void logShutdownErrorIfNecessary(Future<?> future) {

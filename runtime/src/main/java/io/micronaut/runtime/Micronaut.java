@@ -15,21 +15,25 @@
  */
 package io.micronaut.runtime;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.naming.Described;
+import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
+import io.micronaut.runtime.server.EmbeddedServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URL;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Function;
 
@@ -89,6 +93,17 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                                 LOG.info("Startup completed in {}ms. Server Running: {}", took, url);
                             }
                             keepAlive = embeddedServer.isKeepAlive();
+                            if (applicationContext.containsBean(EmbeddedServerInstance.class)) {
+                                final ApplicationConfiguration applicationConfiguration = applicationContext.getBean(ApplicationConfiguration.class);
+                                applicationConfiguration.getName().ifPresent(id -> {
+                                    final EmbeddedServerInstance embeddedServerInstance = applicationContext.createBean(
+                                            EmbeddedServerInstance.class,
+                                            id,
+                                            embeddedServer);
+                                    applicationContext.publishEvent(new ServiceStartedEvent(embeddedServerInstance));
+
+                                });
+                            }
                         } else {
                             if (LOG.isInfoEnabled()) {
                                 long end = System.currentTimeMillis();
