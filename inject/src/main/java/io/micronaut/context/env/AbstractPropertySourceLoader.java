@@ -52,12 +52,8 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
     }
 
     @Override
-    public Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader, @Nullable String environmentName) {
-        if (environmentName != null) {
-            return loadEnv(resourceName, resourceLoader, ActiveEnvironment.of(environmentName, 0));
-        } else {
-            return load(resourceLoader, resourceName, getOrder());
-        }
+    public Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader) {
+        return load(resourceLoader, resourceName, getOrder());
     }
 
     @Override

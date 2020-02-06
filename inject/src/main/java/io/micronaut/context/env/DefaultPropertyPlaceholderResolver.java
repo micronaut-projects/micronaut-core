@@ -56,15 +56,6 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
     /**
      * @param environment The property resolver for the environment
-     * @deprecated Use {@link #DefaultPropertyPlaceholderResolver(PropertyResolver, ConversionService)} instead
-     */
-    @Deprecated
-    public DefaultPropertyPlaceholderResolver(PropertyResolver environment) {
-        this(environment, ConversionService.SHARED);
-    }
-
-    /**
-     * @param environment The property resolver for the environment
      * @param conversionService The conversion service
      */
     public DefaultPropertyPlaceholderResolver(PropertyResolver environment, ConversionService conversionService) {
@@ -141,24 +132,6 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             segments.add(new RawSegment(value));
         }
         return segments;
-    }
-
-    /**
-     * Resolves a replacement for the given expression. Returning true if the replacement was resolved.
-     *
-     * @deprecated No longer used internally. See {@link #resolveExpression(String, String, Class)}
-     * @param builder The builder
-     * @param str The full string
-     * @param expr The current expression
-     * @return True if a placeholder was resolved
-     */
-    @Deprecated
-    protected boolean resolveReplacement(StringBuilder builder, String str, String expr) {
-        if (environment.containsProperty(expr)) {
-            builder.append(environment.getProperty(expr, String.class).orElseThrow(() -> new ConfigurationException("Could not resolve placeholder ${" + expr + "} in value: " + str)));
-            return true;
-        }
-        return false;
     }
 
     /**

@@ -62,12 +62,6 @@ public class SystemFile implements FileCustomizableResponseType {
     }
 
     @Override
-    @Deprecated
-    public String getName() {
-        return file.getName();
-    }
-
-    @Override
     public MediaType getMediaType() {
         return mediaType;
     }

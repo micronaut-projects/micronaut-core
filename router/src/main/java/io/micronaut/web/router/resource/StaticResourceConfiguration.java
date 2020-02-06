@@ -66,15 +66,6 @@ public class StaticResourceConfiguration implements Toggleable {
 
     /**
      * @param resourceResolver The {@linkplain ResourceResolver}
-     * @deprecated Use {@link #StaticResourceConfiguration(ResourceResolver, ServerContextPathProvider)} instead.
-     */
-    @Deprecated
-    public StaticResourceConfiguration(ResourceResolver resourceResolver) {
-        this(resourceResolver, null);
-    }
-
-    /**
-     * @param resourceResolver The {@linkplain ResourceResolver}
      * @param contextPathProvider The context path provider
      */
     @Inject

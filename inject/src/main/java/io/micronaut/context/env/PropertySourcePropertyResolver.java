@@ -325,17 +325,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     /**
      * Returns a combined Map of all properties in the catalog.
      *
-     * @return Map of all properties
-     * @deprecated Use {@link #getAllProperties(StringConvention, MapFormat.MapTransformation)} instead
-     */
-    @Deprecated
-    public Map<String, Object> getAllProperties() {
-        return getAllProperties(StringConvention.RAW, MapFormat.MapTransformation.NESTED);
-    }
-
-    /**
-     * Returns a combined Map of all properties in the catalog.
-     *
      * @param keyConvention The map key convention
      * @param transformation The map format
      * @return Map of all properties

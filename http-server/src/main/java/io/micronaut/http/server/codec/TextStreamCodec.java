@@ -72,21 +72,6 @@ public class TextStreamCodec implements MediaTypeCodec {
     private MediaTypeCodecRegistry codecRegistry;
 
     /**
-     * @param serverConfiguration   The HTTP server configuration
-     * @param byteBufferFactory     A byte buffer factory
-     * @param codecRegistryProvider A media type codec registry
-     * @param codecConfiguration    The configuration for the codec
-     */
-    @Deprecated
-    public TextStreamCodec(
-        HttpServerConfiguration serverConfiguration,
-        ByteBufferFactory byteBufferFactory,
-        Provider<MediaTypeCodecRegistry> codecRegistryProvider,
-        @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        this(serverConfiguration.getDefaultCharset(), byteBufferFactory, codecRegistryProvider, codecConfiguration);
-    }
-
-    /**
      * @param applicationConfiguration The application configuration
      * @param byteBufferFactory     A byte buffer factory
      * @param codecRegistryProvider A media type codec registry

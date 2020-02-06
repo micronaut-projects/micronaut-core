@@ -109,24 +109,10 @@ public class DefaultRouter implements Router {
         });
     }
 
-    @SuppressWarnings("unchecked")
     @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri) {
-        return this.<T, R>find(httpMethod.name(), uri).stream();
-    }
-
-    @NonNull
-    @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest request, @NonNull CharSequence uri) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request, @NonNull CharSequence uri) {
         return this.<T, R>find(request.getMethodName(), uri).stream();
-    }
-
-    @NonNull
-    @Deprecated
-    @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri) {
-        return this.<T, R>find(httpMethod.name(), uri.toString()).stream();
     }
 
     @NonNull
@@ -141,9 +127,10 @@ public class DefaultRouter implements Router {
     @NonNull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
-        return find(httpMethod, uri);
+        return this.<T, R>find(httpMethod.name(), uri).stream();
     }
 
+    @NonNull
     @Override
     public Stream<UriRoute> uriRoutes() {
         return routesByMethod.values().stream().flatMap(List::stream);
@@ -288,14 +275,6 @@ public class DefaultRouter implements Router {
         } else {
             return Collections.emptyList();
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    @Deprecated
-    @NonNull
-    @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri) {
-        return findAny(uri, null);
     }
 
     @SuppressWarnings("unchecked")

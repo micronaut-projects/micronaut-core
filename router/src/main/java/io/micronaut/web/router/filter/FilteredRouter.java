@@ -64,13 +64,6 @@ public class FilteredRouter implements Router {
     }
 
     @NonNull
-    @Deprecated
-    @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri) {
-        return router.findAny(uri, null);
-    }
-
-    @NonNull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
         final Stream<UriRouteMatch<T, R>> matchStream = router.findAny(uri, context);
@@ -88,12 +81,6 @@ public class FilteredRouter implements Router {
     @Override
     public void applyDefaultPorts(List<Integer> ports) {
         router.applyDefaultPorts(ports);
-    }
-
-    @NonNull
-    @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri) {
-        return router.find(httpMethod, uri, null);
     }
 
     @NonNull
@@ -116,7 +103,7 @@ public class FilteredRouter implements Router {
 
     @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest request, @NonNull CharSequence uri) {
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request, @NonNull CharSequence uri) {
         return router.find(request, uri);
     }
 
@@ -190,13 +177,6 @@ public class FilteredRouter implements Router {
     @Override
     public <T, R> Optional<UriRouteMatch<T, R>> HEAD(@NonNull CharSequence uri) {
         return router.HEAD(uri);
-    }
-
-    @NonNull
-    @Deprecated
-    @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri) {
-        return router.find(httpMethod, uri, null);
     }
 
     @NonNull

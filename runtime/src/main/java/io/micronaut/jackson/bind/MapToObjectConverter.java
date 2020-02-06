@@ -42,15 +42,6 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
 
     /**
      * @param beanPropertyBinder To bind map and Java bean properties
-     * @deprecated Use {@link #MapToObjectConverter(Provider)} instead
-     */
-    @Deprecated
-    public MapToObjectConverter(BeanPropertyBinder beanPropertyBinder) {
-        this(() -> beanPropertyBinder);
-    }
-
-    /**
-     * @param beanPropertyBinder To bind map and Java bean properties
      */
     @Inject
     public MapToObjectConverter(Provider<BeanPropertyBinder> beanPropertyBinder) {

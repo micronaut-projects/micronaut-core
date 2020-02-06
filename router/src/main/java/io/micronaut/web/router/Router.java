@@ -40,27 +40,13 @@ public interface Router {
     /**
      * Find any {@link RouteMatch} regardless of HTTP method.
      *
-     * @param uri The URI
-     * @param <T> The target type
-     * @param <R> The return type
-     * @return A stream of route matches
-     * @deprecated Use {@link #findAny(CharSequence, HttpRequest)} instead
-     */
-    @Deprecated
-    @NonNull <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri);
-
-    /**
-     * Find any {@link RouteMatch} regardless of HTTP method.
-     *
      * @param uri     The URI
      * @param context The optional {@link HttpRequest} context information to apply {@link io.micronaut.web.router.filter.RouteMatchFilter}.
      * @param <T>     The target type
      * @param <R>     The return type
      * @return A stream of route matches
      */
-    default @NonNull <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
-        return findAny(uri);
-    }
+    @NonNull <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> context);
 
     /**
      * @return The exposed ports.
@@ -79,42 +65,12 @@ public interface Router {
      *
      * @param httpMethod The HTTP method
      * @param uri        The URI route match
-     * @param <T> The target type
-     * @param <R>        The type
-     * @return A {@link Stream} of possible {@link Route} instances.
-     * @deprecated Use {@link #find(HttpMethod, CharSequence, HttpRequest)} instead
-     */
-    @Deprecated
-    @NonNull <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri);
-
-    /**
-     * Finds all of the possible routes for the given HTTP method and URI.
-     *
-     * @param httpMethod The HTTP method
-     * @param uri        The URI route match
      * @param context    The optional {@link HttpRequest} context information to apply {@link io.micronaut.web.router.filter.RouteMatchFilter}.
      * @param <T>        The target type
      * @param <R>        The type
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    default @NonNull <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
-        return find(httpMethod, uri);
-    }
-
-    /**
-     * Finds all of the possible routes for the given HTTP method and URI.
-     *
-     * @param httpMethod The HTTP method
-     * @param uri        The URI
-     * @param <T> The target type
-     * @param <R>        The URI route match
-     * @return A {@link Stream} of possible {@link Route} instances.
-     * @deprecated Use {@link #find(HttpMethod, URI, HttpRequest)} instead
-     */
-    @Deprecated
-    default @NonNull <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri) {
-        return find(httpMethod, uri, null);
-    }
+    @NonNull <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context);
 
     /**
      * Finds all of the possible routes for the given HTTP method and URI.
@@ -126,8 +82,9 @@ public interface Router {
      * @param <R>        The URI route match
      * @return A {@link Stream} of possible {@link Route} instances.
      */
+    @Deprecated
     default @NonNull <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri, @Nullable HttpRequest<?> context) {
-        return find(httpMethod, uri.toString());
+        return find(httpMethod, uri.toString(), context);
     }
 
     /**
@@ -144,15 +101,15 @@ public interface Router {
 
     /**
      * Find method, that should be used for non-standard http methods. For standards it should act
-     * the same as {@link #find(HttpMethod, URI)}
+     * the same as {@link #find(HttpMethod, CharSequence, HttpRequest)}
      * @param request The request, that can have overridden {@link HttpRequest#getMethodName()}
      * @param uri The URI route match.
      * @param <T> The target type.
      * @param <R> The type of what
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    default @NonNull  <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest request, @NonNull CharSequence uri) {
-        return find(HttpMethod.valueOf(request.getMethodName()), uri);
+    default @NonNull  <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request, @NonNull CharSequence uri) {
+        return find(HttpMethod.valueOf(request.getMethodName()), uri, request);
     }
 
     /**

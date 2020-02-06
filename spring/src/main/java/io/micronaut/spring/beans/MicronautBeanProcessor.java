@@ -68,7 +68,7 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
     public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
         if (environment != null) {
             micronautContext = new DefaultApplicationContext(environment.getActiveProfiles()) {
-                DefaultEnvironment env = new DefaultEnvironment(environment.getActiveProfiles()) {
+                DefaultEnvironment env = new DefaultEnvironment(() -> Arrays.asList(environment.getActiveProfiles())) {
                     @Override
                     public io.micronaut.context.env.Environment start() {
                         return this;

@@ -60,28 +60,14 @@ public class ValidatingInterceptor implements MethodInterceptor {
     /**
      * Creates ValidatingInterceptor from the validatorFactory.
      *
-     * @param validatorFactory Factory returning initialized {@code Validator} instances
-     * @deprecated Use {@link #ValidatingInterceptor(Validator, ValidatorFactory)} instead
-     */
-    @Deprecated
-    public ValidatingInterceptor(Optional<ValidatorFactory> validatorFactory) {
-        this(Validator.getInstance(), validatorFactory.orElse(null));
-    }
-
-    /**
-     * Creates ValidatingInterceptor from the validatorFactory.
-     *
      * @param micronautValidator The micronaut validator use if no factory is available
      * @param validatorFactory   Factory returning initialized {@code Validator} instances
      */
     @Inject
-    public ValidatingInterceptor(
-            @Nullable Validator micronautValidator,
-            @Nullable ValidatorFactory validatorFactory) {
-
+    public ValidatingInterceptor(@Nullable Validator micronautValidator,
+                                 @Nullable ValidatorFactory validatorFactory) {
 
         if (validatorFactory != null) {
-
             javax.validation.Validator validator = validatorFactory.getValidator();
             if (validator instanceof Validator) {
                 this.micronautValidator = (ExecutableMethodValidator) validator;

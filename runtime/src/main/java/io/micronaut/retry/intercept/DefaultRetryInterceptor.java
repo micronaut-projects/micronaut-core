@@ -68,19 +68,6 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
      * Construct a default retry method interceptor with the event publisher.
      *
      * @param eventPublisher The event publisher to publish retry events
-     * @deprecated Use {@link #DefaultRetryInterceptor(ApplicationEventPublisher, ExecutorService)} instead
-     */
-    @Deprecated
-    public DefaultRetryInterceptor(ApplicationEventPublisher eventPublisher) {
-        this.eventPublisher = eventPublisher;
-        UserExecutorConfiguration configuration = UserExecutorConfiguration.of(ExecutorType.SCHEDULED);
-        this.executorService = Executors.newScheduledThreadPool(configuration.getCorePoolSize());
-    }
-
-    /**
-     * Construct a default retry method interceptor with the event publisher.
-     *
-     * @param eventPublisher The event publisher to publish retry events
      * @param executorService The executor service to use for completable futures
      */
     @Inject

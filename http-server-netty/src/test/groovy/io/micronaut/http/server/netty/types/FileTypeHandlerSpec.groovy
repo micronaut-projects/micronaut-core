@@ -25,10 +25,8 @@ import io.micronaut.http.server.netty.types.files.FileTypeHandler
 import io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType
-import io.micronaut.http.server.types.files.AttachedFile
 import io.micronaut.http.server.types.files.StreamedFile
 import io.micronaut.http.server.types.files.SystemFile
-import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType
 import spock.lang.IgnoreIf
 
 import javax.inject.Inject
@@ -295,8 +293,8 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         }
 
         @Get('/download')
-        AttachedFile download() {
-            new AttachedFile(tempFile)
+        SystemFile download() {
+            new SystemFile(tempFile)
         }
 
         @Get('/custom-cache-control')
@@ -306,13 +304,13 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         }
 
         @Get('/different-name')
-        AttachedFile differentName() {
-            new AttachedFile(tempFile, "abc.xyz")
+        SystemFile differentName() {
+            new SystemFile(tempFile).attach("abc.xyz")
         }
 
         @Get('/custom-content-type')
-        HttpResponse<AttachedFile> customContentType() {
-            HttpResponse.ok(new AttachedFile(tempFile, "temp.html")).contentType(MediaType.TEXT_PLAIN_TYPE)
+        HttpResponse<SystemFile> customContentType() {
+            HttpResponse.ok(new SystemFile(tempFile, MediaType.TEXT_HTML_TYPE).attach("temp.html")).contentType(MediaType.TEXT_PLAIN_TYPE)
         }
     }
 

@@ -157,21 +157,6 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
      * @param readTimeoutMs read timeout in millis
      * @return AWS EC2 metadata information
      * @throws IOException Signals that an I/O exception of some sort has occurred
-     * @deprecated See {@link io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils#readMetadataUrl(URL, int, int, ObjectMapper, Map)}
-     */
-    @Deprecated
-    protected JsonNode readEc2MetadataJson(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
-        return readMetadataUrl(url, connectionTimeoutMs, readTimeoutMs, objectMapper, Collections.emptyMap());
-    }
-
-    /**
-     * Read EC2 metadata from the given URL.
-     *
-     * @param url URL to fetch AWS EC2 metadata information
-     * @param connectionTimeoutMs connection timeout in millis
-     * @param readTimeoutMs read timeout in millis
-     * @return AWS EC2 metadata information
-     * @throws IOException Signals that an I/O exception of some sort has occurred
      */
     private String readEc2MetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
 

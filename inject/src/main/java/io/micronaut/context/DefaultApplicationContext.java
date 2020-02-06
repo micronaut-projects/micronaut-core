@@ -66,13 +66,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment names
      */
     public DefaultApplicationContext(@NonNull String... environmentNames) {
-        this(new ApplicationContextConfiguration() {
-            @NonNull
-            @Override
-            public List<String> getEnvironments() {
-                ArgumentUtils.requireNonNull("environmentNames", environmentNames);
-                return Arrays.asList(environmentNames);
-            }
+        this(() -> {
+            ArgumentUtils.requireNonNull("environmentNames", environmentNames);
+            return Arrays.asList(environmentNames);
         });
     }
 
@@ -139,18 +135,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             return resolvedBeanReferences;
         }
         return super.resolveBeanDefinitionReferences();
-    }
-
-    /**
-     * Creates the default environment for the given environment name.
-     *
-     * @deprecated  Use {@link #createEnvironment(ApplicationContextConfiguration)} instead
-     * @param environmentNames The environment name
-     * @return The environment instance
-     */
-    @Deprecated
-    protected @NonNull DefaultEnvironment createEnvironment(@NonNull String... environmentNames) {
-        return createEnvironment(() -> Arrays.asList(environmentNames));
     }
 
     /**
@@ -553,11 +537,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         public @NonNull Environment getEnvironment() {
-            return bootstrapEnvironment;
-        }
-
-        @Override
-        protected @NonNull BootstrapEnvironment createEnvironment(@NonNull String... environmentNames) {
             return bootstrapEnvironment;
         }
 

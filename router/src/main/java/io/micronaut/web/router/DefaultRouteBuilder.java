@@ -64,30 +64,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     public static final UriNamingStrategy CAMEL_CASE_NAMING_STRATEGY = new UriNamingStrategy() {
     };
 
-    /**
-     * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} whereby hyphenated naming conventions are used.
-     *
-     * @deprecated Dynamic naming conventions are no longer supported
-     */
-    @Deprecated
-    public static final UriNamingStrategy HYPHENATED_NAMING_STRATEGY = new UriNamingStrategy() {
-        @Override
-        public @NonNull String resolveUri(Class type) {
-            return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
-        }
-
-        @Override
-        public @NonNull String resolveUri(String property) {
-            if (StringUtils.isEmpty(property)) {
-                return "/";
-            }
-            if (property.charAt(0) != '/') {
-                return '/' + NameUtils.hyphenate(property, true);
-            }
-            return property;
-        }
-    };
-
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
 
     static final Object NO_VALUE = new Object();

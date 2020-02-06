@@ -44,52 +44,6 @@ public class StreamedFile implements FileCustomizableResponseType {
 
     /**
      * @param inputStream The input stream
-     * @param name        The name of the file used to determine the content type
-     *
-     * @deprecated use {@link #StreamedFile(InputStream, MediaType)} instead. See
-     * {@link MediaType#forFilename(String)} for converting existing names if the
-     * type is unknown.
-     */
-    @Deprecated
-    public StreamedFile(InputStream inputStream, String name) {
-        this(inputStream, name, Instant.now().toEpochMilli());
-    }
-
-    /**
-     * @param inputStream  The input stream
-     * @param name         the name of the file used to determine the content type
-     * @param lastModified The last modified date
-     *
-     * @deprecated use {@link #StreamedFile(InputStream, MediaType, long)} instead. See
-     * {@link MediaType#forFilename(String)} for converting existing names if the
-     * type is unknown.
-     */
-    @Deprecated
-    public StreamedFile(InputStream inputStream, String name, long lastModified) {
-        this(inputStream, name, lastModified, -1);
-    }
-
-    /**
-     * @param inputStream   The input stream
-     * @param name          the name of the file used to determine the content type
-     * @param lastModified  The last modified date
-     * @param contentLength the content length
-     *
-     * @deprecated use {@link #StreamedFile(InputStream, MediaType, long, long)} instead. See
-     * {@link MediaType#forFilename(String)} for converting existing names if the
-     * type is unknown.
-     */
-    @Deprecated
-    public StreamedFile(InputStream inputStream, String name, long lastModified, long contentLength) {
-        this.mediaType = MediaType.forFilename(name);
-        this.name = name;
-        this.lastModified = lastModified;
-        this.inputStream = inputStream;
-        this.length = contentLength;
-    }
-
-    /**
-     * @param inputStream The input stream
      * @param mediaType   The media type of the content
      */
     public StreamedFile(InputStream inputStream, MediaType mediaType) {
@@ -148,12 +102,6 @@ public class StreamedFile implements FileCustomizableResponseType {
     @Override
     public long getLength() {
         return length;
-    }
-
-    @Override
-    @Deprecated
-    public String getName() {
-        return name != null ? name : "temp."  + mediaType.getExtension();
     }
 
     @Override

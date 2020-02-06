@@ -38,12 +38,6 @@ import java.util.concurrent.ScheduledExecutorService;
 public class SessionConfiguration {
 
     /**
-     * @deprecated Use {@link #DEFAULT_MAXINACTIVEINTERVAL_MINUTES} instead.
-     */
-    @Deprecated
-    public static final int DEFAULT_MAXINACTIVEINTERVAL_SECONDS = 30;
-
-    /**
      * The default max inactive interval in minutes.
      */
     @SuppressWarnings("WeakerAccess")

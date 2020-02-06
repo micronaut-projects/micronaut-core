@@ -223,60 +223,6 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
         /**
          * @param embeddedServer           The embedded server
          * @param applicationConfiguration The application configuration
-         * @param ipAddress                The IP address
-         * @param dataCenterInfo           The data center info
-         * @deprecated Use {@link #EurekaRegistrationConfiguration(EmbeddedServer, ApplicationConfiguration, DataCenterInfo, String, String, Integer, String, String, Boolean)} instead
-         */
-        @Deprecated
-        public EurekaRegistrationConfiguration(
-                EmbeddedServer embeddedServer,
-                ApplicationConfiguration applicationConfiguration,
-                @Property(name = EurekaRegistrationConfiguration.IP_ADDRESS) @Nullable String ipAddress,
-                @Nullable DataCenterInfo dataCenterInfo) {
-            String instanceId = applicationConfiguration.getInstance().getId().orElse(null);
-            String applicationName = applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
-            boolean explicitInstanceId = instanceId != null;
-            setPreferIpAddress(embeddedServer.getApplicationContext().get(PREFER_IP_ADDRESS, Boolean.class).orElse(false));
-            String serverHost = embeddedServer.getHost();
-            int serverPort = embeddedServer.getPort();
-            final boolean preferIpAddress = isPreferIpAddress();
-            if (ipAddress != null) {
-                this.instanceInfo = new InstanceInfo(
-                        preferIpAddress ? ipAddress : serverHost,
-                        serverPort,
-                        ipAddress,
-                        applicationName,
-                        explicitInstanceId ? instanceId : applicationName
-                );
-
-            } else {
-                if (preferIpAddress) {
-                    ipAddress = lookupIp(serverHost);
-                    this.instanceInfo = new InstanceInfo(
-                            ipAddress,
-                            serverPort,
-                            ipAddress,
-                            applicationName,
-                            explicitInstanceId ? instanceId : applicationName
-                    );
-                } else {
-                    this.instanceInfo = new InstanceInfo(
-                            serverHost,
-                            serverPort,
-                            applicationName,
-                            explicitInstanceId ? instanceId : applicationName
-                    );
-                }
-            }
-            if (dataCenterInfo != null) {
-                this.instanceInfo.setDataCenterInfo(dataCenterInfo);
-            }
-            this.explicitInstanceId = false;
-        }
-
-        /**
-         * @param embeddedServer           The embedded server
-         * @param applicationConfiguration The application configuration
          * @param dataCenterInfo           The data center info
          * @param appName                  The application name
          * @param hostname                 The hostname

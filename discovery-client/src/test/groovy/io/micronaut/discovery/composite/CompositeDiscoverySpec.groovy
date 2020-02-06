@@ -6,7 +6,6 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.consul.MockConsulServer
-import io.micronaut.discovery.kubernetes.KubernetesDiscoveryClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.AutoCleanup
@@ -47,18 +46,17 @@ class CompositeDiscoverySpec extends Specification {
             instances.stream().anyMatch({ instance -> instance.host == "localhost" && instance.port == embeddedServer.getPort() })
         }
     }
-
-    @Singleton
-    @Replaces(KubernetesDiscoveryClient.class)
-    @Requires(property = "spec.name", value = "CompositeDiscoverySpec")
-    static class MockKubernetesDiscoveryClient extends KubernetesDiscoveryClient {
-
-        @Override
-        protected Map<String, String> resolveEnvironment() {
-            [
-                    "FOO_SERVICE_PORT_HTTPS":"8443",
-                    "FOO_SERVICE_HOST":"foo"
-            ]
-        }
-    }
+//
+//    @Singleton
+//    @Requires(property = "spec.name", value = "CompositeDiscoverySpec")
+//    static class MockDiscoveryClient {
+//
+//        @Override
+//        protected Map<String, String> resolveEnvironment() {
+//            [
+//                    "FOO_SERVICE_PORT_HTTPS":"8443",
+//                    "FOO_SERVICE_HOST":"foo"
+//            ]
+//        }
+//    }
 }

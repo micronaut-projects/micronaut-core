@@ -37,15 +37,6 @@ public class ObjectToJsonNodeConverter implements TypeConverter<Object, JsonNode
     private final Provider<ObjectMapper> objectMapper;
 
     /**
-     * @param objectMapper To read/write JSON
-     * @deprecated Use {@link #ObjectToJsonNodeConverter(Provider)} instead
-     */
-    @Deprecated
-    public ObjectToJsonNodeConverter(ObjectMapper objectMapper) {
-        this(() -> objectMapper);
-    }
-
-    /**
      * @param objectMapper The object mapper provider to read/write JSON
      */
     @Inject
