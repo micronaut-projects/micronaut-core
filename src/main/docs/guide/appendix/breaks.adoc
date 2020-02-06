@@ -37,4 +37,8 @@ NOTE: This change does not apply to an explicit primary defined in the annotatio
 
 === Invalid Configuration File Locations
 
-Specifying a file with `micronaut.config.files`, either through the system property or environment variable, that does not exist or cannot be read will now result in the application failing to startup. In previous version of Micronaut a warning would be logged and the file would be ignored.
+Specifying a file with `micronaut.config.files`, either through the system property or environment variable, that does not exist or cannot be read will now result in the application failing to startup. In previous versions of Micronaut a warning would be logged and the file would be ignored.
+
+=== Graal Dependency
+
+The old Graal group name `com.oracle.substratevm` is no longer part of the Micronaut BOM.
