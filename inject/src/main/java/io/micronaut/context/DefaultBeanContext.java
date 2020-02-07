@@ -2325,10 +2325,14 @@ public class DefaultBeanContext implements BeanContext {
                     definition = candidates.iterator().next();
                 } else {
 
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
+                    if (candidates.isEmpty()) {
+                        throw new NoSuchBeanException(beanType, qualifier);
+                    } else {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
+                        }
+                        definition = lastChanceResolve(beanType, null, throwNonUnique, candidates);
                     }
-                    definition = lastChanceResolve(beanType, null, throwNonUnique, candidates);
                 }
             }
         }

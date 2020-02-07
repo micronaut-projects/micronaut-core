@@ -15,9 +15,12 @@
  */
 package io.micronaut.http.server.netty.configuration;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.convert.format.ReadableBytes;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
@@ -360,22 +363,62 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @ConfigurationProperties("worker")
     public static class Worker extends EventLoopConfig {
+        /**
+         * Default constructor.
+         */
+        Worker() {
+            super(DEFAULT);
+        }
     }
 
     /**
      * Configuration for Netty parent.
      */
-    @ConfigurationProperties("parent")
+    @ConfigurationProperties(Parent.NAME)
     public static class Parent extends EventLoopConfig {
+
+        public static final String NAME = "parent";
+
+        /**
+         * Default constructor.
+         */
+        Parent() {
+            super(NAME);
+        }
     }
 
     /**
      * Abstract class for configuring the Netty event loop.
      */
-    public abstract static class EventLoopConfig {
+    public abstract static class EventLoopConfig implements EventLoopGroupConfiguration {
         private int threads;
         private Integer ioRatio;
         private String executor;
+        private boolean preferNativeTransport = false;
+        private String name;
+
+        /**
+         * @param name The name;
+         */
+        EventLoopConfig(String name) {
+            this.name = name;
+        }
+
+        @NonNull
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        /**
+         * Sets the name to use.
+         * @param name The name
+         */
+        public void setEventLoopGroup(String name) {
+            if (StringUtils.isNotEmpty(name)) {
+                this.name = name;
+            }
+        }
 
         /**
          * Sets the number of threads for the event loop group.
@@ -399,6 +442,13 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         public void setExecutor(String executor) {
             this.executor = executor;
+        }
+
+        /**
+         * @param preferNativeTransport Set whether to prefer the native transport if available
+         */
+        public void setPreferNativeTransport(boolean preferNativeTransport) {
+            this.preferNativeTransport = preferNativeTransport;
         }
 
         /**
@@ -426,6 +476,16 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
                 return Optional.of(executor);
             }
             return Optional.empty();
+        }
+
+        @Override
+        public int getNumThreads() {
+            return threads;
+        }
+
+        @Override
+        public boolean isPreferNativeTransport() {
+            return preferNativeTransport;
         }
     }
 }

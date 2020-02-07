@@ -58,6 +58,10 @@ final class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exec
         if (invocationInstrumenterFactories.isEmpty()) {
             return event.getBean();
         }
+        if (event.getBeanDefinition().getBeanType().getName().startsWith("io.netty")) {
+            // ignore Netty event loops
+            return event.getBean();
+        }
         ExecutorService executorService = event.getBean();
         if (executorService instanceof ScheduledExecutorService) {
             return new InstrumentedScheduledExecutorService() {

@@ -16,23 +16,17 @@
 package io.micronaut.http.server.netty.configuration
 
 import io.micronaut.http.server.HttpServerConfiguration
-import io.micronaut.http.server.netty.EventLoopGroupFactory
 import io.netty.channel.ChannelOption
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.server.cors.CorsOriginConfiguration
 import io.micronaut.http.server.netty.NettyHttpServer
-import io.micronaut.http.server.netty.NioEventLoopGroupFactory
-import io.netty.channel.socket.nio.NioServerSocketChannel
 import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.time.Duration
-
-import javax.annotation.Nonnull
 
 /**
  * @author Graeme Rocher

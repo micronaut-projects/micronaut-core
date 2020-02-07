@@ -13,96 +13,101 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty;
 
+package io.micronaut.http.netty.channel;
+
+import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.kqueue.KQueue;
+import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.kqueue.KQueueServerSocketChannel;
+import io.netty.channel.socket.ServerSocketChannel;
+
+import javax.inject.Named;
+import javax.inject.Singleton;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Singleton;
-
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.util.StringUtils;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.socket.ServerSocketChannel;
-import io.netty.channel.epoll.Epoll;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.EpollServerSocketChannel;
-
 /**
- * Factory for EpollEventLoopGroup.
+ * Factory for KQueueEventLoopGroup.
  * 
  * @author croudet
  */
 @Singleton
-@Requires(property = "micronaut.server.netty.use-native-transport", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
-@Requires(classes = Epoll.class, condition = EpollAvailabilityCondition.class)
 @Internal
-class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
+@Requires(classes = KQueue.class, condition = KQueueAvailabilityCondition.class)
+@Named(EventLoopGroupFactory.NATIVE)
+class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
-    private static EpollEventLoopGroup withIoRatio(EpollEventLoopGroup group, @Nullable Integer ioRatio) {
-        if (ioRatio != null) {
-            group.setIoRatio(ioRatio);
-        }
-        return group;
-    }
-    
     /**
-     * Creates an EpollEventLoopGroup.
-     * 
+     * Creates a KQueueEventLoopGroup.
+     *
      * @param threads The number of threads to use.
      * @param ioRatio The io ratio.
-     * @return An EpollEventLoopGroup.
+     * @return A KQueueEventLoopGroup.
      */
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
-        return withIoRatio(new EpollEventLoopGroup(threads), ioRatio);
+        return withIoRatio(new KQueueEventLoopGroup(threads), ioRatio);
     }
 
     /**
-     * Creates an EpollEventLoopGroup.
-     * 
+     * Creates a KQueueEventLoopGroup.
+     *
      * @param threads       The number of threads to use.
      * @param threadFactory The thread factory.
      * @param ioRatio       The io ratio.
-     * @return An EpollEventLoopGroup.
+     * @return A KQueueEventLoopGroup.
      */
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, @Nullable Integer ioRatio) {
-        return withIoRatio(new EpollEventLoopGroup(threads, threadFactory), ioRatio);
+        return withIoRatio(new KQueueEventLoopGroup(threads, threadFactory), ioRatio);
     }
 
     /**
-     * Creates an EpollEventLoopGroup.
-     * 
+     * Creates a KQueueEventLoopGroup.
+     *
      * @param threads  The number of threads to use.
      * @param executor An Executor.
      * @param ioRatio  The io ratio.
-     * @return An EpollEventLoopGroup.
+     * @return A KQueueEventLoopGroup.
      */
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
-        return withIoRatio(new EpollEventLoopGroup(threads, executor), ioRatio);
+        return withIoRatio(new KQueueEventLoopGroup(threads, executor), ioRatio);
     }
 
     /**
-     * Creates a default EpollEventLoopGroup.
-     * 
+     * Creates a default KQueueEventLoopGroup.
+     *
      * @param ioRatio The io ratio.
-     * @return An EpollEventLoopGroup.
+     * @return A KQueueEventLoopGroup.
      */
     @Override
     public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return withIoRatio(new EpollEventLoopGroup(), ioRatio);
+        return withIoRatio(new KQueueEventLoopGroup(), ioRatio);
+    }
+
+    @Override
+    public boolean isNative() {
+        return true;
     }
 
     /**
      * Returns the server channel class.
-     * 
-     * @return EpollServerSocketChannel.
+     *
+     * @return KQueueServerSocketChannel.
      */
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
-        return EpollServerSocketChannel.class;
+        return KQueueServerSocketChannel.class;
+    }
+
+    private static KQueueEventLoopGroup withIoRatio(KQueueEventLoopGroup group, @Nullable Integer ioRatio) {
+        if (ioRatio != null) {
+            group.setIoRatio(ioRatio);
+        }
+        return group;
     }
 }
