@@ -6,8 +6,6 @@ dependencies {
     api project(":http-netty")
     api dependencyVersion("netty")
 
-    compileOnly dependencyModuleVersion("netty", "netty-transport-native-epoll")
-    compileOnly dependencyModuleVersion("netty", "netty-transport-native-kqueue")
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
 
     testCompileOnly project(":inject-groovy")

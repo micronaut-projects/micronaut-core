@@ -29,7 +29,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.netty.channel.NettyThreadFactory;
+import io.micronaut.http.netty.channel.*;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -130,15 +130,18 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final int specifiedPort;
     private final HttpCompressionStrategy httpCompressionStrategy;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
+    private final EventLoopGroupRegistry eventLoopGroupRegistry;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final SslContext sslContext;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+    private final EventLoopGroupFactory eventLoopGroupFactory;
+    private boolean shutdownWorker = false;
+    private boolean shutdownParent = false;
     private EventLoopGroup workerGroup;
     private EventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
-    private EventLoopGroupFactory eventLoopGroupFactory;
 
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
@@ -153,6 +156,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param executorSelector                        The executor selector
      * @param serverSslBuilder                        The Netty Server SSL builder
      * @param outboundHandlers                        The outbound handlers
+     * @param eventLoopGroupRegistry                  The event loop registry
      * @param eventLoopGroupFactory                   The EventLoopGroupFactory
      * @param httpCompressionStrategy                 The http compression strategy
      * @param httpContentProcessorResolver            The http content processor resolver
@@ -173,6 +177,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         @Nullable ServerSslBuilder serverSslBuilder,
         List<ChannelOutboundHandler> outboundHandlers,
         EventLoopGroupFactory eventLoopGroupFactory,
+        EventLoopGroupRegistry eventLoopGroupRegistry,
         HttpCompressionStrategy httpCompressionStrategy,
         HttpContentProcessorResolver httpContentProcessorResolver
     ) {
@@ -211,6 +216,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.threadFactory = threadFactory;
         this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(applicationContext);
         this.eventLoopGroupFactory = eventLoopGroupFactory;
+        this.eventLoopGroupRegistry = eventLoopGroupRegistry;
     }
 
     /**
@@ -261,14 +267,15 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     @Override
     public synchronized EmbeddedServer start() {
         if (!isRunning()) {
-            workerGroup = createWorkerEventLoopGroup();
+            EventLoopGroupConfiguration workerConfig = resolveWorkerConfiguration();
+            workerGroup = createWorkerEventLoopGroup(workerConfig);
             parentGroup = createParentEventLoopGroup();
             ServerBootstrap serverBootstrap = createServerBootstrap();
 
             processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
             processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
-                .channel(eventLoopGroupFactory.serverSocketChannelClass())
+                .channel(eventLoopGroupFactory.serverSocketChannelClass(workerConfig))
                 .childHandler(new ChannelInitializer() {
                     final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
                     final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
@@ -382,6 +389,19 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         return this;
     }
 
+    private EventLoopGroupConfiguration resolveWorkerConfiguration() {
+        EventLoopGroupConfiguration workerConfig = serverConfiguration.getWorker();
+        if (workerConfig == null) {
+            workerConfig = eventLoopGroupRegistry.getEventLoopGroupConfiguration(EventLoopGroupConfiguration.DEFAULT).orElse(null);
+        } else {
+            final String eventLoopGroupName = workerConfig.getName();
+            if (!EventLoopGroupConfiguration.DEFAULT.equals(eventLoopGroupName)) {
+                workerConfig = eventLoopGroupRegistry.getEventLoopGroupConfiguration(eventLoopGroupName).orElse(workerConfig);
+            }
+        }
+        return workerConfig;
+    }
+
     @Override
     public synchronized EmbeddedServer stop() {
         if (isRunning() && workerGroup != null) {
@@ -441,15 +461,27 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      */
     @SuppressWarnings("WeakerAccess")
     protected EventLoopGroup createParentEventLoopGroup() {
-        return newEventLoopGroup(serverConfiguration.getParent());
+        final NettyHttpServerConfiguration.Parent parent = serverConfiguration.getParent();
+        return eventLoopGroupRegistry.getEventLoopGroup(parent != null ? parent.getName() : NettyHttpServerConfiguration.Parent.NAME)
+                .orElseGet(() -> {
+                    final EventLoopGroup newGroup = newEventLoopGroup(parent);
+                    shutdownParent = true;
+                    return newGroup;
+                });
     }
 
     /**
      * @return The worker event loop group
+     * @param workerConfig The worker configuration
      */
     @SuppressWarnings("WeakerAccess")
-    protected EventLoopGroup createWorkerEventLoopGroup() {
-        return newEventLoopGroup(serverConfiguration.getWorker());
+    protected EventLoopGroup createWorkerEventLoopGroup(@Nullable EventLoopGroupConfiguration workerConfig) {
+        return eventLoopGroupRegistry.getEventLoopGroup(workerConfig != null ? workerConfig.getName() : EventLoopGroupConfiguration.DEFAULT)
+                .orElseGet(() -> {
+                    final EventLoopGroup newGroup = newEventLoopGroup(workerConfig);
+                    shutdownWorker = true;
+                    return newGroup;
+                });
     }
 
     /**
@@ -522,10 +554,14 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     private void stopInternal() {
         try {
-            workerGroup.shutdownGracefully()
-                    .addListener(this::logShutdownErrorIfNecessary);
-            parentGroup.shutdownGracefully()
-                    .addListener(this::logShutdownErrorIfNecessary);
+            if (shutdownParent) {
+                parentGroup.shutdownGracefully()
+                        .addListener(this::logShutdownErrorIfNecessary);
+            }
+            if (shutdownWorker) {
+                workerGroup.shutdownGracefully()
+                        .addListener(this::logShutdownErrorIfNecessary);
+            }
             webSocketSessions.close();
             applicationContext.publishEvent(new ServerShutdownEvent(this));
             if (serviceInstance != null) {
@@ -542,26 +578,26 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
     }
 
-    private EventLoopGroup newEventLoopGroup(NettyHttpServerConfiguration.EventLoopConfig config) {
+    private EventLoopGroup newEventLoopGroup(EventLoopGroupConfiguration config) {
         if (config != null) {
-            Optional<ExecutorService> executorService = config.getExecutorName().flatMap(name -> beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name)));
-            int threads = config.getNumOfThreads();
-            Integer ioRatio = config.getIoRatio().orElse(null);
-            return executorService.map(service ->
-                eventLoopGroupFactory.createEventLoopGroup(threads, service, ioRatio)
-            ).orElseGet(() -> {
-                if (threadFactory != null) {
-                    return eventLoopGroupFactory.createEventLoopGroup(threads, threadFactory, ioRatio);
-                } else {
-                    return eventLoopGroupFactory.createEventLoopGroup(threads, ioRatio);
-                }
-            });
-        } else {
-            if (threadFactory != null) {
-                return eventLoopGroupFactory.createEventLoopGroup(NettyThreadFactory.DEFAULT_EVENT_LOOP_THREADS, threadFactory, null);
+            ExecutorService executorService = config.getExecutorName()
+                    .flatMap(name -> beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name))).orElse(null);
+            if (executorService != null) {
+                return eventLoopGroupFactory.createEventLoopGroup(
+                        config.getNumThreads(),
+                        executorService,
+                        config.getIoRatio().orElse(null)
+                );
             } else {
-                return eventLoopGroupFactory.createEventLoopGroup(null);
+                return eventLoopGroupFactory.createEventLoopGroup(
+                        config,
+                        threadFactory
+                );
             }
+        } else {
+            return eventLoopGroupFactory.createEventLoopGroup(
+                    new DefaultEventLoopGroupConfiguration(), threadFactory
+            );
         }
     }
 

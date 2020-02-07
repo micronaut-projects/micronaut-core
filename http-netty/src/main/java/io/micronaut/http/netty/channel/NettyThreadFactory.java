@@ -62,7 +62,7 @@ public class NettyThreadFactory {
      */
     @Singleton
     @Named(NAME)
-    ThreadFactory nettyThreadFactory() {
+    protected ThreadFactory nettyThreadFactory() {
         return new DefaultThreadFactory(NioEventLoopGroup.class);
     }
 }
