@@ -85,6 +85,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 /**
  * Implements the bootstrap and configuration logic for the Netty implementation of {@link EmbeddedServer}.
@@ -269,77 +270,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
                 .channel(eventLoopGroupFactory.serverSocketChannelClass())
-                .childHandler(new ChannelInitializer() {
-                    final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
-                    final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
-                    final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
-                    final RoutingInBoundHandler routingHandler = new RoutingInBoundHandler(
-                        applicationContext,
-                        router,
-                        mediaTypeCodecRegistry,
-                        customizableResponseTypeHandlerRegistry,
-                        staticResourceResolver,
-                        serverConfiguration,
-                        requestArgumentSatisfier,
-                        executorSelector,
-                        ioExecutor,
-                            httpContentProcessorResolver
-                    );
-                    final LoggingHandler loggingHandler = serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(serverConfiguration.getLogLevel().get()) : null;
-
-                    @Override
-                    protected void initChannel(Channel ch) {
-                        ChannelPipeline pipeline = ch.pipeline();
-
-                        int port = ((InetSocketAddress) ch.localAddress()).getPort();
-                        boolean ssl = sslContext != null && sslConfiguration != null && port == sslConfiguration.getPort();
-                        if (ssl) {
-                            pipeline.addLast(sslContext.newHandler(ch.alloc()));
-                        }
-
-                        if (loggingHandler != null) {
-                            pipeline.addLast(loggingHandler);
-                        }
-
-                        final Duration idleTime = serverConfiguration.getIdleTimeout();
-                        if (!idleTime.isNegative()) {
-                            pipeline.addLast(new IdleStateHandler(
-                                    (int) serverConfiguration.getReadIdleTimeout().getSeconds(),
-                                    (int) serverConfiguration.getWriteIdleTimeout().getSeconds(),
-                                    (int) idleTime.getSeconds()));
-                        }
-
-                        pipeline.addLast(HTTP_CODEC, new HttpServerCodec(
-                                serverConfiguration.getMaxInitialLineLength(),
-                                serverConfiguration.getMaxHeaderSize(),
-                                serverConfiguration.getMaxChunkSize(),
-                                serverConfiguration.isValidateHeaders(),
-                                serverConfiguration.getInitialBufferSize()
-                        ));
-
-                        pipeline.addLast(new FlowControlHandler());
-                        pipeline.addLast(HTTP_KEEP_ALIVE_HANDLER, new HttpServerKeepAliveHandler());
-                        pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor(httpCompressionStrategy));
-                        pipeline.addLast(HTTP_DECOMPRESSOR, new HttpContentDecompressor());
-                        pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
-                        pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
-                        pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
-                        if (ssl) {
-                            pipeline.addLast(requestCertificateHandler);
-                        }
-                        pipeline.addLast(HttpResponseEncoder.ID, responseDecoder);
-                        pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
-                                getWebSocketSessionRepository(),
-                                router,
-                                requestArgumentSatisfier.getBinderRegistry(),
-                                webSocketBeanRegistry,
-                                mediaTypeCodecRegistry,
-                                applicationContext
-                        ));
-                        pipeline.addLast(MICRONAUT_HANDLER, routingHandler);
-                        registerMicronautChannelHandlers(pipeline);
-                    }
-                });
+                .childHandler(new EmbeddedServerChannelInitializer());
 
             Optional<String> host = serverConfiguration.getHost();
 
@@ -565,19 +496,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
     }
 
-    private void registerMicronautChannelHandlers(ChannelPipeline pipeline) {
-        int i = 0;
-        for (ChannelHandler outboundHandlerAdapter : outboundHandlers) {
-            String name;
-            if (outboundHandlerAdapter instanceof Named) {
-                name = ((Named) outboundHandlerAdapter).getName();
-            } else {
-                name = NettyHttpServer.MICRONAUT_HANDLER + NettyHttpServer.OUTBOUND_KEY + ++i;
-            }
-            pipeline.addAfter(NettyHttpServer.HTTP_CODEC, name, outboundHandlerAdapter);
-        }
-    }
-
     private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
         for (ChannelOption channelOption : options.keySet()) {
             String name = channelOption.name();
@@ -621,4 +539,180 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     public WebSocketSessionRepository getWebSocketSessionRepository() {
         return this;
     }
+
+    /**
+     * A ChannelHandler to be added to pipeline.
+     */
+    private static interface IChannelHandlerEntry {
+
+        ChannelPipeline addLast(ChannelPipeline pipeline, boolean ssl);
+    }
+
+    /**
+     * A Sharable ChannelHandler to be added to pipeline.
+     */
+    private static class SharableChannelHandlerEntry implements IChannelHandlerEntry {
+        final String name;
+        final ChannelHandler channelHandler;
+
+        public SharableChannelHandlerEntry(ChannelHandler channelHandler) {
+            this(null, channelHandler);
+        }
+
+        public SharableChannelHandlerEntry(String name, ChannelHandler channelHandler) {
+            this.name = name;
+            this.channelHandler = channelHandler;
+        }
+
+        @Override
+        public ChannelPipeline addLast(ChannelPipeline pipeline, boolean ssl) {
+            if (name == null) {
+                pipeline.addLast(channelHandler);
+            } else {
+                pipeline.addLast(name, channelHandler);
+            }
+            return pipeline;
+        }
+
+    }
+
+    /**
+     * A Non Sharable ChannelHandler to be added to pipeline.
+     */
+    private static class NonSharableChannelHandlerEntry implements IChannelHandlerEntry {
+        final String name;
+        final Supplier<ChannelHandler> channelHandler;
+
+        public NonSharableChannelHandlerEntry(Supplier<ChannelHandler> channelHandler) {
+            this(null, channelHandler);
+        }
+
+        public NonSharableChannelHandlerEntry(String name, Supplier<ChannelHandler> channelHandler) {
+            this.name = name;
+            this.channelHandler = channelHandler;
+        }
+
+        @Override
+        public ChannelPipeline addLast(ChannelPipeline pipeline, boolean ssl) {
+            if (name == null) {
+                pipeline.addLast(channelHandler.get());
+            } else {
+                pipeline.addLast(name, channelHandler.get());
+            }
+            return pipeline;
+        }
+    }
+
+    /**
+     * A Sharable ssl related ChannelHandler to be added to pipeline.
+     */
+    private static class SslChannelHandlerEntry extends SharableChannelHandlerEntry {
+
+        public SslChannelHandlerEntry(ChannelHandler channelHandler) {
+            super(channelHandler);
+        }
+
+        @Override
+        public ChannelPipeline addLast(ChannelPipeline pipeline, boolean ssl) {
+            if (ssl) {
+                return super.addLast(pipeline, ssl);
+            }
+            return pipeline;
+        }
+    }
+
+    /**
+     * A ssl ChannelHandler to be added to pipeline.
+     */
+    private static class SslContextChannelHandlerEntry implements IChannelHandlerEntry {
+        final SslContext sslContext;
+
+        public SslContextChannelHandlerEntry(SslContext sslContext) {
+            this.sslContext = sslContext;
+        }
+
+        @Override
+        public ChannelPipeline addLast(ChannelPipeline pipeline, boolean ssl) {
+            if (ssl) {
+                pipeline.addLast(sslContext.newHandler(pipeline.channel().alloc()));
+            }
+            return pipeline;
+        }
+    }
+
+    /**
+     * The embedded server channel initializer.
+     */
+    private class EmbeddedServerChannelInitializer extends ChannelInitializer {
+        private final List<IChannelHandlerEntry> channelHandlers;
+        private final boolean ssl = sslContext != null && sslConfiguration != null;
+
+        public EmbeddedServerChannelInitializer() {
+            channelHandlers = new ArrayList<>(15);
+
+            final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
+            HttpRequestCertificateHandler requestCertificateHandler = null;
+            final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
+            final RoutingInBoundHandler routingHandler = new RoutingInBoundHandler(applicationContext, router, mediaTypeCodecRegistry,
+                    customizableResponseTypeHandlerRegistry, staticResourceResolver, serverConfiguration, requestArgumentSatisfier, executorSelector, ioExecutor,
+                    httpContentProcessorResolver);
+
+            if (ssl) {
+                requestCertificateHandler = new HttpRequestCertificateHandler();
+                channelHandlers.add(new SslContextChannelHandlerEntry(sslContext));
+            }
+            if (serverConfiguration.getLogLevel().isPresent()) {
+                channelHandlers.add(new NonSharableChannelHandlerEntry(() -> new LoggingHandler(serverConfiguration.getLogLevel().get())));
+            }
+
+            final Duration idleTime = serverConfiguration.getIdleTimeout();
+            if (!idleTime.isNegative()) {
+                channelHandlers.add(new NonSharableChannelHandlerEntry(() -> new IdleStateHandler((int) serverConfiguration.getReadIdleTimeout().getSeconds(),
+                        (int) serverConfiguration.getWriteIdleTimeout().getSeconds(), (int) idleTime.getSeconds())));
+            }
+
+            channelHandlers.add(new NonSharableChannelHandlerEntry(HTTP_CODEC,
+                    () -> new HttpServerCodec(serverConfiguration.getMaxInitialLineLength(), serverConfiguration.getMaxHeaderSize(),
+                            serverConfiguration.getMaxChunkSize(), serverConfiguration.isValidateHeaders(), serverConfiguration.getInitialBufferSize())));
+
+            int i = 0;
+            for (ChannelHandler outboundHandlerAdapter : outboundHandlers) {
+                String name;
+                if (outboundHandlerAdapter instanceof Named) {
+                    name = ((Named) outboundHandlerAdapter).getName();
+                } else {
+                    name = NettyHttpServer.MICRONAUT_HANDLER + NettyHttpServer.OUTBOUND_KEY + ++i;
+                }
+                channelHandlers.add(new SharableChannelHandlerEntry(name, outboundHandlerAdapter));
+            }
+
+            channelHandlers.add(new NonSharableChannelHandlerEntry(FlowControlHandler::new));
+            channelHandlers.add(new NonSharableChannelHandlerEntry(HTTP_KEEP_ALIVE_HANDLER, HttpServerKeepAliveHandler::new));
+            channelHandlers.add(new NonSharableChannelHandlerEntry(HTTP_COMPRESSOR, () -> new SmartHttpContentCompressor(httpCompressionStrategy)));
+            channelHandlers.add(new NonSharableChannelHandlerEntry(HTTP_DECOMPRESSOR, HttpContentDecompressor::new));
+            channelHandlers.add(new NonSharableChannelHandlerEntry(HTTP_STREAMS_CODEC, HttpStreamsServerHandler::new));
+            channelHandlers.add(new NonSharableChannelHandlerEntry(HTTP_CHUNKED_HANDLER, ChunkedWriteHandler::new));
+            channelHandlers.add(new SharableChannelHandlerEntry(HttpRequestDecoder.ID, requestDecoder));
+            if (ssl) {
+                channelHandlers.add(new SslChannelHandlerEntry(requestCertificateHandler));
+            }
+            channelHandlers.add(new SharableChannelHandlerEntry(HttpResponseEncoder.ID, responseDecoder));
+            channelHandlers.add(
+                    new NonSharableChannelHandlerEntry(NettyServerWebSocketUpgradeHandler.ID, () -> new NettyServerWebSocketUpgradeHandler(getWebSocketSessionRepository(),
+                            router, requestArgumentSatisfier.getBinderRegistry(), webSocketBeanRegistry, mediaTypeCodecRegistry, applicationContext)));
+            channelHandlers.add(new SharableChannelHandlerEntry(MICRONAUT_HANDLER, routingHandler));
+            ((ArrayList<IChannelHandlerEntry>) channelHandlers).trimToSize();
+        }
+
+        @Override
+        protected void initChannel(Channel ch) throws Exception {
+            final ChannelPipeline pipeline = ch.pipeline();
+            final boolean sslFlag = ssl && ((InetSocketAddress) ch.localAddress()).getPort() == sslConfiguration.getPort();
+            for (IChannelHandlerEntry entry: channelHandlers) {
+                entry.addLast(pipeline, sslFlag);
+            }
+        }
+
+    }
+
 }
