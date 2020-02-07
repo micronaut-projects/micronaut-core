@@ -647,7 +647,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             for (Feature d: dependents) {
 
                 if (!oneOfOnly || oneOfFeatureNames.contains(d.name)) {
-                    if (d.isSupported(javaVersion)) {
+                    if (d.isSupported(javaVersion) && !evicted.contains(d.name)) {
                         if (feature.requested) {
                             d.requested = true
                         }
