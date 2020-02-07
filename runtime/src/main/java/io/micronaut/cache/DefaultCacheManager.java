@@ -50,17 +50,6 @@ public class DefaultCacheManager<C> implements CacheManager<C> {
      * Create default cache manager for the given caches.
      *
      * @param caches List of synchronous cache implementations
-     * @deprecated Use {@link #DefaultCacheManager(List, Provider)} instead.
-     */
-    @Deprecated
-    public DefaultCacheManager(List<SyncCache<C>> caches) {
-        this(caches, null);
-    }
-
-    /**
-     * Create default cache manager for the given caches.
-     *
-     * @param caches List of synchronous cache implementations
      * @param dynamicCacheManager The dynamic cache manager
      */
     @Inject public DefaultCacheManager(List<SyncCache<C>> caches, @Nullable Provider<DynamicCacheManager<C>> dynamicCacheManager) {
@@ -86,7 +75,7 @@ public class DefaultCacheManager<C> implements CacheManager<C> {
      * @param caches List of synchronous cache implementations
      */
     public DefaultCacheManager(SyncCache<C>... caches) {
-        this(Arrays.asList(caches));
+        this(Arrays.asList(caches), null);
     }
 
     @Override

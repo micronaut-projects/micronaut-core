@@ -20,7 +20,6 @@ import io.micronaut.context.converters.StringArrayToClassArrayConverter;
 import io.micronaut.context.converters.StringToClassConverter;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
@@ -98,90 +97,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final AtomicBoolean reading = new AtomicBoolean(false);
     private final Boolean deduceEnvironments;
     private final ApplicationContextConfiguration configuration;
-
-    /**
-     * @param classLoader The class loader
-     * @param names       The names
-     * @deprecated Use {@link #DefaultEnvironment(ApplicationContextConfiguration)} instead
-     */
-    @Deprecated
-    public DefaultEnvironment(ClassLoader classLoader, String... names) {
-        this(classLoader, ConversionService.SHARED, names);
-    }
-
-    /**
-     * @param names The names
-     * @deprecated Use {@link #DefaultEnvironment(ApplicationContextConfiguration)} instead
-     */
-    @Deprecated
-    public DefaultEnvironment(String... names) {
-        this(DefaultEnvironment.class.getClassLoader(), ConversionService.SHARED, names);
-    }
-
-    /**
-     * @param classLoader       The class loader
-     * @param conversionService The conversion service
-     * @param names             The names
-     * @deprecated Use {@link #DefaultEnvironment(ApplicationContextConfiguration)} instead
-     */
-    @Deprecated
-    public DefaultEnvironment(ClassLoader classLoader, ConversionService conversionService, String... names) {
-        this(ClassPathResourceLoader.defaultLoader(classLoader), conversionService, names);
-    }
-
-    /**
-     * @param resourceLoader    The resource loader
-     * @param conversionService The conversion service
-     * @param names             The names
-     * @deprecated Use {@link #DefaultEnvironment(ApplicationContextConfiguration)} instead
-     */
-    @Deprecated
-    @SuppressWarnings("MagicNumber")
-    public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
-        this(resourceLoader, conversionService, null, names);
-    }
-
-    /**
-     * @param resourceLoader     The resource loader
-     * @param conversionService  The conversion service
-     * @param deduceEnvironments Option to deduce environments
-     * @param names              The names
-     * @deprecated  Use {@link #DefaultEnvironment(ApplicationContextConfiguration)} instead.
-     */
-    @SuppressWarnings("MagicNumber")
-    @Deprecated
-    public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, @Nullable Boolean deduceEnvironments, String... names) {
-        this(new ApplicationContextConfiguration() {
-            @NonNull
-            @Override
-            public ClassLoader getClassLoader() {
-                return resourceLoader.getClassLoader();
-            }
-
-            @NonNull
-            @Override
-            public List<String> getEnvironments() {
-                return Arrays.asList(names);
-            }
-
-            @NonNull
-            @Override
-            public ConversionService<?> getConversionService() {
-                return conversionService;
-            }
-
-            @Override
-            public @NonNull ClassPathResourceLoader getResourceLoader() {
-                return resourceLoader;
-            }
-
-            @Override
-            public Optional<Boolean> getDeduceEnvironments() {
-                return Optional.ofNullable(deduceEnvironments);
-            }
-
-        });
-    }
 
     /**
      * Construct a new environment for the given configuration.

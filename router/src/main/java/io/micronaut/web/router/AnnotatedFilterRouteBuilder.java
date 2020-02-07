@@ -53,26 +53,6 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
      * @param executionHandleLocator The execution handler locator
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
-     * @deprecated Use
-     */
-    @Deprecated
-    public AnnotatedFilterRouteBuilder(
-        BeanContext beanContext,
-        ExecutionHandleLocator executionHandleLocator,
-        UriNamingStrategy uriNamingStrategy,
-        ConversionService<?> conversionService) {
-        super(executionHandleLocator, uriNamingStrategy, conversionService);
-        this.beanContext = beanContext;
-        this.contextPathProvider = null;
-    }
-
-    /**
-     * Constructor.
-     *
-     * @param beanContext The bean context
-     * @param executionHandleLocator The execution handler locator
-     * @param uriNamingStrategy The URI naming strategy
-     * @param conversionService The conversion service
      * @param contextPathProvider The server context path provider
      */
     @Inject

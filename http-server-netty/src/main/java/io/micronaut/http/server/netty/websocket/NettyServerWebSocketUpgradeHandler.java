@@ -127,7 +127,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     @Override
     protected final void channelRead0(ChannelHandlerContext ctx, NettyHttpRequest<?> msg) {
 
-        Optional<UriRouteMatch<Object, Object>> routeMatch = router.find(HttpMethod.GET, msg.getUri())
+        Optional<UriRouteMatch<Object, Object>> routeMatch = router.find(HttpMethod.GET, msg.getUri().toString(), msg)
                 .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
                 .findFirst();
 

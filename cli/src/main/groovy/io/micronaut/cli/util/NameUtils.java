@@ -655,6 +655,7 @@ public final class NameUtils {
      * @return true if it is a javabean property getter
      * @deprecated use {@link #isGetter(String, Class, Class[])} instead because this method has a defect for "is.." method with Boolean return types.
      */
+    @Deprecated
     public static boolean isGetter(String name, Class<?>[] args) {
         return isGetter(name, boolean.class, args);
     }

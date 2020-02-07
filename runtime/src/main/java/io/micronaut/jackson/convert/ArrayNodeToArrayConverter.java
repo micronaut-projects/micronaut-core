@@ -41,17 +41,6 @@ public class ArrayNodeToArrayConverter implements TypeConverter<ArrayNode, Objec
      * Create a converter to convert form ArrayNode to Array.
      *
      * @param objectMapper To convert from Json to Array
-     * @deprecated Use {@link #ArrayNodeToArrayConverter(Provider)} instead
-     */
-    @Deprecated
-    public ArrayNodeToArrayConverter(ObjectMapper objectMapper) {
-        this(() -> objectMapper);
-    }
-
-    /**
-     * Create a converter to convert form ArrayNode to Array.
-     *
-     * @param objectMapper To convert from Json to Array
      */
     @Inject
     public ArrayNodeToArrayConverter(Provider<ObjectMapper> objectMapper) {

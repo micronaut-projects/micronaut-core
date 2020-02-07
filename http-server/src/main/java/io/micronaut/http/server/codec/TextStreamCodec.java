@@ -25,7 +25,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.ApplicationConfiguration;
 
@@ -70,21 +69,6 @@ public class TextStreamCodec implements MediaTypeCodec {
     private final List<MediaType> additionalTypes;
     private final Charset defaultCharset;
     private MediaTypeCodecRegistry codecRegistry;
-
-    /**
-     * @param serverConfiguration   The HTTP server configuration
-     * @param byteBufferFactory     A byte buffer factory
-     * @param codecRegistryProvider A media type codec registry
-     * @param codecConfiguration    The configuration for the codec
-     */
-    @Deprecated
-    public TextStreamCodec(
-        HttpServerConfiguration serverConfiguration,
-        ByteBufferFactory byteBufferFactory,
-        Provider<MediaTypeCodecRegistry> codecRegistryProvider,
-        @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        this(serverConfiguration.getDefaultCharset(), byteBufferFactory, codecRegistryProvider, codecConfiguration);
-    }
 
     /**
      * @param applicationConfiguration The application configuration

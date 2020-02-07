@@ -15,7 +15,6 @@
  */
 package io.micronaut.jackson.convert;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -37,18 +36,6 @@ import java.util.Optional;
 public class ArrayNodeToIterableConverter implements TypeConverter<ArrayNode, Iterable> {
 
     private final ConversionService conversionService;
-
-    /**
-     * Create a new converter to convert from json to given type iteratively.
-     *
-     * @param objectMapper  To convert from Json
-     * @param conversionService Convert the given json node to the given target type.
-     * @deprecated Use {@link #ArrayNodeToIterableConverter(ConversionService)} instead
-     */
-    @Deprecated
-    public ArrayNodeToIterableConverter(ObjectMapper objectMapper, ConversionService conversionService) {
-        this(conversionService);
-    }
 
     /**
      * Create a new converter to convert from json to given type iteratively.

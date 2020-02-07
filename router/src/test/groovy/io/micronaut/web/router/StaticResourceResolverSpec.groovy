@@ -25,10 +25,10 @@ class StaticResourceResolverSpec extends Specification {
     void "test the path is not mangled between resolution attempts"() {
         given:
         ResourceResolver rr = new ResourceResolver()
-        StaticResourceConfiguration config1 = new StaticResourceConfiguration(rr)
+        StaticResourceConfiguration config1 = new StaticResourceConfiguration(rr, null)
         config1.setPaths(["classpath:public"])
         config1.setMapping("/**")
-        StaticResourceConfiguration config2 = new StaticResourceConfiguration(rr)
+        StaticResourceConfiguration config2 = new StaticResourceConfiguration(rr, null)
         config2.setPaths(["classpath:other"])
         config2.setMapping("/other/**")
         StaticResourceResolver resolver = new StaticResourceResolver([config1, config2])

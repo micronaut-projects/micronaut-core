@@ -36,16 +36,8 @@ import java.util.Optional;
  */
 @Singleton
 public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object> {
-    private final Provider<ObjectMapper> objectMapper;
 
-    /**
-     * @param objectMapper To read/write JSON
-     * @deprecated Use {@link #JsonNodeToObjectConverter(Provider)} instead
-     */
-    @Deprecated
-    public JsonNodeToObjectConverter(ObjectMapper objectMapper) {
-        this(() -> objectMapper);
-    }
+    private final Provider<ObjectMapper> objectMapper;
 
     /**
      * @param objectMapper To read/write JSON

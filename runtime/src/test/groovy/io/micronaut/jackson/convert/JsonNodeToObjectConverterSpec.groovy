@@ -23,7 +23,7 @@ class JsonNodeToObjectConverterSpec extends Specification {
 
     void "test the converter handles NullNode correctly"() {
         given:
-        def converter = new JsonNodeToObjectConverter(new ObjectMapper())
+        def converter = new JsonNodeToObjectConverter({ new ObjectMapper()})
 
         when:
         Optional optional = converter.convert(NullNode.instance, Pojo.class)

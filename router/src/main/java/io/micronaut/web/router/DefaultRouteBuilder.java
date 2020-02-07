@@ -20,11 +20,8 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameResolver;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.naming.conventions.TypeConvention;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -41,7 +38,6 @@ import io.micronaut.web.router.exceptions.RoutingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Qualifier;
 import java.nio.charset.Charset;
@@ -62,30 +58,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} where by camel case conventions are used.
      */
     public static final UriNamingStrategy CAMEL_CASE_NAMING_STRATEGY = new UriNamingStrategy() {
-    };
-
-    /**
-     * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} whereby hyphenated naming conventions are used.
-     *
-     * @deprecated Dynamic naming conventions are no longer supported
-     */
-    @Deprecated
-    public static final UriNamingStrategy HYPHENATED_NAMING_STRATEGY = new UriNamingStrategy() {
-        @Override
-        public @NonNull String resolveUri(Class type) {
-            return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
-        }
-
-        @Override
-        public @NonNull String resolveUri(String property) {
-            if (StringUtils.isEmpty(property)) {
-                return "/";
-            }
-            if (property.charAt(0) != '/') {
-                return '/' + NameUtils.hyphenate(property, true);
-            }
-            return property;
-        }
     };
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);

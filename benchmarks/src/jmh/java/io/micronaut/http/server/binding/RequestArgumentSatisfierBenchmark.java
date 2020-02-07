@@ -33,7 +33,7 @@ public class RequestArgumentSatisfierBenchmark {
     @Benchmark
     public void benchmarkFulfillArgumentRequirements() {
         final MutableHttpRequest<Object> request = HttpRequest.GET("/arguments/foo/bar/10");
-        final UriRouteMatch<Object, Object> routeMatch = router.find(request.getMethod(), request.getUri(), request).findFirst().orElse(null);
+        final UriRouteMatch<Object, Object> routeMatch = router.find(request.getMethod(), request.getUri().toString(), request).findFirst().orElse(null);
         final RouteMatch<?> transformed = requestArgumentSatisfier.fulfillArgumentRequirements(
                 routeMatch,
                 request,

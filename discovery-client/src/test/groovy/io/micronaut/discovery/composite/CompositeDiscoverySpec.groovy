@@ -3,12 +3,13 @@ package io.micronaut.discovery.composite
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.consul.MockConsulServer
-import io.micronaut.discovery.kubernetes.KubernetesDiscoveryClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -31,8 +32,7 @@ class CompositeDiscoverySpec extends Specification {
              "micronaut.caches.discoveryClient.enabled": false,
              'consul.client.host'                     : 'localhost',
              'consul.client.port'                     : consulServer.getPort(),
-             'spec.name': 'CompositeDiscoverySpec']
-    , "k8s")
+             'spec.name': 'CompositeDiscoverySpec'])
 
     void "test multiple service discovery clients"() {
         given:
@@ -49,16 +49,37 @@ class CompositeDiscoverySpec extends Specification {
     }
 
     @Singleton
-    @Replaces(KubernetesDiscoveryClient.class)
     @Requires(property = "spec.name", value = "CompositeDiscoverySpec")
-    static class MockKubernetesDiscoveryClient extends KubernetesDiscoveryClient {
+    static class MockDiscoveryClient implements DiscoveryClient {
 
         @Override
-        protected Map<String, String> resolveEnvironment() {
-            [
-                    "FOO_SERVICE_PORT_HTTPS":"8443",
-                    "FOO_SERVICE_HOST":"foo"
-            ]
+        Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+            return Publishers.just([new ServiceInstance() {
+                @Override
+                String getId() {
+                    return "foo"
+                }
+
+                @Override
+                URI getURI() {
+                    return new URI("http://foo:8443")
+                }
+            }])
+        }
+
+        @Override
+        Publisher<List<String>> getServiceIds() {
+            return ["foo"]
+        }
+
+        @Override
+        String getDescription() {
+            return "Mock"
+        }
+
+        @Override
+        void close() throws IOException {
+
         }
     }
 }

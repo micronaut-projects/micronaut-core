@@ -35,20 +35,6 @@ public class LoggerConfiguration {
 
     /**
      * @param name the logger name
-     * @param configuredLevel the configured {@link LogLevel}
-     * @param effectiveLevel the effective {@link LogLevel}
-     * @deprecated Use {@link #LoggerConfiguration(String, io.micronaut.logging.LogLevel, io.micronaut.logging.LogLevel)} instead
-     */
-    @Deprecated
-    public LoggerConfiguration(String name, LogLevel configuredLevel,
-                               LogLevel effectiveLevel) {
-        this(name,
-            io.micronaut.logging.LogLevel.valueOf(configuredLevel.name()),
-            io.micronaut.logging.LogLevel.valueOf(effectiveLevel.name()));
-    }
-
-    /**
-     * @param name the logger name
      * @param configuredLevel the configured {@link io.micronaut.logging.LogLevel}
      * @param effectiveLevel the effective {@link io.micronaut.logging.LogLevel}
      */
@@ -65,24 +51,6 @@ public class LoggerConfiguration {
      */
     public String getName() {
         return name;
-    }
-
-    /**
-     * @return the configured {@link LogLevel}
-     * @deprecated Use {@link #configuredLevel()} instead
-     */
-    @Deprecated
-    public LogLevel getConfiguredLevel() {
-        return LogLevel.valueOf(configuredLevel.name());
-    }
-
-    /**
-     * @return the effective {@link LogLevel}
-     * @deprecated Use {@link #effectiveLevel()} instead
-     */
-    @Deprecated
-    public LogLevel getEffectiveLevel() {
-        return LogLevel.valueOf(effectiveLevel.name());
     }
 
     /**

@@ -18,7 +18,6 @@ package io.micronaut.context.env;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.Toggleable;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Optional;
 
 /**
@@ -47,21 +46,7 @@ public interface PropertySourceLoader extends Toggleable, PropertySourceLocator,
      * @param resourceLoader  The {@link ResourceLoader} to retrieve the resource
      * @return An optional of {@link PropertySource}
      */
-    default Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader) {
-        return load(resourceName, resourceLoader, null);
-    }
-
-    /**
-     * Load a {@link PropertySource} for the given {@link Environment}.
-     *
-     * @param resourceName    The resourceName of the resource to load
-     * @param resourceLoader  The {@link ResourceLoader} to retrieve the resource
-     * @param environmentName The environment name to load. Null if the default environment is to be used
-     * @return An optional of {@link PropertySource}
-     * @deprecated Use {@link #load(String, ResourceLoader)} or {@link #loadEnv(String, ResourceLoader, ActiveEnvironment)} (String, ResourceLoader, ActiveEnvironment)} instead
-     */
-    @Deprecated
-    Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader, @Nullable String environmentName);
+    Optional<PropertySource> load(String resourceName, ResourceLoader resourceLoader);
 
     /**
      * Load a {@link PropertySource} for the given {@link Environment}.
@@ -71,7 +56,5 @@ public interface PropertySourceLoader extends Toggleable, PropertySourceLocator,
      * @param activeEnvironment   The environment to load
      * @return An optional of {@link PropertySource}
      */
-    default Optional<PropertySource> loadEnv(String resourceName, ResourceLoader resourceLoader, ActiveEnvironment activeEnvironment) {
-        return load(resourceName, resourceLoader, activeEnvironment.getName());
-    }
+    Optional<PropertySource> loadEnv(String resourceName, ResourceLoader resourceLoader, ActiveEnvironment activeEnvironment);
 }

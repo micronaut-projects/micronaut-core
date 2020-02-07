@@ -50,16 +50,6 @@ public class ResourceLoaderFactory {
     private final ClassLoader classLoader;
 
     /**
-     * Default constructor.
-     *
-     * @deprecated Use {@link #ResourceLoaderFactory(Environment)} instead.
-     */
-    @Deprecated
-    public ResourceLoaderFactory() {
-        this.classLoader = ResourceLoaderFactory.class.getClassLoader();
-    }
-
-    /**
      * The resource factory.
      *
      * @param environment The environment

@@ -56,3 +56,11 @@ Specifying a file with `micronaut.config.files`, either through the system prope
 === Graal Dependency
 
 The old Graal group name `com.oracle.substratevm` is no longer part of the Micronaut BOM.
+
+=== PropertySourceLoader Changes
+
+Some default interface methods are no longer default and require implementation.
+
+=== Deprecation Removal
+
+Most if not all deprecated classes and methods have been removed.

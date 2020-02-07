@@ -33,16 +33,6 @@ public class RouteMatchUtils {
     /**
      * @param request The Http request
      * @return The optional route match
-     * @deprecated Use {@link #findRouteMatch(HttpRequest)} instead.
-     */
-    @Deprecated
-    public static Optional<RouteMatch> findRouteMatchAtRequest(HttpRequest<?> request) {
-        return findRouteMatch(request);
-    }
-
-    /**
-     * @param request The Http request
-     * @return The optional route match
      */
     public static Optional<RouteMatch> findRouteMatch(HttpRequest<?> request) {
         Optional<RouteMatch> routeMatchAttribute = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class);

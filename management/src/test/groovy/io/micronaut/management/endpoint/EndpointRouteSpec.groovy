@@ -42,7 +42,7 @@ class EndpointRouteSpec extends Specification {
         Router router = ctx.getBean(Router)
 
         then:
-        router.find(method, uri).count() == (exists ? 1 : 0)
+        router.find(method, uri, null).count() == (exists ? 1 : 0)
 
         where:
         method | uri      | exists

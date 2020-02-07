@@ -17,10 +17,7 @@ package io.micronaut.spring.core.env;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ClassUtils;
 import org.springframework.core.env.PropertyResolver;
-
-import java.util.Optional;
 
 /**
  * Adapts a {@link io.micronaut.core.value.PropertyResolver} to a Spring {@link org.springframework.core.env.PropertyResolver}.
@@ -74,28 +71,6 @@ public class PropertyResolverAdapter implements PropertyResolver {
     @Override
     public <T> T getProperty(String key, Class<T> targetType, T defaultValue) {
         return propertyResolver.getProperty(NameUtils.hyphenate(key), targetType, defaultValue);
-    }
-
-    /**
-     * Return the property value converted to a class loaded by
-     * the current thread context class loader.
-     *
-     * @param key The property key
-     * @param targetType The class
-     * @param <T> The class type
-     * @return The class value
-     */
-    @Deprecated
-    public <T> Class<T> getPropertyAsClass(String key, Class<T> targetType) {
-        Optional<String> property = propertyResolver.getProperty(NameUtils.hyphenate(key), String.class);
-        if (property.isPresent()) {
-            Optional<Class> aClass = ClassUtils.forName(property.get(), Thread.currentThread().getContextClassLoader());
-            if (aClass.isPresent()) {
-                //noinspection unchecked
-                return aClass.get();
-            }
-        }
-        return null;
     }
 
     @Override

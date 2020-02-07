@@ -18,17 +18,16 @@ package io.micronaut.management.endpoint.loggers.impl;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.management.endpoint.loggers.LogLevel;
+import io.micronaut.logging.LogLevel;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
 import io.micronaut.management.endpoint.loggers.LoggingSystem;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
@@ -42,9 +41,10 @@ import java.util.stream.Collectors;
 @Requires(beans = LoggersEndpoint.class)
 @Requires(classes = ch.qos.logback.classic.LoggerContext.class)
 @Replaces(io.micronaut.logging.impl.LogbackLoggingSystem.class)
-public class LogbackLoggingSystem implements LoggingSystem {
+public class LogbackLoggingSystem implements LoggingSystem, io.micronaut.logging.LoggingSystem {
 
     @Override
+    @NonNull
     public Collection<LoggerConfiguration> getLoggers() {
         return getLoggerContext()
                 .getLoggerList()
@@ -54,20 +54,13 @@ public class LogbackLoggingSystem implements LoggingSystem {
     }
 
     @Override
+    @NonNull
     public LoggerConfiguration getLogger(String name) {
         return toLoggerConfiguration(getLoggerContext().getLogger(name));
     }
 
     @Override
-    @Deprecated
-    public void setLogLevel(@NotBlank String name, @NotNull LogLevel level) {
-        getLoggerContext().getLogger(name).setLevel(toLevel(
-                io.micronaut.logging.LogLevel.valueOf(level.name())
-        ));
-    }
-
-    @Override
-    public void setLogLevel(String name, io.micronaut.logging.LogLevel level) {
+    public void setLogLevel(String name, LogLevel level) {
         getLoggerContext().getLogger(name).setLevel(toLevel(level));
     }
 
@@ -94,11 +87,11 @@ public class LogbackLoggingSystem implements LoggingSystem {
      * @param level The logback {@link Level} to convert
      * @return The converted {@link io.micronaut.logging.LogLevel}
      */
-    private static io.micronaut.logging.LogLevel toLogLevel(Level level) {
+    private static LogLevel toLogLevel(Level level) {
         if (level == null) {
-            return io.micronaut.logging.LogLevel.NOT_SPECIFIED;
+            return LogLevel.NOT_SPECIFIED;
         } else {
-            return io.micronaut.logging.LogLevel.valueOf(level.toString());
+            return LogLevel.valueOf(level.toString());
         }
     }
 
@@ -106,8 +99,8 @@ public class LogbackLoggingSystem implements LoggingSystem {
      * @param logLevel The micronaut {@link io.micronaut.logging.LogLevel} to convert
      * @return The converted logback {@link Level}
      */
-    private static Level toLevel(io.micronaut.logging.LogLevel logLevel) {
-        if (logLevel == io.micronaut.logging.LogLevel.NOT_SPECIFIED) {
+    private static Level toLevel(LogLevel logLevel) {
+        if (logLevel == LogLevel.NOT_SPECIFIED) {
             return null;
         } else {
             return Level.valueOf(logLevel.name());

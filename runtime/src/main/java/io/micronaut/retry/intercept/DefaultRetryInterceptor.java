@@ -30,8 +30,6 @@ import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.Retryable;
 import io.micronaut.retry.event.RetryEvent;
 import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.executor.ExecutorType;
-import io.micronaut.scheduling.executor.UserExecutorConfiguration;
 import io.reactivex.Flowable;
 import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
@@ -63,19 +61,6 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     private final ApplicationEventPublisher eventPublisher;
     private final ScheduledExecutorService executorService;
     private final Map<ExecutableMethod, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
-
-    /**
-     * Construct a default retry method interceptor with the event publisher.
-     *
-     * @param eventPublisher The event publisher to publish retry events
-     * @deprecated Use {@link #DefaultRetryInterceptor(ApplicationEventPublisher, ExecutorService)} instead
-     */
-    @Deprecated
-    public DefaultRetryInterceptor(ApplicationEventPublisher eventPublisher) {
-        this.eventPublisher = eventPublisher;
-        UserExecutorConfiguration configuration = UserExecutorConfiguration.of(ExecutorType.SCHEDULED);
-        this.executorService = Executors.newScheduledThreadPool(configuration.getCorePoolSize());
-    }
 
     /**
      * Construct a default retry method interceptor with the event publisher.

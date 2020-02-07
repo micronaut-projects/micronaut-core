@@ -46,19 +46,6 @@ public interface LoggersManager<T> {
      */
     Publisher<T> getLogger(LoggingSystem loggingSystem, @NotBlank String name);
 
-    /**
-     * Set the log level for the named logger in the system.
-     *
-     * @param loggingSystem The {@link LoggingSystem} in use
-     * @param name The name of the logger to find or create
-     * @param level The log level to configure
-     * @deprecated Use {@link #setLogLevel(LoggingSystem, String, io.micronaut.logging.LogLevel)} instead
-     */
-    @Deprecated
-    default void setLogLevel(LoggingSystem loggingSystem, @NotBlank String name,
-                     @NotNull LogLevel level) {
-        loggingSystem.setLogLevel(name, level);
-    }
 
     /**
      * Set the log level for the named logger in the system.

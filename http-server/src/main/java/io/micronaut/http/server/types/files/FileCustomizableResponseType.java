@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.types.files;
 
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.server.types.CustomizableResponseType;
 
@@ -25,7 +24,6 @@ import io.micronaut.http.server.types.CustomizableResponseType;
  * @author James Kleeh
  * @since 1.0
  */
-@Experimental
 public interface FileCustomizableResponseType extends CustomizableResponseType {
 
     String ATTACHMENT_HEADER = "attachment; filename=\"%s\"";
@@ -39,12 +37,6 @@ public interface FileCustomizableResponseType extends CustomizableResponseType {
      * @return The length of the file
      */
     long getLength();
-
-    /**
-     * @return The name of the file
-     */
-    @Deprecated
-    String getName();
 
     /**
      * @return The media type of the file

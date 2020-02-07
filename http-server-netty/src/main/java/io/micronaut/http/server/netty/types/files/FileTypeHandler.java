@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty.types.files;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
@@ -27,7 +26,6 @@ import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 
@@ -47,7 +45,7 @@ import java.util.Arrays;
 @Singleton
 public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
-    private static final Class<?>[] SUPPORTED_TYPES = new Class[]{File.class, SystemFileCustomizableResponseType.class, StreamedFile.class, NettyFileCustomizableResponseType.class, SystemFile.class};
+    private static final Class<?>[] SUPPORTED_TYPES = new Class[]{File.class, StreamedFile.class, NettyFileCustomizableResponseType.class, SystemFile.class};
     private final FileTypeHandlerConfiguration configuration;
 
     /**
@@ -65,8 +63,6 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             type = new NettySystemFileCustomizableResponseType((File) obj);
         } else if (obj instanceof NettyFileCustomizableResponseType) {
             type = (NettyFileCustomizableResponseType) obj;
-        } else if (obj instanceof SystemFileCustomizableResponseType) {
-            type = new NettySystemFileCustomizableResponseType((SystemFileCustomizableResponseType) obj);
         } else if (obj instanceof StreamedFile) {
             type = new NettyStreamedFileCustomizableResponseType((StreamedFile) obj);
         } else if (obj instanceof SystemFile) {
@@ -106,17 +102,6 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
     public boolean supports(Class<?> type) {
         return Arrays.stream(SUPPORTED_TYPES)
             .anyMatch((aClass -> aClass.isAssignableFrom(type)));
-    }
-
-    /**
-     * @param filename The filename
-     * @deprecated The media type now comes from the file types.
-     * @see io.micronaut.http.server.types.files.FileCustomizableResponseType#getMediaType()
-     * @return The {@link MediaType}
-     */
-    @Deprecated
-    protected MediaType getMediaType(String filename) {
-        return MediaType.TEXT_PLAIN_TYPE;
     }
 
     /**

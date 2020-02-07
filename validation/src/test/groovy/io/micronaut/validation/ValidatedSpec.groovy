@@ -56,7 +56,7 @@ class ValidatedSpec extends Specification {
 
     def "test order"() {
         given:
-        def list = [new CacheInterceptor(Mock(CacheManager), Mock(CacheErrorHandler), Mock(AsyncCacheErrorHandler), Mock(ExecutorService), Mock(BeanContext)), new ValidatingInterceptor(Optional.empty())]
+        def list = [new CacheInterceptor(Mock(CacheManager), Mock(CacheErrorHandler), Mock(AsyncCacheErrorHandler), Mock(ExecutorService), Mock(BeanContext)), new ValidatingInterceptor(null, null)]
         OrderUtil.sort(list)
 
         expect:

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.types.files;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
@@ -24,7 +25,6 @@ import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -49,7 +49,8 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class NettySystemFileCustomizableResponseType extends SystemFileCustomizableResponseType implements NettyFileCustomizableResponseType {
+@Internal
+public class NettySystemFileCustomizableResponseType extends SystemFile implements NettyFileCustomizableResponseType {
 
     private static final int LENGTH_8K = 8192;
     private static final Logger LOG = LoggerFactory.getLogger(NettySystemFileCustomizableResponseType.class);
@@ -78,14 +79,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
     /**
      * @param delegate The system file customizable response type
      */
-    public NettySystemFileCustomizableResponseType(SystemFileCustomizableResponseType delegate) {
-        this(delegate.getFile());
-        this.delegate = Optional.of(delegate);
-    }
-
-    /**
-     * @param delegate The system file customizable response type
-     */
     public NettySystemFileCustomizableResponseType(SystemFile delegate) {
         this(delegate.getFile());
         this.delegate = Optional.of(delegate);
@@ -99,12 +92,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
     @Override
     public long getLastModified() {
         return delegate.map(FileCustomizableResponseType::getLastModified).orElse(super.getLastModified());
-    }
-
-    @Override
-    @Deprecated
-    public String getName() {
-        return delegate.map(FileCustomizableResponseType::getName).orElse(super.getName());
     }
 
     @Override
@@ -152,7 +139,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
                 try {
                     raf.close();
                 } catch (IOException e) {
-                    LOG.warn("An error occurred closing the file reference: " + file.getAbsolutePath(), e);
+                    LOG.warn("An error occurred closing the file reference: " + getFile().getAbsolutePath(), e);
                 }
             });
 
