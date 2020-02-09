@@ -1060,6 +1060,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 ArgumentConversionContext<?> conversionContext = ConversionContext.of(argument);
                 Optional<?> value = resolveValue(propertyResolver, conversionContext, valAnn.isPresent(), prop);
                 if (argument.getType() == Optional.class) {
+                    path.pop();
                     return resolveOptionalObject(value);
                 } else {
                     // can't use orElseThrow here due to compiler bug
@@ -1092,8 +1093,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             return result;
         } catch (NoSuchBeanException | BeanInstantiationException e) {
             throw new DependencyInjectionException(resolutionContext, argument, e);
-        } finally {
-            path.pop();
         }
     }
 
