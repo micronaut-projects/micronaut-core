@@ -71,17 +71,29 @@ public interface RxHttpClient extends HttpClient {
 
     @Override
     default <I, O> Flowable<O> retrieve(HttpRequest<I> request, Class<O> bodyType) {
-        return Flowable.fromPublisher(HttpClient.super.retrieve(request, bodyType));
+        return retrieve(
+                request,
+                Argument.of(bodyType),
+                DEFAULT_ERROR_TYPE
+        );
     }
 
     @Override
     default <I> Flowable<String> retrieve(HttpRequest<I> request) {
-        return Flowable.fromPublisher(HttpClient.super.retrieve(request));
+        return retrieve(
+                request,
+                Argument.STRING,
+                DEFAULT_ERROR_TYPE
+        );
     }
 
     @Override
     default Flowable<String> retrieve(String uri) {
-        return (Flowable<String>) HttpClient.super.retrieve(uri);
+        return retrieve(
+                HttpRequest.GET(uri),
+                Argument.STRING,
+                DEFAULT_ERROR_TYPE
+        );
     }
 
     /**

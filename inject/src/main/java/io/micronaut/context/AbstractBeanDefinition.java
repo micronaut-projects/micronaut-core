@@ -1092,6 +1092,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             return result;
         } catch (NoSuchBeanException | BeanInstantiationException e) {
             throw new DependencyInjectionException(resolutionContext, argument, e);
+        } finally {
+            path.pop();
         }
     }
 
@@ -1610,7 +1612,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             path.pushMethodArgumentResolve(this, injectionPoint, argument);
             try {
                 Qualifier qualifier = resolveQualifier(resolutionContext, argument);
-                @SuppressWarnings("unchecked") Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+                @SuppressWarnings("unchecked")
+                Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                 path.pop();
                 return bean;
             } catch (NoSuchBeanException e) {
