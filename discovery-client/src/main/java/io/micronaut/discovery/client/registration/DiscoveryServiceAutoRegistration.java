@@ -26,6 +26,9 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
 /**
  * Abstract class for {@link AutoRegistration} with discovery services.
  *
@@ -55,7 +58,13 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
         ServiceInstance instance,
         Publisher<HttpStatus> registrationObservable) {
 
-        registrationObservable.subscribe(new Subscriber<HttpStatus>() {
+        Flowable<HttpStatus> registrationFlowable = Flowable.fromPublisher(registrationObservable);
+        final Duration timeout = registration.getTimeout().orElse(null);
+        if (timeout != null) {
+            registrationFlowable = registrationFlowable.timeout(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        }
+
+        registrationFlowable.subscribe(new Subscriber<HttpStatus>() {
             @Override
             public void onSubscribe(Subscription s) {
                 s.request(1);
@@ -115,10 +124,19 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
      * @param applicationName     The application name to de-register
      */
     protected void performDeregistration(String discoveryService, RegistrationConfiguration registration, Publisher<HttpStatus> deregisterPublisher, String applicationName) {
+        Flowable<HttpStatus> deregisterFlowable = Flowable.fromPublisher(deregisterPublisher);
+        final Duration timeout = registration.getTimeout().orElse(null);
+        if (timeout != null) {
+            deregisterFlowable = deregisterFlowable.timeout(
+                    timeout.toMillis(),
+                    TimeUnit.MILLISECONDS
+            );
+        }
         if (registration.isFailFast()) {
 
             try {
-                Flowable.fromPublisher(deregisterPublisher).blockingFirst();
+                deregisterFlowable
+                        .blockingFirst();
                 if (LOG.isInfoEnabled()) {
                     LOG.info("De-registered service [{}] with {}", applicationName, discoveryService);
                 }
@@ -130,7 +148,7 @@ public abstract class DiscoveryServiceAutoRegistration extends AutoRegistration 
                 registered.set(false);
             }
         } else {
-            deregisterPublisher.subscribe(new Subscriber<HttpStatus>() {
+            deregisterFlowable.subscribe(new Subscriber<HttpStatus>() {
                 @Override
                 public void onSubscribe(Subscription subscription) {
                     subscription.request(1);
