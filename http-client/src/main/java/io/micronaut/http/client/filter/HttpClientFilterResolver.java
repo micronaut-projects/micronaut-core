@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
@@ -55,13 +54,13 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
      * Default constructor.
      *
      * @param clientIdentifiers          The client identifiers
-     * @param annotationValue            The filter annotation
+     * @param filterAnnotation            The filter annotation
      * @param annotationMetadataResolver The annotation metadata resolver
      * @param clientFilters              All client filters
      */
     public HttpClientFilterResolver(
             @Parameter @Nullable Collection<String> clientIdentifiers,
-            @Parameter @Nullable AnnotationValue<?> annotationValue,
+            @Parameter @Nullable String filterAnnotation,
             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
             List<HttpClientFilter> clientFilters) {
         if (clientIdentifiers == null) {
@@ -93,8 +92,8 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
                 }).filter(entry -> {
                     AnnotationMetadata annotationMetadata = entry.annotationMetadata;
                     boolean matches = !annotationMetadata.hasStereotype(FilterMatcher.class);
-                    if (annotationValue != null && !matches) {
-                        matches = annotationMetadata.hasAnnotation(annotationValue.getAnnotationName());
+                    if (filterAnnotation != null && !matches) {
+                        matches = annotationMetadata.hasAnnotation(filterAnnotation);
                     }
 
                     if (matches) {

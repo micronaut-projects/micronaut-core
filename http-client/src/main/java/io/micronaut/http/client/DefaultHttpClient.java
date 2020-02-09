@@ -17,12 +17,9 @@ package io.micronaut.http.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.context.annotation.Parameter;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
@@ -100,7 +97,10 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
-import io.reactivex.*;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
+import io.reactivex.FlowableEmitter;
+import io.reactivex.Scheduler;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Cancellable;
 import io.reactivex.functions.Consumer;
@@ -112,10 +112,6 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.annotation.PreDestroy;
-import javax.inject.Inject;
-import javax.inject.Named;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.*;
@@ -138,10 +134,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Prototype
 @Internal
-@BootstrapContextCompatible
-@Primary
 public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStreamingHttpClient, RxSseClient, Closeable, AutoCloseable {
 
     protected static final String HANDLER_AGGREGATOR = "http-aggregator";
@@ -201,10 +194,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param annotationMetadataResolver The annotation metadata resolver
      * @param filters                    The filters to use
      */
-    public DefaultHttpClient(@Parameter LoadBalancer loadBalancer,
-                             @Parameter HttpClientConfiguration configuration,
-                             @Parameter @Nullable String contextPath,
-                             @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
+    public DefaultHttpClient(LoadBalancer loadBalancer,
+                             HttpClientConfiguration configuration,
+                             @Nullable String contextPath,
+                             @Nullable ThreadFactory threadFactory,
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
@@ -223,12 +216,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param nettyClientSslBuilder      The SSL builder
      * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      */
-    @Inject
-    public DefaultHttpClient(@Parameter @Nullable LoadBalancer loadBalancer,
-                             @Parameter HttpClientConfiguration configuration,
-                             @Parameter @Nullable String contextPath,
-                             @Parameter HttpClientFilterResolver filterResolver,
-                             @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
+    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
+                             HttpClientConfiguration configuration,
+                             @Nullable String contextPath,
+                             HttpClientFilterResolver filterResolver,
+                             @Nullable ThreadFactory threadFactory,
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry) {
 
@@ -343,7 +335,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     /**
      * @param url The URL
      */
-    public DefaultHttpClient(@Parameter URL url) {
+    public DefaultHttpClient(URL url) {
         this(url, new DefaultHttpClientConfiguration());
     }
 
@@ -426,7 +418,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     @Override
-    @PreDestroy
     public HttpClient stop() {
         if (isRunning()) {
             if (poolMap instanceof Iterable) {
@@ -723,7 +714,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      *
      * @param beanContext The bean context
      */
-    @Inject
     protected void configure(BeanContext beanContext) {
         if (beanContext != null) {
             this.webSocketRegistry = WebSocketBeanRegistry.forClient(beanContext);

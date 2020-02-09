@@ -25,20 +25,18 @@ import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.retry.annotation.Recoverable;
 
-import javax.inject.Scope;
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
 /**
- * A custom {@link Scope} for injecting {@link io.micronaut.http.client.HttpClient} implementations.
+ * Allows defining declarative HTTP clients and customizing injection for injecting {@link io.micronaut.http.client.HttpClient} implementations.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Documented
 @Retention(RUNTIME)
-@Scope
 @Introduction
 @Type(HttpClientIntroductionAdvice.class)
 @Recoverable

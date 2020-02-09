@@ -15,21 +15,23 @@
  */
 package io.micronaut.http.client;
 
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.*;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.client.filter.HttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
 import io.micronaut.scheduling.TaskScheduler;
 import io.reactivex.Flowable;
 
 import java.net.URI;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -39,24 +41,21 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * @since 1.0
  */
 @Factory
+@Internal
 public class ServiceHttpClientFactory {
 
-    private final BeanContext beanContext;
     private final ServiceInstanceListLoadBalancerFactory loadBalancerFactory;
     private final TaskScheduler taskScheduler;
 
     /**
      * Default constructor.
      *
-     * @param beanContext The bean context
      * @param loadBalancerFactory The load balancer factory
-     * @param taskScheduler The task scheduler
+     * @param taskScheduler       The task scheduler
      */
     public ServiceHttpClientFactory(
-            BeanContext beanContext,
             ServiceInstanceListLoadBalancerFactory loadBalancerFactory,
             TaskScheduler taskScheduler) {
-        this.beanContext = beanContext;
         this.loadBalancerFactory = loadBalancerFactory;
         this.taskScheduler = taskScheduler;
     }
@@ -77,26 +76,33 @@ public class ServiceHttpClientFactory {
 
     /**
      * Creates {@link HttpClient} instances for each defined {@link ServiceHttpClientConfiguration}.
+     *
      * @param configuration The configuration
-     * @param instanceList The instance list
+     * @param instanceList  The instance list
+     * @param httpClientFactory The HTTP client factory
      * @return The client bean
      */
     @EachBean(ServiceHttpClientConfiguration.class)
     @Requires(condition = ServiceHttpClientCondition.class)
     @Secondary
-    DefaultHttpClient serviceHttpClient(
+    @Bean(preDestroy = "close")
+    RxHttpClient serviceHttpClient(
             @Parameter ServiceHttpClientConfiguration configuration,
-            @Parameter StaticServiceInstanceList instanceList) {
+            @Parameter StaticServiceInstanceList instanceList,
+            RxHttpClientFactory httpClientFactory) {
         List<URI> originalURLs = configuration.getUrls();
         Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
         boolean isHealthCheck = configuration.isHealthCheck();
 
-        Optional<String> path = configuration.getPath();
+        String path = configuration.getPath().orElse(null);
         LoadBalancer loadBalancer = loadBalancerFactory.create(instanceList);
-        HttpClientFilterResolver filterResolver = beanContext.createBean(HttpClientFilterResolver.class,
-                                                               Collections.singleton(configuration.getServiceId()), null);
-
-        DefaultHttpClient httpClient = beanContext.createBean(DefaultHttpClient.class, loadBalancer, configuration, path.orElse(null), filterResolver);
+        final RxHttpClient httpClient = httpClientFactory.buildClient(
+                loadBalancer,
+                configuration,
+                Collections.singletonList(configuration.getServiceId()),
+                null,
+                path
+        );
         if (isHealthCheck) {
             taskScheduler.scheduleWithFixedDelay(configuration.getHealthCheckInterval(), configuration.getHealthCheckInterval(), () -> Flowable.fromIterable(originalURLs).flatMap(originalURI -> {
                 URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());

@@ -230,6 +230,7 @@ class HttpGetSpec extends Specification {
 
 
         cleanup:
+        context.close()
         client.stop()
     }
 
@@ -251,6 +252,7 @@ class HttpGetSpec extends Specification {
 
 
         cleanup:
+        context.close()
         client.stop()
     }
 
@@ -284,6 +286,7 @@ class HttpGetSpec extends Specification {
 
 
         cleanup:
+        context.close()
         client.stop()
     }
 
@@ -426,6 +429,9 @@ class HttpGetSpec extends Specification {
         client.retrieve("/noslash/") == "noslash"
         client.retrieve("/slash") == "slash"
         client.retrieve("/slash/") == "slash"
+
+        cleanup:
+        client.close()
     }
 
     void "test a request with a custom host header"() {
@@ -442,7 +448,6 @@ class HttpGetSpec extends Specification {
         body == "http://foo.com"
 
         cleanup:
-        client.stop()
         client.close()
     }
 
@@ -457,6 +462,9 @@ class HttpGetSpec extends Specification {
         noExceptionThrown()
         response.status == HttpStatus.OK
         response.body().isEmpty()
+
+        cleanup:
+        client.close()
     }
 
     void "test single empty list returns ok"() {
@@ -470,6 +478,9 @@ class HttpGetSpec extends Specification {
         noExceptionThrown()
         response.status == HttpStatus.OK
         response.body().isEmpty()
+
+        cleanup:
+        client.close()
     }
 
     void "test mono empty list returns ok"() {
@@ -483,6 +494,9 @@ class HttpGetSpec extends Specification {
         noExceptionThrown()
         response.status == HttpStatus.OK
         response.body().isEmpty()
+
+        cleanup:
+        client.close()
     }
 
     void "test completable returns 200"() {
@@ -508,6 +522,9 @@ class HttpGetSpec extends Specification {
         then:
         noExceptionThrown()
         body == 'x-y'
+
+        cleanup:
+        client.close()
     }
 
     void "test overriding the URL"() {

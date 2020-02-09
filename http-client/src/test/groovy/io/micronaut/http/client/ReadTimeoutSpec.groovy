@@ -283,7 +283,7 @@ class ReadTimeoutSpec extends Specification {
             } catch (Throwable e){ }
         }
 
-        def clients = clientContext.getBean(HttpClientIntroductionAdvice).clients;
+        def clients = clientContext.getBean(RxNettyHttpClientFactory).clients
         def clientKey = clients.keySet().stream()
                 .filter { it.clientId == "http://localhost:${embeddedServer.getPort()}" }
                 .findFirst()

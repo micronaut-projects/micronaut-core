@@ -39,7 +39,7 @@ import java.math.RoundingMode
 class BigDecimalSerializationSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared RxHttpClient client = embeddedServer.applicationContext.createBean(
+    @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(
             RxHttpClient,
             embeddedServer.getURL()
     )
