@@ -28,7 +28,7 @@ import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
-
+import io.micronaut.inject.visitor.VisitorContext;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -89,6 +89,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         if (executed) {
             return false;
         }
+        // set supported options as system properties to keep compatibility
+        // in particular for micronaut-openapi
+        processingEnv.getOptions().entrySet().stream().filter(entry -> entry.getKey() != null && entry.getKey().startsWith(VisitorContext.MICRONAUT_BASE_OPTION_NAME))
+          .forEach(entry -> System.setProperty(entry.getKey(), entry.getValue() == null ? "" : entry.getValue()));
 
         List<LoadedVisitor> loadedVisitors = new ArrayList<>(typeElementVisitors.size());
         for (TypeElementVisitor visitor : typeElementVisitors) {
