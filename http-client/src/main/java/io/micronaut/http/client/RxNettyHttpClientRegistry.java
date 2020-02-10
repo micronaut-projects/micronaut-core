@@ -21,10 +21,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -163,6 +160,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
      */
     @Bean
     @BootstrapContextCompatible
+    @Primary
     protected DefaultHttpClient httpClient(
             @Nullable InjectionPoint<?> injectionPoint,
             @Parameter @Nullable LoadBalancer loadBalancer,
