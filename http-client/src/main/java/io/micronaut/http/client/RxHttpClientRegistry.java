@@ -20,8 +20,6 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 
-import java.util.List;
-
 /**
  * Internal interface for managing the construction and lifecycle of instances of {@link RxHttpClient}.
  *
@@ -29,7 +27,7 @@ import java.util.List;
  * @since 2.0
  */
 @Internal
-public interface RxHttpClientFactory {
+public interface RxHttpClientRegistry {
 
     /**
      * Return the client for the given annotation metadata.
@@ -45,23 +43,6 @@ public interface RxHttpClientFactory {
      * @return The client
      */
     @NonNull RxHttpClient getClient(@NonNull AnnotationMetadata annotationMetadata);
-
-    /**
-     * Builds a new client for the given parameters (unmanaged must be manually closed).
-     * @param loadBalancer The load balancer
-     * @param configuration The configuration
-     * @param clientIdentifiers The client identifiers
-     * @param filterAnnotation The filter annotation
-     * @param contextPath The context path
-     * @return The client
-     */
-    @NonNull RxHttpClient buildClient(
-            @NonNull LoadBalancer loadBalancer,
-            @NonNull HttpClientConfiguration configuration,
-            @Nullable List<String> clientIdentifiers,
-            @Nullable String filterAnnotation,
-            @Nullable String contextPath
-    );
 
     /**
      * Dispose of the client defined by the given metadata.

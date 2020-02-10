@@ -96,7 +96,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final Map<String, ClientVersioningConfiguration> versioningConfigurations = new ConcurrentHashMap<>(5);
     private final List<ReactiveClientResultTransformer> transformers;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
-    private final RxHttpClientFactory clientFactory;
+    private final RxHttpClientRegistry clientFactory;
 
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
@@ -109,7 +109,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     @Inject
     public HttpClientIntroductionAdvice(
             BeanContext beanContext,
-            RxHttpClientFactory clientFactory,
+            RxHttpClientRegistry clientFactory,
             JsonMediaTypeCodec jsonMediaTypeCodec,
             List<ReactiveClientResultTransformer> transformers) {
 

@@ -63,8 +63,8 @@ import java.util.concurrent.ThreadFactory;
  */
 @Factory
 @BootstrapContextCompatible
-public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFactory {
-    private static final Logger LOG = LoggerFactory.getLogger(RxNettyHttpClientFactory.class);
+public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientRegistry {
+    private static final Logger LOG = LoggerFactory.getLogger(RxNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
     private final LoadBalancerResolver loadBalancerResolver;
     private final NettyClientSslBuilder nettyClientSslBuilder;
@@ -86,7 +86,7 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
      * @param requestBinderRegistry          The request binder registry
      * @param beanContext                    The bean context
      */
-    public RxNettyHttpClientFactory(
+    public RxNettyHttpClientRegistry(
             HttpClientConfiguration defaultHttpClientConfiguration,
             LoadBalancerResolver loadBalancerResolver,
             NettyClientSslBuilder nettyClientSslBuilder,
@@ -115,6 +115,48 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
     public DefaultHttpClient getClient(AnnotationMetadata metadata) {
         final ClientKey key = getClientKey(metadata);
         return getClient(key);
+    }
+
+    @Override
+    @PreDestroy
+    public void close() {
+        for (HttpClient httpClient : clients.values()) {
+            try {
+                httpClient.close();
+            } catch (Throwable e) {
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("Error shutting down HTTP client: " + e.getMessage(), e);
+                }
+            }
+        }
+        clients.clear();
+    }
+
+    @Override
+    public void disposeClient(AnnotationMetadata annotationMetadata) {
+        final ClientKey key = getClientKey(annotationMetadata);
+        final RxStreamingHttpClient rxStreamingHttpClient = clients.get(key);
+        if (rxStreamingHttpClient != null && rxStreamingHttpClient.isRunning()) {
+            rxStreamingHttpClient.close();
+            clients.remove(key);
+        }
+    }
+
+    /**
+     * Creates a new {@link HttpClient} for the given injection point.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @return The client
+     */
+    @Bean
+    @BootstrapContextCompatible
+    protected DefaultHttpClient httpClient(
+            @Nullable InjectionPoint<?> injectionPoint,
+            @Parameter @Nullable LoadBalancer loadBalancer,
+            @Parameter @Nullable HttpClientConfiguration configuration) {
+        return resolveClient(injectionPoint, loadBalancer, configuration);
     }
 
     private DefaultHttpClient getClient(ClientKey key) {
@@ -231,14 +273,13 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
         });
     }
 
-    @Override
-    public DefaultHttpClient buildClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration, List<String> clientIdentifiers, String filterAnnotation, String contextPath) {
+    private DefaultHttpClient buildClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration, List<String> clientIdentifiers, String filterAnnotation, String contextPath) {
         HttpClientFilterResolver filterResolver = beanContext.createBean(HttpClientFilterResolver.class,
                 clientIdentifiers,
                 filterAnnotation
         );
 
-        final DefaultHttpClient client = new DefaultHttpClient(
+        return new DefaultHttpClient(
                 loadBalancer,
                 configuration,
                 contextPath,
@@ -249,39 +290,6 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
                 webSocketBeanRegistry,
                 requestBinderRegistry
         );
-        return client;
-    }
-
-    /**
-     * Creates a new {@link HttpClient} for the given injection point.
-     *
-     * @param injectionPoint The injection point
-     * @param loadBalancer   The load balancer to use (Optional)
-     * @param configuration  The configuration (Optional)
-     * @return The client
-     */
-    @Bean
-    @BootstrapContextCompatible
-    protected DefaultHttpClient httpClient(
-            @Nullable InjectionPoint<?> injectionPoint,
-            @Parameter @Nullable LoadBalancer loadBalancer,
-            @Parameter @Nullable HttpClientConfiguration configuration) {
-        return resolveClient(injectionPoint, loadBalancer, configuration);
-    }
-
-    @Override
-    @PreDestroy
-    public void close() {
-        for (HttpClient httpClient : clients.values()) {
-            try {
-                httpClient.close();
-            } catch (Throwable e) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Error shutting down HTTP client: " + e.getMessage(), e);
-                }
-            }
-        }
-        clients.clear();
     }
 
     private DefaultHttpClient resolveClient(
@@ -318,16 +326,6 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
         AnnotationValue<JacksonFeatures> jacksonFeaturesAnn = metadata.findAnnotation(JacksonFeatures.class).orElse(null);
 
         return new ClientKey(clientId, filterAnnotation, path, configurationClass, jacksonFeaturesAnn);
-    }
-
-    @Override
-    public void disposeClient(AnnotationMetadata annotationMetadata) {
-        final ClientKey key = getClientKey(annotationMetadata);
-        final RxStreamingHttpClient rxStreamingHttpClient = clients.get(key);
-        if (rxStreamingHttpClient != null && rxStreamingHttpClient.isRunning()) {
-            rxStreamingHttpClient.close();
-            clients.remove(key);
-        }
     }
 
     private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, io.micronaut.jackson.codec.JacksonFeatures jacksonFeatures) {
