@@ -137,6 +137,14 @@ class ClientScopeSpec extends Specification {
         client.name() == "success"
     }
 
+    void "test injected instances are different/same"() {
+        InstanceEquals bean = context.getBean(InstanceEquals)
+
+        expect:
+        bean.client.is(bean.client2)
+        !bean.rxClient.is(bean.client)
+    }
+
     @Controller('/scope')
     static class ScopeController {
         @Get(produces = MediaType.TEXT_PLAIN)
@@ -211,6 +219,19 @@ class ClientScopeSpec extends Specification {
                     HttpRequest.GET('/scope'), String
             )
         }
+    }
+
+    @Singleton
+    static class InstanceEquals {
+
+        @Inject @Client('/')
+        protected HttpClient client
+
+        @Inject @Client('/')
+        protected HttpClient client2
+
+        @Inject @Client('/')
+        protected RxHttpClient rxClient
     }
 
     @Requires(property = 'spec.name', value = "ClientScopeSpec")
