@@ -102,11 +102,12 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
                 .getAnnotationNameByStereotype(FilterMatcher.class)
                 .map(metadata::getAnnotation);
 
+        String path = annotation.get("path", String.class).orElse(null);
+        Optional<Class<?>> configurationClass = annotation.classValue("configuration");
+
         //noinspection unchecked
-        return (T) clients.computeIfAbsent(new ClientKey(identifier, value, filterAnnotation.orElse(null)), clientKey -> {
-            String path = annotation.get("path", String.class).orElse(null);
+        return (T) clients.computeIfAbsent(new ClientKey(value, filterAnnotation.map(AnnotationValue::getAnnotationName).orElse(null), path, configurationClass.orElse(null)), clientKey -> {
             HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(value)).orElse(null);
-            Optional<Class<?>> configurationClass = annotation.classValue("configuration");
 
             if (clientBean != null && path == null && !configurationClass.isPresent() && !filterAnnotation.isPresent()) {
                 return clientBean;
@@ -176,15 +177,17 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
     /**
      * Client key.
      */
-    private static class ClientKey {
-        final BeanIdentifier identifier;
-        final String value;
-        final AnnotationValue filterAnnotation;
+    private static final class ClientKey {
+        final String clientId;
+        final String filterAnnotation;
+        final String path;
+        final Class<?> configurationClass;
 
-        public ClientKey(BeanIdentifier identifier, String value, AnnotationValue filterAnnotation) {
-            this.identifier = identifier;
-            this.value = value;
+        ClientKey(String clientId, String filterAnnotation, String path, Class<?> configurationClass) {
+            this.clientId = clientId;
             this.filterAnnotation = filterAnnotation;
+            this.path = path;
+            this.configurationClass = configurationClass;
         }
 
         @Override
@@ -196,14 +199,15 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
                 return false;
             }
             ClientKey clientKey = (ClientKey) o;
-            return Objects.equals(identifier, clientKey.identifier) &&
+            return Objects.equals(clientId, clientKey.clientId) &&
                     Objects.equals(filterAnnotation, clientKey.filterAnnotation) &&
-                    Objects.equals(value, clientKey.value);
+                    Objects.equals(path, clientKey.path) &&
+                    Objects.equals(configurationClass, clientKey.configurationClass);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(identifier, value, filterAnnotation);
+            return Objects.hash(clientId, filterAnnotation, path, configurationClass);
         }
     }
 }

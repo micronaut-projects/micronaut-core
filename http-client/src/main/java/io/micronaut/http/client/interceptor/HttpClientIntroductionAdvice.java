@@ -50,6 +50,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.filter.HttpClientFilterResolver;
 import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
+import io.micronaut.http.client.scope.ClientScope;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -802,14 +803,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private class ClientKey {
         final String clientId;
+        final String filterAnnotation;
         final String path;
-        final AnnotationValue filterAnnotation;
+        final Class<?> configurationClass;
 
         public ClientKey(AnnotationValue<Client> clientAnn,
-                         AnnotationValue filterAnnotation) {
+                         AnnotationValue<?> filterAnnotation) {
             this.clientId = getClientId(clientAnn);
             this.path = clientAnn.stringValue("path").orElse(null);
-            this.filterAnnotation = filterAnnotation;
+            this.filterAnnotation = filterAnnotation != null ? filterAnnotation.getAnnotationName() : null;
+            this.configurationClass =  clientAnn.classValue("configuration").orElse(null);
         }
 
         @Override
@@ -823,12 +826,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             ClientKey clientKey = (ClientKey) o;
             return Objects.equals(clientId, clientKey.clientId) &&
                     Objects.equals(filterAnnotation, clientKey.filterAnnotation) &&
-                    Objects.equals(path, clientKey.path);
+                    Objects.equals(path, clientKey.path) &&
+                    Objects.equals(configurationClass, clientKey.configurationClass);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(clientId, path, filterAnnotation);
+            return Objects.hash(clientId, filterAnnotation, path, configurationClass);
         }
     }
 }
