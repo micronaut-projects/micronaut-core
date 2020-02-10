@@ -21,7 +21,7 @@ package io.micronaut.web.router;
  * @author James Kleeh
  * @since 1.3.1
  */
-public class NullArgument {
+public final class NullArgument {
 
     /**
      * The NullArgument instance.
