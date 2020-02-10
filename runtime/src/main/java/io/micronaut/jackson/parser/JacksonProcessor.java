@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import org.slf4j.Logger;
@@ -398,7 +397,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         } else if (node instanceof ArrayNode) {
             return ((ArrayNode) node).addArray();
         } else {
-            return JsonNodeFactory.instance.arrayNode();
+            return deserializationConfig.getNodeFactory().arrayNode();
         }
     }
 
@@ -408,7 +407,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         } else if (node instanceof ArrayNode && !(streamArray && nodeStack.size() == 1)) {
             return ((ArrayNode) node).addObject();
         } else {
-            return JsonNodeFactory.instance.objectNode();
+            return deserializationConfig.getNodeFactory().objectNode();
         }
     }
 }
