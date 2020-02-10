@@ -18,6 +18,7 @@ package io.micronaut.http.client;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Bean;
@@ -34,7 +35,6 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.HttpClientFilterResolver;
-import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -104,9 +104,20 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
         this.webSocketBeanRegistry = WebSocketBeanRegistry.forClient(beanContext);
     }
 
+    @NonNull
+    @Override
+    public RxHttpClient getClient(@NonNull String clientId, @Nullable String path) {
+        final ClientKey key = new ClientKey(clientId, null, path, null, null);
+        return getClient(key);
+    }
+
     @Override
     public DefaultHttpClient getClient(AnnotationMetadata metadata) {
         final ClientKey key = getClientKey(metadata);
+        return getClient(key);
+    }
+
+    private DefaultHttpClient getClient(ClientKey key) {
         return clients.computeIfAbsent(key, clientKey -> {
             DefaultHttpClient clientBean = null;
             final String clientId = clientKey.clientId;
@@ -155,8 +166,8 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
             } else if (StringUtils.isNotEmpty(clientId) && clientId.startsWith("/")) {
                 contextPath = clientId;
             } else {
-                if (loadBalancer instanceof FixedLoadBalancer) {
-                    contextPath = ((FixedLoadBalancer) loadBalancer).getUrl().getPath();
+                if (loadBalancer != null) {
+                    contextPath = loadBalancer.getContextPath().orElse(null);
                 }
             }
 

@@ -15,11 +15,13 @@
  */
 package io.micronaut.discovery;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.health.HealthStatus;
 
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -31,6 +33,7 @@ import java.util.stream.Collectors;
 public class StaticServiceInstanceList implements ServiceInstanceList {
     private final String id;
     private final Collection<URI> loadBalancedURIs;
+    private final String contextPath;
 
     /**
      * Default constructor.
@@ -38,8 +41,20 @@ public class StaticServiceInstanceList implements ServiceInstanceList {
      * @param loadBalancedURIs The URIs
      */
     public StaticServiceInstanceList(String id, Collection<URI> loadBalancedURIs) {
+        this(id, loadBalancedURIs, null);
+    }
+
+
+    /**
+     * Default constructor.
+     * @param id The id
+     * @param loadBalancedURIs The URIs
+     * @param contextPath The context path
+     */
+    public StaticServiceInstanceList(String id, Collection<URI> loadBalancedURIs, @Nullable String contextPath) {
         this.id = id;
         this.loadBalancedURIs = loadBalancedURIs;
+        this.contextPath = contextPath;
     }
 
     @Override
@@ -61,5 +76,10 @@ public class StaticServiceInstanceList implements ServiceInstanceList {
      */
     public Collection<URI> getLoadBalancedURIs() {
         return loadBalancedURIs;
+    }
+
+    @Override
+    public Optional<String> getContextPath() {
+        return Optional.ofNullable(contextPath);
     }
 }

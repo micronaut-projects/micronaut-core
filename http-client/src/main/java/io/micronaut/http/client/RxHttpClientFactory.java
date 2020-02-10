@@ -33,6 +33,14 @@ public interface RxHttpClientFactory {
 
     /**
      * Return the client for the given annotation metadata.
+     * @param clientId The client ID
+     * @param path The path (Optional)
+     * @return The client
+     */
+    @NonNull RxHttpClient getClient(@NonNull String clientId, @Nullable String path);
+
+    /**
+     * Return the client for the given annotation metadata.
      * @param annotationMetadata The annotation metadata.
      * @return The client
      */
@@ -67,4 +75,5 @@ public interface RxHttpClientFactory {
     default RxHttpClient getDefaultClient() {
         return getClient(AnnotationMetadata.EMPTY_METADATA);
     }
+
 }

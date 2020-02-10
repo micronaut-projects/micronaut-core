@@ -23,6 +23,7 @@ import org.reactivestreams.Publisher;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URL;
+import java.util.Optional;
 
 /**
  * Interface to abstract server selection. Allows plugging in load balancing strategies.
@@ -38,6 +39,13 @@ public interface LoadBalancer {
      * @return The selected {@link ServiceInstance}
      */
     Publisher<ServiceInstance> select(@Nullable Object discriminator);
+
+    /**
+     * @return The context path to use for requests.
+     */
+    default Optional<String> getContextPath() {
+        return Optional.empty();
+    }
 
     /**
      * @return The selected {@link ServiceInstance}
