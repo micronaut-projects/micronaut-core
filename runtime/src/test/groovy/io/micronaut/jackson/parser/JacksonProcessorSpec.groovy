@@ -180,6 +180,76 @@ class JacksonProcessorSpec extends Specification {
         foo.bd2 == dec
     }
 
+    void "test big decimal - USE_BIG_DECIMAL_FOR_FLOATS and withExactBigDecimals"() {
+
+        given:
+        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper).setNodeFactory(JsonNodeFactory.withExactBigDecimals(false))
+        DeserializationConfig cfg = objectMapper.getDeserializationConfig().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+        objectMapper.setConfig(cfg)
+        JacksonProcessor processor = new JacksonProcessor(objectMapper.getFactory(), cfg)
+        BigDecimal dec = new BigDecimal("888.7794538169553400000")
+        BigD bigD = new BigD(bd1: dec, bd2: dec)
+
+        when:
+        def string = objectMapper.writeValueAsString(bigD)
+        byte[] bytes = objectMapper.writeValueAsBytes(bigD)
+        boolean complete = false
+        JsonNode node = null
+        Throwable error = null
+        int nodeCount = 0
+        processor.subscribe(new Subscriber<JsonNode>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
+            }
+
+            @Override
+            void onNext(JsonNode jsonNode) {
+                nodeCount++
+                node = jsonNode
+            }
+
+            @Override
+            void onError(Throwable t) {
+                error = t
+            }
+
+            @Override
+            void onComplete() {
+                complete = true
+            }
+        })
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {
+
+            }
+
+            @Override
+            void cancel() {
+
+            }
+        })
+        processor.onNext(bytes)
+        processor.onComplete()
+
+        then:
+        complete
+        node != null
+        error == null
+        nodeCount == 1
+        string == '{"bd1":"888.7794538169553400000","bd2":888.7794538169553400000}'
+
+        when:
+        BigD foo = objectMapper.treeToValue(node, BigD)
+
+        then:
+        foo != null
+        foo.bd1.toPlainString() == dec.toPlainString()
+        foo.bd2.toPlainString() != dec.toPlainString()
+        foo.bd2.toPlainString() == "888.77945381695534"
+    }
+
     void "test publish JSON node async"() {
 
         given:
