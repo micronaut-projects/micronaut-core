@@ -16,8 +16,11 @@
 package io.micronaut.http
 
 import io.micronaut.core.value.OptionalValues
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
+
+import java.nio.charset.StandardCharsets
 
 /**
  * @author Graeme Rocher
@@ -88,5 +91,15 @@ class MediaTypeSpec extends Specification {
         "multipart/form-data"        | false
         "application/x-json-stream"  | false
         "invalid"                    | false
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2746")
+    void "test creating a media type with params"() {
+        when:
+        MediaType mt = new MediaType("application/json", ["charset": StandardCharsets.UTF_8.name()])
+
+        then:
+        noExceptionThrown()
+        mt.getParameters().get("charset").get() == "UTF-8"
     }
 }
