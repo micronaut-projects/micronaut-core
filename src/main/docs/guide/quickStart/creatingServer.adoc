@@ -22,7 +22,7 @@ $ ./gradlew run
 
 If you have created a Maven based project, use `./mvnw compile exec:exec` instead.
 
-NOTE: For Windows the ./ before gradlew commands is not needed
+NOTE: For Windows the ./ before commands is not needed
 
 By default the Micronaut HTTP server is configured to run on port 8080. See the section <<runningSpecificPort, Running Server on a Specific Port>> in the user guide for more options.
 
