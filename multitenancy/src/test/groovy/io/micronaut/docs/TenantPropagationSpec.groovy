@@ -96,13 +96,11 @@ micronaut:
 
     @Shared
     Map<String, Object> gatewayconfig = [
-            'micronaut.server.port': SocketUtils.findAvailableTcpPort(),
             'spec.name' : 'docstenantpropagationgateway',
     ] << flatten(gatewayConfMap)
 
     @Shared
     Map<String, Object> catalogueconfig = [
-            'micronaut.server.port': SocketUtils.findAvailableTcpPort(),
             'spec.name' : 'docstenantpropagationcatalogue',
     ] << flatten(catalogueConfMap)
 
