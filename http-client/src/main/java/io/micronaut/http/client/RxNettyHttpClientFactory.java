@@ -30,6 +30,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.FilterMatcher;
+import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.HttpClientFilterResolver;
@@ -45,6 +46,7 @@ import io.micronaut.jackson.annotation.JacksonFeatures;
 import io.micronaut.jackson.codec.JacksonMediaTypeCodec;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,15 +72,19 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
     private final MediaTypeCodecRegistry codecRegistry;
     private final BeanContext beanContext;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
+    private final WebSocketBeanRegistry webSocketBeanRegistry;
+    private final RequestBinderRegistry requestBinderRegistry;
 
     /**
      * Default constructor.
+     *
      * @param defaultHttpClientConfiguration The default HTTP client configuration
-     * @param loadBalancerResolver The load balancer resolver
-     * @param nettyClientSslBuilder The client SSL builder
-     * @param threadFactory The thread factory
-     * @param codecRegistry The codec registry
-     * @param beanContext The bean context
+     * @param loadBalancerResolver           The load balancer resolver
+     * @param nettyClientSslBuilder          The client SSL builder
+     * @param threadFactory                  The thread factory
+     * @param codecRegistry                  The codec registry
+     * @param requestBinderRegistry          The request binder registry
+     * @param beanContext                    The bean context
      */
     public RxNettyHttpClientFactory(
             HttpClientConfiguration defaultHttpClientConfiguration,
@@ -86,6 +92,7 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
             NettyClientSslBuilder nettyClientSslBuilder,
             ThreadFactory threadFactory,
             MediaTypeCodecRegistry codecRegistry,
+            RequestBinderRegistry requestBinderRegistry,
             BeanContext beanContext) {
         this.defaultHttpClientConfiguration = defaultHttpClientConfiguration;
         this.loadBalancerResolver = loadBalancerResolver;
@@ -93,6 +100,8 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
         this.threadFactory = threadFactory;
         this.codecRegistry = codecRegistry;
         this.beanContext = beanContext;
+        this.requestBinderRegistry = requestBinderRegistry;
+        this.webSocketBeanRegistry = WebSocketBeanRegistry.forClient(beanContext);
     }
 
     @Override
@@ -195,7 +204,7 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
 
                 List<MediaTypeCodec> codecs = new ArrayList<>(2);
                 MediaTypeCodecRegistry codecRegistry = client.getMediaTypeCodecRegistry();
-                for (MediaTypeCodec codec: codecRegistry.getCodecs()) {
+                for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
                     if (codec instanceof JacksonMediaTypeCodec) {
                         codecs.add(((JacksonMediaTypeCodec) codec).cloneWithFeatures(jacksonFeatures));
                     } else {
@@ -225,10 +234,10 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
                 filterResolver,
                 threadFactory,
                 nettyClientSslBuilder,
-                codecRegistry
-
+                codecRegistry,
+                webSocketBeanRegistry,
+                requestBinderRegistry
         );
-        client.configure(beanContext);
         return client;
     }
 
@@ -236,8 +245,8 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
      * Creates a new {@link HttpClient} for the given injection point.
      *
      * @param injectionPoint The injection point
-     * @param loadBalancer The load balancer to use (Optional)
-     * @param configuration The configuration (Optional)
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
      * @return The client
      */
     @Bean
@@ -278,9 +287,10 @@ public class RxNettyHttpClientFactory implements AutoCloseable, RxHttpClientFact
                     filterResolver,
                     threadFactory,
                     nettyClientSslBuilder,
-                    codecRegistry
+                    codecRegistry,
+                    webSocketBeanRegistry,
+                    requestBinderRegistry
             );
-            client.configure(beanContext);
             return client;
         } else {
             return getClient(injectionPoint != null ? injectionPoint.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA);

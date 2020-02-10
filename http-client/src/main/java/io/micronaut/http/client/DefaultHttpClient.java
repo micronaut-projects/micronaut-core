@@ -17,9 +17,9 @@ package io.micronaut.http.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
-import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
@@ -31,8 +31,10 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
+import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.exceptions.*;
 import io.micronaut.http.client.filter.HttpClientFilterResolver;
@@ -175,12 +177,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private final Charset defaultCharset;
     private final ChannelPoolMap<RequestKey, ChannelPool> poolMap;
     private final Logger log;
-    private final @Nullable Long readTimeoutMillis;
-    private final @Nullable Long connectionTimeAliveMillis;
+    private final @Nullable
+    Long readTimeoutMillis;
+    private final @Nullable
+    Long connectionTimeAliveMillis;
     private final HttpClientFilterResolver filterResolver;
+    private final WebSocketBeanRegistry webSocketRegistry;
+    private final RequestBinderRegistry requestBinderRegistry;
 
-    private WebSocketBeanRegistry webSocketRegistry = WebSocketBeanRegistry.EMPTY;
-    private RequestBinderRegistry requestBinderRegistry;
 
     /**
      * Construct a client for the given arguments.
@@ -202,28 +206,37 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              MediaTypeCodecRegistry codecRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              HttpClientFilter... filters) {
-        this(loadBalancer, configuration, contextPath, new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)), threadFactory, nettyClientSslBuilder, codecRegistry);
+        this(loadBalancer, configuration, contextPath, new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)), threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED));
     }
 
     /**
      * Construct a client for the given arguments.
      *
-     * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
-     * @param configuration              The {@link HttpClientConfiguration} object
-     * @param contextPath                The base URI to prepend to request uris
-     * @param filterResolver             The http client filter resolver
-     * @param threadFactory              The thread factory to use for client threads
-     * @param nettyClientSslBuilder      The SSL builder
-     * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param loadBalancer          The {@link LoadBalancer} to use for selecting servers
+     * @param configuration         The {@link HttpClientConfiguration} object
+     * @param contextPath           The base URI to prepend to request uris
+     * @param filterResolver        The http client filter resolver
+     * @param threadFactory         The thread factory to use for client threads
+     * @param nettyClientSslBuilder The SSL builder
+     * @param codecRegistry         The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param webSocketBeanRegistry The websocket bean registry
+     * @param requestBinderRegistry The request binder registry
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-                             HttpClientConfiguration configuration,
+                             @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
-                             HttpClientFilterResolver filterResolver,
+                             @NonNull HttpClientFilterResolver filterResolver,
                              @Nullable ThreadFactory threadFactory,
-                             NettyClientSslBuilder nettyClientSslBuilder,
-                             MediaTypeCodecRegistry codecRegistry) {
-
+                             @NonNull NettyClientSslBuilder nettyClientSslBuilder,
+                             @NonNull MediaTypeCodecRegistry codecRegistry,
+                             @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
+                             @NonNull RequestBinderRegistry requestBinderRegistry) {
+        ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
+        ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
+        ArgumentUtils.requireNonNull("webSocketBeanRegistry", webSocketBeanRegistry);
+        ArgumentUtils.requireNonNull("requestBinderRegistry", requestBinderRegistry);
+        ArgumentUtils.requireNonNull("configuration", configuration);
+        ArgumentUtils.requireNonNull("filterResolver", filterResolver);
         this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
         this.contextPath = contextPath;
@@ -303,6 +316,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.mediaTypeCodecRegistry = codecRegistry;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(LOG);
         this.filterResolver = filterResolver;
+        this.webSocketRegistry = webSocketBeanRegistry != null ? webSocketBeanRegistry : WebSocketBeanRegistry.EMPTY;
+        this.requestBinderRegistry = requestBinderRegistry;
     }
 
     /**
@@ -709,18 +724,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         stop();
     }
 
-    /**
-     * Configure this client for the active bean context.
-     *
-     * @param beanContext The bean context
-     */
-    protected void configure(BeanContext beanContext) {
-        if (beanContext != null) {
-            this.webSocketRegistry = WebSocketBeanRegistry.forClient(beanContext);
-            this.requestBinderRegistry = beanContext.findBean(RequestBinderRegistry.class).orElse(null);
-        }
-    }
-
     private <T> Flowable<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, WebSocketBean<T> webSocketBean) {
         Bootstrap bootstrap = this.bootstrap.clone();
         if (webSocketBean == null) {
@@ -733,7 +736,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             WebSocketVersion protocolVersion = finalWebSocketBean.getBeanDefinition().enumValue(ClientWebSocket.class, "version", WebSocketVersion.class).orElse(WebSocketVersion.V13);
             int maxFramePayloadLength = finalWebSocketBean.messageMethod()
                     .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
-                    .orElse(65536)).orElse(65536);
+                            .orElse(65536)).orElse(65536);
             String subprotocol = finalWebSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class, "subprotocol").orElse(StringUtils.EMPTY_STRING);
 
             RequestKey requestKey;
@@ -823,30 +826,30 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 return httpContentFlowable
                         .filter(message -> !(message.content() instanceof EmptyByteBuf))
                         .map((Function<HttpContent, io.micronaut.http.HttpResponse<ByteBuffer<?>>>) message -> {
-                    ByteBuf byteBuf = message.content();
-                    if (log.isTraceEnabled()) {
-                        log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
-                                byteBuf.readableBytes(), request.getMethodName(), request.getUri());
-                        traceBody("Response", byteBuf);
-                    }
-                    ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
-                    return new HttpResponseWrapper<ByteBuffer<?>>(nettyStreamedHttpResponse) {
-                        @Override
-                        public Optional<ByteBuffer<?>> getBody() {
-                            return Optional.of(byteBuffer);
-                        }
-                    };
-                });
+                            ByteBuf byteBuf = message.content();
+                            if (log.isTraceEnabled()) {
+                                log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
+                                        byteBuf.readableBytes(), request.getMethodName(), request.getUri());
+                                traceBody("Response", byteBuf);
+                            }
+                            ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
+                            return new HttpResponseWrapper<ByteBuffer<?>>(nettyStreamedHttpResponse) {
+                                @Override
+                                public Optional<ByteBuffer<?>> getBody() {
+                                    return Optional.of(byteBuffer);
+                                }
+                            };
+                        });
             });
         };
     }
 
     /**
      * @param parentRequest The parent request
-     * @param request The request
-     * @param type    The type
-     * @param <I>     The input type
-     * @param <O>     The output type
+     * @param request       The request
+     * @param type          The type
+     * @param <I>           The input type
+     * @param <O>           The output type
      * @return A {@link Function}
      */
     protected <I, O> Function<URI, Flowable<O>> buildJsonStreamPublisher(io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
@@ -917,9 +920,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
     /**
      * @param parentRequest The parent request
-     * @param request    The request
-     * @param requestURI The request URI
-     * @param <I>        The input type
+     * @param request       The request
+     * @param requestURI    The request URI
+     * @param <I>           The input type
      * @return A {@link Flowable}
      */
     @SuppressWarnings("MagicNumber")
@@ -957,7 +960,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             );
                         }
                     });
-            }, BackpressureStrategy.BUFFER);
+        }, BackpressureStrategy.BUFFER);
 
         // apply filters
         streamResponsePublisher = Flowable.fromPublisher(
@@ -968,13 +971,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     /**
-     * @param <I>       The input type
-     * @param <O>       The output type
-     * @param <E>       The error type
+     * @param <I>           The input type
+     * @param <O>           The output type
+     * @param <E>           The error type
      * @param parentRequest The parent request
-     * @param request   The request
-     * @param bodyType  The body type
-     * @param errorType The error type
+     * @param request       The request
+     * @param bodyType      The body type
+     * @param errorType     The error type
      * @return A {@link Function}
      */
     protected <I, O, E> Function<URI, Publisher<? extends io.micronaut.http.HttpResponse<O>>> buildExchangePublisher(
@@ -1167,8 +1170,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param uri      The URI to connect to
      * @param sslCtx   The SslContext instance
      * @param isStream Is the connection a stream connection
-     * @throws HttpClientException If the URI is invalid
      * @return A ChannelFuture
+     * @throws HttpClientException If the URI is invalid
      */
     protected ChannelFuture doConnect(
             io.micronaut.http.HttpRequest<?> request,
@@ -1996,7 +1999,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             if (value != null) {
                 if (value instanceof Collection) {
                     Collection collection = (Collection) value;
-                    for (Object val: collection) {
+                    for (Object val : collection) {
                         addBodyAttribute(postRequestEncoder, entry.getKey(), val);
                     }
                 } else {
