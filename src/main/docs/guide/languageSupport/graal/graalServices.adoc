@@ -49,7 +49,7 @@ $ ./docker-build.sh
 The provided `Dockerfile` is a multi-stage dockerfile which builds the project in two steps:
 
 1. A GraalVM official image will build the native image.
-2. A typical dockerfile structure will build the final image which in smaller due to layering.
+2. A typical dockerfile structure will build the final image which is smaller due to layering.
 
 
 ==== Building a Native Image Without Using Docker
