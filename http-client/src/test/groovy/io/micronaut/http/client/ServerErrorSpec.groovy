@@ -15,23 +15,23 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.context.ApplicationContext
+
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
-import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Single
-import spock.lang.AutoCleanup
-import spock.lang.Shared
 import spock.lang.Specification
 
-class ServerErrorSpec extends Specification {
+import javax.inject.Inject
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared MyClient myClient = embeddedServer.getApplicationContext().getBean(MyClient)
+@MicronautTest
+class ServerErrorSpec extends Specification {
+    @Inject
+    MyClient myClient
 
     void "test 500 error"() {
         when:

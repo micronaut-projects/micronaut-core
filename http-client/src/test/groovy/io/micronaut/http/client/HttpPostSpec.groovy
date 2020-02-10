@@ -28,29 +28,27 @@ import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.core.type.Argument
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.inject.Inject
 import java.nio.charset.StandardCharsets
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@MicronautTest
 class HttpPostSpec extends Specification {
+    @Inject
+    @Client("/")
+    HttpClient client
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
-    @Shared
-    @AutoCleanup
-    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+    @Inject
+    PostClient postClient
 
     void "test send invalid http method"() {
         given:
@@ -296,7 +294,7 @@ class HttpPostSpec extends Specification {
 
     void "test content length is 0 with a post and no body"() {
         expect:
-        context.getBean(PostClient).call() == "0"
+        postClient.call() == "0"
     }
 
     void "test simple post request url encoded"() {
@@ -332,7 +330,7 @@ class HttpPostSpec extends Specification {
 
     void "test request generic type no body"() {
         when:
-        def response = HttpClient.create(embeddedServer.getURL()).toBlocking().exchange(
+        def response = client.toBlocking().exchange(
                 HttpRequest.POST('/post/requestObject', ''), String
         )
 
@@ -352,11 +350,11 @@ class HttpPostSpec extends Specification {
 
         expect:
         data == "5 - Sally"
-        context.getBean(PostClient).bodyParts("Joe", 6) == "6 - Joe"
+        postClient.bodyParts("Joe", 6) == "6 - Joe"
     }
 
     void "test multiple uris"() {
-        def client = embeddedServer.applicationContext.getBean(PostClient)
+        def client = this.postClient
 
         when:
         String val = client.multiple()

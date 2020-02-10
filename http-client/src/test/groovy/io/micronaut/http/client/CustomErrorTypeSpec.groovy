@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.context.ApplicationContext
+
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -23,21 +23,25 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.AutoCleanup
-import spock.lang.Shared
+import io.micronaut.test.annotation.MicronautTest
 import spock.lang.Specification
 
+import javax.inject.Inject
+
+@MicronautTest
 class CustomErrorTypeSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Inject
+    CustomErrorClient customErrorClient
+
+    @Inject
+    @Client("/")
+    RxHttpClient client
 
     void "test custom error type"() {
-        given:
-        CustomErrorClient client = embeddedServer.getApplicationContext().getBean(CustomErrorClient)
 
         when:
-        client.index()
+        customErrorClient.index()
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -45,7 +49,6 @@ class CustomErrorTypeSpec extends Specification {
     }
 
     void "test custom error type with generic"() {
-        HttpClient client = embeddedServer.getApplicationContext().createBean(HttpClient, embeddedServer.getURL())
         Argument<OtherError> errorType = Argument.of(OtherError, String)
 
         when:

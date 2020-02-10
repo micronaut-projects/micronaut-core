@@ -17,6 +17,7 @@ package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
@@ -32,22 +33,21 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.inject.Inject
+
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@MicronautTest
 class HttpPatchSpec extends Specification {
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    @Inject
+    @Client("/")
+    HttpClient client
 
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
-    @Shared
-    @AutoCleanup
-    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+    @Inject
+    MyPatchClient myPatchClient
 
     void "test simple post request with JSON"() {
         given:
@@ -139,7 +139,7 @@ class HttpPatchSpec extends Specification {
     }
 
     void "test multiple uris"() {
-        def client = embeddedServer.applicationContext.getBean(MyPatchClient)
+        def client = myPatchClient
 
         when:
         String val = client.multiple()

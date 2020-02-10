@@ -18,7 +18,9 @@ package io.micronaut.http.client
 import io.micronaut.core.io.buffer.ByteBufferFactory
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.codec.CodecException
+import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.internal.operators.flowable.FlowableBlockingSubscribe
@@ -36,6 +38,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.inject.Inject
 import javax.print.attribute.standard.Media
 import java.nio.charset.StandardCharsets
 
@@ -43,18 +46,17 @@ import java.nio.charset.StandardCharsets
  * @author graemerocher
  * @since 1.0
  */
+@MicronautTest
 class DataStreamSpec extends Specification {
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    @Inject
+    @Client("/")
+    RxStreamingHttpClient client
 
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Inject
+    ByteBufferFactory bufferFactory
 
     void "test read bytebuffer stream"() {
-        given:
-        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient,embeddedServer.getURL())
 
         when:
         List<byte[]> arrays = client.dataStream(HttpRequest.GET(
@@ -68,14 +70,9 @@ class DataStreamSpec extends Specification {
         new String(arrays[0]) == 'The Stand'
         new String(arrays[1]) == 'The Shining'
 
-        cleanup:
-        client.stop()
-
     }
 
     void "test read bytebuffer stream - regulate demand"() {
-        given:
-        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient,embeddedServer.getURL())
 
         when:
         def publisher = client.dataStream(HttpRequest.GET(
@@ -111,16 +108,9 @@ class DataStreamSpec extends Specification {
         then:
         arrays.size() == 1
         new String(arrays[0]) == 'The Stand'
-
-        cleanup:
-        client.stop()
-
     }
 
     void "test read response bytebuffer stream"() {
-        given:
-        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient,embeddedServer.getURL())
-
         when:
         List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(
                 '/datastream/books'
@@ -130,16 +120,9 @@ class DataStreamSpec extends Specification {
         arrays.size() == 2
         new String(arrays[0]) == 'The Stand'
         new String(arrays[1]) == 'The Shining'
-
-        cleanup:
-        client.stop()
-
     }
 
     void "test that stream response is free of race conditions"() {
-        given:
-        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient,embeddedServer.getURL())
-
         when:
         List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(
                 '/datastream/books'
@@ -149,15 +132,9 @@ class DataStreamSpec extends Specification {
         arrays.size() == 2
         new String(arrays[0]) == 'The Stand'
         new String(arrays[1]) == 'The Shining'
-
-        cleanup:
-        client.stop()
     }
 
     void "test streaming body codec exception"() {
-        given:
-        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
-
         when:
         Publisher<String> bodyPublisher = client.retrieve(HttpRequest.POST(
                 '/datastream/books', Flowable.just(new Book(title: 'The Shining'))
@@ -168,14 +145,11 @@ class DataStreamSpec extends Specification {
         def ex = thrown(CodecException)
         ex.message.startsWith("Cannot encode value")
 
-        cleanup:
-        client.stop()
     }
 
     void "test streaming ByteBuffer"() {
         given:
-        ByteBuffer<byte[]> buffer = context.getBean(ByteBufferFactory).wrap("The Shining".bytes)
-        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+        ByteBuffer<byte[]> buffer = bufferFactory.wrap("The Shining".bytes)
 
         when:
         Publisher<String> bodyPublisher = client.retrieve(HttpRequest.POST(
@@ -186,8 +160,6 @@ class DataStreamSpec extends Specification {
         then:
         body == 'The Shining'
 
-        cleanup:
-        client.stop()
     }
 
     static class Book {

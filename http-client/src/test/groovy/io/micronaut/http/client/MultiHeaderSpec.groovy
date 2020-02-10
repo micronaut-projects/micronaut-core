@@ -15,22 +15,28 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.context.ApplicationContext
+
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
-import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.test.annotation.MicronautTest
 import spock.lang.Specification
 
+import javax.inject.Inject
+
+@MicronautTest
 class MultiHeaderSpec extends Specification {
+
+    @Inject
+    @Client("/")
+    RxHttpClient asyncClient
 
     void "test multi-valued header"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        def asyncClient = HttpClient.create(embeddedServer.getURL())
         BlockingHttpClient client = asyncClient.toBlocking()
 
         when:
@@ -43,9 +49,6 @@ class MultiHeaderSpec extends Specification {
 
         then:
         response.body() == expected
-
-        cleanup:
-        embeddedServer.close()
 
         where:
         path | expected
