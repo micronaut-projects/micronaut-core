@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.annotation.Client
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
@@ -30,8 +31,11 @@ import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Put
 import spock.lang.AutoCleanup
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
+
+import javax.annotation.Nullable
 
 /**
  * @author Graeme Rocher
@@ -187,6 +191,18 @@ class HttpPutSpec extends Specification {
         val == "multiple mappings"
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2757")
+    void "test put with nullable header"() throws Exception {
+        //This test verifies that the body is not read in an attempt to populate the header argument
+        MutableHttpRequest<?> request = HttpRequest.PUT("/put/nullableHeader", "body".getBytes()).
+                accept(MediaType.TEXT_PLAIN_TYPE)
+
+        String body = client.toBlocking().retrieve(request)
+
+        expect:
+        body == "put done"
+    }
+
     @Controller('/put')
     static class PostController {
 
@@ -233,6 +249,13 @@ class HttpPutSpec extends Specification {
         @Put(uris = ["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
+        }
+
+        @Put(value = "/nullableHeader", consumes = MediaType.ALL, produces = MediaType.TEXT_PLAIN)
+        public String putNullableHeader(@Body final Flowable<byte[]> contents,
+                                        @Nullable @Header("foo") final String auth) {
+
+            return "put done"
         }
     }
 

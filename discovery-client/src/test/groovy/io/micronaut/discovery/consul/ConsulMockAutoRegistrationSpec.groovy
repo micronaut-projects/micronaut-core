@@ -58,6 +58,7 @@ class ConsulMockAutoRegistrationSpec extends Specification {
 
     @Shared
     ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
+
     @Shared
     DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
 
@@ -104,9 +105,9 @@ class ConsulMockAutoRegistrationSpec extends Specification {
             instances[0].port == anotherServer.getPort()
             instances[0].host == anotherServer.getHost()
             // TTL check by default so now URL
-            MockConsulServer.lastNewEntry.checks.size() == 1
-            MockConsulServer.lastNewEntry.checks[0].HTTP == null
-            MockConsulServer.lastNewEntry.checks[0].status == 'passing'
+            MockConsulServer.newEntries.get(serviceName).checks.size() == 1
+            MockConsulServer.newEntries.get(serviceName).checks[0].HTTP == null
+            MockConsulServer.newEntries.get(serviceName).checks[0].status == 'passing'
         }
 
         when: "stopping the server"
@@ -158,11 +159,11 @@ class ConsulMockAutoRegistrationSpec extends Specification {
             List<HealthEntry> entry = Flowable.fromPublisher(client.getHealthyServices(serviceName)).blockingFirst()
             entry.size() == 1
             entry[0].service.tags == ['foo', 'bar']
-            MockConsulServer.lastNewEntry.checks.size() == 1
-            MockConsulServer.lastNewEntry.tags == ['foo', 'bar']
-            MockConsulServer.lastNewEntry.checks[0] instanceof HTTPCheck
-            MockConsulServer.lastNewEntry.checks[0].HTTP == new URL(expectedCheckURI)
-            MockConsulServer.lastNewEntry.checks[0].status == 'passing'
+            MockConsulServer.newEntries.get(serviceName).checks.size() == 1
+            MockConsulServer.newEntries.get(serviceName).tags == ['foo', 'bar']
+            MockConsulServer.newEntries.get(serviceName).checks[0] instanceof HTTPCheck
+            MockConsulServer.newEntries.get(serviceName).checks[0].HTTP == new URL(expectedCheckURI)
+            MockConsulServer.newEntries.get(serviceName).checks[0].status == 'passing'
 
         }
 
@@ -188,12 +189,12 @@ class ConsulMockAutoRegistrationSpec extends Specification {
             List<HealthEntry> entry = Flowable.fromPublisher(client.getHealthyServices(serviceName)).blockingFirst()
             entry.size() == 1
             entry[0].service.tags == ['foo', 'bar']
-            MockConsulServer.lastNewEntry.checks.size() == 1
-            MockConsulServer.lastNewEntry.tags == ['foo', 'bar']
-            MockConsulServer.lastNewEntry.checks[0] instanceof HTTPCheck
-            MockConsulServer.lastNewEntry.checks[0].HTTP == new URL(expectedCheckURI)
-            MockConsulServer.lastNewEntry.checks[0].deregisterCriticalServiceAfter() == Duration.ofMinutes(90)
-            MockConsulServer.lastNewEntry.checks[0].status == 'passing'
+            MockConsulServer.newEntries.get(serviceName).checks.size() == 1
+            MockConsulServer.newEntries.get(serviceName).tags == ['foo', 'bar']
+            MockConsulServer.newEntries.get(serviceName).checks[0] instanceof HTTPCheck
+            MockConsulServer.newEntries.get(serviceName).checks[0].HTTP == new URL(expectedCheckURI)
+            MockConsulServer.newEntries.get(serviceName).checks[0].deregisterCriticalServiceAfter() == Duration.ofMinutes(90)
+            MockConsulServer.newEntries.get(serviceName).checks[0].status == 'passing'
         }
 
         cleanup:
@@ -210,20 +211,21 @@ class ConsulMockAutoRegistrationSpec extends Specification {
                                                                                'consul.client.host'                            : 'localhost',
                                                                                'consul.client.port'                            : consulServer.port])
 
-        PollingConditions conditions = new PollingConditions(timeout: 3)
         String expectedCheckURI = "http://localhost:${anotherServer.port}/health"
-        then:
+        PollingConditions conditions = new PollingConditions(timeout: 5)
 
+
+        then:
         conditions.eventually {
             List<HealthEntry> entry = Flowable.fromPublisher(client.getHealthyServices(serviceName)).blockingFirst()
             entry.size() == 1
             entry[0].service.tags == ['foo', 'bar']
-            MockConsulServer.lastNewEntry.checks.size() == 1
-            MockConsulServer.lastNewEntry.tags == ['foo', 'bar']
-            MockConsulServer.lastNewEntry.checks[0] instanceof HTTPCheck
-            MockConsulServer.lastNewEntry.checks[0].HTTP == new URL(expectedCheckURI)
-            MockConsulServer.lastNewEntry.checks[0].isTLSSkipVerify()
-            MockConsulServer.lastNewEntry.checks[0].status == 'passing'
+            MockConsulServer.newEntries.get(serviceName).checks.size() == 1
+            MockConsulServer.newEntries.get(serviceName).tags == ['foo', 'bar']
+            MockConsulServer.newEntries.get(serviceName).checks[0] instanceof HTTPCheck
+            MockConsulServer.newEntries.get(serviceName).checks[0].HTTP == new URL(expectedCheckURI)
+            MockConsulServer.newEntries.get(serviceName).checks[0].isTLSSkipVerify()
+            MockConsulServer.newEntries.get(serviceName).checks[0].status == 'passing'
         }
 
         cleanup:
@@ -248,12 +250,12 @@ class ConsulMockAutoRegistrationSpec extends Specification {
             List<HealthEntry> entry = Flowable.fromPublisher(client.getHealthyServices(serviceName)).blockingFirst()
             entry.size() == 1
             entry[0].service.tags == ['foo', 'bar']
-            MockConsulServer.lastNewEntry.checks.size() == 1
-            MockConsulServer.lastNewEntry.tags == ['foo', 'bar']
-            MockConsulServer.lastNewEntry.checks[0] instanceof HTTPCheck
-            MockConsulServer.lastNewEntry.checks[0].HTTP == new URL(expectedCheckURI)
-            MockConsulServer.lastNewEntry.checks[0].method.get() == HttpMethod.POST
-            MockConsulServer.lastNewEntry.checks[0].status == 'passing'
+            MockConsulServer.newEntries.get(serviceName).checks.size() == 1
+            MockConsulServer.newEntries.get(serviceName).tags == ['foo', 'bar']
+            MockConsulServer.newEntries.get(serviceName).checks[0] instanceof HTTPCheck
+            MockConsulServer.newEntries.get(serviceName).checks[0].HTTP == new URL(expectedCheckURI)
+            MockConsulServer.newEntries.get(serviceName).checks[0].method.get() == HttpMethod.POST
+            MockConsulServer.newEntries.get(serviceName).checks[0].status == 'passing'
         }
 
         cleanup:
