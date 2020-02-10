@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.channel;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -33,6 +34,7 @@ import java.util.concurrent.ThreadFactory;
  */
 @Internal
 @Singleton
+@BootstrapContextCompatible
 public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**

@@ -170,10 +170,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
     private final String contextPath;
-    private final NettyClientSslBuilder nettyClientSslBuilder;
     private final SslContext sslContext;
     private final ThreadFactory threadFactory;
-
+    private final boolean shutdownGroup;
     private final Charset defaultCharset;
     private final ChannelPoolMap<RequestKey, ChannelPool> poolMap;
     private final Logger log;
@@ -206,7 +205,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              MediaTypeCodecRegistry codecRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              HttpClientFilter... filters) {
-        this(loadBalancer, configuration, contextPath, new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)), threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED));
+        this(loadBalancer, configuration, contextPath, new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)), threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null);
     }
 
     /**
@@ -221,6 +220,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param codecRegistry         The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      * @param webSocketBeanRegistry The websocket bean registry
      * @param requestBinderRegistry The request binder registry
+     * @param eventLoopGroup        The event loop group to use
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              @NonNull HttpClientConfiguration configuration,
@@ -230,7 +230,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              @NonNull NettyClientSslBuilder nettyClientSslBuilder,
                              @NonNull MediaTypeCodecRegistry codecRegistry,
                              @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
-                             @NonNull RequestBinderRegistry requestBinderRegistry) {
+                             @NonNull RequestBinderRegistry requestBinderRegistry,
+                             @Nullable EventLoopGroup eventLoopGroup) {
         ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
         ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
         ArgumentUtils.requireNonNull("webSocketBeanRegistry", webSocketBeanRegistry);
@@ -240,11 +241,16 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
         this.contextPath = contextPath;
-        this.nettyClientSslBuilder = nettyClientSslBuilder;
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
         this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration()).orElse(null);
-        this.group = createEventLoopGroup(configuration, threadFactory);
+        if (eventLoopGroup != null) {
+            this.group = eventLoopGroup;
+            this.shutdownGroup = false;
+        } else {
+            this.group = createEventLoopGroup(configuration, threadFactory);
+            this.shutdownGroup = true;
+        }
         this.scheduler = Schedulers.from(group);
         this.threadFactory = threadFactory;
         this.bootstrap.group(group)
@@ -447,22 +453,25 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                 }
             }
-            Duration shutdownTimeout = configuration.getShutdownTimeout().orElse(Duration.ofMillis(100));
-            Future<?> future = this.group.shutdownGracefully(
-                    1,
-                    shutdownTimeout.toMillis(),
-                    TimeUnit.MILLISECONDS
-            );
-            future.addListener(f -> {
-                if (!f.isSuccess() && log.isErrorEnabled()) {
-                    Throwable cause = f.cause();
-                    log.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
+            if (shutdownGroup) {
+                Duration shutdownTimeout = configuration.getShutdownTimeout().orElse(Duration.ofMillis(100));
+
+                Future<?> future = this.group.shutdownGracefully(
+                        1,
+                        shutdownTimeout.toMillis(),
+                        TimeUnit.MILLISECONDS
+                );
+                future.addListener(f -> {
+                    if (!f.isSuccess() && log.isErrorEnabled()) {
+                        Throwable cause = f.cause();
+                        log.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
+                    }
+                });
+                try {
+                    future.await(shutdownTimeout.toMillis());
+                } catch (InterruptedException e) {
+                    // ignore
                 }
-            });
-            try {
-                future.await(shutdownTimeout.toMillis());
-            } catch (InterruptedException e) {
-                // ignore
             }
         }
         return this;

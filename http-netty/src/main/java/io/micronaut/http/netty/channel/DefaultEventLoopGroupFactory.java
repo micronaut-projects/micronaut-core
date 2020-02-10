@@ -17,6 +17,7 @@ package io.micronaut.http.netty.channel;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.core.util.ArgumentUtils;
@@ -37,6 +38,7 @@ import java.util.concurrent.ThreadFactory;
  */
 @Primary
 @Singleton
+@BootstrapContextCompatible
 public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
 
     private boolean useNativeTransport = false;

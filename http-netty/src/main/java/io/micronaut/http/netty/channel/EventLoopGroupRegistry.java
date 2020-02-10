@@ -36,6 +36,11 @@ public interface EventLoopGroupRegistry {
     Optional<EventLoopGroup> getEventLoopGroup(@NonNull String name);
 
     /**
+     * @return Obtains the default event loop group.
+     */
+    @NonNull EventLoopGroup getDefaultEventLoopGroup();
+
+    /**
      * Obtain a configured Event Loop Group from the registry.
      * @param name The name of the group
      * @return The event loop group if configured

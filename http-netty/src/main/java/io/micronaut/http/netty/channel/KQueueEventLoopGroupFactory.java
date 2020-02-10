@@ -17,6 +17,7 @@
 package io.micronaut.http.netty.channel;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.EventLoopGroup;
@@ -39,6 +40,7 @@ import java.util.concurrent.ThreadFactory;
 @Internal
 @Requires(classes = KQueue.class, condition = KQueueAvailabilityCondition.class)
 @Named(EventLoopGroupFactory.NATIVE)
+@BootstrapContextCompatible
 class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**

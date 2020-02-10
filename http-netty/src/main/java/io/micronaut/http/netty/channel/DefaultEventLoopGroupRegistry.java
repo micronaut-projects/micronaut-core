@@ -38,6 +38,7 @@ import java.util.concurrent.ThreadFactory;
  */
 @Factory
 @Internal
+@BootstrapContextCompatible
 public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final ThreadFactory threadFactory;
@@ -67,6 +68,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
      */
     @EachBean(EventLoopGroupConfiguration.class)
     @Bean(preDestroy = "shutdownGracefully")
+    @BootstrapContextCompatible
     protected EventLoopGroup eventLoopGroup(EventLoopGroupConfiguration configuration) {
         final String executor = configuration.getExecutorName().orElse(null);
         if (executor != null) {
@@ -90,8 +92,15 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     @Requires(missingProperty = EventLoopGroupConfiguration.DEFAULT_LOOP)
     @Primary
     @Bean(preDestroy = "shutdownGracefully")
+    @BootstrapContextCompatible
     protected EventLoopGroup defaultEventLoopGroup() {
         return eventLoopGroupFactory.createEventLoopGroup(new DefaultEventLoopGroupConfiguration(), threadFactory);
+    }
+
+    @NonNull
+    @Override
+    public EventLoopGroup getDefaultEventLoopGroup() {
+        return beanLocator.getBean(EventLoopGroup.class);
     }
 
     @Override

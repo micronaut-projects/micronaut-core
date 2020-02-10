@@ -23,6 +23,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.EventLoopGroup;
@@ -40,6 +41,7 @@ import io.netty.channel.epoll.EpollServerSocketChannel;
 @Requires(classes = Epoll.class, condition = EpollAvailabilityCondition.class)
 @Internal
 @Named(EventLoopGroupFactory.NATIVE)
+@BootstrapContextCompatible
 class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**

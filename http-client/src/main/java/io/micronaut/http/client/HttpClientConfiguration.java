@@ -15,8 +15,11 @@
  */
 package io.micronaut.http.client;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.convert.format.ReadableBytes;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -119,6 +122,8 @@ public abstract class HttpClientConfiguration {
 
     private String loggerName;
 
+    private String eventLoopGroup = EventLoopGroupConfiguration.DEFAULT;
+
     /**
      * Default constructor.
      */
@@ -132,6 +137,21 @@ public abstract class HttpClientConfiguration {
         if (applicationConfiguration != null) {
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
         }
+    }
+
+    /**
+     * @return The event loop group to use.
+     */
+    public String getEventLoopGroup() {
+        return eventLoopGroup;
+    }
+
+    /**
+     * @param eventLoopGroup Sets the event loop group to use for the client.
+     */
+    public void setEventLoopGroup(@NonNull String eventLoopGroup) {
+        ArgumentUtils.requireNonNull("eventLoopGroup", eventLoopGroup);
+        this.eventLoopGroup = eventLoopGroup;
     }
 
     /**
