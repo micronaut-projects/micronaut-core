@@ -41,7 +41,9 @@ import io.micronaut.http.client.ssl.NettyClientSslBuilder;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -52,6 +54,7 @@ import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,6 +81,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
     private final BeanContext beanContext;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
+    private final EventLoopGroupFactory eventLoopGroupFactory;
 
     /**
      * Default constructor.
@@ -88,6 +92,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
      * @param threadFactory                  The thread factory
      * @param codecRegistry                  The codec registry
      * @param eventLoopGroupRegistry         The event loop group registry
+     * @param eventLoopGroupFactory          The event loop group factory
      * @param beanContext                    The bean context
      */
     public RxNettyHttpClientRegistry(
@@ -97,6 +102,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
             ThreadFactory threadFactory,
             MediaTypeCodecRegistry codecRegistry,
             EventLoopGroupRegistry eventLoopGroupRegistry,
+            EventLoopGroupFactory eventLoopGroupFactory,
             BeanContext beanContext) {
         this.defaultHttpClientConfiguration = defaultHttpClientConfiguration;
         this.loadBalancerResolver = loadBalancerResolver;
@@ -104,6 +110,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
         this.threadFactory = threadFactory;
         this.codecRegistry = codecRegistry;
         this.beanContext = beanContext;
+        this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
     }
 
@@ -294,6 +301,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
         );
 
         EventLoopGroup eventLoopGroup = resolveEventLoopGroup(configuration, beanContext);
+        Class<? extends SocketChannel> socketChannelClass = resolveSocketChannel(configuration, beanContext);
         return new DefaultHttpClient(
                 loadBalancer,
                 configuration,
@@ -306,7 +314,8 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                 beanContext.findBean(RequestBinderRegistry.class).orElseGet(() ->
                     new DefaultRequestBinderRegistry(ConversionService.SHARED)
                 ),
-                eventLoopGroup
+                eventLoopGroup,
+                socketChannelClass
         );
     }
 
@@ -331,6 +340,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
             // direct creation via createBean
             HttpClientFilterResolver filterResolver = beanContext.createBean(HttpClientFilterResolver.class);
             EventLoopGroup eventLoopGroup = resolveEventLoopGroup(configuration, beanContext);
+            Class<? extends SocketChannel> socketChannelClass = resolveSocketChannel(configuration, beanContext);
             return new DefaultHttpClient(
                     loadBalancer,
                     configuration != null ? configuration : defaultHttpClientConfiguration,
@@ -343,11 +353,27 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                     beanContext.findBean(RequestBinderRegistry.class).orElseGet(() ->
                         new DefaultRequestBinderRegistry(ConversionService.SHARED)
                     ),
-                    eventLoopGroup
+                    eventLoopGroup,
+                    socketChannelClass
             );
         } else {
             return getClient(injectionPoint != null ? injectionPoint.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA);
         }
+    }
+
+    private Class<? extends SocketChannel> resolveSocketChannel(HttpClientConfiguration configuration, BeanContext beanContext) {
+        final String eventLoopGroup = configuration.getEventLoopGroup();
+
+        final EventLoopGroupConfiguration eventLoopGroupConfiguration = beanContext.findBean(EventLoopGroupConfiguration.class, Qualifiers.byName(eventLoopGroup))
+                .orElseGet(() -> {
+                    if (EventLoopGroupConfiguration.DEFAULT.equals(eventLoopGroup)) {
+                        return new DefaultEventLoopGroupConfiguration();
+                    } else {
+                        throw new HttpClientException("Specified event loop group is not defined: " + eventLoopGroup);
+                    }
+                });
+
+        return eventLoopGroupFactory.clientSocketChannelClass(eventLoopGroupConfiguration);
     }
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {

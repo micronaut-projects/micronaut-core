@@ -1,6 +1,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.netty.channel.EventLoopGroup
@@ -19,8 +20,8 @@ class ClientEventLoopGroupSpec extends Specification {
         context.getBean(RxHttpClient)
 
         then:
-        def e = thrown(HttpClientException)
-        e.message =='Specified event loop group is not defined: invalid'
+        def e = thrown(BeanInstantiationException)
+        e.cause.message =='Specified event loop group is not defined: invalid'
 
         cleanup:
         context.close()

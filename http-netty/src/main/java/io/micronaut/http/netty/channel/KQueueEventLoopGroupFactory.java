@@ -16,6 +16,7 @@
 
 package io.micronaut.http.netty.channel;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
@@ -24,7 +25,9 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.kqueue.KQueueServerSocketChannel;
+import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.socket.ServerSocketChannel;
+import io.netty.channel.socket.SocketChannel;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -104,6 +107,12 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
      */
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return KQueueServerSocketChannel.class;
+    }
+
+    @NonNull
+    @Override
+    public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
+        return KQueueSocketChannel.class;
     }
 
     private static KQueueEventLoopGroup withIoRatio(KQueueEventLoopGroup group, @Nullable Integer ioRatio) {

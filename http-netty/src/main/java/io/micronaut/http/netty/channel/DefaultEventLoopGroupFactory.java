@@ -23,6 +23,7 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.core.util.ArgumentUtils;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
+import io.netty.channel.socket.SocketChannel;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -101,10 +102,20 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass(EventLoopGroupConfiguration configuration) {
         if (useNativeTransport || configuration != null && configuration.isPreferNativeTransport()) {
-            return this.nativeFactory.serverSocketChannelClass();
+            return this.nativeFactory.serverSocketChannelClass(configuration);
         } else {
-            return this.defaultFactory.serverSocketChannelClass();
+            return this.defaultFactory.serverSocketChannelClass(configuration);
         }
 
+    }
+
+    @NonNull
+    @Override
+    public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
+        if (useNativeTransport || configuration != null && configuration.isPreferNativeTransport()) {
+            return this.nativeFactory.clientSocketChannelClass(configuration);
+        } else {
+            return this.defaultFactory.clientSocketChannelClass(configuration);
+        }
     }
 }

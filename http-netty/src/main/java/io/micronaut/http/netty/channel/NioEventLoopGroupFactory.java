@@ -15,13 +15,16 @@
  */
 package io.micronaut.http.netty.channel;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
 
 import javax.inject.Singleton;
 import java.util.concurrent.Executor;
@@ -93,6 +96,12 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
      */
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return NioServerSocketChannel.class;
+    }
+
+    @NonNull
+    @Override
+    public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
+        return NioSocketChannel.class;
     }
 
     private static NioEventLoopGroup withIoRatio(NioEventLoopGroup group, @Nullable Integer ioRatio) {

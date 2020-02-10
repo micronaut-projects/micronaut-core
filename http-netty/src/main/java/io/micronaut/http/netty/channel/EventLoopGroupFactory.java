@@ -25,6 +25,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.netty.channel.socket.SocketChannel;
 
 /**
  * Factory for EventLoopGroup.
@@ -132,4 +133,12 @@ public interface EventLoopGroupFactory {
     default @NonNull Class<? extends ServerSocketChannel> serverSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return serverSocketChannelClass();
     }
+
+    /**
+     * Returns the client channel class.
+     *
+     * @param configuration The configuration
+     * @return A SocketChannel.
+     */
+    @NonNull Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration);
 }

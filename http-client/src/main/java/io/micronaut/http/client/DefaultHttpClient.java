@@ -74,6 +74,7 @@ import io.netty.buffer.*;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.pool.*;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.TooLongFrameException;
@@ -205,7 +206,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              MediaTypeCodecRegistry codecRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              HttpClientFilter... filters) {
-        this(loadBalancer, configuration, contextPath, new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)), threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null);
+        this(loadBalancer, configuration, contextPath, new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)), threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class);
     }
 
     /**
@@ -221,6 +222,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param webSocketBeanRegistry The websocket bean registry
      * @param requestBinderRegistry The request binder registry
      * @param eventLoopGroup        The event loop group to use
+     * @param socketChannelClass    The socket channel class
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
                              @NonNull HttpClientConfiguration configuration,
@@ -231,13 +233,15 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              @NonNull MediaTypeCodecRegistry codecRegistry,
                              @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
                              @NonNull RequestBinderRegistry requestBinderRegistry,
-                             @Nullable EventLoopGroup eventLoopGroup) {
+                             @Nullable EventLoopGroup eventLoopGroup,
+                             @NonNull Class<? extends SocketChannel> socketChannelClass) {
         ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
         ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
         ArgumentUtils.requireNonNull("webSocketBeanRegistry", webSocketBeanRegistry);
         ArgumentUtils.requireNonNull("requestBinderRegistry", requestBinderRegistry);
         ArgumentUtils.requireNonNull("configuration", configuration);
         ArgumentUtils.requireNonNull("filterResolver", filterResolver);
+        ArgumentUtils.requireNonNull("socketChannelClass", socketChannelClass);
         this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
         this.contextPath = contextPath;
@@ -254,7 +258,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.scheduler = Schedulers.from(group);
         this.threadFactory = threadFactory;
         this.bootstrap.group(group)
-                .channel(NioSocketChannel.class)
+                .channel(socketChannelClass)
                 .option(ChannelOption.SO_KEEPALIVE, true);
 
         Optional<Duration> readTimeout = configuration.getReadTimeout();
