@@ -36,6 +36,7 @@ import io.reactivex.Single
 import io.reactivex.functions.Consumer
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -412,20 +413,40 @@ class HttpGetSpec extends Specification {
         client.retrieve("/noslash/slash/") == "slash"
         client.retrieve("/noslash/noslash") == "noslash"
         client.retrieve("/noslash/noslash/") == "noslash"
+        client.retrieve("/noslash/startslash") == "startslash"
+        client.retrieve("/noslash/startslash/") == "startslash"
+        client.retrieve("/noslash/endslash") == "endslash"
+        client.retrieve("/noslash/endslash/") == "endslash"
+
         client.retrieve("/slash/slash") == "slash"
         client.retrieve("/slash/slash/") == "slash"
         client.retrieve("/slash/noslash") == "noslash"
         client.retrieve("/slash/noslash/") == "noslash"
+        client.retrieve("/slash/startslash") == "startslash"
+        client.retrieve("/slash/startslash/") == "startslash"
+        client.retrieve("/slash/endslash") == "endslash"
+        client.retrieve("/slash/endslash/") == "endslash"
 
         client.retrieve("/ending-slash/slash") == "slash"
         client.retrieve("/ending-slash/slash/") == "slash"
         client.retrieve("/ending-slash/noslash") == "noslash"
         client.retrieve("/ending-slash/noslash/") == "noslash"
+        client.retrieve("/ending-slash/startslash") == "startslash"
+        client.retrieve("/ending-slash/startslash/") == "startslash"
+        client.retrieve("/ending-slash/endslash") == "endslash"
+        client.retrieve("/ending-slash/endslash/") == "endslash"
 
         client.retrieve("/noslash") == "noslash"
         client.retrieve("/noslash/") == "noslash"
         client.retrieve("/slash") == "slash"
         client.retrieve("/slash/") == "slash"
+        client.retrieve("/startslash") == "startslash"
+        client.retrieve("/startslash/") == "startslash"
+        client.retrieve("/endslash") == "endslash"
+        client.retrieve("/endslash/") == "endslash"
+
+        cleanup:
+        client.close()
     }
 
     void "test a request with a custom host header"() {
@@ -442,7 +463,6 @@ class HttpGetSpec extends Specification {
         body == "http://foo.com"
 
         cleanup:
-        client.stop()
         client.close()
     }
 
@@ -457,6 +477,9 @@ class HttpGetSpec extends Specification {
         noExceptionThrown()
         response.status == HttpStatus.OK
         response.body().isEmpty()
+
+        cleanup:
+        client.close()
     }
 
     void "test single empty list returns ok"() {
@@ -470,6 +493,9 @@ class HttpGetSpec extends Specification {
         noExceptionThrown()
         response.status == HttpStatus.OK
         response.body().isEmpty()
+
+        cleanup:
+        client.close()
     }
 
     void "test mono empty list returns ok"() {
@@ -483,6 +509,9 @@ class HttpGetSpec extends Specification {
         noExceptionThrown()
         response.status == HttpStatus.OK
         response.body().isEmpty()
+
+        cleanup:
+        client.close()
     }
 
     void "test completable returns 200"() {
@@ -508,6 +537,9 @@ class HttpGetSpec extends Specification {
         then:
         noExceptionThrown()
         body == 'x-y'
+
+        cleanup:
+        client.close()
     }
 
     void "test overriding the URL"() {
@@ -554,8 +586,30 @@ class HttpGetSpec extends Specification {
         requestUri.endsWith("bar=abc&bar=xyz&tag=random")
     }
 
-        @Controller("/get")
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2782")
+    void "test single letter uri"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        MutableHttpRequest request = HttpRequest.GET("/get/a")
+        String body = client.toBlocking().retrieve(request)
+
+        then:
+        noExceptionThrown()
+        body == 'success'
+
+        cleanup:
+        client.close()
+    }
+
+    @Controller("/get")
     static class GetController {
+
+        @Get(value = "a", produces = MediaType.TEXT_PLAIN)
+        String a() {
+            return "success"
+        }
 
         @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
         String simple() {
@@ -672,7 +726,7 @@ class HttpGetSpec extends Specification {
     @Controller("noslash")
     static class NoSlashController {
 
-        @Get("/slash")
+        @Get("/slash/")
         String slash() {
             "slash"
         }
@@ -680,6 +734,16 @@ class HttpGetSpec extends Specification {
         @Get("noslash")
         String noSlash() {
             "noslash"
+        }
+
+        @Get("/startslash")
+        String startSlash() {
+            "startslash"
+        }
+
+        @Get("endslash/")
+        String endSlash() {
+            "endslash"
         }
     }
 
@@ -687,7 +751,7 @@ class HttpGetSpec extends Specification {
     @Controller("/slash")
     static class SlashController {
 
-        @Get("/slash")
+        @Get("/slash/")
         String slash() {
             "slash"
         }
@@ -695,6 +759,16 @@ class HttpGetSpec extends Specification {
         @Get("noslash")
         String noSlash() {
             "noslash"
+        }
+
+        @Get("/startslash")
+        String startSlash() {
+            "startslash"
+        }
+
+        @Get("endslash/")
+        String endSlash() {
+            "endslash"
         }
     }
 
@@ -706,16 +780,26 @@ class HttpGetSpec extends Specification {
             "slash"
         }
 
-        @Get("noslash/")
+        @Get("noslash")
         String noSlash() {
             "noslash"
+        }
+
+        @Get("/startslash")
+        String startSlash() {
+            "startslash"
+        }
+
+        @Get("endslash/")
+        String endSlash() {
+            "endslash"
         }
     }
 
     @Controller
     static class SlashRootController {
 
-        @Get("/slash")
+        @Get("/slash/")
         String slash() {
             "slash"
         }
@@ -723,6 +807,16 @@ class HttpGetSpec extends Specification {
         @Get("noslash")
         String noSlash() {
             "noslash"
+        }
+
+        @Get("/startslash")
+        String startSlash() {
+            "startslash"
+        }
+
+        @Get("endslash/")
+        String endSlash() {
+            "endslash"
         }
     }
 
