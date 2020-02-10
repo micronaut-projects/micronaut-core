@@ -100,3 +100,52 @@ micronaut:
 <2> Sets the maximum number of connections in the pool
 
 See the API for link:{api}/io/micronaut/http/client/HttpClientConfiguration.ConnectionPoolConfiguration.html[ConnectionPoolConfiguration] for details on available options to configure the pool.
+
+=== Configuring Event Loop Groups
+
+By default Micronaut will share a common Netty `EventLoopGroup` for worker threads and all HTTP clients threads.
+
+This common `EventLoopGroup` can be configured via the `micronaut.netty.event-loops.default` property:
+
+.Configuring The Default Event Loop
+[source,yaml]
+----
+micronaut:
+    netty:
+        event-loops:
+            default:
+                num-threads: 10
+                prefer-native-transport: true
+----
+
+You can also use the `micronaut.netty.event-loops` setting to configure one or more additional event loops. The following table summarizes the properties:
+
+include::{includedir}configurationProperties/io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration.adoc[]
+
+For example, if your interactions with an HTTP client involve CPU intensive work it may be worthwhile configuring a separate `EventLoopGroup` for one or all clients.
+
+
+The following example configures an additional event loop group called "other" that uses 10 threads:
+
+.Configuring Additional Event Loops
+[source,yaml]
+----
+micronaut:
+    netty:
+        event-loops:
+            other:
+                num-threads: 10
+                prefer-native-transport: true
+----
+
+
+Once an additional event loop has been configured you can alter the HTTP client configuration to use the newly defined event loop group:
+
+.Altering the Event Loop Group used by Clients
+[source,yaml]
+----
+micronaut:
+    http:
+        client:
+            event-loop-group: other
+----
