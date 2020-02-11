@@ -15,9 +15,7 @@
  */
 package io.micronaut.http.netty.channel;
 
-import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.Named;
-import io.micronaut.core.util.StringUtils;
 
 import java.util.Optional;
 
