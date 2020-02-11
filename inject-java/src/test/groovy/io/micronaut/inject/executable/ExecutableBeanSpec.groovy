@@ -17,6 +17,7 @@ package io.micronaut.inject.executable
 
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
+import spock.lang.Issue
 
 class ExecutableBeanSpec extends AbstractTypeElementSpec {
 
@@ -41,6 +42,42 @@ class ExecutableBean1 {
         definition != null
         definition.findMethod("round", float.class).get().returnType.type == int.class
 
+    }
+
+    @Issue('#2789')
+    void "test don't generate executable methods for inherited protected or package private methods"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.MyBean','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@javax.inject.Singleton
+@Executable
+class MyBean extends Parent {
+
+    public int round(float num) {
+        return Math.round(num);
+    }
+}
+
+class Parent {
+    protected void protectedMethod() {
+    }
+    
+    void packagePrivateMethod() {
+    }
+    
+    private void privateMethod() {
+    }
+}
+''')
+        expect:
+        definition != null
+        !definition.findMethod("privateMethod").isPresent()
+        !definition.findMethod("packagePrivateMethod").isPresent()
+        !definition.findMethod("protectedMethod").isPresent()
     }
 }
 
