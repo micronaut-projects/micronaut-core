@@ -30,7 +30,8 @@ import io.micronaut.core.annotation.Internal;
 public interface RxHttpClientRegistry {
 
     /**
-     * Return the client for the given annotation metadata.
+     * Return the client for the client ID and path.
+     *
      * @param clientId The client ID
      * @param path The path (Optional)
      * @return The client
@@ -39,6 +40,7 @@ public interface RxHttpClientRegistry {
 
     /**
      * Return the client for the given annotation metadata.
+     *
      * @param annotationMetadata The annotation metadata.
      * @return The client
      */

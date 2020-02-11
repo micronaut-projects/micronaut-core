@@ -99,7 +99,6 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
      * @return Whether to prefer the native transport
      */
     @Override
-    @Bindable(defaultValue = StringUtils.TRUE)
     public boolean isPreferNativeTransport() {
         return preferNativeTransport;
     }

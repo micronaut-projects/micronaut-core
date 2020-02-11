@@ -59,6 +59,5 @@ public interface EventLoopGroupConfiguration extends Named {
     /**
      * @return Whether to prefer the native transport
      */
-    @Bindable(defaultValue = StringUtils.TRUE)
     boolean isPreferNativeTransport();
 }
