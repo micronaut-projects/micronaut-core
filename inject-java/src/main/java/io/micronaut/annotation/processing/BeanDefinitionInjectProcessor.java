@@ -795,13 +795,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
 
 
+
             Set<Modifier> modifiers = method.getModifiers();
             boolean hasInvalidModifiers = modelUtils.isAbstract(method) || modifiers.contains(Modifier.STATIC) || methodAnnotationMetadata.hasAnnotation(Internal.class) || modelUtils.isPrivate(method);
             boolean isPublic = modifiers.contains(Modifier.PUBLIC) && !hasInvalidModifiers;
             boolean isExecutable =
                     !hasInvalidModifiers &&
-                    ((isExecutableType && isPublic) ||
-                            methodAnnotationMetadata.hasStereotype(Executable.class)) ;
+                            (isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
+                                annotationMetadata.hasStereotype(AROUND_TYPE));
 
 
             boolean hasConstraints = false;
@@ -835,6 +836,16 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             return null;
+        }
+
+        private boolean isExecutableThroughType(
+                Element enclosingElement,
+                AnnotationMetadata annotationMetadataHierarchy,
+                AnnotationMetadata declaredMetadata, Set<Modifier> modifiers,
+                boolean isPublic) {
+            return (isExecutableType && (isPublic || (modifiers.isEmpty()) && concreteClass.equals(enclosingElement))) ||
+                    annotationMetadataHierarchy.hasDeclaredStereotype(Executable.class) ||
+                    declaredMetadata.hasAnnotation(Executable.class);
         }
 
         private void visitConfigurationPropertySetter(ExecutableElement method) {
