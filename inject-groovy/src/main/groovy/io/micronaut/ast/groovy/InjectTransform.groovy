@@ -413,6 +413,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     node.visitContents(this)
                 }
             } else {
+                boolean isOwningClass = node == concreteClass
+                if (isOwningClass && concreteClass.abstract && !isDeclaredBean) {
+                    return
+                }
                 ClassNode superClass = node.getSuperClass()
                 List<ClassNode> superClasses = []
                 while (superClass != null) {
@@ -1004,10 +1008,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (declaringClass != ClassHelper.OBJECT_TYPE) {
 
                 boolean isOwningClass = declaringClass == concreteClass
-
-                if (isOwningClass && concreteClass.abstract && !annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
-                    return
-                }
 
                 Map<String, Map<String, ClassNode>> genericInfo = AstGenericUtils.buildAllGenericElementInfo(concreteClass, new GroovyVisitorContext(sourceUnit, compilationUnit))
 

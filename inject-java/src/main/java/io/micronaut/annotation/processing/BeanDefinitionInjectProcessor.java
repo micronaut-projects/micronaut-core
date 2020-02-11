@@ -472,6 +472,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                         this.constructorParameterInfo,
                                         interceptorTypes);
                             }
+                        } else {
+                            if (modelUtils.isAbstract(classElement)) {
+                                return null;
+                            }
                         }
                     }
 
@@ -596,8 +600,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
                     ExecutableElement method = (ExecutableElement) element;
                     final boolean isAbstract = modelUtils.isAbstract(method);
-
-
 
                     Map<String, Object> boundTypes = genericUtils.resolveBoundTypes(type);
                     ExecutableElementParamInfo params = populateParameterData(introductionTypeName, method, boundTypes);
