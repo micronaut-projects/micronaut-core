@@ -27,7 +27,9 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.BackpressureStrategy
 import io.reactivex.Flowable
 import io.reactivex.FlowableEmitter
@@ -37,6 +39,8 @@ import io.reactivex.annotations.NonNull
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import javax.inject.Inject
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 
@@ -44,13 +48,19 @@ import java.time.Duration
  * @author graemerocher
  * @since 1.0
  */
+@MicronautTest
 class StreamRequestSpec extends Specification {
-    @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
+    @Inject
+    @Client("/")
+    RxStreamingHttpClient client
+
+    @Inject
+    ApplicationContext applicationContext
+
+    @Inject
+    EmbeddedServer embeddedServer
 
     void "test stream post request with numbers"() {
-        given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
 
         when:
         int i = 0
@@ -71,16 +81,9 @@ class StreamRequestSpec extends Specification {
         then:
         result.body().size() == 5
         result.body() == [0, 1, 2, 3, 4]
-
-        cleanup:
-        client.stop()
-        client.close()
    }
 
     void "test stream post request with strings"() {
-        given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
-
         when:
         int i = 0
         HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/strings', Flowable.create( new FlowableOnSubscribe<Object>() {
@@ -101,15 +104,9 @@ class StreamRequestSpec extends Specification {
         result.body().size() == 5
         result.body() == ["Number 0", "Number 1", "Number 2", "Number 3", "Number 4"]
 
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test stream post request with byte chunks"() {
-        given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
-
         when:
         int i = 0
         HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/bytes', Flowable.create( new FlowableOnSubscribe<Object>() {
@@ -129,16 +126,9 @@ class StreamRequestSpec extends Specification {
         then:
         result.body().size() == 5
         result.body() == ["Number 0", "Number 1", "Number 2", "Number 3", "Number 4"]
-
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test stream post request with POJOs"() {
-        given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
-
         when:
         int i = 0
         HttpResponse<List> result = client.exchange(HttpRequest.POST('/stream/request/pojos', Flowable.create( new FlowableOnSubscribe<Object>() {
@@ -158,10 +148,6 @@ class StreamRequestSpec extends Specification {
         then:
         result.body().size() == 5
         result.body() == [new Book(title: "Number 0"), new Book(title: "Number 1"), new Book(title: "Number 2"), new Book(title: "Number 3"), new Book(title: "Number 4")]
-
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test stream post request with POJOs flowable"() {
@@ -169,7 +155,7 @@ class StreamRequestSpec extends Specification {
         given:
         def configuration = new DefaultHttpClientConfiguration()
         configuration.setReadTimeout(Duration.ofMinutes(1))
-        RxHttpClient client = new DefaultHttpClient(embeddedServer.getURL(), configuration)
+        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), configuration)
 
         when:
         int i = 0
@@ -196,9 +182,6 @@ class StreamRequestSpec extends Specification {
     }
 
     void "test json stream post request with POJOs flowable"() {
-        given:
-        RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
-
         when:
         int i = 0
         List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable', Flowable.create( new FlowableOnSubscribe<Object>() {
@@ -217,15 +200,9 @@ class StreamRequestSpec extends Specification {
         then:
         result.size() == 5
         result == [new Book(title: "Number 0"), new Book(title: "Number 1"), new Book(title: "Number 2"), new Book(title: "Number 3"), new Book(title: "Number 4")]
-
-        cleanup:
-        client.close()
     }
 
     void "test json stream post request with POJOs flowable error"() {
-        given:
-        RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
-
         when:
         int i = 0
         List<Book> result = client.jsonStream(HttpRequest.POST('/stream/request/pojo-flowable-error', Flowable.create( new FlowableOnSubscribe<Object>() {
@@ -245,14 +222,9 @@ class StreamRequestSpec extends Specification {
         def e= thrown(RuntimeException) // TODO: this should be HttpClientException
         e != null
 
-        cleanup:
-        client.close()
     }
 
     void "test manually setting the content length does not chunked encoding"() {
-        given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
-
         when:
         int i = 0
         HttpResponse<String> result = client.exchange(HttpRequest.POST('/stream/request/strings/contentLength', Flowable.create( new FlowableOnSubscribe<Object>() {
@@ -273,8 +245,6 @@ class StreamRequestSpec extends Specification {
         result.body().size() == 10
         result.body() == "aaaaaaaaaa"
 
-        cleanup:
-        client.close()
     }
 
     @Controller('/stream/request')

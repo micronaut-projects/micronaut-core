@@ -30,6 +30,9 @@ class ClientVersioningConfSpec extends Specification {
         context.getBeansOfType(ClientVersioningConfiguration, Qualifiers.byName("simple")).isEmpty()
         context.getBean(ClientVersioningConfiguration).headers == [DefaultClientVersioningConfiguration.DEFAULT_HEADER_NAME]
         context.getBean(ClientVersioningConfiguration).parameters == []
+
+        cleanup:
+        context.close()
     }
 
     def "should contain versioning configuration in context"() {
@@ -38,6 +41,9 @@ class ClientVersioningConfSpec extends Specification {
                 "test")
         then:
         context.getBean(ClientVersioningConfiguration, Qualifiers.byName("simple")) != null
+
+        cleanup:
+        context.close()
     }
 
     def "should contain headers and parameters for configuration"() {
@@ -52,6 +58,9 @@ class ClientVersioningConfSpec extends Specification {
         simpleConfig.getHeaders() == ["X-API"]
         simpleConfig.getParameters() == ["api-version"]
         defaultConfig.getParameters() == ["version"]
+
+        cleanup:
+        context.close()
     }
 
 
