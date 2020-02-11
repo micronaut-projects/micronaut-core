@@ -83,6 +83,7 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
     /**
      * @param receivedLength The length of the content received
      * @param expected The expected length of the content
+     * @param message The message to release
      */
     protected void fireExceedsLength(long receivedLength, long expected, ByteBufHolder message) {
         try {
