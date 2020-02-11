@@ -158,7 +158,11 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                     extraMessages.updateAndGet((p) -> p + messages.size() - 1);
                     messages.stream().map(HttpData.class::cast).forEach(subscriber::onNext);
                 }
+
+                httpContent.release();
             }
+        } else {
+            message.release();
         }
     }
 

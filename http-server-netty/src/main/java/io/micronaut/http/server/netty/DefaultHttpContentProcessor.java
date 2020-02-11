@@ -25,7 +25,6 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscriber;
 
 import java.util.concurrent.atomic.AtomicLong;
@@ -75,16 +74,12 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
     protected void onUpstreamMessage(ByteBufHolder message) {
         long receivedLength = this.receivedLength.addAndGet(resolveLength(message));
 
-        try {
-            if (advertisedLength > requestMaxSize) {
-                fireExceedsLength(advertisedLength, requestMaxSize);
-            } else if (receivedLength > requestMaxSize) {
-                fireExceedsLength(receivedLength, requestMaxSize);
-            } else {
-                publishVerifiedContent(message);
-            }
-        } finally {
-            ReferenceCountUtil.safeRelease(message);
+        if (advertisedLength > requestMaxSize) {
+            fireExceedsLength(advertisedLength, requestMaxSize);
+        } else if (receivedLength > requestMaxSize) {
+            fireExceedsLength(receivedLength, requestMaxSize);
+        } else {
+            publishVerifiedContent(message);
         }
     }
 

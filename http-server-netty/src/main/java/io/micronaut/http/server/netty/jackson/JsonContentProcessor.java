@@ -147,8 +147,12 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
     @Override
     protected void onData(ByteBufHolder message) {
         ByteBuf content = message.content();
-        byte[] bytes = ByteBufUtil.getBytes(content);
-        jacksonProcessor.onNext(bytes);
+        try {
+            byte[] bytes = ByteBufUtil.getBytes(content);
+            jacksonProcessor.onNext(bytes);
+        } finally {
+            ReferenceCountUtil.release(content);
+        }
     }
 
     @Override
