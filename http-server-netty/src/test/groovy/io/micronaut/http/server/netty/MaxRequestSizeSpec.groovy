@@ -7,7 +7,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.client.netty.multipart.MultipartBody
+import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.runtime.server.EmbeddedServer

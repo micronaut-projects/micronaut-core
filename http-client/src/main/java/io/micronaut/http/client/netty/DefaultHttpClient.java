@@ -40,7 +40,8 @@ import io.micronaut.http.client.*;
 import io.micronaut.http.client.exceptions.*;
 import io.micronaut.http.client.filter.HttpClientFilterResolver;
 import io.micronaut.http.client.filters.ClientServerContextFilter;
-import io.micronaut.http.client.netty.multipart.MultipartBody;
+import io.micronaut.http.client.multipart.MultipartBody;
+import io.micronaut.http.client.multipart.MultipartDataFactory;
 import io.micronaut.http.client.sse.RxSseClient;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
@@ -84,9 +85,7 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
-import io.netty.handler.codec.http.multipart.HttpDataFactory;
-import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
+import io.netty.handler.codec.http.multipart.*;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.proxy.HttpProxyHandler;
@@ -117,7 +116,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.*;
 import java.net.Proxy.Type;
 import java.nio.charset.Charset;
@@ -2039,7 +2040,47 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             bodyValue = ((MultipartBody.Builder) bodyValue).build();
         }
         if (bodyValue instanceof MultipartBody) {
-            postRequestEncoder.setBodyHttpDatas(((MultipartBody) bodyValue).getData(request, factory));
+            final MultipartBody multipartBody = (MultipartBody) bodyValue;
+            postRequestEncoder.setBodyHttpDatas(multipartBody.getData(new MultipartDataFactory<InterfaceHttpData>() {
+                @NonNull
+                @Override
+                public InterfaceHttpData createFileUpload(@NonNull String name, @NonNull String filename, @NonNull MediaType contentType, @Nullable String encoding, @Nullable Charset charset, long length) {
+                    return factory.createFileUpload(
+                            request,
+                            name,
+                            filename,
+                            contentType.toString(),
+                            encoding,
+                            charset,
+                            length
+                    );
+                }
+
+                @NonNull
+                @Override
+                public InterfaceHttpData createAttribute(@NonNull String name, @NonNull String value) {
+                    return factory.createAttribute(
+                            request,
+                            name,
+                            value
+                    );
+                }
+
+                @Override
+                public void setContent(InterfaceHttpData fileUploadObject, Object content) throws IOException {
+                    if (fileUploadObject instanceof FileUpload) {
+                        FileUpload fu = (FileUpload) fileUploadObject;
+                        if (content instanceof InputStream) {
+                            fu.setContent((InputStream) content);
+                        } else if (content instanceof File) {
+                            fu.setContent((File) content);
+                        } else if (content instanceof byte[]) {
+                            final ByteBuf buffer = Unpooled.wrappedBuffer((byte[]) content);
+                            fu.setContent(buffer);
+                        }
+                    }
+                }
+            }));
         } else {
             throw new MultipartException(String.format("The type %s is not a supported type for a multipart request body", bodyValue.getClass().getName()));
         }

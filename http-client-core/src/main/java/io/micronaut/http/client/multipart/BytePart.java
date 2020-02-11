@@ -13,13 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.netty.multipart;
+package io.micronaut.http.client.multipart;
 
 import io.micronaut.http.MediaType;
-import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.http.multipart.FileUpload;
-
-import java.io.IOException;
 
 /**
  * A class representing a byte[] data {@link Part} in {@link MultipartBody} to build a Netty multipart request.
@@ -27,13 +23,13 @@ import java.io.IOException;
  * @author Puneet Behl
  * @since 1.0
  */
-class BytePart extends AbstractFilePart {
+class BytePart extends AbstractFilePart<byte[]> {
     private final byte[] data;
 
     /**
      * @param name     Parameter name to bind in the multipart request
      * @param filename Name of the file
-     * @param data     The content to copy in {@link FileUpload}
+     * @param data     The contents of the file as a byte[]
      */
     BytePart(String name, String filename, byte[] data) {
         this(name, filename, null, data);
@@ -43,21 +39,11 @@ class BytePart extends AbstractFilePart {
      * @param name        Parameter name to bind in the multipart request
      * @param filename    Name of the file
      * @param contentType The type of the content, example - "application/json", "text/plain" etc
-     * @param data        The content to copy in {@link FileUpload}
+     * @param data        The contents of the file as a byte[]
      */
     BytePart(String name, String filename, MediaType contentType, byte[] data) {
         super(name, filename, contentType);
         this.data = data;
-    }
-
-    /**
-     * Copy the byte data into {@link FileUpload} object.
-     *
-     * @see AbstractFilePart#setContent(FileUpload)
-     */
-    @Override
-    void setContent(FileUpload fileUpload) throws IOException {
-        fileUpload.setContent(Unpooled.wrappedBuffer(data));
     }
 
     /**
@@ -66,5 +52,10 @@ class BytePart extends AbstractFilePart {
     @Override
     long getLength() {
         return data.length;
+    }
+
+    @Override
+    byte[] getContent() {
+        return data;
     }
 }

@@ -13,19 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.netty.multipart;
+package io.micronaut.http.client.multipart;
 
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.multipart.HttpDataFactory;
-import io.netty.handler.codec.http.multipart.InterfaceHttpData;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * The base class representing multiple parts in the {@link MultipartBody} to build a Netty multipart request.
  *
  * @author Puneet Behl
  * @since 1.0
+ * @param <D> the data type
  */
-abstract class Part {
+abstract class Part<D> {
 
     /**
      * Name of the parameter in Multipart request body.
@@ -43,9 +42,14 @@ abstract class Part {
     }
 
     /**
-     * @param request Associated request
-     * @param factory The factory used to create the {@link InterfaceHttpData}
-     * @return {@link InterfaceHttpData} object to build Netty multipart request body
+     * @return The content of this part.
      */
-    abstract InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory);
+    abstract D getContent();
+
+    /**
+     * @param factory The factory used to create the multipart data
+     * @return The multi part data object
+     * @param <T> The data
+     */
+    abstract @NonNull <T> T getData(@NonNull MultipartDataFactory<T> factory);
 }

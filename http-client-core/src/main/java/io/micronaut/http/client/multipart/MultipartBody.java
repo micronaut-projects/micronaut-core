@@ -13,49 +13,48 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.netty.multipart;
+package io.micronaut.http.client.multipart;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.MultipartException;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.multipart.HttpDataFactory;
-import io.netty.handler.codec.http.multipart.InterfaceHttpData;
-
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A builder class to generate a list {@link InterfaceHttpData} to build a Netty multipart request.
+ * A builder class to generate a list a list of parts for a multi part request.
  *
  * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
 public final class MultipartBody {
 
-    private final List<Part> parts;
+    private final List<Part<?>> parts;
 
     /**
      * Initialize with all the parts.
      *
      * @param parts The List of all parts to be sent in the body of Netty multipart request, such a File, String, Bytes etc.
      */
-    private MultipartBody(List<Part> parts) {
+    private MultipartBody(List<Part<?>> parts) {
         this.parts = parts;
     }
 
     /**
-     * Create a list of {@link InterfaceHttpData} to build Netty multipart request.
+     * Create a list of data objects using the given factory.
      *
-     * @param request Associated request
-     * @param factory The factory used to create the {@link InterfaceHttpData}
-     * @return List of {@link InterfaceHttpData} objects to build Netty multipart request
+     * @param factory The factory used to create the data objects.
+     * @return List of data objects
+     * @param <T> The data type
      */
-    public List<InterfaceHttpData> getData(HttpRequest request, HttpDataFactory factory) {
-        List<InterfaceHttpData> data = new ArrayList<>(parts.size());
-        for (Part part : parts) {
-            data.add(part.getData(request, factory));
+    @Internal
+    public <T> List<T> getData(MultipartDataFactory<T> factory) {
+        List<T> data = new ArrayList<>(parts.size());
+        for (Part<?> part : parts) {
+            data.add(part.getData(factory));
         }
         return data;
     }
@@ -75,7 +74,7 @@ public final class MultipartBody {
         /**
          * List of all parts.
          */
-        private List<Part> parts = new ArrayList<>();
+        private List<Part<?>> parts = new ArrayList<>();
 
         /**
          * Construct a builder.
@@ -150,8 +149,7 @@ public final class MultipartBody {
          * @param name          Name of the parameter for file object to be passed in multipart request
          * @param filename      Name of the file
          * @param data          An {@link InputStream} data value representing the content of file object
-         * @param contentLength The size of the content to pass to {@link HttpDataFactory} in order to create
-         *                      {@link io.netty.handler.codec.http.multipart.FileUpload} object
+         * @param contentLength The size of the content
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
         public Builder addPart(String name, String filename, InputStream data, long contentLength) {
@@ -165,8 +163,7 @@ public final class MultipartBody {
          * @param filename      Name of the file
          * @param contentType   The content type of File, possible values could be "text/plain", "application/json" etc
          * @param data          An {@link InputStream} data value representing the content of file object
-         * @param contentLength The size of the content to pass to {@link HttpDataFactory} in order to create
-         *                      {@link io.netty.handler.codec.http.multipart.FileUpload} object
+         * @param contentLength The size of the content
          * @return A {@link MultipartBody.Builder} to build MultipartBody
          */
         public Builder addPart(String name, String filename, MediaType contentType, InputStream data, long contentLength) {

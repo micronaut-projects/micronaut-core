@@ -7,7 +7,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.client.netty.multipart.MultipartBody;
+import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.reactivex.Flowable;
 import org.junit.AfterClass;

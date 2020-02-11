@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.netty.multipart;
+package io.micronaut.http.client.multipart;
 
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.multipart.HttpDataFactory;
-import io.netty.handler.codec.http.multipart.InterfaceHttpData;
+import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
  * A class representing a String {@link Part} in {@link MultipartBody} to build a Netty multipart request.
@@ -25,7 +23,7 @@ import io.netty.handler.codec.http.multipart.InterfaceHttpData;
  * @author Puneet Behl
  * @since 1.0
  */
-class StringPart extends Part {
+class StringPart extends Part<String> {
 
     protected final String value;
 
@@ -42,13 +40,14 @@ class StringPart extends Part {
         }
     }
 
-    /**
-     * Create an object of {@link InterfaceHttpData} to build Netty multipart request body.
-     *
-     * @see Part#getData(HttpRequest, HttpDataFactory)
-     */
     @Override
-    InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory) {
-        return factory.createAttribute(request, name, value);
+    String getContent() {
+        return value;
+    }
+
+    @NonNull
+    @Override
+    <T> T getData(@NonNull MultipartDataFactory<T> factory) {
+        return factory.createAttribute(name, value);
     }
 }

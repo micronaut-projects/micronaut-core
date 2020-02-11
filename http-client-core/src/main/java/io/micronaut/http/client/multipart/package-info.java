@@ -19,4 +19,4 @@
  * @author Graeme Rocher
  * @since 1.0
  */
-package io.micronaut.http.client.netty.multipart;
+package io.micronaut.http.client.multipart;

@@ -13,15 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.netty.multipart;
+package io.micronaut.http.client.multipart;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.MediaType;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpDataFactory;
-import io.netty.handler.codec.http.multipart.InterfaceHttpData;
-
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -32,8 +28,9 @@ import java.nio.charset.Charset;
  *
  * @author Puneet Behl
  * @since 1.0
+ * @param <D> the data type
  */
-abstract class AbstractFilePart extends Part {
+abstract class AbstractFilePart<D> extends Part<D> {
     protected final String filename;
     protected final MediaType contentType;
 
@@ -58,33 +55,20 @@ abstract class AbstractFilePart extends Part {
     }
 
     /**
-     * Copy the content into {@link FileUpload} object.
-     *
-     * @param fileUpload The {@link FileUpload} to write the content to
-     * @throws IOException if there is an error writing the file
-     */
-    abstract void setContent(FileUpload fileUpload) throws IOException;
-
-    /**
-     * @return The size of the content to pass to {@link HttpDataFactory} in order to create {@link FileUpload} object
+     * @return The size of the content
      */
     abstract long getLength();
 
-    /**
-     * Create an object of {@link InterfaceHttpData} to build Netty multipart request.
-     *
-     * @see Part#getData(HttpRequest, HttpDataFactory)
-     */
+    @NonNull
     @Override
-    InterfaceHttpData getData(HttpRequest request, HttpDataFactory factory) {
+    <T> T getData(MultipartDataFactory<T> factory) {
         MediaType mediaType = contentType;
-        String contentType = mediaType.toString();
         String encoding = mediaType.isTextBased() ? null : "binary";
         Charset charset = mediaType.getCharset().orElse(null);
-        FileUpload fileUpload = factory.createFileUpload(request, name, filename, contentType,
-            encoding, charset, getLength());
+        T fileUpload = factory.createFileUpload(name, filename, mediaType,
+                encoding, charset, getLength());
         try {
-            setContent(fileUpload);
+            factory.setContent(fileUpload, getContent());
         } catch (IOException e) {
             throw new IllegalArgumentException(e);
         }

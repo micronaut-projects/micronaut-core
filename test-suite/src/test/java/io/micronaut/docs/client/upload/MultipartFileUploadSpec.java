@@ -25,7 +25,7 @@ import static org.junit.Assert.assertEquals;
 // end::imports[]
 
 // tag::multipartBodyImports[]
-import io.micronaut.http.client.netty.multipart.MultipartBody;
+import io.micronaut.http.client.multipart.MultipartBody;
 // end::multipartBodyImports[]
 
 // tag::controllerImports[]

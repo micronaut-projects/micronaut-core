@@ -6,7 +6,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.client.netty.multipart.MultipartBody
+import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
 import spock.lang.Issue
 

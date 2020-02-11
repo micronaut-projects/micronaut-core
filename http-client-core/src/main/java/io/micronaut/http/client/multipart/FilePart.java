@@ -13,13 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.netty.multipart;
+package io.micronaut.http.client.multipart;
 
 import io.micronaut.http.MediaType;
-import io.netty.handler.codec.http.multipart.FileUpload;
-
 import java.io.File;
-import java.io.IOException;
 
 /**
  * A class representing a File object in {@link MultipartBody} to build a Netty multipart request.
@@ -27,7 +24,7 @@ import java.io.IOException;
  * @author Puneet Behl
  * @since 1.0
  */
-class FilePart extends AbstractFilePart {
+class FilePart extends AbstractFilePart<File> {
 
     private final File data;
 
@@ -52,20 +49,15 @@ class FilePart extends AbstractFilePart {
     }
 
     /**
-     * Copy the file content into {@link FileUpload}.
-     *
-     * @see AbstractFilePart#setContent(FileUpload)
-     */
-    @Override
-    void setContent(FileUpload fileUpload) throws IOException {
-        fileUpload.setContent(data);
-    }
-
-    /**
      * @see AbstractFilePart#getLength()
      */
     @Override
     long getLength() {
         return data.length();
+    }
+
+    @Override
+    File getContent() {
+        return data;
     }
 }

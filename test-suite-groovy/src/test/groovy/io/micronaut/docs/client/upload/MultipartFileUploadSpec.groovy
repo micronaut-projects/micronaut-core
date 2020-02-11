@@ -15,7 +15,7 @@ import io.reactivex.Flowable
 // tag::multipartBodyImports[]
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.http.multipart.StreamingFileUpload
-import io.micronaut.http.client.netty.multipart.MultipartBody
+import io.micronaut.http.client.multipart.MultipartBody
 import org.reactivestreams.Publisher
 // end::multipartBodyImports[]
 // tag::controllerImports[]
