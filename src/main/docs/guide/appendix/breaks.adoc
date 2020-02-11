@@ -24,6 +24,10 @@ The following events were renamed to avoid confusion with other events of simila
 | api:discovery.event.ServiceStoppedEvent[]
 |===
 
+=== New Package for Netty Specific Classes of HTTP Client
+
+The HTTP client implementation classes including api:http.client.netty.DefaultHttpClient[] (considered internal in Micronaut 1.x) have been moved to a sub-package called `io.micronaut.http.client.netty`.
+
 === HTTP Clients No Longer Named Beans
 
 HTTP clients declared with `micronaut.http.services` (see <<serviceDiscoveryManual,Manual Service Discovery Configuration>>) are no longer named beans in the context and cannot be injected with `javax.inject.Named`, for example given the configuration:
