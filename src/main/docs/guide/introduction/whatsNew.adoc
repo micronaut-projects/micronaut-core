@@ -38,6 +38,13 @@ Support for immutable ann:context.annotation.ConfigurationProperties[] has been 
 
 snippet::io.micronaut.docs.config.itfce.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
 
+<1> The ann:context.annotation.ConfigurationProperties[] annotation takes the configuration prefix and is declared on an interface
+<2> You can use ann:core.bind.annotation.Bindable[] to set a default value if you want
+<3> Validation annotations can be used too
+<4> You can also specify references to other ann:context.annotation.ConfigurationProperties[] beans.
+<5> You can nest immutable configuration
+<6> Optional configuration can be indicated by returning an `Optional` or specifying `@Nullable`
+
 === Ability to Configure Log Levels via Properties
 
 Log levels can now be configured via properties defined in `application.yml` (and environment variables) with the `log.level` prefix:
