@@ -23,9 +23,8 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
 import java.security.cert.Certificate;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * <p>Common interface for HTTP request implementations.</p>
@@ -56,6 +55,31 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The full request URI
      */
     @Nonnull URI getUri();
+
+    /**
+     * A list of accepted {@link MediaType} instances sorted by their quality rating.
+     *
+     * @return A list of zero or many {@link MediaType} instances
+     */
+    default Collection<MediaType> accept() {
+        final List<String> values = getHeaders().getAll(HttpHeaders.ACCEPT);
+        if (!values.isEmpty()) {
+            Set<MediaType> mediaTypes = new TreeSet<>();
+            for (String value : values) {
+                final String[] tokens = value.split(",");
+                for (String token : tokens) {
+                    try {
+                        mediaTypes.add(new MediaType(token));
+                    } catch (IllegalArgumentException e) {
+                        // ignore
+                    }
+                }
+            }
+            return Collections.unmodifiableSet(mediaTypes);
+        } else {
+            return Collections.emptySet();
+        }
+    }
 
     /**
      *
