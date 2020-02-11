@@ -24,7 +24,6 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
-import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.core.type.Argument
 import io.micronaut.runtime.server.EmbeddedServer
@@ -33,7 +32,7 @@ import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-
+import io.micronaut.http.client.netty.multipart.MultipartBody
 import javax.inject.Inject
 import java.nio.charset.StandardCharsets
 

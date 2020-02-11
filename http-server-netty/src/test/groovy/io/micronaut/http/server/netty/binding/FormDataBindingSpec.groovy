@@ -23,7 +23,7 @@ import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.client.multipart.MultipartBody
+import io.micronaut.http.client.netty.multipart.MultipartBody
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post

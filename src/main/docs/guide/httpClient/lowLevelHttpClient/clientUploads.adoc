@@ -1,5 +1,5 @@
 :linkattrs:
-The Micronaut HTTP Client supports the ability to create multipart requests. In order to build a multipart request you must set the content type to `multipart/form-data` and set the body to be an instance of api:io.micronaut.http.client.multipart.MultipartBody[]:
+The Micronaut HTTP Client supports the ability to create multipart requests. In order to build a multipart request you must set the content type to `multipart/form-data` and set the body to be an instance of api:io.micronaut.http.client.netty.multipart.MultipartBody[]:
 
 For example:
 

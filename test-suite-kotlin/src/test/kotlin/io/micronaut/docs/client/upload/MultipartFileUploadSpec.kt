@@ -16,7 +16,7 @@ import java.io.FileWriter
 
 // end::imports[]
 // tag::multipartBodyImports[]
-import io.micronaut.http.client.multipart.MultipartBody
+import io.micronaut.http.client.netty.multipart.MultipartBody
 // end::multipartBodyImports[]
 // tag::controllerImports[]
 import io.micronaut.http.annotation.Controller
