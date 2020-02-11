@@ -25,6 +25,7 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscriber;
 
 import java.util.concurrent.atomic.AtomicLong;
@@ -75,9 +76,9 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
         long receivedLength = this.receivedLength.addAndGet(resolveLength(message));
 
         if (advertisedLength > requestMaxSize) {
-            fireExceedsLength(advertisedLength, requestMaxSize);
+            fireExceedsLength(advertisedLength, requestMaxSize, message);
         } else if (receivedLength > requestMaxSize) {
-            fireExceedsLength(receivedLength, requestMaxSize);
+            fireExceedsLength(receivedLength, requestMaxSize, message);
         } else {
             publishVerifiedContent(message);
         }
@@ -91,13 +92,14 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
         }
     }
 
-    private void fireExceedsLength(long receivedLength, long expected) {
+    private void fireExceedsLength(long receivedLength, long expected, ByteBufHolder message) {
         upstreamState = SingleThreadedBufferingSubscriber.BackPressureState.DONE;
         upstreamSubscription.cancel();
         upstreamBuffer.clear();
         currentDownstreamSubscriber().ifPresent(subscriber ->
                 subscriber.onError(new ContentLengthExceededException(expected, receivedLength))
         );
+        ReferenceCountUtil.safeRelease(message);
     }
 
     private void publishVerifiedContent(ByteBufHolder message) {

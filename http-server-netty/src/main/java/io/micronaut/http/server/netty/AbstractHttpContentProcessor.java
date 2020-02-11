@@ -21,6 +21,7 @@ import io.micronaut.core.async.processor.SingleSubscriberProcessor;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscriber;
 
 import java.util.concurrent.atomic.AtomicLong;
@@ -71,9 +72,9 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
         long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
 
         if (advertisedLength > requestMaxSize) {
-            fireExceedsLength(advertisedLength, requestMaxSize);
+            fireExceedsLength(advertisedLength, requestMaxSize, message);
         } else if (receivedLength > requestMaxSize) {
-            fireExceedsLength(receivedLength, requestMaxSize);
+            fireExceedsLength(receivedLength, requestMaxSize, message);
         } else {
             onData(message);
         }
@@ -83,10 +84,11 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
      * @param receivedLength The length of the content received
      * @param expected The expected length of the content
      */
-    protected void fireExceedsLength(long receivedLength, long expected) {
+    protected void fireExceedsLength(long receivedLength, long expected, ByteBufHolder message) {
         try {
             onError(new ContentLengthExceededException(expected, receivedLength));
         } finally {
+            ReferenceCountUtil.safeRelease(message);
             parentSubscription.cancel();
         }
     }
