@@ -13,41 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty;
+package io.micronaut.http.netty.channel;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadFactory;
-
+import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Singleton;
-
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+
+import javax.inject.Singleton;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for NioEventLoopGroup.
  * 
  * @author croudet
  */
-@Singleton
 @Internal
-@Requires(missingBeans = { EpollEventLoopGroupFactory.class, KQueueEventLoopGroupFactory.class })
-class NioEventLoopGroupFactory implements EventLoopGroupFactory {
-
-    private static NioEventLoopGroup withIoRatio(NioEventLoopGroup group, @Nullable Integer ioRatio) {
-        if (ioRatio != null) {
-            group.setIoRatio(ioRatio);
-        }
-        return group;
-    }
+@Singleton
+@BootstrapContextCompatible
+public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a NioEventLoopGroup.
-     * 
+     *
      * @param threads The number of threads to use.
      * @param ioRatio The io ratio.
      * @return A NioEventLoopGroup.
@@ -59,7 +54,7 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a NioEventLoopGroup.
-     * 
+     *
      * @param threads       The number of threads to use.
      * @param threadFactory The thread factory.
      * @param ioRatio       The io ratio.
@@ -72,7 +67,7 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a NioEventLoopGroup.
-     * 
+     *
      * @param threads  The number of threads to use.
      * @param executor An Executor.
      * @param ioRatio  The io ratio.
@@ -85,7 +80,7 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Creates a default NioEventLoopGroup.
-     * 
+     *
      * @param ioRatio The io ratio.
      * @return A NioEventLoopGroup.
      */
@@ -96,10 +91,23 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
      * Returns the server channel class.
-     * 
+     *
      * @return NioServerSocketChannel.
      */
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return NioServerSocketChannel.class;
+    }
+
+    @NonNull
+    @Override
+    public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
+        return NioSocketChannel.class;
+    }
+
+    private static NioEventLoopGroup withIoRatio(NioEventLoopGroup group, @Nullable Integer ioRatio) {
+        if (ioRatio != null) {
+            group.setIoRatio(ioRatio);
+        }
+        return group;
     }
 }

@@ -24,25 +24,27 @@ import com.fasterxml.jackson.databind.SerializerProvider
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.test.annotation.MicronautTest
 import spock.lang.AutoCleanup
 import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 import io.micronaut.http.annotation.*
 
+import javax.inject.Inject
 import javax.inject.Singleton
 import java.math.RoundingMode
 
 
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1089")
+@MicronautTest
 class BigDecimalSerializationSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-    @Shared RxHttpClient client = embeddedServer.applicationContext.createBean(
-            RxHttpClient,
-            embeddedServer.getURL()
-    )
+    @Inject
+    @Client("/")
+    RxHttpClient client
 
     void "test that big decimal precision is retained during JSON ser-de"() {
         given:

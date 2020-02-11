@@ -24,7 +24,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.ReadTimeoutException
-import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.pool.AbstractChannelPoolMap
 import io.netty.channel.pool.FixedChannelPool
@@ -283,7 +282,7 @@ class ReadTimeoutSpec extends Specification {
             } catch (Throwable e){ }
         }
 
-        def clients = clientContext.getBean(HttpClientIntroductionAdvice).clients;
+        def clients = clientContext.getBean(RxNettyHttpClientRegistry).clients
         def clientKey = clients.keySet().stream()
                 .filter { it.clientId == "http://localhost:${embeddedServer.getPort()}" }
                 .findFirst()

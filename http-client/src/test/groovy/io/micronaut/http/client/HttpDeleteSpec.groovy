@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
@@ -30,26 +31,23 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.inject.Inject
+
 /**
  * TODO: Javadoc description
  *
  * @author graemerocher
  * @since 1.0
  */
+@MicronautTest
 class HttpDeleteSpec extends Specification {
 
+    @Inject
+    @Client("/")
+    HttpClient client
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
-    @Shared
-    @AutoCleanup
-    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
-
+    @Inject
+    MyDeleteClient myDeleteClient
 
     void "test http delete"() {
         when:
@@ -80,7 +78,7 @@ class HttpDeleteSpec extends Specification {
     }
 
     void "test multiple uris"() {
-        def client = embeddedServer.applicationContext.getBean(MyDeleteClient)
+        def client = myDeleteClient
 
         when:
         String val = client.multiple()

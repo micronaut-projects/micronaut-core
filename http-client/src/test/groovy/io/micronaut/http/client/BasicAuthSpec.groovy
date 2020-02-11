@@ -18,6 +18,7 @@ package io.micronaut.http.client
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
 import spock.lang.Specification
 
 class BasicAuthSpec extends Specification {
@@ -38,13 +39,16 @@ class BasicAuthSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
         ApplicationContext ctx = server.getApplicationContext()
 
+        def httpClient = ctx.createBean(RxHttpClient, new URL("http://sherlock:password@localhost:${server.port}"))
+        def client = httpClient.retrieve("/basic-auth")
         when:
-        String resp = ctx.createBean(RxHttpClient, new URL("http://sherlock:password@localhost:${server.port}")).retrieve("/basic-auth").blockingFirst()
+        String resp = client.blockingFirst()
 
         then:
         resp == "sherlock:password"
 
         cleanup:
+        httpClient.close()
         ctx.close()
     }
 }

@@ -22,6 +22,7 @@ import org.reactivestreams.Publisher;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URL;
+import java.util.Optional;
 
 /**
  * A {@link LoadBalancer} that resolves a fixed URL.
@@ -53,5 +54,10 @@ public class FixedLoadBalancer implements LoadBalancer  {
      */
     public URL getUrl() {
         return url;
+    }
+
+    @Override
+    public Optional<String> getContextPath() {
+        return Optional.ofNullable(getUrl().getPath());
     }
 }

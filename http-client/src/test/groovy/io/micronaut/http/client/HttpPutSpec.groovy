@@ -17,6 +17,7 @@ package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
@@ -33,22 +34,20 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.inject.Inject
+
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@MicronautTest
 class HttpPutSpec extends Specification {
+    @Inject
+    @Client("/")
+    HttpClient client
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
-    @Shared
-    @AutoCleanup
-    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+    @Inject
+    MyPutClient myPutClient
 
     void "test send invalid http method"() {
         given:
@@ -172,7 +171,7 @@ class HttpPutSpec extends Specification {
     }
 
     void "test multiple uris"() {
-        def client = embeddedServer.applicationContext.getBean(MyPutClient)
+        def client = this.myPutClient
 
         when:
         String val = client.multiple()

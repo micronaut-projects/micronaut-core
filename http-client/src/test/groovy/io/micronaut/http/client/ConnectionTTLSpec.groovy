@@ -35,7 +35,7 @@ class ConnectionTTLSpec extends Specification {
       'micronaut.http.client.connect-ttl':'1000ms',
       'micronaut.http.client.pool.enabled':true
     )
-    DefaultHttpClient httpClient = clientContext.createBean(DefaultHttpClient, embeddedServer.getURL())
+    RxHttpClient httpClient = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
     when:"make first request"
@@ -65,7 +65,7 @@ class ConnectionTTLSpec extends Specification {
       'my.port':embeddedServer.getPort(),
       'micronaut.http.client.pool.enabled':true
     )
-    DefaultHttpClient httpClient = clientContext.createBean(DefaultHttpClient, embeddedServer.getURL())
+    RxHttpClient httpClient = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
     when:"make first request"

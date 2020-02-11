@@ -15,14 +15,17 @@
  */
 package io.micronaut.http.client;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -119,6 +122,8 @@ public abstract class HttpClientConfiguration {
 
     private String loggerName;
 
+    private String eventLoopGroup = EventLoopGroupConfiguration.DEFAULT;
+
     /**
      * Default constructor.
      */
@@ -132,6 +137,51 @@ public abstract class HttpClientConfiguration {
         if (applicationConfiguration != null) {
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
         }
+    }
+
+    /**
+     * Copy constructor.
+     *
+     * @param copy The client configuration to copy settings from
+     */
+    public HttpClientConfiguration(HttpClientConfiguration copy) {
+        if (copy != null) {
+            this.channelOptions = copy.channelOptions;
+            this.numOfThreads = copy.numOfThreads;
+            this.connectTimeout = copy.connectTimeout;
+            this.connectTtl = copy.connectTtl;
+            this.defaultCharset = copy.defaultCharset;
+            this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
+            this.eventLoopGroup = copy.eventLoopGroup;
+            this.followRedirects = copy.followRedirects;
+            this.loggerName = copy.loggerName;
+            this.maxContentLength = copy.maxContentLength;
+            this.proxyAddress = copy.proxyAddress;
+            this.proxyPassword = copy.proxyPassword;
+            this.proxySelector = copy.proxySelector;
+            this.proxyType = copy.proxyType;
+            this.proxyUsername = copy.proxyUsername;
+            this.readIdleTimeout = copy.readIdleTimeout;
+            this.readTimeout = copy.readTimeout;
+            this.shutdownTimeout = copy.shutdownTimeout;
+            this.sslConfiguration = copy.sslConfiguration;
+            this.threadFactory = copy.threadFactory;
+        }
+    }
+
+    /**
+     * @return The event loop group to use.
+     */
+    public String getEventLoopGroup() {
+        return eventLoopGroup;
+    }
+
+    /**
+     * @param eventLoopGroup Sets the event loop group to use for the client.
+     */
+    public void setEventLoopGroup(@NonNull String eventLoopGroup) {
+        ArgumentUtils.requireNonNull("eventLoopGroup", eventLoopGroup);
+        this.eventLoopGroup = eventLoopGroup;
     }
 
     /**
@@ -165,7 +215,6 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     *
      * @return Whether throwing an exception upon HTTP error status (>= 400) is preferred.
      */
     public boolean isExceptionOnErrorStatus() {
@@ -464,16 +513,16 @@ public abstract class HttpClientConfiguration {
 
     /**
      * Resolves a proxy to use for connection.
-     *
+     * <p>
      * If ProxySelector is set by {@link #setProxySelector(ProxySelector)} then it constructs URI and pass it to {@link ProxySelector#select(URI)}.
      * First proxy returned by proxy selector will be used. If no proxy is returned by select, then {@link Proxy#NO_PROXY} will be used.
-     *
+     * <p>
      * If ProxySelector is not set then parameters are ignored and a proxy as defined by {@link #setProxyAddress(SocketAddress)} and {@link #setProxyType(Proxy.Type)} will be returned.
      * If no proxy is defined then parameters are ignored and {@link Proxy#NO_PROXY} is returned.
      *
      * @param isSsl is it http or https connection
-     * @param host connection host
-     * @param port connection port
+     * @param host  connection host
+     * @param port  connection port
      * @return A non null proxy instance
      */
     public Proxy resolveProxy(boolean isSsl, String host, int port) {
@@ -486,7 +535,7 @@ public abstract class HttpClientConfiguration {
             } else if (proxyAddress != null) {
                 return new Proxy(getProxyType(), proxyAddress);
             }
-            return  Proxy.NO_PROXY;
+            return Proxy.NO_PROXY;
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
@@ -552,6 +601,7 @@ public abstract class HttpClientConfiguration {
 
         /**
          * Sets the maximum number of connections. Defaults to no maximum.
+         *
          * @param maxConnections The count
          */
         public void setMaxConnections(int maxConnections) {

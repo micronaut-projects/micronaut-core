@@ -16,6 +16,7 @@
 package io.micronaut.discovery;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Interface for types that expose a list of {@link ServiceInstance}.
@@ -36,4 +37,11 @@ public interface ServiceInstanceList {
      * @return The instances
      */
     List<ServiceInstance> getInstances();
+
+    /**
+     * @return The context path to use for requests to the service.
+     */
+    default Optional<String> getContextPath() {
+        return Optional.empty();
+    }
 }

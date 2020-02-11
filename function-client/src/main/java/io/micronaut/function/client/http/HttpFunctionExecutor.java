@@ -15,7 +15,6 @@
  */
 package io.micronaut.function.client.http;
 
-import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
@@ -28,25 +27,15 @@ import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.client.DefaultHttpClient;
-import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.LoadBalancer;
-import io.micronaut.http.client.filter.HttpClientFilterResolver;
-import io.micronaut.http.client.ssl.NettyClientSslBuilder;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.filter.HttpClientFilter;
-import io.micronaut.http.netty.channel.NettyThreadFactory;
+import io.micronaut.http.client.RxHttpClient;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.PreDestroy;
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.URI;
-import java.util.Arrays;
 import java.util.Optional;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * A {@link io.micronaut.function.executor.FunctionExecutor} that uses a {@link io.micronaut.http.client.HttpClient} to execute a remote function definition.
@@ -59,34 +48,15 @@ import java.util.concurrent.ThreadFactory;
 @Singleton
 public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closeable, FunctionInvokerChooser {
 
-    private final DefaultHttpClient httpClient;
+    private final RxHttpClient httpClient;
 
     /**
      * Constructor.
-     * @param configuration configuration
-     * @param threadFactory threadFactory
-     * @param nettyClientSslBuilder nettyClientSslBuilder
-     * @param codecRegistry codecRegistry
-     * @param annotationMetadataResolver annotationMetadataResolver
-     * @param filters filters
+     * @param httpClient  The HTTP client
      */
-    public HttpFunctionExecutor(
-            HttpClientConfiguration configuration,
-            @Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
-            NettyClientSslBuilder nettyClientSslBuilder,
-            MediaTypeCodecRegistry codecRegistry,
-            AnnotationMetadataResolver annotationMetadataResolver,
-            HttpClientFilter... filters) {
+    public HttpFunctionExecutor(RxHttpClient httpClient) {
         super();
-        this.httpClient = new DefaultHttpClient(
-            LoadBalancer.empty(),
-            configuration,
-            null,
-            new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)),
-            threadFactory,
-            nettyClientSslBuilder,
-            codecRegistry
-        );
+        this.httpClient = httpClient;
     }
 
     @Override

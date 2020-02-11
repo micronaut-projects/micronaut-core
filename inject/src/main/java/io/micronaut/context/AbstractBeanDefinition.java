@@ -1060,6 +1060,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 ArgumentConversionContext<?> conversionContext = ConversionContext.of(argument);
                 Optional<?> value = resolveValue(propertyResolver, conversionContext, valAnn.isPresent(), prop);
                 if (argument.getType() == Optional.class) {
+                    path.pop();
                     return resolveOptionalObject(value);
                 } else {
                     // can't use orElseThrow here due to compiler bug
@@ -1610,7 +1611,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             path.pushMethodArgumentResolve(this, injectionPoint, argument);
             try {
                 Qualifier qualifier = resolveQualifier(resolutionContext, argument);
-                @SuppressWarnings("unchecked") Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
+                @SuppressWarnings("unchecked")
+                Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                 path.pop();
                 return bean;
             } catch (NoSuchBeanException e) {

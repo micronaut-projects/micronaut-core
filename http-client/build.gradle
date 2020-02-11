@@ -19,6 +19,10 @@ dependencies {
     testImplementation dependencyVersion("reactor")
     testImplementation project(":http-server-netty")
     testImplementation "com.github.tomakehurst:wiremock-jre8:2.25.0"
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
 }
 
 //tasks.withType(Test) {

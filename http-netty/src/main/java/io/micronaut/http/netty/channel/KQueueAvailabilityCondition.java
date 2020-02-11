@@ -13,29 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty;
+package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Internal;
 
-import io.netty.channel.epoll.Epoll;
+import io.netty.channel.kqueue.KQueue;
 
 /**
- * Checks if epoll is available.
+ * Checks if kqueue is available.
  * 
  * @author croudet
  */
 @Internal
-class EpollAvailabilityCondition implements Condition {
+class KQueueAvailabilityCondition implements Condition {
 
     /**
-     * Checks if netty's epoll native transport is available.
+     * Checks if netty's kqueue native transport is available.
      * 
      * @param context The ConditionContext.
-     * @return true if the epoll native transport is available.
+     * @return true if the kqueue native transport is available.
      */
     public boolean matches(ConditionContext context) {
-        return Epoll.isAvailable();
+        return KQueue.isAvailable();
     }
 }

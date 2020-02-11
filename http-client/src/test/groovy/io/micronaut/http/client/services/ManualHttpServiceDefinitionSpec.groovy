@@ -36,6 +36,8 @@ import io.netty.handler.ssl.SslHandler
 import spock.lang.Retry
 import spock.lang.Specification
 
+import javax.inject.Inject
+import javax.inject.Singleton
 import java.security.cert.X509Certificate
 import java.time.Duration
 
@@ -49,6 +51,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
 
         ApplicationContext clientApp = ApplicationContext.run(
+                'micronaut.http.client.read-timeout': '27s',
                 'micronaut.http.services.foo.url': firstApp.getURI(),
                 'micronaut.http.services.foo.path': '/manual/http/service',
                 'micronaut.http.services.foo.health-check':true,
@@ -75,6 +78,12 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         TestClientFoo tcFoo = clientApp.getBean(TestClientFoo)
         TestClientBar tcBar = clientApp.getBean(TestClientBar)
 
+        when:"Config that inherits the default HTTP client config is retrieved"
+        def inheritedConfig = clientApp.getBean(HttpClientConfiguration, Qualifiers.byName("baz"))
+
+        then:"The config is inherited"
+        inheritedConfig.readTimeout.get() == Duration.ofSeconds(27)
+
         when:'the config is retrieved'
         def config = clientApp.getBean(HttpClientConfiguration, Qualifiers.byName("foo"))
 
@@ -88,7 +97,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
 
         when:
-        RxHttpClient client = clientApp.getBean(RxHttpClient, Qualifiers.byName("foo"))
+        RxHttpClient client = clientApp.getBean(TestBean).fooClient
         String result = client.retrieve('/').blockingFirst()
 
         then:
@@ -108,7 +117,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         config.sslConfiguration.clientAuthentication.get() == ClientAuthentication.NEED
 
         when:
-        client = clientApp.getBean(RxHttpClient, Qualifiers.byName("bar"))
+        client = clientApp.getBean(TestBean).barClient
         result = client.retrieve(HttpRequest.POST('/', '')).blockingFirst()
 
         then:
@@ -208,7 +217,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         client.toBlocking().retrieve(HttpRequest.GET("/ssl-test"), String) == DN
 
         when:
-        client = ctx.getBean(RxHttpClient, Qualifiers.byName("client1"))
+        client = ctx.getBean(TestSslBean).client
 
         then:
         client.toBlocking().retrieve(HttpRequest.GET("/"), String) == DN
@@ -217,8 +226,27 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         client1.test().body() == "CN=client1.test.example.com, OU=IT, O=Whatever, L=Munich, ST=Bavaria, C=DE, EMAILADDRESS=info@example.com"
 
         cleanup:
+        client.close()
         ctx.close()
         embeddedServer.close()
+    }
+
+    @Singleton
+    static class TestBean {
+        @Client(id = "foo")
+        @Inject
+        RxHttpClient fooClient
+
+        @Client(id = "bar")
+        @Inject
+        RxHttpClient barClient
+    }
+
+    @Singleton
+    static class TestSslBean {
+        @Client(id = "client1")
+        @Inject
+        RxHttpClient client
     }
 
     @Client(id = "foo")

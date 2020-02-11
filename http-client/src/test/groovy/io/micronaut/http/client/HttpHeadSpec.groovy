@@ -31,6 +31,7 @@ import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
 import io.reactivex.functions.Consumer
 import spock.lang.AutoCleanup
@@ -38,21 +39,27 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import javax.inject.Inject
 import java.time.LocalDate
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@MicronautTest
 class HttpHeadSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
+    @Inject
+    @Client("/")
+    RxHttpClient client
+
+    @Inject
+    MyGetClient myGetClient
+
+    @Inject
+    MyGetHelper myGetHelper
 
     void "test simple head request"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.HEAD("/head/simple").header("Accept-Encoding", "gzip")
@@ -64,16 +71,10 @@ class HttpHeadSpec extends Specification {
         then:
         !body.isPresent()
 
-        cleanup:
-        client.stop()
-        client.close()
     }
 
 
     void "test simple 404 request"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.HEAD("/head/doesntexist")
@@ -85,16 +86,9 @@ class HttpHeadSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         e.message == "Not Found"
         e.status == HttpStatus.NOT_FOUND
-
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test 500 request with body"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.HEAD("/head/error"), Argument.of(String), Argument.of(String)
@@ -107,16 +101,9 @@ class HttpHeadSpec extends Specification {
         e.message == "Internal Server Error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
         !e.response.getBody(String).isPresent()
-
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test 500 request with json body"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.HEAD("/get/jsonError"), Argument.of(String), Argument.of(Map)
@@ -128,16 +115,9 @@ class HttpHeadSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         e.message == "Internal Server Error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
-
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test simple 404 request as VndError"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.GET("/head/doesntexist")
@@ -155,17 +135,12 @@ class HttpHeadSpec extends Specification {
         then:
         body.isPresent()
         body.get().message == "Page Not Found"
-
-        cleanup:
-        client.stop()
-        client.close()
     }
 
     void "test simple blocking get request"() {
 
         given:
-        def asyncClient = HttpClient.create(embeddedServer.getURL())
-        BlockingHttpClient client = asyncClient.toBlocking()
+        BlockingHttpClient client = client.toBlocking()
 
         when:
         HttpResponse<String> response = client.exchange(
@@ -178,15 +153,9 @@ class HttpHeadSpec extends Specification {
         then:
         !body.isPresent()
 
-        cleanup:
-        asyncClient.stop()
-        asyncClient.close()
     }
 
     void "test simple get request with type"() {
-        given:
-        HttpClient client = new DefaultHttpClient(embeddedServer.getURL())
-
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.HEAD("/head/simple"), String
@@ -198,14 +167,9 @@ class HttpHeadSpec extends Specification {
         response.status == HttpStatus.OK
         !body.isPresent()
 
-        cleanup:
-        client.stop()
     }
 
     void "test simple exchange request with POJO"() {
-        given:
-        def context = ApplicationContext.run()
-        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         when:
         Flowable<HttpResponse<Book>> flowable = Flowable.fromPublisher(client.exchange(
@@ -220,16 +184,9 @@ class HttpHeadSpec extends Specification {
         response.contentLength == -1
         response.status == HttpStatus.OK
         !body.isPresent()
-
-        cleanup:
-        client.stop()
     }
 
     void "test simple retrieve request with POJO"() {
-        given:
-        def context = ApplicationContext.run()
-        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
-
         when:
         Flowable<Book> flowable = Flowable.fromPublisher(client.retrieve(
                 HttpRequest.HEAD("/head/pojo"), Book
@@ -238,17 +195,9 @@ class HttpHeadSpec extends Specification {
         then:
         def ex = thrown(HttpClientResponseException)
         ex.message == "Empty body"
-
-
-        cleanup:
-        client.stop()
     }
 
     void "test simple get request with POJO list"() {
-        given:
-        def context = ApplicationContext.run()
-        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
-
         when:
         Flowable<HttpResponse<List<Book>>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.HEAD("/head/pojoList"), Argument.of(List, Book)
@@ -262,14 +211,11 @@ class HttpHeadSpec extends Specification {
         response.contentLength == -1
         response.status == HttpStatus.OK
         !body.isPresent()
-
-        cleanup:
-        client.stop()
     }
 
     void "test get with @Client"() {
         given:
-        MyGetHelper helper = embeddedServer.applicationContext.getBean(MyGetHelper)
+        MyGetHelper helper = this.myGetHelper
 
         expect:
         helper.simple() == null
@@ -281,7 +227,7 @@ class HttpHeadSpec extends Specification {
 
     void "test query parameter with @Client interface"() {
         given:
-        MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
+        MyGetClient client = this.myGetClient
 
         when:
         client.queryParam('{"service":["test"]}')
@@ -306,9 +252,6 @@ class HttpHeadSpec extends Specification {
     }
 
     void "test body availability"() {
-        given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
-
         when:
         Flowable<HttpResponse> flowable = client.exchange(
                 HttpRequest.HEAD("/head/simple")
@@ -324,15 +267,9 @@ class HttpHeadSpec extends Specification {
         conditions.eventually {
             body == null
         }
-
-        cleanup:
-        client.stop()
     }
 
     void "test that Optional.empty() should return 404"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
         def flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.HEAD("/head/empty")
@@ -344,15 +281,9 @@ class HttpHeadSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         e.message == "Not Found"
         e.status == HttpStatus.NOT_FOUND
-
-        cleanup:
-        client.close()
     }
 
     void "test a non empty optional should return the value"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
         String body = client.toBlocking().retrieve(
                 HttpRequest.HEAD("/head/notEmpty"), String
@@ -361,14 +292,11 @@ class HttpHeadSpec extends Specification {
         then:
         def ex = thrown(HttpClientResponseException)
         ex.message == "Empty body"
-
-        cleanup:
-        client.close()
     }
 
     void 'test format dates with @Format'() {
         given:
-        MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
+        MyGetClient client = this.myGetClient
         Date d = new Date(2018, 10, 20)
         LocalDate dt = LocalDate.now()
 
@@ -402,9 +330,6 @@ class HttpHeadSpec extends Specification {
     }
 
     void "test a request with a custom host header"() {
-        given:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
-
         when:
         String body = client.toBlocking().retrieve(
                 HttpRequest.HEAD("/head/host").header("Host", "http://foo.com"), String
@@ -414,13 +339,11 @@ class HttpHeadSpec extends Specification {
         def ex = thrown(HttpClientResponseException)
         ex.message == "Empty body"
 
-        cleanup:
-        client.close()
     }
 
     void "test a disabled head route"() {
         given:
-        MyGetClient myGetClient = embeddedServer.applicationContext.getBean(MyGetClient)
+        MyGetClient myGetClient = this.myGetClient
 
         when:
         myGetClient.noHead()
@@ -430,7 +353,6 @@ class HttpHeadSpec extends Specification {
         ex.message == "Method Not Allowed"
 
         when:
-        HttpClient client = HttpClient.create(embeddedServer.getURL())
         String body = client.toBlocking().retrieve(HttpRequest.GET("/head/no-head"), String)
 
         then:
@@ -441,7 +363,7 @@ class HttpHeadSpec extends Specification {
     }
 
     void "test multiple uris"() {
-        def client = embeddedServer.applicationContext.getBean(MyGetClient)
+        def client = this.myGetClient
 
         when:
         String val = client.multiple().header("X-Test")

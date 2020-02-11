@@ -22,6 +22,8 @@ import org.reactivestreams.Publisher;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 
+import java.util.Optional;
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -44,5 +46,10 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
     @Override
     public String getServiceID() {
         return serviceInstanceList.getID();
+    }
+
+    @Override
+    public Optional<String> getContextPath() {
+        return serviceInstanceList.getContextPath();
     }
 }

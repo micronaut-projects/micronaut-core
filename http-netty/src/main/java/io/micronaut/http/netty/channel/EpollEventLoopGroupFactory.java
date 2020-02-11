@@ -13,22 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty;
+package io.micronaut.http.netty.channel;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
+import javax.inject.Named;
 import javax.inject.Singleton;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.util.StringUtils;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
+import io.netty.channel.socket.SocketChannel;
 
 /**
  * Factory for EpollEventLoopGroup.
@@ -36,18 +41,12 @@ import io.netty.channel.epoll.EpollServerSocketChannel;
  * @author croudet
  */
 @Singleton
-@Requires(property = "micronaut.server.netty.use-native-transport", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Requires(classes = Epoll.class, condition = EpollAvailabilityCondition.class)
 @Internal
+@Named(EventLoopGroupFactory.NATIVE)
+@BootstrapContextCompatible
 class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
 
-    private static EpollEventLoopGroup withIoRatio(EpollEventLoopGroup group, @Nullable Integer ioRatio) {
-        if (ioRatio != null) {
-            group.setIoRatio(ioRatio);
-        }
-        return group;
-    }
-    
     /**
      * Creates an EpollEventLoopGroup.
      * 
@@ -57,7 +56,7 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
      */
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
-        return withIoRatio(new EpollEventLoopGroup(threads), ioRatio);
+        return new EpollEventLoopGroup(threads);
     }
 
     /**
@@ -70,7 +69,7 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
      */
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, @Nullable Integer ioRatio) {
-        return withIoRatio(new EpollEventLoopGroup(threads, threadFactory), ioRatio);
+        return new EpollEventLoopGroup(threads, threadFactory);
     }
 
     /**
@@ -83,7 +82,7 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
      */
     @Override
     public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
-        return withIoRatio(new EpollEventLoopGroup(threads, executor), ioRatio);
+        return new EpollEventLoopGroup(threads, executor);
     }
 
     /**
@@ -94,7 +93,7 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
      */
     @Override
     public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
-        return withIoRatio(new EpollEventLoopGroup(), ioRatio);
+        return new EpollEventLoopGroup();
     }
 
     /**
@@ -104,5 +103,16 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
      */
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return EpollServerSocketChannel.class;
+    }
+
+    @NonNull
+    @Override
+    public Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
+        return EpollSocketChannel.class;
+    }
+
+    @Override
+    public boolean isNative() {
+        return true;
     }
 }

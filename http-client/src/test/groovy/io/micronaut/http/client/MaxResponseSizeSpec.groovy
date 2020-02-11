@@ -15,35 +15,30 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.context.ApplicationContext
+
+import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
-import io.micronaut.http.client.exceptions.ContentLengthExceededException
-import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Get
-import spock.lang.AutoCleanup
-import spock.lang.Shared
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.ContentLengthExceededException
+import io.micronaut.test.annotation.MicronautTest
 import spock.lang.Specification
+
+import javax.inject.Inject
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+@MicronautTest
+@Property(name = "micronaut.http.client.maxContentLength", value = '1kb' )
 class MaxResponseSizeSpec extends Specification {
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run(
-            "micronaut.http.client.maxContentLength":'1kb'
-    )
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
-    @Shared
-    @AutoCleanup
-    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+    @Inject
+    @Client("/")
+    HttpClient client
 
     void "test max content length setting"() {
         when:

@@ -23,7 +23,12 @@ micronaut:
 
 include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration.adoc[]
 
-The `use-native-transport` option also requires the relevant netty dependency to take effect. The native transports add features specific to a particular platform, generate less garbage, and generally improve performance when compared to the NIO based transport.
+=== Using Native Transports
+
+
+The native Netty transports add features specific to a particular platform, generate less garbage, and generally improve performance when compared to the NIO based transport.
+
+To enable native transports first add a necessarily dependency:
 
 For macOS:
 
@@ -32,3 +37,15 @@ dependency:netty-transport-native-kqueue[groupId="io.netty",scope="runtime",clas
 For Linux:
 
 dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtime",classifier="linux-x86_64"]
+
+Then configure the default event loop group to prefer native transports:
+
+.Configuring The Default Event Loop to Prefer Native Transports
+[source,yaml]
+----
+micronaut:
+    netty:
+        event-loops:
+            default:
+                prefer-native-transport: true
+----

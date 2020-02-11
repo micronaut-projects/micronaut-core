@@ -24,6 +24,42 @@ The following events were renamed to avoid confusion with other events of simila
 | api:discovery.event.ServiceStoppedEvent[]
 |===
 
+=== HTTP Clients No Longer Named Beans
+
+HTTP clients declared with `micronaut.http.services` (see <<serviceDiscoveryManual,Manual Service Discovery Configuration>>) are no longer named beans in the context and cannot be injected with `javax.inject.Named`, for example given the configuration:
+
+.Manually configuring services
+[source,yaml]
+----
+micronaut:
+    http:
+        services:
+            foo:
+                urls:
+                    - http://foo1
+                    - http://foo2
+
+----
+
+You can lon longer inject an HTTP client with `@Named("foo")`:
+
+[source,java]
+----
+@Inject
+@Named("foo")
+RxHttpClient httpClient;
+----
+
+Instead you should always use ann:http.client.annotation.Client[]:
+
+[source,java]
+----
+@Inject
+@Client("foo")
+RxHttpClient httpClient;
+----
+
+
 === Source Retention Annotations No Longer Retained in Runtime Metadata
 
 In Micronaut 1.x annotations specified as source retention were still retained in the api:core.annotation.AnnotationMetadata[] interface. As of Micronaut 2.x this is no longer the case with source retention annotations only available within the compiler APIs.

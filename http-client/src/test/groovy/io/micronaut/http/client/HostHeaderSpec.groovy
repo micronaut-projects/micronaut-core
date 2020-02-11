@@ -53,6 +53,7 @@ class HostHeaderSpec extends Specification {
 
         cleanup:
         embeddedServer.close()
+        asyncClient.close()
     }
 
     void "test host header with server on random port"() {
@@ -72,6 +73,7 @@ class HostHeaderSpec extends Specification {
 
         cleanup:
         embeddedServer.close()
+        asyncClient.close()
     }
 
     // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
@@ -93,6 +95,7 @@ class HostHeaderSpec extends Specification {
 
         cleanup:
         embeddedServer.close()
+        asyncClient.close()
     }
 
     // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
@@ -118,6 +121,7 @@ class HostHeaderSpec extends Specification {
 
         cleanup:
         embeddedServer.close()
+        asyncClient.close()
     }
 
     void "test host header with https server on custom port"() {
@@ -140,6 +144,7 @@ class HostHeaderSpec extends Specification {
 
         cleanup:
         embeddedServer.close()
+        asyncClient.close()
     }
 
     @Controller("/echo-host")

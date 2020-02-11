@@ -2012,20 +2012,28 @@ public class DefaultBeanContext implements BeanContext {
 
             if (CollectionUtils.isNotEmpty(path)) {
                 final Iterator<BeanResolutionContext.Segment<?>> i = path.iterator();
-                i.next();
+                final BeanResolutionContext.Segment<?> injectionPointSegment = i.next();
                 if (i.hasNext()) {
                     BeanResolutionContext.Segment segment = i.next();
                     final BeanDefinition declaringBean = segment.getDeclaringType();
                     if (declaringBean.hasStereotype(INTRODUCTION_TYPE)) {
                         if (!i.hasNext()) {
-                            throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                            if (!injectionPointSegment.getArgument().isNullable()) {
+                                throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                            } else {
+                                return null;
+                            }
                         } else {
                             segment = i.next();
                         }
                     }
                     return (T) segment.getInjectionPoint();
                 } else {
-                    throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                    if (!injectionPointSegment.getArgument().isNullable()) {
+                        throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
+                    } else {
+                        return null;
+                    }
                 }
             } else {
                 throw new BeanContextException("Failed to obtain injection point. No valid injection path present in path: " + path);
@@ -2325,10 +2333,14 @@ public class DefaultBeanContext implements BeanContext {
                     definition = candidates.iterator().next();
                 } else {
 
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
+                    if (candidates.isEmpty()) {
+                        throw new NoSuchBeanException(beanType, qualifier);
+                    } else {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
+                        }
+                        definition = lastChanceResolve(beanType, null, throwNonUnique, candidates);
                     }
-                    definition = lastChanceResolve(beanType, null, throwNonUnique, candidates);
                 }
             }
         }

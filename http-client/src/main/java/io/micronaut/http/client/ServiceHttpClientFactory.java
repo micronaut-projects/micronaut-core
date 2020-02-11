@@ -15,21 +15,25 @@
  */
 package io.micronaut.http.client;
 
-import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.*;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.client.filter.HttpClientFilterResolver;
-import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
+import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskScheduler;
 import io.reactivex.Flowable;
 
+import javax.inject.Provider;
 import java.net.URI;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -39,26 +43,23 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * @since 1.0
  */
 @Factory
+@Internal
 public class ServiceHttpClientFactory {
 
-    private final BeanContext beanContext;
-    private final ServiceInstanceListLoadBalancerFactory loadBalancerFactory;
     private final TaskScheduler taskScheduler;
+    private final Provider<RxHttpClientRegistry> clientFactory;
 
     /**
      * Default constructor.
      *
-     * @param beanContext The bean context
-     * @param loadBalancerFactory The load balancer factory
      * @param taskScheduler The task scheduler
+     * @param clientFactory The client factory
      */
     public ServiceHttpClientFactory(
-            BeanContext beanContext,
-            ServiceInstanceListLoadBalancerFactory loadBalancerFactory,
-            TaskScheduler taskScheduler) {
-        this.beanContext = beanContext;
-        this.loadBalancerFactory = loadBalancerFactory;
+            TaskScheduler taskScheduler,
+            Provider<RxHttpClientRegistry> clientFactory) {
         this.taskScheduler = taskScheduler;
+        this.clientFactory = clientFactory;
     }
 
     /**
@@ -72,55 +73,51 @@ public class ServiceHttpClientFactory {
     StaticServiceInstanceList serviceInstanceList(ServiceHttpClientConfiguration configuration) {
         List<URI> originalURLs = configuration.getUrls();
         Collection<URI> loadBalancedURIs = new ConcurrentLinkedQueue<>(originalURLs);
-        return new StaticServiceInstanceList(configuration.getServiceId(), loadBalancedURIs);
+        return new StaticServiceInstanceList(configuration.getServiceId(), loadBalancedURIs, configuration.getPath().orElse(null));
     }
 
     /**
-     * Creates {@link HttpClient} instances for each defined {@link ServiceHttpClientConfiguration}.
+     * Creates a {@link ApplicationEventListener} that listens to {@link ServerStartupEvent} for each configured HTTP client
+     * in order to register a health check if necessary.
+     *
      * @param configuration The configuration
-     * @param instanceList The instance list
-     * @return The client bean
+     * @param instanceList  The instance list
+     * @return The event listener
      */
     @EachBean(ServiceHttpClientConfiguration.class)
     @Requires(condition = ServiceHttpClientCondition.class)
-    @Secondary
-    DefaultHttpClient serviceHttpClient(
-            @Parameter ServiceHttpClientConfiguration configuration,
-            @Parameter StaticServiceInstanceList instanceList) {
-        List<URI> originalURLs = configuration.getUrls();
-        Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
-        boolean isHealthCheck = configuration.isHealthCheck();
+    ApplicationEventListener<ServerStartupEvent> healthCheckStarter(@Parameter ServiceHttpClientConfiguration configuration,
+                                                                    @Parameter StaticServiceInstanceList instanceList) {
+        if (configuration.isHealthCheck()) {
+            return event -> {
+                    final List<URI> originalURLs = configuration.getUrls();
+                    Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
+                    final RxHttpClient httpClient = clientFactory.get().getClient(configuration.getServiceId(), configuration.getPath().orElse(null));
+                    taskScheduler.scheduleWithFixedDelay(configuration.getHealthCheckInterval(), configuration.getHealthCheckInterval(), () -> Flowable.fromIterable(originalURLs).flatMap(originalURI -> {
+                        URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());
+                        return httpClient.exchange(HttpRequest.GET(healthCheckURI)).onErrorResumeNext(throwable -> {
+                            if (throwable instanceof HttpClientResponseException) {
+                                HttpClientResponseException responseException = (HttpClientResponseException) throwable;
+                                HttpResponse<ByteBuffer> response = (HttpResponse<ByteBuffer>) responseException.getResponse();
+                                return Flowable.just(response);
+                            }
+                            return Flowable.just(HttpResponse.serverError());
+                        }).map(response -> Collections.singletonMap(originalURI, response.getStatus()));
+                    }).subscribe(uriToStatusMap -> {
+                        Map.Entry<URI, HttpStatus> entry = uriToStatusMap.entrySet().iterator().next();
 
-        Optional<String> path = configuration.getPath();
-        LoadBalancer loadBalancer = loadBalancerFactory.create(instanceList);
-        HttpClientFilterResolver filterResolver = beanContext.createBean(HttpClientFilterResolver.class,
-                                                               Collections.singleton(configuration.getServiceId()), null);
+                        URI uri = entry.getKey();
+                        HttpStatus status = entry.getValue();
 
-        DefaultHttpClient httpClient = beanContext.createBean(DefaultHttpClient.class, loadBalancer, configuration, path.orElse(null), filterResolver);
-        if (isHealthCheck) {
-            taskScheduler.scheduleWithFixedDelay(configuration.getHealthCheckInterval(), configuration.getHealthCheckInterval(), () -> Flowable.fromIterable(originalURLs).flatMap(originalURI -> {
-                URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());
-                return httpClient.exchange(HttpRequest.GET(healthCheckURI)).onErrorResumeNext(throwable -> {
-                    if (throwable instanceof HttpClientResponseException) {
-                        HttpClientResponseException responseException = (HttpClientResponseException) throwable;
-                        HttpResponse<ByteBuffer> response = (HttpResponse<ByteBuffer>) responseException.getResponse();
-                        return Flowable.just(response);
-                    }
-                    return Flowable.just(HttpResponse.serverError());
-                }).map(response -> Collections.singletonMap(originalURI, response.getStatus()));
-            }).subscribe(uriToStatusMap -> {
-                Map.Entry<URI, HttpStatus> entry = uriToStatusMap.entrySet().iterator().next();
-
-                URI uri = entry.getKey();
-                HttpStatus status = entry.getValue();
-
-                if (status.getCode() >= 300) {
-                    loadBalancedURIs.remove(uri);
-                } else if (!loadBalancedURIs.contains(uri)) {
-                    loadBalancedURIs.add(uri);
-                }
-            }));
+                        if (status.getCode() >= 300) {
+                            loadBalancedURIs.remove(uri);
+                        } else if (!loadBalancedURIs.contains(uri)) {
+                            loadBalancedURIs.add(uri);
+                        }
+                    }));
+            };
         }
-        return httpClient;
+        return null;
     }
+
 }

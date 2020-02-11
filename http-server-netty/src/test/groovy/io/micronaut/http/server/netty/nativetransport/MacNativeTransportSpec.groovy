@@ -2,7 +2,7 @@ package io.micronaut.http.server.netty.nativetransport
 
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.http.server.netty.EventLoopGroupFactory
+import io.micronaut.http.netty.channel.EventLoopGroupFactory
 import io.netty.channel.kqueue.KQueueServerSocketChannel
 import spock.lang.Requires
 import spock.util.environment.OperatingSystem
@@ -18,8 +18,10 @@ class MacNativeTransportSpec extends AbstractMicronautSpec {
         noExceptionThrown()
         body == "works"
 
+        def eventLoopGroupFactory = applicationContext.getBean(EventLoopGroupFactory)
+
         expect:
-        applicationContext.getBean(EventLoopGroupFactory).serverSocketChannelClass() == KQueueServerSocketChannel.class
+        eventLoopGroupFactory.serverSocketChannelClass() == KQueueServerSocketChannel.class
     }
 
     @Override

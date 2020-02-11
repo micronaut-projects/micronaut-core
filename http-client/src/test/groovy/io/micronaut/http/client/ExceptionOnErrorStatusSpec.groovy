@@ -15,7 +15,8 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.context.ApplicationContext
+
+import io.micronaut.context.annotation.Property
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -23,30 +24,23 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.hateoas.JsonError
-import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.AutoCleanup
-import spock.lang.Shared
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.test.annotation.MicronautTest
 import spock.lang.Specification
+
+import javax.inject.Inject
 
 /**
  * @author Fabien Renaud
  * @since 1.3.0
  */
+@MicronautTest
+@Property(name = "micronaut.http.client.exceptionOnErrorStatus", value = 'false')
 class ExceptionOnErrorStatusSpec extends Specification {
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run(
-            "micronaut.http.client.exceptionOnErrorStatus":'false'
-    )
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
-    @Shared
-    @AutoCleanup
-    HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+    @Inject
+    @Client("/")
+    RxHttpClient client
 
     void "test not found"() {
         when:

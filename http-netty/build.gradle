@@ -2,6 +2,8 @@ dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
     compileOnly "org.graalvm.nativeimage:svm:$graalVersion"
+    compileOnly dependencyModuleVersion("netty", "netty-transport-native-epoll")
+    compileOnly dependencyModuleVersion("netty", "netty-transport-native-kqueue")
 
     api project(":http")
     api project(":websocket")

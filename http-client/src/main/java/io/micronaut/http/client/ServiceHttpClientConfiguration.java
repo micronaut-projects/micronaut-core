@@ -24,6 +24,8 @@ import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+
+import javax.inject.Inject;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Collections;
@@ -86,6 +88,32 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             @Nullable ServiceSslClientConfiguration sslConfiguration,
             ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
+        this.serviceId = serviceId;
+        if (sslConfiguration != null) {
+            setSslConfiguration(sslConfiguration);
+        }
+        if (connectionPoolConfiguration != null) {
+            this.connectionPoolConfiguration = connectionPoolConfiguration;
+        } else {
+            this.connectionPoolConfiguration = new ServiceConnectionPoolConfiguration();
+        }
+    }
+
+    /**
+     * Creates a new client configuration for the given service ID.
+     *
+     * @param serviceId The service id
+     * @param connectionPoolConfiguration The connection pool configuration
+     * @param sslConfiguration The SSL configuration
+     * @param defaultHttpClientConfiguration The default HTTP client configuration
+     */
+    @Inject
+    public ServiceHttpClientConfiguration(
+            @Parameter String serviceId,
+            @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
+            @Nullable ServiceSslClientConfiguration sslConfiguration,
+            HttpClientConfiguration defaultHttpClientConfiguration) {
+        super(defaultHttpClientConfiguration);
         this.serviceId = serviceId;
         if (sslConfiguration != null) {
             setSslConfiguration(sslConfiguration);
