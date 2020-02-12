@@ -167,8 +167,8 @@ class ClientScopeSpec extends Specification {
     }
 
     void "test injected instances are different/same"() {
-        InstanceEquals bean = context.getBean(InstanceEquals)
-        InstanceDoesNotEqual bean2 = context.getBean(InstanceDoesNotEqual)
+        InstanceEquals bean = applicationContext.getBean(InstanceEquals)
+        InstanceDoesNotEqual bean2 = applicationContext.getBean(InstanceDoesNotEqual)
 
         expect:
         bean.client.is(bean.client2)

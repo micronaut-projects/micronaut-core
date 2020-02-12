@@ -34,6 +34,7 @@ import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
+import io.micronaut.inject.processing.JavaModelUtils
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 import io.micronaut.inject.writer.GeneratedFile
 
@@ -577,7 +578,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     targetGenericParams,
                                     targetAnnotationMetadata,
                                     targetMethodGenericTypeMap,
-                                    annotationMetadata
+                                    annotationMetadata,
+                                    methodNode.declaringClass.isInterface()
                             )
                         }
                     }
@@ -598,7 +600,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 targetGenericParams,
                                 targetAnnotationMetadata,
                                 targetMethodGenericTypeMap,
-                                annotationMetadata
+                                annotationMetadata,
+                                methodNode.declaringClass.isInterface()
                         )
                     }
                     if (methodNode.isAbstract()) {

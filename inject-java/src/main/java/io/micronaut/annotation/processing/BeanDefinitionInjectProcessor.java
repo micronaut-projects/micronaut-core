@@ -838,7 +838,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             boolean isExecutable =
                     !hasInvalidModifiers &&
                             (isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
-                                annotationMetadata.hasStereotype(AROUND_TYPE));
+                                    annotationMetadata.hasStereotype(AROUND_TYPE));
 
 
             boolean hasConstraints = false;
@@ -880,7 +880,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 AnnotationMetadata declaredMetadata, Set<Modifier> modifiers,
                 boolean isPublic) {
             return (isExecutableType && (isPublic || (modifiers.isEmpty()) && concreteClass.equals(enclosingElement))) ||
-                    annotationMetadataHierarchy.hasStereotype(Executable.class) ||
+                    annotationMetadataHierarchy.hasDeclaredStereotype(Executable.class) ||
                     declaredMetadata.hasAnnotation(Executable.class);
         }
 
