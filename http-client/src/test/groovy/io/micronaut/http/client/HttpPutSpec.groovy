@@ -15,11 +15,12 @@
  */
 package io.micronaut.http.client
 
+import edu.umd.cs.findbugs.annotations.Nullable
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
-import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -30,8 +31,7 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Put
-import spock.lang.AutoCleanup
-import spock.lang.Shared
+import spock.lang.Issue
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -42,6 +42,7 @@ import javax.inject.Inject
  */
 @MicronautTest
 class HttpPutSpec extends Specification {
+
     @Inject
     @Client("/")
     HttpClient client
@@ -186,6 +187,18 @@ class HttpPutSpec extends Specification {
         val == "multiple mappings"
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2757")
+    void "test put with nullable header"() throws Exception {
+        //This test verifies that the body is not read in an attempt to populate the header argument
+        MutableHttpRequest<?> request = HttpRequest.PUT("/put/nullableHeader", "body".getBytes()).
+                accept(MediaType.TEXT_PLAIN_TYPE)
+
+        String body = client.toBlocking().retrieve(request)
+
+        expect:
+        body == "put done"
+    }
+
     @Controller('/put')
     static class PostController {
 
@@ -232,6 +245,13 @@ class HttpPutSpec extends Specification {
         @Put(uris = ["/multiple", "/multiple/mappings"])
         String multipleMappings() {
             return "multiple mappings"
+        }
+
+        @Put(value = "/nullableHeader", consumes = MediaType.ALL, produces = MediaType.TEXT_PLAIN)
+        String putNullableHeader(@Body final Flowable<byte[]> contents,
+                                 @Nullable @Header("foo") final String auth) {
+
+            return "put done"
         }
     }
 

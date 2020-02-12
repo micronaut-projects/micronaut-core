@@ -17,6 +17,7 @@ package io.micronaut.http.client
 
 import com.fasterxml.jackson.databind.DeserializationFeature
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
@@ -165,6 +166,29 @@ class ClientScopeSpec extends Specification {
         ex.message == "Request URI specifies no host to connect to"
     }
 
+    void "test injected instances are different/same"() {
+        InstanceEquals bean = context.getBean(InstanceEquals)
+        InstanceDoesNotEqual bean2 = context.getBean(InstanceDoesNotEqual)
+
+        expect:
+        bean.client.is(bean.client2)
+        !bean.client.is(bean2.client) //value is different
+        !bean.client2.is(bean2.client2) //bean2 has configuration
+
+        bean.clientId.is(bean.clientId2)
+        !bean.clientId.is(bean2.clientId) //id is different
+        !bean.clientId2.is(bean2.clientId2) //bean2 has path
+        !bean.clientId2.is(bean2.clientId3) //bean2 has configuration
+
+        bean.clientIdPath.is(bean.clientIdPath2)
+        !bean.clientIdPath.is(bean2.clientId) // path is different
+
+        bean.clientConfiguration.is(bean.clientConfiguration2)
+        !bean.clientConfiguration.is(bean2.client2) // configuration is different
+
+        bean.rxClient.is(bean.client)
+    }
+
     @Controller('/scope')
     static class ScopeController {
         @Get(produces = MediaType.TEXT_PLAIN)
@@ -242,6 +266,62 @@ class ClientScopeSpec extends Specification {
                     HttpRequest.GET('/scope'), String
             )
         }
+    }
+
+    @Singleton
+    static class InstanceEquals {
+
+        @Inject @Client('/')
+        protected HttpClient client
+
+        @Inject @Client('/')
+        protected HttpClient client2
+
+        @Inject @Client(id = "bar")
+        protected HttpClient clientId
+
+        @Inject @Client(id = "bar")
+        protected HttpClient clientId2
+
+        @Inject @Client(id = "bar", path = "/bar")
+        protected HttpClient clientIdPath
+
+        @Inject @Client(id = "bar", path = "/bar")
+        protected HttpClient clientIdPath2
+
+        @Inject @Client(value = '/', configuration = DefaultHttpClientConfiguration)
+        protected HttpClient clientConfiguration
+
+        @Inject @Client(value = '/', configuration = DefaultHttpClientConfiguration)
+        protected HttpClient clientConfiguration2
+
+        @Inject @Client('/')
+        protected RxHttpClient rxClient
+    }
+
+    @Singleton
+    static class InstanceDoesNotEqual {
+
+        @Inject @Client('/foo')
+        protected HttpClient client
+
+        @Inject @Client(value = '/', configuration = CustomConfig)
+        protected HttpClient client2
+
+        @Inject @Client(id = "foo")
+        protected HttpClient clientId
+
+        @Inject @Client(id = "bar", path = "/foo")
+        protected HttpClient clientId2
+
+        @Inject @Client(id = "bar", configuration = CustomConfig)
+        protected HttpClient clientId3
+    }
+
+    @Singleton
+    @ConfigurationProperties("custom")
+    static class CustomConfig extends DefaultHttpClientConfiguration {
+
     }
 
     @Requires(property = 'spec.name', value = "ClientScopeSpec")

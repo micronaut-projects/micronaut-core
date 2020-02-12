@@ -281,6 +281,8 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                         }
 
                     }
+                } else if (value instanceof NullArgument) {
+                    argumentList.add(null);
                 } else if (value instanceof ConversionError) {
                     throw new ConversionErrorException(argument, (ConversionError) value);
                 } else if (value == DefaultRouteBuilder.NO_VALUE) {
@@ -324,7 +326,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
                 if (value != null) {
                     String name = resolveInputName(requiredArgument);
-                    if (value instanceof UnresolvedArgument) {
+                    if (value instanceof UnresolvedArgument || value instanceof NullArgument) {
                         newVariables.put(name, value);
                     } else {
                         ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
