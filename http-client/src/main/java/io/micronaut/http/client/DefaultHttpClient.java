@@ -234,7 +234,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
         this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
-        this.contextPath = contextPath;
+        if (StringUtils.isNotEmpty(contextPath)) {
+            if (contextPath.charAt(0) != '/') {
+                contextPath = '/' + contextPath;
+            }
+            this.contextPath = contextPath;
+        } else {
+            this.contextPath = null;
+        }
         this.nettyClientSslBuilder = nettyClientSslBuilder;
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
@@ -731,6 +738,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         }
     }
 
+    private <I, O, E> Flowable<io.micronaut.http.HttpResponse<O>> redirectExchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+        final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
+        Publisher<URI> uriPublisher = resolveRequestURI(request, false);
+        return Flowable.fromPublisher(uriPublisher)
+                .switchMap(buildExchangePublisher(parentRequest, request, bodyType, errorType));
+    }
+
     private <T> Flowable<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, WebSocketBean<T> webSocketBean) {
         Bootstrap bootstrap = this.bootstrap.clone();
         if (webSocketBean == null) {
@@ -1116,6 +1130,16 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @return A {@link Publisher} with the resolved URI
      */
     protected <I> Publisher<URI> resolveRequestURI(io.micronaut.http.HttpRequest<I> request) {
+        return resolveRequestURI(request, true);
+    }
+
+    /**
+     * @param request            The request
+     * @param includeContextPath Whether to prepend the client context path
+     * @param <I>                The input type
+     * @return A {@link Publisher} with the resolved URI
+     */
+    protected <I> Publisher<URI> resolveRequestURI(io.micronaut.http.HttpRequest<I> request, boolean includeContextPath) {
         URI requestURI;
         if (!request.getParameters().isEmpty()) {
             UriBuilder newUri = UriBuilder.of(request.getUri());
@@ -1141,7 +1165,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                 ((MutableHttpRequest) request).getHeaders().auth(authInfo.get());
                             }
                         }
-                        return server.resolve(resolveRequestURI(requestURI));
+                        return server.resolve(includeContextPath ? prependContextPath(requestURI) : requestURI);
                     }
             );
         }
@@ -1151,7 +1175,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param requestURI The request URI
      * @return A URI that is prepended with the contextPath, if set
      */
-    protected URI resolveRequestURI(URI requestURI) {
+    protected URI prependContextPath(URI requestURI) {
         if (StringUtils.isNotEmpty(contextPath)) {
             try {
                 return new URI(StringUtils.prependUri(contextPath, requestURI.toString()));
@@ -1611,7 +1635,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         try {
                             MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
                             setRedirectHeaders(nettyRequest, redirectRequest);
-                            redirectedExchange = Flowable.fromPublisher(resolveRequestURI(redirectRequest))
+                            redirectedExchange = Flowable.fromPublisher(resolveRequestURI(redirectRequest, false))
                                     .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri));
 
                             //noinspection SubscriberImplementation
@@ -1769,7 +1793,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             String location = headers.get(HttpHeaderNames.LOCATION);
                             final MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
                             setRedirectHeaders(request, redirectRequest);
-                            Flowable<io.micronaut.http.HttpResponse<O>> redirectExchange = exchange(redirectRequest, bodyType);
+                            Flowable<io.micronaut.http.HttpResponse<O>> redirectExchange = redirectExchange(redirectRequest, bodyType, DEFAULT_ERROR_TYPE);
                             redirectExchange.first(io.micronaut.http.HttpResponse.notFound())
                                     .subscribe((oHttpResponse, throwable) -> {
                                         if (throwable != null) {
