@@ -1,13 +1,17 @@
 package io.micronaut.http.client
 
+import edu.umd.cs.findbugs.annotations.Nullable
 import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.async.publisher.Publishers
+import io.micronaut.discovery.ServiceInstance
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -19,7 +23,7 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: full uri, direct"() {
         given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/direct', String)
@@ -35,7 +39,7 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: full uri, redirect: absolute - follows correctly"() {
         given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect', String)
@@ -52,7 +56,7 @@ class ClientRedirectSpec extends Specification {
     @NotYetImplemented
     void "test - client: full uri, redirect: relative"() {
         given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect-relative', String)
@@ -68,7 +72,17 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: relative uri, direct"() {
         given:
-        RxHttpClient client = new DefaultHttpClient(embeddedServer.getURL(), new DefaultHttpClientConfiguration(), "/test")
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, new LoadBalancer() {
+            @Override
+            Publisher<ServiceInstance> select(@Nullable Object discriminator) {
+                URL url = embeddedServer.getURL()
+                Publishers.just(ServiceInstance.of(url.getHost(), url))
+            }
+
+            Optional<String> getContextPath() {
+                Optional.of("/test")
+            }
+        })
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('direct', String)
@@ -84,8 +98,17 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: relative uri - no slash"() {
         given:
-        RxHttpClient client = new DefaultHttpClient(embeddedServer.getURL(), new DefaultHttpClientConfiguration(), "test")
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, new LoadBalancer() {
+            @Override
+            Publisher<ServiceInstance> select(@Nullable Object discriminator) {
+                URL url = embeddedServer.getURL()
+                Publishers.just(ServiceInstance.of(url.getHost(), url))
+            }
 
+            Optional<String> getContextPath() {
+                Optional.of("test")
+            }
+        })
         when:
         HttpResponse<String> response = client.toBlocking().exchange('direct', String)
 
@@ -100,7 +123,17 @@ class ClientRedirectSpec extends Specification {
 
     void "test - client: relative uri, redirect: absolute "() {
         given:
-        RxHttpClient client = new DefaultHttpClient(embeddedServer.getURL(), new DefaultHttpClientConfiguration(), "/test")
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, new LoadBalancer() {
+            @Override
+            Publisher<ServiceInstance> select(@Nullable Object discriminator) {
+                URL url = embeddedServer.getURL()
+                Publishers.just(ServiceInstance.of(url.getHost(), url))
+            }
+
+            Optional<String> getContextPath() {
+                Optional.of("/test")
+            }
+        })
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('redirect', String)
