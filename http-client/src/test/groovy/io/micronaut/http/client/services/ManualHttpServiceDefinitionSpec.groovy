@@ -22,7 +22,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Put
-import io.micronaut.http.client.DefaultHttpClient
+import io.micronaut.http.client.netty.DefaultHttpClient
 import io.micronaut.http.client.ServiceHttpClientConfiguration
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClientConfiguration

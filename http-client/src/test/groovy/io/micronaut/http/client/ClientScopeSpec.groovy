@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.client.exceptions.NoHostException
+import io.micronaut.http.client.netty.DefaultHttpClient
 import io.micronaut.jackson.annotation.JacksonFeatures
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
