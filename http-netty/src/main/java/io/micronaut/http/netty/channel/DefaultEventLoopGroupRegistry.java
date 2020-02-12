@@ -84,7 +84,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     }
 
     /**
-     * Constructs an event loop group with default Configuration
+     * Constructs an event loop group with default Configuration.
      *
      * @return The event loop group
      */
