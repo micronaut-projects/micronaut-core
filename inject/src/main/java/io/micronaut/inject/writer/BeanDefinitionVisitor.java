@@ -294,6 +294,7 @@ public interface BeanDefinitionVisitor {
      * @param argumentAnnotationMetadata The argument annotation metadata
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         The annotation metadata for the method
+     * @param isInterface                If the method belongs to an interface
      * @return The {@link ExecutableMethodWriter}.
      */
     ExecutableMethodWriter visitExecutableMethod(Object declaringType,
@@ -305,7 +306,8 @@ public interface BeanDefinitionVisitor {
                                                  Map<String, Object> genericArgumentTypes,
                                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                                  Map<String, Map<String, Object>> genericTypes,
-                                                 @Nullable AnnotationMetadata annotationMetadata);
+                                                 @Nullable AnnotationMetadata annotationMetadata,
+                                                 boolean isInterface);
 
     /**
      * Visits a field injection point.
