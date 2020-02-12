@@ -15,33 +15,6 @@
  */
 package io.micronaut.http.server.netty;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
-import javax.annotation.Nullable;
-
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
@@ -56,15 +29,11 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpHeaders;
-import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
@@ -101,12 +70,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
-import io.micronaut.web.router.BasicObjectRouteMatch;
-import io.micronaut.web.router.MethodBasedRouteMatch;
-import io.micronaut.web.router.RouteMatch;
-import io.micronaut.web.router.Router;
-import io.micronaut.web.router.UriRoute;
-import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.*;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.micronaut.web.router.resource.StaticResourceResolver;
@@ -121,16 +85,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.DefaultHttpContent;
-import io.netty.handler.codec.http.DefaultLastHttpContent;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
@@ -147,6 +103,28 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
 import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
@@ -213,30 +191,44 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+        super.handlerRemoved(ctx);
+        cleanupIfNecessary(ctx);
+    }
+
+    @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
         if (ctx.channel().isWritable()) {
             ctx.flush();
         }
+        cleanupIfNecessary(ctx);
+    }
+
+    private void cleanupIfNecessary(ChannelHandlerContext ctx) {
         NettyHttpRequest request = NettyHttpRequest.remove(ctx);
         if (request != null) {
-            try {
-                request.release();
-            } finally {
-                ctx.executor().execute(() -> {
-                    try {
-                        beanContext.publishEvent(
-                                new HttpRequestTerminatedEvent(
-                                        request
-                                )
-                        );
-                    } catch (Exception e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
-                        }
+            cleanupRequest(ctx, request);
+        }
+    }
+
+    private void cleanupRequest(ChannelHandlerContext ctx, NettyHttpRequest request) {
+        try {
+            request.release();
+        } finally {
+            ctx.executor().execute(() -> {
+                try {
+                    beanContext.publishEvent(
+                            new HttpRequestTerminatedEvent(
+                                    request
+                            )
+                    );
+                } catch (Exception e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
                     }
-                });
-            }
+                }
+            });
         }
     }
 
@@ -255,7 +247,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         NettyHttpRequest nettyHttpRequest = NettyHttpRequest.remove(ctx);
@@ -1311,7 +1302,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnError(Throwable t) {
-                exceptionCaughtInternal(context, t, (NettyHttpRequest) requestReference.get(), false);
+                final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
+                exceptionCaughtInternal(context, t, nettyHttpRequest, false);
             }
         });
     }
@@ -1344,7 +1336,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             }
             // close handled by HttpServerKeepAliveHandler
-            context.writeAndFlush(nettyResponse);
+            final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
+
+            context.writeAndFlush(nettyResponse)
+                   .addListener(future -> cleanupRequest(context, nettyHttpRequest));
             context.read();
         }
     }
@@ -1676,6 +1671,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             // once an http content is written, read the next item if it is available
             context.read();
         });
+
+        httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
+                .doOnTerminate(() -> cleanupRequest(context, request));
 
         DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(nativeResponse, httpContentPublisher);
         io.netty.handler.codec.http.HttpHeaders headers = streamedResponse.headers();
