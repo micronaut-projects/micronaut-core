@@ -206,10 +206,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void cleanupIfNecessary(ChannelHandlerContext ctx) {
-        NettyHttpRequest request = NettyHttpRequest.remove(ctx);
-        if (request != null) {
-            cleanupRequest(ctx, request);
-        }
+        NettyHttpRequest.remove(ctx);
     }
 
     private void cleanupRequest(ChannelHandlerContext ctx, NettyHttpRequest request) {
