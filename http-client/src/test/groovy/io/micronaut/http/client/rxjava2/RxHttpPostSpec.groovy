@@ -43,7 +43,7 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
-class RxHttpPostSpec extends Specification {
+class   RxHttpPostSpec extends Specification {
 
     @Shared
     @AutoCleanup
@@ -181,7 +181,11 @@ class RxHttpPostSpec extends Specification {
         )
         User user = flowable.onErrorResumeNext((Function){ t ->
             if (t instanceof HttpClientResponseException) {
-                return Flowable.just(((HttpClientResponseException) t).response.getBody(User).get())
+                try {
+                    return Flowable.just(((HttpClientResponseException) t).response.getBody(User).get())
+                } catch (e) {
+                    return Flowable.error(e)
+                }
             } else {
                 return Flowable.error(t)
             }
