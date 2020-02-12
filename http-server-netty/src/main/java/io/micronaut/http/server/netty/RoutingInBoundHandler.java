@@ -213,11 +213,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+        super.handlerRemoved(ctx);
+        cleanupIfNecessary(ctx);
+    }
+
+    @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
         if (ctx.channel().isWritable()) {
             ctx.flush();
         }
+        cleanupIfNecessary(ctx);
+    }
+
+    private void cleanupIfNecessary(ChannelHandlerContext ctx) {
         NettyHttpRequest request = NettyHttpRequest.remove(ctx);
         if (request != null) {
             try {
