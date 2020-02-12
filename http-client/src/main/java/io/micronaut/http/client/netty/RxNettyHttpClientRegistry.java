@@ -343,7 +343,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
             return new DefaultHttpClient(
                     loadBalancer,
                     configuration != null ? configuration : defaultHttpClientConfiguration,
-                    null,
+                    loadBalancer.getContextPath().orElse(null),
                     filterResolver,
                     threadFactory,
                     nettyClientSslBuilder,
