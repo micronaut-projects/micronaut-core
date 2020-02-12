@@ -1673,8 +1673,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         });
 
         httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
-                .doOnComplete(() -> cleanupRequest(context, request))
-                .doOnError(throwable -> cleanupRequest(context, request));
+                .doOnTerminate(() -> cleanupRequest(context, request));
 
         DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(nativeResponse, httpContentPublisher);
         io.netty.handler.codec.http.HttpHeaders headers = streamedResponse.headers();
