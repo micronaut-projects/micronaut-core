@@ -2,6 +2,7 @@ dependencies {
     annotationProcessor project(":inject-java")
     api dependencyVersion("rxjava2")    
     api project(":runtime")
+    api project(":http-client-core")
     api project(":websocket")
 
     api project(":http-netty")

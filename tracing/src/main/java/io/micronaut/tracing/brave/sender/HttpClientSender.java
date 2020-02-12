@@ -23,6 +23,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.*;
+import io.micronaut.http.client.netty.DefaultHttpClient;
 import io.micronaut.tracing.brave.ZipkinServiceInstanceList;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
