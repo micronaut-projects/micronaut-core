@@ -208,23 +208,27 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private void cleanupIfNecessary(ChannelHandlerContext ctx) {
         NettyHttpRequest request = NettyHttpRequest.remove(ctx);
         if (request != null) {
-            try {
-                request.release();
-            } finally {
-                ctx.executor().execute(() -> {
-                    try {
-                        beanContext.publishEvent(
-                                new HttpRequestTerminatedEvent(
-                                        request
-                                )
-                        );
-                    } catch (Exception e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
-                        }
+            cleanupRequest(ctx, request);
+        }
+    }
+
+    private void cleanupRequest(ChannelHandlerContext ctx, NettyHttpRequest request) {
+        try {
+            request.release();
+        } finally {
+            ctx.executor().execute(() -> {
+                try {
+                    beanContext.publishEvent(
+                            new HttpRequestTerminatedEvent(
+                                    request
+                            )
+                    );
+                } catch (Exception e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
                     }
-                });
-            }
+                }
+            });
         }
     }
 
@@ -243,7 +247,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         NettyHttpRequest nettyHttpRequest = NettyHttpRequest.remove(ctx);
@@ -1300,7 +1303,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             @Override
             protected void doOnError(Throwable t) {
                 final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
-                nettyHttpRequest.release();
                 exceptionCaughtInternal(context, t, nettyHttpRequest, false);
             }
         });
@@ -1334,8 +1336,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             }
             // close handled by HttpServerKeepAliveHandler
+            final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
+
             context.writeAndFlush(nettyResponse)
-                   .addListener(future -> cleanupIfNecessary(context));
+                   .addListener(future -> cleanupRequest(context, nettyHttpRequest));
             context.read();
         }
     }
@@ -1669,8 +1673,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         });
 
         httpContentPublisher = Flowable.fromPublisher(httpContentPublisher)
-                .doOnComplete(() -> cleanupIfNecessary(context))
-                .doOnError(throwable -> cleanupIfNecessary(context));
+                .doOnComplete(() -> cleanupRequest(context, request))
+                .doOnError(throwable -> cleanupRequest(context, request));
 
         DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(nativeResponse, httpContentPublisher);
         io.netty.handler.codec.http.HttpHeaders headers = streamedResponse.headers();
