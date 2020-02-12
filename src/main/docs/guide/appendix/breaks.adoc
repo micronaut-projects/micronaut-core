@@ -10,6 +10,10 @@ The following changes could potentially be considered to be breaking changes, ho
 
 * Concrete types are now preferred when creating a class hierarchy. The most common case where this will have an impact is converters. Converters that match super classes of the target type will be preferred over converters that match an interface that the target type implements.
 
+==== 1.2.9
+
+* The data format was changed for multiline server sent event data payloads to conform to the specification. Previously multiline data did not have the required `data:` prefix on each line and now it does.
+
 ==== 1.2.0
 
 The following changes could potentially be considered to be breaking changes, however the likelihood of any negative impact is low.
