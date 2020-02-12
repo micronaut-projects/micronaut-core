@@ -1,5 +1,6 @@
 package io.micronaut.http.client
 
+import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -11,9 +12,6 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-/**
- * Tests of Micronaut HTTP Client relative URIs and redirects.
- */
 class ClientRedirectSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
@@ -51,7 +49,8 @@ class ClientRedirectSpec extends Specification {
         client.close()
     }
 
-    void "BUG: test - client: full uri, redirect: relative"() {
+    @NotYetImplemented
+    void "test - client: full uri, redirect: relative"() {
         given:
         RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
 
@@ -64,7 +63,6 @@ class ClientRedirectSpec extends Specification {
         response.body() == "It works!"
 
         cleanup:
-        client.stop()
         client.close()
     }
 
@@ -84,7 +82,7 @@ class ClientRedirectSpec extends Specification {
         client.close()
     }
 
-    void "BUG: test - client: relative uri - no slash"() {
+    void "test - client: relative uri - no slash"() {
         given:
         RxHttpClient client = new DefaultHttpClient(embeddedServer.getURL(), new DefaultHttpClientConfiguration(), "test")
 
@@ -100,7 +98,7 @@ class ClientRedirectSpec extends Specification {
         client.close()
     }
 
-    void "BUG: test - client: relative uri, redirect: absolute "() {
+    void "test - client: relative uri, redirect: absolute "() {
         given:
         RxHttpClient client = new DefaultHttpClient(embeddedServer.getURL(), new DefaultHttpClientConfiguration(), "/test")
 
