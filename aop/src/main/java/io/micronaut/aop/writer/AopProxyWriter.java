@@ -423,6 +423,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 argumentAnnotationMetadata,
                 genericTypes,
                 annotationMetadata,
+                true,
                 true);
     }
 
@@ -439,6 +440,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * @param argumentAnnotationMetadata The argument annotation metadata
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         metadata
+     * @param isInterface                If the method is in an interface
      */
     public void visitAroundMethod(Object declaringType,
                                   Object returnType,
@@ -449,7 +451,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                   Map<String, Object> genericParameters,
                                   Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                   Map<String, Map<String, Object>> genericTypes,
-                                  AnnotationMetadata annotationMetadata) {
+                                  AnnotationMetadata annotationMetadata,
+                                  boolean isInterface) {
 
 
         visitAroundMethod(
@@ -463,7 +466,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 argumentAnnotationMetadata,
                 genericTypes,
                 annotationMetadata,
-                false);
+                false, isInterface);
     }
 
     private void visitAroundMethod(Object declaringType,
@@ -476,7 +479,10 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                    Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                    Map<String, Map<String, Object>> genericTypes,
                                    AnnotationMetadata annotationMetadata,
-                                   boolean isAbstract) {
+                                   boolean isAbstract,
+                                   boolean isInterface) {
+
+        boolean interfaceMethod = isInterface || this.isInterface;
 
         // to make dispatch to this method more efficient and annotation metadata accurate also generate an executable method
         visitExecutableMethod(
@@ -489,7 +495,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 genericParameters,
                 argumentAnnotationMetadata,
                 genericTypes,
-                annotationMetadata);
+                annotationMetadata,
+                isInterface);
 
         List<Object> argumentTypeList = new ArrayList<>(argumentTypes.values());
         int argumentCount = argumentTypes.size();
@@ -521,9 +528,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             bridgeArguments.addAll(argumentTypeList);
             String bridgeDesc = getMethodDescriptor(returnType, bridgeArguments);
             boolean isSuspend = "kotlin.coroutines.Continuation".equals(CollectionUtils.last(argumentTypes.values()));
-
             ExecutableMethodWriter executableMethodWriter = new ExecutableMethodWriter(
-                    proxyFullName, methodExecutorClassName, methodProxyShortName, isInterface, isAbstract, isSuspend, annotationMetadata) {
+                    proxyFullName, methodExecutorClassName, methodProxyShortName, interfaceMethod, isAbstract, isSuspend, annotationMetadata) {
 
                 @Override
                 protected void buildInvokeMethod(Type declaringTypeObject, String methodName, Object returnType, Collection<Object> argumentTypes, GeneratorAdapter invokeMethodVisitor) {
@@ -539,7 +545,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                             AopProxyWriter.pushCastToType(invokeMethodVisitor, argumentTypeList.get(i));
                         }
                         String desc = getMethodDescriptor(returnType, argumentTypeList);
-                        invokeMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL, declaringTypeObject.getInternalName(), methodName, desc, isInterface);
+                        invokeMethodVisitor.visitMethodInsn(interfaceMethod ? INVOKEINTERFACE : INVOKEVIRTUAL, declaringTypeObject.getInternalName(), methodName, desc, interfaceMethod);
                         if (isVoidReturn) {
                             invokeMethodVisitor.visitInsn(ACONST_NULL);
                         } else {
@@ -1152,7 +1158,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             Map<String, Object> genericArgumentTypes,
             Map<String, AnnotationMetadata> argumentAnnotationMetadata,
             Map<String, Map<String, Object>> genericTypes,
-            AnnotationMetadata annotationMetadata) {
+            AnnotationMetadata annotationMetadata,
+            boolean isInterface) {
         deferredInjectionPoints.add(() ->
                 proxyBeanDefinitionWriter.visitExecutableMethod(
                         declaringType,
@@ -1164,7 +1171,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         genericArgumentTypes,
                         argumentAnnotationMetadata,
                         genericTypes,
-                        annotationMetadata
+                        annotationMetadata,
+                        isInterface
                 )
         );
         return null;

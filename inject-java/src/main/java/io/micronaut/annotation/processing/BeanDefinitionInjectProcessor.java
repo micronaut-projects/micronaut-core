@@ -721,7 +721,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                annotationMetadata
+                                annotationMetadata,
+                                JavaModelUtils.isInterface(method.getEnclosingElement())
                         );
                     }
 
@@ -1063,7 +1064,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                annotationMetadata
+                                annotationMetadata,
+                                JavaModelUtils.isInterface(method.getEnclosingElement())
                         );
 
                         aopProxyWriter.visitAroundMethod(
@@ -1076,7 +1078,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                !isAnnotationReference ? new AnnotationMetadataReference(executableMethodWriter.getClassName(), annotationMetadata) : annotationMetadata
+                                !isAnnotationReference ? new AnnotationMetadataReference(executableMethodWriter.getClassName(), annotationMetadata) : annotationMetadata,
+                                JavaModelUtils.isInterface(method.getEnclosingElement())
 
                         );
                     }
@@ -1132,7 +1135,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                annotationMetadata
+                                annotationMetadata,
+                                JavaModelUtils.isInterface(enclosingElement)
                         );
 
                     }
@@ -1226,7 +1230,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         params.getParameters(),
                         params.getGenericParameters(),
                         params.getParameterMetadata(),
-                        params.getGenericTypes(), methodAnnotationMetadata);
+                        params.getGenericTypes(),
+                        methodAnnotationMetadata,
+                        JavaModelUtils.isInterface(enclosingElement));
             }
 
 
@@ -1286,7 +1292,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                             params.getParameters(),
                                             params.getGenericParameters(),
                                             params.getParameterMetadata(),
-                                            params.getGenericTypes(), methodAnnotationMetadata);
+                                            params.getGenericTypes(),
+                                            methodAnnotationMetadata,
+                                            JavaModelUtils.isInterface(enclosingElement));
                                 }
                             } else {
                                 error(method, "Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");
@@ -1303,7 +1311,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 params.getGenericParameters(),
                                 params.getParameterMetadata(),
                                 params.getGenericTypes(),
-                                aroundMethodMetadata);
+                                aroundMethodMetadata,
+                                JavaModelUtils.isInterface(enclosingElement));
                     }
 
                 } else if (executableMethodWriter == null) {
@@ -1316,7 +1325,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             params.getParameters(),
                             params.getGenericParameters(),
                             params.getParameterMetadata(),
-                            params.getGenericTypes(), methodAnnotationMetadata);
+                            params.getGenericTypes(),
+                            methodAnnotationMetadata,
+                            JavaModelUtils.isInterface(enclosingElement));
                 }
             }
         }
@@ -1503,7 +1514,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                             genericParameters,
                                             methodQualifier,
                                             methodGenericTypes,
-                                            annotationMetadata
+                                            annotationMetadata,
+                                            JavaModelUtils.isInterface(method.getEnclosingElement())
                                     );
 
 
