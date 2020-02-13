@@ -17,6 +17,7 @@ package io.micronaut.jackson.serialize;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.core.value.OptionalValues;
@@ -52,7 +53,7 @@ public class OptionalValuesSerializer extends JsonSerializer<OptionalValues<?>> 
                 Object v = opt.get();
                 if (value instanceof OptionalMultiValues) {
                     List list = (List) v;
-                    if (list.size() == 1) {
+                    if (serializers.isEnabled(SerializationFeature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED) && list.size() == 1) {
                         gen.writeObject(list.get(0));
                     } else {
                         gen.writeObject(list);
