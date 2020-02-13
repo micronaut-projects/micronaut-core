@@ -26,8 +26,7 @@ import spock.util.environment.Jvm
 // This test causes issues on Java 9+ due to use of javax.xml.parsers
 // In general this test os overly complex and uses things we don't use elsewhere like powermock
 // and should be rewritten and simplified
-@IgnoreIf({ Jvm.current.isJava9Compatible() })
-@IgnoreIf({ env["GITHUB_WORKFLOW"] })
+@IgnoreIf({ Jvm.current.isJava9Compatible() || env["GITHUB_WORKFLOW"] })
 class NettyHttpPortContentionSpec extends Specification{
     void "test server url is correct when having to rebind on port contention"() {
         given: "we have some ports to use"
