@@ -15,12 +15,10 @@
  */
 package io.micronaut.context.env
 
+import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
-import org.junit.Rule
-import org.junit.contrib.java.lang.system.EnvironmentVariables
-import spock.lang.Ignore
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
 
@@ -29,9 +27,6 @@ import spock.util.environment.RestoreSystemProperties
  */
 @RestoreSystemProperties
 class DefaultEnvironmentSpec extends Specification {
-
-    @Rule
-    private final EnvironmentVariables environmentVariables = new EnvironmentVariables()
 
     void "test environment system property resolve"() {
         given:
@@ -417,7 +412,8 @@ class DefaultEnvironmentSpec extends Specification {
         when:
         System.setProperty("micronaut.config.files", "classpath:config-files.yml,classpath:config-files2.yml")
         System.setProperty("config.prop", "system-property")
-        environmentVariables.set("CONFIG_PROP", "env-var")
+        def envs = SystemLambda.withEnvironmentVariable("CONFIG_PROP", "env-var")
+                .set()
         Environment env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "System properties have highest precedence"
@@ -431,7 +427,7 @@ class DefaultEnvironmentSpec extends Specification {
         env.getRequiredProperty("config.prop", String.class) == "env-var"
 
         when:
-        environmentVariables.clear("CONFIG_PROP")
+        envs.restore()
         env = new DefaultEnvironment({["first", "second"]}).start()
 
         then: "Config files last in the list have precedence over those first in the list"

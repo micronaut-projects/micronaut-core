@@ -4,29 +4,10 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.runtime.server.EmbeddedServer
-import org.junit.runner.RunWith
-import org.mockito.Mockito
-import org.powermock.api.mockito.PowerMockito
-import org.powermock.core.classloader.annotations.PowerMockIgnore
-import org.powermock.core.classloader.annotations.PrepareForTest
-import org.powermock.modules.junit4.PowerMockRunner
-import org.powermock.modules.junit4.PowerMockRunnerDelegate
-import org.spockframework.runtime.Sputnik
-import spock.lang.IgnoreIf
-import spock.lang.Retry
+import spock.lang.Ignore
 import spock.lang.Specification
-import spock.util.environment.Jvm
 
-@RunWith(PowerMockRunner.class)
-@PowerMockRunnerDelegate(Sputnik.class)
-@PowerMockIgnore(["javax.net.ssl.*"])
-@PrepareForTest([SocketUtils.class])
-// due to the nature of port binding here there is a likelyhood this will sometimes fails to bind port on Travis
-@Retry(count = 5, delay = 200)
-// This test causes issues on Java 9+ due to use of javax.xml.parsers
-// In general this test os overly complex and uses things we don't use elsewhere like powermock
-// and should be rewritten and simplified
-@IgnoreIf({ Jvm.current.isJava9Compatible() || env["GITHUB_WORKFLOW"] })
+@Ignore
 class NettyHttpPortContentionSpec extends Specification{
     void "test server url is correct when having to rebind on port contention"() {
         given: "we have some ports to use"

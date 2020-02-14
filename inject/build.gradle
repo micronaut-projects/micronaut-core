@@ -14,9 +14,4 @@ dependencies {
 
     testImplementation dependencyVersion("validation")
     testImplementation project(":inject-groovy")
-    //system-rules has a transitive on junit-dep:[4.9,), so hard setting the version instead
-    testImplementation("com.github.stefanbirkner:system-rules:$systemRulesVersion") {
-        exclude group: "junit", module: "junit-dep"
-    }
-    testImplementation "junit:junit-dep:4.11"
 }

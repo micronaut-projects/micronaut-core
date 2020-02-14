@@ -3,7 +3,6 @@ dependencies {
     api project(':aop')
     api dependencyVersion("groovy")
 
-    testImplementation "junit:junit:4.13"
 //    testImplementation 'javax.validation:validation-api:1.1.0.Final'
     testImplementation "org.hibernate:hibernate-core:5.4.10.Final"
     testImplementation 'org.hibernate:hibernate-validator:6.0.13.Final'

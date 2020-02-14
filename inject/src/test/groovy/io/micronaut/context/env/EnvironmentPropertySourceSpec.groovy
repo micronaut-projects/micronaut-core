@@ -1,17 +1,14 @@
 package io.micronaut.context.env
 
+import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
-import org.junit.Rule
-import org.junit.contrib.java.lang.system.EnvironmentVariables
 import spock.lang.Specification
 
 class EnvironmentPropertySourceSpec extends Specification {
 
-    @Rule
-    private final EnvironmentVariables environmentVariables = new EnvironmentVariables()
-
     void "test disabling environment properties"() {
-        environmentVariables.set("A_B_C_D", "abcd")
+        def envs = SystemLambda.withEnvironmentVariable("A_B_C_D", "abcd")
+                .set()
         ApplicationContext context = ApplicationContext.build().start()
 
         expect:
@@ -26,14 +23,16 @@ class EnvironmentPropertySourceSpec extends Specification {
 
         cleanup:
         context.close()
+        envs.restore()
     }
 
     void "test include and exclude environment properties"() {
-        environmentVariables.set("A_B_C_D", "abcd")
-        environmentVariables.set("A_B_C_E", "abce")
-        environmentVariables.set("A_B_C_F", "abcf")
-        environmentVariables.set("A_B_C_G", "abcg")
-        environmentVariables.set("A_B_C_H", "abch")
+        def envs = SystemLambda.withEnvironmentVariable("A_B_C_D", "abcd")
+                .and("A_B_C_E", "abce")
+                .and("A_B_C_F", "abcf")
+                .and("A_B_C_G", "abcg")
+                .and("A_B_C_H", "abch")
+                .set()
         ApplicationContext context = ApplicationContext.build().environmentVariableIncludes("A_B_C_G", "A_B_C_E").start()
 
         expect:
@@ -70,10 +69,11 @@ class EnvironmentPropertySourceSpec extends Specification {
 
         cleanup:
         context.close()
+        envs.restore()
     }
 
     void "test a very large environment variable"() {
-        environmentVariables.set("A_B_C_D_E_F_G_H_I_J_K_L_M_N", "alphabet")
+        def envs = SystemLambda.withEnvironmentVariable("A_B_C_D_E_F_G_H_I_J_K_L_M_N", "alphabet").set()
         ApplicationContext context = ApplicationContext.build().start()
 
         expect:
@@ -81,6 +81,7 @@ class EnvironmentPropertySourceSpec extends Specification {
 
         cleanup:
         context.close()
+        envs.restore()
     }
 
 }

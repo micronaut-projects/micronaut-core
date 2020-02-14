@@ -373,7 +373,6 @@ class SuperTest {
     }
 
     void "test parse super class inherited interface stereotype data attributes"() {
-
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata("test.Test",'''\
 package test;

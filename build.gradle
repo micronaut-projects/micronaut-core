@@ -666,6 +666,7 @@ subprojects { Project subproject ->
 //    }
 
     tasks.withType(Test) {
+        useJUnitPlatform()
         jvmArgs '-Duser.country=US', '-Duser.language=en', '-Xmx2048m'
         reports.html.enabled = !System.getenv("GITHUB_ACTIONS")
         reports.junitXml.enabled = !System.getenv("GITHUB_ACTIONS")
