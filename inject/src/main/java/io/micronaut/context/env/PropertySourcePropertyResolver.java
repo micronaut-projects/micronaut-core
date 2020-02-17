@@ -408,7 +408,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 MapFormat.class,
                 "transformation",
                 MapFormat.MapTransformation.class)
-                .orElse(conversionContext.isAnnotationPresent(Property.class) ? MapFormat.MapTransformation.FLAT : MapFormat.MapTransformation.NESTED);
+                .orElse(MapFormat.MapTransformation.NESTED);
         return resolveSubMap(name, entries, conversionContext, keyConvention, transformation);
     }
 

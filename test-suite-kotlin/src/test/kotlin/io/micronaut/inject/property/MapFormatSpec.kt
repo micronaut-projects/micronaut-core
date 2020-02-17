@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import junit.framework.TestCase
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import kotlin.test.assertTrue
 
 
 class MapFormatSpec {
@@ -28,6 +29,22 @@ class MapFormatSpec {
         val context = ApplicationContext.run(mapOf("text.properties.yyy.zzz" to 3, "test.properties.yyy.xxx" to 2, "test.properties.yyy.yyy" to 3))
         val config = context.getBean(ConfigProps::class.java)
         assertEquals(config.properties?.get("yyy.xxx"), 2)
+        context.close()
+    }
+
+    @Test
+    fun testMapProperty() {
+        val context = ApplicationContext.run(mapOf("text.other-properties.yyy.zzz" to 3, "test.other-properties.yyy.xxx" to 2, "test.properties.yyy.yyy" to 3))
+        val config = context.getBean(ConfigProps::class.java)
+        assertTrue(config.otherProperties?.containsKey("yyy") ?: false)
+        context.close()
+    }
+
+    @Test
+    fun testMapPropertySetter() {
+        val context = ApplicationContext.run(mapOf("text.setter-properties.yyy.zzz" to 3, "test.setter-properties.yyy.xxx" to 2, "test.properties.yyy.yyy" to 3))
+        val config = context.getBean(ConfigProps::class.java)
+        assertTrue(config.getSetterProperties()?.containsKey("yyy") ?: false)
         context.close()
     }
 }

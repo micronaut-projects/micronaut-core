@@ -23,4 +23,14 @@ class ConfigProps {
 
     @setparam:MapFormat(transformation = MapFormat.MapTransformation.FLAT)
     var properties: Map<String, Any>? = null
+
+    var otherProperties: Map<String, Any>? = null
+
+    private var setterProperties: Map<String, Any>? = null
+
+    fun setSetterProperties(setterProperties: Map<String, Any>) {
+        this.setterProperties = setterProperties
+    }
+
+    fun getSetterProperties() = setterProperties
 }
