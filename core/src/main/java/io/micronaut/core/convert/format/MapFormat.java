@@ -38,7 +38,7 @@ public @interface MapFormat {
     /**
      * @return The map transformation to apply
      */
-    MapTransformation transformation() default MapTransformation.FLAT;
+    MapTransformation transformation() default MapTransformation.NESTED;
 
     /**
      * @return The key format to apply to keys
