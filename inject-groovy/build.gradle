@@ -15,5 +15,9 @@ dependencies {
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
 }
 
+test {
+    exclude '**/*$_closure*'
+}
+
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 //compileGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

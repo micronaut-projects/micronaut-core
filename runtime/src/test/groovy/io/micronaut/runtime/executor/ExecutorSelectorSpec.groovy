@@ -15,7 +15,6 @@
  */
 package io.micronaut.runtime.executor
 
-import grails.gorm.transactions.Transactional
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
@@ -67,7 +66,6 @@ class ExecutorSelectorSpec extends Specification {
 @Executable
 class MyService {
 
-    @Transactional
     void someMethod() {
 
     }

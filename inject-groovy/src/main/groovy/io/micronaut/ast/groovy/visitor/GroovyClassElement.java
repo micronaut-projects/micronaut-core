@@ -264,7 +264,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                             boolean validModifiers = node.isPublic() && !node.isStatic() && !node.isSynthetic() && !node.isAbstract();
                             if (validModifiers) {
                                 String methodName = node.getName();
-                                if (methodName.contains("$")) {
+                                if (methodName.contains("$") || methodName.equals("getMetaClass")) {
                                     return false;
                                 }
 

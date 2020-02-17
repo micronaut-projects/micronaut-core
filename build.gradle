@@ -48,7 +48,7 @@ ext {
                     version: groovyVersion,
                     group  : 'org.codehaus.groovy',
                     name   : 'groovy',
-                    modules: ['groovy-test', 'groovy-ant', 'groovy-json', 'groovy-jmx', 'groovy-templates']
+                    modules: ['groovy-test', 'groovy-test-junit5', 'groovy-ant', 'groovy-json', 'groovy-jmx', 'groovy-templates']
             ],
             gorm                       : [
                     version: gormVersion,
@@ -617,6 +617,7 @@ subprojects { Project subproject ->
     group projectGroupId
 
     repositories {
+        mavenLocal()
         maven { url "https://repo.grails.org/grails/core" }
     }
 
@@ -737,7 +738,7 @@ subprojects { Project subproject ->
         testImplementation "org.objenesis:objenesis:3.1"
 
         testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
-        testImplementation "org.codehaus.groovy:groovy-test:$groovyVersion"
+        testImplementation "org.codehaus.groovy:groovy-test-junit5:$groovyVersion"
         compileOnly "org.ow2.asm:asm:$asmVersion"
         compileOnly "org.ow2.asm:asm-commons:$asmVersion"
         annotationProcessor "org.ow2.asm:asm:$asmVersion"
