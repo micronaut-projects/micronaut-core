@@ -16,6 +16,7 @@
 package io.micronaut.scheduling.instrument;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Indexed;
 
 /**
  * An factory interface for invocation instrumentation, factory method decides if instrumentation is needed.
@@ -24,6 +25,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
  * @author graemerocher
  * @since 1.3
  */
+@Indexed(InvocationInstrumenterFactory.class)
 public interface InvocationInstrumenterFactory {
 
     /**
