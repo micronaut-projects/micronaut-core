@@ -108,6 +108,11 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
     }
 
     @Override
+    public boolean isWritable() {
+        return channel.isWritable();
+    }
+
+    @Override
     public boolean isSecure() {
         return isSecure;
     }

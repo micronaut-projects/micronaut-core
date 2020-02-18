@@ -56,6 +56,12 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     boolean isOpen();
 
     /**
+     * Whether the session is writable. It may not be writable, if the buffer is currently full
+     * @return True if it is
+     */
+    boolean isWritable();
+
+    /**
      * Whether the connection is secure.
      *
      * @return True if it is secure
