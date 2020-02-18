@@ -137,8 +137,12 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
         if (isOpen()) {
             if (message != null) {
                 CompletableFuture<T> future = new CompletableFuture<>();
-
-                WebSocketFrame frame = messageEncoder.encodeMessage(message, mediaType);
+                WebSocketFrame frame;
+                if (message instanceof WebSocketFrame) {
+                    frame = (WebSocketFrame) message;
+                } else {
+                    frame = messageEncoder.encodeMessage(message, mediaType);
+                }
                 channel.writeAndFlush(frame).addListener(f -> {
                     if (f.isSuccess()) {
                         future.complete(message);
@@ -160,7 +164,12 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
         if (isOpen()) {
             if (message != null) {
                 try {
-                    WebSocketFrame frame = messageEncoder.encodeMessage(message, mediaType);
+                    WebSocketFrame frame;
+                    if (message instanceof WebSocketFrame) {
+                        frame = (WebSocketFrame) message;
+                    } else {
+                        frame = messageEncoder.encodeMessage(message, mediaType);
+                    }
                     channel.writeAndFlush(frame).sync().get();
                 } catch (InterruptedException e) {
                     throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
@@ -183,7 +192,12 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
             if (!isOpen()) {
                 emitter.onError(new WebSocketSessionException("Session closed"));
             } else {
-                WebSocketFrame frame = messageEncoder.encodeMessage(message, mediaType);
+                WebSocketFrame frame;
+                if (message instanceof WebSocketFrame) {
+                    frame = (WebSocketFrame) message;
+                } else {
+                    frame = messageEncoder.encodeMessage(message, mediaType);
+                }
 
                 ChannelFuture channelFuture = channel.writeAndFlush(frame);
                 channelFuture.addListener(future -> {
