@@ -20,15 +20,14 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.multipart.HttpData;
-
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
  * @author James Kleeh
  * @since 1.0
+ * @deprecated Registered by HTTP data to byte array converter
  */
-@Singleton
+@Deprecated
 public class HttpDataToByteArrayConverter implements TypeConverter<HttpData, byte[]> {
 
     private final ConversionService conversionService;

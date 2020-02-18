@@ -20,7 +20,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.netty.buffer.ByteBuf;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -29,7 +28,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
+@Deprecated
 public class ByteBufToObjectConverter implements TypeConverter<ByteBuf, Object> {
 
     private final ConversionService<?> conversionService;
@@ -43,8 +42,6 @@ public class ByteBufToObjectConverter implements TypeConverter<ByteBuf, Object> 
 
     @Override
     public Optional<Object> convert(ByteBuf object, Class<Object> targetType, ConversionContext context) {
-        return conversionService
-            .convert(object, String.class, context)
-            .flatMap(val -> conversionService.convert(val, targetType, context));
+        return conversionService.convert(object.toString(context.getCharset()), targetType, context);
     }
 }

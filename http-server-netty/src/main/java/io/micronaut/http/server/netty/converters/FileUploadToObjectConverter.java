@@ -27,7 +27,6 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.handler.codec.http.multipart.FileUpload;
 
 import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -35,8 +34,9 @@ import java.util.Optional;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Registered by {@link NettyConverters} instead
  */
-@Singleton
+@Deprecated
 public class FileUploadToObjectConverter implements TypeConverter<FileUpload, Object> {
 
     private final ConversionService conversionService;

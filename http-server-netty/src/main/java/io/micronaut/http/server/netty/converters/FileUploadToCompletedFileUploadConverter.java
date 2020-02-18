@@ -20,8 +20,6 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.netty.handler.codec.http.multipart.FileUpload;
-
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -29,8 +27,8 @@ import java.util.Optional;
  *
  * @author Zachary Klein
  * @since 1.0
+ * @deprecated Registered by {@link NettyConverters} instead
  */
-@Singleton
 public class FileUploadToCompletedFileUploadConverter implements TypeConverter<FileUpload, CompletedFileUpload> {
 
     @Override
