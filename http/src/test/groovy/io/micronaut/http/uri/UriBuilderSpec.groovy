@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.uri
 
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -99,7 +100,6 @@ class UriBuilderSpec extends Specification {
 
     @Unroll
     void "test queryParam method for uri #uri"() {
-
         given:
         def builder = UriBuilder.of(uri)
         for (p in params) {
@@ -119,5 +119,18 @@ class UriBuilderSpec extends Specification {
         '/foo'               | ['foo': 'bar']          | '/foo?foo=bar'
         '/foo'               | ['foo': 'hello world']  | '/foo?foo=hello+world'
         '/foo'               | ['foo': ['bar', 'baz']] | '/foo?foo=bar&foo=baz'
+        '/foo'               | ['foo': ['bar', 'baz']] | '/foo?foo=bar&foo=baz'
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2823")
+    void "test parameter names with special characters"() {
+        given:
+        UriBuilder builder = UriBuilder.of("myurl")
+                .queryParam("\$top", "10")
+                .queryParam("\$filter", "xyz")
+        String uri = builder.build().toString()
+
+        expect:
+        uri == 'myurl?%24top=10&%24filter=xyz'
     }
 }

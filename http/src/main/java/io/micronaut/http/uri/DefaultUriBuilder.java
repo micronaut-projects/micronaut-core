@@ -346,10 +346,10 @@ class DefaultUriBuilder implements UriBuilder {
             StringBuilder builder = new StringBuilder();
             final Iterator<String> nameIterator = queryParams.names().iterator();
             while (nameIterator.hasNext()) {
-                String name = nameIterator.next();
-                name = expandOrEncode(name, values);
+                String rawName = nameIterator.next();
+                String name = expandOrEncode(rawName, values);
 
-                final Iterator<String> i = queryParams.getAll(name).iterator();
+                final Iterator<String> i = queryParams.getAll(rawName).iterator();
                 while (i.hasNext()) {
                     String v = expandOrEncode(i.next(), values);
                     builder.append(name).append('=').append(v);
