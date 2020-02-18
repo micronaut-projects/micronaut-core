@@ -20,8 +20,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
-
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -29,8 +27,9 @@ import java.util.Optional;
  *
  * @author msanssouci
  * @since 1.1.0
+ * @deprecated Replaced by {@link io.micronaut.jackson.convert.JacksonConverterRegistrar}
  */
-@Singleton
+@Deprecated
 public class CharSequencePropertyNamingStrategyConverter implements TypeConverter<CharSequence, PropertyNamingStrategy> {
 
     @Override

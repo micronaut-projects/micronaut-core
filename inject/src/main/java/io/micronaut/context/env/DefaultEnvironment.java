@@ -15,9 +15,9 @@
  */
 package io.micronaut.context.env;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.ApplicationContextConfiguration;
-import io.micronaut.context.converters.StringArrayToClassArrayConverter;
-import io.micronaut.context.converters.StringToClassConverter;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
@@ -37,8 +37,6 @@ import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.*;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
@@ -124,12 +122,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if (LOG.isInfoEnabled() && !environments.isEmpty()) {
             LOG.info("Established active environments: {}", environments);
         }
-        conversionService.addConverter(
-                CharSequence.class, Class.class, new StringToClassConverter(classLoader)
-        );
-        conversionService.addConverter(
-                Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
-        );
         this.resourceLoader = configuration.getResourceLoader();
         this.annotationScanner = createAnnotationScanner(classLoader);
     }

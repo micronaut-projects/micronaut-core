@@ -18,8 +18,6 @@ package io.micronaut.http.client.converters;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
-
-import javax.inject.Singleton;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Optional;
@@ -29,8 +27,9 @@ import java.util.Optional;
  *
  * @author James Kleeh
  * @since 1.1.0
+ * @deprecated Replaced by {@link io.micronaut.http.converters.HttpConverterRegistrar}
  */
-@Singleton
+@Deprecated
 public class SocketAddressConverter implements TypeConverter<CharSequence, SocketAddress> {
 
     @Override

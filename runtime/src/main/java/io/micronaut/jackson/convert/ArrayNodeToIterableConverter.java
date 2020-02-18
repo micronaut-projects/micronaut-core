@@ -20,9 +20,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.type.Argument;
-
-import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,8 +28,9 @@ import java.util.Optional;
 /**
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Replaced by {@link JacksonConverterRegistrar}
  */
-@Singleton
+@Deprecated
 public class ArrayNodeToIterableConverter implements TypeConverter<ArrayNode, Iterable> {
 
     private final ConversionService conversionService;
@@ -42,7 +40,6 @@ public class ArrayNodeToIterableConverter implements TypeConverter<ArrayNode, It
      *
      * @param conversionService Convert the given json node to the given target type.
      */
-    @Inject
     public ArrayNodeToIterableConverter(ConversionService conversionService) {
         this.conversionService = conversionService;
     }

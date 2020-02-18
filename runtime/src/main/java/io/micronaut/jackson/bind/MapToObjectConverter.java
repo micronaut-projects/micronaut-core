@@ -20,10 +20,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
-
-import javax.inject.Inject;
 import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -34,8 +31,9 @@ import java.util.function.BiFunction;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Replaced by {@link io.micronaut.jackson.convert.JacksonConverterRegistrar}
  */
-@Singleton
+@Deprecated
 public class MapToObjectConverter implements TypeConverter<Map, Object> {
 
     private final Provider<BeanPropertyBinder> beanPropertyBinder;
@@ -43,7 +41,6 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
     /**
      * @param beanPropertyBinder To bind map and Java bean properties
      */
-    @Inject
     public MapToObjectConverter(Provider<BeanPropertyBinder> beanPropertyBinder) {
         this.beanPropertyBinder = beanPropertyBinder;
     }
