@@ -15,13 +15,11 @@
  */
 package io.micronaut.reactive.reactor.converters;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -29,12 +27,11 @@ import java.util.Optional;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Registered by {@link ReactorConverterRegistrar} instead
  */
-@Singleton
-@Requires(classes = Flux.class)
+@Deprecated
 public class ObjectToFluxConverter implements TypeConverter<Object, Flux> {
 
-    @SuppressWarnings("unchecked")
     @Override
     public Optional<Flux> convert(Object object, Class<Flux> targetType, ConversionContext context) {
         if (object instanceof Publisher) {
