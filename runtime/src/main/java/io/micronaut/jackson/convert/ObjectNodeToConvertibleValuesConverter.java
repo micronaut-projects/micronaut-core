@@ -20,8 +20,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
-
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -29,8 +27,9 @@ import java.util.Optional;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Replaced by {@link JacksonConverterRegistrar}
  */
-@Singleton
+@Deprecated
 public class ObjectNodeToConvertibleValuesConverter implements TypeConverter<ObjectNode, ConvertibleValues> {
 
     private final ConversionService<?> conversionService;

@@ -21,14 +21,14 @@ import io.micronaut.core.convert.TypeConverter;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.multipart.HttpData;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
  * @author James Kleeh
  * @since 1.0
+ * @deprecated Registered by {@link NettyConverters} instead
  */
-@Singleton
+@Deprecated
 public class HttpDataToStringConverter implements TypeConverter<HttpData, CharSequence> {
 
     private final ConversionService conversionService;

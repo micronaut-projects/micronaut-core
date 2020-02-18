@@ -22,9 +22,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 
-import javax.inject.Inject;
 import javax.inject.Provider;
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -33,8 +31,9 @@ import java.util.Optional;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Replaced by {@link JacksonConverterRegistrar}
  */
-@Singleton
+@Deprecated
 public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object> {
 
     private final Provider<ObjectMapper> objectMapper;
@@ -42,7 +41,6 @@ public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object
     /**
      * @param objectMapper To read/write JSON
      */
-    @Inject
     public JsonNodeToObjectConverter(Provider<ObjectMapper> objectMapper) {
         this.objectMapper = objectMapper;
     }

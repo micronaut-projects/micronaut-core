@@ -150,7 +150,7 @@ public class HealthEndpoint {
      */
     @ConfigurationProperties("status")
     public static class StatusConfiguration {
-        private Map<String, HttpStatus> httpMapping = new HashMap<>();
+        private Map<String, HttpStatus> httpMapping = new HashMap<>(5);
 
         /**
          * Default constructor.

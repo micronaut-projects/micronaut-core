@@ -20,8 +20,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.netty.buffer.ByteBuf;
-
-import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -30,8 +28,9 @@ import java.util.Optional;
 /**
  * @author James Kleeh
  * @since 1.0
+ * @deprecated Now registered with {@link NettyConverters}
  */
-@Singleton
+@Deprecated
 public class NettyPartDataToObjectConverter implements TypeConverter<NettyPartData, Object> {
 
     private final ConversionService conversionService;

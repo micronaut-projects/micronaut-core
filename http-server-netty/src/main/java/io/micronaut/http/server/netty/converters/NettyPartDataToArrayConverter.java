@@ -19,16 +19,15 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
-
-import javax.inject.Singleton;
 import java.io.IOException;
 import java.util.Optional;
 
 /**
  * @author James Kleeh
  * @since 1.0
+ * @deprecated Now registered with {@link NettyConverters}
  */
-@Singleton
+@Deprecated
 public class NettyPartDataToArrayConverter implements TypeConverter<NettyPartData, byte[]> {
 
     private final ConversionService conversionService;
