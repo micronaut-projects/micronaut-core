@@ -19,13 +19,14 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.discovery.CompositeDiscoveryClient;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.inject.BeanDefinition;
 
 import java.util.Collection;
 
-import static java.lang.Boolean.TRUE;
+import static java.lang.Boolean.FALSE;
 
 /**
  * Custom condition to conditionally enable the heart beat.
@@ -38,19 +39,17 @@ public final class HeartbeatDiscoveryClientCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
         final ApplicationContext beanContext = (ApplicationContext) context.getBeanContext();
-        final Boolean enabled = beanContext.getProperty(HeartbeatConfiguration.ENABLED, Boolean.class).orElse(TRUE);
-        if (enabled) {
-            return true;
-        }
-
         final Collection<BeanDefinition<DiscoveryClient>> discoveryClients = beanContext.getBeanDefinitions(DiscoveryClient.class);
         final boolean hasDiscovery = discoveryClients.stream()
                 .anyMatch(bean -> !CompositeDiscoveryClient.class.isAssignableFrom(bean.getBeanType()));
         if (hasDiscovery) {
             return true;
         } else {
-            context.fail("Heartbeat not enabled since no Discovery client active");
-            return false;
+            final Boolean enabled = beanContext.getProperty(HeartbeatConfiguration.ENABLED, ArgumentConversionContext.BOOLEAN).orElse(FALSE);
+            if (!enabled) {
+                context.fail("Heartbeat not enabled since no Discovery client active");
+            }
+            return enabled;
         }
     }
 }

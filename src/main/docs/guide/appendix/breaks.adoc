@@ -1,5 +1,11 @@
 This section will document breaking changes between Micronaut 1.0 and Micronaut 2.0
 
+=== Heartbeat Events No Longer Published if no Discovery Clients present
+
+A api:health.HeartbeatEvent[] is no longer published automatically if there are no api:discovery.DiscoveryClient[] instances present.
+
+This behaviour can be changed by setting `micronaut.heartbeat.enabled` to `true` explicitly in configuration.
+
 === @Executable No Longer Stereotype of @Around
 
 In Micronaut 1.x the ann:context.annotation.Executable[] annotation was a meta-annotation specified on the ann:aop.Around[] and ann:aop.Introduction[] annotations. This meant that an api:inject.ExecutableMethod[] reference was generated for every usage of AOP advice which consumed additional memory unnecessarily.
