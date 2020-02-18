@@ -20,6 +20,7 @@ import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 
+import javax.inject.Singleton;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Optional;
@@ -30,6 +31,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 2.0
  */
+@Singleton
 public class HttpConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(ConversionService<?> conversionService) {
