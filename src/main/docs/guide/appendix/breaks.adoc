@@ -6,6 +6,28 @@ A api:health.HeartbeatEvent[] is no longer published automatically if there are 
 
 This behaviour can be changed by setting `micronaut.heartbeat.enabled` to `true` explicitly in configuration.
 
+=== Several TypeConverters Are No Longer Beans
+
+Many `TypeConverter` instances that were previously beans are no longer beans and are deprecated including:
+
+* api:http.MediaTypeConverter[]
+* api:convext.converters.StringToClassConverter[]
+* api:convext.converters.StringArrayToClassArrayConverter[]
+* api:http.client.converters.SocketAddressConverter[]
+* api:reactive.reactor.converters.PublisherToMonoConverter[]
+* api:reactive.reactor.converters.PublisherToFluxConverter[]
+* api:reactive.reactor.converters.ObjectToFluxConverter[]
+* api:reactive.reactor.converters.ObjectToMonoConverter[]
+* api:jackson.convert.JsonNodeToObjectConverter[]
+* api:jackson.convert.MapToObjectConverter[]
+* api:jackson.convert.ObjectToJsonNodeConverter[]
+* api:jackson.convert.ArrayNodeToArrayConverter[]
+* api:jackson.convert.ArrayNodeToIterableConverter[]
+* api:jackson.convert.ObjectNodeToConvertibleValuesConverter[]
+* api:runtime.http.converters.HttpStatusConverter[]
+
+These should not be injected directly but instead used through the api:core.convert.ConversionService[] API.
+
 === @Executable No Longer Stereotype of @Around
 
 In Micronaut 1.x the ann:context.annotation.Executable[] annotation was a meta-annotation specified on the ann:aop.Around[] and ann:aop.Introduction[] annotations. This meant that an api:inject.ExecutableMethod[] reference was generated for every usage of AOP advice which consumed additional memory unnecessarily.
