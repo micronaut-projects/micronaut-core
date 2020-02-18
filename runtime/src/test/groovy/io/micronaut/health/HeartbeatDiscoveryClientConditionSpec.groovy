@@ -3,6 +3,7 @@ package io.micronaut.health
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.condition.ConditionContext
 import io.micronaut.core.convert.ArgumentConversionContext
+import io.micronaut.discovery.CompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
@@ -26,7 +27,7 @@ class HeartbeatDiscoveryClientConditionSpec extends Specification {
         !matches
         1 * conditionContext.getBeanContext() >> beanContext
         1 * beanContext.getProperty(HeartbeatConfiguration.ENABLED, ArgumentConversionContext.BOOLEAN) >> Optional.empty()
-        1 * beanContext.getBeanDefinitions(DiscoveryClient.class) >> []
+        1 * beanContext.getBean(CompositeDiscoveryClient.class) >> new CompositeDiscoveryClient() {}
     }
 
     def "matches should return false when micronaut.heartbeat.enabled is defined as false and there are no discovery clients"() {
@@ -42,7 +43,7 @@ class HeartbeatDiscoveryClientConditionSpec extends Specification {
         !matches
         1 * conditionContext.getBeanContext() >> beanContext
         1 * beanContext.getProperty(HeartbeatConfiguration.ENABLED, ArgumentConversionContext.BOOLEAN) >> Optional.of(FALSE)
-        1 * beanContext.getBeanDefinitions(DiscoveryClient.class) >> []
+        1 * beanContext.getBean(CompositeDiscoveryClient.class) >> new CompositeDiscoveryClient() {}
     }
 
     def "matches should return true when micronaut.heartbeat.enabled is defined as false and there are discovery clients"() {
@@ -50,7 +51,6 @@ class HeartbeatDiscoveryClientConditionSpec extends Specification {
         given:
         ConditionContext conditionContext = Mock(ConditionContext)
         ApplicationContext  beanContext = Mock(ApplicationContext)
-        def beanDefinition = Mock(BeanDefinition)
 
         when:
         Boolean matches = heartbeatDiscoveryClientCondition.matches(conditionContext)
@@ -58,7 +58,7 @@ class HeartbeatDiscoveryClientConditionSpec extends Specification {
         then:
         matches
         1 * conditionContext.getBeanContext() >> beanContext
-        1 * beanDefinition.getBeanType() >> DiscoveryClient.class
-        1 * beanContext.getBeanDefinitions(DiscoveryClient.class) >> [beanDefinition]
+        1 * beanContext.getBean(CompositeDiscoveryClient.class) >> new CompositeDiscoveryClient(Mock(DiscoveryClient)) {
+        }
     }
 }
