@@ -132,3 +132,34 @@ Some default interface methods are no longer default and require implementation.
 === Deprecation Removal
 
 Most if not all deprecated classes and methods have been removed.
+
+=== Map Property Binding
+
+In Micronaut 1.x `java.util.Map` properties being bound from config were inconsistently bound as either a nested or flat. Now maps are bound as nested by default and the ann:core.convert.format.MapFormat[] annotation's default value for `transformation` has been changed to reflect that.
+
+For example given the config:
+
+[source,yaml]
+----
+persons:
+  joe:
+    age: 30
+  sally:
+    age: 25
+----
+
+A map property injected via `@Property(name ="persons")` may have been injected flat or nested depending on a couple factors.
+
+[source,json]
+.Flat
+----
+{"joe.age": 30, "sally.age": 25}
+----
+
+[source,json]
+.Nested
+----
+{"joe": {"age": 30}, "sally": {"age": 25}}
+----
+
+To bind to a map with flat keys, add the ann:core.convert.format.MapFormat[] annotation and set the `transformation` member.
