@@ -106,16 +106,17 @@ public class VaultConfigurationClient implements ConfigurationClient {
                     .map(data -> PropertySource.of(value, data.getSecrets(), key))
                     .onErrorResumeNext(throwable -> {
                         //TODO: Discover why the below hack is necessary
-                        if (throwable instanceof HttpClientResponseException) {
-                            if (((HttpClientResponseException) throwable).getStatus() == HttpStatus.NOT_FOUND) {
+                        Throwable t = (Throwable) throwable;
+                        if (t instanceof HttpClientResponseException) {
+                            if (((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
                                 if (vaultClientConfiguration.isFailFast()) {
                                     return Flowable.error(new ConfigurationException(
-                                            "Could not locate PropertySource and the fail fast property is set", throwable));
+                                            "Could not locate PropertySource and the fail fast property is set", t));
                                 }
                             }
                             return Flowable.empty();
                         }
-                        return Flowable.error(new ConfigurationException("Error reading distributed configuration from Vault: " + throwable.getMessage(), throwable));
+                        return Flowable.error(new ConfigurationException("Error reading distributed configuration from Vault: " + t.getMessage(), t));
                     });
             if (scheduler != null) {
                 propertySourceFlowable = propertySourceFlowable.subscribeOn(scheduler);

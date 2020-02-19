@@ -12,7 +12,7 @@ import java.util.concurrent.ExecutorService;
 // end::imports[]
 
 // tag::class[]
-@Controller("/people")
+@Controller("/subscribeOn/people")
 public class PersonController {
 
     private final Scheduler scheduler;

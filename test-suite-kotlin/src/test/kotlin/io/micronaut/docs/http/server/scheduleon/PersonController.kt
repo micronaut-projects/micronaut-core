@@ -8,7 +8,7 @@ import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ScheduleOn
 // end::imports[]
 // tag::class[]
-@Controller("/people")
+@Controller("/scheduleOn/people")
 class PersonController (private val personService: PersonService) {
     @Get("/{name}")
     @ScheduleOn(TaskExecutors.IO) // <1>

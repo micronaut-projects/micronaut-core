@@ -975,19 +975,28 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         // Select the most appropriate Executor
         ExecutorService executor;
         final ThreadSelection threadSelection = serverConfiguration.getThreadSelection();
+        final MediaType contentType = request.getContentType().orElse(null);
         switch (threadSelection) {
             case MANUAL:
-                executor = null;
+                if (MediaType.APPLICATION_JSON_STREAM_TYPE.equals(contentType)) {
+                    executor = ioExecutor;
+                } else {
+                    executor = null;
+                }
             break;
             case IO:
                 executor = ioExecutor;
             break;
             case AUTO:
             default:
-                if (route instanceof MethodBasedRouteMatch) {
-                    executor = executorSelector.select((MethodBasedRouteMatch) route, threadSelection).orElse(null);
+                if (MediaType.APPLICATION_JSON_STREAM_TYPE.equals(contentType)) {
+                    executor = ioExecutor;
                 } else {
-                    executor = null;
+                    if (route instanceof MethodBasedRouteMatch) {
+                        executor = executorSelector.select((MethodBasedRouteMatch) route, threadSelection).orElse(null);
+                    } else {
+                        executor = null;
+                    }
                 }
                 break;
         }

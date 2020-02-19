@@ -12,7 +12,7 @@ import javax.inject.Named
 // end::imports[]
 
 // tag::class[]
-@Controller("/people")
+@Controller("/subscribeOn/people")
 class PersonController internal constructor(
         @Named(TaskExecutors.IO) executorService: ExecutorService, // <1>
         val personService: PersonService) {

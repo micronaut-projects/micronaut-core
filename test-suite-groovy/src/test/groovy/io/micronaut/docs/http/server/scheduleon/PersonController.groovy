@@ -10,7 +10,7 @@ import io.micronaut.scheduling.annotation.ScheduleOn
 // end::imports[]
 
 // tag::class[]
-@Controller("/people")
+@Controller("/scheduleOn/people")
 class PersonController {
 
     private final PersonService personService
