@@ -1,17 +1,10 @@
-As mentioned previously, Micronaut is built on Netty which is designed around an Event loop model and non-blocking I/O.
+As mentioned previously, Micronaut is built on Netty which is designed around an Event loop model and non-blocking I/O. Micronaut will execute code defined in ann:http.annotation.Controller[] beans in the same thread as the request thread (an Event Loop thread).
 
-Although it is recommended to follow a non-blocking approach, in particular when making remote calls to other microservices, Micronaut acknowledges the fact that in real world scenarios developers encounter situations where the need arises to interface with blocking APIs and, in order to facilitate this, features automatic thread selection based on the return type of the method.
-
-If your controller method returns a non-blocking type such as an RxJava `Observable` or a `CompletableFuture` then Micronaut will use the Event loop thread to subscribe to the result.
-
-If however you return any other type then Micronaut will execute your `@Controller` method in a preconfigured I/O thread pool.
-
-WARNING: This means effectively that if you write a method that uses `Single.fromCallable(..)` and block within the body of the callable you may unknowingly block the Netty event loop thread and when writing such logic *you must* also invoke `Single.subscribeOn(..)` to ensure the event loop thread is not blocked.
-
-The I/O thread pool by default is a caching, unbound thread pool. However, you may wish to configure the nature of the thread pool to avoid exhausting resources in applications that perform a lot of blocking I/O under high load.
+This makes it critical that if you do any blocking I/O operations (for example interactions with Hibernate/JPA or JDBC) that you offload those tasks to a separate thread pool that does not block the Event loop.
 
 For example the following configuration will configure the I/O thread pool as a fixed thread pool with 75 threads (similar to what a traditional blocking server such as Tomcat uses in the thread per connection model):
 
+.Configuring the IO thread pool
 [source,yaml]
 ----
 micronaut:
@@ -21,13 +14,21 @@ micronaut:
             nThreads: 75
 ----
 
-If automatic thread selection is undesirable for your application you can either annotate the controller or method with ann:core.annotation.NonBlocking[] in which case all operations of the controller will run on the event loop or alternatively you can completely disable automatic thread selection by setting the `micronaut.server.thread-selection` to one of the values in the api:scheduling.executor.ThreadSelection[] enum. For example the following configuration:
+To use this thread pool in a ann:http.annotation.Controller[] bean you have a number of options. The simplest option is to use the ann:scheduling.annotation.ScheduleOn[] annotation which can be declared at the type or method level to indicate which configured thread pool you wish to run the method or methods of the controller on:
 
-[source,yaml]
-----
-micronaut:
-    server:
-        thread-selection: MANUAL
-----
+snippet::io.micronaut.docs.http.server.scheduleon.PersonController[tags="imports,class", indent=0,title="Using @ScheduleOn"]
 
-Will perform no thread selection and run all operations on the Netty event loop thread. It is then up to the developer to ensure logic that includes blocking I/O is scheduled on another thread by, for example, using RxJava's `subscribeOn(..)` facility or the ann:scheduling.annotation.Async[] annotation (amongst other options).
+<1> The ann:scheduling.annotation.ScheduleOn[] annotation is used to schedule the operation on the I/O thread pool
+
+The value of the ann:scheduling.annotation.ScheduleOn[] annotation can be any named executor defined under `micronaut.executors`.
+
+TIP: Generally speaking for database operations you will want a thread pool configured that matches maximum number of connections you have specified in the database connection pool.
+
+An alternative to the ann:scheduling.annotation.ScheduleOn[] annotation is to use the facility provided by the reactive library you have chosen. RxJava for example features a `subscribeOn` method which allows you to alter which thread executes user code. For example:
+
+snippet::io.micronaut.docs.http.server.reactive.PersonController[tags="imports,class", indent=0,title="RxJava subscribeOn Example"]
+
+<1> The configured I/O executor service is injected
+<2> RxJava's `fromCallable` method is used to wrap the blocking operation
+<3> RxJava's `subscribeOn` method is used to schedule the operation on the I/O thread pool
+

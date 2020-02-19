@@ -43,7 +43,7 @@ class ExecutorSelectorSpec extends Specification {
         ExecutorSelector selector = applicationContext.getBean(ExecutorSelector)
         Optional<ExecutableMethod> method = applicationContext.findExecutableMethod(MyService, methodName)
 
-        Optional<ExecutorService> executorService = selector.select(method.get())
+        Optional<ExecutorService> executorService = selector.select(method.get(), threadSelection)
 
         expect:
         executorService.isPresent() == present

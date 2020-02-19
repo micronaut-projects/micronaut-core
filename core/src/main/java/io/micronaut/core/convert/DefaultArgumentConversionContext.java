@@ -33,7 +33,7 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     private final Argument<T> argument;
     private final Locale finalLocale;
     private final Charset finalCharset;
-    private final List<ConversionError> conversionErrors = new ArrayList<>();
+    private final List<ConversionError> conversionErrors = new ArrayList<>(3);
 
     /**
      * @param argument     The argument

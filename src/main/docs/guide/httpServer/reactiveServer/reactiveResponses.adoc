@@ -4,9 +4,7 @@ Micronaut supports returning common reactive types such as rx:Single[] or rx:Obs
 
 The argument that is designated the body of the request using the api:http.annotation.Body[] annotation can also be a reactive type or a jdk:java.util.concurrent.CompletableFuture[].
 
-Micronaut also uses these types to influence which thread pool to execute the method on. If the request is considered non-blocking (because it returns a non-blocking type) then the Netty event loop thread will be used to execute the method.
-
-If the method is considered blocking then the method is executed on the I/O thread pool, which Micronaut creates at startup.
+When returning a reactive type Micronaut will subscribe to the returned reactive type on the same thread as the request (A Netty Event Loop thread). It is therefore important that if you perform any blocking operations you offload those operations to an appropriately configured thread pool for example, using RxJava's `subscribeOn(..)` facility or ann:scheduling.annotation.ScheduleOn[].
 
 TIP: See the section on <<threadPools, Configuring Thread Pools>> for information on the thread pools that Micronaut sets up and how to configure them.
 

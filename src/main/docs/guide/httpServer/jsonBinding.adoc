@@ -35,14 +35,11 @@ The above example uses the `thenApply` method to achieve the same as the previou
 
 == Binding using POJOs
 
-Note however, that if your method does not do any blocking I/O then you can just as easily write:
+Note however you can just as easily write:
 
 snippet::io.micronaut.docs.server.json.PersonController[tags="class,regular,endclass", indent=0, title="Binding JSON POJOs"]
 
-Micronaut will still using non-blocking I/O to read the JSON and only execute your method once the data has been read.
-
-In other words, as a rule reactive types should be used when you plan to do further downstream I/O operations in which case they can greatly simplify composing operations.
-
+Micronaut will only execute your method once the data has been read in a non-blocking manner.
 
 TIP: The output produced by Jackson can be customized in a variety of manners, from defining Jackson modules to using https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations[Jackson's annotations]
 

@@ -27,10 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -980,7 +977,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         final ThreadSelection threadSelection = serverConfiguration.getThreadSelection();
         switch (threadSelection) {
             case MANUAL:
-                executor = context.channel().eventLoop();
+                executor = null;
             break;
             case IO:
                 executor = ioExecutor;
@@ -988,9 +985,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             case AUTO:
             default:
                 if (route instanceof MethodBasedRouteMatch) {
-                    executor = executorSelector.select((MethodBasedRouteMatch) route).orElse(context.channel().eventLoop());
+                    executor = executorSelector.select((MethodBasedRouteMatch) route, threadSelection).orElse(null);
                 } else {
-                    executor = context.channel().eventLoop();
+                    executor = null;
                 }
                 break;
         }
@@ -1479,11 +1476,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 } else {
                     // emit the result
                     if (result instanceof Writable) {
-                        ByteBuf byteBuf = context.alloc().ioBuffer(128);
-                        ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
                         Writable writable = (Writable) result;
-                        writable.writeTo(outputStream, requestReference.get().getCharacterEncoding());
-                        emitter.onNext(byteBuf);
+                        Flowable.fromCallable(() -> {
+                            ByteBuf byteBuf = context.alloc().ioBuffer(128);
+                            ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
+                            writable.writeTo(outputStream, requestReference.get().getCharacterEncoding());
+                            return byteBuf;
+                        }).subscribe((byteBuf -> {
+                            emitter.onNext(byteBuf);
+                            emitter.onComplete();
+                        }));
+
                     } else {
                         emitter.onNext(result);
                     }
@@ -1546,7 +1549,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private Flowable<? extends MutableHttpResponse<?>> filterPublisher(
             AtomicReference<HttpRequest<?>> requestReference,
             Publisher<MutableHttpResponse<?>> routePublisher,
-            ExecutorService executor,
+            @Nullable ExecutorService executor,
             boolean skipOncePerRequest) {
         Publisher<? extends io.micronaut.http.MutableHttpResponse<?>> finalPublisher;
         List<HttpFilter> filters = new ArrayList<>(router.findFilters(requestReference.get()));
@@ -1578,13 +1581,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             finalPublisher = routePublisher;
         }
 
-        // Handle the scheduler to subscribe on
-        if (finalPublisher instanceof Flowable) {
-            return ((Flowable<MutableHttpResponse<?>>) finalPublisher)
-                    .subscribeOn(Schedulers.from(executor));
+        if (executor != null) {
+            // Handle the scheduler to subscribe on
+            if (finalPublisher instanceof Flowable) {
+                return ((Flowable<MutableHttpResponse<?>>) finalPublisher)
+                        .subscribeOn(Schedulers.from(executor));
+            } else {
+                return Flowable.fromPublisher(finalPublisher)
+                        .subscribeOn(Schedulers.from(executor));
+            }
         } else {
-            return Flowable.fromPublisher(finalPublisher)
-                    .subscribeOn(Schedulers.from(executor));
+            if (finalPublisher instanceof Flowable) {
+                return (Flowable<? extends MutableHttpResponse<?>>) finalPublisher;
+            } else {
+                return Flowable.fromPublisher(finalPublisher);
+            }
         }
     }
 

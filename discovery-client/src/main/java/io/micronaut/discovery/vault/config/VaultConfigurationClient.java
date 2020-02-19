@@ -99,24 +99,23 @@ public class VaultConfigurationClient implements ConfigurationClient {
 
         Scheduler scheduler = executorService != null ? Schedulers.from(executorService) : null;
 
-        buildVaultKeys(applicationName, activeNames).entrySet().forEach(entry -> {
+        buildVaultKeys(applicationName, activeNames).forEach((key, value) -> {
             Flowable<PropertySource> propertySourceFlowable = Flowable.fromPublisher(
-                    configHttpClient.readConfigurationValues(token, engine, entry.getValue()))
+                    configHttpClient.readConfigurationValues(token, engine, value))
                     .filter(data -> !data.getSecrets().isEmpty())
-                    .map(data -> PropertySource.of(entry.getValue(), data.getSecrets(), entry.getKey()))
+                    .map(data -> PropertySource.of(value, data.getSecrets(), key))
                     .onErrorResumeNext(throwable -> {
                         //TODO: Discover why the below hack is necessary
-                        Throwable t = (Throwable) throwable;
-                        if (t instanceof HttpClientResponseException) {
-                            if (((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
+                        if (throwable instanceof HttpClientResponseException) {
+                            if (((HttpClientResponseException) throwable).getStatus() == HttpStatus.NOT_FOUND) {
                                 if (vaultClientConfiguration.isFailFast()) {
                                     return Flowable.error(new ConfigurationException(
-                                            "Could not locate PropertySource and the fail fast property is set", t));
+                                            "Could not locate PropertySource and the fail fast property is set", throwable));
                                 }
                             }
                             return Flowable.empty();
                         }
-                        return Flowable.error(new ConfigurationException("Error reading distributed configuration from Vault: " + t.getMessage(), t));
+                        return Flowable.error(new ConfigurationException("Error reading distributed configuration from Vault: " + throwable.getMessage(), throwable));
                     });
             if (scheduler != null) {
                 propertySourceFlowable = propertySourceFlowable.subscribeOn(scheduler);
