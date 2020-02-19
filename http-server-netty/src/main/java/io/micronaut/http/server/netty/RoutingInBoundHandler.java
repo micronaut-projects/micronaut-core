@@ -1461,19 +1461,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
             // for non-reactive results we build flowable that executes the
             // route
-            resultEmitter = Flowable.create((emitter) -> {
+            resultEmitter = Flowable.defer(() -> {
                 HttpRequest<?> httpRequest = requestReference.get();
                 RouteMatch<?> routeMatch = finalRoute;
                 if (!routeMatch.isExecutable()) {
                     routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
                 }
-                Object result;
-                try {
-                    result = routeMatch.execute();
-                } catch (Throwable e) {
-                    emitter.onError(e);
-                    return;
-                }
+                Object result = routeMatch.execute();
 
                 if (result instanceof Optional) {
                     result = ((Optional<?>) result).orElse(null);
@@ -1481,29 +1475,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                 if (result == null) {
                     // empty flowable
-                    emitter.onComplete();
+                    return Flowable.empty();
                 } else {
                     // emit the result
                     if (result instanceof Writable) {
                         Writable writable = (Writable) result;
-                        Flowable.fromCallable(() -> {
+                        return Flowable.fromCallable(() -> {
                             ByteBuf byteBuf = context.alloc().ioBuffer(128);
                             ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
                             writable.writeTo(outputStream, requestReference.get().getCharacterEncoding());
                             return byteBuf;
-                        }).subscribeOn(Schedulers.from(ioExecutor)).subscribe((byteBuf -> {
-                            emitter.onNext(byteBuf);
-                            emitter.onComplete();
-                        }));
+                        }).subscribeOn(Schedulers.from(ioExecutor));
 
                     } else {
-                        emitter.onNext(result);
+                        return Publishers.just(result);
                     }
-                    emitter.onComplete();
                 }
-
-                // should be no back pressure
-            }, BackpressureStrategy.ERROR);
+            });
         }
         return resultEmitter;
     }
