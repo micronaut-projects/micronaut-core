@@ -1491,7 +1491,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
                             writable.writeTo(outputStream, requestReference.get().getCharacterEncoding());
                             return byteBuf;
-                        }).subscribe((byteBuf -> {
+                        }).subscribeOn(Schedulers.from(ioExecutor)).subscribe((byteBuf -> {
                             emitter.onNext(byteBuf);
                             emitter.onComplete();
                         }));

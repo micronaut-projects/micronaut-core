@@ -16,6 +16,7 @@
 package io.micronaut.scheduling.executor;
 
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.NonBlocking;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
@@ -24,6 +25,7 @@ import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ScheduleOn;
+import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -53,7 +55,16 @@ public class DefaultExecutorSelector implements ExecutorSelector {
     public Optional<ExecutorService> select(MethodReference method, ThreadSelection threadSelection) {
         final String name = method.stringValue(ScheduleOn.class).orElse(null);
         if (name != null) {
-            return beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name));
+            final ExecutorService executorService;
+            try {
+                executorService = beanLocator.getBean(ExecutorService.class, Qualifiers.byName(name));
+                return Optional.of(executorService);
+            } catch (NoSuchBeanException e) {
+                throw new SchedulerConfigurationException(
+                        method,
+                        "No executor configured for name: " + name
+                );
+            }
         } else if (threadSelection == ThreadSelection.AUTO) {
             if (method.hasStereotype(NonBlocking.class)) {
                 return Optional.empty();
