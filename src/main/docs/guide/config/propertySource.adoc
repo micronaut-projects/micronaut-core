@@ -21,6 +21,8 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 
 TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
 
+CAUTION: Custom confiruation options that are camel-case (e.g., `fooBar`) may behave unexpectedly when evaluating against the property list above. Specifically, there is no way for an OS environment variable to specify a value for an option named `fooBar`. Micronaut would translate `FOO_BAR` to `foo_bar`, `foo.bar`, but not `fooBar`. Similarly it would translate `FOOBAR` to `foobar` but not `fooBar`. 
+
 === Property Value Placeholders
 
 Micronaut includes a property placeholder syntax which can be used to reference configuration properties both within configuration values and with any Micronaut annotation (see ann:io.micronaut.context.annotation.Value[] and the section on <<valueAnnotation,Configuration Injection>>).
