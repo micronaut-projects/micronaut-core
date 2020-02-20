@@ -16,8 +16,6 @@
 package io.micronaut.websocket;
 
 import io.micronaut.http.MediaType;
-import io.micronaut.websocket.annotation.OnMessage;
-import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -37,7 +35,7 @@ public interface WebSocketBroadcaster {
     /**
      * When used on the server this method will broadcast a message to all open WebSocket connections that match the given filter.
      * The resulting {@link Publisher} does not start sending until subscribed to.
-     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * If you return it from Micronaut annotated methods such as {@link io.micronaut.websocket.annotation.OnOpen} and {@link io.micronaut.websocket.annotation.OnMessage},
      * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
@@ -51,7 +49,7 @@ public interface WebSocketBroadcaster {
     /**
      * When used on the server this method will broadcast a message to all open WebSocket connections.
      * The resulting {@link Publisher} does not start sending until subscribed to.
-     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * If you return it from Micronaut annotated methods such as {@link io.micronaut.websocket.annotation.OnOpen} and {@link io.micronaut.websocket.annotation.OnMessage},
      * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
@@ -66,7 +64,7 @@ public interface WebSocketBroadcaster {
     /**
      * When used on the server this method will broadcast a message to all open WebSocket connections.
      * The resulting {@link Publisher} does not start sending until subscribed to.
-     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * If you return it from Micronaut annotated methods such as {@link io.micronaut.websocket.annotation.OnOpen} and {@link io.micronaut.websocket.annotation.OnMessage},
      * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
@@ -80,7 +78,7 @@ public interface WebSocketBroadcaster {
     /**
      * When used on the server this method will broadcast a message to all open WebSocket connections that match the given filter.
      * The resulting {@link Publisher} does not start sending until subscribed to.
-     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * If you return it from Micronaut annotated methods such as {@link io.micronaut.websocket.annotation.OnOpen} and {@link io.micronaut.websocket.annotation.OnMessage},
      * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message

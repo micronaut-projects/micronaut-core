@@ -19,8 +19,6 @@ import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.MediaType;
-import io.micronaut.websocket.annotation.OnMessage;
-import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import org.reactivestreams.Publisher;
 
@@ -94,7 +92,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     /**
      * Send the given message to the remote peer.
      * The resulting {@link Publisher} does not start sending until subscribed to.
-     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * If you return it from Micronaut annotated methods such as {@link io.micronaut.websocket.annotation.OnOpen} and {@link io.micronaut.websocket.annotation.OnMessage},
      * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
@@ -133,7 +131,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     /**
      * Send the given message to the remote peer.
      * The resulting {@link Publisher} does not start sending until subscribed to.
-     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * If you return it from Micronaut annotated methods such as {@link io.micronaut.websocket.annotation.OnOpen} and {@link io.micronaut.websocket.annotation.OnMessage},
      * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
