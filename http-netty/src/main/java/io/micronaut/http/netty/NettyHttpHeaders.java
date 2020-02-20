@@ -53,7 +53,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
      * Default constructor.
      */
     public NettyHttpHeaders() {
-        this.nettyHeaders = new DefaultHttpHeaders(false);
+        this.nettyHeaders = new DefaultHttpHeaders();
         this.conversionService = ConversionService.SHARED;
     }
 
