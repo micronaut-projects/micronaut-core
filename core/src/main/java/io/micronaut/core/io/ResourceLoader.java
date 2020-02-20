@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.io;
 
+import io.micronaut.core.annotation.Indexed;
+
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Optional;
@@ -26,6 +28,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Indexed(ResourceLoader.class)
 public interface ResourceLoader {
 
     /**
