@@ -19,6 +19,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
@@ -78,6 +79,7 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @BootstrapContextCompatible
+    @Indexed(ResourceResolver.class)
     protected @NonNull ResourceResolver resourceResolver(@NonNull List<ResourceLoader> resourceLoaders) {
         return new ResourceResolver(resourceLoaders);
     }
