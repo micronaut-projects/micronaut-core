@@ -16,6 +16,8 @@
 package io.micronaut.websocket;
 
 import io.micronaut.http.MediaType;
+import io.micronaut.websocket.annotation.OnMessage;
+import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -34,6 +36,9 @@ import java.util.function.Predicate;
 public interface WebSocketBroadcaster {
     /**
      * When used on the server this method will broadcast a message to all open WebSocket connections that match the given filter.
+     * The resulting {@link Publisher} does not start sending until subscribed to.
+     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
      * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
@@ -45,6 +50,9 @@ public interface WebSocketBroadcaster {
 
     /**
      * When used on the server this method will broadcast a message to all open WebSocket connections.
+     * The resulting {@link Publisher} does not start sending until subscribed to.
+     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
      * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
@@ -57,6 +65,9 @@ public interface WebSocketBroadcaster {
 
     /**
      * When used on the server this method will broadcast a message to all open WebSocket connections.
+     * The resulting {@link Publisher} does not start sending until subscribed to.
+     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
      * @param <T> The message type
@@ -68,6 +79,9 @@ public interface WebSocketBroadcaster {
 
     /**
      * When used on the server this method will broadcast a message to all open WebSocket connections that match the given filter.
+     * The resulting {@link Publisher} does not start sending until subscribed to.
+     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
      * @param filter The filter to apply
@@ -86,7 +100,7 @@ public interface WebSocketBroadcaster {
      * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param filter The filter
      * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
+     * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
      */
     default <T> CompletableFuture<T> broadcastAsync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
         CompletableFuture<T> future = new CompletableFuture<>();
@@ -103,7 +117,7 @@ public interface WebSocketBroadcaster {
      *
      * @param message The message
      * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
+     * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
      */
     default <T> CompletableFuture<T> broadcastAsync(T message) {
         return broadcastAsync(message, MediaType.APPLICATION_JSON_TYPE, (o) -> true);
@@ -115,7 +129,7 @@ public interface WebSocketBroadcaster {
      * @param message The message
      * @param filter The filter to apply
      * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
+     * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
      */
     default <T> CompletableFuture<T> broadcastAsync(T message, Predicate<WebSocketSession> filter) {
         return broadcastAsync(message, MediaType.APPLICATION_JSON_TYPE, filter);
@@ -127,7 +141,7 @@ public interface WebSocketBroadcaster {
      * @param message The message
      * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
+     * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
      */
     default <T> CompletableFuture<T> broadcastAsync(T message, MediaType mediaType) {
         return broadcastAsync(message, mediaType, (o) -> true);
