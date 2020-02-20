@@ -19,6 +19,8 @@ import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.MediaType;
+import io.micronaut.websocket.annotation.OnMessage;
+import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import org.reactivestreams.Publisher;
 
@@ -91,6 +93,9 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
 
     /**
      * Send the given message to the remote peer.
+     * The resulting {@link Publisher} does not start sending until subscribed to.
+     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
      * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
@@ -105,7 +110,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      * @param message The message
      *  @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
+     * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
      */
     <T> CompletableFuture<T> sendAsync(T message, MediaType mediaType);
 
@@ -127,6 +132,9 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
 
     /**
      * Send the given message to the remote peer.
+     * The resulting {@link Publisher} does not start sending until subscribed to.
+     * If you return it from Micronaut annotated methods such as {@link OnOpen} and {@link OnMessage},
+     * Micronaut will subscribe to it and send the message without blocking.
      *
      * @param message The message
      * @param <T> The message type
@@ -141,7 +149,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      *
      * @param message The message
      * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
+     * @return A {@link CompletableFuture} that tracks the execution. {@link CompletableFuture#get()} and related methods will return the message on success, on error throw the underlying Exception.
      */
     default <T> CompletableFuture<T> sendAsync(T message) {
         return sendAsync(message, MediaType.APPLICATION_JSON_TYPE);
