@@ -29,6 +29,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -121,6 +122,7 @@ public class DefaultBeanContext implements BeanContext {
     private final ClassLoader classLoader;
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
     private final Set<Class> indexedTypes = CollectionUtils.setOf(
+            ResourceLoader.class,
             TypeConverter.class,
             TypeConverterRegistrar.class,
             ApplicationEventListener.class,
