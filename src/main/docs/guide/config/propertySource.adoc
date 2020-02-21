@@ -21,8 +21,6 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 
 TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
 
-CAUTION: Custom configuration options that are camel-case (e.g., `fooBar`) may behave unexpectedly when evaluating against the property list above. Specifically, there is no way for an OS environment variable to specify a value for an option named `fooBar`. Micronaut would translate `FOO_BAR` to `foo_bar`, `foo.bar`, but not `fooBar`. Similarly it would translate `FOOBAR` to `foobar` but not `fooBar`. 
-
 === Property Value Placeholders
 
 Micronaut includes a property placeholder syntax which can be used to reference configuration properties both within configuration values and with any Micronaut annotation (see ann:io.micronaut.context.annotation.Value[] and the section on <<valueAnnotation,Configuration Injection>>).
@@ -80,7 +78,7 @@ Micronaut still allows specifying the latter in configuration, but normalizes th
 |`MY_APP_MY_STUFF` | `my.app.my.stuff`, `my.app.my-stuff`, `my.app-my.stuff`, `my.app-my-stuff`, `my-app.my.stuff`, `my-app.my-stuff`, `my-app-my.stuff`, `my-app-my-stuff`  | Environment Variable
 |===
 
-Environment variables are given special treatment to allow the definition of environment variables to be more flexible.
+Environment variables are given special treatment to allow the definition of environment variables to be more flexible. Note that there is no way to specify an environment variable with camel-case.
 
 IMPORTANT: Because the number of properties generated is exponential based on the number of `_` characters in the environment variable, it is recommended to refine which, if any, environment variables are included in configuration if the number of environment variables with a large number of underscores is high.
 
