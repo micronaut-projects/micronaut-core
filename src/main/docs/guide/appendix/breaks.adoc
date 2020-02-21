@@ -171,3 +171,7 @@ The no longer used group for Graal is no longer part of the bom. While upgrading
 === Cookie Configuration
 
 The `getCookieMaxAge` method has been changed to return a `java.time.Duration`.
+
+===`@Retryable` and `@CircuitBreaker` exception handling
+
+`@Retryable` and `@CircuitBreaker` now also catch subclasses of the exception types specified in `includes/excludes`.

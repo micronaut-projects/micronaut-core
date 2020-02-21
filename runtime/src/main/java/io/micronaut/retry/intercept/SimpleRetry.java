@@ -20,9 +20,9 @@ import io.micronaut.retry.RetryState;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -42,8 +42,8 @@ class SimpleRetry implements RetryState, MutableRetryState {
     private final boolean hasExcludes;
     private AtomicInteger attemptNumber = new AtomicInteger(0);
     private AtomicLong overallDelay = new AtomicLong(0);
-    private final Set<Class<? extends Throwable>> includes;
-    private final Set<Class<? extends Throwable>> excludes;
+    private final List<Class<? extends Throwable>> includes;
+    private final List<Class<? extends Throwable>> excludes;
 
     /**
      * @param maxAttempts The maximum number of attemps
@@ -58,15 +58,15 @@ class SimpleRetry implements RetryState, MutableRetryState {
         double multiplier,
         Duration delay,
         Duration maxDelay,
-        Set<Class<? extends Throwable>> includes,
-        Set<Class<? extends Throwable>> excludes) {
+        List<Class<? extends Throwable>> includes,
+        List<Class<? extends Throwable>> excludes) {
 
         this.maxAttempts = maxAttempts;
         this.multiplier = multiplier;
         this.delay = delay;
         this.maxDelay = maxDelay;
-        this.includes = includes == null ? Collections.emptySet() : includes;
-        this.excludes = excludes == null ? Collections.emptySet() : excludes;
+        this.includes = includes == null ? Collections.emptyList() : includes;
+        this.excludes = excludes == null ? Collections.emptyList() : excludes;
         this.hasIncludes = !this.includes.isEmpty();
         this.hasExcludes = !this.excludes.isEmpty();
     }
@@ -78,7 +78,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
      * @param maxDelay The maximum overall delay
      */
     SimpleRetry(int maxAttempts, double multiplier, Duration delay, Duration maxDelay) {
-        this(maxAttempts, multiplier, delay, maxDelay, Collections.emptySet(), Collections.emptySet());
+        this(maxAttempts, multiplier, delay, maxDelay, Collections.emptyList(), Collections.emptyList());
     }
 
     /**
@@ -101,10 +101,9 @@ class SimpleRetry implements RetryState, MutableRetryState {
             return false;
         }
 
-        Class<? extends Throwable> exceptionClass = exception.getClass();
-        if (hasIncludes && !includes.contains(exceptionClass)) {
+        if (hasIncludes && includes.stream().noneMatch(cls -> cls.isInstance(exception))) {
             return false;
-        } else if (hasExcludes && excludes.contains(exceptionClass)) {
+        } else if (hasExcludes && excludes.stream().anyMatch(cls -> cls.isInstance(exception))) {
             return false;
         } else {
             return this.attemptNumber.incrementAndGet() < (maxAttempts + 1) && ((maxDelay == null) || overallDelay.get() < maxDelay.toMillis());
