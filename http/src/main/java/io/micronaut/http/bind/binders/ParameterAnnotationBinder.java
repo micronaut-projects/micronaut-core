@@ -102,8 +102,9 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         }
         Optional<T> val = result.getValue();
         if (!val.isPresent() && !hasAnnotation) {
-            // try attribute
-            result = doBind(context, source.getAttributes(), parameterName);
+            // attributes are sometimes added by filters, so this should return unsatisfied if not found
+            // so it can be picked up after the filters are executed
+            result = doBind(context, source.getAttributes(), parameterName, BindingResult.UNSATISFIED);
         }
 
         Class argumentType;
