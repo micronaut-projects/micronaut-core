@@ -45,4 +45,56 @@ class StaticResourceResolverSpec extends Specification {
         then:
         url.toString().endsWith("other/index.html")
     }
+
+    void "test add static route programmatically"() {
+        given:
+        ResourceResolver rr = new ResourceResolver()
+        StaticResourceResolver resolver = new StaticResourceResolver([])
+
+        when:
+        Optional<URL> url = resolver.resolve("/")
+
+        then:
+        !url.isPresent()
+
+        when:
+        resolver.addRoute("/other/**", [rr.getLoaderForBasePath("classpath:other").get()])
+        url = resolver.resolve("/other")
+
+        then:
+        url.isPresent()
+        url.get().toString().endsWith("other/index.html")
+    }
+
+    void "test remove static route programmatically"() {
+        given:
+        ResourceResolver rr = new ResourceResolver()
+        StaticResourceConfiguration config1 = new StaticResourceConfiguration(rr)
+        config1.setPaths(["classpath:public"])
+        config1.setMapping("/**")
+        StaticResourceConfiguration config2 = new StaticResourceConfiguration(rr)
+        config2.setPaths(["classpath:other"])
+        config2.setMapping("/other/**")
+        StaticResourceResolver resolver = new StaticResourceResolver([config1, config2])
+
+        when:
+        URL url = resolver.resolve("/").get()
+
+        then:
+        url.toString().endsWith("public/index.html")
+
+        when:
+        url = resolver.resolve("/other").get()
+
+        then:
+        url.toString().endsWith("other/index.html")
+
+        when:
+        boolean removed = resolver.removeRoute("/other/**")
+        Optional<URL> nurl = resolver.resolve("/other")
+
+        then:
+        removed
+        !nurl.isPresent()
+    }
 }

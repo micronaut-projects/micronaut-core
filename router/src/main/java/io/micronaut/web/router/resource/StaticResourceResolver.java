@@ -26,6 +26,7 @@ import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -39,7 +40,7 @@ public class StaticResourceResolver {
 
     private static final String INDEX_PAGE = "index.html";
     private final AntPathMatcher pathMatcher;
-    private final Map<String, List<ResourceLoader>> resourceMappings = new LinkedHashMap<>();
+    private Map<String, List<ResourceLoader>> resourceMappings = new LinkedHashMap<>();
 
     /**
      * Default constructor.
@@ -58,13 +59,51 @@ public class StaticResourceResolver {
     }
 
     /**
+     * Add or Replace a route.
+     * @param mapping The mapping.
+     * @param paths The paths.
+     */
+    public void addRoute(String mapping, List<ResourceLoader> paths) {
+        Objects.requireNonNull(mapping);
+        Objects.requireNonNull(paths);
+        if (paths.isEmpty()) {
+            throw new IllegalArgumentException("paths is empty");
+        }
+        synchronized (this) {
+            Map<String, List<ResourceLoader>> newMappings = new LinkedHashMap<>(resourceMappings);
+            newMappings.put(mapping, paths);
+            resourceMappings = newMappings;
+        }
+    }
+
+    /**
+     * Remove the specified route.
+     * @param mapping The mapping to remove.
+     * @return true if the route has been removed, false otherwise.
+     */
+    public boolean removeRoute(String mapping) {
+        if (mapping == null) {
+          return false;
+        }
+        synchronized (this) {
+            Map<String, List<ResourceLoader>> newMappings = new LinkedHashMap<>(resourceMappings);
+            final boolean removed = newMappings.remove(mapping) != null;
+            if (removed) {
+                resourceMappings = newMappings;
+            }
+            return removed;
+        }
+    }
+
+    /**
      * Resolves a path to a URL.
      *
      * @param resourcePath The path to the resource
      * @return The optional URL
      */
     public Optional<URL> resolve(String resourcePath) {
-        for (Map.Entry<String, List<ResourceLoader>> entry : resourceMappings.entrySet()) {
+        final Map<String, List<ResourceLoader>> mappings = resourceMappings;
+        for (Map.Entry<String, List<ResourceLoader>> entry : mappings.entrySet()) {
             List<ResourceLoader> loaders = entry.getValue();
             String mapping = entry.getKey();
             if (!loaders.isEmpty() && pathMatcher.matches(mapping, resourcePath)) {
