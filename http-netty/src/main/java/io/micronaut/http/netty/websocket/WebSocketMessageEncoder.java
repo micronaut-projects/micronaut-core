@@ -59,7 +59,7 @@ public class WebSocketMessageEncoder {
     public WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
         if (message instanceof byte[]) {
             return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((byte[]) message));
-        } else if (ClassUtils.isJavaLangType(message.getClass())) {
+        } else if (ClassUtils.isJavaLangType(message.getClass()) || message instanceof CharSequence) {
             String s = message.toString();
             return new TextWebSocketFrame(s);
         } else if (message instanceof ByteBuf) {
