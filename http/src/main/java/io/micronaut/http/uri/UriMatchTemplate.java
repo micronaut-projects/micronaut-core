@@ -207,6 +207,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         private final String uri;
         private final Map<String, Object> variableValues;
         private final List<UriMatchVariable> variables;
+        private final Map<String, UriMatchVariable> variableMap;
 
         /**
          * @param uri            The URI
@@ -217,6 +218,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             this.uri = uri;
             this.variableValues = variableValues;
             this.variables = variables;
+            LinkedHashMap<String, UriMatchVariable> vm = new LinkedHashMap<>(variables.size());
+            for (UriMatchVariable variable : variables) {
+                vm.put(variable.getName(), variable);
+            }
+            this.variableMap = Collections.unmodifiableMap(vm);
         }
 
         @Override
@@ -232,6 +238,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         @Override
         public List<UriMatchVariable> getVariables() {
             return Collections.unmodifiableList(variables);
+        }
+
+        @Override
+        public Map<String, UriMatchVariable> getVariableMap() {
+            return variableMap;
         }
 
         @Override

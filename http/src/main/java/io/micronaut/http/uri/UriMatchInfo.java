@@ -40,4 +40,9 @@ public interface UriMatchInfo {
      * @return The list of template variables
      */
     List<UriMatchVariable> getVariables();
+
+    /**
+     * @return A map of the variables.
+     */
+    Map<String, UriMatchVariable> getVariableMap();
 }

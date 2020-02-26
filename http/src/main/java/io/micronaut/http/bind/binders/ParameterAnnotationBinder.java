@@ -69,11 +69,10 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         // checks if the variable is defined with modifier char *
         // eg. ?pojo*
         boolean bindAll = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class)
-                .flatMap(umi -> umi.getVariables()
-                        .stream()
-                        .filter(v -> v.getName().equals(parameterName))
-                        .findFirst()
-                        .map(UriMatchVariable::isExploded)).orElse(false);
+                .map(umi -> {
+                    UriMatchVariable uriMatchVariable = umi.getVariableMap().get(parameterName);
+                    return uriMatchVariable != null && uriMatchVariable.isExploded();
+                }).orElse(false);
 
 
         BindingResult<T> result;
