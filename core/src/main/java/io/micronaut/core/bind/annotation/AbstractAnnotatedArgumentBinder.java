@@ -139,6 +139,7 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
     protected BindingResult<T> doConvert(Object value, ArgumentConversionContext<T> context) {
         return doConvert(value, context, BindingResult.EMPTY);
     }
+
     /**
      * Convert the value and return a binding result.
      *
