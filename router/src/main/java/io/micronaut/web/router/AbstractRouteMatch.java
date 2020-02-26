@@ -241,6 +241,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                     value = argumentValues.get(name);
                 }
 
+                Class argumentType = argument.getType();
                 if (value instanceof UnresolvedArgument) {
                     UnresolvedArgument<?> unresolved = (UnresolvedArgument<?>) value;
                     ArgumentBinder.BindingResult<?> bindingResult = unresolved.get();
@@ -252,9 +253,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                             ConversionError conversionError = (ConversionError) resolved;
                             throw new ConversionErrorException(argument, conversionError);
                         } else {
-                            ConversionContext conversionContext = ConversionContext.of(argument);
-                            Optional<?> result = conversionService.convert(resolved, argument.getType(), conversionContext);
-                            argumentList.add(resolveValueOrError(argument, conversionContext, result));
+                            convertValueAndAddToList(conversionService, argumentList, argument, resolved, argumentType);
                         }
                     } else {
                         if (argument.isNullable()) {
@@ -280,13 +279,31 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 } else if (value == DefaultRouteBuilder.NO_VALUE) {
                     throw UnsatisfiedRouteException.create(argument);
                 } else {
-                    ConversionContext conversionContext = ConversionContext.of(argument);
-                    Optional<?> result = conversionService.convert(value, argument.getType(), conversionContext);
-                    argumentList.add(resolveValueOrError(argument, conversionContext, result));
+                    convertValueAndAddToList(conversionService, argumentList, argument, value, argumentType);
                 }
             }
 
             return executableMethod.invoke(argumentList.toArray());
+        }
+    }
+
+    private void convertValueAndAddToList(ConversionService conversionService, List argumentList, Argument argument, Object value, Class argumentType) {
+        if (argumentType.isInstance(value)) {
+            if (argument.isContainerType()) {
+                if (argument.hasTypeVariables()) {
+                    ConversionContext conversionContext = ConversionContext.of(argument);
+                    Optional<?> result = conversionService.convert(value, argumentType, conversionContext);
+                    argumentList.add(resolveValueOrError(argument, conversionContext, result));
+                } else {
+                    argumentList.add(value);
+                }
+            } else {
+                argumentList.add(value);
+            }
+        } else {
+            ConversionContext conversionContext = ConversionContext.of(argument);
+            Optional<?> result = conversionService.convert(value, argumentType, conversionContext);
+            argumentList.add(resolveValueOrError(argument, conversionContext, result));
         }
     }
 
