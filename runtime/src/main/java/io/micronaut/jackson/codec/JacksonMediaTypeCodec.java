@@ -142,7 +142,7 @@ public abstract class JacksonMediaTypeCodec implements MediaTypeCodec {
                 return getObjectMapper().readValue(inputStream, type.getType());
             }
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage());
+            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
     }
 
