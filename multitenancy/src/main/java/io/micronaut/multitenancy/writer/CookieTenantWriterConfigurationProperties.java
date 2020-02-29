@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.time.Duration;
-import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
 /**
@@ -153,7 +152,7 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
      * @return The max age to use for the cookie
      */
     @Override
-    public Optional<TemporalAmount> getCookieMaxAge() {
+    public Optional<Duration> getCookieMaxAge() {
         return Optional.ofNullable(cookieMaxAge);
     }
 

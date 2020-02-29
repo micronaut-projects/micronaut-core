@@ -163,3 +163,11 @@ A map property injected via `@Property(name ="persons")` may have been injected 
 ----
 
 To bind to a map with flat keys, add the ann:core.convert.format.MapFormat[] annotation and set the `transformation` member.
+
+=== GraalVM BOM Entry
+
+The no longer used group for Graal is no longer part of the bom. While upgrading if you depend on Graal you may see `Could not find com.oracle.substratevm:svm:.`. To resolve the issue, change the dependency group to `org.graalvm.nativeimage`.
+
+=== Cookie Configuration
+
+The `getCookieMaxAge` method has been changed to return a `java.time.Duration`.
