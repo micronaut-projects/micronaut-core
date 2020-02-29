@@ -40,7 +40,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = "micronaut.security.enabled", notEquals = StringUtils.TRUE)
+@Requires(condition = EndpointsFilterCondition.class)
 @Filter("/**")
 public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
