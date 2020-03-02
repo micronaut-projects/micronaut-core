@@ -44,7 +44,7 @@ A common use case is for example when an annotation defines the `value()` member
 .The @Client Annotation
 [source,java]
 ----
-include::http-client/src/main/java/io/micronaut/http/client/annotation/Client.java[tag=value]
+include::http-client-core/src/main/java/io/micronaut/http/client/annotation/Client.java[tag=value]
 }
 ----
 
