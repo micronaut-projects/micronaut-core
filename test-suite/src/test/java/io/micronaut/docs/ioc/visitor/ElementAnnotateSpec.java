@@ -5,7 +5,7 @@ import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.docs.client.versioning.HelloClient;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.visitor.AnnotatingVisitor;
+import example.micronaut.inject.visitor.AnnotatingVisitor;
 import junit.framework.TestCase;
 
 public class ElementAnnotateSpec extends TestCase {

@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.visitor;
+package example.micronaut.inject.visitor;
 
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.visitor.TypeElementVisitor;
+import io.micronaut.inject.visitor.VisitorContext;
 
 // tests that dynamic annotation works
 public class AnnotatingVisitor implements TypeElementVisitor<Version, Version> {

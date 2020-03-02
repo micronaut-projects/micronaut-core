@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.visitor;
+package example.micronaut.inject.visitor;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
