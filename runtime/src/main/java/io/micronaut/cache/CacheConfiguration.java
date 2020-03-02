@@ -173,7 +173,7 @@ public class CacheConfiguration {
     }
 
     /**
-     * Set whether record stats is enabled. Default value ({@value #DEFAULT_RECORD_STATS}).
+     * Set whether record stats is enabled. Default value ({@value io.micronaut.cache.CacheConfiguration#DEFAULT_RECORD_STATS}).
      *
      * @param recordStats True if record status is enabled
      */
@@ -199,7 +199,7 @@ public class CacheConfiguration {
     }
 
     /**
-     * Set whether test mode is enabled. Default value ({@value #DEFAULT_TESTMODE}).
+     * Set whether test mode is enabled. Default value ({@value io.micronaut.cache.CacheConfiguration#DEFAULT_TESTMODE}).
      *
      * @param testMode True if test mode is eanbled
      */
