@@ -748,88 +748,6 @@ subprojects { Project subproject ->
         testAnnotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
     }
 
-    task moveConfigProps() {
-        group 'documentation'
-        doLast {
-            ant.mkdir(dir: "${rootProject.buildDir}/config-props")
-            ant.move(file: "${subproject.buildDir}/classes/java/main/META-INF/config-properties.adoc", tofile: "${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc", failonerror: false, quiet: true)
-        }
-    }
-
-    task javaDocAtReplacement(type: io.micronaut.docs.JavaDocAtValueReplacementTask, dependsOn: moveConfigProps) {
-        adocFile = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
-        rootProjectDir = rootProject.projectDir
-    }
-
-    task replaceAtLink(dependsOn: moveConfigProps) {
-        group 'documentation'
-
-        doLast {
-            File file = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
-            if (file.exists()) {
-                def atLinkReplacer = { String str ->
-                    String newLine = str.substring(0, str.indexOf('{@link io.micronaut.'))
-                    String sub = "api:" + str.substring(str.indexOf('{@link io.micronaut.') + '{@link io.micronaut.'.length())
-                    newLine += sub.substring(0, sub.indexOf('}')) + '[]'
-                    newLine += sub.substring(sub.indexOf('}') + '}'.length())
-                    newLine
-                }
-
-                List<String> lines = file.readLines()
-                List<String> outputLines = []
-                for (String line : lines) {
-                    String proccessedLine = line
-                    while (proccessedLine.contains('{@link io.micronaut.')) {
-                        proccessedLine = atLinkReplacer(proccessedLine)
-                    }
-                    outputLines << proccessedLine
-                }
-                file.text = outputLines.join('\n')
-            }
-        }
-    }
-    task processConfigProps(dependsOn: [replaceAtLink, javaDocAtReplacement]) {
-        group 'documentation'
-        ext {
-            individualConfigPropsFolder = "${rootProject.buildDir}/generated/configurationProperties"
-        }
-        doFirst {
-            if (!new File("${rootProject.buildDir}/generated").exists()) {
-                new File("${rootProject.buildDir}/generated").mkdir()
-            }
-            if (!new File("${rootProject.buildDir}/generated/configurationProperties").exists()) {
-                new File("${rootProject.buildDir}/generated/configurationProperties").mkdir()
-            }
-        }
-        doLast {
-
-            def f = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
-            if (f.exists()) {
-                def lines = f.readLines()
-                def separator = "<<<"
-                List<String> accumulator = []
-                String configurationPropertyName = ''
-                for (String line : lines) {
-
-                    if (line.startsWith('<a id="')) {
-                        String sub = line.substring(line.indexOf('id="') + 'id="'.length())
-                        sub = sub.substring(0, sub.indexOf('"'))
-                        configurationPropertyName = sub
-                    }
-                    if (line == separator) {
-                        File outputfile = new File("${individualConfigPropsFolder}/${configurationPropertyName}.adoc")
-                        outputfile.createNewFile()
-                        outputfile.text = accumulator.join('\n')
-                        accumulator = []
-                        configurationPropertyName = null
-                    } else {
-                        accumulator << line
-                    }
-                }
-            }
-        }
-    }
-
     groovydoc {
         classpath += project.configurations.documentation
     }
@@ -837,7 +755,7 @@ subprojects { Project subproject ->
     task allDeps(type: DependencyReportTask) {}
 }
 
-apply from: "gradle/docs.gradle"
+apply from:"https://raw.githubusercontent.com/micronaut-projects/micronaut-docs/v${micronautDocsVersion}/gradle/docs.gradle"
 
 // IDEA 2017.2 made a breaking change with IDE build output vs gradle build output
 // [see https://youtrack.jetbrains.com/issue/IDEA-175172]

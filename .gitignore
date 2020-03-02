@@ -20,3 +20,12 @@ bin/
 *.iws
 .kotlintest
 */.kotlintest/
+
+# ignore resources, are downloaded via a gradle task from micronaut_docs
+src/main/docs/resources/css/highlight/*.css
+src/main/docs/resources/css/highlight/*.png
+src/main/docs/resources/css/highlight/*.jpg
+src/main/docs/resources/css/*.css
+src/main/docs/resources/img/*.svg
+src/main/docs/resources/js/*.js
+src/main/docs/resources/style/*.html
