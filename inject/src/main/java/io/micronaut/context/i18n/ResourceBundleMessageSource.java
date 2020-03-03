@@ -76,8 +76,8 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
 
     @NonNull
     @Override
-    public Optional<String> getMessage(@NonNull String code, @NonNull MessageContext context) {
-        final Locale locale = context.getLocale();
+    public Optional<String> getMessage(@Nonnull String code, @Nonnull MessageContext context) {
+        final Locale locale = defaultBundle != null ? context.getLocale(defaultBundle.getLocale()) : context.getLocale();
         MessageKey messageKey = new MessageKey(locale, code);
         Optional<String> opt = messageCache.get(messageKey);
         //noinspection OptionalAssignedToNull

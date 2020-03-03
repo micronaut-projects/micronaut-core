@@ -125,6 +125,7 @@ public class ClassUtils {
         COMMON_CLASS_MAP.put(Float.class.getName(), Float.class);
         COMMON_CLASS_MAP.put(Character.class.getName(), Character.class);
         COMMON_CLASS_MAP.put(String.class.getName(), String.class);
+        COMMON_CLASS_MAP.put(CharSequence.class.getName(), CharSequence.class);
 
         BASIC_TYPE_MAP.put(UUID.class.getName(), UUID.class);
         BASIC_TYPE_MAP.put(BigDecimal.class.getName(), BigDecimal.class);

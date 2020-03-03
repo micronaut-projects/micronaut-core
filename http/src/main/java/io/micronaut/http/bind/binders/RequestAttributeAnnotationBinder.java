@@ -52,7 +52,7 @@ public class RequestAttributeAnnotationBinder<T> extends AbstractAnnotatedArgume
         MutableConvertibleValues<Object> parameters = source.getAttributes();
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         String parameterName = annotationMetadata.stringValue(RequestAttribute.class).orElse(argument.getArgument().getName());
-        return doBind(argument, parameters, parameterName);
+        return doBind(argument, parameters, parameterName, BindingResult.UNSATISFIED);
     }
 
     @Override

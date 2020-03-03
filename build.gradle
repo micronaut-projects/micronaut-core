@@ -755,7 +755,7 @@ subprojects { Project subproject ->
     task allDeps(type: DependencyReportTask) {}
 }
 
-apply from:"https://raw.githubusercontent.com/micronaut-projects/micronaut-docs/v${micronautDocsVersion}/gradle/docs.gradle"
+apply from:"https://raw.githubusercontent.com/micronaut-projects/micronaut-docs/v$micronautDocsVersion/gradle/docs.gradle"
 
 // IDEA 2017.2 made a breaking change with IDE build output vs gradle build output
 // [see https://youtrack.jetbrains.com/issue/IDEA-175172]

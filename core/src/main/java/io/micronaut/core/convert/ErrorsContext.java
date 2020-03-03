@@ -48,7 +48,7 @@ public interface ErrorsContext extends Iterable<ConversionError> {
 
     @Override
     default Iterator<ConversionError> iterator() {
-        return Collections.<ConversionError>emptyList().iterator();
+        return Collections.emptyIterator();
     }
 
     /**

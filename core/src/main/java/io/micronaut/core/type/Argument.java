@@ -192,6 +192,13 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     }
 
     /**
+     * @return Whether this is a container type.
+     */
+    default boolean isContainerType() {
+        return DefaultArgument.CONTAINER_TYPES.contains(getType());
+    }
+
+    /**
      * Convert an argument array to a class array.
      *
      * @param arguments The arguments

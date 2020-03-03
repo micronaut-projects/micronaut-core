@@ -178,7 +178,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
 
     private NettyHttpParameters decodeParameters(String uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
-        return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService);
+        return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService, null);
     }
 
     @Override

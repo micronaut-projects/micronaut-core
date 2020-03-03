@@ -2075,7 +2075,7 @@ public class DefaultBeanContext implements BeanContext {
             if (concreteCandidate.isPresent()) {
                 BeanDefinition<T> definition = concreteCandidate.get();
 
-                bean = findExistingCompatibleSingleton(beanType, qualifier, definition);
+                bean = findExistingCompatibleSingleton(definition.getBeanType(), qualifier, definition);
                 if (bean != null) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", bean, beanType, qualifier);

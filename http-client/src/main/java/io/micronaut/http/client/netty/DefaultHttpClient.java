@@ -58,7 +58,6 @@ import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.sse.Event;
-import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
@@ -1148,16 +1147,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @return A {@link Publisher} with the resolved URI
      */
     protected <I> Publisher<URI> resolveRequestURI(io.micronaut.http.HttpRequest<I> request, boolean includeContextPath) {
-        URI requestURI;
-        if (!request.getParameters().isEmpty()) {
-            UriBuilder newUri = UriBuilder.of(request.getUri());
-            request.getParameters().forEach((key, value) -> {
-                newUri.queryParam(key, value.toArray());
-            });
-            requestURI = newUri.build();
-        } else {
-            requestURI = request.getUri();
-        }
+        URI requestURI = request.getUri();
         if (requestURI.getScheme() != null) {
             // if the request URI includes a scheme then it is fully qualified so use the direct server
             return Publishers.just(requestURI);

@@ -6,7 +6,6 @@ Micronaut 2.0 uses a new shared default Netty `EventLoopGroup` for server worker
 
 See the <<clientConfiguration, HTTP Client Configuration>> section for information on how to configure the default `EventLoopGroup` and add additional `EventLoopGroup`'s that are configured per client.
 
-
 === Clients With No Base Path
 
 For the situations when the host of a client call is variable, it is no longer required to pass a service id or URL to ann:http.client.annotation.Client[]. If no host is provided at the time of a request, a api:http.client.exceptions.NoHostException[] will be thrown.

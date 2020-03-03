@@ -57,10 +57,20 @@ class DefaultMessageContext implements MessageSource.MessageContext {
     @NonNull
     @Override
     public Locale getLocale() {
+        return getLocale(Locale.getDefault());
+    }
+
+    /**
+     * The locale to use to resolve messages.
+     * @param defaultLocale The locale to use if no locale is present
+     * @return The locale
+     */
+    @Nonnull
+    public Locale getLocale(@Nullable Locale defaultLocale) {
         if (locale != null) {
             return locale;
         } else {
-            return Locale.getDefault();
+            return defaultLocale != null ? defaultLocale : Locale.getDefault();
         }
     }
 }

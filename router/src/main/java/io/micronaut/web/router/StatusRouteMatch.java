@@ -18,10 +18,8 @@ package io.micronaut.web.router;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpStatus;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
 import java.util.function.Function;
 
 /**
@@ -35,6 +33,7 @@ import java.util.function.Function;
 class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
 
     final HttpStatus httpStatus;
+    private final ArrayList<Argument> requiredArguments;
 
     /**
      * @param httpStatus The HTTP status
@@ -44,6 +43,7 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     StatusRouteMatch(HttpStatus httpStatus, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
         super(abstractRoute, conversionService);
         this.httpStatus = httpStatus;
+        this.requiredArguments = new ArrayList<>(Arrays.asList(getArguments()));
     }
 
     @Override
@@ -52,11 +52,16 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     }
 
     @Override
+    public Collection<Argument> getRequiredArguments() {
+        return requiredArguments;
+    }
+
+    @Override
     protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
         return new StatusRouteMatch<T, R>(httpStatus, abstractRoute, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {
-                return Collections.unmodifiableCollection(requiredArguments);
+                return requiredArguments;
             }
 
             @Override
@@ -74,7 +79,7 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
         return new StatusRouteMatch<T, R>(httpStatus, abstractRoute, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {
-                return Collections.unmodifiableCollection(arguments);
+                return arguments;
             }
 
             @Override
