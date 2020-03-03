@@ -32,6 +32,7 @@ import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpParameters;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
+import io.micronaut.http.uri.UriBuilder;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
@@ -183,7 +184,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
             synchronized (this) { // double check
                 httpParameters = this.httpParameters;
                 if (httpParameters == null) {
-                    httpParameters = decodeParameters(getUri().getRawPath());
+                    httpParameters = decodeParameters(getUri());
                     this.httpParameters = httpParameters;
                 }
             }
@@ -201,16 +202,22 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
         return uri;
     }
 
-    private NettyHttpParameters decodeParameters(String uri) {
+    private NettyHttpParameters decodeParameters(URI uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
-        return new NettyHttpParameters(queryStringDecoder.parameters(), ConversionService.SHARED);
+        return new NettyHttpParameters(queryStringDecoder.parameters(),
+                ConversionService.SHARED,
+                (name, value) -> {
+                    UriBuilder newUri = UriBuilder.of(getUri());
+                    newUri.replaceQueryParam(name.toString(), value.toArray());
+                    this.uri(newUri.build());
+                });
     }
 
     /**
      * @param uri The URI
      * @return The query string decoder
      */
-    protected QueryStringDecoder createDecoder(String uri) {
+    protected QueryStringDecoder createDecoder(URI uri) {
         Charset charset = getCharacterEncoding();
         return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
     }

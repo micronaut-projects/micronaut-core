@@ -242,6 +242,21 @@ class DefaultUriBuilder implements UriBuilder {
 
     @Nonnull
     @Override
+    public UriBuilder replaceQueryParam(String name, Object... values) {
+        if (StringUtils.isNotEmpty(name) && ArrayUtils.isNotEmpty(values)) {
+            List<String> strings = new ArrayList<>(values.length);
+            for (Object value : values) {
+                if (value != null) {
+                    strings.add(value.toString());
+                }
+            }
+            queryParams.put(name, strings);
+        }
+        return this;
+    }
+
+    @Nonnull
+    @Override
     public URI build() {
         try {
             return new URI(reconstructAsString(null));
