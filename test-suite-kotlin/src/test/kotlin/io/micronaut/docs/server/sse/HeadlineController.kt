@@ -5,6 +5,8 @@ package io.micronaut.docs.server.sse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.sse.Event
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ScheduleOn
 import io.reactivex.Emitter
 import io.reactivex.Flowable
 import io.reactivex.functions.BiFunction
@@ -18,6 +20,7 @@ import java.util.concurrent.Callable
 class HeadlineController {
 
     @Get
+    @ScheduleOn(TaskExecutors.IO)
     fun index(): Publisher<Event<Headline>> { // <1>
         val versions = arrayOf("1.0", "2.0") // <2>
 

@@ -90,6 +90,7 @@ import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableRes
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
 import io.micronaut.scheduling.executor.ExecutorSelector;
@@ -975,11 +976,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         // Select the most appropriate Executor
         ExecutorService executor;
         final ThreadSelection threadSelection = serverConfiguration.getThreadSelection();
-        final MediaType contentType = request.getContentType().orElse(null);
         switch (threadSelection) {
             case MANUAL:
-                if (MediaType.APPLICATION_JSON_STREAM_TYPE.equals(contentType)) {
-                    executor = ioExecutor;
+                if (route instanceof MethodReference) {
+                    executor = executorSelector.select((MethodReference) route, threadSelection).orElse(null);
                 } else {
                     executor = null;
                 }
@@ -989,14 +989,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             break;
             case AUTO:
             default:
-                if (MediaType.APPLICATION_JSON_STREAM_TYPE.equals(contentType)) {
-                    executor = ioExecutor;
+                if (route instanceof MethodReference) {
+                    executor = executorSelector.select((MethodReference) route, threadSelection).orElse(null);
                 } else {
-                    if (route instanceof MethodBasedRouteMatch) {
-                        executor = executorSelector.select((MethodBasedRouteMatch) route, threadSelection).orElse(null);
-                    } else {
-                        executor = null;
-                    }
+                    executor = null;
                 }
                 break;
         }

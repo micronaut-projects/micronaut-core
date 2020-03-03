@@ -18,6 +18,8 @@ snippet::io.micronaut.docs.server.sse.HeadlineController[tags="imports,class", i
 <4> The rx:Emitter[] interface's `onNext` method is used to emit objects of type api:http.sse.Event[]. The api:http.sse.Event.of(ET)[] factory method is used to construct the event.
 <5> The rx:Emitter[] interface's `onComplete` method is used to indicate when to finish sending server sent events.
 
+NOTE: You typically want to schedule SSE event streams on a separate executor. The previous example uses ann:scheduling.annotation.ScheduleOn[] to schedule the stream on the I/O executor.
+
 The above example will send back a response of type `text/event-stream` and for each  api:http.sse.Event[] emitted the `Headline` type previously will be converted to JSON resulting in responses such as:
 
 .Server Sent Event Response Output
