@@ -96,6 +96,16 @@ public interface UriBuilder {
     @Nonnull UriBuilder queryParam(String name, Object...values);
 
     /**
+     * Adds a query parameter for the give name and values. The values will be URI encoded.
+     * If either name or values are null the value will be ignored.
+     *
+     * @param name The name
+     * @param values The values
+     * @return This builder
+     */
+    @Nonnull UriBuilder replaceQueryParam(String name, Object...values);
+
+    /**
      * The constructed URI.
      *
      * @return Build the URI

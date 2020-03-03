@@ -21,6 +21,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.UriBuilder;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.DefaultAttributeMap;
 
@@ -178,7 +179,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
 
     private NettyHttpParameters decodeParameters(String uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
-        return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService);
+        return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService, null);
     }
 
     @Override

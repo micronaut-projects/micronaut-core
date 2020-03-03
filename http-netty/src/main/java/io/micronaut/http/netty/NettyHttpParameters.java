@@ -22,13 +22,11 @@ import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap;
 import io.micronaut.http.MutableHttpParameters;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import javax.annotation.Nullable;
+import java.net.URI;
+import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -42,14 +40,18 @@ public class NettyHttpParameters implements MutableHttpParameters {
 
     private final LinkedHashMap<CharSequence, List<String>> valuesMap;
     private final ConvertibleMultiValues<String> values;
+    private final BiConsumer<CharSequence, List<String>> onChange;
 
     /**
      * @param parameters        The parameters
      * @param conversionService The conversion service
      */
-    public NettyHttpParameters(Map<String, List<String>> parameters, ConversionService conversionService) {
+    public NettyHttpParameters(Map<String, List<String>> parameters,
+                               ConversionService<?> conversionService,
+                               @Nullable BiConsumer<CharSequence, List<String>> onChange) {
         this.valuesMap = new LinkedHashMap<>(parameters.size());
         this.values = new ConvertibleMultiValuesMap<>(valuesMap, conversionService);
+        this.onChange = onChange;
         for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {
             valuesMap.put(entry.getKey(), Collections.unmodifiableList(entry.getValue()));
         }
@@ -82,9 +84,22 @@ public class NettyHttpParameters implements MutableHttpParameters {
 
     @Override
     public MutableHttpParameters add(CharSequence name, List<CharSequence> values) {
-        valuesMap.put(name, Collections.unmodifiableList(
-                values.stream().map(v -> v == null ? null : v.toString()).collect(Collectors.toList()))
-        );
+        List<String> valueList = valuesMap.compute(name, (key, val) -> {
+            List<String> newValues = values.stream().map(v -> v == null ? null : v.toString()).collect(Collectors.toList());
+            if (val == null) {
+                val = new ArrayList<>(newValues.size());
+            } else {
+                //val is unmodifiable
+                val = new ArrayList<>(val);
+            }
+            val.addAll(newValues);
+
+            return Collections.unmodifiableList(val);
+        });
+
+        if (onChange != null) {
+            onChange.accept(name, valueList);
+        }
         return this;
     }
 }

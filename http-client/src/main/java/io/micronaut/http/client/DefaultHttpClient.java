@@ -1133,16 +1133,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @return A {@link Publisher} with the resolved URI
      */
     protected <I> Publisher<URI> resolveRequestURI(io.micronaut.http.HttpRequest<I> request, boolean includeContextPath) {
-        URI requestURI;
-        if (!request.getParameters().isEmpty()) {
-            UriBuilder newUri = UriBuilder.of(request.getUri());
-            request.getParameters().forEach((key, value) -> {
-                newUri.queryParam(key, value.toArray());
-            });
-            requestURI = newUri.build();
-        } else {
-            requestURI = request.getUri();
-        }
+        URI requestURI = request.getUri();
         if (requestURI.getScheme() != null) {
             // if the request URI includes a scheme then it is fully qualified so use the direct server
             return Publishers.just(requestURI);
