@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,6 +105,11 @@ class DefaultFeature implements Feature {
 
         this.minJava = (Integer) configuration.get("java.min") ?: null
         this.maxJava = (Integer) configuration.get("java.max") ?: null
+
+        String mainClassName = (String) configuration.get("mainClassName") ?: null
+        if (mainClassName != null) {
+            profile.setMainClassName(mainClassName)
+        }
     }
 
     @Override

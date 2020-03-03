@@ -42,8 +42,7 @@ Single<Pet> save(
 <1> The name parameter, included as part of the URI, and declared `@NotBlank`
 <2> The `pet` parameter, used to encode the body and declared `@Valid`
 
-The following table summarizes the parameter annotations, their purpose and provides an example:
-
+The following table summarizes the parameter annotations, their purpose, and provides an example:
 
 .Parameter Binding Annotations
 |===
@@ -63,7 +62,7 @@ The following table summarizes the parameter annotations, their purpose and prov
 
 |ann:http.annotation.QueryValue[]
 |Allows customizing the name of the URI parameter to bind from
-|`@QueryValue('userAge') Integer age`
+|`@QueryValue("userAge") Integer age`
 
 |ann:http.annotation.PathVariable[]
 |Used to bind a parameter exclusively from a <<routing, Path Variable>>.
@@ -72,5 +71,18 @@ The following table summarizes the parameter annotations, their purpose and prov
 |ann:http.annotation.RequestAttribute[]
 |Allows specifying parameters that should be set as request attributes
 |`@RequestAttribute Integer locationId`
+
+|===
+
+==== Type Based Binding Parameters
+
+Some parameters are recognized by their type instead of their annotation. The following table summarizes the parameter types, their purpose, and provides an example:
+
+|===
+|Type |Description |Example
+
+|api:http.BasicAuth[]
+|Allows binding of basic authorization credentials
+|`BasicAuth basicAuth`
 
 |===

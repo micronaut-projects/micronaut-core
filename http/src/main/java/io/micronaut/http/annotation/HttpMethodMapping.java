@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,4 +48,11 @@ public @interface HttpMethodMapping {
      * @return The URI of the action
      */
     String value() default UriMapping.DEFAULT_URI;
+
+    /**
+     * Only to be used in the context of a server.
+     *
+     * @return The URIs of the action
+     */
+    String[] uris() default {UriMapping.DEFAULT_URI};
 }

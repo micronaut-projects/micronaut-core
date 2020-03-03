@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.micronaut.web.router.exceptions;
 
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.annotation.*;
 
 import java.lang.annotation.Annotation;
 import java.util.Optional;
@@ -32,11 +33,47 @@ public class UnsatisfiedRouteException extends RoutingException {
     private final Argument<?> argument;
 
     /**
+     * @param message  The error message
      * @param argument The {@link Argument}
      */
-    public UnsatisfiedRouteException(Argument<?> argument) {
-        super(buildMessage(argument));
+    UnsatisfiedRouteException(String message, Argument<?> argument) {
+        super(message);
         this.argument = argument;
+    }
+
+    /**
+     * Creates a specialized UnsatisfiedRouteException given the provided argument.
+     *
+     * @param argument The {@link Argument}
+     * @return A UnsatisfiedRouteException
+     */
+    public static UnsatisfiedRouteException create(Argument<?> argument) {
+        Optional<Class<? extends Annotation>> classOptional = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class);
+
+        if (classOptional.isPresent()) {
+            Class<? extends Annotation> clazz = classOptional.get();
+            String name = argument.getAnnotationMetadata().stringValue(clazz).orElse(argument.getName());
+
+            if (clazz == Body.class) {
+                throw new UnsatisfiedBodyRouteException(name, argument);
+            } else if (clazz == QueryValue.class) {
+                throw new UnsatisfiedQueryValueRouteException(name, argument);
+            } else if (clazz == PathVariable.class) {
+                throw new UnsatisfiedPathVariableRouteException(name, argument);
+            } else if (clazz == Header.class) {
+                throw new UnsatisfiedHeaderRouteException(name, argument);
+            } else if (clazz == Part.class) {
+                throw new UnsatisfiedPartRouteException(name, argument);
+            } else if (clazz == RequestAttribute.class) {
+                throw new UnsatisfiedRequestAttributeRouteException(name, argument);
+            } else if (clazz == CookieValue.class) {
+                throw new UnsatisfiedCookieValueRouteException(name, argument);
+            } else {
+                throw new UnsatisfiedRouteException("Required " + clazz.getSimpleName() + " [" + name + "] not specified", argument);
+            }
+        }
+
+        throw new UnsatisfiedRouteException("Required argument [" + argument + "] not specified", argument);
     }
 
     /**
@@ -44,22 +81,5 @@ public class UnsatisfiedRouteException extends RoutingException {
      */
     public Argument<?> getArgument() {
         return argument;
-    }
-
-    private static String buildMessage(Argument<?> argument) {
-
-        Optional<Class<? extends Annotation>> classOptional = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class);
-
-        if (classOptional.isPresent()) {
-            Class<? extends Annotation> clazz = classOptional.get();
-            Optional<Object> valOptional = argument.getAnnotationMetadata().getValue(clazz);
-            if (valOptional.isPresent()) {
-                return "Required " + clazz.getSimpleName() + " [" + valOptional.get().toString() + "] not specified";
-            } else {
-                return "Required " + clazz.getSimpleName() + " [" + argument + "] not specified";
-            }
-        }
-
-        return "Required argument [" + argument + "] not specified";
     }
 }

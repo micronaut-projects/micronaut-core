@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,6 +88,9 @@ class RequestCustomScope implements CustomScope<RequestScope>, LifeCycle<Request
                 bean = (T) scopedBeanMap.get(identifier);
                 if (bean == null) {
                     bean = provider.get();
+                    if (bean instanceof RequestAware) {
+                        ((RequestAware) bean).setRequest(httpRequest);
+                    }
                     scopedBeanMap.put(identifier, bean);
                 }
             }

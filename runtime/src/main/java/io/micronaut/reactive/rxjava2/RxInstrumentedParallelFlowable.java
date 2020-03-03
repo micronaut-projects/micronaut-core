@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,9 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.parallel.ParallelFlowable;
 import org.reactivestreams.Subscriber;
-
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -35,45 +31,47 @@ import java.util.List;
 @Internal
 final class RxInstrumentedParallelFlowable<T> extends ParallelFlowable<T> implements RxInstrumentedComponent {
     protected final ParallelFlowable<T> source;
-    private final List<RunnableInstrumenter> instrumentations;
+    private final RxInstrumenterFactory instrumenterFactory;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
+     *
+     * @param source              The source
+     * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedParallelFlowable(
-            ParallelFlowable<T> source, List<RunnableInstrumenter> instrumentations) {
+    RxInstrumentedParallelFlowable(ParallelFlowable<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumentations = instrumentations;
+        this.instrumenterFactory = instrumenterFactory;
+        this.instrumenter = instrumenterFactory.create();
     }
 
-    /**
-     * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedParallelFlowable(
-            ParallelFlowable<T> source, Collection<ReactiveInstrumenter> instrumentations) {
-        this.source = source;
-        this.instrumentations = toRunnableInstrumenters(instrumentations);
-    }
-
-    @Override public int parallelism() {
+    @Override
+    public int parallelism() {
         return source.parallelism();
     }
 
-    @Override public void subscribe(Subscriber<? super T>[] s) {
+    @Override
+    public void subscribe(Subscriber<? super T>[] s) {
         if (!validate(s)) {
             return;
         }
-        int n = s.length;
-        @SuppressWarnings("unchecked")
-        Subscriber<? super T>[] parents = new Subscriber[n];
-        for (int i = 0; i < n; i++) {
-            Subscriber<? super T> z = s[i];
-            parents[i] = RxInstrumentedWrappers.wrap(z, instrumentations);
+        if (instrumenter != null) {
+            int n = s.length;
+            @SuppressWarnings("unchecked")
+            Subscriber<? super T>[] parents = new Subscriber[n];
+            for (int i = 0; i < n; i++) {
+                Subscriber<? super T> z = s[i];
+                parents[i] = RxInstrumentedWrappers.wrap(z, instrumenterFactory);
+            }
+            try {
+                instrumenter.beforeInvocation();
+                source.subscribe(parents);
+            } finally {
+                instrumenter.afterInvocation();
+            }
+        } else {
+            source.subscribe(s);
         }
-        source.subscribe(parents);
     }
 }

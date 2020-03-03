@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,7 @@ package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
@@ -30,6 +26,7 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
@@ -67,6 +64,9 @@ public class ObjectMapperFactory {
     @Inject
     protected BeanDeserializerModifier[] beanDeserializerModifiers = new BeanDeserializerModifier[0];
 
+    @Inject
+    protected KeyDeserializer[] keyDeserializers = new KeyDeserializer[0];
+
     /**
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
      *
@@ -76,6 +76,7 @@ public class ObjectMapperFactory {
      */
     @Singleton
     @Primary
+    @Named("json")
     @BootstrapContextCompatible
     public ObjectMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
                                      @Nullable JsonFactory jsonFactory) {
@@ -119,6 +120,17 @@ public class ObjectMapperFactory {
                 targetType.ifPresent(aClass -> module.addDeserializer(aClass, deserializer));
             }
         }
+
+        for (KeyDeserializer keyDeserializer : keyDeserializers) {
+            Class<? extends KeyDeserializer> type = keyDeserializer.getClass();
+            Type annotation = type.getAnnotation(Type.class);
+            if (annotation != null) {
+                Class[] value = annotation.value();
+                for (Class clazz : value) {
+                    module.addKeyDeserializer(clazz, keyDeserializer);
+                }
+            }
+        }
         objectMapper.registerModule(module);
 
         for (BeanSerializerModifier beanSerializerModifier : beanSerializerModifiers) {
@@ -136,7 +148,7 @@ public class ObjectMapperFactory {
 
             ObjectMapper.DefaultTyping defaultTyping = jacksonConfiguration.getDefaultTyping();
             if (defaultTyping != null) {
-                objectMapper.enableDefaultTyping(defaultTyping);
+                objectMapper.activateDefaultTyping(objectMapper.getPolymorphicTypeValidator(), defaultTyping);
             }
 
             JsonInclude.Include include = jacksonConfiguration.getSerializationInclusion();
@@ -159,7 +171,7 @@ public class ObjectMapperFactory {
             if (propertyNamingStrategy != null) {
                 objectMapper.setPropertyNamingStrategy(propertyNamingStrategy);
             }
-            
+
             jacksonConfiguration.getSerializationSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getDeserializationSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getMapperSettings().forEach(objectMapper::configure);

@@ -18,6 +18,8 @@ package io.micronaut.context.env
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
+import org.junit.Rule
+import org.junit.contrib.java.lang.system.EnvironmentVariables
 import spock.lang.Ignore
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
@@ -25,24 +27,24 @@ import spock.util.environment.RestoreSystemProperties
 /**
  * Created by graemerocher on 12/06/2017.
  */
+@RestoreSystemProperties
 class DefaultEnvironmentSpec extends Specification {
 
-    void "test environment system property resolve"() {
+    @Rule
+    private final EnvironmentVariables environmentVariables = new EnvironmentVariables()
 
+    void "test environment system property resolve"() {
         given:
         System.setProperty("test.foo.bar", "10")
         Environment env = new DefaultEnvironment("test").start()
+
         expect:
         env.getProperty("test.foo.bar", Integer).get() == 10
         env.getRequiredProperty("test.foo.bar", Integer) == 10
         env.getProperty("test.foo.bar", Integer, 20) == 10
-
-        cleanup:
-        System.setProperty("test.foo.bar", "")
     }
 
     void "test environment sub property resolve"() {
-
         given:
         System.setProperty("test.foo.bar", "10")
         System.setProperty("test.bar.foo", "30")
@@ -51,15 +53,9 @@ class DefaultEnvironmentSpec extends Specification {
 
         expect:
         env.getProperty("test.foo", Map.class).get() == [bar: "10", baz: "20"]
-
-        cleanup:
-        System.setProperty("test.foo.bar", "")
-        System.setProperty("test.bar.foo", "")
-        System.setProperty("test.foo.baz", "")
     }
 
     void "test environment system property refresh"() {
-
         when:
         System.setProperty("test.foo.bar", "10")
         Environment env = new DefaultEnvironment("test").start()
@@ -77,15 +73,8 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("test.foo.bar", Integer).get() == 30
         env.getRequiredProperty("test.foo.bar", Integer) == 30
         env.getProperty("test.foo.bar", Integer, 20) == 30
-
-        cleanup:
-        System.setProperty("test.foo.bar", "")
-        System.setProperty("test.bar.foo", "")
-        System.setProperty("test.foo.baz", "")
     }
 
-    @Ignore //TODO: Ignoring temporarily
-    @RestoreSystemProperties
     void "test getting environments from a system property"() {
         when:
         System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "foo ,x")
@@ -146,7 +135,7 @@ class DefaultEnvironmentSpec extends Specification {
         def e = thrown(ConfigurationException)
         e.message == "Unsupported properties file format: " + NameUtils.filename(unsupportedFile.absolutePath)
 
-        when: "file from system property source loader override the key"
+        when: "file from system property source loader does not override the key"
         System.setProperty("foo.baz", "10")
         configPropertiesFile = File.createTempFile("config-file", ".properties")
         configPropertiesFile.write("foo.baz=50")
@@ -156,7 +145,7 @@ class DefaultEnvironmentSpec extends Specification {
         env = new DefaultEnvironment("test").start()
 
         then:
-        env.getProperty("foo.baz", Integer).get() == 50
+        env.getProperty("foo.baz", Integer).get() == 10
 
         when: "nothing is passed to micronaut.config.files"
         System.setProperty("micronaut.config.files", "")
@@ -165,6 +154,7 @@ class DefaultEnvironmentSpec extends Specification {
         new DefaultEnvironment("test").start()
 
         when: "file is is passed as file:path"
+        System.clearProperty("foo.baz")
         configPropertiesFile = File.createTempFile("config-file", ".properties")
         configPropertiesFile.write("foo.baz=100")
         System.setProperty("micronaut.config.files", "file:${configPropertiesFile.absolutePath}")
@@ -174,13 +164,6 @@ class DefaultEnvironmentSpec extends Specification {
 
         then: "property is set"
         env.getProperty("foo.baz", Integer).get() == 100
-
-        cleanup:
-        System.clearProperty("foo")
-        System.clearProperty("foo.bar")
-        System.clearProperty("foo.baz")
-        System.clearProperty("micronaut.config.files")
-
     }
 
     void "test system env source loader"() {
@@ -219,7 +202,7 @@ class DefaultEnvironmentSpec extends Specification {
         def e = thrown(ConfigurationException)
         e.message == "Unsupported properties file format: " + NameUtils.filename(unsupportedFile.absolutePath)
 
-        when: "file from system property source loader override the key"
+        when: "file from system property source loader does not override the key"
         System.setProperty("foo.baz", "10")
         configPropertiesFile = File.createTempFile("config-file", ".properties")
         configPropertiesFile.write("foo.baz=50")
@@ -228,12 +211,13 @@ class DefaultEnvironmentSpec extends Specification {
         env = startEnv("${configPropertiesFile.absolutePath}")
 
         then:
-        env.getProperty("foo.baz", Integer).get() == 50
+        env.getProperty("foo.baz", Integer).get() == 10
 
         expect: "when nothing is passed to micronaut.config.files then should start normally"
         startEnv("")
 
         when: "file is is passed as file:path"
+        System.clearProperty("foo.baz")
         configPropertiesFile = File.createTempFile("config-file", ".properties")
         configPropertiesFile.write("foo.baz=100")
 
@@ -287,7 +271,6 @@ class DefaultEnvironmentSpec extends Specification {
         System.clearProperty("micronaut.config.files")
     }
 
-    @RestoreSystemProperties
     def "constructor(String... names) should preserve order specified in micronaut.environments system property"() {
         given: "set environments system property"
         System.setProperty('micronaut.environments', 'cloud, ec2, foo, bar, foo,baz,ec2,cloud,cloud')
@@ -344,7 +327,6 @@ class DefaultEnvironmentSpec extends Specification {
     }
     // end::disableEnvDeduction[]
 
-    @RestoreSystemProperties
     void "test disable environment deduction via system property"() {
         when:
         System.setProperty(Environment.CLOUD_PLATFORM_PROPERTY, "GOOGLE_COMPUTE")
@@ -418,6 +400,58 @@ class DefaultEnvironmentSpec extends Specification {
 
         cleanup:
         env.close()
+    }
+
+    @RestoreSystemProperties
+    void "test property source order"() {
+        when:
+        System.setProperty("micronaut.config.files", "classpath:config-files.yml,classpath:config-files2.yml")
+        System.setProperty("config.prop", "system-property")
+        environmentVariables.set("CONFIG_PROP", "env-var")
+        Environment env = new DefaultEnvironment("first", "second").start()
+
+        then: "System properties have highest precedence"
+        env.getRequiredProperty("config.prop", String.class) == "system-property"
+
+        when:
+        System.clearProperty("config.prop")
+        env = new DefaultEnvironment("first", "second").start()
+
+        then: "Environment variables have next highest precedence"
+        env.getRequiredProperty("config.prop", String.class) == "env-var"
+
+        when:
+        environmentVariables.clear("CONFIG_PROP")
+        env = new DefaultEnvironment("first", "second").start()
+
+        then: "Config files last in the list have precedence over those first in the list"
+        env.getRequiredProperty("config.prop", String.class) == "config-files2.yml"
+
+        when:
+        System.setProperty("micronaut.config.files", "classpath:config-files.yml")
+        env = new DefaultEnvironment("first", "second").start()
+
+        then: "Config files have precedence over application-*.* files"
+        env.getRequiredProperty("config.prop", String.class) == "config-files.yml"
+
+        when:
+        System.clearProperty("micronaut.config.files")
+        env = new DefaultEnvironment("first", "second").start()
+
+        then: "Environments last in the list have precedence over those first in the list"
+        env.getRequiredProperty("config.prop", String.class) == "application-second.yml"
+
+        when:
+        env = new DefaultEnvironment("first").start()
+
+        then: "Environments files have precedence over normal files"
+        env.getRequiredProperty("config.prop", String.class) == "application-first.yml"
+
+        when:
+        env = new DefaultEnvironment().start()
+
+        then: "Normal application files have the least precedence"
+        env.getRequiredProperty("config.prop", String.class) == "application.yml"
     }
 
     private static Environment startEnv(String files) {

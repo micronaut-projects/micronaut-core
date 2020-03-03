@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -184,7 +184,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                                                     existing,
                                                     beanProperty,
                                                     existing.getSerializer(),
-                                                    config.getTypeFactory()
+                                                    config.getTypeFactory(),
+                                                    existing.getViews()
                                             )
                                     );
                                     continue;
@@ -194,7 +195,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                                                     existing,
                                                     beanProperty,
                                                     existing.getSerializer(),
-                                                    config.getTypeFactory()
+                                                    config.getTypeFactory(),
+                                                    existing.getViews()
                                             )
                                     );
                                     continue;
@@ -204,7 +206,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                                         existing,
                                         beanProperty,
                                         existing.getSerializer(),
-                                        config.getTypeFactory()
+                                        config.getTypeFactory(),
+                                        existing.getViews()
                                     )
                             );
                         } else {
@@ -484,6 +487,7 @@ public class BeanIntrospectionModule extends SimpleModule {
      * Introspected property writer.
      */
     private class BeanIntrospectionPropertyWriter extends BeanPropertyWriter {
+        protected final Class<?>[] _views;
         final BeanProperty<Object, Object> beanProperty;
         final SerializableString fastName;
         private final JavaType type;
@@ -491,20 +495,23 @@ public class BeanIntrospectionModule extends SimpleModule {
         BeanIntrospectionPropertyWriter(BeanPropertyWriter src,
                                         BeanProperty<Object, Object> introspection,
                                         JsonSerializer<Object> ser,
-                                        TypeFactory typeFactory) {
-            this(src.getSerializedName(), src, introspection, ser, typeFactory);
+                                        TypeFactory typeFactory,
+                                        Class<?>[] views) {
+            this(src.getSerializedName(), src, introspection, ser, typeFactory, views);
         }
 
         BeanIntrospectionPropertyWriter(SerializableString name,
                                         BeanPropertyWriter src,
                                         BeanProperty<Object, Object> introspection,
                                         JsonSerializer<Object> ser,
-                                        TypeFactory typeFactory) {
+                                        TypeFactory typeFactory,
+                                        Class<?>[] views) {
             super(src);
             // either use the passed on serializer or the original one
             _serializer = (ser != null) ? ser : src.getSerializer();
             beanProperty = introspection;
             fastName = name;
+            _views = views;
             this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = (ser == null) ? PropertySerializerMap
                     .emptyForProperties() : null;
@@ -516,6 +523,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                 TypeFactory typeFactory) {
             beanProperty = introspection;
             fastName = new SerializedString(name);
+            _views = null;
             this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = PropertySerializerMap
                     .emptyForProperties();
@@ -541,8 +549,25 @@ public class BeanIntrospectionModule extends SimpleModule {
             return type;
         }
 
+        private boolean inView(Class<?> activeView) {
+            if (activeView == null || _views == null) {
+                return true;
+            }
+            final int len = _views.length;
+            for (int i = 0; i < len; ++i) {
+                if (_views[i].isAssignableFrom(activeView)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         @Override
         public final void serializeAsField(Object bean, JsonGenerator gen, SerializerProvider prov) throws Exception {
+            if (!inView(prov.getActiveView())) {
+                serializeAsOmittedField(bean, gen, prov);
+                return;
+            }
             Object value = beanProperty.get(bean);
             // Null (etc) handling; copied from super-class impl
             if (value == null) {
@@ -589,6 +614,11 @@ public class BeanIntrospectionModule extends SimpleModule {
 
         @Override
         public final void serializeAsElement(Object bean, JsonGenerator gen, SerializerProvider prov) throws Exception {
+            if (!inView(prov.getActiveView())) {
+                serializeAsOmittedField(bean, gen, prov);
+                return;
+            }
+
             Object value = beanProperty.get(bean);
             // Null (etc) handling; copied from super-class impl
             if (value == null) {

@@ -47,7 +47,6 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         URL url = new URL(url1.getProtocol(), url1.getHost(), url1.getPort(), url1.getFile() + "/test-consumes", null)
         URLConnection connection = url.openConnection()
         connection.setRequestMethod("POST")
-        connection.setRequestProperty('Content-Type', null)
         connection.doOutput = true
 
         def writer = new OutputStreamWriter(connection.outputStream)
@@ -61,6 +60,41 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         then:
         noExceptionThrown()
         body == "all"
+    }
+
+    void "test routes are not filtered by content-type when consumes=all"() {
+        when:
+        String body = rxClient.retrieve(HttpRequest.POST("/test-consumes-all", "true").contentType(APPLICATION_JSON_TYPE)).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        body == "all:true"
+
+        when:
+        body = rxClient.retrieve(HttpRequest.POST("/test-consumes-all", "graphql").contentType(APPLICATION_GRAPHQL_TYPE)).blockingFirst()
+
+        then:
+        noExceptionThrown()
+        body == "all:graphql"
+
+        when:
+        URL url1 = embeddedServer.getURL()
+        URL url = new URL(url1.getProtocol(), url1.getHost(), url1.getPort(), url1.getFile() + "/test-consumes-all", null)
+        URLConnection connection = url.openConnection()
+        connection.setRequestMethod("POST")
+        connection.doOutput = true
+
+        def writer = new OutputStreamWriter(connection.outputStream)
+        writer.write("abc")
+        writer.flush()
+        writer.close()
+        connection.connect()
+
+        body = connection.content.text
+
+        then:
+        noExceptionThrown()
+        body == "all:abc"
     }
 
     void "test accept matching has priority over route complexity"() {
@@ -89,6 +123,16 @@ class ConsumesMatchesRouteSpec extends AbstractMicronautSpec {
         @Post(consumes = ALL)
         HttpResponse postc(@Body String body) {
             HttpResponse.ok("all")
+        }
+    }
+
+    @Requires(property = "spec.name", value = "ConsumesMatchesRouteSpec")
+    @Controller("/test-consumes-all")
+    static class MyControllerForAll  {
+
+        @Post(consumes = ALL)
+        HttpResponse posta(@Body String body) {
+            HttpResponse.ok("all:" + body)
         }
     }
 

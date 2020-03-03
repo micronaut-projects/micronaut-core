@@ -37,5 +37,7 @@ public class EachBeanTest {
 
         // end::beans[]
         assertNotNull(firstConfig);
+
+        applicationContext.close();
     }
 }

@@ -42,7 +42,7 @@ class BasicAuthSpec extends Specification {
         String resp = ctx.createBean(RxHttpClient, new URL("http://sherlock:password@localhost:${server.port}")).retrieve("/basic-auth").blockingFirst()
 
         then:
-        resp == "Basic ${'sherlock:password'.bytes.encodeBase64().toString()}"
+        resp == "sherlock:password"
 
         cleanup:
         ctx.close()

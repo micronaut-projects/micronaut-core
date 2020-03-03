@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,9 @@ public class StaticResourceConfiguration implements Toggleable {
 
     /**
      * @param resourceResolver The {@linkplain ResourceResolver}
+     * @deprecated Use {@link #StaticResourceConfiguration(ResourceResolver, ServerContextPathProvider)} instead.
      */
+    @Deprecated
     public StaticResourceConfiguration(ResourceResolver resourceResolver) {
         this(resourceResolver, null);
     }

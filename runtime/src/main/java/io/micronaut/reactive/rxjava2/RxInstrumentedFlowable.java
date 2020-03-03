@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,12 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableSubscriber;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -35,36 +32,32 @@ import java.util.List;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumentedComponent {
+final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumentedComponent  {
     private final Publisher<T> source;
-    private final List<RunnableInstrumenter> instrumentations;
+    private final InvocationInstrumenter instrumenter;
+
 
     /**
      * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
+     *
+     * @param source       The source
+     * @param instrumenter The instrumenter
      */
-    RxInstrumentedFlowable(
-            Publisher<T> source, List<RunnableInstrumenter> instrumentations) {
+    RxInstrumentedFlowable(Publisher<T> source, InvocationInstrumenter instrumenter) {
         this.source = source;
-        this.instrumentations = instrumentations;
+        this.instrumenter = instrumenter;
     }
 
-    /**
-     * Default constructor.
-     * @param source The source
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedFlowable(
-            Publisher<T> source, Collection<ReactiveInstrumenter> instrumentations) {
-        this.source = source;
-        this.instrumentations = toRunnableInstrumenters(instrumentations);
-    }
-
-    @Override protected void subscribeActual(Subscriber<? super T> s) {
+    @Override
+    protected void subscribeActual(Subscriber<? super T> s) {
         if (!(s instanceof FlowableSubscriber)) {
             throw new IllegalArgumentException("Subscriber must be an instance of FlowableSubscriber");
         }
-        source.subscribe(RxInstrumentedWrappers.wrap(s, instrumentations));
+        try {
+            instrumenter.beforeInvocation();
+            source.subscribe(s);
+        } finally {
+            instrumenter.afterInvocation();
+        }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -36,16 +37,8 @@ import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
 import javax.annotation.Nonnull;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * Abstract implementation of the {@link RouteMatch} interface.
@@ -248,6 +241,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                     value = argumentValues.get(name);
                 }
 
+                Class argumentType = argument.getType();
                 if (value instanceof UnresolvedArgument) {
                     UnresolvedArgument<?> unresolved = (UnresolvedArgument<?>) value;
                     ArgumentBinder.BindingResult<?> bindingResult = unresolved.get();
@@ -259,9 +253,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                             ConversionError conversionError = (ConversionError) resolved;
                             throw new ConversionErrorException(argument, conversionError);
                         } else {
-                            ConversionContext conversionContext = ConversionContext.of(argument);
-                            Optional<?> result = conversionService.convert(resolved, argument.getType(), conversionContext);
-                            argumentList.add(resolveValueOrError(argument, conversionContext, result));
+                            convertValueAndAddToList(conversionService, argumentList, argument, resolved, argumentType);
                         }
                     } else {
                         if (argument.isNullable()) {
@@ -275,23 +267,43 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                                 ConversionError conversionError = conversionErrors.iterator().next();
                                 throw new ConversionErrorException(argument, conversionError);
                             } else {
-                                throw new UnsatisfiedRouteException(argument);
+                                throw UnsatisfiedRouteException.create(argument);
                             }
                         }
 
                     }
+                } else if (value instanceof NullArgument) {
+                    argumentList.add(null);
                 } else if (value instanceof ConversionError) {
                     throw new ConversionErrorException(argument, (ConversionError) value);
                 } else if (value == DefaultRouteBuilder.NO_VALUE) {
-                    throw new UnsatisfiedRouteException(argument);
+                    throw UnsatisfiedRouteException.create(argument);
                 } else {
-                    ConversionContext conversionContext = ConversionContext.of(argument);
-                    Optional<?> result = conversionService.convert(value, argument.getType(), conversionContext);
-                    argumentList.add(resolveValueOrError(argument, conversionContext, result));
+                    convertValueAndAddToList(conversionService, argumentList, argument, value, argumentType);
                 }
             }
 
             return executableMethod.invoke(argumentList.toArray());
+        }
+    }
+
+    private void convertValueAndAddToList(ConversionService conversionService, List argumentList, Argument argument, Object value, Class argumentType) {
+        if (argumentType.isInstance(value)) {
+            if (argument.isContainerType()) {
+                if (argument.hasTypeVariables()) {
+                    ConversionContext conversionContext = ConversionContext.of(argument);
+                    Optional<?> result = conversionService.convert(value, argumentType, conversionContext);
+                    argumentList.add(resolveValueOrError(argument, conversionContext, result));
+                } else {
+                    argumentList.add(value);
+                }
+            } else {
+                argumentList.add(value);
+            }
+        } else {
+            ConversionContext conversionContext = ConversionContext.of(argument);
+            Optional<?> result = conversionService.convert(value, argumentType, conversionContext);
+            argumentList.add(resolveValueOrError(argument, conversionContext, result));
         }
     }
 
@@ -307,39 +319,53 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public RouteMatch<R> fulfill(Map<String, Object> argumentValues) {
-        Map<String, Object> oldVariables = getVariableValues();
-        Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
-        for (Argument requiredArgument : getArguments()) {
-            Object value = argumentValues.get(requiredArgument.getName());
-            Optional<Argument<?>> ba = getBodyArgument();
-            if (ba.isPresent()) {
-                Argument<?> a = ba.get();
-                if (a.getName().equals(requiredArgument.getName())) {
-                    requiredArgument = a;
-                }
-            }
+        if (CollectionUtils.isEmpty(argumentValues)) {
+            return this;
+        } else {
+            Map<String, Object> oldVariables = getVariableValues();
+            Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
+            final Argument<?> bodyArgument = getBodyArgument().orElse(null);
+            Argument[] arguments = getArguments();
+            Collection<Argument> requiredArguments = getRequiredArguments();
+            boolean hasRequiredArguments = CollectionUtils.isNotEmpty(requiredArguments);
+            for (Argument requiredArgument : arguments) {
 
-            if (value != null) {
-                String name = resolveInputName(requiredArgument);
-                if (value instanceof UnresolvedArgument) {
-                    newVariables.put(name, value);
-                } else {
-                    ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
-                    Optional converted = conversionService.convert(value, conversionContext);
-                    Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
-                    if (result != null) {
-                        newVariables.put(name, result);
+                String argumentName = requiredArgument.getName();
+                if (argumentValues.containsKey(argumentName)) {
+
+                    Object value = argumentValues.get(argumentName);
+                    if (bodyArgument != null) {
+                        if (bodyArgument.getName().equals(argumentName)) {
+                            requiredArgument = bodyArgument;
+                        }
+                    }
+
+                    if (hasRequiredArguments) {
+                        requiredArguments.remove(requiredArgument);
+                    }
+
+                    if (value != null) {
+                        String name = resolveInputName(requiredArgument);
+                        if (value instanceof UnresolvedArgument || value instanceof NullArgument) {
+                            newVariables.put(name, value);
+                        } else {
+                            Class type = requiredArgument.getType();
+                            if (type.isInstance(value)) {
+                                newVariables.put(name, value);
+                            } else {
+                                ArgumentConversionContext conversionContext = ConversionContext.of(requiredArgument);
+                                Optional converted = conversionService.convert(value, conversionContext);
+                                Object result = converted.isPresent() ? converted.get() : conversionContext.getLastError().orElse(null);
+                                if (result != null) {
+                                    newVariables.put(name, result);
+                                }
+                            }
+                        }
                     }
                 }
             }
+            return newFulfilled(newVariables, (List<Argument>) requiredArguments);
         }
-        Set<String> argumentNames = argumentValues.keySet();
-        List<Argument> requiredArguments = getRequiredArguments()
-            .stream()
-            .filter(arg -> !argumentNames.contains(arg.getName()))
-            .collect(Collectors.toList());
-
-        return newFulfilled(newVariables, requiredArguments);
     }
 
     /**
@@ -355,7 +381,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 return null;
             }
             throw lastError.map(conversionError ->
-                (RuntimeException) new ConversionErrorException(argument, conversionError)).orElseGet(() -> new UnsatisfiedRouteException(argument)
+                (RuntimeException) new ConversionErrorException(argument, conversionError)).orElseGet(() -> UnsatisfiedRouteException.create(argument)
             );
         } else {
             return result.get();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,14 @@
  */
 package io.micronaut.http.context;
 
-import io.micronaut.http.HttpRequest;
-
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+import io.micronaut.http.HttpRequest;
 
 /**
  * The holder for the current {@link HttpRequest} that is bound to instrumented threads.
@@ -36,23 +39,36 @@ public final class ServerRequestContext {
     }
 
     /**
+     * Set {@link HttpRequest}.
+     *
+     * @param request new {@link HttpRequest}
+     */
+    public static void set(@Nullable HttpRequest request) {
+        if (request == null) {
+            REQUEST.remove();
+        } else {
+            REQUEST.set(request);
+        }
+    }
+
+    /**
      * Wrap the execution of the given runnable in request context processing.
      *
      * @param request  The request
      * @param runnable The runnable
      */
-    public static void with(HttpRequest request, Runnable runnable) {
+    public static void with(@Nullable HttpRequest request, @Nonnull Runnable runnable) {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {
             if (request != existing) {
                 isSet = true;
-                REQUEST.set(request);
+                set(request);
             }
             runnable.run();
         } finally {
             if (isSet) {
-                REQUEST.remove();
+                set(existing);
             }
         }
     }
@@ -64,7 +80,7 @@ public final class ServerRequestContext {
      * @param runnable The runnable
      * @return The newly instrumented runnable
      */
-    public static Runnable instrument(HttpRequest request, Runnable runnable) {
+    public static Runnable instrument(@Nullable HttpRequest request, @Nonnull Runnable runnable) {
         return () -> with(request, runnable);
     }
 
@@ -76,18 +92,18 @@ public final class ServerRequestContext {
      * @param <T>      The return type of the callable
      * @return The return value of the callable
      */
-    public static <T> T with(HttpRequest request, Supplier<T> callable) {
+    public static <T> T with(@Nullable HttpRequest request, @Nonnull Supplier<T> callable) {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {
             if (request != existing) {
                 isSet = true;
-                REQUEST.set(request);
+                set(request);
             }
             return callable.get();
         } finally {
             if (isSet) {
-                REQUEST.remove();
+                set(existing);
             }
         }
     }
@@ -101,18 +117,18 @@ public final class ServerRequestContext {
      * @return The return value of the callable
      * @throws Exception If the callable throws an exception
      */
-    public static <T> T with(HttpRequest request, Callable<T> callable) throws Exception {
+    public static <T> T with(@Nullable HttpRequest request, @Nonnull Callable<T> callable) throws Exception {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {
             if (request != existing) {
                 isSet = true;
-                REQUEST.set(request);
+                set(request);
             }
             return callable.call();
         } finally {
             if (isSet) {
-                REQUEST.remove();
+                set(existing);
             }
         }
     }

@@ -40,5 +40,7 @@ public class EachPropertyTest {
                 firstConfig.getUrl()
         );
         // end::beans[]
+
+        applicationContext.close();
     }
 }

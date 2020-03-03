@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,8 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.*;
+
+import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
 /**
  * Default implementation of the {@link RequestBinderRegistry} interface.
@@ -77,9 +79,11 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                         TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
                         Argument argumentType = typedRequestArgumentBinder.argumentType();
                         byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), binder);
-                        Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType.getType());
-                        for (Class<?> itfce : allInterfaces) {
-                            byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), binder);
+                        if (((TypedRequestArgumentBinder) binder).supportsSuperTypes()) {
+                            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType.getType());
+                            for (Class<?> itfce : allInterfaces) {
+                                byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), binder);
+                            }
                         }
                     } else {
                         byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
@@ -223,6 +227,11 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
         PathVariableAnnotationBinder<Object> pathVariableAnnotationBinder = new PathVariableAnnotationBinder<>(conversionService);
         byAnnotation.put(pathVariableAnnotationBinder.getAnnotationType(), pathVariableAnnotationBinder);
+
+        if (KOTLIN_COROUTINES_SUPPORTED) {
+            ContinuationArgumentBinder continuationArgumentBinder = new ContinuationArgumentBinder();
+            byType.put(continuationArgumentBinder.argumentType().typeHashCode(), continuationArgumentBinder);
+        }
     }
 
     /**

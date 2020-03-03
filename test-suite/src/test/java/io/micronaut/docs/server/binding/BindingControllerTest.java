@@ -7,11 +7,14 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+
+import java.util.HashSet;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -50,6 +53,20 @@ public class BindingControllerTest {
 
         assertNotNull(body);
         assertEquals("cookie value", body);
+    }
+
+
+    @Test
+    public void testCookiesBinding() {
+
+        HashSet<Cookie> cookies = new HashSet<>();
+        cookies.add(Cookie.of("myCookieA", "cookie A value"));
+        cookies.add(Cookie.of("myCookieB", "cookie B value"));
+
+        String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/cookieMultiple").cookies(cookies));
+
+        assertNotNull(body);
+        assertEquals("[\"cookie A value\",\"cookie B value\"]", body);
     }
 
     @Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.event.ServiceShutdownEvent;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -37,6 +38,7 @@ import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
+import io.micronaut.http.server.netty.ssl.HttpRequestCertificateHandler;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
@@ -77,9 +79,7 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.net.*;
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -129,6 +129,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final WebSocketBeanRegistry webSocketBeanRegistry;
     private final int specifiedPort;
     private final HttpCompressionStrategy httpCompressionStrategy;
+    private final HttpContentProcessorResolver httpContentProcessorResolver;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final SslContext sslContext;
@@ -154,6 +155,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param outboundHandlers                        The outbound handlers
      * @param eventLoopGroupFactory                   The EventLoopGroupFactory
      * @param httpCompressionStrategy                 The http compression strategy
+     * @param httpContentProcessorResolver            The http content processor resolver
      */
     @SuppressWarnings("ParameterNumber")
     @Inject
@@ -168,12 +170,14 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         @javax.inject.Named(TaskExecutors.IO) ExecutorService ioExecutor,
         @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
         ExecutorSelector executorSelector,
-        Optional<ServerSslBuilder> serverSslBuilder,
+        @Nullable ServerSslBuilder serverSslBuilder,
         List<ChannelOutboundHandler> outboundHandlers,
         EventLoopGroupFactory eventLoopGroupFactory,
-        HttpCompressionStrategy httpCompressionStrategy
+        HttpCompressionStrategy httpCompressionStrategy,
+        HttpContentProcessorResolver httpContentProcessorResolver
     ) {
         this.httpCompressionStrategy = httpCompressionStrategy;
+        this.httpContentProcessorResolver = httpContentProcessorResolver;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());
         this.applicationContext = applicationContext;
@@ -184,22 +188,12 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.serverConfiguration = serverConfiguration;
         this.router = router;
         this.ioExecutor = ioExecutor;
-        Optional<Integer> configPort = serverConfiguration.getPort();
-        if (configPort.isPresent()) {
-            this.specifiedPort = configPort.get();
-        } else {
-            if (environment.getActiveNames().contains(Environment.TEST)) {
-                this.specifiedPort = -1;
-            } else {
-                this.specifiedPort = HttpServerConfiguration.DEFAULT_PORT;
-            }
-        }
+        this.specifiedPort = getHttpPort(serverConfiguration);
 
         int port = specifiedPort;
-        if (serverSslBuilder.isPresent()) {
-            ServerSslBuilder sslBuilder = serverSslBuilder.get();
-            this.sslConfiguration = sslBuilder.getSslConfiguration();
-            this.sslContext = sslBuilder.build().orElse(null);
+        if (serverSslBuilder != null) {
+            this.sslConfiguration = serverSslBuilder.getSslConfiguration();
+            this.sslContext = serverSslBuilder.build().orElse(null);
             if (this.sslConfiguration.isEnabled()) {
                 port = sslConfiguration.getPort();
             }
@@ -208,7 +202,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             this.sslContext = null;
         }
 
-        this.serverPort = port == -1 ? SocketUtils.findAvailableTcpPort() : port;
+        this.serverPort = getPortOrDefault(port);
         this.executorSelector = executorSelector;
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
@@ -217,6 +211,33 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.threadFactory = threadFactory;
         this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(applicationContext);
         this.eventLoopGroupFactory = eventLoopGroupFactory;
+    }
+
+    /**
+     * Randomizes port if not set.
+     * @param port current port value
+     * @return random port number if the original value was -1
+     */
+    private int getPortOrDefault(int port) {
+        return port == -1 ? SocketUtils.findAvailableTcpPort() : port;
+    }
+
+    /**
+     * Get the configured http port otherwise will default the value depending on the env.
+     * @param serverConfiguration configuration object for the server
+     * @return http port
+     */
+    private int getHttpPort(NettyHttpServerConfiguration serverConfiguration) {
+        Optional<Integer> configPort = serverConfiguration.getPort();
+        if (configPort.isPresent()) {
+            return configPort.get();
+        } else {
+            if (environment.getActiveNames().contains(Environment.TEST)) {
+                return -1;
+            } else {
+                return HttpServerConfiguration.DEFAULT_PORT;
+            }
+        }
     }
 
     @Override
@@ -250,9 +271,10 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 .channel(eventLoopGroupFactory.serverSocketChannelClass())
                 .childHandler(new ChannelInitializer() {
                     final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
+                    final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
                     final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
                     final RoutingInBoundHandler routingHandler = new RoutingInBoundHandler(
-                        beanLocator,
+                        applicationContext,
                         router,
                         mediaTypeCodecRegistry,
                         customizableResponseTypeHandlerRegistry,
@@ -260,7 +282,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         serverConfiguration,
                         requestArgumentSatisfier,
                         executorSelector,
-                        ioExecutor
+                        ioExecutor,
+                            httpContentProcessorResolver
                     );
                     final LoggingHandler loggingHandler = serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(serverConfiguration.getLogLevel().get()) : null;
 
@@ -268,7 +291,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     protected void initChannel(Channel ch) {
                         ChannelPipeline pipeline = ch.pipeline();
 
-                        if (sslContext != null) {
+                        int port = ((InetSocketAddress) ch.localAddress()).getPort();
+                        boolean ssl = sslContext != null && sslConfiguration != null && port == sslConfiguration.getPort();
+                        if (ssl) {
                             pipeline.addLast(sslContext.newHandler(ch.alloc()));
                         }
 
@@ -299,6 +324,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                         pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
                         pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
+                        if (ssl) {
+                            pipeline.addLast(requestCertificateHandler);
+                        }
                         pipeline.addLast(HttpResponseEncoder.ID, responseDecoder);
                         pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
                                 getWebSocketSessionRepository(),
@@ -315,7 +343,39 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
             Optional<String> host = serverConfiguration.getHost();
 
-            bindServerToHost(serverBootstrap, host.orElse(null), new AtomicInteger(0));
+            serverPort = bindServerToHost(serverBootstrap, host.orElse(null), serverPort, new AtomicInteger(0));
+            List<Integer> defaultPorts = new ArrayList<>(2);
+            defaultPorts.add(serverPort);
+            if (serverConfiguration.isDualProtocol()) {
+                // By default we will bind ssl first and then bind http after.
+                int httpPort = getPortOrDefault(getHttpPort(serverConfiguration));
+                defaultPorts.add(httpPort);
+                bindServerToHost(serverBootstrap, host.orElse(null), httpPort, new AtomicInteger(0));
+            }
+            final Set<Integer> exposedPorts = router.getExposedPorts();
+            if (CollectionUtils.isNotEmpty(exposedPorts)) {
+                router.applyDefaultPorts(defaultPorts);
+                for (Integer exposedPort : exposedPorts) {
+                    try {
+                        if (host.isPresent()) {
+                            serverBootstrap.bind(host.get(), exposedPort).sync();
+                        } else {
+                            serverBootstrap.bind(exposedPort).sync();
+                        }
+                    } catch (Throwable e) {
+                        final boolean isBindError = e instanceof BindException;
+                        if (LOG.isErrorEnabled()) {
+                            if (isBindError) {
+                                LOG.error("Unable to start server. Additional specified server port {} already in use.", exposedPort);
+                            } else {
+                                LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
+                            }
+                        }
+                        throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, e);
+                    }
+                }
+            }
+            fireStartupEvents();
             running.set(true);
         }
 
@@ -401,37 +461,31 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     }
 
     @SuppressWarnings("MagicNumber")
-    private void bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, AtomicInteger attempts) {
+    private int bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, int port, AtomicInteger attempts) {
         boolean isRandomPort = specifiedPort == -1;
         Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         if (applicationName.isPresent()) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Binding {} server to {}:{}", applicationName.get(), host != null ? host : "*", serverPort);
+                LOG.debug("Binding {} server to {}:{}", applicationName.get(), host != null ? host : "*", port);
             }
         } else {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Binding server to {}:{}", host != null ? host : "*", serverPort);
+                LOG.debug("Binding server to {}:{}", host != null ? host : "*", port);
             }
         }
 
         try {
             if (host != null) {
-                serverBootstrap.bind(host, serverPort).sync();
+                serverBootstrap.bind(host, port).sync();
             } else {
-                serverBootstrap.bind(serverPort).sync();
+                serverBootstrap.bind(port).sync();
             }
-
-            applicationContext.publishEvent(new ServerStartupEvent(this));
-            applicationName.ifPresent(id -> {
-                this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-                applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
-            });
-
+            return port;
         } catch (Throwable e) {
             final boolean isBindError = e instanceof BindException;
             if (LOG.isErrorEnabled()) {
                 if (isBindError) {
-                    LOG.error("Unable to start server. Port already {} in use.", serverPort);
+                    LOG.error("Unable to start server. Port already {} in use.", port);
                 } else {
                     LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                 }
@@ -439,13 +493,22 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             int attemptCount = attempts.getAndIncrement();
 
             if (isRandomPort && attemptCount < 3) {
-                serverPort = SocketUtils.findAvailableTcpPort();
-                bindServerToHost(serverBootstrap, host, attempts);
+                port = SocketUtils.findAvailableTcpPort();
+                return bindServerToHost(serverBootstrap, host, port, attempts);
             } else {
                 stopInternal();
-                throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, e);
+                throw new ServerStartupException("Unable to start Micronaut server on port: " + port, e);
             }
         }
+    }
+
+    private void fireStartupEvents() {
+        Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
+        applicationContext.publishEvent(new ServerStartupEvent(this));
+        applicationName.ifPresent(id -> {
+            this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
+            applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
+        });
     }
 
     private void logShutdownErrorIfNecessary(Future<?> future) {

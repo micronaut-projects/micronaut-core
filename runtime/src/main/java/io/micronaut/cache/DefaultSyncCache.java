@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,6 +171,13 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
     public <T> Optional<T> putIfAbsent(Object key, T value) {
         Object previous = cache.asMap().putIfAbsent(key, value);
         return Optional.ofNullable((T) previous);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> T putIfAbsent(Object key, Supplier<T> value) {
+        Object val = cache.asMap().computeIfAbsent(key, (k) -> value.get());
+        return (T) val;
     }
 
     /**

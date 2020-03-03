@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -30,8 +31,8 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -44,10 +45,12 @@ import java.util.stream.Stream;
 @Singleton
 public class DefaultRouter implements Router {
 
-    private final UriRoute[][] routesByMethod = new UriRoute[HttpMethod.values().length][];
+    private final Map<String, List<UriRoute>> routesByMethod = new HashMap<>();
     private final Set<StatusRoute> statusRoutes = new HashSet<>();
     private final Collection<FilterRoute> filterRoutes = new ArrayList<>();
     private final Set<ErrorRoute> errorRoutes = new HashSet<>();
+    private final Set<Integer> exposedPorts;
+    private List<Integer> defaultPorts;
 
     /**
      * Construct a new router for the given route builders.
@@ -56,90 +59,27 @@ public class DefaultRouter implements Router {
      */
     @Inject
     public DefaultRouter(Collection<RouteBuilder> builders) {
-        List<UriRoute> getRoutes = new ArrayList<>();
-        List<UriRoute> putRoutes = new ArrayList<>();
-        List<UriRoute> postRoutes = new ArrayList<>();
-        List<UriRoute> patchRoutes = new ArrayList<>();
-        List<UriRoute> deleteRoutes = new ArrayList<>();
-        List<UriRoute> optionsRoutes = new ArrayList<>();
-        List<UriRoute> headRoutes = new ArrayList<>();
-        List<UriRoute> connectRoutes = new ArrayList<>();
-        List<UriRoute> traceRoutes = new ArrayList<>();
-
+        Set<Integer> exposedPorts = new HashSet<>(5);
         for (RouteBuilder builder : builders) {
             List<UriRoute> constructedRoutes = builder.getUriRoutes();
             for (UriRoute route : constructedRoutes) {
-                switch (route.getHttpMethod()) {
-                    case GET:
-                        getRoutes.add(route);
-                        break;
-                    case PUT:
-                        putRoutes.add(route);
-                        break;
-                    case POST:
-                        postRoutes.add(route);
-                        break;
-                    case PATCH:
-                        patchRoutes.add(route);
-                        break;
-                    case DELETE:
-                        deleteRoutes.add(route);
-                        break;
-                    case OPTIONS:
-                        optionsRoutes.add(route);
-                        break;
-                    case HEAD:
-                        headRoutes.add(route);
-                        break;
-                    case CONNECT:
-                        connectRoutes.add(route);
-                        break;
-                    case TRACE:
-                        traceRoutes.add(route);
-                        break;
-                    default:
-                        // no-op
-                }
+                String key = route.getHttpMethodName();
+                routesByMethod.computeIfAbsent(key, x -> new ArrayList<>()).add(route);
             }
 
             this.statusRoutes.addAll(builder.getStatusRoutes());
             this.errorRoutes.addAll(builder.getErrorRoutes());
             this.filterRoutes.addAll(builder.getFilterRoutes());
+            exposedPorts.addAll(builder.getExposedPorts());
         }
 
-        for (HttpMethod method : HttpMethod.values()) {
-            switch (method) {
-                case GET:
-                    routesByMethod[method.ordinal()] = finalizeRoutes(getRoutes);
-                    break;
-                case PUT:
-                    routesByMethod[method.ordinal()] = finalizeRoutes(putRoutes);
-                    break;
-                case POST:
-                    routesByMethod[method.ordinal()] = finalizeRoutes(postRoutes);
-                    break;
-                case PATCH:
-                    routesByMethod[method.ordinal()] = finalizeRoutes(patchRoutes);
-                    break;
-                case DELETE:
-                    routesByMethod[method.ordinal()] = finalizeRoutes(deleteRoutes);
-                    break;
-                case OPTIONS:
-                    routesByMethod[method.ordinal()] = finalizeRoutes(optionsRoutes);
-                    break;
-                case HEAD:
-                    routesByMethod[method.ordinal()] = finalizeRoutes(headRoutes);
-                    break;
-                case CONNECT:
-                    routesByMethod[method.ordinal()] = finalizeRoutes(connectRoutes);
-                    break;
-                case TRACE:
-                    routesByMethod[method.ordinal()] = finalizeRoutes(traceRoutes);
-                    break;
-                default:
-                    // no-op
-            }
+        if (CollectionUtils.isNotEmpty(exposedPorts)) {
+            this.exposedPorts = exposedPorts;
+        } else {
+            this.exposedPorts = Collections.emptySet();
         }
+
+        routesByMethod.values().forEach(this::finalizeRoutes);
     }
 
     /**
@@ -151,16 +91,50 @@ public class DefaultRouter implements Router {
         this(Arrays.asList(builders));
     }
 
+    @Override
+    public Set<Integer> getExposedPorts() {
+        return exposedPorts;
+    }
+
+    @Override
+    public void applyDefaultPorts(List<Integer> ports) {
+        Predicate<HttpRequest<?>> portMatches = (httpRequest -> ports.contains(httpRequest.getServerAddress().getPort()));
+        routesByMethod.values().forEach(routes -> {
+            for (int i = 0; i < routes.size(); i++) {
+                UriRoute route = routes.get(i);
+                if (route.getPort() == null) {
+                    routes.set(i, route.where(portMatches));
+                }
+            }
+        });
+    }
+
     @SuppressWarnings("unchecked")
     @Nonnull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri) {
-        UriRoute[] routes = routesByMethod[httpMethod.ordinal()];
-        String uriString = uri.toString();
-        return Arrays
-            .stream(routes)
-            .map((route -> (UriRouteMatch<T, R>) route.match(uriString).orElse(null)))
-            .filter(Objects::nonNull);
+        return this.<T, R>find(httpMethod.name(), uri).stream();
+    }
+
+    @Nonnull
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpRequest request, @Nonnull CharSequence uri) {
+        return this.<T, R>find(request.getMethodName(), uri).stream();
+    }
+
+    @Nonnull
+    @Deprecated
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull URI uri) {
+        return this.<T, R>find(httpMethod.name(), uri.toString()).stream();
+    }
+
+    @Nonnull
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpRequest<?> request) {
+        boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
+        return this.<T, R>find(request, request.getPath())
+                .filter((match) -> match.test(request) && (!permitsBody || match.accept(request.getContentType().orElse(null))));
     }
 
     @SuppressWarnings("unchecked")
@@ -170,23 +144,34 @@ public class DefaultRouter implements Router {
         return find(httpMethod, uri);
     }
 
+    @Override
+    public Stream<UriRoute> uriRoutes() {
+        return routesByMethod.values().stream().flatMap(List::stream);
+    }
+
     @Nonnull
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(@Nonnull HttpRequest<?> request) {
-        List<UriRouteMatch<T, R>> uriRoutes = this.<T, R>find(request).collect(Collectors.toList());
+        final HttpMethod httpMethod = request.getMethod();
+        final MediaType contentType = request.getContentType().orElse(null);
+        boolean permitsBody = HttpMethod.permitsRequestBody(httpMethod);
+        List<UriRouteMatch<T, R>> uriRoutes = this.find(request.getMethodName(), request.getPath());
+        uriRoutes.removeIf(routeMatch ->
+                !(routeMatch.test(request) && (!permitsBody || routeMatch.accept(contentType)))
+        );
 
-        if (uriRoutes.size() > 1 && HttpMethod.permitsRequestBody(request.getMethod())) {
+        int routeCount = uriRoutes.size();
+        if (routeCount > 1 && permitsBody) {
 
-            List<UriRouteMatch<T, R>> explicitAcceptRoutes = new ArrayList<>(uriRoutes.size());
-            List<UriRouteMatch<T, R>> acceptRoutes = new ArrayList<>(uriRoutes.size());
+            List<UriRouteMatch<T, R>> explicitAcceptRoutes = new ArrayList<>(routeCount);
+            List<UriRouteMatch<T, R>> acceptRoutes = new ArrayList<>(routeCount);
 
-            Optional<MediaType> contentType = request.getContentType();
 
             for (UriRouteMatch<T, R> match: uriRoutes) {
-                if (match.explicitAccept(contentType.orElse(MediaType.ALL_TYPE))) {
+                if (match.explicitAccept(contentType != null ? contentType : MediaType.ALL_TYPE)) {
                     explicitAcceptRoutes.add(match);
                 }
-                if (explicitAcceptRoutes.isEmpty() && match.accept(contentType.orElse(null))) {
+                if (explicitAcceptRoutes.isEmpty() && match.accept(contentType)) {
                     acceptRoutes.add(match);
                 }
             }
@@ -194,16 +179,17 @@ public class DefaultRouter implements Router {
             uriRoutes = explicitAcceptRoutes.isEmpty() ? acceptRoutes : explicitAcceptRoutes;
         }
 
-        /**
+        /*
          * Any changes to the logic below may also need changes to {@link io.micronaut.http.uri.UriTemplate#compareTo(UriTemplate)}
          */
-        if (uriRoutes.size() > 1) {
+        routeCount = uriRoutes.size();
+        if (routeCount > 1) {
             long variableCount = 0;
             long rawLength = 0;
 
-            List<UriRouteMatch<T, R>> closestMatches = new ArrayList<>(uriRoutes.size());
+            List<UriRouteMatch<T, R>> closestMatches = new ArrayList<>(routeCount);
 
-            for (int i = 0; i < uriRoutes.size(); i++) {
+            for (int i = 0; i < routeCount; i++) {
                 UriRouteMatch<T, R> match = uriRoutes.get(i);
                 UriMatchTemplate template = match.getRoute().getUriMatchTemplate();
                 long variable = template.getPathVariableSegmentCount();
@@ -225,26 +211,9 @@ public class DefaultRouter implements Router {
 
     @Nonnull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpRequest<?> request) {
-        HttpMethod httpMethod = request.getMethod();
-        boolean permitsBody = HttpMethod.permitsRequestBody(httpMethod);
-        return this.<T, R>find(httpMethod, request.getPath())
-                .filter((match) -> match.test(request) && (!permitsBody || match.accept(request.getContentType().orElse(null))));
-    }
-
-    @Nonnull
-    @Override
-    public Stream<UriRoute> uriRoutes() {
-        return Arrays
-            .stream(routesByMethod)
-            .flatMap(Arrays::stream);
-    }
-
-    @Override
     public <T, R> Optional<UriRouteMatch<T, R>> route(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri) {
-        UriRoute[] routes = routesByMethod[httpMethod.ordinal()];
-        Optional<UriRouteMatch> result = Arrays
-            .stream(routes)
+        List<UriRoute> routes = routesByMethod.getOrDefault(httpMethod.name(), Collections.emptyList());
+        Optional<UriRouteMatch> result = routes.stream()
             .map((route -> route.match(uri.toString())))
             .filter(Optional::isPresent)
             .map(Optional::get)
@@ -306,7 +275,7 @@ public class DefaultRouter implements Router {
     @Nonnull
     @Override
     public List<HttpFilter> findFilters(@Nonnull HttpRequest<?> request) {
-        List<HttpFilter> httpFilters = new ArrayList<>();
+        List<HttpFilter> httpFilters = new ArrayList<>(filterRoutes.size());
         HttpMethod method = request.getMethod();
         URI uri = request.getUri();
         for (FilterRoute filterRoute : filterRoutes) {
@@ -322,23 +291,46 @@ public class DefaultRouter implements Router {
     }
 
     @SuppressWarnings("unchecked")
+    @Deprecated
     @Nonnull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri) {
-        return Arrays
-            .stream(routesByMethod)
-            .filter(Objects::nonNull)
-            .flatMap(Arrays::stream)
-            .map(route -> route.match(uri.toString()))
-            .filter(Optional::isPresent)
-            .map(Optional::get);
+        return findAny(uri, null);
     }
 
     @SuppressWarnings("unchecked")
     @Nonnull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
-        return findAny(uri);
+        List matchedRoutes = new ArrayList<>(5);
+        final String uriStr = uri.toString();
+        for (List<UriRoute> routes : routesByMethod.values()) {
+            for (UriRoute route : routes) {
+                final UriRouteMatch match = route.match(uriStr).orElse(null);
+                if (match != null && match.test(context)) {
+                    matchedRoutes.add(match);
+                }
+            }
+        }
+        return (Stream<UriRouteMatch<T, R>>) matchedRoutes.stream();
+    }
+
+    private <T, R> List<UriRouteMatch<T, R>> find(String httpMethodName, CharSequence uri) {
+        List<UriRoute> routes = routesByMethod.getOrDefault(httpMethodName, Collections.emptyList());
+        if (CollectionUtils.isNotEmpty(routes)) {
+            final String uriStr = uri.toString();
+            List<UriRouteMatch<T, R>> routeMatches = new ArrayList<>(routes.size());
+            for (UriRoute route : routes) {
+                final UriRouteMatch match = route.match(uriStr).orElse(null);
+                if (match != null) {
+                    routeMatches.add(match);
+                }
+            }
+            return routeMatches;
+        } else {
+            //noinspection unchecked
+            return Collections.EMPTY_LIST;
+        }
     }
 
     private UriRoute[] finalizeRoutes(List<UriRoute> routes) {

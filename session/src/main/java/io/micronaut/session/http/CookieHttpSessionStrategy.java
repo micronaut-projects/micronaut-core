@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -91,26 +92,27 @@ public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
                          MutableHttpResponse<?> response,
                          Session session) {
         Cookie cookie;
+        HttpSessionConfiguration configuration = getConfiguration();
         if (session.isExpired()) {
-            cookie = Cookie.of(getConfiguration().getCookieName(), "")
+            cookie = Cookie.of(configuration.getCookieName(), "")
                 .maxAge(0);
         } else {
             String cookieValue = cookieHttpSessionIdGenerator.cookieValueFromSession(session);
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("path {}, cookie value {}", request.getPath(), cookieValue);
             }
-            cookie = Cookie.of(getConfiguration().getCookieName(), cookieValue);
-            if (getConfiguration().isRememberMe()) {
+            cookie = Cookie.of(configuration.getCookieName(), cookieValue);
+            if (configuration.isRememberMe()) {
                 cookie.maxAge(Integer.MAX_VALUE);
             } else {
-                getConfiguration().getCookieMaxAge().ifPresent(cookie::maxAge);
+                configuration.getCookieMaxAge().ifPresent(maxAge -> cookie.maxAge(maxAge.get(ChronoUnit.SECONDS)));
             }
         }
 
-        cookie.httpOnly(true).secure(request.isSecure());
+        cookie.httpOnly(true).secure(configuration.isCookieSecure().orElse(request.isSecure()));
 
-        getConfiguration().getCookiePath().ifPresent(cookie::path);
-        getConfiguration().getDomainName().ifPresent(cookie::domain);
+        configuration.getCookiePath().ifPresent(cookie::path);
+        configuration.getDomainName().ifPresent(cookie::domain);
 
         response.cookie(cookie);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -178,18 +178,13 @@ public class TracingPublisher<T> implements Publisher<T> {
 
                     @Override
                     public void onComplete() {
-                        if (!finished) {
-                            try (Scope ignored = scopeManager.activeSpan() != span ? scopeManager.activate(span) : NoopScopeManager.NoopScope.INSTANCE) {
-                                actual.onComplete();
-                                TracingPublisher.this.doOnFinish(span);
-                            } finally {
-                                if (finishOnClose) {
-                                    span.finish();
-                                }
-                            }
-
-                        } else {
+                        try (Scope ignored = scopeManager.activeSpan() != span ? scopeManager.activate(span) : NoopScopeManager.NoopScope.INSTANCE) {
                             actual.onComplete();
+                            TracingPublisher.this.doOnFinish(span);
+                        } finally {
+                            if (!finished && finishOnClose) {
+                                span.finish();
+                            }
                         }
                     }
                 });

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,11 @@
  */
 package io.micronaut.inject.configuration;
 
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
-
+import io.micronaut.core.util.CollectionUtils;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.Writer;
@@ -70,11 +73,26 @@ public abstract class ConfigurationMetadataBuilder<T> {
     public ConfigurationMetadata visitProperties(T type,
                                                  @Nullable String description) {
 
-        String path = buildTypePath(type, type);
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata(type);
+        return visitProperties(type, description, annotationMetadata);
+    }
+
+    /**
+     * Visit a {@link io.micronaut.context.annotation.ConfigurationProperties} class.
+     *
+     * @param type        The type of the {@link io.micronaut.context.annotation.ConfigurationProperties}
+     * @param description A description
+     * @param annotationMetadata the annotation metadata
+     * @return This {@link ConfigurationMetadata}
+     */
+    public ConfigurationMetadata visitProperties(T type, @Nullable String description, @Nonnull AnnotationMetadata annotationMetadata) {
+        String path = buildTypePath(type, type, annotationMetadata);
         ConfigurationMetadata configurationMetadata = new ConfigurationMetadata();
         configurationMetadata.name = NameUtils.hyphenate(path, true);
         configurationMetadata.type = getTypeString(type);
         configurationMetadata.description = description;
+        configurationMetadata.includes = CollectionUtils.setOf(annotationMetadata.stringValues(ConfigurationReader.class, "includes"));
+        configurationMetadata.excludes = CollectionUtils.setOf(annotationMetadata.stringValues(ConfigurationReader.class, "excludes"));
         this.configurations.add(configurationMetadata);
         return configurationMetadata;
     }
@@ -182,12 +200,28 @@ public abstract class ConfigurationMetadataBuilder<T> {
     protected abstract String buildTypePath(T owningType, T declaringType);
 
     /**
+     * Variation of {@link #buildPropertyPath(Object, Object, String)} for types.
+     *
+     * @param owningType    The owning type
+     * @param declaringType The type
+     * @param annotationMetadata The annotation metadata
+     * @return The type path
+     */
+    protected abstract String buildTypePath(T owningType, T declaringType, AnnotationMetadata annotationMetadata);
+
+    /**
      * Convert the given type to a string.
      *
      * @param type The type
      * @return The string
      */
     protected abstract String getTypeString(T type);
+
+    /**
+     * @param type The type
+     * @return The annotation metadata for the type
+     */
+    protected abstract AnnotationMetadata getAnnotationMetadata(T type);
 
     /**
      * Quote a string.

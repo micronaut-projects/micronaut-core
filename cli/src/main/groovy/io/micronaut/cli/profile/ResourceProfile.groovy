@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,11 @@ class ResourceProfile extends AbstractProfile implements Profile {
     @Override
     String getName() {
         super.name
+    }
+
+    @Override
+    void setMainClassName(String mainClassName) {
+        super.mainClassName = mainClassName
     }
 
     public static Profile create(ProfileRepository repository, String name, Resource profileDir) {

@@ -82,7 +82,7 @@ dataSource:
         env.get("data-source.jmx-export", boolean).get() == true
     }
 
-    void "test datasources.default: {}"() {
+    void "test datasources default"() {
         def serviceDefinition = Mock(ServiceDefinition)
         serviceDefinition.isPresent() >> true
         serviceDefinition.load() >> new YamlPropertySourceLoader()

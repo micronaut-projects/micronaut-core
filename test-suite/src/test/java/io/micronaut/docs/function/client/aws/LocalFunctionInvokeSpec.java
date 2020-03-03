@@ -33,6 +33,7 @@ public class LocalFunctionInvokeSpec {
         assertEquals(2, mathClient.rnd(1.6f));
         assertEquals(15, mathClient.sum(sum));
 
+        server.close();
     }
     //end::invokeLocalFunction[]
 
@@ -50,6 +51,7 @@ public class LocalFunctionInvokeSpec {
         assertEquals(2, mathClient.rnd(1.6f).blockingGet().longValue());
         assertEquals(15, mathClient.sum(sum).blockingGet().longValue());
 
+        server.close();
     }
     //end::invokeRxLocalFunction[]
 

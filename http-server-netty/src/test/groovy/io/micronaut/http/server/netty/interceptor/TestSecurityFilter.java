@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ public class TestSecurityFilter implements HttpServerFilter {
         }
         else {
             request.getAttributes().put("authenticated", true);
-            return Publishers.map(
+            return Publishers.then(
                     chain.proceed(request),
                     mutableHttpResponse -> mutableHttpResponse.header("X-Test", "Foo " + request.getAttributes().get("SomeServiceValue", String.class, "none"))
             );

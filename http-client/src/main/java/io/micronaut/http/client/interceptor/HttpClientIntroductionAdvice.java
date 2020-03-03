@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,13 +47,14 @@ import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.filter.HttpClientFilterResolver;
 import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.context.ContextPathProvider;
+import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
@@ -62,6 +63,7 @@ import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.annotation.JacksonFeatures;
+import io.micronaut.jackson.codec.JacksonMediaTypeCodec;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.reactivex.Completable;
@@ -105,7 +107,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final int HEADERS_INITIAL_CAPACITY = 3;
     private final int ATTRIBUTES_INITIAL_CAPACITY = 1;
     private final BeanContext beanContext;
-    private final Map<String, HttpClient> clients = new ConcurrentHashMap<>();
+    private final Map<ClientKey, HttpClient> clients = new ConcurrentHashMap<>();
     private final Map<String, ClientVersioningConfiguration> versioningConfigurations = new ConcurrentHashMap<>();
     private final List<ReactiveClientResultTransformer> transformers;
     private final LoadBalancerResolver loadBalancerResolver;
@@ -159,13 +161,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context)
         );
 
-        HttpClient httpClient = getClient(context, clientAnnotation);
+        AnnotationValue filterAnnotation = context
+                .getAnnotationNameByStereotype(FilterMatcher.class)
+                .map(context::getAnnotation)
+                .orElse(null);
+
+        HttpClient httpClient = getClient(context, clientAnnotation, filterAnnotation);
 
         Class<?> declaringType = context.getDeclaringType();
         if (Closeable.class == declaringType || AutoCloseable.class == declaringType) {
-            String clientId = clientAnnotation.stringValue().orElse(null);
-            String path = clientAnnotation.stringValue("path").orElse(null);
-            String clientKey = computeClientKey(clientId, path);
+            ClientKey clientKey = new ClientKey(clientAnnotation, filterAnnotation);
             clients.remove(clientKey);
             httpClient.close();
             return null;
@@ -181,7 +186,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
 
-            HttpMethod httpMethod = HttpMethod.valueOf(annotationType.getSimpleName().toUpperCase());
+            HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase());
+            String httpMethodName = context.stringValue(CustomHttpMethod.class, "method").orElse(httpMethod.name());
 
             ReturnType returnType = context.getReturnType();
             Class<?> javaReturnType = returnType.getType();
@@ -208,7 +214,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 String headerName = headerAnnotation.stringValue("name").orElse(null);
                 String headerValue = headerAnnotation.stringValue().orElse(null);
                 if (StringUtils.isNotEmpty(headerName) && StringUtils.isNotEmpty(headerValue)) {
-                    headers.put(headerName, headerValue);
+                    headers.putIfAbsent(headerName, headerValue);
                 }
             }
 
@@ -225,7 +231,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         configuration.getParameters()
                                 .forEach(parameter -> queryParams.put(parameter, version));
                     });
-          
+
             Map<String, Object> attributes = new LinkedHashMap<>(ATTRIBUTES_INITIAL_CAPACITY);
 
             List<AnnotationValue<RequestAttribute>> attributeAnnotations = context.getAnnotationValuesByType(RequestAttribute.class);
@@ -240,6 +246,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             List<NettyCookie> cookies = new ArrayList<>();
             List<Argument> bodyArguments = new ArrayList<>();
             ConversionService<?> conversionService = ConversionService.SHARED;
+            BasicAuth basicAuth = null;
+
             for (Argument argument : arguments) {
                 String argumentName = argument.getName();
                 AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
@@ -255,7 +263,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     }
                 }
                 if (definedValue == null) {
-                    definedValue = argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", String.class).orElse(null);
+                    definedValue = argument.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null);
                 }
 
                 if (definedValue == null && !argument.isNullable()) {
@@ -323,6 +331,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             paramMap.put(parameterName, o);
                         }
                     });
+                } else if (argument.getType() == BasicAuth.class) {
+                    basicAuth = (BasicAuth) paramMap.get(argument.getName());
                 } else if (!uriVariables.contains(argumentName)) {
                     bodyArguments.add(argument);
                 }
@@ -368,7 +378,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             uri = uriTemplate.expand(paramMap);
             uriVariables.forEach(queryParams::remove);
 
-            request = HttpRequest.create(httpMethod, appendQuery(uri, queryParams));
+            request = HttpRequest.create(httpMethod, appendQuery(uri, queryParams), httpMethodName);
+
             if (body != null) {
                 request.body(body);
 
@@ -408,10 +419,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 acceptTypes = DEFAULT_ACCEPT_TYPES;
             }
 
+            if (basicAuth != null) {
+                request.basicAuth(basicAuth.getUsername(), basicAuth.getPassword());
+            }
+
             boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
             final Class<?> methodDeclaringType = declaringType;
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
-                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.getValue(Consumes.class, "single", Boolean.class).orElse(false);
+                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.isTrue(Consumes.class, "single");
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
 
@@ -640,21 +655,18 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @param clientAnn client annotation
      * @return client registration
      */
-    private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn) {
+    private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn, AnnotationValue filterAnnotation) {
         String clientId = getClientId(clientAnn);
         String path = clientAnn.stringValue("path").orElse(null);
-        String clientKey = computeClientKey(clientId, path);
-        if (clientKey == null) {
-            return null;
-        }
+        ClientKey clientKey = new ClientKey(clientAnn, filterAnnotation);
 
         return clients.computeIfAbsent(clientKey, integer -> {
             HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(NameUtils.hyphenate(clientId))).orElse(null);
-            AnnotationValue<JacksonFeatures> jacksonFeatures = context.findAnnotation(JacksonFeatures.class).orElse(null);
+            AnnotationValue<JacksonFeatures> jacksonFeaturesAnn = context.findAnnotation(JacksonFeatures.class).orElse(null);
             Optional<Class<?>> configurationClass = clientAnn.classValue("configuration");
 
             if (null != clientBean) {
-                if (path == null && jacksonFeatures == null && !configurationClass.isPresent()) {
+                if (path == null && jacksonFeaturesAnn == null && !configurationClass.isPresent() && filterAnnotation == null) {
                     return clientBean;
                 }
             }
@@ -682,68 +694,76 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             );
             Class<HttpClientConfiguration> defaultConfiguration = (Class<HttpClientConfiguration>) configurationClass.orElse(HttpClientConfiguration.class);
             configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
-
-            if (contextPath == null && configuration instanceof ContextPathProvider) {
-                contextPath = ((ContextPathProvider) configuration).getContextPath().orElse(null);
+            if (contextPath == null && configuration instanceof ClientContextPathProvider) {
+                contextPath = ((ClientContextPathProvider) configuration).getContextPath().orElse(null);
             }
-
-            HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath);
+            HttpClientFilterResolver filterResolver = beanContext.createBean(HttpClientFilterResolver.class, Collections.singleton(clientId), filterAnnotation);
+            HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath, filterResolver);
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
-                defaultClient.setClientIdentifiers(clientId);
 
-                if (jacksonFeatures != null) {
-                    Optional<MediaTypeCodec> existingCodec = defaultClient.getMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE);
-                    ObjectMapper objectMapper = null;
-                    if (existingCodec.isPresent()) {
-                        MediaTypeCodec existing = existingCodec.get();
-                        if (existing instanceof JsonMediaTypeCodec) {
-                            objectMapper = ((JsonMediaTypeCodec) existing).getObjectMapper().copy();
-                        }
-                    }
-                    if (objectMapper == null) {
-                        objectMapper = new ObjectMapperFactory().objectMapper(null, null);
-                    }
+                if (jacksonFeaturesAnn != null) {
+                    io.micronaut.jackson.codec.JacksonFeatures jacksonFeatures = new io.micronaut.jackson.codec.JacksonFeatures();
 
-                    SerializationFeature[] enabledSerializationFeatures = jacksonFeatures.get("enabledSerializationFeatures", SerializationFeature[].class).orElse(null);
+
+                    SerializationFeature[] enabledSerializationFeatures = jacksonFeaturesAnn.get("enabledSerializationFeatures", SerializationFeature[].class).orElse(null);
                     if (enabledSerializationFeatures != null) {
                         for (SerializationFeature serializationFeature : enabledSerializationFeatures) {
-                            objectMapper.configure(serializationFeature, true);
+                            jacksonFeatures.addFeature(serializationFeature, true);
                         }
                     }
 
-                    DeserializationFeature[] enabledDeserializationFeatures = jacksonFeatures.get("enabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
+                    DeserializationFeature[] enabledDeserializationFeatures = jacksonFeaturesAnn.get("enabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
 
                     if (enabledDeserializationFeatures != null) {
-                        for (DeserializationFeature serializationFeature : enabledDeserializationFeatures) {
-                            objectMapper.configure(serializationFeature, true);
+                        for (DeserializationFeature deserializationFeature : enabledDeserializationFeatures) {
+                            jacksonFeatures.addFeature(deserializationFeature, true);
                         }
                     }
 
-                    SerializationFeature[] disabledSerializationFeatures = jacksonFeatures.get("disabledSerializationFeatures", SerializationFeature[].class).orElse(null);
+                    SerializationFeature[] disabledSerializationFeatures = jacksonFeaturesAnn.get("disabledSerializationFeatures", SerializationFeature[].class).orElse(null);
                     if (disabledSerializationFeatures != null) {
                         for (SerializationFeature serializationFeature : disabledSerializationFeatures) {
-                            objectMapper.configure(serializationFeature, false);
+                            jacksonFeatures.addFeature(serializationFeature, false);
                         }
                     }
 
-                    DeserializationFeature[] disabledDeserializationFeatures = jacksonFeatures.get("disabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
+                    DeserializationFeature[] disabledDeserializationFeatures = jacksonFeaturesAnn.get("disabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
 
                     if (disabledDeserializationFeatures != null) {
                         for (DeserializationFeature feature : disabledDeserializationFeatures) {
-                            objectMapper.configure(feature, false);
+                            jacksonFeatures.addFeature(feature, false);
                         }
                     }
 
-                    defaultClient.setMediaTypeCodecRegistry(
-                            MediaTypeCodecRegistry.of(
-                                    new JsonMediaTypeCodec(objectMapper,
-                                            beanContext.getBean(ApplicationConfiguration.class),
-                                            beanContext.findBean(CodecConfiguration.class, Qualifiers.byName(JsonMediaTypeCodec.CONFIGURATION_QUALIFIER)).orElse(null))));
+                    List<MediaTypeCodec> codecs = new ArrayList<>(2);
+                    MediaTypeCodecRegistry codecRegistry = defaultClient.getMediaTypeCodecRegistry();
+                    for (MediaTypeCodec codec: codecRegistry.getCodecs()) {
+                        if (codec instanceof JacksonMediaTypeCodec) {
+                            codecs.add(((JacksonMediaTypeCodec) codec).cloneWithFeatures(jacksonFeatures));
+                        } else {
+                            codecs.add(codec);
+                        }
+                    }
+                    if (!codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isPresent()) {
+                        codecs.add(createNewJsonCodec(beanContext, jacksonFeatures));
+                    }
+                    defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(codecs));
                 }
             }
             return client;
         });
+    }
+
+    private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, io.micronaut.jackson.codec.JacksonFeatures jacksonFeatures) {
+        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(null, null);
+
+        jacksonFeatures.getDeserializationFeatures().forEach(objectMapper::configure);
+        jacksonFeatures.getSerializationFeatures().forEach(objectMapper::configure);
+
+        return new JsonMediaTypeCodec(objectMapper,
+                                beanContext.getBean(ApplicationConfiguration.class),
+                                beanContext.findBean(CodecConfiguration.class, Qualifiers.byName(JsonMediaTypeCodec.CONFIGURATION_QUALIFIER)).orElse(null));
     }
 
     private String getClientId(AnnotationValue<Client> clientAnn) {
@@ -752,17 +772,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             throw new HttpClientException("Either the id or value of the @Client annotation must be specified");
         }
         return clientId;
-    }
-
-    private String computeClientKey(String clientId, String path) {
-        if (StringUtils.isEmpty(clientId)) {
-            return null;
-        }
-        String clientKey = clientId;
-        if (StringUtils.isNotEmpty(path)) {
-            clientKey = clientKey + path;
-        }
-        return clientKey;
     }
 
     private String appendQuery(String uri, Map<String, String> queryParams) {
@@ -785,6 +794,44 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     public void close() {
         for (HttpClient client : clients.values()) {
             client.close();
+        }
+    }
+
+    /**
+     * Client key.
+     */
+    private class ClientKey {
+        final String clientId;
+        final String filterAnnotation;
+        final String path;
+        final Class<?> configurationClass;
+
+        public ClientKey(AnnotationValue<Client> clientAnn,
+                         AnnotationValue<?> filterAnnotation) {
+            this.clientId = getClientId(clientAnn);
+            this.path = clientAnn.stringValue("path").orElse(null);
+            this.filterAnnotation = filterAnnotation != null ? filterAnnotation.getAnnotationName() : null;
+            this.configurationClass =  clientAnn.classValue("configuration").orElse(null);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            ClientKey clientKey = (ClientKey) o;
+            return Objects.equals(clientId, clientKey.clientId) &&
+                    Objects.equals(filterAnnotation, clientKey.filterAnnotation) &&
+                    Objects.equals(path, clientKey.path) &&
+                    Objects.equals(configurationClass, clientKey.configurationClass);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(clientId, filterAnnotation, path, configurationClass);
         }
     }
 }

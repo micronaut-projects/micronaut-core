@@ -16,12 +16,13 @@ public class SampleEventListenerSpec {
 
     @Test
     public void testEventListenerIsNotified() {
-        ApplicationContext context = ApplicationContext.run();
-        SampleEventEmitterBean emitter = context.getBean(SampleEventEmitterBean.class);
-        SampleEventListener listener = context.getBean(SampleEventListener.class);
-        assertEquals(0, listener.getInvocationCounter());
-        emitter.publishSampleEvent();
-        await().atMost(10, SECONDS).until(listener::getInvocationCounter, equalTo(1));
+        try (ApplicationContext context = ApplicationContext.run()) {
+            SampleEventEmitterBean emitter = context.getBean(SampleEventEmitterBean.class);
+            SampleEventListener listener = context.getBean(SampleEventListener.class);
+            assertEquals(0, listener.getInvocationCounter());
+            emitter.publishSampleEvent();
+            await().atMost(10, SECONDS).until(listener::getInvocationCounter, equalTo(1));
+        }
     }
 
 }

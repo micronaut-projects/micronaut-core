@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,4 +26,14 @@ import io.micronaut.http.HttpRequest;
  * @since 1.0
  */
 public interface TypedRequestArgumentBinder<T> extends RequestArgumentBinder<T>, TypeArgumentBinder<T, HttpRequest<?>> {
+
+    /**
+     * Determines whether arguments that are an interface that {@link T}
+     * implements are candidates for binding.
+     *
+     * @return True if super interfaces are binding candidates
+     */
+    default boolean supportsSuperTypes() {
+        return true;
+    }
 }

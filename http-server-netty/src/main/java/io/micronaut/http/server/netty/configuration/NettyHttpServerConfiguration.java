@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,6 +86,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_COMPRESSIONTHRESHOLD = 1024;
 
+    /**
+     * The default compression level.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_COMPRESSIONLEVEL = 6;
+
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
     private Map<ChannelOption, Object> options = Collections.emptyMap();
     private Worker worker;
@@ -98,6 +104,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
     private LogLevel logLevel;
     private int compressionThreshold = DEFAULT_COMPRESSIONTHRESHOLD;
+    private int compressionLevel = DEFAULT_COMPRESSIONLEVEL;
     private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
 
     /**
@@ -193,6 +200,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public int getCompressionThreshold() {
         return compressionThreshold;
+    }
+
+    /**
+     * The default compression level. Default value ({@value #DEFAULT_COMPRESSIONLEVEL}).
+     *
+     * @return The compression level.
+     */
+    public int getCompressionLevel() {
+        return compressionLevel;
     }
 
     /**
@@ -328,6 +344,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setCompressionThreshold(@ReadableBytes int compressionThreshold) {
         this.compressionThreshold = compressionThreshold;
+    }
+
+    /**
+     * Sets the compression level (0-9). Default value ({@value #DEFAULT_COMPRESSIONLEVEL}).
+     *
+     * @param compressionLevel The compression level.
+     */
+    public void setCompressionLevel(@ReadableBytes int compressionLevel) {
+        this.compressionLevel = compressionLevel;
     }
 
     /**

@@ -259,7 +259,7 @@ class UploadSpec extends AbstractMicronautSpec {
         response.getBody().get() == 'bar: 9'
     }
 
-    @IgnoreIf({ env["TRAVIS"] })
+    @IgnoreIf({ env["GITHUB_WORKFLOW"] })
     void "test simple in-memory file upload exceeds size"() {
         given:
         MultipartBody requestBody = MultipartBody.builder()
@@ -310,4 +310,5 @@ class UploadSpec extends AbstractMicronautSpec {
         response.code() == HttpStatus.OK.code
         result == 'data.json: 16'
     }
+
 }

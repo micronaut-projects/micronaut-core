@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -23,9 +22,9 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
@@ -49,13 +48,13 @@ public class SingleBodyBinder extends DefaultBodyAnnotationBinder<Single> implem
     private PublisherBodyBinder publisherBodyBinder;
 
     /**
-     * @param conversionService       The conversion service
-     * @param beanLocator             The bean locator
-     * @param httpServerConfiguration The Http server configuration
+     * @param conversionService           The conversion service
+     * @param httpContentProcessorResolver The http content processor resolver
      */
-    public SingleBodyBinder(ConversionService conversionService, BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration) {
+    public SingleBodyBinder(ConversionService conversionService,
+                            HttpContentProcessorResolver httpContentProcessorResolver) {
         super(conversionService);
-        this.publisherBodyBinder = new PublisherBodyBinder(conversionService, beanLocator, httpServerConfiguration);
+        this.publisherBodyBinder = new PublisherBodyBinder(conversionService, httpContentProcessorResolver);
     }
 
     @Override

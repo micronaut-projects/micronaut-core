@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,7 @@ import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
-import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.naming.Described;
-import io.micronaut.runtime.context.env.CommandLinePropertySource;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
@@ -46,7 +44,6 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
 
-    private String[] args = new String[0];
     private Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
 
     /**
@@ -61,8 +58,6 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     @Override
     public @Nonnull ApplicationContext start() {
         long start = System.currentTimeMillis();
-        CommandLine commandLine = CommandLine.parse(args);
-        propertySources(new CommandLinePropertySource(commandLine));
         ApplicationContext applicationContext = super.build();
 
         try {
@@ -226,17 +221,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         return (Micronaut) super.classLoader(classLoader);
     }
 
-    /**
-     * Set the command line arguments.
-     *
-     * @param args The arguments
-     * @return This application
-     */
+    @Override
     public @Nonnull Micronaut args(@Nullable String... args) {
-        if (args != null) {
-            this.args = args;
-        }
-        return this;
+        return (Micronaut) super.args(args);
     }
 
     @Override

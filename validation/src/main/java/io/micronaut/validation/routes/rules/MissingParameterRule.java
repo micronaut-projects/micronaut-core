@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,7 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -37,9 +34,9 @@ import java.util.stream.Collectors;
 public class MissingParameterRule implements RouteValidationRule {
 
     @Override
-    public RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters, MethodElement method) {
+    public RouteValidationResult validate(List<UriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method) {
 
-        List<String> variables = template.getVariableNames();
+        Set<String> variables = templates.stream().flatMap(t -> t.getVariableNames().stream()).collect(Collectors.toSet());
         List<String> routeVariables = Arrays.stream(parameters).map(ParameterElement::getName).collect(Collectors.toList());
 
         routeVariables.addAll(Arrays.stream(parameters)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.inject.Provider;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -227,7 +228,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         Environment defaultEnvironment = getEnvironment();
         defaultEnvironment.start();
         registerSingleton(Environment.class, defaultEnvironment);
-        registerSingleton(new AnnotationProcessorListener());
     }
 
     @Override
@@ -296,7 +296,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     String qualifierKey = javax.inject.Qualifier.class.getName();
                                     Argument<?>[] arguments = candidate.getConstructor().getArguments();
                                     for (Argument<?> argument : arguments) {
-                                        if (argument.getType().equals(dependentType)) {
+                                        Class<?> argumentType;
+                                        if (Provider.class.isAssignableFrom(argument.getType())) {
+                                            argumentType = argument.getFirstTypeVariable().orElse(argument).getType();
+                                        } else {
+                                            argumentType = argument.getType();
+                                        }
+                                        if (argumentType.equals(dependentType)) {
                                             Map<? extends Argument<?>, Qualifier> qualifedArg = Collections.singletonMap(argument, qualifier);
                                             delegate.put(qualifierKey, qualifedArg);
                                             break;

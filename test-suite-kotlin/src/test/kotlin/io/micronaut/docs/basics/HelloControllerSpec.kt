@@ -19,7 +19,7 @@ import io.micronaut.http.HttpRequest.POST
 class HelloControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java)
+            ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName))
     )
 
     val client = autoClose(

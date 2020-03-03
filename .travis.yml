@@ -1,4 +1,5 @@
 dist: trusty
+if: tag IS present
 addons:
   chrome: stable
 language: java
@@ -22,18 +23,9 @@ env:
   - secure: h/tHauoDSJyQcZEqa+8sL+r0mgJYirBQWGnC6f3haUlsdSLNNoQKImg5QBFSheZr7bYG8E4CevlMjERV/KV+hAZ1zXBXRe+WG56pF7mWDsTqUM7ZMicf1N0Rjg5hyTSNbUrM2dth1eRzY2mvt3by+LQoIkocWe0hPYMXAqxbQRYdx9ydSQ++OoPDywT8spPGtOp8Bhn/apzfYxCDmsG8HT9MSQ4KJ8/yq9ty104N4cEgF2lwK8yVT20XY0hYRTR8V+ucCLC2Yv7+/OdzPPToqpwXYvcMXUmJIvYJr93zi6MAojUm4q+QOP9YOkdalkBdJrEe5lFAtjQsuWWvYNIxYK3qSPrFzfijpbRXwgHvRsVzPbzqsIcXpdGsra5yytcvyp0FNKATQsTa0K61ilsRKGnxKb6u0Pe2Od/unhZXVh2cghy+K9kZ2Tq65GdbcWgvC51gj04ZQO0t0qftoqY61NBTlsecsWktsSFQRastFfnuHTKjg/RSPRXXCgpjvKjgabwPMA0CYiTRA2N+6DN4CXaxDWlMcqguyVnErZIFaAJnSgkaWB0d6GCJijf9+4eWaQ12cNnrV1kK0y8ToLWJgksZfvhR45H3kOcIzXFSxJLxRtVLa/TXtfSApGegUz9ckkaHxChNWAuV9umKSJqUALLCfAwbfIeuCffVylZCxv4=
   - secure: fxzpPZ9AW2CdU9+isdBGplxnQZBReNZWaj9jWtYbVkMxLVCfENLQQl20f5FB6OOXKCQePo4c4dXFwB+aa3xiHVP91JDFm12d9cyz87MIbFVi3oBuob8rJG7NopJjQy9Y1Z2z/+Er0ScvthSTEOGnY8G/wyRMwJB12/NayaDpn+xKQYQgZbuXhHFexPO/pRiolNoXxaLb8ZHMqz7v/OtVpQ45p5sxontO9BA6fUUKF1704qk3hMGBzQYOfKhQ7lfJXV7O0KziChUIhDlyFEW+67gI9kuD1KqRjzut857gSoHc/KNjlX+ZKVouqKmarPJ7TSjEmcUuNJPesyvLHBmU07DtiSCOPlFPH1Hy/NL4CF0NAAo9iFyQnaS/LIpD005MvnlC5MhYsa5Sw/BOKcnWVoslqi0csiuaqv6ZJCKJEATfPCuU5rzIq7/jLx6ultI8zOGjH1Eii1+g4xItEh+c6MrhE90sw+Rz9ZFQY87Qt16ZpNGx/r0TX72bACYxHffFH2755/7Jc5f+6plGdMMQYjgkFVk8q0z3vYJjKmRx9y3zK3WJBmRvopC/PdwHVIyYQm+uRuo5oru8GBiEcCdsZ5zX9MAFAiF/VTsgqX037AP1mKle/R9tMuCRfl2GCLCeMJ70CpSOtWzbGQ1+NKLjADDeUgzuSUJMubKynns8+EA=
 install: "/bin/true"
-script:
-- if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then bash ./travis-build-pr.sh; fi
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then bash ./travis-build.sh; fi
-before_cache:
-  - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
-  - rm -fr $HOME/.gradle/caches/*/plugin-resolution/
-cache:
-  directories:
-    - $HOME/.gradle/caches/
-    - $HOME/.gradle/wrapper/
+script: ./travis-build.sh
 after_deploy:
-- "./gradlew sdkMajorRelease"
+- "./gradlew sdkMajorRelease --no-daemon"
 deploy:
   provider: releases
   api_key:

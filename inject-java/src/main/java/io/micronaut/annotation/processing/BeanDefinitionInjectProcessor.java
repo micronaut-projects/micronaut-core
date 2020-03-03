@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,21 +15,21 @@
  */
 package io.micronaut.annotation.processing;
 
-import static javax.lang.model.element.ElementKind.*;
-import static javax.lang.model.type.TypeKind.ARRAY;
-
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.*;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
@@ -45,36 +45,28 @@ import io.micronaut.inject.writer.ExecutableMethodWriter;
 import javax.annotation.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedOptions;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Scope;
-import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.Name;
-import javax.lang.model.element.PackageElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.TypeParameterElement;
-import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.ArrayType;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
-import javax.lang.model.type.TypeVariable;
+import javax.lang.model.element.*;
+import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static javax.lang.model.element.ElementKind.*;
+import static javax.lang.model.type.TypeKind.ARRAY;
 
 /**
  * <p>The core annotation processor used to generate bean definitions and power AOP for Micronaut.</p>
@@ -86,8 +78,8 @@ import java.util.stream.Collectors;
  * @author Dean Wette
  * @since 1.0
  */
-@SupportedAnnotationTypes("*")
 @Internal
+@SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS})
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
     private static final String[] ANNOTATION_STEREOTYPES = new String[]{
@@ -108,6 +100,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     private static final String ANN_VALID = "javax.validation.Valid";
     private static final Predicate<AnnotationMetadata> IS_CONSTRAINT = am ->
             am.hasStereotype(ANN_CONSTRAINT) || am.hasStereotype(ANN_VALID);
+    private static final String ANN_CONFIGURATION_ADVICE = "io.micronaut.runtime.context.env.ConfigurationAdvice";
+    private static final String ANN_VALIDATED = "io.micronaut.validation.Validated";
 
     private JavaConfigurationMetadataBuilder metadataBuilder;
     private Set<String> beanDefinitions;
@@ -119,11 +113,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         super.init(processingEnv);
         this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils, annotationUtils);
         this.beanDefinitions = new LinkedHashSet<>();
-    }
-
-    @Override
-    public Set<String> getSupportedOptions() {
-        return Collections.singleton("org.gradle.annotation.processing.aggregating");
     }
 
     @Override
@@ -163,7 +152,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 if (!isInterface) {
                                     beanDefinitions.add(name);
                                 } else {
-                                    if (annotationUtils.hasStereotype(typeElement, INTRODUCTION_TYPE)) {
+                                    if (annotationUtils.hasStereotype(typeElement, INTRODUCTION_TYPE) || annotationUtils.hasStereotype(typeElement, ConfigurationReader.class)) {
                                         beanDefinitions.add(name);
                                     }
                                 }
@@ -303,6 +292,39 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
     }
 
+    private AnnotationMetadata addPropertyMetadata(AnnotationMetadata annotationMetadata, VariableElement element, String propertyName) {
+        final PropertyMetadata pm = metadataBuilder.visitProperty(
+                getPropertyMetadataTypeReference(element.asType()),
+                propertyName, null, null
+        );
+        return addPropertyMetadata(annotationMetadata, pm);
+    }
+
+    private AnnotationMetadata addPropertyMetadata(AnnotationMetadata annotationMetadata, PropertyMetadata propertyMetadata) {
+        return DefaultAnnotationMetadata.mutateMember(
+                annotationMetadata,
+                PropertySource.class.getName(),
+                AnnotationMetadata.VALUE_MEMBER,
+                Collections.singletonList(
+                        new io.micronaut.core.annotation.AnnotationValue(
+                                Property.class.getName(),
+                                Collections.singletonMap(
+                                        "name",
+                                        propertyMetadata.getPath()
+                                )
+                        )
+                )
+        );
+    }
+
+    private AnnotationMetadata addAnnotation(AnnotationMetadata annotationMetadata, String annotation) {
+        final JavaAnnotationMetadataBuilder metadataBuilder = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder();
+        annotationMetadata = metadataBuilder.annotate(
+                annotationMetadata,
+                io.micronaut.core.annotation.AnnotationValue.builder(annotation).build());
+        return annotationMetadata;
+    }
+
     /**
      * Annotation Bean element visitor.
      */
@@ -330,7 +352,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             this.concreteClassMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
             beanDefinitionWriters = new LinkedHashMap<>();
             this.isFactoryType = concreteClassMetadata.hasStereotype(Factory.class);
-            this.isConfigurationPropertiesType = isConfigurationProperties(concreteClass);
+            this.isConfigurationPropertiesType = concreteClassMetadata.hasDeclaredStereotype(ConfigurationReader.class) || concreteClassMetadata.hasDeclaredStereotype(EachProperty.class);
             this.isAopProxyType = concreteClassMetadata.hasStereotype(AROUND_TYPE) && !modelUtils.isAbstract(concreteClass);
             this.aopSettings = isAopProxyType ? concreteClassMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.empty();
             ExecutableElement constructor = modelUtils.concreteConstructorFor(concreteClass, annotationUtils);
@@ -360,6 +382,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 // bail out if already visited
                 return o;
             }
+            boolean isInterface = JavaModelUtils.isInterface(classElement);
             visitedTypes.add(classElementQualifiedName);
             AnnotationMetadata typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(classElement);
             if (isConfigurationPropertiesType) {
@@ -369,9 +392,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         concreteClass,
                         null
                 );
+                if (isInterface) {
+                    typeAnnotationMetadata = addAnnotation(
+                            typeAnnotationMetadata,
+                            ANN_CONFIGURATION_ADVICE
+                    );
+                }
             }
 
-            if (annotationUtils.hasStereotype(classElement, INTRODUCTION_TYPE)) {
+            if (typeAnnotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
                 AopProxyWriter aopProxyWriter = createIntroductionAdviceWriter(classElement);
                 ExecutableElement constructor = JavaModelUtils.resolveKind(classElement, ElementKind.CLASS).isPresent() ? modelUtils.concreteConstructorFor(classElement, annotationUtils) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(null, constructor, Collections.emptyMap()) : null;
@@ -393,7 +422,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 beanDefinitionWriters.put(classElementQualifiedName, aopProxyWriter);
                 visitIntroductionAdviceInterface(classElement, typeAnnotationMetadata, aopProxyWriter);
 
-                boolean isInterface = JavaModelUtils.isInterface(classElement);
+
                 if (!isInterface) {
 
                     List<? extends Element> elements = classElement.getEnclosedElements().stream()
@@ -420,6 +449,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         if (isBean) {
                             // we know this class has supported annotations so we need a beandef writer for it
+                            PackageElement packageElement = elementUtils.getPackageOf(classElement);
+                            if (packageElement.isUnnamed()) {
+                                error(classElement, "Micronaut beans cannot be in the default package");
+                                return null;
+                            }
                             BeanDefinitionVisitor beanDefinitionWriter = getOrCreateBeanDefinitionWriter(classElement, qualifiedName);
 
                             if (isAopProxyType) {
@@ -437,6 +471,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                         false,
                                         this.constructorParameterInfo,
                                         interceptorTypes);
+                            }
+                        } else {
+                            if (modelUtils.isAbstract(classElement)) {
+                                return null;
                             }
                         }
                     }
@@ -515,9 +553,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
 
                 BeanDefinitionVisitor proxyWriter = beanDefinitionWriters.get(proxyKey);
+                final AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
+                        concreteClassMetadata,
+                        constructorParameterInfo.getAnnotationMetadata()
+                );
                 if (proxyWriter != null) {
                     proxyWriter.visitBeanDefinitionConstructor(
-                            constructorParameterInfo.getAnnotationMetadata(),
+                            annotationMetadata,
                             constructorParameterInfo.isRequiresReflection(),
                             constructorParameterInfo.getParameters(),
                             constructorParameterInfo.getParameterMetadata(),
@@ -525,17 +567,28 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 beanDefinitionWriter.visitBeanDefinitionConstructor(
-                        constructorParameterInfo.getAnnotationMetadata(),
+                        annotationMetadata,
                         constructorParameterInfo.isRequiresReflection(),
                         constructorParameterInfo.getParameters(),
                         constructorParameterInfo.getParameterMetadata(),
                         constructorParameterInfo.getGenericTypes());
+
+                if (constructorParameterInfo.isValidated()) {
+                    beanDefinitionWriter.setValidated(true);
+                }
             }
             return beanDefinitionWriter;
         }
 
         private void visitIntroductionAdviceInterface(TypeElement classElement, AnnotationMetadata typeAnnotationMetadata, AopProxyWriter aopProxyWriter) {
             String introductionTypeName = classElement.getQualifiedName().toString();
+            final boolean isConfigProps = typeAnnotationMetadata.hasAnnotation(ANN_CONFIGURATION_ADVICE);
+            if (isConfigProps) {
+                metadataBuilder.visitProperties(
+                        classElement,
+                        null
+                );
+            }
             classElement.asType().accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(classElement, modelUtils, elementUtils) {
 
                 @Override
@@ -546,6 +599,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 @Override
                 protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
                     ExecutableElement method = (ExecutableElement) element;
+                    final boolean isAbstract = modelUtils.isAbstract(method);
 
                     Map<String, Object> boundTypes = genericUtils.resolveBoundTypes(type);
                     ExecutableElementParamInfo params = populateParameterData(introductionTypeName, method, boundTypes);
@@ -572,7 +626,68 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 typeAnnotationMetadata
                         );
                     }
-                    if (annotationUtils.hasStereotype(method, AROUND_TYPE)) {
+
+                    if (!annotationMetadata.hasStereotype(ANN_VALIDATED) &&
+                            isDeclaredBean &&
+                            params.getParameterMetadata().values().stream().anyMatch(IS_CONSTRAINT)) {
+                        annotationMetadata = addAnnotation(annotationMetadata, ANN_VALIDATED);
+                    }
+
+                    if (isConfigProps) {
+                        if (isAbstract) {
+
+                            if (!aopProxyWriter.isValidated()) {
+                                aopProxyWriter.setValidated(IS_CONSTRAINT.test(annotationMetadata));
+                            }
+
+                            if (!NameUtils.isGetterName(methodName)) {
+                                error(classElement, "Only getter methods are allowed on @ConfigurationProperties interfaces: " + method);
+                                return;
+                            }
+
+                            if (!methodParameters.isEmpty()) {
+                                error(classElement, "Only zero argument getter methods are allowed on @ConfigurationProperties interfaces: " + method);
+                                return;
+                            }
+
+                            String docComment = elementUtils.getDocComment(method);
+                            final String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+                            final String propertyType = getPropertyMetadataTypeReference(returnTypeMirror);
+
+                            if ("void".equals(propertyType)) {
+                                error(classElement, "Getter methods must return a value @ConfigurationProperties interfaces: " + method);
+                                return;
+                            }
+                            final PropertyMetadata propertyMetadata = metadataBuilder.visitProperty(
+                                    classElement,
+                                    classElement,
+                                    propertyType,
+                                    propertyName,
+                                    docComment,
+                                    annotationMetadata.stringValue(Bindable.class, "defaultValue").orElse(null)
+                            );
+                            annotationMetadata = addPropertyMetadata(
+                                    annotationMetadata,
+                                    propertyMetadata
+                            );
+
+                            final TypeElement typeElement = !ClassUtils.isJavaBasicType(propertyType) ? resolveTypeElement(returnTypeMirror) : null;
+                            final AnnotationValueBuilder<Annotation> builder = io.micronaut.core.annotation.AnnotationValue.builder(ANN_CONFIGURATION_ADVICE);
+                            if (typeElement != null && annotationUtils.hasStereotype(typeElement, Scope.class)) {
+                                builder.member("bean", true);
+                            }
+                            if (typeAnnotationMetadata.hasStereotype(EachProperty.class)) {
+                                builder.member("iterable", true);
+                            }
+
+                            final JavaAnnotationMetadataBuilder metadataBuilder = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder();
+                            annotationMetadata = metadataBuilder.annotate(
+                                    annotationMetadata,
+                                    builder.build());
+                        }
+                    }
+
+                    if (annotationMetadata.hasStereotype(AROUND_TYPE)) {
                         Object[] interceptorTypes = annotationMetadata
                                 .getAnnotationNamesByStereotype(AROUND_TYPE)
                                 .toArray();
@@ -580,7 +695,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         aopProxyWriter.visitInterceptorTypes(interceptorTypes);
                     }
 
-                    if (modelUtils.isAbstract(method)) {
+
+                    if (isAbstract) {
                         aopProxyWriter.visitIntroductionMethod(
                                 owningType,
                                 modelUtils.resolveTypeReference(returnTypeMirror),
@@ -605,11 +721,22 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                annotationMetadata
+                                annotationMetadata,
+                                JavaModelUtils.isInterface(method.getEnclosingElement())
                         );
                     }
 
 
+                }
+
+                private @Nullable TypeElement resolveTypeElement(TypeMirror typeMirror) {
+                    if (typeMirror instanceof DeclaredType) {
+                        final Element element = ((DeclaredType) typeMirror).asElement();
+                        if (element instanceof TypeElement) {
+                            return (TypeElement) element;
+                        }
+                    }
+                    return null;
                 }
             }, aopProxyWriter);
         }
@@ -628,7 +755,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
 
-            AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
+            final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
+
+            AnnotationMetadata methodAnnotationMetadata;
+
+            if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+                methodAnnotationMetadata = annotationMetadata;
+            } else {
+
+                methodAnnotationMetadata = new AnnotationMetadataHierarchy(
+                        concreteClassMetadata,
+                        annotationMetadata
+                );
+            }
 
             TypeKind returnKind = method.getReturnType().getKind();
             if ((returnKind == TypeKind.ERROR) && !processingOver) {
@@ -645,7 +784,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             boolean injected = methodAnnotationMetadata.hasDeclaredStereotype(Inject.class);
             boolean postConstruct = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.POST_CONSTRUCT);
             boolean preDestroy = methodAnnotationMetadata.hasDeclaredStereotype(ProcessedTypes.PRE_DESTROY);
-            if (injected || postConstruct || preDestroy) {
+            if (injected || postConstruct || preDestroy || methodAnnotationMetadata.hasDeclaredStereotype(ConfigurationInject.class)) {
                 if (isDeclaredBean) {
                     visitAnnotatedMethod(method, o);
                 } else if (injected) {
@@ -657,10 +796,29 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
 
 
+
             Set<Modifier> modifiers = method.getModifiers();
             boolean hasInvalidModifiers = modelUtils.isAbstract(method) || modifiers.contains(Modifier.STATIC) || methodAnnotationMetadata.hasAnnotation(Internal.class) || modelUtils.isPrivate(method);
             boolean isPublic = modifiers.contains(Modifier.PUBLIC) && !hasInvalidModifiers;
-            boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable.class)) && !hasInvalidModifiers;
+            boolean isExecutable =
+                    !hasInvalidModifiers &&
+                            (isExecutableThroughType(method.getEnclosingElement(), methodAnnotationMetadata, annotationMetadata, modifiers, isPublic) ||
+                                annotationMetadata.hasStereotype(AROUND_TYPE));
+
+
+            boolean hasConstraints = false;
+            if (isDeclaredBean &&
+                    !methodAnnotationMetadata.hasStereotype(ANN_VALIDATED) &&
+                    method.getParameters()
+                            .stream()
+                            .anyMatch((p) -> annotationUtils.hasStereotype(p, ANN_CONSTRAINT) || annotationUtils.hasStereotype(p, ANN_VALID))) {
+                hasConstraints = true;
+                methodAnnotationMetadata = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder().annotate(
+                        methodAnnotationMetadata,
+                        io.micronaut.core.annotation.AnnotationValue.builder(ANN_VALIDATED).build()
+                );
+            }
+
             if (isExecutable) {
                 visitExecutableMethod(method, methodAnnotationMetadata);
                 return null;
@@ -674,17 +832,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         writer.setValidated(true);
                     }
                 }
-            } else if (isPublic) {
-                final boolean isConstrained =
-                        method.getParameters()
-                              .stream()
-                              .anyMatch((p) -> annotationUtils.hasStereotype(p, ANN_CONSTRAINT) || annotationUtils.hasStereotype(p, ANN_VALID));
-                if (isConstrained) {
-                    visitExecutableMethod(method, methodAnnotationMetadata);
-                }
+            } else if (isPublic && hasConstraints) {
+                visitExecutableMethod(method, methodAnnotationMetadata);
             }
 
             return null;
+        }
+
+        private boolean isExecutableThroughType(
+                Element enclosingElement,
+                AnnotationMetadata annotationMetadataHierarchy,
+                AnnotationMetadata declaredMetadata, Set<Modifier> modifiers,
+                boolean isPublic) {
+            return (isExecutableType && (isPublic || (modifiers.isEmpty()) && concreteClass.equals(enclosingElement))) ||
+                    annotationMetadataHierarchy.hasDeclaredStereotype(Executable.class) ||
+                    declaredMetadata.hasAnnotation(Executable.class);
         }
 
         private void visitConfigurationPropertySetter(ExecutableElement method) {
@@ -703,10 +865,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (declaringClass != null) {
 
                 AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
+
+                String propertyName = NameUtils.getPropertyNameForSetter(method.getSimpleName().toString());
                 if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                     writer.visitConfigBuilderMethod(
                             fieldType,
-                            NameUtils.getterNameFor(NameUtils.getPropertyNameForSetter(method.getSimpleName().toString())),
+                            NameUtils.getterNameFor(propertyName),
                             methodAnnotationMetadata,
                             metadataBuilder);
                     try {
@@ -715,31 +879,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         writer.visitConfigBuilderEnd();
                     }
                 } else {
+                    if (shouldExclude(configurationMetadata, propertyName)) {
+                        return;
+                    }
                     String docComment = elementUtils.getDocComment(method);
                     String setterName = method.getSimpleName().toString();
                     PropertyMetadata propertyMetadata = metadataBuilder.visitProperty(
                             concreteClass,
                             declaringClass,
                             getPropertyMetadataTypeReference(valueType),
-                            NameUtils.getPropertyNameForSetter(setterName),
+                            propertyName,
                             docComment,
                             null
                     );
 
-                    AnnotationMetadata annotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                            AnnotationMetadata.EMPTY_METADATA,
-                            PropertySource.class.getName(),
-                            AnnotationMetadata.VALUE_MEMBER,
-                            Collections.singletonList(
-                                    new io.micronaut.core.annotation.AnnotationValue(
-                                            Property.class.getName(),
-                                            Collections.singletonMap(
-                                                    "name",
-                                                    propertyMetadata.getPath()
-                                            )
-                                    )
-                            )
-                    );
+                    AnnotationMetadata annotationMetadata = addPropertyMetadata(AnnotationMetadata.EMPTY_METADATA, propertyMetadata);
 
                     boolean requiresReflection = true;
                     if (modelUtils.isPublic(method)) {
@@ -910,7 +1064,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                annotationMetadata
+                                annotationMetadata,
+                                JavaModelUtils.isInterface(method.getEnclosingElement())
                         );
 
                         aopProxyWriter.visitAroundMethod(
@@ -923,7 +1078,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                !isAnnotationReference ? new AnnotationMetadataReference(executableMethodWriter.getClassName(), annotationMetadata) : annotationMetadata
+                                !isAnnotationReference ? new AnnotationMetadataReference(executableMethodWriter.getClassName(), annotationMetadata) : annotationMetadata,
+                                JavaModelUtils.isInterface(method.getEnclosingElement())
 
                         );
                     }
@@ -979,7 +1135,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                annotationMetadata
+                                annotationMetadata,
+                                JavaModelUtils.isInterface(enclosingElement)
                         );
 
                     }
@@ -1051,7 +1208,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             BeanDefinitionVisitor beanWriter = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
 
             // This method requires pre-processing. See Executable#processOnStartup()
-            boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "processOnStartup", Boolean.class).orElse(false);
+            boolean preprocess = methodAnnotationMetadata.isTrue(Executable.class, "processOnStartup");
             if (preprocess) {
                 beanWriter.setRequiresMethodProcessing(true);
             }
@@ -1061,35 +1218,36 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 typeRef = modelUtils.resolveTypeReference(concreteClass);
             }
 
-            ExecutableMethodWriter executableMethodWriter = beanWriter.visitExecutableMethod(
-                    typeRef,
-                    resolvedReturnType,
-                    resolvedReturnType,
-                    returnTypeGenerics,
-                    method.getSimpleName().toString(),
-                    params.getParameters(),
-                    params.getGenericParameters(),
-                    params.getParameterMetadata(),
-                    params.getGenericTypes(), methodAnnotationMetadata);
+            final AopProxyWriter proxyWriter = resolveAopWriter(beanWriter);
+            ExecutableMethodWriter executableMethodWriter = null;
+            if (proxyWriter == null || proxyWriter.isProxyTarget()) {
+                executableMethodWriter = beanWriter.visitExecutableMethod(
+                        typeRef,
+                        resolvedReturnType,
+                        resolvedReturnType,
+                        returnTypeGenerics,
+                        method.getSimpleName().toString(),
+                        params.getParameters(),
+                        params.getGenericParameters(),
+                        params.getParameterMetadata(),
+                        params.getGenericTypes(),
+                        methodAnnotationMetadata,
+                        JavaModelUtils.isInterface(enclosingElement));
+            }
+
 
             if (methodAnnotationMetadata.hasStereotype(Adapter.class)) {
                 visitAdaptedMethod(method, methodAnnotationMetadata);
             }
 
-            boolean hasConstraints = false;
-            if (!methodAnnotationMetadata.hasStereotype("io.micronaut.validation.Validated") &&
-                    isDeclaredBean &&
-                    params.getParameterMetadata().values().stream().anyMatch(IS_CONSTRAINT)) {
-                hasConstraints = true;
-                methodAnnotationMetadata = javaVisitorContext.getAnnotationUtils().newAnnotationBuilder().annotate(
-                        methodAnnotationMetadata,
-                        io.micronaut.core.annotation.AnnotationValue.builder("io.micronaut.validation.Validated").build()
-                );
-            }
+
             // shouldn't visit around advice on an introduction advice instance
             if (!(beanWriter instanceof AopProxyWriter)) {
-                boolean hasAround = hasConstraints || methodAnnotationMetadata.hasStereotype(AROUND_TYPE);
-                if ((isAopProxyType && method.getModifiers().contains(Modifier.PUBLIC)) || (hasAround && !modelUtils.isAbstract(concreteClass))) {
+                final boolean isConcrete = !modelUtils.isAbstract(concreteClass);
+                final boolean isPublic = method.getModifiers().contains(Modifier.PUBLIC) || modelUtils.isPackagePrivate(method);
+                if ((isAopProxyType && isPublic) ||
+                        (!isAopProxyType && methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) ||
+                        (methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE) && isConcrete)) {
 
                     Object[] interceptorTypes = methodAnnotationMetadata.getAnnotationNamesByStereotype(AROUND_TYPE)
                             .toArray();
@@ -1112,14 +1270,35 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     if (!isAnnotationReference && executableMethodWriter != null) {
                         aroundMethodMetadata = new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata);
                     } else {
-                        aroundMethodMetadata = methodAnnotationMetadata;
+                        if (methodAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
+                            aroundMethodMetadata = methodAnnotationMetadata;
+                        } else {
+                            aroundMethodMetadata = new AnnotationMetadataHierarchy(concreteClassMetadata, methodAnnotationMetadata);
+                        }
                     }
 
                     if (modelUtils.isFinal(method)) {
                         if (methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE)) {
                             error(method, "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.");
                         } else {
-                            error(method, "Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");
+                            if (isAopProxyType && isPublic && !declaringClass.equals(concreteClass)) {
+                                if (executableMethodWriter == null) {
+                                    beanWriter.visitExecutableMethod(
+                                            typeRef,
+                                            resolvedReturnType,
+                                            resolvedReturnType,
+                                            returnTypeGenerics,
+                                            method.getSimpleName().toString(),
+                                            params.getParameters(),
+                                            params.getGenericParameters(),
+                                            params.getParameterMetadata(),
+                                            params.getGenericTypes(),
+                                            methodAnnotationMetadata,
+                                            JavaModelUtils.isInterface(enclosingElement));
+                                }
+                            } else {
+                                error(method, "Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");
+                            }
                         }
                     } else {
                         aopProxyWriter.visitAroundMethod(
@@ -1132,9 +1311,23 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 params.getGenericParameters(),
                                 params.getParameterMetadata(),
                                 params.getGenericTypes(),
-                                aroundMethodMetadata);
+                                aroundMethodMetadata,
+                                JavaModelUtils.isInterface(enclosingElement));
                     }
 
+                } else if (executableMethodWriter == null) {
+                    beanWriter.visitExecutableMethod(
+                            typeRef,
+                            resolvedReturnType,
+                            resolvedReturnType,
+                            returnTypeGenerics,
+                            method.getSimpleName().toString(),
+                            params.getParameters(),
+                            params.getGenericParameters(),
+                            params.getParameterMetadata(),
+                            params.getGenericTypes(),
+                            methodAnnotationMetadata,
+                            JavaModelUtils.isInterface(enclosingElement));
                 }
             }
         }
@@ -1321,7 +1514,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                             genericParameters,
                                             methodQualifier,
                                             methodGenericTypes,
-                                            annotationMetadata
+                                            annotationMetadata,
+                                            JavaModelUtils.isInterface(method.getEnclosingElement())
                                     );
 
 
@@ -1470,7 +1664,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         params.getGenericTypes(),
                         annotationMetadata
                 );
-            } else if (annotationMetadata.hasDeclaredStereotype(Inject.class)) {
+            } else if (annotationMetadata.hasDeclaredStereotype(Inject.class) || annotationMetadata.hasDeclaredStereotype(ConfigurationInject.class)) {
                 BeanDefinitionVisitor writer = getOrCreateBeanDefinitionWriter(concreteClass, concreteClass.getQualifiedName());
                 writer.visitMethodInjectionPoint(
                         modelUtils.resolveTypeReference(declaringClass),
@@ -1604,6 +1798,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 String fieldName = field.getSimpleName().toString();
+
                 if (fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
 
                     boolean accessible = false;
@@ -1632,7 +1827,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         writer.visitConfigBuilderEnd();
                     }
                 } else {
-
+                    if (shouldExclude(configurationMetadata, fieldName)) {
+                        return null;
+                    }
                     if (setterMethod.isPresent()) {
                         ExecutableElement method = setterMethod.get();
                         // Just visit the field metadata, the setter will be processed
@@ -1662,20 +1859,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     null
                             );
 
-                            fieldAnnotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                                    fieldAnnotationMetadata,
-                                    PropertySource.class.getName(),
-                                    AnnotationMetadata.VALUE_MEMBER,
-                                    Collections.singletonList(
-                                            new io.micronaut.core.annotation.AnnotationValue(
-                                                    Property.class.getName(),
-                                                    Collections.singletonMap(
-                                                            "name",
-                                                            propertyMetadata.getPath()
-                                                    )
-                                            )
-                                    )
-                            );
+                            fieldAnnotationMetadata = addPropertyMetadata(fieldAnnotationMetadata, propertyMetadata);
                             writer.visitFieldValue(
                                     declaringType,
                                     fieldType,
@@ -1734,10 +1918,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     String methodName = method.getSimpleName().toString();
                     String prefix = getMethodPrefix(prefixes, methodName);
                     String propertyName = NameUtils.decapitalize(methodName.substring(prefix.length()));
-                    if (!includes.isEmpty() && !includes.contains(propertyName)) {
-                        return;
-                    }
-                    if (!excludes.isEmpty() && excludes.contains(propertyName)) {
+                    if (shouldExclude(includes, excludes, propertyName)) {
                         return;
                     }
 
@@ -1877,11 +2058,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             );
         }
 
-        private boolean isConfigurationProperties(TypeElement concreteClass) {
-            AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(concreteClass);
-            return annotationMetadata.hasDeclaredStereotype(ConfigurationReader.class) || annotationMetadata.hasDeclaredStereotype(EachProperty.class);
-        }
-
         private DynamicName createProxyKey(String beanName) {
             return new DynamicName(beanName + "$Proxy");
         }
@@ -2004,6 +2180,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     modelUtils.isPrivate(element),
                     elementMetadata
             );
+            final boolean isConstructBinding = elementMetadata.hasDeclaredStereotype(ConfigurationInject.class);
+            if (isConstructBinding) {
+                    this.configurationMetadata = metadataBuilder.visitProperties(
+                            concreteClass,
+                            null);
+
+            }
 
             element.getParameters().forEach(paramElement -> {
 
@@ -2013,9 +2196,24 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 if (annotationMetadata.hasDeclaredAnnotation("org.jetbrains.annotations.Nullable")) {
                     annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, "javax.annotation.Nullable", Collections.emptyMap());
                 }
-                params.addAnnotationMetadata(argName, annotationMetadata);
+
+                if (annotationMetadata.hasStereotype(ANN_CONSTRAINT)) {
+                    params.setValidated(true);
+                }
 
                 TypeMirror typeMirror = paramElement.asType();
+                if (isConstructBinding) {
+                    if (Stream.of(Property.class, Value.class, Parameter.class).noneMatch(annotationMetadata::hasAnnotation)) {
+                        final Element parameterElement = typeUtils.asElement(typeMirror);
+                        final AnnotationMetadata parameterTypeMetadata = parameterElement != null ? annotationUtils.getAnnotationMetadata(parameterElement) : AnnotationMetadata.EMPTY_METADATA;
+                        if (!parameterTypeMetadata.hasStereotype(Scope.class)) {
+                            annotationMetadata = addPropertyMetadata(annotationMetadata, paramElement, argName);
+                        }
+                    }
+                }
+                params.addAnnotationMetadata(argName, annotationMetadata);
+
+
                 TypeKind kind = typeMirror.getKind();
                 if ((kind == TypeKind.ERROR) && !processingOver) {
                     throw new PostponeToNextRoundException();    
@@ -2090,6 +2288,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             });
 
             return params;
+        }
+
+        private boolean shouldExclude(Set<String> includes, Set<String> excludes, String propertyName) {
+            if (!includes.isEmpty() && !includes.contains(propertyName)) {
+                return true;
+            }
+            if (!excludes.isEmpty() && excludes.contains(propertyName)) {
+                return true;
+            }
+            return false;
+        }
+
+        private boolean shouldExclude(ConfigurationMetadata configurationMetadata, String propertyName) {
+            return shouldExclude(configurationMetadata.getIncludes(), configurationMetadata.getExcludes(), propertyName);
         }
     }
 

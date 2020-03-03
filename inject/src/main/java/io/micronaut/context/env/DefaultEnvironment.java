@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,7 +81,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
 
     protected final ClassPathResourceLoader resourceLoader;
-    protected final List<PropertySource> refreshablePropertySources = new ArrayList<>();
+    protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
 
     private EnvironmentsAndPackage environmentsAndPackage;
 
@@ -89,8 +89,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final ClassLoader classLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final ClassPathAnnotationScanner annotationScanner;
-    private Collection<String> configurationIncludes = new HashSet<>();
-    private Collection<String> configurationExcludes = new HashSet<>();
+    private Collection<String> configurationIncludes = new HashSet<>(3);
+    private Collection<String> configurationExcludes = new HashSet<>(3);
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Collection<PropertySourceLoader> propertySourceLoaderList;
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
@@ -504,7 +504,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         filePathList.ifPresent(list -> {
             if (!list.isEmpty()) {
-                list.forEach(filePath -> {
+                int order = AbstractPropertySourceLoader.DEFAULT_POSITION + 50;
+                for (String filePath: list) {
                     if (!propertySourceLoaders.isEmpty()) {
                         String extension = NameUtils.extension(filePath);
                         String fileName = NameUtils.filename(filePath);
@@ -513,12 +514,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                             if (LOG.isDebugEnabled()) {
                                 LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
                             }
-                            readPropertySourceFromLoader(fileName, filePath, propertySourceLoader.get(), propertySources);
+                            Optional<Map<String, Object>> properties = readPropertiesFromLoader(fileName, filePath, propertySourceLoader.get());
+                            if (properties.isPresent()) {
+                                propertySources.add(PropertySource.of(filePath, properties.get(), order));
+                            }
+                            order++;
                         } else {
                             throw new ConfigurationException("Unsupported properties file format: " + fileName);
                         }
                     }
-                });
+                }
             }
         });
         return propertySources;
@@ -622,27 +627,24 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param fileName             Name of the file to be used as property source name
      * @param filePath             Absolute file path
      * @param propertySourceLoader The appropriate property source loader
-     * @param propertySources      List of property sources to add to
      * @throws ConfigurationException If unable to find the appropriate property soruce loader for the given file
      */
-    private void readPropertySourceFromLoader(String fileName, String filePath, PropertySourceLoader propertySourceLoader, List<PropertySource> propertySources) throws ConfigurationException {
-        if (!this.propertySources.containsKey(filePath)) {
-            ResourceResolver resourceResolver = new ResourceResolver();
-            Optional<ResourceLoader> resourceLoader = resourceResolver.getSupportingLoader(filePath);
-            ResourceLoader loader = resourceLoader.orElse(FileSystemResourceLoader.defaultLoader());
-            try {
-                Optional<InputStream> inputStream = loader.getResourceAsStream(filePath);
-                if (inputStream.isPresent()) {
-                    Map<String, Object> properties = propertySourceLoader.read(fileName, inputStream.get());
-                    propertySources.add(PropertySource.of(filePath, properties));
-                } else {
-                    if (LOG.isWarnEnabled()) {
-                        LOG.warn("Unable to load properties file: {}", fileName);
-                    }
+    private Optional<Map<String, Object>> readPropertiesFromLoader(String fileName, String filePath, PropertySourceLoader propertySourceLoader) throws ConfigurationException {
+        ResourceResolver resourceResolver = new ResourceResolver();
+        Optional<ResourceLoader> resourceLoader = resourceResolver.getSupportingLoader(filePath);
+        ResourceLoader loader = resourceLoader.orElse(FileSystemResourceLoader.defaultLoader());
+        try {
+            Optional<InputStream> inputStream = loader.getResourceAsStream(filePath);
+            if (inputStream.isPresent()) {
+                return Optional.of(propertySourceLoader.read(fileName, inputStream.get()));
+            } else {
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("Unable to load properties file: {}", fileName);
                 }
-            } catch (IOException e) {
-                throw new ConfigurationException("Unsupported properties file: " + fileName);
+                return Optional.empty();
             }
+        } catch (IOException e) {
+            throw new ConfigurationException("Unsupported properties file: " + fileName);
         }
     }
 

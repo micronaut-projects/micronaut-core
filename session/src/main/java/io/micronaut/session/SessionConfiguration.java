@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,17 @@
 package io.micronaut.session;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.scheduling.TaskExecutors;
 
+import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Provider;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * <p>Base configuration properties for session handling.</p>
@@ -30,13 +38,21 @@ import java.util.OptionalInt;
 public class SessionConfiguration {
 
     /**
-     * The default max inactive interval in seconds.
+     * @deprecated Use {@link #DEFAULT_MAXINACTIVEINTERVAL_MINUTES} instead.
      */
-    @SuppressWarnings("WeakerAccess")
+    @Deprecated
     public static final int DEFAULT_MAXINACTIVEINTERVAL_SECONDS = 30;
 
-    private Duration maxInactiveInterval = Duration.ofMinutes(DEFAULT_MAXINACTIVEINTERVAL_SECONDS);
+    /**
+     * The default max inactive interval in minutes.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAXINACTIVEINTERVAL_MINUTES = 30;
+
+    private Duration maxInactiveInterval = Duration.ofMinutes(DEFAULT_MAXINACTIVEINTERVAL_MINUTES);
     private Integer maxActiveSessions;
+    private boolean promptExpiration = false;
+    private Provider<ExecutorService> executorService;
 
     /**
      * @return The maximum number of active sessions
@@ -46,7 +62,7 @@ public class SessionConfiguration {
     }
 
     /**
-     * Sets the maximum number of active sessions. Default value ({@value #DEFAULT_MAXINACTIVEINTERVAL_SECONDS} seconds).
+     * Sets the maximum number of active sessions.
      *
      * @param maxActiveSessions The max active sessions
      */
@@ -55,14 +71,14 @@ public class SessionConfiguration {
     }
 
     /**
-     * @return The default max inactive interval
+     * @return The maximum inactive interval
      */
     public Duration getMaxInactiveInterval() {
         return maxInactiveInterval;
     }
 
     /**
-     * Set the max active sessions.
+     * Set the maximum inactive interval. Default value ({@value #DEFAULT_MAXINACTIVEINTERVAL_MINUTES} minutes).
      *
      * @param maxInactiveInterval The max inactive interval
      */
@@ -70,5 +86,41 @@ public class SessionConfiguration {
         if (maxInactiveInterval != null) {
             this.maxInactiveInterval = maxInactiveInterval;
         }
+    }
+
+    /**
+     * @return if prompt expiration is enabled.
+     */
+    public boolean isPromptExpiration() {
+        return promptExpiration;
+    }
+
+    /**
+     * Set if prompt expiration is enabled.
+     *
+     * @param promptExpiration if prompt expiration is enabled / disabled
+     */
+    public void setPromptExpiration(boolean promptExpiration) {
+        this.promptExpiration = promptExpiration;
+    }
+
+    /**
+     * @return The injected executor service
+     */
+    public Optional<ScheduledExecutorService> getExecutorService() {
+        return Optional.ofNullable(executorService)
+                .map(Provider::get)
+                .filter(ScheduledExecutorService.class::isInstance)
+                .map(ScheduledExecutorService.class::cast);
+    }
+
+    /**
+     * Set the executor service.
+     *
+     * @param executorService The executorService
+     */
+    @Inject
+    public void setExecutorService(@Nullable @Named(TaskExecutors.SCHEDULED) Provider<ExecutorService> executorService) {
+        this.executorService = executorService;
     }
 }

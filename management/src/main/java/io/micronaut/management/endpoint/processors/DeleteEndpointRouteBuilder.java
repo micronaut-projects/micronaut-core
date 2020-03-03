@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,10 +55,13 @@ public class DeleteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
     }
 
     @Override
-    protected void registerRoute(ExecutableMethod<?, ?> method, String id) {
+    protected void registerRoute(ExecutableMethod<?, ?> method, String id, Integer port) {
         Class<?> declaringType = method.getDeclaringType();
         UriTemplate template = buildUriTemplate(method, id);
-        final UriRoute uriRoute = DELETE(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        UriRoute uriRoute = DELETE(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        if (port != null) {
+            uriRoute = uriRoute.exposedPort(port);
+        }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);
         }

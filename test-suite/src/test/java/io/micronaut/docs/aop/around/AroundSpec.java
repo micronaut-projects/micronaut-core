@@ -13,13 +13,14 @@ public class AroundSpec {
 
     @Test
     public void testNotNull() {
-        ApplicationContext applicationContext = ApplicationContext.run();
-        NotNullExample exampleBean = applicationContext.getBean(NotNullExample.class);
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            NotNullExample exampleBean = applicationContext.getBean(NotNullExample.class);
 
-        thrown.expect(IllegalArgumentException.class);
-        thrown.expectMessage("Null parameter [taskName] not allowed");
+            thrown.expect(IllegalArgumentException.class);
+            thrown.expectMessage("Null parameter [taskName] not allowed");
 
-        exampleBean.doWork(null);
+            exampleBean.doWork(null);
+        }
     }
     // end::test[]
 }

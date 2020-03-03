@@ -7,7 +7,6 @@ To get started creating a Microservice that can be compiled into a native image,
 ----
 $ mn create-app hello-world --features graal-native-image
 ----
-NOTE: For Kotlin use `graal-native-image-kotlin` feature.
 
 The `graal-native-image` feature adds three important items:
 
@@ -19,7 +18,7 @@ The `native-image.properties` file that is generated looks something like:
 
 [source,properties]
 ----
-Args = -H:IncludeResources=logback.xml|application.yml \ # <1>
+Args = -H:IncludeResources=logback.xml|application.yml|bootstrap.yml \ # <1>
        -H:Name=example \ # <2>
        -H:Class=example.Application # <3>
 ----
@@ -50,18 +49,18 @@ $ ./docker-build.sh
 The provided `Dockerfile` is a multi-stage dockerfile which builds the project in two steps:
 
 1. A GraalVM official image will build the native image.
-2. A typical dockerfile structure will build the final image which in smaller due to layering.
+2. A typical dockerfile structure will build the final image which is smaller due to layering.
 
 
 ==== Building a Native Image Without Using Docker
 
 To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using SDKman:
 
-.Installing GraalVM 19.3.0 with SDKman
+.Installing GraalVM 20.0.0 with SDKman
 [source,bash]
 ----
-$ sdk install java 19.3.0.r8-grl # or 19.3.0.r11-grl if you want to use JDK 11
-$ sdk use java 19.3.0.r8-grl
+$ sdk install java 20.0.0.r8-grl # or 20.0.0.r11-grl if you want to use JDK 11
+$ sdk use java 20.0.0.r8-grl
 ----
 
 The `native-image` tool was extracted from the base GraalVM distribution. Currently it is available as an early adopter plugin. To install it, run:
@@ -85,6 +84,12 @@ $ native-image --no-server -cp build/libs/hello-world-0.1-all.jar
 ----
 $ ./mvnw package
 $ native-image --no-server -cp target/hello-world-0.1-all.jar
+----
+
+.Run native image
+[source,bash]
+----
+$ ./hello-world
 ----
 
 

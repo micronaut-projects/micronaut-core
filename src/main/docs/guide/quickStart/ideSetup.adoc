@@ -39,6 +39,13 @@ You should then enable annotation processing by opening `Eclipse -> Preferences`
 
 Micronaut can be setup within Visual Studio Code. You will need to first install the The https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[Java Extension Pack].
 
-NOTE: Visual Studio Code support currently only works for Maven builds.
+TIP: You can also optionally install https://marketplace.visualstudio.com/items?itemName=Pivotal.vscode-spring-boot[STS] to enable code completion for `application.yml`.
 
-Once the extension pack is installed follow the same setup steps as Eclipse above or if you have setup https://code.visualstudio.com/docs/setup/mac[terminal integration] just type `code .` in any project directory and the project will be automatically setup.
+If you are using Gradle prior to opening the project in VSC you should run the following command from a terminal window:
+
+[source,bash]
+----
+./gradlew eclipse
+----
+
+Once the extension pack is installed and if you have setup https://code.visualstudio.com/docs/setup/mac[terminal integration] just type `code .` in any project directory and the project will be automatically setup.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,12 @@ public enum HttpMethod implements CharSequence {
     /**
      * See https://tools.ietf.org/html/rfc5789.
      */
-    PATCH;
+    PATCH,
+
+    /**
+     * A custom non-standard HTTP method.
+     */
+    CUSTOM;
 
     @Override
     public int length() {
@@ -100,8 +105,23 @@ public enum HttpMethod implements CharSequence {
      * @return True if it does
      */
     public static boolean permitsRequestBody(HttpMethod method) {
-        return requiresRequestBody(method)
-            || method.equals(OPTIONS)
-            || method.equals(DELETE);
+        return method != null && (requiresRequestBody(method)
+                || method.equals(OPTIONS)
+                || method.equals(DELETE)
+                || method.equals(CUSTOM)
+        );
+    }
+
+    /**
+     *
+     * @param httpMethodName Name of the http method (may be nonstandard)
+     * @return the value of enum (CUSTOM by default).
+     */
+    public static HttpMethod parse(String httpMethodName) {
+        try {
+            return HttpMethod.valueOf(httpMethodName.toUpperCase());
+        } catch (Exception e) {
+            return CUSTOM;
+        }
     }
 }

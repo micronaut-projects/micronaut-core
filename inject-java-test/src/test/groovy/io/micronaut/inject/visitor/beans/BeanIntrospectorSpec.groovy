@@ -53,8 +53,7 @@ class BeanIntrospectorSpec extends Specification {
     void "test find introspections"() {
         expect:
         BeanIntrospector.SHARED.findIntrospections(Introspected).size() > 0
-        BeanIntrospector.SHARED.findIntrospections(Introspected, "io.micronaut.inject.visitor.beans").size() == 2
+        BeanIntrospector.SHARED.findIntrospections(Introspected, "io.micronaut.inject.visitor.beans").size() == 3
         BeanIntrospector.SHARED.findIntrospections(Introspected, "blah").size() == 0
-        BeanIntrospector.SHARED.findIntrospections(Singleton).size() == 0
     }
 }

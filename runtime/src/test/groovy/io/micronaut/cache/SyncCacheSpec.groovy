@@ -15,6 +15,7 @@
  */
 package io.micronaut.cache
 
+import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.async.annotation.SingleResult
 import io.reactivex.Flowable
 import io.reactivex.Single
@@ -220,7 +221,6 @@ class SyncCacheSpec extends Specification {
 
         then:
         conditions.eventually {
-
             !syncCache.get("one", Integer).isPresent()
             !syncCache.get("two", Integer).isPresent()
             syncCache.get("three", Integer).isPresent()
@@ -234,12 +234,50 @@ class SyncCacheSpec extends Specification {
 
         then:
         conditions.eventually {
-
             !syncCache.get("one", Integer).isPresent()
             !syncCache.get("two", Integer).isPresent()
             !syncCache.get("three", Integer).isPresent()
             !syncCache.get("four", Integer).isPresent()
         }
+
+        and:
+        !syncCache.putIfAbsent("five", 5).isPresent()
+        syncCache.putIfAbsent("five", 6).get() == 5
+
+        cleanup:
+        applicationContext.stop()
+    }
+
+    void "test exception isn't thrown if non configured cache is retrieved"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'micronaut.caches.test.initialCapacity':1,
+                'micronaut.caches.test.maximumSize':3
+        )
+        CacheManager cacheManager = applicationContext.getBean(CacheManager)
+
+        when:
+        cacheManager.getCache("fooBar")
+
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        applicationContext.stop()
+    }
+
+    void "the dynamic cache manager can be disabled"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'micronaut.cache.dynamic': false
+        )
+        CacheManager cacheManager = applicationContext.getBean(CacheManager)
+
+        when:
+        cacheManager.getCache("test")
+
+        then:
+        thrown(ConfigurationException)
 
         cleanup:
         applicationContext.stop()

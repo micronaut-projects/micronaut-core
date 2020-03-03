@@ -118,6 +118,17 @@ The previous example used the link:{api}/io/micronaut/http/annotation/Get.html[@
 
 NOTE: All of the method annotations default to `/`.
 
+== Multiple URIs
+
+Each of the routing annotations support multiple URI templates. For each template, a route will be created. This feature is useful for example to change the path of the API and leaving the existing path as is for backwards compatibility. For example:
+
+snippet::io.micronaut.docs.server.routing.BackwardCompatibleController[tags="imports,class", indent=0, title="Multiple URIs"]
+
+<1> Specify multiple templates
+<2> Bind to the template arguments as normal
+
+NOTE: Route validation is more complicated with multiple templates. If a variable that would normally be required does not exist in all templates, then that variable is considered optional since it may not exist for every execution of the method.
+
 == Building Routes Programmatically
 
 If you prefer to not use annotations and declare all of your routes in code then never fear, Micronaut has a flexible link:{api}/io/micronaut/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
@@ -155,3 +166,16 @@ An optional variable is one that will allow the route to match a URI even if the
  The URI template contains a variable that is missing from the method arguments.
 
 NOTE: To disable route compile time validation, set the system property `-Dmicronaut.route.validation=false`. For Java and Kotlin users using Gradle, the same effect can be achieved by removing the `validation` dependency from the `annotationProcessor`/`kapt` scope.
+
+== Routing non-standard HTTP methods
+
+It may be necessary to support a non-standard HTTP method for a client or server. Specifications like https://tools.ietf.org/html/rfc4918[RFC-4918 Webdav] require additional methods like REPORT or LOCK for example. To support that use case the @CustomHttpMethod annotation can be used.
+ 
+.RoutingExample
+[source,java]
+----
+@CustomHttpMethod(method = "LOCK", value = "/{name}")
+String lock(String name)
+----
+
+The annotation can be used anywhere any of the standard method annotations can be used, including controllers and declarative http clients.

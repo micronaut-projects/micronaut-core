@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.micronaut.validation.validator;
 
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.inject.ExecutableMethod;
 
@@ -108,6 +109,22 @@ public interface ExecutableMethodValidator extends ExecutableValidator  {
             @Nonnull BeanIntrospection<? extends T> introspection,
             @Nonnull Object[] parameterValues,
             @Nullable Class<?>... groups);
+
+    /**
+     * Validates arguments for the given bean type and constructor arguments.
+     * @param beanType The bean type
+     * @param constructorArguments The constructor arguments
+     * @param parameterValues The parameter values
+     * @param groups The validation groups
+     * @param <T> The generic type of the bean
+     * @return A set of constraint violations, if any
+     */
+    <T> Set<ConstraintViolation<T>> validateConstructorParameters(
+            @Nonnull Class<? extends T> beanType,
+            @Nonnull Argument<?>[] constructorArguments,
+            @Nonnull Object[] parameterValues,
+            @Nullable Class<?>[] groups
+    );
 
     @Override
     @Nonnull <T> Set<ConstraintViolation<T>> validateParameters(@Nonnull T object, @Nonnull Method method, @Nonnull Object[] parameterValues, @Nullable Class<?>... groups);

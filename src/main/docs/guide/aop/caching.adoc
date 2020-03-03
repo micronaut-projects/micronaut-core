@@ -30,7 +30,7 @@ By default https://github.com/ben-manes/caffeine[Caffeine] is used for cache def
 micronaut:
     caches:
         my-cache:
-            maximumSize: 20
+            maximum-size: 20
 ----
 
 The above example will configure a cache called "my-cache" with a maximum size of 20.
@@ -38,7 +38,7 @@ The above example will configure a cache called "my-cache" with a maximum size o
 [NOTE]
 .Naming Caches
 ====
-Names of caches under `micronaut.caches` should be defined in kebab case (lowercase and hyphen seperated), if camel case is used the names are normalized to kebab case. So for example specifing `myCache` will become `my-cache`. The kebab case form should be used when referencing caches in the ann:cache.annotation.Cacheable[] annotation, like `@Cacheable("my-cache-name")`.
+Names of caches under `micronaut.caches` should be defined in kebab case (lowercase and hyphen seperated), if camel case is used the names are normalized to kebab case. So for example specifing `myCache` will become `my-cache`. The kebab case form should be used when referencing caches in the ann:cache.annotation.Cacheable[] annotation.
 ====
 
 To configure a weigher to be used with the `maximumWeight` configuration, create a bean that implements `io.micronaut.caffeine.cache.Weigher`. To associate a given weigher with only a specific cache, annotate the bean with `@Named(<cache name>)`. Weighers without a named qualifier will apply to all caches that don't have a named weigher. If no beans are found, a default implementation will be used.
@@ -46,16 +46,13 @@ To configure a weigher to be used with the `maximumWeight` configuration, create
 
 include::{includedir}configurationProperties/io.micronaut.cache.DefaultCacheConfiguration.adoc[]
 
+== Dynamic Cache Creation
 
-== Caching with Redis
+For use cases where caches cannot be configured ahead of time, a api:cache.DynamicCacheManager[] bean can be registered. When a cache is attempted to be retrieved that was not predefined, the dynamic cache manager will be invoked to return a cache.
 
-[TIP]
-.Using the CLI
-====
-If you are creating your project using the Micronaut CLI, supply the `redis-lettuce` feature to configure Redis/Lettuce in your project:
-----
-$ mn create-app my-app --features redis-lettuce
-----
-====
+By default, if there is no other dynamic cache manager defined in the application, Micronaut registers an instance of api:cache.DefaultDynamicCacheManager[] that will create Caffeine caches with default values.
 
-If you wish to use Redis to cache results the https://micronaut-projects.github.io/micronaut-redis/snapshot/guide/#cache[Micronaut Redis] module provides a api:cache.CacheManager[] implementation that allows using Redis as a backing cache.
+== Other Cache Implementations
+
+Check the https://micronaut-projects.github.io/micronaut-cache/latest/guide/index.html[Micronaut Cache] project for more
+information.

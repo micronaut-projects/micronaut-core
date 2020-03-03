@@ -11,7 +11,7 @@ $ mn create-app hello-world
 
 TIP: You can supply `--build maven` if you wish to create a Maven based build instead
 
-The previous command will create a new Java application in a directory called `hello-world` featuring a Gradle a build. The application can be run with `./gradlew run`:
+The previous command will create a new Java application in a directory called `hello-world` featuring a Gradle build. The application can be run with `./gradlew run`:
 
 [source,bash]
 ----
@@ -21,6 +21,8 @@ $ ./gradlew run
 ----
 
 If you have created a Maven based project, use `./mvnw compile exec:exec` instead.
+
+NOTE: For Windows the ./ before commands is not needed
 
 By default the Micronaut HTTP server is configured to run on port 8080. See the section <<runningSpecificPort, Running Server on a Specific Port>> in the user guide for more options.
 
@@ -32,6 +34,7 @@ snippet::io.micronaut.docs.server.intro.HelloController[tags="imports,class"]
 <2> The link:{api}/io/micronaut/http/annotation/Get.html[@Get] annotation is used to map the `index` method to all requests that use an HTTP `GET`
 <3> A String "Hello World" is returned as the result
 
+[%hardbreaks]
 If you are using Java, place the previous file in `src/main/java/hello/world`.
 If you are using Groovy, place the previous file in `src/main/groovy/hello/world`.
 If you are using Kotlin, place the previous file in `src/main/kotlin/hello/world`.

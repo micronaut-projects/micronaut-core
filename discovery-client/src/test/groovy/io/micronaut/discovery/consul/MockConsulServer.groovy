@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ class MockConsulServer implements ConsulOperations {
 
     final CatalogEntry nodeEntry
 
-    static NewServiceEntry lastNewEntry
+    static Map<String, NewServiceEntry> newEntries
     static List<String> passingReports = []
 
     final MemberEntry agent = new MemberEntry().tap {
@@ -63,7 +63,7 @@ class MockConsulServer implements ConsulOperations {
     }
 
     MockConsulServer(EmbeddedServer embeddedServer) {
-        lastNewEntry = null
+        newEntries = [:]
         passingReports.clear()
         nodeEntry = new CatalogEntry(UUID.randomUUID().toString(), InetAddress.localHost)
     }
@@ -72,7 +72,7 @@ class MockConsulServer implements ConsulOperations {
         services.clear()
         checks.clear()
         passingReports.clear()
-        lastNewEntry = null
+        newEntries = [:]
     }
 
     @Override
@@ -165,8 +165,8 @@ class MockConsulServer implements ConsulOperations {
 
     @Override
     Publisher<HttpStatus> register(@NotNull @Body NewServiceEntry entry) {
-        lastNewEntry = entry
         def service = entry.getName()
+        newEntries.put(service, entry)
         services.put(service, new ServiceEntry(entry))
         checks.computeIfAbsent(service, { String key -> new MockCheckEntry(service)})
         return Publishers.just(HttpStatus.OK)

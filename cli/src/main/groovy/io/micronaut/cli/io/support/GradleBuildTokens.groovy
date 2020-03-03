@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -119,7 +119,15 @@ class GradleBuildTokens extends BuildTokens {
             gradleDependencies.add(new GradleDependency("kapt", enforcedPlatform))
             gradleDependencies.add(new GradleDependency("kaptTest", enforcedPlatform))
         }
-        gradleDependencies.addAll(dependencies.collect{ new GradleDependency(it) })
+        gradleDependencies.addAll(dependencies.collect{
+            if (it.scope == 'annotationProcessor' && sourceLanguage == 'kotlin') {
+                new GradleDependency("kapt", it)
+            } else if (it.scope == 'testAnnotationProcessor' && sourceLanguage == 'kotlin') {
+                new GradleDependency("kaptTest", it)
+            } else {
+                return new GradleDependency(it)
+            }
+        })
         gradleDependencies
     }
 }

@@ -232,4 +232,70 @@ class Book {
         then:
         noExceptionThrown()
     }
+
+    void "test missing parameter with multiple uris"() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{abc}"})
+    String abc(String abc) {
+        return "";
+    }
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{abc}", "/{def}"})
+    String abc(String abc) {
+        return "";
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("The route declares a uri variable named [def], but no corresponding method argument is present")
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import javax.annotation.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get(uris = {"/{abc}", "/{def}"})
+    String abc(@Nullable String abc, @Nullable String def) {
+        return "";
+    }
+}
+
+""")
+        then:
+        noExceptionThrown()
+    }
 }

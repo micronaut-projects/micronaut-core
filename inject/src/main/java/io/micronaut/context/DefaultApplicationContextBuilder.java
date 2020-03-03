@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,11 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.env.CommandLinePropertySource;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
+import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.StringUtils;
 
@@ -44,6 +46,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean envPropertySource = true;
     private List<String> envVarIncludes = new ArrayList<>();
     private List<String> envVarExcludes = new ArrayList<>();
+    private String[] args = new String[0];
 
     /**
      * Default constructor.
@@ -182,12 +185,19 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public @Nonnull ApplicationContextBuilder args(@Nullable String... args) {
+        if (args != null) {
+            this.args = args;
+        }
+        return this;
+    }
+
+    @Override
     @SuppressWarnings("MagicNumber")
     public @Nonnull ApplicationContext build() {
         DefaultApplicationContext applicationContext = new DefaultApplicationContext(
             this
         );
-
         Environment environment = applicationContext.getEnvironment();
         if (!packages.isEmpty()) {
             for (String aPackage : packages) {
@@ -197,6 +207,10 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (!properties.isEmpty()) {
             PropertySource contextProperties = PropertySource.of(PropertySource.CONTEXT, properties, SystemPropertiesPropertySource.POSITION + 100);
             environment.addPropertySource(contextProperties);
+        }
+        if (args.length > 0) {
+            CommandLine commandLine = CommandLine.parse(args);
+            environment.addPropertySource(new CommandLinePropertySource(commandLine));
         }
         if (!propertySources.isEmpty()) {
             for (PropertySource propertySource : propertySources) {

@@ -16,12 +16,14 @@ The `proceed(..)` method returns a Reactive Streams rs:Publisher[] that emits th
 
 To put these concepts into practise lets look at an example.
 
+IMPORTANT: Filters execute in the event loop therefore blocking operations must be offloaded to another thread pool.
+
 
 == Writing a Filter
 
 Consider a hypothetical use case whereby you wish to trace each request to the Micronaut "Hello World" example using some external system. The external system could be a database, a distributed tracing service and may require I/O operations.
 
-What you don't want to do is block the underlying Netty event loop within your filter, instead you want to the filter to proceed with execution once any I/O is complete.
+What you don't want to do is block the underlying Netty event loop within your filter, instead you want the filter to proceed with execution once any I/O is complete.
 
 As an example, consider the following example `TraceService` that uses RxJava to compose an I/O operation:
 

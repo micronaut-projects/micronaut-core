@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -54,7 +56,7 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
     }
 
     @Override
-    public void setLogLevel(LoggingSystem loggingSystem, String name, LogLevel level) {
+    public void setLogLevel(LoggingSystem loggingSystem, @NotBlank String name, io.micronaut.logging.@NotNull LogLevel level) {
         loggingSystem.setLogLevel(name, level);
     }
 
@@ -83,10 +85,10 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
     }
 
     /**
-     * @return A list with all {@link LogLevel} values
+     * @return A list with all {@link io.micronaut.logging.LogLevel} values
      */
-    private static List<LogLevel> getLogLevels() {
-        return Arrays.asList(LogLevel.values());
+    private static List<io.micronaut.logging.LogLevel> getLogLevels() {
+        return Arrays.asList(io.micronaut.logging.LogLevel.values());
     }
 
 }

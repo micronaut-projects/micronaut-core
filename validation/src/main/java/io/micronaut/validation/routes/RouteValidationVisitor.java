@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.*;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.DefaultConversionService;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
@@ -31,6 +32,8 @@ import io.micronaut.validation.routes.rules.RouteValidationRule;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Visits methods annotated with {@link HttpMethodMapping} and validates the
@@ -52,25 +55,29 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
         }
         AnnotationValue<HttpMethodMapping> mappingAnnotation = element.getAnnotation(HttpMethodMapping.class);
         if (mappingAnnotation != null) {
-            String uri = mappingAnnotation.getRequiredValue(String.class);
+            Set<String> uris = CollectionUtils.setOf(mappingAnnotation.stringValues("uris"));
+            mappingAnnotation.stringValue().ifPresent(uris::add);
 
-            List<Segment> segments = resolver.buildSegments(uri);
-            StringBuilder uriValue = new StringBuilder();
-            for (Segment segment: segments) {
-                if (segment instanceof RawSegment) {
-                    uriValue.append(segment.getValue(String.class));
-                } else {
-                    uriValue.append("tmp");
+            List<UriMatchTemplate> templates = uris.stream().map(uri -> {
+                List<Segment> segments = resolver.buildSegments(uri);
+                StringBuilder uriValue = new StringBuilder();
+                for (Segment segment: segments) {
+                    if (segment instanceof RawSegment) {
+                        uriValue.append(segment.getValue(String.class));
+                    } else {
+                        uriValue.append("tmp");
+                    }
                 }
-            }
 
-            UriMatchTemplate template = UriMatchTemplate.of(uriValue.toString());
+                return UriMatchTemplate.of(uriValue.toString());
+            }).collect(Collectors.toList());
+
             RouteParameterElement[] parameters = Arrays.stream(element.getParameters())
                     .map(RouteParameterElement::new)
                     .toArray(RouteParameterElement[]::new);
 
             for (RouteValidationRule rule: rules) {
-                RouteValidationResult result = rule.validate(template, parameters, element);
+                RouteValidationResult result = rule.validate(templates, parameters, element);
 
                 if (!result.isValid()) {
                     for (String err: result.getErrorMessages()) {

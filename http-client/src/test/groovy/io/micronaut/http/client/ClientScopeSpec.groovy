@@ -17,6 +17,7 @@ package io.micronaut.http.client
 
 import com.fasterxml.jackson.databind.DeserializationFeature
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
@@ -40,26 +41,28 @@ import javax.inject.Singleton
  * @author Graeme Rocher
  * @since 1.0
  */
-@Retry
+@Retry(mode = Retry.Mode.SETUP_FEATURE_CLEANUP)
 class ClientScopeSpec extends Specification {
 
-    @Shared int port = SocketUtils.findAvailableTcpPort()
+    ApplicationContext context
+    int port
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run(
-            'spec.name': 'ClientScopeSpec',
-            'from.config': '/',
-            'micronaut.server.port':port,
-            'micronaut.http.services.my-service.url': "http://localhost:$port",
-            'micronaut.http.services.my-service-declared.url': "http://my-service-declared:$port",
-            'micronaut.http.services.my-service-declared.path': "/my-declarative-client-path",
-            'micronaut.http.services.other-service.url': "http://localhost:$port",
-            'micronaut.http.services.other-service.path': "/scope",
-    )
+    void setup() {
+        port = SocketUtils.findAvailableTcpPort()
+        context = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'ClientScopeSpec',
+                'from.config': '/',
+                'micronaut.server.port':port,
+                'micronaut.http.services.my-service.url': "http://localhost:$port",
+                'micronaut.http.services.my-service-declared.url': "http://my-service-declared:$port",
+                'micronaut.http.services.my-service-declared.path': "/my-declarative-client-path",
+                'micronaut.http.services.other-service.url': "http://localhost:$port",
+                'micronaut.http.services.other-service.path': "/scope"]).applicationContext
+    }
 
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    void cleanup() {
+        context.close()
+    }
 
     void "test client scope annotation method injection"() {
         given:
@@ -71,6 +74,9 @@ class ClientScopeSpec extends Specification {
         myService.get() == 'success'
         myJavaService.client == myService.client
         myJavaService.rxHttpClient == myService.rxHttpClient
+
+        cleanup:
+        context.close()
     }
 
     void "test client scope annotation field injection"() {
@@ -130,6 +136,29 @@ class ClientScopeSpec extends Specification {
 
         expect:
         client.name() == "success"
+    }
+
+    void "test injected instances are different/same"() {
+        InstanceEquals bean = context.getBean(InstanceEquals)
+        InstanceDoesNotEqual bean2 = context.getBean(InstanceDoesNotEqual)
+
+        expect:
+        bean.client.is(bean.client2)
+        !bean.client.is(bean2.client) //value is different
+        !bean.client2.is(bean2.client2) //bean2 has configuration
+
+        bean.clientId.is(bean.clientId2)
+        !bean.clientId.is(bean2.clientId) //id is different
+        !bean.clientId2.is(bean2.clientId2) //bean2 has path
+        !bean.clientId2.is(bean2.clientId3) //bean2 has configuration
+
+        bean.clientIdPath.is(bean.clientIdPath2)
+        !bean.clientIdPath.is(bean2.clientId) // path is different
+
+        bean.clientConfiguration.is(bean.clientConfiguration2)
+        !bean.clientConfiguration.is(bean2.client2) // configuration is different
+
+        bean.rxClient.is(bean.client)
     }
 
     @Controller('/scope')
@@ -206,6 +235,62 @@ class ClientScopeSpec extends Specification {
                     HttpRequest.GET('/scope'), String
             )
         }
+    }
+
+    @Singleton
+    static class InstanceEquals {
+
+        @Inject @Client('/')
+        protected HttpClient client
+
+        @Inject @Client('/')
+        protected HttpClient client2
+
+        @Inject @Client(id = "bar")
+        protected HttpClient clientId
+
+        @Inject @Client(id = "bar")
+        protected HttpClient clientId2
+
+        @Inject @Client(id = "bar", path = "/bar")
+        protected HttpClient clientIdPath
+
+        @Inject @Client(id = "bar", path = "/bar")
+        protected HttpClient clientIdPath2
+
+        @Inject @Client(value = '/', configuration = DefaultHttpClientConfiguration)
+        protected HttpClient clientConfiguration
+
+        @Inject @Client(value = '/', configuration = DefaultHttpClientConfiguration)
+        protected HttpClient clientConfiguration2
+
+        @Inject @Client('/')
+        protected RxHttpClient rxClient
+    }
+
+    @Singleton
+    static class InstanceDoesNotEqual {
+
+        @Inject @Client('/foo')
+        protected HttpClient client
+
+        @Inject @Client(value = '/', configuration = CustomConfig)
+        protected HttpClient client2
+
+        @Inject @Client(id = "foo")
+        protected HttpClient clientId
+
+        @Inject @Client(id = "bar", path = "/foo")
+        protected HttpClient clientId2
+
+        @Inject @Client(id = "bar", configuration = CustomConfig)
+        protected HttpClient clientId3
+    }
+
+    @Singleton
+    @ConfigurationProperties("custom")
+    static class CustomConfig extends DefaultHttpClientConfiguration {
+
     }
 
     @Requires(property = 'spec.name', value = "ClientScopeSpec")

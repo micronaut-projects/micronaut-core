@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,10 @@ package io.micronaut.http.simple;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpParameters;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.simple.cookies.SimpleCookies;
@@ -26,12 +29,12 @@ import io.micronaut.http.simple.cookies.SimpleCookies;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Simple {@link MutableHttpRequest} implementation.
  *
  * @param <B> the type of the body
- *
  * @author Vladimir Orany
  * @since 1.0
  */
@@ -48,9 +51,10 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
 
     /**
      * Simple {@link MutableHttpRequest} implementation.
-     * @param method    the HTTP method
-     * @param uri       the URI of the request
-     * @param body      the optional body of the request
+     *
+     * @param method the HTTP method
+     * @param uri    the URI of the request
+     * @param body   the optional body of the request
      */
     public SimpleHttpRequest(HttpMethod method, String uri, B body) {
         this.method = method;
@@ -64,7 +68,15 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
 
     @Override
     public MutableHttpRequest<B> cookie(Cookie cookie) {
-        cookies.put(cookie.getName(), cookie);
+        this.cookies.put(cookie.getName(), cookie);
+        return this;
+    }
+
+    @Override
+    public MutableHttpRequest<B> cookies(Set<Cookie> cookies) {
+        for (Cookie cookie: cookies) {
+            cookie(cookie);
+        }
         return this;
     }
 

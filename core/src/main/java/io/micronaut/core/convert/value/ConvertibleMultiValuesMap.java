@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,22 +72,32 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         List<V> values = getAll(name);
         if (!values.isEmpty()) {
-            Optional<T> converted = conversionService.convert(values, conversionContext);
-            boolean hasValue = converted.isPresent();
             boolean hasSingleEntry = values.size() == 1;
-            if (!hasValue && hasSingleEntry) {
-                return conversionService.convert(values.get(0), conversionContext);
-            } else if (hasValue && hasSingleEntry) {
-                T result = converted.get();
-                if (result instanceof Collection && ((Collection) result).isEmpty()) {
+            if (hasSingleEntry) {
+                final V v = values.iterator().next();
+                if (conversionContext.getArgument().getType().isInstance(v)) {
+                    return Optional.of((T) v);
+                } else {
+                    return conversionService.convert(v, conversionContext);
+                }
+            } else {
+
+                Optional<T> converted = conversionService.convert(values, conversionContext);
+                boolean hasValue = converted.isPresent();
+                if (!hasValue && hasSingleEntry) {
                     return conversionService.convert(values.get(0), conversionContext);
-                } else if (result instanceof Optional && !((Optional) result).isPresent()) {
-                    return conversionService.convert(values.get(0), conversionContext);
+                } else if (hasValue && hasSingleEntry) {
+                    T result = converted.get();
+                    if (result instanceof Collection && ((Collection) result).isEmpty()) {
+                        return conversionService.convert(values.get(0), conversionContext);
+                    } else if (result instanceof Optional && !((Optional) result).isPresent()) {
+                        return conversionService.convert(values.get(0), conversionContext);
+                    } else {
+                        return converted;
+                    }
                 } else {
                     return converted;
                 }
-            } else {
-                return converted;
             }
         } else {
             Argument<T> argument = conversionContext.getArgument();

@@ -17,6 +17,7 @@ class ValidatorSpec {
         val violations = validator.validate(person)
 //      TODO: currently fails because bean introspection API does not handle data classes
 //        assertEquals(2, violations.size)
+        context.close()
     }
 
     @Test
@@ -30,5 +31,6 @@ class ValidatorSpec {
         } catch (e: ConstraintViolationException) {
             assertEquals(2, e.constraintViolations.size)
         }
+        context.close()
     }
 }

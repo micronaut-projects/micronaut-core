@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,9 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import org.reactivestreams.Subscriber;
-
-import java.util.Collection;
-import java.util.List;
+import org.reactivestreams.Subscription;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -32,24 +29,79 @@ import java.util.List;
  * @since 1.1
  */
 @Internal
-class RxInstrumentedSubscriber<T> extends InstrumentedSubscriber<T> implements RxInstrumentedComponent {
-    /**
-     * Default constructor.
-     *
-     * @param downstream       The downstream subscriber
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedSubscriber(Subscriber<T> downstream, Collection<ReactiveInstrumenter> instrumentations) {
-        super(downstream, instrumentations);
-    }
+class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent {
+    private final Subscriber<T> source;
+    private final RxInstrumenterFactory instrumenterFactory;
 
     /**
      * Default constructor.
      *
-     * @param downstream       The downstream subscriber
-     * @param instrumentations The instrumentations
+     * @param source              The source subscriber
+     * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedSubscriber(Subscriber<T> downstream, List<RunnableInstrumenter> instrumentations) {
-        super(downstream, instrumentations);
+    RxInstrumentedSubscriber(Subscriber<T> source, RxInstrumenterFactory instrumenterFactory) {
+        this.source = source;
+        this.instrumenterFactory = instrumenterFactory;
+    }
+
+    @Override
+    public final void onSubscribe(Subscription s) {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onSubscribe(s);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onSubscribe(s);
+            } finally {
+                instrumenter.afterInvocation();
+            }
+        }
+    }
+
+    @Override
+    public void onNext(T t) {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onNext(t);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onNext(t);
+            } finally {
+                instrumenter.afterInvocation();
+            }
+        }
+    }
+
+    @SuppressWarnings("Duplicates")
+    @Override
+    public void onError(Throwable t) {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onError(t);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onError(t);
+            } finally {
+                instrumenter.afterInvocation();
+            }
+        }
+    }
+
+    @Override
+    public void onComplete() {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onComplete();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onComplete();
+            } finally {
+                instrumenter.afterInvocation();
+            }
+        }
     }
 }

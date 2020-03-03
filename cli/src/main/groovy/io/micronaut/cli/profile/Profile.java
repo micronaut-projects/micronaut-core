@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,18 @@ public interface Profile {
      * @return The version of the profile
      */
     String getVersion();
+
+    /**
+     * @return The main class name of the profile
+     */
+    String getMainClassName();
+
+    /**
+     * Set the mainClassName.
+     *
+     * @param mainClassName the name to set
+     */
+    void setMainClassName(String mainClassName);
 
     /**
      * @return The description of the profile

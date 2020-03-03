@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
@@ -36,7 +35,6 @@ import java.util.Optional;
 @Factory
 @Internal
 public class ByteBufConverters {
-
 
     /**
      * @return A converter that converts bytebufs to strings
@@ -68,25 +66,6 @@ public class ByteBufConverters {
     @Singleton
     TypeConverter<byte[], ByteBuf> byteArrayToByteBuffTypeConverter() {
         return (object, targetType, context) -> Optional.of(Unpooled.wrappedBuffer(object));
-    }
-
-    /**
-     * @return A converter that converts composite bytebufs to byte arrays
-     */
-    @Singleton
-    TypeConverter<CompositeByteBuf, byte[]> compositeByteBufTypeConverter() {
-        return (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object));
-    }
-
-    /**
-     * @param conversionService The conversion service
-     * @return A converter that converts composite bytebufs to object
-     */
-    @Singleton
-    TypeConverter<CompositeByteBuf, Object> compositeByteBufToObjectTypeConverter(ConversionService conversionService) {
-        return (object, targetType, context) -> conversionService
-                    .convert(object, String.class, context)
-                    .flatMap(val -> conversionService.convert(val, targetType, context));
     }
 
 }

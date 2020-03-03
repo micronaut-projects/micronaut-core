@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,9 @@ package io.micronaut.management.endpoint.loggers;
  *
  * @author Matthew Moss
  * @since 1.0
+ * @deprecated Use {@link io.micronaut.logging.LogLevel} instead
  */
+@Deprecated
 public enum LogLevel {
     ALL,
     TRACE,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatcher;
 
+import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -86,4 +87,25 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
     @Override
     UriRoute body(String argument);
 
+    /**
+     * The exposed port that the route applies to.
+     *
+     * @param port The port
+     * @return The route
+     */
+    UriRoute exposedPort(int port);
+
+    /**
+     * @return The port the route listens to, or null if the default port
+     */
+    @Nullable
+    Integer getPort();
+
+    /**
+     *
+     * @return The http method. Is equal to {@link #getHttpMethod()} value for standard http methods.
+     */
+    default String getHttpMethodName() {
+        return getHttpMethod().name();
+    }
 }

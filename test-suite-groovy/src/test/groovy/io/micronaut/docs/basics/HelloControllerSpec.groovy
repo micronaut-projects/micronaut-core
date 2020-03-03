@@ -18,7 +18,7 @@ import static io.micronaut.http.HttpRequest.POST
 
 class HelloControllerSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ["spec.name": HelloControllerSpec.simpleName])
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.getApplicationContext()
                                                              .createBean(RxHttpClient, embeddedServer.getURL())
 

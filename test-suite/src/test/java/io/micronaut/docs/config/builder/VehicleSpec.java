@@ -5,7 +5,7 @@ import org.junit.Test;
 
 import java.util.HashMap;
 
-import static org.testng.AssertJUnit.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
 public class VehicleSpec {

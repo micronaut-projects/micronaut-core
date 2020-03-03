@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
     public static final RepositoryConfiguration DEFAULT_REPO
     public static final RepositoryConfiguration SNAPSHOT_REPO = new RepositoryConfiguration(
             "micronautSnapshots",
-            new URI("https://oss.sonatype.org/content/repositories/snapshots"), true
+            new URI("https://oss.jfrog.org/artifactory/oss-snapshot-local"), true
     )
     public static final RepositoryConfiguration RELEASE_REPO = new RepositoryConfiguration(
             "jcenter",

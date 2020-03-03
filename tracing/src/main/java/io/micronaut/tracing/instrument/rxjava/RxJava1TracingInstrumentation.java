@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,9 @@ package io.micronaut.tracing.instrument.rxjava;
 
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.tracing.instrument.util.TracingRunnableInstrumenter;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
+import io.micronaut.tracing.instrument.util.TracingInvocationInstrumenterFactory;
 import rx.Single;
 import rx.functions.Action0;
 import rx.functions.Func1;
@@ -35,16 +37,17 @@ import javax.inject.Singleton;
 @Singleton
 @Context
 @Requires(classes = Single.class)
-@Requires(beans = TracingRunnableInstrumenter.class)
-public class RxJava1TracingInstrumentation {
+@Requires(beans = TracingInvocationInstrumenterFactory.class)
+@Internal
+public final class RxJava1TracingInstrumentation {
 
     /**
-     * Instrumentation for RxJava 1 using function with {@link io.micronaut.tracing.instrument.util.TracingRunnable}..
+     * Instrumentation for RxJava 1 for tracing.
      *
-     * @param instrumenter A function that instruments an existing Runnable with {@link io.micronaut.tracing.instrument.util.TracingRunnable}.
+     * @param instrumenter A function that instruments an existing Runnable
      */
     @PostConstruct
-    void init(TracingRunnableInstrumenter instrumenter) {
+    void init(TracingInvocationInstrumenterFactory instrumenter) {
         if (instrumenter != null) {
             Func1<Action0, Action0> existing = RxJavaHooks.getOnScheduleAction();
             if (existing != null && !(existing instanceof InstrumentScheduleAction)) {
@@ -61,15 +64,27 @@ public class RxJava1TracingInstrumentation {
      * A function that instruments an existing Runnable with {@link io.micronaut.tracing.instrument.util.TracingRunnable}.
      */
     private static class InstrumentScheduleAction implements Func1<Action0, Action0> {
-        private final TracingRunnableInstrumenter instrumenter;
+        private final TracingInvocationInstrumenterFactory instrumenter;
 
-        InstrumentScheduleAction(TracingRunnableInstrumenter instrumenter) {
+        InstrumentScheduleAction(TracingInvocationInstrumenterFactory instrumenter) {
             this.instrumenter = instrumenter;
         }
 
         @Override
         public Action0 call(Action0 action0) {
-            return () -> instrumenter.apply(action0::call).run();
+            final InvocationInstrumenter instrumenter = this.instrumenter.newTracingInvocationInstrumenter();
+            if (instrumenter != null) {
+                return () -> {
+                    try {
+                        instrumenter.beforeInvocation();
+                        action0.call();
+                    } finally {
+                        instrumenter.afterInvocation();
+                    }
+                };
+            } else {
+                return action0;
+            }
         }
     }
 }

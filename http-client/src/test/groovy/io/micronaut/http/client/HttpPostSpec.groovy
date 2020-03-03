@@ -355,6 +355,22 @@ class HttpPostSpec extends Specification {
         context.getBean(PostClient).bodyParts("Joe", 6) == "6 - Joe"
     }
 
+    void "test multiple uris"() {
+        def client = embeddedServer.applicationContext.getBean(PostClient)
+
+        when:
+        String val = client.multiple()
+
+        then:
+        val == "multiple mappings"
+
+        when:
+        val = client.multipleMappings()
+
+        then:
+        val == "multiple mappings"
+    }
+
     @Controller('/post')
     static class PostController {
 
@@ -448,6 +464,11 @@ class HttpPostSpec extends Specification {
         String bodyParts(String name, Integer id) {
             "$id - $name"
         }
+
+        @Post(uris = ["/multiple", "/multiple/mappings"])
+        String multipleMappings() {
+            return "multiple mappings"
+        }
     }
 
     @EqualsAndHashCode
@@ -468,5 +489,11 @@ class HttpPostSpec extends Specification {
 
         @Post(uri = "/bodyParts", consumes = MediaType.TEXT_PLAIN)
         String bodyParts(String name, Integer id)
+
+        @Post("/multiple")
+        String multiple()
+
+        @Post("/multiple/mappings")
+        String multipleMappings()
     }
 }

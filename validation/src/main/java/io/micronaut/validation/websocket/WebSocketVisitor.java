@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
         if (skipValidation) {
             return;
         }
-        String uri = element.getValue(WEB_SOCKET_COMPONENT, String.class).orElse("/ws");
+        String uri = element.stringValue(WEB_SOCKET_COMPONENT).orElse("/ws");
         UriMatchTemplate template = uriCache.computeIfAbsent(uri, UriMatchTemplate::of);
         List<String> variables = template.getVariableNames();
         ParameterElement[] parameters = element.getParameters();

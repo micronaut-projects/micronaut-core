@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,4 +95,16 @@ public @interface EachProperty {
      * @return The name of the key returned by {@link #value()} that should be regarded as the {@link Primary} bean
      */
     String primary() default "";
+
+    /**
+     * @return The names of the properties to include
+     */
+    @AliasFor(annotation = ConfigurationReader.class, member = "includes")
+    String[] includes() default {};
+
+    /**
+     * @return The names of the properties to exclude
+     */
+    @AliasFor(annotation = ConfigurationReader.class, member = "excludes")
+    String[] excludes() default {};
 }

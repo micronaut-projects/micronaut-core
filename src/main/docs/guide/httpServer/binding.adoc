@@ -77,6 +77,19 @@ Additionally, any `DateTime` that conforms to link:{jdkapi}/java/time/format/Dat
 
 snippet::io.micronaut.docs.server.binding.BindingController[tags="format1,format2",indent=0]
 
+== Type Based Binding Parameters
+
+Some parameters are recognized by their type instead of their annotation. The following table summarizes the parameter types, their purpose, and provides an example:
+
+|===
+|Type |Description |Example
+
+|api:http.BasicAuth[]
+|Allows binding of basic authorization credentials
+|`BasicAuth basicAuth`
+
+|===
+
 == Variables resolution
 
 Micronaut will try to populate method arguments in the following order:

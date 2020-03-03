@@ -15,7 +15,12 @@
  */
 package io.micronaut.http.client
 
+import io.micronaut.core.io.buffer.ByteBufferFactory
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.codec.CodecException
 import io.reactivex.Flowable
+import io.reactivex.Single
 import io.reactivex.internal.operators.flowable.FlowableBlockingSubscribe
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.buffer.ByteBuffer
@@ -31,6 +36,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.print.attribute.standard.Media
 import java.nio.charset.StandardCharsets
 
 /**
@@ -148,13 +154,73 @@ class DataStreamSpec extends Specification {
         client.stop()
     }
 
+    void "test streaming body codec exception"() {
+        given:
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
 
-    @Controller("/datastream/books")
+        when:
+        Publisher<String> bodyPublisher = client.retrieve(HttpRequest.POST(
+                '/datastream/books', Flowable.just(new Book(title: 'The Shining'))
+        ).contentType("custom/content"))
+        String body = Flowable.fromPublisher(bodyPublisher).toList().map({list -> list.join('')}).blockingGet()
+
+        then:
+        def ex = thrown(CodecException)
+        ex.message.startsWith("Cannot encode value")
+
+        cleanup:
+        client.stop()
+    }
+
+    void "test streaming ByteBuffer"() {
+        given:
+        ByteBuffer<byte[]> buffer = context.getBean(ByteBufferFactory).wrap("The Shining".bytes)
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+
+        when:
+        Publisher<String> bodyPublisher = client.retrieve(HttpRequest.POST(
+                '/datastream/books', Flowable.just(buffer)
+        ).contentType("custom/content"))
+        String body = Flowable.fromPublisher(bodyPublisher).toList().map({list -> list.join('')}).blockingGet()
+
+        then:
+        body == 'The Shining'
+
+        cleanup:
+        client.stop()
+    }
+
+    void "test reading a byte array"() {
+        RxStreamingHttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        byte[] data = client.toBlocking().retrieve("/datastream/data", byte[].class)
+
+        then:
+        data == [188309,188310] as byte[]
+    }
+
+    static class Book {
+        String title
+    }
+
+    @Controller("/datastream")
     static class BookController {
 
-        @Get(produces = MediaType.APPLICATION_JSON_STREAM)
+        @Get(uri = "/books", produces = MediaType.APPLICATION_JSON_STREAM)
         Publisher<byte[]> list() {
             return Flowable.just("The Stand".getBytes(StandardCharsets.UTF_8), "The Shining".getBytes(StandardCharsets.UTF_8))
+        }
+
+        @Post(uri = "/books", consumes = "custom/content", produces = MediaType.TEXT_PLAIN)
+        Publisher<String> list(@Body Publisher<String> body) {
+            return body
+        }
+
+        //testing that the client will ignore the content type if the type requested is byte[]
+        @Get(uri = "/data", produces = MediaType.TEXT_PLAIN)
+        byte[] data() {
+            [188309,188310] as byte[]
         }
     }
 }

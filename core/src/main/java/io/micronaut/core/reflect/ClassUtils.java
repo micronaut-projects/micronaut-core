@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -125,6 +125,7 @@ public class ClassUtils {
         COMMON_CLASS_MAP.put(Float.class.getName(), Float.class);
         COMMON_CLASS_MAP.put(Character.class.getName(), Character.class);
         COMMON_CLASS_MAP.put(String.class.getName(), String.class);
+        COMMON_CLASS_MAP.put(CharSequence.class.getName(), CharSequence.class);
 
         BASIC_TYPE_MAP.put(UUID.class.getName(), UUID.class);
         BASIC_TYPE_MAP.put(BigDecimal.class.getName(), BigDecimal.class);
@@ -321,14 +322,21 @@ public class ClassUtils {
     public static List<Class> resolveHierarchy(Class<?> type) {
         Class<?> superclass = type.getSuperclass();
         List<Class> hierarchy = new ArrayList<>();
+        List<Class> interfaces = new ArrayList<>();
         if (superclass != null) {
-            populateHierarchyInterfaces(type, hierarchy);
+            hierarchy.add(type);
+            populateHierarchyInterfaces(type, interfaces);
 
             while (superclass != Object.class) {
-                populateHierarchyInterfaces(superclass, hierarchy);
+                if (!hierarchy.contains(superclass)) {
+                    hierarchy.add(superclass);
+                }
+                populateHierarchyInterfaces(superclass, interfaces);
                 superclass = superclass.getSuperclass();
             }
+            hierarchy.addAll(interfaces);
         } else if (type.isInterface()) {
+            hierarchy.add(type);
             populateHierarchyInterfaces(type, hierarchy);
         }
 
@@ -344,9 +352,6 @@ public class ClassUtils {
     }
 
     private static void populateHierarchyInterfaces(Class<?> superclass, List<Class> hierarchy) {
-        if (!hierarchy.contains(superclass)) {
-            hierarchy.add(superclass);
-        }
         for (Class<?> aClass : superclass.getInterfaces()) {
             if (!hierarchy.contains(aClass)) {
                 hierarchy.add(aClass);

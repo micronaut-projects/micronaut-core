@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Executable;
 
 /**
@@ -34,6 +35,17 @@ public interface ExecutableMethod<T, R> extends Executable<T, R>, MethodReferenc
      * @since 1.2.3
      */
     default boolean isAbstract() {
+        return false;
+    }
+
+    /**
+     * Defines whether the method is Kotlin suspend function.
+     *
+     * @return Is the method Kotlin suspend function.
+     * @since 1.3.0
+     */
+    @Experimental
+    default boolean isSuspend() {
         return false;
     }
 }

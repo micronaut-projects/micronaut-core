@@ -1,24 +1,10 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.inject.requires
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.condition.OperatingSystem
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.AbstractTypeElementSpec
@@ -26,10 +12,6 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import spock.util.environment.RestoreSystemProperties
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 class RequiresSpec extends AbstractTypeElementSpec{
 
     void "test requires property not equals"() {
@@ -53,6 +35,7 @@ class MyBean {
         beanDefinition.isEnabled(applicationContext)
 
         when:
+        applicationContext.close()
         applicationContext = ApplicationContext.build().build()
         applicationContext.environment.addPropertySource(PropertySource.of("foo":"bar"))
         applicationContext.environment.start()
@@ -61,11 +44,15 @@ class MyBean {
         !beanDefinition.isEnabled(applicationContext)
 
         when:
+        applicationContext.close()
         applicationContext = ApplicationContext.build().build()
         applicationContext.environment.start()
 
         then:
         beanDefinition.isEnabled(applicationContext)
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test requires classes with classes present"() {
@@ -143,6 +130,9 @@ class MyBean {
 
         then:
         beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires missing beans with no bean present"() {
@@ -180,6 +170,9 @@ class MyBean {
 
         then:
         !beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires beans with no bean present"() {
@@ -217,6 +210,9 @@ class MyBean {
 
         then:
         beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
 
@@ -239,6 +235,9 @@ class MyBean {
 
         then:
         beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires environment with environment present"() {
@@ -258,6 +257,9 @@ class MyBean {
 
         then:
         beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires environment with environment not present"() {
@@ -277,6 +279,9 @@ class MyBean {
 
         then:
         !beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires not environment with environment present"() {
@@ -296,6 +301,9 @@ class MyBean {
 
         then:
         !beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires not multiple environment with environment present"() {
@@ -315,6 +323,9 @@ class MyBean {
 
         then:
         !beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires not environment with environment not present"() {
@@ -334,6 +345,9 @@ class MyBean {
 
         then:
         beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires not multiple environments with environment not present"() {
@@ -353,6 +367,9 @@ class MyBean {
 
         then:
         beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires property with property present"() {
@@ -377,6 +394,9 @@ class MyBean {
 
         then:
         beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     @RestoreSystemProperties
@@ -404,6 +424,9 @@ class MyBean {
 
         then:
         !beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires property and value with property present"() {
@@ -427,6 +450,9 @@ class MyBean {
 
         then:
         beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires property and value with property not present"() {
@@ -451,6 +477,9 @@ class MyBean {
 
         then:
         !beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires property and value with property not equal"() {
@@ -475,6 +504,9 @@ class MyBean {
 
         then:
         !beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     //  *********************************************************************************
@@ -500,6 +532,9 @@ class MyBean {
 
         then:
         beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires property and pattern with property not present"() {
@@ -524,6 +559,9 @@ class MyBean {
 
         then:
         !beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
     }
 
     void "test requires property and pattern with property not matching"() {
@@ -548,5 +586,86 @@ class MyBean {
 
         then:
         !beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test requires OS"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(os = {Requires.Family.WINDOWS, Requires.Family.MAC_OS})
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+        OperatingSystem.instance = new OperatingSystem(Requires.Family.LINUX)
+        def context = ApplicationContext
+                .build()
+                .build()
+
+        context.environment.start()
+
+        then:
+        !beanDefinition.isEnabled(context)
+
+        when:
+        context.close()
+        OperatingSystem.instance = new OperatingSystem(Requires.Family.WINDOWS)
+        context = ApplicationContext
+                .build()
+                .build()
+
+        context.environment.start()
+
+        then:
+        beanDefinition.isEnabled(context)
+
+        cleanup:
+        OperatingSystem.instance = null
+        context.close()
+    }
+
+    void "test not OS"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(notOs = {Requires.Family.WINDOWS, Requires.Family.MAC_OS})
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+        OperatingSystem.instance = new OperatingSystem(Requires.Family.WINDOWS)
+        def context = ApplicationContext
+                .build()
+                .build()
+
+        context.environment.start()
+
+        then:
+        !beanDefinition.isEnabled(context)
+
+        when:
+        context.close()
+        OperatingSystem.instance = new OperatingSystem(Requires.Family.LINUX)
+        context = ApplicationContext
+                .build()
+                .build()
+
+        context.environment.start()
+
+        then:
+        beanDefinition.isEnabled(context)
+
+        cleanup:
+        OperatingSystem.instance = null
+        context.close()
     }
 }

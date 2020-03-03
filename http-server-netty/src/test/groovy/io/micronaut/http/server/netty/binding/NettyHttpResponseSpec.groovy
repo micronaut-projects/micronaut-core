@@ -85,4 +85,15 @@ class NettyHttpResponseSpec extends Specification {
         status        | header
         HttpStatus.OK | HttpHeaders.SET_COOKIE
     }
+
+    void "test multiple cookies"() {
+        given:
+        DefaultFullHttpResponse nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        MutableHttpResponse response = new NettyMutableHttpResponse(nettyResponse, new DefaultConversionService())
+
+        response.cookies([Cookie.of("a", "b"), Cookie.of("c", "d")] as Set)
+
+        expect:
+        response.headers.getAll("Set-Cookie").size() == 2
+    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import java.util.Map;
 @Internal
 class ExecutableElementParamInfo {
 
+    private boolean validated = false;
     private boolean requiresReflection;
     private AnnotationMetadata metadata;
     private Map<String, Object> parameters = new LinkedHashMap<>();
@@ -116,5 +117,19 @@ class ExecutableElementParamInfo {
      */
     public AnnotationMetadata getAnnotationMetadata() {
         return metadata;
+    }
+
+    /**
+     * @return Is the executable validated
+     */
+    public boolean isValidated() {
+        return validated;
+    }
+
+    /**
+     * @param validated True if it is validated
+     */
+    public void setValidated(boolean validated) {
+        this.validated = validated;
     }
 }

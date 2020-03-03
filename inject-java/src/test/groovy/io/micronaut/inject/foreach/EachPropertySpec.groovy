@@ -304,4 +304,48 @@ class EachPropertySpec extends Specification {
         cleanup:
         applicationContext.close()
     }
+
+    void "test eachbean with providers"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of(
+                'test',
+                ['foo.bar.one.port':'8080',
+                 'foo.bar.two.port':'8888']
+        ))
+
+        applicationContext.start()
+
+        MyBeanProvider bean = applicationContext.getBean(MyBeanProvider, Qualifiers.byName("one"))
+        MyBeanProvider bean2 = applicationContext.getBean(MyBeanProvider, Qualifiers.byName("two"))
+
+        expect:
+        bean.configuration.port == 8080
+        bean2.configuration.port == 8888
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test eachbean with parameter providers"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of(
+                'test',
+                ['foo.bar.one.port':'8080',
+                 'foo.bar.two.port':'8888']
+        ))
+
+        applicationContext.start()
+
+        MyBeanParameterProvider bean = applicationContext.getBean(MyBeanParameterProvider, Qualifiers.byName("one"))
+        MyBeanParameterProvider bean2 = applicationContext.getBean(MyBeanParameterProvider, Qualifiers.byName("two"))
+
+        expect:
+        bean.configuration.port == 8080
+        bean2.configuration.port == 8888
+
+        cleanup:
+        applicationContext.close()
+    }
 }

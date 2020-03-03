@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -191,6 +191,20 @@ public @interface Requires {
     String[] resources() default {};
 
     /**
+     * Expresses the current operating system must be one in the given list.
+     *
+     * @return The os families
+     */
+    Family[] os() default {};
+
+    /**
+     * Expresses the current operating system must not be one in the given list.
+     *
+     * @return The os families
+     */
+    Family[] notOs() default {};
+
+    /**
      * Used to express a required SDK version.
      */
     enum Sdk {
@@ -198,5 +212,12 @@ public @interface Requires {
         GROOVY,
         KOTLIN,
         MICRONAUT
+    }
+
+    /**
+     * Used to express an operation system family.
+     */
+    enum Family {
+        LINUX, MAC_OS, WINDOWS, SOLARIS, OTHER
     }
 }

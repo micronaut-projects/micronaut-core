@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,14 +65,14 @@ public class InternalApiTypeElementVisitor implements TypeElementVisitor<Object,
     private void warn(Element element, VisitorContext context) {
         if (element.hasAnnotation(Internal.class) || element.hasAnnotation(Experimental.class)) {
             warned = true;
-            context.warn("Element extends or implements an internal or experimental API", element);
+            context.warn("Element extends or implements an internal or experimental Micronaut API", element);
         }
     }
 
     @Override
     public void finish(VisitorContext visitorContext) {
         if (warned) {
-            visitorContext.warn("Overriding an internal API may result in breaking changes in minor or patch versions of the framework. Proceed with caution!", null);
+            visitorContext.warn("Overriding an internal Micronaut API may result in breaking changes in minor or patch versions of the framework. Proceed with caution!", null);
         }
     }
 }

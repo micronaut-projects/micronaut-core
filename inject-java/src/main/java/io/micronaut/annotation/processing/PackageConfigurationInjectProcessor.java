@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,8 +50,8 @@ public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotatio
     }
 
     @Override
-    public Set<String> getSupportedOptions() {
-        return Collections.singleton("org.gradle.annotation.processing.aggregating");
+    public Set<String> getSupportedAnnotationTypes() {
+        return Collections.singleton("io.micronaut.context.annotation.Configuration");
     }
 
     @Override

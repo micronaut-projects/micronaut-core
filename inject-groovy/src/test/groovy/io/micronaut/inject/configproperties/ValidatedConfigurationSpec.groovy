@@ -23,8 +23,8 @@ import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
 import javax.validation.Validation
+import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotNull
-import org.hibernate.validator.constraints.NotBlank
 /**
  * Created by graemerocher on 15/06/2017.
  */
@@ -35,9 +35,6 @@ class ValidatedConfigurationSpec extends Specification {
 
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.registerSingleton(
-                Validation.buildDefaultValidatorFactory()
-        )
         applicationContext.start()
 
         when:
@@ -46,7 +43,7 @@ class ValidatedConfigurationSpec extends Specification {
         then:
         def e = thrown(BeanInstantiationException)
         e.message.contains('url - must not be null')
-        e.message.contains('name - may not be empty')
+        e.message.contains('name - must not be blank')
     }
 
     void "test validated config with valid config"() {
@@ -58,10 +55,6 @@ class ValidatedConfigurationSpec extends Specification {
                 ['foo.bar.url':'http://localhost',
                 'foo.bar.name':'test']
         ))
-
-        applicationContext.registerSingleton(
-                Validation.buildDefaultValidatorFactory()
-        )
 
         applicationContext.start()
 
@@ -81,6 +74,6 @@ class ValidatedConfigurationSpec extends Specification {
         URL url
 
         @NotBlank
-        protected String name
+        String name
     }
 }

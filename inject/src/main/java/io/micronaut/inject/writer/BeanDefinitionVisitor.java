@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
@@ -66,6 +67,12 @@ public interface BeanDefinitionVisitor {
                                         Map<String, Object> argumentTypes,
                                         Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                         Map<String, Map<String, Object>> genericTypes);
+
+    /**
+     * @return The name of the bean definition reference class.
+     */
+    @Nonnull
+    String getBeanDefinitionReferenceClassName();
 
     /**
      * @return Whether the provided type an interface
@@ -287,6 +294,7 @@ public interface BeanDefinitionVisitor {
      * @param argumentAnnotationMetadata The argument annotation metadata
      * @param genericTypes               The generic types of each argument. Can be null.
      * @param annotationMetadata         The annotation metadata for the method
+     * @param isInterface                If the method belongs to an interface
      * @return The {@link ExecutableMethodWriter}.
      */
     ExecutableMethodWriter visitExecutableMethod(Object declaringType,
@@ -298,7 +306,8 @@ public interface BeanDefinitionVisitor {
                                                  Map<String, Object> genericArgumentTypes,
                                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                                  Map<String, Map<String, Object>> genericTypes,
-                                                 @Nullable AnnotationMetadata annotationMetadata);
+                                                 @Nullable AnnotationMetadata annotationMetadata,
+                                                 boolean isInterface);
 
     /**
      * Visits a field injection point.

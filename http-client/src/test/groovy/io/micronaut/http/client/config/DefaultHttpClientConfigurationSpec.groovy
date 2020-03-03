@@ -41,13 +41,14 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         ctx.close()
 
         where:
-        key                 | property          | value  | expected
-        'read-timeout'      | 'readTimeout'     | '15s'  | Optional.of(Duration.ofSeconds(15))
-        'proxy-type'        | 'proxyType'       | 'http' | Proxy.Type.HTTP
-        'read-idle-timeout' | 'readIdleTimeout' | '-1s'  | Optional.of(Duration.ofSeconds(-1))
-        'read-idle-timeout' | 'readIdleTimeout' | '1s'   | Optional.of(Duration.ofSeconds(1))
-        'read-idle-timeout' | 'readIdleTimeout' | '-1'   | Optional.empty()
-        'connect-ttl'       | 'connectTtl'      | '1s'   | Optional.of(Duration.ofSeconds(1))
+        key                         | property                 | value   | expected
+        'read-timeout'              | 'readTimeout'            | '15s'   | Optional.of(Duration.ofSeconds(15))
+        'proxy-type'                | 'proxyType'              | 'http'  | Proxy.Type.HTTP
+        'read-idle-timeout'         | 'readIdleTimeout'        | '-1s'   | Optional.of(Duration.ofSeconds(-1))
+        'read-idle-timeout'         | 'readIdleTimeout'        | '1s'    | Optional.of(Duration.ofSeconds(1))
+        'read-idle-timeout'         | 'readIdleTimeout'        | '-1'    | Optional.empty()
+        'connect-ttl'               | 'connectTtl'             | '1s'    | Optional.of(Duration.ofSeconds(1))
+        'exception-on-error-status' | 'exceptionOnErrorStatus' | 'false' | false
     }
 
 

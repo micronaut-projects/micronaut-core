@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -330,52 +330,53 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     @Inject
     protected DefaultConstraintValidators(@Nullable BeanContext beanContext) {
         this.beanContext = beanContext;
-        final BeanWrapper<DefaultConstraintValidators> wrapper = getBeanWrapper();
-        final Collection<BeanProperty<DefaultConstraintValidators, Object>> beanProperties = wrapper.getBeanProperties();
-        Map<ValidatorKey, ConstraintValidator> validatorMap = new HashMap<>(beanProperties.size());
-        for (BeanProperty<DefaultConstraintValidators, Object> property : beanProperties) {
-            if (ConstraintValidator.class.isAssignableFrom(property.getType())) {
-                final Argument[] typeParameters = property.asArgument().getTypeParameters();
-                if (ArrayUtils.isNotEmpty(typeParameters)) {
-                    final int len = typeParameters.length;
+        BeanWrapper<DefaultConstraintValidators> wrapper = BeanWrapper.findWrapper(DefaultConstraintValidators.class, this).orElse(null);
+        if (wrapper != null) {
 
-                    wrapper.getProperty(property.getName(), ConstraintValidator.class).ifPresent(constraintValidator -> {
-                        if (len == 2) {
-                            final Class targetType = ReflectionUtils.getWrapperType(typeParameters[1].getType());
-                            final ValidatorKey key = new ValidatorKey(typeParameters[0].getType(), targetType);
-                            validatorMap.put(key, constraintValidator);
-                        } else if (len == 1) {
-                            if (constraintValidator instanceof SizeValidator) {
-                                final ValidatorKey key = new ValidatorKey(Size.class, typeParameters[0].getType());
+            final Collection<BeanProperty<DefaultConstraintValidators, Object>> beanProperties = wrapper.getBeanProperties();
+            Map<ValidatorKey, ConstraintValidator> validatorMap = new HashMap<>(beanProperties.size());
+            for (BeanProperty<DefaultConstraintValidators, Object> property : beanProperties) {
+                if (ConstraintValidator.class.isAssignableFrom(property.getType())) {
+                    final Argument[] typeParameters = property.asArgument().getTypeParameters();
+                    if (ArrayUtils.isNotEmpty(typeParameters)) {
+                        final int len = typeParameters.length;
+
+                        wrapper.getProperty(property.getName(), ConstraintValidator.class).ifPresent(constraintValidator -> {
+                            if (len == 2) {
+                                final Class targetType = ReflectionUtils.getWrapperType(typeParameters[1].getType());
+                                final ValidatorKey key = new ValidatorKey(typeParameters[0].getType(), targetType);
                                 validatorMap.put(key, constraintValidator);
-                            } else if (constraintValidator instanceof DigitsValidator) {
-                                final ValidatorKey key = new ValidatorKey(Digits.class, typeParameters[0].getType());
-                                validatorMap.put(key, constraintValidator);
-                            } else if (constraintValidator instanceof DecimalMaxValidator) {
-                                final ValidatorKey key = new ValidatorKey(DecimalMax.class, typeParameters[0].getType());
-                                validatorMap.put(key, constraintValidator);
-                            } else if (constraintValidator instanceof DecimalMinValidator) {
-                                final ValidatorKey key = new ValidatorKey(DecimalMin.class, typeParameters[0].getType());
-                                validatorMap.put(key, constraintValidator);
+                            } else if (len == 1) {
+                                if (constraintValidator instanceof SizeValidator) {
+                                    final ValidatorKey key = new ValidatorKey(Size.class, typeParameters[0].getType());
+                                    validatorMap.put(key, constraintValidator);
+                                } else if (constraintValidator instanceof DigitsValidator) {
+                                    final ValidatorKey key = new ValidatorKey(Digits.class, typeParameters[0].getType());
+                                    validatorMap.put(key, constraintValidator);
+                                } else if (constraintValidator instanceof DecimalMaxValidator) {
+                                    final ValidatorKey key = new ValidatorKey(DecimalMax.class, typeParameters[0].getType());
+                                    validatorMap.put(key, constraintValidator);
+                                } else if (constraintValidator instanceof DecimalMinValidator) {
+                                    final ValidatorKey key = new ValidatorKey(DecimalMin.class, typeParameters[0].getType());
+                                    validatorMap.put(key, constraintValidator);
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 }
             }
+            validatorMap.put(
+                    new ValidatorKey(Pattern.class, CharSequence.class),
+                    new PatternValidator()
+            );
+            validatorMap.put(
+                    new ValidatorKey(Email.class, CharSequence.class),
+                    new EmailValidator()
+            );
+            this.localValidators = validatorMap;
+        } else {
+            this.localValidators = Collections.emptyMap();
         }
-        validatorMap.put(
-                new ValidatorKey(Pattern.class, CharSequence.class),
-                new PatternValidator()
-        );
-        validatorMap.put(
-                new ValidatorKey(Email.class, CharSequence.class),
-                new EmailValidator()
-        );
-        this.localValidators = validatorMap;
-    }
-
-    private BeanWrapper<DefaultConstraintValidators> getBeanWrapper() {
-        return BeanWrapper.getWrapper(DefaultConstraintValidators.class, this);
     }
 
     @SuppressWarnings("unchecked")

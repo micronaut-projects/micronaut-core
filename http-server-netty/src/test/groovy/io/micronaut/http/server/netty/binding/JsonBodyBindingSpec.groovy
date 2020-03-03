@@ -1,18 +1,3 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.http.server.netty.binding
 
 import com.fasterxml.jackson.core.JsonParseException
@@ -37,30 +22,30 @@ import reactor.core.publisher.Mono
 
 import java.util.concurrent.CompletableFuture
 
-/**
- * Created by graemerocher on 25/08/2017.
- */
 class JsonBodyBindingSpec extends AbstractMicronautSpec {
-    void "test simple string-based body parsing with incomplete JSON"() {
+
+    void "test JSON is not parsed when the body is a raw body type"() {
         when:
         def json = '{"title":"The Stand"'
-        rxClient.exchange(
+        def response = rxClient.exchange(
                 HttpRequest.POST('/json/string', json), String
         ).blockingFirst()
 
         then:
-        def e = thrown(HttpClientResponseException)
-        e.message == """Invalid JSON: Unexpected end-of-input
- at [Source: UNKNOWN; line: 1, column: 21]"""
-        e.response.status == HttpStatus.BAD_REQUEST
+        response.code() == HttpStatus.OK.code
+        response.body() == 'Body: {"title":"The Stand"'
+    }
 
+    void "test JSON is not parsed when the body is a raw body type in a request argument"() {
         when:
-        def body = e.response.getBody(String).orElse(null)
-        def result = new JsonSlurper().parseText(body)
+        def json = '{"title":"The Stand"'
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/request-string', json), String
+        ).blockingFirst()
 
         then:
-        result['_links'].self.href == '/json/string'
-        result.message.startsWith('Invalid JSON')
+        response.code() == HttpStatus.OK.code
+        response.body() == 'Body: {"title":"The Stand"'
     }
 
     void "test parse body into parameters if no @Body specified"() {
@@ -75,17 +60,17 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == "Body: Foo(Fred, 10)"
     }
 
-    void "test simple string-based body parsing with invalid JSON"() {
+    void "test map-based body parsing with invalid JSON"() {
 
         when:
         def json = '{"title":The Stand}'
         rxClient.exchange(
-                HttpRequest.POST('/json/string', json), String
+                HttpRequest.POST('/json/map', json), String
         ).blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == """Invalid JSON: Unexpected character ('T' (code 84)): expected a valid value (number, String, array, object, 'true', 'false' or 'null')
+        e.message == """Invalid JSON: Unexpected character ('T' (code 84)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
  at [Source: UNKNOWN; line: 1, column: 11]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
@@ -97,7 +82,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.BAD_REQUEST.code
         response.headers.get(HttpHeaders.CONTENT_TYPE) == io.micronaut.http.MediaType.APPLICATION_JSON
-        result['_links'].self.href == '/json/string'
+        result['_links'].self.href == '/json/map'
         result.message.startsWith('Invalid JSON')
     }
 
@@ -112,11 +97,33 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == "Body: [title:The Stand]"
     }
 
-    void  "test simple string-based body parsing"() {
+    void "test simple string-based body parsing"() {
         when:
         def json = '{"title":"The Stand"}'
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/string', json), String
+        ).blockingFirst()
+
+        then:
+        response.body() == "Body: $json"
+    }
+
+    void "test binding to part of body with @Body(name)"() {
+        when:
+        def json = '{"title":"The Stand"}'
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/body-title', json), String
+        ).blockingFirst()
+
+        then:
+        response.body() == "Body Title: The Stand"
+    }
+
+    void  "test simple string-based body parsing with request argument"() {
+        when:
+        def json = '{"title":"The Stand"}'
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/request-string', json), String
         ).blockingFirst()
 
         then:
@@ -303,6 +310,16 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Post("/string")
         String string(@Body String text) {
             "Body: ${text}"
+        }
+
+        @Post("/body-title")
+        String bodyNamed(@Body("title") String text) {
+            "Body Title: ${text}"
+        }
+
+        @Post("/request-string")
+        String requestString(HttpRequest<String> req) {
+            "Body: ${req.body.orElse("empty")}"
         }
 
         @Post("/map")

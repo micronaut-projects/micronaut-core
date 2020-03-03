@@ -1,4 +1,4 @@
-eYou can inject configuration values into beans with Micronaut using the ann:io.micronaut.context.annotation.Value[] annotation.
+You can inject configuration values into beans with Micronaut using the ann:io.micronaut.context.annotation.Value[] annotation.
 
 === Using the `@Value` Annotation
 
@@ -89,6 +89,8 @@ snippet::io.micronaut.docs.config.property.Engine[tags="imports,class",indent=0,
 <3> The `@Property` annotation is used to inject through the setter
 
 NOTE: Because it is not possible to define a default value with `@Property`, if the value doesn't exist or cannot be converted to the required type, the bean instantiation will fail.
+
+The above will instead inject the value of the `my.url` property resolved from application configuration. If the property can not be found in configuration, an exception will be thrown. As with other types of injection, the injection point can also be annotated with `@Nullable` to make the injection optional.
 
 You can also use this feature to resolve sub maps. For example, consider the following configuration:
 

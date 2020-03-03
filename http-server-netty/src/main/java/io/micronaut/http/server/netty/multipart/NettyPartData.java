@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.server.netty.HttpDataReference;
@@ -25,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * A Netty implementation of {@link PartData}.
@@ -35,16 +37,24 @@ import java.util.Optional;
 @Internal
 public class NettyPartData implements PartData {
 
-    private final HttpDataReference httpData;
-    private final HttpDataReference.Component component;
+    private final Supplier<Optional<MediaType>> mediaTypeSupplier;
+    private final ThrowingSupplier<ByteBuf, IOException> byteBufSupplier;
 
     /**
      * @param httpData   The data reference
      * @param component  The component reference
      */
     public NettyPartData(HttpDataReference httpData, HttpDataReference.Component component) {
-        this.httpData = httpData;
-        this.component = component;
+        this(httpData::getContentType, component::getByteBuf);
+    }
+
+    /**
+     * @param mediaTypeSupplier The content type supplier
+     * @param byteBufSupplier   The byte buffer supplier
+     */
+    public NettyPartData(Supplier<Optional<MediaType>> mediaTypeSupplier, ThrowingSupplier<ByteBuf, IOException> byteBufSupplier) {
+        this.mediaTypeSupplier = mediaTypeSupplier;
+        this.byteBufSupplier = byteBufSupplier;
     }
 
     /**
@@ -92,7 +102,7 @@ public class NettyPartData implements PartData {
      */
     @Override
     public Optional<MediaType> getContentType() {
-        return httpData.getContentType();
+        return mediaTypeSupplier.get();
     }
 
     /**
@@ -100,6 +110,6 @@ public class NettyPartData implements PartData {
      * @throws IOException If an error occurs retrieving the buffer
      */
     public ByteBuf getByteBuf() throws IOException {
-        return component.getByteBuf();
+        return byteBufSupplier.get();
     }
 }

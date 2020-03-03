@@ -28,6 +28,7 @@ import io.micronaut.inject.configurations.requiresproperty.RequiresProperty
 import io.micronaut.inject.configurations.requiressdk.RequiresJava9
 import spock.lang.IgnoreIf
 import spock.lang.Specification
+import spock.util.environment.Jvm
 
 class RequiresBeanSpec extends Specification {
 
@@ -40,7 +41,7 @@ class RequiresBeanSpec extends Specification {
         context.containsBean(ABean)
         !context.containsBean(RequiresBean)
         !context.containsBean(RequiresConfig)
-        !context.containsBean(RequiresJava9)
+        Jvm.current.isJava9Compatible() || !context.containsBean(RequiresJava9)
     }
 
     @IgnoreIf({ env["TRAVIS"] } ) // fails on travis, which is expected

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -166,7 +166,7 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
             String[] split = arg.split("=");
             String name = split[0].trim();
             validateOptionName(name);
-            String value = split[1].trim();
+            String value = split.length > 1 ? split[1].trim() : "";
             if (declaredOptions.containsKey(name)) {
                 cl.addDeclaredOption(declaredOptions.get(name), value);
             } else {

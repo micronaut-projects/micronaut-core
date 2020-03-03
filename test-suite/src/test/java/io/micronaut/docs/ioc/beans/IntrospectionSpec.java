@@ -46,4 +46,18 @@ public class IntrospectionSpec extends TestCase {
 
         assertEquals("Fred", name);
     }
+
+    public void testVehicle() {
+        final BeanIntrospection<Vehicle> introspection = BeanIntrospection.getIntrospection(Vehicle.class);
+        Vehicle vehicle = introspection.instantiate("Subaru", "WRX", 2);
+        assertEquals("Subaru", vehicle.getMake());
+        assertEquals("WRX", vehicle.getModel());
+        assertEquals(2, vehicle.getAxels());
+    }
+
+    public void testBusiness() {
+        final BeanIntrospection<Business> introspection = BeanIntrospection.getIntrospection(Business.class);
+        Business business = introspection.instantiate("Apple");
+        assertEquals("Apple", business.getName());
+    }
 }

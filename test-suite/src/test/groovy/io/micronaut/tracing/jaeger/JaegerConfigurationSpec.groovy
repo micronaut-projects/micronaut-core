@@ -18,5 +18,8 @@ class JaegerConfigurationSpec extends Specification {
         expect:
         config.reporter.senderConfiguration.agentHost == 'foo'
         config.reporter.senderConfiguration.agentPort == 9999
+
+        cleanup:
+        ctx.close()
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,6 +52,15 @@ public @interface Get {
     String uri() default UriMapping.DEFAULT_URI;
 
     /**
+     * Only to be used in the context of a server.
+     *
+     * @return The URIs of the GET route
+     */
+    @AliasFor(annotation = HttpMethodMapping.class, member = "uris")
+    @AliasFor(annotation = UriMapping.class, member = "uris")
+    String[] uris() default {UriMapping.DEFAULT_URI};
+
+    /**
      * @return The default produces, otherwise override from controller
      */
     @AliasFor(annotation = Produces.class, member = "value")
@@ -85,4 +94,8 @@ public @interface Get {
     @AliasFor(annotation = SingleResult.class, member = "value")
     boolean single() default false;
 
+    /**
+     * @return True if a HEAD route should also be registered for the same method
+     */
+    boolean headRoute() default true;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -84,6 +83,11 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
     @Override
     public T instantiate(boolean strictNullable, Object... arguments) throws InstantiationException {
         ArgumentUtils.requireNonNull("arguments", arguments);
+
+        if (arguments.length == 0) {
+            return instantiate();
+        }
+
         final Argument<?>[] constructorArguments = getConstructorArguments();
         if (constructorArguments.length != arguments.length) {
             throw new InstantiationException("Argument count [" + arguments.length + "] doesn't match required argument count: " + constructorArguments.length);

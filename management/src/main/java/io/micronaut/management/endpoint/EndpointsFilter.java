@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
      */
     @Override
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
-        Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatchAtRequest(request);
+        Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatch(request);
         if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch) {
             ExecutableMethod method = ((MethodBasedRouteMatch) routeMatch.get()).getExecutableMethod();
             if (endpointMethods.getOrDefault(method, false)) {

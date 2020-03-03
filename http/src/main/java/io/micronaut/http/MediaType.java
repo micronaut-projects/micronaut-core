@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -404,8 +404,8 @@ public class MediaType implements CharSequence {
             throw new IllegalArgumentException("Argument [name] cannot be null");
         }
         String withoutArgs;
+        this.parameters = new LinkedHashMap<>();
         if (name.contains(SEMICOLON)) {
-            this.parameters = new LinkedHashMap<>();
             String[] tokenWithArgs = name.split(SEMICOLON);
             withoutArgs = tokenWithArgs[0];
             String[] paramsList = Arrays.copyOfRange(tokenWithArgs, 1, tokenWithArgs.length);
@@ -416,7 +416,6 @@ public class MediaType implements CharSequence {
                 }
             }
         } else {
-            this.parameters = Collections.emptyMap();
             withoutArgs = name;
         }
         this.name = withoutArgs;

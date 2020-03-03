@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,13 @@
  */
 package io.micronaut.context.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>Defines a singleton bean whose property values are resolved from a {@link io.micronaut.core.value.PropertyResolver}.</p>
@@ -41,7 +41,7 @@ import java.lang.annotation.Target;
 @Singleton
 @Documented
 @Retention(RUNTIME)
-@Target(ElementType.TYPE)
+@Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.METHOD, ElementType.CONSTRUCTOR})
 @ConfigurationReader
 public @interface ConfigurationProperties {
 
@@ -62,5 +62,17 @@ public @interface ConfigurationProperties {
      * @return The CLI prefix of the configuration. If a blank string is used then no prefix is appended
      */
     String[] cliPrefix() default {};
+
+    /**
+     * @return The names of the properties to include
+     */
+    @AliasFor(annotation = ConfigurationReader.class, member = "includes")
+    String[] includes() default {};
+
+    /**
+     * @return The names of the properties to exclude
+     */
+    @AliasFor(annotation = ConfigurationReader.class, member = "excludes")
+    String[] excludes() default {};
 
 }

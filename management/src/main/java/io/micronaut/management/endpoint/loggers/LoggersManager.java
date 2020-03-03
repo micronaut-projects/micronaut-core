@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,8 +52,21 @@ public interface LoggersManager<T> {
      * @param loggingSystem The {@link LoggingSystem} in use
      * @param name The name of the logger to find or create
      * @param level The log level to configure
+     * @deprecated Use {@link #setLogLevel(LoggingSystem, String, io.micronaut.logging.LogLevel)} instead
+     */
+    @Deprecated
+    default void setLogLevel(LoggingSystem loggingSystem, @NotBlank String name,
+                     @NotNull LogLevel level) {
+        loggingSystem.setLogLevel(name, level);
+    }
+
+    /**
+     * Set the log level for the named logger in the system.
+     *
+     * @param loggingSystem The {@link LoggingSystem} in use
+     * @param name The name of the logger to find or create
+     * @param level The log level to configure
      */
     void setLogLevel(LoggingSystem loggingSystem, @NotBlank String name,
-                     @NotNull LogLevel level);
-
+                             @NotNull io.micronaut.logging.LogLevel level);
 }

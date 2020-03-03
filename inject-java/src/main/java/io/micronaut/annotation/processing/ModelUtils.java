@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -230,27 +230,130 @@ public class ModelUtils {
     }
 
     /**
+     * The static method or Kotlin companion method to execute to
+     * construct the given class element.
+     *
+     * @param classElement The class element
+     * @param annotationUtils The annotation utilities
+     * @return The creator method
+     */
+    @Nullable
+    public ExecutableElement staticCreatorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
+         List<ExecutableElement> creators = findNonPrivateStaticCreators(classElement, annotationUtils);
+
+        if (creators.isEmpty()) {
+            return null;
+        }
+        if (creators.size() == 1) {
+            return creators.get(0);
+        }
+
+        //Can be multiple static @Creator methods. Prefer one with args here. The no arg method (if present) will
+        //be picked up by staticDefaultCreatorFor
+        List<ExecutableElement> withArgs = creators.stream().filter(method -> !method.getParameters().isEmpty()).collect(Collectors.toList());
+
+        if (withArgs.size() == 1) {
+            return withArgs.get(0);
+        } else {
+            creators = withArgs;
+        }
+
+        return creators.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
+    }
+
+    /**
      * @param classElement The class element
      * @return True if the element has a non private 0 arg constructor
      */
-    public boolean hasDefaultConstructor(TypeElement classElement) {
-        List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
+    public ExecutableElement defaultConstructorFor(TypeElement classElement) {
+        List<ExecutableElement> constructors = findNonPrivateConstructors(classElement)
+                .stream().filter(ctor -> ctor.getParameters().isEmpty()).collect(Collectors.toList());
+
         if (constructors.isEmpty()) {
-            return false;
+            return null;
         }
-        return constructors.stream().anyMatch(ctor -> ctor.getParameters().isEmpty());
+
+        if (constructors.size() == 1) {
+            return constructors.get(0);
+        }
+
+        return constructors.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
+    }
+
+    /**
+     * @param classElement The class element
+     * @param annotationUtils The annotation utils
+     * @return A static creator with no args, or null
+     */
+    public ExecutableElement defaultStaticCreatorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
+        List<ExecutableElement> creators = findNonPrivateStaticCreators(classElement, annotationUtils)
+                .stream().filter(ctor -> ctor.getParameters().isEmpty()).collect(Collectors.toList());
+
+        if (creators.isEmpty()) {
+            return null;
+        }
+
+        if (creators.size() == 1) {
+            return creators.get(0);
+        }
+
+        return creators.stream().filter(method -> method.getModifiers().contains(PUBLIC)).findFirst().orElse(null);
     }
 
     /**
      * @param classElement The {@link TypeElement}
      * @return A list of {@link ExecutableElement}
      */
-    List<ExecutableElement> findNonPrivateConstructors(TypeElement classElement) {
+    private List<ExecutableElement> findNonPrivateConstructors(TypeElement classElement) {
         List<ExecutableElement> ctors =
             ElementFilter.constructorsIn(classElement.getEnclosedElements());
         return ctors.stream()
             .filter(ctor -> !ctor.getModifiers().contains(PRIVATE))
             .collect(Collectors.toList());
+    }
+
+    private List<ExecutableElement> findNonPrivateStaticCreators(TypeElement classElement, AnnotationUtils annotationUtils) {
+        List<? extends Element> enclosedElements = classElement.getEnclosedElements();
+        List<ExecutableElement> staticCreators = ElementFilter.methodsIn(enclosedElements)
+                .stream()
+                .filter(method -> method.getModifiers().contains(STATIC))
+                .filter(method -> !method.getModifiers().contains(PRIVATE))
+                .filter(method -> method.getReturnType().equals(classElement.asType()))
+                .filter(method -> {
+                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
+                    return annotationMetadata.hasStereotype(Creator.class);
+                })
+                .collect(Collectors.toList());
+
+        if (staticCreators.isEmpty()) {
+            TypeElement companionClass = ElementFilter.typesIn(enclosedElements)
+                    .stream()
+                    .filter(type -> type.getSimpleName().toString().equals("Companion"))
+                    .filter(type -> type.getModifiers().contains(STATIC))
+                    .findFirst().orElse(null);
+
+            if (companionClass != null) {
+                staticCreators = ElementFilter.methodsIn(companionClass.getEnclosedElements())
+                        .stream()
+                        .filter(method -> !method.getModifiers().contains(PRIVATE))
+                        .filter(method -> method.getReturnType().equals(classElement.asType()))
+                        .filter(method -> {
+                            final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
+                            return annotationMetadata.hasStereotype(Creator.class);
+                        })
+                        .collect(Collectors.toList());
+            } else if (classElement.getKind() == ElementKind.ENUM) {
+                staticCreators = ElementFilter.methodsIn(classElement.getEnclosedElements())
+                        .stream()
+                        .filter(method -> method.getModifiers().contains(STATIC))
+                        .filter(method -> !method.getModifiers().contains(PRIVATE))
+                        .filter(method -> method.getReturnType().equals(classElement.asType()))
+                        .filter(method -> method.getSimpleName().toString().equals("valueOf"))
+                        .collect(Collectors.toList());
+            }
+        }
+
+        return staticCreators;
     }
 
     /**

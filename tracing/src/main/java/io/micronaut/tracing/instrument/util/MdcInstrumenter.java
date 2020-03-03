@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,26 +15,18 @@
  */
 package io.micronaut.tracing.instrument.util;
 
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.Function;
-import javax.inject.Singleton;
-
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.event.BeanCreatedEvent;
-import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
-import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
+import io.micronaut.scheduling.instrument.ReactiveInvocationInstrumenterFactory;
 import org.slf4j.MDC;
 
+import javax.inject.Singleton;
+import java.util.Map;
+
 /**
- * A function that instruments an existing Runnable with the Mapped Diagnostic Context for Slf4j.
+ * A function that instruments invocations with the Mapped Diagnostic Context for Slf4j.
  *
  * @author graemerocher
  * @author LarsEckart
@@ -43,101 +35,41 @@ import org.slf4j.MDC;
 @Singleton
 @Requires(classes = MDC.class)
 @Internal
-public final class MdcInstrumenter implements Function<Runnable, Runnable>, RunnableInstrumenter, ReactiveInstrumenter, BeanCreatedEventListener<ExecutorService> {
+public final class MdcInstrumenter implements InvocationInstrumenterFactory, ReactiveInvocationInstrumenterFactory {
 
+    /**
+     * Creates optional invocation instrumenter.
+     * @return An optional that contains the invocation instrumenter
+     */
     @Override
-    public Runnable apply(Runnable runnable) {
+    public InvocationInstrumenter newInvocationInstrumenter() {
         Map<String, String> contextMap = MDC.getCopyOfContextMap();
         if (contextMap != null && !contextMap.isEmpty()) {
-            return passMdcTo(runnable, contextMap);
-        } else {
-            return runnable;
-        }
-    }
+            return new InvocationInstrumenter() {
 
-    private <T> Callable<T> apply(Callable<T> callable) {
-        final Map<String, String> copyOfContextMap = MDC.getCopyOfContextMap();
-        if (copyOfContextMap != null && !copyOfContextMap.isEmpty()) {
-            return () -> {
-                try {
-                    MDC.setContextMap(copyOfContextMap);
-                    return callable.call();
-                } finally {
-                    MDC.clear();
-                }
-            };
-        } else {
-            return callable;
-        }
-    }
+                Map<String, String> oldContextMap;
 
-    @Override
-    public Runnable instrument(Runnable command) {
-        return apply(command);
-    }
-
-    @Override
-    public Optional<RunnableInstrumenter> newInstrumentation() {
-        Map<String, String> contextMap = MDC.getCopyOfContextMap();
-        if (contextMap != null && !contextMap.isEmpty()) {
-            return Optional.of(new RunnableInstrumenter() {
                 @Override
-                public Runnable instrument(Runnable runnable) {
-                    return passMdcTo(runnable, contextMap);
-                }
-            });
-        }
-        return Optional.empty();
-    }
-
-    private Runnable passMdcTo(Runnable runnable, Map<String, String> contextMap) {
-        return () -> {
-            try {
-                MDC.setContextMap(contextMap);
-                runnable.run();
-            } finally {
-                MDC.clear();
-            }
-        };
-    }
-
-    @Override
-    public ExecutorService onCreated(BeanCreatedEvent<ExecutorService> event) {
-        ExecutorService executorService = event.getBean();
-        if (executorService instanceof ScheduledExecutorService) {
-            return new InstrumentedScheduledExecutorService() {
-                @Override
-                public ScheduledExecutorService getTarget() {
-                    return (ScheduledExecutorService) executorService;
+                public void beforeInvocation() {
+                    oldContextMap = MDC.getCopyOfContextMap();
+                    MDC.setContextMap(contextMap);
                 }
 
                 @Override
-                public <T> Callable<T> instrument(Callable<T> task) {
-                    return apply(task);
-                }
-
-                @Override
-                public Runnable instrument(Runnable command) {
-                    return apply(command);
-                }
-            };
-        } else {
-            return new InstrumentedExecutorService() {
-                @Override
-                public ExecutorService getTarget() {
-                    return executorService;
-                }
-
-                @Override
-                public <T> Callable<T> instrument(Callable<T> task) {
-                    return apply(task);
-                }
-
-                @Override
-                public Runnable instrument(Runnable command) {
-                    return apply(command);
+                public void afterInvocation() {
+                    if (oldContextMap != null && !oldContextMap.isEmpty()) {
+                        MDC.setContextMap(oldContextMap);
+                    } else {
+                        MDC.clear();
+                    }
                 }
             };
         }
+        return null;
+    }
+
+    @Override
+    public InvocationInstrumenter newReactiveInvocationInstrumenter() {
+        return newInvocationInstrumenter();
     }
 }

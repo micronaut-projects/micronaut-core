@@ -8,7 +8,7 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.testng.Assert;
+import org.junit.jupiter.api.Assertions;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -48,7 +48,7 @@ public class IssuesControllerTest {
 
     @Test
     public void testShowWithInvalidInteger() {
-        HttpClientResponseException e =Assert.expectThrows(HttpClientResponseException.class, () ->
+        HttpClientResponseException e =Assertions.assertThrows(HttpClientResponseException.class, () ->
                 client.toBlocking().exchange("/issues/hello"));
 
         assertEquals(400, e.getStatus().getCode()); // <5>
@@ -56,7 +56,7 @@ public class IssuesControllerTest {
 
     @Test
     public void testIssueWithoutNumber() {
-        HttpClientResponseException e =Assert.expectThrows(HttpClientResponseException.class, () ->
+        HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class, () ->
                 client.toBlocking().exchange("/issues/"));
 
         assertEquals(404, e.getStatus().getCode()); // <6>

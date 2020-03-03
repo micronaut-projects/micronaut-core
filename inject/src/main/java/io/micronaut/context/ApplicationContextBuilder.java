@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -140,6 +140,16 @@ public interface ApplicationContextBuilder {
      * @return This application
      */
     @Nonnull ApplicationContextBuilder exclude(@Nullable String... configurations);
+
+    /**
+     * Set the command line arguments.
+     *
+     * @param args The arguments
+     * @return This application
+     */
+    default  @Nonnull ApplicationContextBuilder args(@Nullable String... args) {
+        return this;
+    }
 
     /**
      * Starts the {@link ApplicationContext}.

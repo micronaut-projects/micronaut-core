@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,6 +73,7 @@ public final class Parser {
      */
     public static Iterable<? extends Element> parse(JavaFileObject... sources) {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
         InMemoryJavaFileManager fileManager =
                 new InMemoryJavaFileManager(
@@ -142,6 +143,7 @@ public final class Parser {
             if(error.length() > 0) {
                 throw new RuntimeException(error.toString());
             }
+
             return fileManager.getOutputFiles();
         } catch (IOException e) {
             throw new RuntimeException(e);

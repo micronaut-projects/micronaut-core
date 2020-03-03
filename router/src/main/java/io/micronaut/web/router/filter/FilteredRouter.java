@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -63,31 +64,42 @@ public class FilteredRouter implements Router {
     }
 
     @Nonnull
+    @Deprecated
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri) {
-        return router.findAny(uri);
+        return router.findAny(uri, null);
     }
 
     @Nonnull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> findAny(@Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
-        final Stream<UriRouteMatch<T, R>> matchStream = router.findAny(uri);
+        final Stream<UriRouteMatch<T, R>> matchStream = router.findAny(uri, context);
         if (context != null) {
             return matchStream.filter(routeFilter.filter(context));
         }
         return matchStream;
     }
 
+    @Override
+    public Set<Integer> getExposedPorts() {
+        return router.getExposedPorts();
+    }
+
+    @Override
+    public void applyDefaultPorts(List<Integer> ports) {
+        router.applyDefaultPorts(ports);
+    }
+
     @Nonnull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri) {
-        return router.find(httpMethod, uri);
+        return router.find(httpMethod, uri, null);
     }
 
     @Nonnull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull CharSequence uri, @Nullable HttpRequest<?> context) {
-        final Stream<UriRouteMatch<T, R>> matchStream = router.find(httpMethod, uri);
+        final Stream<UriRouteMatch<T, R>> matchStream = router.find(httpMethod, uri, context);
         if (context != null) {
             return matchStream.filter(routeFilter.filter(context));
         }
@@ -100,6 +112,12 @@ public class FilteredRouter implements Router {
         List<UriRouteMatch<T, R>> closestMatches = router.findAllClosest(request);
         return closestMatches.stream().filter(routeFilter.filter(request))
                     .collect(Collectors.toList());
+    }
+
+    @Nonnull
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpRequest request, @Nonnull CharSequence uri) {
+        return router.find(request, uri);
     }
 
     @Nonnull
@@ -175,9 +193,10 @@ public class FilteredRouter implements Router {
     }
 
     @Nonnull
+    @Deprecated
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpMethod httpMethod, @Nonnull URI uri) {
-        return router.find(httpMethod, uri);
+        return router.find(httpMethod, uri, null);
     }
 
     @Nonnull

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,8 @@ public class Publishers {
         Publishers.SINGLE_TYPES.add(JustPublisher.class);
         List<String> typeNames = Arrays.asList(
             "io.reactivex.Observable",
-            "reactor.core.publisher.Flux"
+            "reactor.core.publisher.Flux",
+            "kotlinx.coroutines.flow.Flow"
         );
         for (String name : typeNames) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);

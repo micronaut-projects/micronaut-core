@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package io.micronaut.cache.jcache;
 
-import io.micronaut.cache.AsyncCache;
 import io.micronaut.cache.SyncCache;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -24,7 +23,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import javax.annotation.Nonnull;
 import javax.cache.Cache;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
@@ -38,7 +36,7 @@ class JCacheSyncCache implements SyncCache<Cache> {
 
     private final Cache nativeCache;
     private final ConversionService<?> conversionService;
-    private final AsyncCache<Cache> asyncCache;
+    private final ExecutorService ioExecutor;
 
     /**
      * Default constructor.
@@ -54,63 +52,12 @@ class JCacheSyncCache implements SyncCache<Cache> {
         ArgumentUtils.requireNonNull("nativeCache", nativeCache);
         this.nativeCache = nativeCache;
         this.conversionService = conversionService;
-        asyncCache = new AsyncCache<Cache>() {
-            @Override
-            public <T> CompletableFuture<Optional<T>> get(Object key, Argument<T> requiredType) {
-                return CompletableFuture.supplyAsync(() -> JCacheSyncCache.this.get(key, requiredType), ioExecutor);
-            }
+        this.ioExecutor = ioExecutor;
+    }
 
-            @Override
-            public <T> CompletableFuture<T> get(Object key, Argument<T> requiredType, Supplier<T> supplier) {
-                return CompletableFuture.supplyAsync(() -> JCacheSyncCache.this.get(key, requiredType, supplier), ioExecutor);
-            }
-
-            @Override
-            public <T> CompletableFuture<Optional<T>> putIfAbsent(Object key, T value) {
-                return CompletableFuture.supplyAsync(() -> JCacheSyncCache.this.putIfAbsent(key, value), ioExecutor);
-            }
-
-            @SuppressWarnings("unchecked")
-            @Override
-            public CompletableFuture<Boolean> put(Object key, Object value) {
-                return CompletableFuture.supplyAsync(() -> {
-                            JCacheSyncCache.this.nativeCache.put(key, value);
-                            return true;
-                        },
-                        ioExecutor
-                );
-            }
-
-            @Override
-            public CompletableFuture<Boolean> invalidate(Object key) {
-                return CompletableFuture.supplyAsync(() -> {
-                            JCacheSyncCache.this.invalidate(key);
-                            return true;
-                        },
-                        ioExecutor
-                );
-            }
-
-            @Override
-            public CompletableFuture<Boolean> invalidateAll() {
-                return CompletableFuture.supplyAsync(() -> {
-                            JCacheSyncCache.this.invalidateAll();
-                            return true;
-                        },
-                        ioExecutor
-                );
-            }
-
-            @Override
-            public String getName() {
-                return JCacheSyncCache.this.getName();
-            }
-
-            @Override
-            public Cache getNativeCache() {
-                return JCacheSyncCache.this.nativeCache;
-            }
-        };
+    @Override
+    public ExecutorService getExecutorService() {
+        return ioExecutor;
     }
 
     @Override
@@ -166,10 +113,5 @@ class JCacheSyncCache implements SyncCache<Cache> {
     @Override
     public Cache<?, ?> getNativeCache() {
         return nativeCache;
-    }
-
-    @Override
-    public AsyncCache<Cache> async() {
-        return asyncCache;
     }
 }

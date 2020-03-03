@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,9 +38,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -53,6 +51,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 @TypeHint(value = NettyMutableHttpResponse.class)
 public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
+    private static final ServerCookieEncoder DEFAULT_SERVER_COOKIE_ENCODER = ServerCookieEncoder.LAX;
 
     protected FullHttpResponse nettyResponse;
     final NettyHttpHeaders headers;
@@ -60,6 +59,8 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
     private B body;
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
     private final MutableConvertibleValues<Object> attributes;
+
+    private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
 
     /**
      * @param nettyResponse     The {@link FullHttpResponse}
@@ -123,10 +124,21 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
     public MutableHttpResponse<B> cookie(Cookie cookie) {
         if (cookie instanceof NettyCookie) {
             NettyCookie nettyCookie = (NettyCookie) cookie;
-            String value = ServerCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+            String value = serverCookieEncoder.encode(nettyCookie.getNettyCookie());
             headers.add(HttpHeaderNames.SET_COOKIE, value);
         } else {
             throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+        }
+        return this;
+    }
+
+    @Override
+    public MutableHttpResponse<B> cookies(Set<Cookie> cookies) {
+        if (cookies == null || cookies.isEmpty()) {
+            return this;
+        }
+        for (Cookie cookie: cookies) {
+            cookie(cookie);
         }
         return this;
     }
@@ -187,4 +199,19 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
         return this;
     }
 
+    /**
+     *
+     * @return Server cookie encoder
+     */
+    public ServerCookieEncoder getServerCookieEncoder() {
+        return serverCookieEncoder;
+    }
+
+    /**
+     *
+     * @param serverCookieEncoder Server cookie encoder
+     */
+    public void setServerCookieEncoder(ServerCookieEncoder serverCookieEncoder) {
+        this.serverCookieEncoder = serverCookieEncoder;
+    }
 }

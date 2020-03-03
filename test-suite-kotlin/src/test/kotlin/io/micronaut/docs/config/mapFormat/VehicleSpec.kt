@@ -25,6 +25,8 @@ class VehicleSpec: StringSpec({
         // end::start[]
 
         vehicle.start().shouldBe("Engine Starting V8 [sensors=2]")
+
+        applicationContext.close()
     }
 
 })

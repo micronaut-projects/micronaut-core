@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -191,7 +191,7 @@ public class AnnotationUtils {
     public AnnotationMetadata getAnnotationMetadata(Element element) {
         AnnotationMetadata metadata = annotationMetadataCache.get(element);
         if (metadata == null) {
-            metadata = newAnnotationBuilder().build(element);
+            metadata = newAnnotationBuilder().buildOverridden(element);
             annotationMetadataCache.put(element, metadata);
         }
         return metadata;
@@ -208,7 +208,10 @@ public class AnnotationUtils {
     }
 
     /**
-     * Get the annotation metadata for the given element.
+     * Get the annotation metadata for the given element and the given parent.
+     * This method is used for cases when you need to combine annotation metadata for
+     * two elements, for example a JavaBean property where the field and the method metadata
+     * need to be combined.
      *
      * @param parent  The parent
      * @param element The element

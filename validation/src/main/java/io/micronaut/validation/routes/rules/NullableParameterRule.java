@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,28 +37,60 @@ import java.util.*;
 public class NullableParameterRule implements RouteValidationRule {
 
     @Override
-    public RouteValidationResult validate(UriMatchTemplate template, ParameterElement[] parameters, MethodElement method) {
-
-        List<UriMatchVariable> variables = template.getVariables();
+    public RouteValidationResult validate(List<UriMatchTemplate> templates, ParameterElement[] parameters, MethodElement method) {
         List<String> errorMessages = new ArrayList<>();
 
         boolean isClient = method.hasAnnotation("io.micronaut.http.client.annotation.Client");
 
         //Optional variables can be required in clients
         if (!isClient) {
-            for (UriMatchVariable variable : variables) {
-                if (variable.isOptional() && !variable.isExploded()) {
-                    Arrays.stream(parameters)
-                            .filter(p -> p.getName().equals(variable.getName()))
-                            .findFirst()
-                            .ifPresent(p -> {
-                                ClassElement type = p.getType();
-                                boolean hasDefaultValue = p.findAnnotation(Bindable.class).flatMap(av -> av.stringValue("defaultValue")).isPresent();
-                                if (!isNullable(p) && type != null && !type.isAssignable(Optional.class) && !hasDefaultValue) {
-                                    errorMessages.add(String.format("The uri variable [%s] is optional, but the corresponding method argument [%s] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.", variable.getName(), p.toString()));
+            Map<String, UriMatchVariable> variables = new HashMap<>();
+            Set<UriMatchVariable> required = new HashSet<>();
+            for (UriMatchTemplate template: templates) {
+                for (UriMatchVariable variable: template.getVariables()) {
+                    if (!variable.isOptional() || variable.isExploded()) {
+                        required.add(variable);
+                    }
+                    variables.compute(variable.getName(), (key, var) -> {
+                        if (var == null) {
+                            if (variable.isOptional() && !variable.isExploded()) {
+                                return variable;
+                            } else {
+                                return null;
+                            }
+                        } else {
+                            if (!var.isOptional() || var.isExploded()) {
+                                if (variable.isOptional() && !variable.isExploded()) {
+                                    return variable;
+                                } else {
+                                    return var;
                                 }
-                            });
+                            } else {
+                                return var;
+                            }
+                        }
+                    });
                 }
+            }
+
+            for (UriMatchVariable variable: required) {
+                if (templates.stream().anyMatch(t -> !t.getVariableNames().contains(variable.getName()))) {
+                    variables.putIfAbsent(variable.getName(), variable);
+                }
+            }
+
+            for (UriMatchVariable variable : variables.values()) {
+                Arrays.stream(parameters)
+                        .filter(p -> p.getName().equals(variable.getName()))
+                        .findFirst()
+                        .ifPresent(p -> {
+                            ClassElement type = p.getType();
+                            boolean hasDefaultValue = p.findAnnotation(Bindable.class).flatMap(av -> av.stringValue("defaultValue")).isPresent();
+                            if (!isNullable(p) && type != null && !type.isAssignable(Optional.class) && !hasDefaultValue) {
+                                errorMessages.add(String.format("The uri variable [%s] is optional, but the corresponding method argument [%s] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.", variable.getName(), p.toString()));
+                            }
+                        });
+
             }
         }
 

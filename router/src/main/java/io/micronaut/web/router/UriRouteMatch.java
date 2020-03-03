@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
 
@@ -46,22 +47,19 @@ public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch
      * @return The required arguments in order to invoke this route
      */
     default List<Argument> getRequiredArguments() {
-        Map<String, Object> matchVariables = getVariableValues();
-
         Argument[] arguments = getArguments();
-        List<Argument> actualArguments = new ArrayList<>(arguments.length);
-        Argument<?> body = getBodyArgument().orElse(null);
-        for (Argument argument : arguments) {
-            if (!matchVariables.containsKey(argument.getName())) {
-                if (body != null && body.getName().equals(argument.getName())) {
-                    actualArguments.add(body);
-                } else {
+        if (ArrayUtils.isNotEmpty(arguments)) {
+            Map<String, Object> matchVariables = getVariableValues();
+            List<Argument> actualArguments = new ArrayList<>(arguments.length);
+            for (Argument argument : arguments) {
+                if (!matchVariables.containsKey(argument.getName())) {
                     actualArguments.add(argument);
                 }
             }
-        }
 
-        return actualArguments;
+            return actualArguments;
+        }
+        return Collections.emptyList();
     }
 
     /**

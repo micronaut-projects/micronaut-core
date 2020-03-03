@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,8 +33,18 @@ public class RouteMatchUtils {
     /**
      * @param request The Http request
      * @return The optional route match
+     * @deprecated Use {@link #findRouteMatch(HttpRequest)} instead.
      */
+    @Deprecated
     public static Optional<RouteMatch> findRouteMatchAtRequest(HttpRequest<?> request) {
+        return findRouteMatch(request);
+    }
+
+    /**
+     * @param request The Http request
+     * @return The optional route match
+     */
+    public static Optional<RouteMatch> findRouteMatch(HttpRequest<?> request) {
         Optional<RouteMatch> routeMatchAttribute = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class);
         if (routeMatchAttribute.isPresent()) {
             return routeMatchAttribute;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.NoSuchMessageException;
@@ -113,6 +112,15 @@ public interface MessageSource {
          */
         @Nonnull default Locale getLocale() {
             return Locale.getDefault();
+        }
+
+        /**
+         * The locale to use to resolve messages.
+         * @param defaultLocale The locale to use if no locale is present
+         * @return The locale
+         */
+        @Nonnull default Locale getLocale(@Nullable Locale defaultLocale) {
+            return defaultLocale != null ? defaultLocale : getLocale();
         }
 
         /**

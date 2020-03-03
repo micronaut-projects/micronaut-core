@@ -44,7 +44,6 @@ import java.time.Duration
  * @author graemerocher
  * @since 1.0
  */
-//@IgnoreIf({env["TRAVIS"]})
 class StreamRequestSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer)

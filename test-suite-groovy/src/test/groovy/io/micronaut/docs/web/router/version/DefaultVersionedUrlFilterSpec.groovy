@@ -46,7 +46,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
             })]
 
     def setup() {
-        context = new DefaultApplicationContext("test").start()
+        context = ApplicationContext.run("test")
         def controller = new VersionedController()
         context.registerSingleton(controller)
 

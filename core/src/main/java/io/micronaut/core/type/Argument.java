@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -192,6 +192,13 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     }
 
     /**
+     * @return Whether this is a container type.
+     */
+    default boolean isContainerType() {
+        return DefaultArgument.CONTAINER_TYPES.contains(getType());
+    }
+
+    /**
      * Convert an argument array to a class array.
      *
      * @param arguments The arguments
@@ -312,7 +319,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @Nonnull
     static <T> Argument<T> of(
         Class<T> type) {
-        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
+        return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
     }
 
     /**
@@ -340,7 +347,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
             TypeVariable<Class<T>> parameter = parameters[i];
             typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
         }
-        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeArguments);
+        return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, typeArguments);
     }
 
     /**

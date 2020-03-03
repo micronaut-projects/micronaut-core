@@ -51,6 +51,15 @@ class UriTemplateSpec extends Specification {
         '{var}{?q}'    | '{var2}'             | [var: 'foo', var2: 'bar', q: 'test']    | 'foo/bar?q=test'
         '{var}{#hash}' | '{var2}'             | [var: 'foo', var2: 'bar', hash: 'test'] | 'foo/bar#test'
         '/'            | '{?req*}'            | [req: [var: 'foo', var2: null]]         | '/?var=foo'
+        '/'            | '{?keys*}{?keys2*}'  | [keys: [var: 'foo', var2: null]]          | '/?var=foo'
+        '/'            | '{?keys*}{?keys2*}'  | [keys: [var: null], keys2: [var2: null]]  | '/'
+        '/'            | '{?keys*}{?keys2*}'  | [keys: [var: 'foo'], keys2: [var2: null]] | '/?var=foo'
+        '/'            | '{?keys*}{?keys2*}'  | [keys: [var: 'foo'], keys2: [var2: 'bar']]| '/?var=foo&var2=bar'
+        '/'            | '{?keys*}{?keys2*}'  | [keys: [var: null], keys2: [var2: 'bar']] | '/?var2=bar'
+        '/'            | '{?keys*}{&keys2*}'  | [keys: [var: null], keys2: [var2: null]]  | '/'
+        '/'            | '{?keys*}{&keys2*}'  | [keys: [var: 'foo'], keys2: [var2: null]] | '/?var=foo'
+        '/'            | '{?keys*}{&keys2*}'  | [keys: [var: 'foo'], keys2: [var2: 'bar']]| '/?var=foo&var2=bar'
+        '/'            | '{?keys*}{&keys2*}'  | [keys: [var: null], keys2: [var2: 'bar']] | '/&var2=bar'
     }
 
     @Unroll
@@ -86,6 +95,8 @@ class UriTemplateSpec extends Specification {
         '{var}{?q}'    | '/{var2}'                      | '{var}/{var2}'
         '{var}{#hash}' | '{var2}'                       | '{var}/{var2}'
         '/foo'         | '/find{?year*}'                | '/foo/find'
+        '/foo'         | '/find{?bar*}{?baz*}'          | '/foo/find'
+        '/foo'         | '/find{?bar*}{&baz*}'          | '/foo/find'
 
 
     }
@@ -126,6 +137,8 @@ class UriTemplateSpec extends Specification {
         '{var}{?q}'    | '/{var2}'                      | '{var}/{var2}{?q}'
         '{var}{#hash}' | '{var2}'                       | '{var}/{var2}{#hash}'
         '/foo'         | '/find{?year*}'                | '/foo/find{?year*}'
+        '/foo'         | '/find{?keys1*}{?keys2*}'      | '/foo/find{?keys1*}{?keys2*}'
+        '/foo'         | '/find{?keys1*}{&keys2*}'      | '/foo/find{?keys1*}{&keys2*}'
 
 
     }
@@ -272,6 +285,15 @@ class UriTemplateSpec extends Specification {
         '{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | '&semi=%3B&dot=.&comma=%2C'
         '{?list*,locale,currency}' | [list: ['red', 'green', 'blue'], locale: null, currency: 'USD'] | '?list=red&list=green&list=blue&currency=USD'
         '{?param[]*}'         | ['param[]': ['a', 'b', 'c']]                       | '?param[]=a&param[]=b&param[]=c'
+        '{?keys*}{?keys2*}'   | [keys: [var: 'foo', var2: null]]                   | '?var=foo'
+        '{?keys*}{?keys2*}'   | [keys: [var: null], keys2: [var2: null]]           | ''
+        '{?keys*}{?keys2*}'   | [keys: [var: 'foo'], keys2: [var2: null]]          | '?var=foo'
+        '{?keys*}{?keys2*}'   | [keys: [var: 'foo'], keys2: [var2: 'bar']]         | '?var=foo&var2=bar'
+        '{?keys*}{?keys2*}'   | [keys: [var: null], keys2: [var2: 'bar']]          | '?var2=bar'
+        '{?keys*}{&keys2*}'   | [keys: [var: null], keys2: [var2: null]]           | ''
+        '{?keys*}{&keys2*}'   | [keys: [var: 'foo'], keys2: [var2: null]]          | '?var=foo'
+        '{?keys*}{&keys2*}'   | [keys: [var: 'foo'], keys2: [var2: 'bar']]         | '?var=foo&var2=bar'
+        '{?keys*}{&keys2*}'   | [keys: [var: null], keys2: [var2: 'bar']]          | '&var2=bar'
     }
 
 
@@ -420,6 +442,15 @@ class UriTemplateSpec extends Specification {
         'http://example.com/foo{?query,number}'  | [query: 'mycelium', number: 100]                   | 'http://example.com/foo?query=mycelium&number=100'
         'http://example.com/foo{?query,number}'  | [number: 100]                                      | 'http://example.com/foo?number=100'
         'http://example.com/foo{?req*}'          | [req: [number: 100, name: null]]                   | 'http://example.com/foo?number=100'
+        'http://example.com/foo{?keys*}{?keys2*}'| [keys: [var: 'foo', var2: null]]                   | 'http://example.com/foo?var=foo'
+        'http://example.com/foo{?keys*}{?keys2*}'| [keys: [var: null], keys2: [var2: null]]           | 'http://example.com/foo'
+        'http://example.com/foo{?keys*}{?keys2*}'| [keys: [var: 'foo'], keys2: [var2: null]]          | 'http://example.com/foo?var=foo'
+        'http://example.com/foo{?keys*}{?keys2*}'| [keys: [var: 'foo'], keys2: [var2: 'bar']]         | 'http://example.com/foo?var=foo&var2=bar'
+        'http://example.com/foo{?keys*}{?keys2*}'| [keys: [var: null], keys2: [var2: 'bar']]          | 'http://example.com/foo?var2=bar'
+        'http://example.com/foo{?keys*}{&keys2*}'| [keys: [var: null], keys2: [var2: null]]           | 'http://example.com/foo'
+        'http://example.com/foo{?keys*}{&keys2*}'| [keys: [var: 'foo'], keys2: [var2: null]]          | 'http://example.com/foo?var=foo'
+        'http://example.com/foo{?keys*}{&keys2*}'| [keys: [var: 'foo'], keys2: [var2: 'bar']]         | 'http://example.com/foo?var=foo&var2=bar'
+        'http://example.com/foo{?keys*}{&keys2*}'| [keys: [var: null], keys2: [var2: 'bar']]          | 'http://example.com/foo&var2=bar'
     }
 
 
@@ -566,6 +597,15 @@ class UriTemplateSpec extends Specification {
         'http://example.com:8080/{&keys}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com:8080/&keys=semi,%3B,dot,.,comma,%2C'
         'http://example.com:8080/{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com:8080/&semi=%3B&dot=.&comma=%2C'
         'http://example.com:8080/{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: null]]     | 'http://example.com:8080/&semi=%3B&dot=.'
+        'http://example.com:8080/{?keys*}{?keys2*}'   | [keys: [var: 'foo', var2: null]]                   | 'http://example.com:8080/?var=foo'
+        'http://example.com:8080/{?keys*}{?keys2*}'   | [keys: [var: null], keys2: [var2: null]]           | 'http://example.com:8080/'
+        'http://example.com:8080/{?keys*}{?keys2*}'   | [keys: [var: 'foo'], keys2: [var2: null]]          | 'http://example.com:8080/?var=foo'
+        'http://example.com:8080/{?keys*}{?keys2*}'   | [keys: [var: 'foo'], keys2: [var2: 'bar']]         | 'http://example.com:8080/?var=foo&var2=bar'
+        'http://example.com:8080/{?keys*}{?keys2*}'   | [keys: [var: null], keys2: [var2: 'bar']]          | 'http://example.com:8080/?var2=bar'
+        'http://example.com:8080/{?keys*}{&keys2*}'   | [keys: [var: null], keys2: [var2: null]]           | 'http://example.com:8080/'
+        'http://example.com:8080/{?keys*}{&keys2*}'   | [keys: [var: 'foo'], keys2: [var2: null]]          | 'http://example.com:8080/?var=foo'
+        'http://example.com:8080/{?keys*}{&keys2*}'   | [keys: [var: 'foo'], keys2: [var2: 'bar']]         | 'http://example.com:8080/?var=foo&var2=bar'
+        'http://example.com:8080/{?keys*}{&keys2*}'   | [keys: [var: null], keys2: [var2: 'bar']]          | 'http://example.com:8080/&var2=bar'
     }
 
 }

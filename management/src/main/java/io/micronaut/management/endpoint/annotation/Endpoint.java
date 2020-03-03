@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,6 +54,16 @@ public @interface Endpoint {
     boolean SENSITIVE = true;
 
     /**
+     * The default prefix.
+     */
+    String DEFAULT_PREFIX = "endpoints";
+
+    /**
+     * The ID used to refer to all.
+     */
+    String ALL = "all";
+
+    /**
      * @return The ID of the endpoint
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "value")
@@ -71,7 +81,7 @@ public @interface Endpoint {
      * @return The default prefix to use
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "prefix")
-    String prefix() default "endpoints";
+    String prefix() default DEFAULT_PREFIX;
 
     /**
      * @return If the endpoint is enabled when no configuration is provided
@@ -86,5 +96,5 @@ public @interface Endpoint {
     /**
      * @return The configuration key to look for when no configuration is provided
      */
-    String defaultConfigurationId() default "all";
+    String defaultConfigurationId() default ALL;
 }

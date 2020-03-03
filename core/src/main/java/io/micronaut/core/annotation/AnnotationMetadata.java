@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -655,6 +656,66 @@ public interface AnnotationMetadata extends AnnotationSource {
         ArgumentUtils.requireNonNull("member", member);
 
         return enumValue(annotation.getName(), member, enumType);
+    }
+
+
+    /**
+     * The enum values for the given annotation.
+     *
+     * @param annotation The annotation
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An array of enum values
+     */
+    default <E extends Enum> E[] enumValues(@Nonnull String annotation, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return enumValues(annotation, VALUE_MEMBER, enumType);
+    }
+
+    /**
+     * The enum values for the given annotation.
+     *
+     * @param annotation The annotation
+     * @param member     The annotation member
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An array of enum values
+     */
+    default <E extends Enum> E[] enumValues(@Nonnull String annotation, @Nonnull String member, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return (E[]) Array.newInstance(enumType, 0);
+    }
+
+    /**
+     * The enum values for the given annotation.
+     *
+     * @param annotation The annotation
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An array of enum values
+     */
+    default <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+
+        return enumValues(annotation, VALUE_MEMBER, enumType);
+    }
+
+    /**
+     * The enum values for the given annotation.
+     *
+     * @param annotation The annotation
+     * @param member     The annotation member
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An array of enum values
+     */
+    default <E extends Enum> E[] enumValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, Class<E> enumType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+
+        return enumValues(annotation.getName(), member, enumType);
     }
 
     /**

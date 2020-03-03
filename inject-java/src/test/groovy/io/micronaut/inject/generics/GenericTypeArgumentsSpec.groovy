@@ -23,6 +23,50 @@ import java.util.function.Function
 
 class GenericTypeArgumentsSpec extends AbstractTypeElementSpec {
 
+    void "test wildcard placeholder"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.ConvertibleValuesSerializer', '''
+package test;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import io.micronaut.core.convert.value.ConvertibleValues;
+
+import javax.inject.Singleton;
+import java.io.IOException;
+import java.util.Map;
+import io.micronaut.context.annotation.Executable;
+
+@Singleton
+@Executable
+class ConvertibleValuesSerializer extends JsonSerializer<ConvertibleValues<?>> {
+
+    @Override
+    public boolean isEmpty(SerializerProvider provider, ConvertibleValues<?> value) {
+        return value.isEmpty();
+    }
+
+    @Override
+    public void serialize(ConvertibleValues<?> value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+        gen.writeStartObject();
+
+        for (Map.Entry<String, ?> entry : value) {
+            String fieldName = entry.getKey();
+            Object v = entry.getValue();
+            if (v != null) {
+                gen.writeFieldName(fieldName);
+                gen.writeObject(v);
+            }
+        }
+        gen.writeEndObject();
+    }
+}
+''')
+        expect:
+        definition != null
+    }
+
     void "test recusive generic type parameter"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.TrackedSortedSet','''\

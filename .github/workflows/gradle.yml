@@ -1,0 +1,49 @@
+name: Java CI
+on:
+  push:
+    branches:
+    - 1.3.x
+  pull_request:
+    branches:
+    - 1.3.x
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java: ['8', '11', '13']
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v1
+      with:
+        path: ~/.gradle/caches
+        key: ${{ runner.os }}-micronaut-core-gradle-${{ hashFiles('**/*.gradle') }}
+        restore-keys: |
+          ${{ runner.os }}-micronaut-core-gradle-
+    - uses: actions/cache@v1
+      with:
+        path: ~/.gradle/wrapper
+        key: ${{ runner.os }}-micronaut-core-wrapper-${{ hashFiles('**/*.gradle') }}
+        restore-keys: |
+          ${{ runner.os }}-micronaut-core-wrapper-
+    - name: Set up JDK
+      uses: actions/setup-java@v1
+      with:
+        java-version: ${{ matrix.java }}   
+    - name: Build with Gradle
+      run: ./gradlew check --no-daemon --parallel --continue
+    - name: Publish to JFrog OSS
+      if: success() && github.event_name == 'push' && matrix.java == '8'
+      env:
+         BINTRAY_USER: ${{ secrets.BINTRAY_USER }}
+         BINTRAY_KEY: ${{ secrets.BINTRAY_KEY }}
+      run: ./gradlew publish docs --no-daemon
+    - name: Publish to Github Pages
+      if: success() && github.event_name == 'push' && matrix.java == '8'
+      uses: micronaut-projects/micronaut-docs-deploy@master
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GH_REPOSITORY: micronaut-projects/micronaut-docs
+        BASE_BRANCH: 1.3.x
+        BRANCH: gh-pages
+        FOLDER: build/docs

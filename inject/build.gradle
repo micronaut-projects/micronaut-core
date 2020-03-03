@@ -1,16 +1,22 @@
-shadowJar.enabled = true
+ext {
+    shadowJarEnabled = true
+}
 dependencies {
-    compile dependencyVersion("javax.annotation-api")
-    compile group: 'javax.inject', name: 'javax.inject', version: '1'
-    compile project(':core')
-    compile dependencyVersion("snakeyaml")
+    api dependencyVersion("javax.annotation-api")
+    api group: 'javax.inject', name: 'javax.inject', version: '1'
+    api project(':core')
+    api dependencyVersion("snakeyaml")
 
     compileOnly "javax.persistence:javax.persistence-api:2.2"
     compileOnly dependencyVersion("groovy")
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
     compileOnly dependencyVersion("validation")
 
-    testCompile dependencyVersion("validation")
-    testCompile project(":inject-groovy")
-    testCompile "com.github.stefanbirkner:system-rules:$systemRulesVersion"
+    testImplementation dependencyVersion("validation")
+    testImplementation project(":inject-groovy")
+    //system-rules has a transitive on junit-dep:[4.9,), so hard setting the version instead
+    testImplementation("com.github.stefanbirkner:system-rules:$systemRulesVersion") {
+        exclude group: "junit", module: "junit-dep"
+    }
+    testImplementation "junit:junit-dep:4.11"
 }

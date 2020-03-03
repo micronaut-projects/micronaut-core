@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,7 @@
  */
 package io.micronaut.session;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Expiry;
-import com.github.benmanes.caffeine.cache.RemovalListener;
+import com.github.benmanes.caffeine.cache.*;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
@@ -118,11 +115,17 @@ public class InMemorySessionStore implements SessionStore<InMemorySession> {
      * @return The new cache
      */
     protected Cache<String, InMemorySession> newSessionCache(SessionConfiguration configuration) {
-        Caffeine<String, InMemorySession> builder = Caffeine
-            .newBuilder()
-            .removalListener(newRemovalListener())
-            .expireAfter(newExpiry());
+        Caffeine<String, InMemorySession> builder = Caffeine.newBuilder().removalListener(newRemovalListener());
+
+        if (configuration.isPromptExpiration()) {
+            configuration.getExecutorService()
+                    .map(Scheduler::forScheduledExecutorService)
+                    .ifPresent(builder::scheduler);
+        }
+
+        builder.expireAfter(newExpiry());
         configuration.getMaxActiveSessions().ifPresent(builder::maximumSize);
+
         return builder.build();
     }
 

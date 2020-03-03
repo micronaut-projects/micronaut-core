@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.uri
 
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -178,5 +179,27 @@ class UriMatchTemplateSpec extends Specification {
         "/book/show{/id}"                | '/book/1/'            | false   | null
         "/books{?max,offset}"            | "/books/"             | true    | [:]
         "/books{#hashtag}"               | "/books/"             | true    | [:]
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-aws/issues/110")
+    @Unroll
+    void "Test URI template #template matches uri with encoded characters: #uri"() {
+        given:
+        UriMatchTemplate matchTemplate = new UriMatchTemplate(template)
+        Optional<UriMatchInfo> info = matchTemplate.match(uri)
+
+        expect:
+        info.isPresent() == matches
+        info.orElse(null)?.variableValues == variables
+
+        where:
+        template        | uri                           | matches   | variables
+        "/{someId}"     | '/username@company.com'       | true      | [someId: 'username@company.com']
+        "/{someId}"     | '/username%2B1@company.com'   | true      | [someId: 'username%2B1@company.com']
+        "/{someId}"     | '/username+1@company.com'     | false     | null
+
+        "/{+someId}"    | '/username@company.com'       | true      | [someId: 'username@company.com']
+        "/{+someId}"    | '/username%2B1@company.com'   | true      | [someId: 'username%2B1@company.com']
+        "/{+someId}"    | '/username+1@company.com'     | true      | [someId: 'username+1@company.com']
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
      */
     protected String resolveSpanName(HttpRequest<?> request) {
         Optional<String> route = request.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
-        return route.map(s -> request.getMethod() + " " + s).orElse(request.getMethod() + " " + request.getPath());
+        return route.map(s -> request.getMethodName() + " " + s).orElse(request.getMethodName() + " " + request.getPath());
     }
 
     /**
@@ -111,7 +111,7 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
                 spanName
         ).asChildOf(spanContext);
 
-        spanBuilder.withTag(TAG_METHOD, request.getMethod().name());
+        spanBuilder.withTag(TAG_METHOD, request.getMethodName());
         String path = request.getPath();
         spanBuilder.withTag(TAG_PATH, path);
         return spanBuilder;

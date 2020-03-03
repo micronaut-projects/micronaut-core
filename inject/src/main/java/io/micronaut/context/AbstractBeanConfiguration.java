@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinitionReference;
 
@@ -68,7 +67,8 @@ public abstract class AbstractBeanConfiguration extends AbstractBeanContextCondi
 
     @Override
     public boolean isWithin(String className) {
-        String pkgName = NameUtils.getPackageName(className);
+        final int i = className.lastIndexOf('.');
+        String pkgName = i > -1 ? className.substring(0, i) : className;
         return pkgName.equals(this.packageName) || pkgName.startsWith(this.packageName + '.');
     }
 }

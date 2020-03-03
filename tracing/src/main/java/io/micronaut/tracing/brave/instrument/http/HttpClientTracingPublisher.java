@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,22 +15,21 @@
  */
 package io.micronaut.tracing.brave.instrument.http;
 
-import brave.Span;
 import brave.Tracer;
-import brave.Tracing;
 import brave.http.HttpClientHandler;
+import brave.http.HttpClientRequest;
+import brave.http.HttpClientResponse;
 import brave.http.HttpTracing;
-import brave.propagation.TraceContext;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
 import io.micronaut.tracing.instrument.http.TraceRequestAttributes;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-
-import java.util.Optional;
 
 /**
  * A Publisher that handles HTTP client request tracing.
@@ -40,40 +39,39 @@ import java.util.Optional;
  */
 @SuppressWarnings("PublisherImplementation")
 class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
-    private static final int HTTP_SUCCESS_CODE_UPPER_LIMIT = 299;
 
     private final Publisher<HttpResponse<?>> publisher;
-    private final HttpClientHandler<HttpRequest<?>, HttpResponse<?>> clientHandler;
-    private final TraceContext.Injector<MutableHttpHeaders> injector;
+    private final HttpClientHandler<HttpClientRequest, HttpClientResponse> clientHandler;
     private final MutableHttpRequest<?> request;
     private final Tracer tracer;
 
     /**
      * Construct a publisher to handle HTTP client request tracing.
      *
-     * @param publisher The response publisher
-     * @param request An extended version of request that allows mutating
+     * @param publisher     The response publisher
+     * @param request       An extended version of request that allows mutating
      * @param clientHandler The standardize way to instrument client
-     * @param httpTracing HttpTracing
+     * @param httpTracing   HttpTracing
      */
     HttpClientTracingPublisher(
             Publisher<HttpResponse<?>> publisher,
             MutableHttpRequest<?> request,
-            HttpClientHandler<HttpRequest<?>, HttpResponse<?>> clientHandler,
+            HttpClientHandler<HttpClientRequest, HttpClientResponse> clientHandler,
             HttpTracing httpTracing) {
         this.publisher = publisher;
         this.request = request;
         this.clientHandler = clientHandler;
-        Tracing tracing = httpTracing.tracing();
-        this.tracer = tracing.tracer();
-        this.injector = tracing.propagation().injector(MutableHttpHeaders::add);
+        this.tracer = httpTracing.tracing().tracer();
     }
 
     @Override
     public void subscribe(Subscriber<? super HttpResponse<?>> actual) {
-        brave.Span span = clientHandler.handleSend(injector, request.getHeaders(), request);
+        HttpClientRequest httpClientRequest = mapRequest(request);
+        brave.Span span = clientHandler.handleSend(httpClientRequest);
+        request.getAttribute(HttpAttributes.SERVICE_ID, String.class)
+                .filter(StringUtils::isNotEmpty)
+                .ifPresent(span::remoteServiceName);
         request.setAttribute(TraceRequestAttributes.CURRENT_SPAN, span);
-        String serviceName = request.getAttribute(HttpAttributes.SERVICE_ID, String.class).orElse(null);
         try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
             publisher.subscribe(new Subscriber<HttpResponse<?>>() {
                 @Override
@@ -86,13 +84,7 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
                 @Override
                 public void onNext(HttpResponse<?> response) {
                     try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
-                        configureAttributes(response);
-                        configureSpan(span, serviceName);
-                        HttpStatus status = response.getStatus();
-                        if (status.getCode() > HTTP_SUCCESS_CODE_UPPER_LIMIT) {
-                            span.tag(AbstractOpenTracingFilter.TAG_HTTP_STATUS_CODE, String.valueOf(status.getCode()));
-                        }
-                        clientHandler.handleReceive(response, null, span);
+                        clientHandler.handleReceive(mapResponse(request, response), null, span);
                         actual.onNext(response);
                     }
                 }
@@ -100,13 +92,9 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
                 @Override
                 public void onError(Throwable error) {
                     try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
-                        configureSpan(span, serviceName);
                         if (error instanceof HttpClientResponseException) {
                             HttpClientResponseException e = (HttpClientResponseException) error;
-                            HttpResponse<?> response = e.getResponse();
-                            configureAttributes(response);
-
-                            clientHandler.handleReceive(response, e, span);
+                            clientHandler.handleReceive(mapResponse(request, e.getResponse()), e, span);
                         } else {
                             span.error(error);
                             span.finish();
@@ -124,19 +112,62 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
         }
     }
 
-    private void configureSpan(Span span, String serviceName) {
-        span.kind(Span.Kind.CLIENT);
-        if (StringUtils.isNotEmpty(serviceName)) {
-            span.remoteServiceName(serviceName);
-        }
-        span.tag(AbstractOpenTracingFilter.TAG_METHOD, request.getMethod().name());
-        String path = request.getPath();
-        span.tag(AbstractOpenTracingFilter.TAG_PATH, path);
+    private HttpClientRequest mapRequest(MutableHttpRequest<?> request) {
+        return new HttpClientRequest() {
+
+            @Override
+            public void header(String name, String value) {
+                request.header(name, value);
+            }
+
+            @Override
+            public String method() {
+                return request.getMethodName();
+            }
+
+            @Override
+            public String path() {
+                return request.getPath();
+            }
+
+            @Override
+            public String url() {
+                return request.getUri().toString();
+            }
+
+            @Override
+            public String header(String name) {
+                return request.getHeaders().get(name);
+            }
+
+            @Override
+            public Object unwrap() {
+                return request;
+            }
+        };
     }
 
-    private void configureAttributes(HttpResponse<?> response) {
-        Optional<Object> routeTemplate = request.getAttribute(HttpAttributes.URI_TEMPLATE);
-        routeTemplate.ifPresent(o -> response.setAttribute(HttpAttributes.URI_TEMPLATE, o));
-        response.setAttribute(HttpAttributes.METHOD_NAME, request.getMethod().name());
+    private HttpClientResponse mapResponse(HttpRequest<?> request, HttpResponse<?> response) {
+        return new HttpClientResponse() {
+            @Override
+            public Object unwrap() {
+                return response;
+            }
+
+            @Override
+            public String method() {
+                return request.getMethodName();
+            }
+
+            @Override
+            public String route() {
+                return request.getAttribute(HttpAttributes.URI_TEMPLATE, String.class).orElse(null);
+            }
+
+            @Override
+            public int statusCode() {
+                return response.getStatus().getCode();
+            }
+        };
     }
 }

@@ -1,7 +1,8 @@
 dependencies {
-    compile project(":runtime")
-    compileOnly project(":inject-java")
-    compile project(":http")
+	annotationProcessor project(":inject-java")
 
-    testCompile project(":inject-java")
+    api project(":runtime")    
+    api project(":http")
+
+    testAnnotationProcessor project(":inject-java")
 }

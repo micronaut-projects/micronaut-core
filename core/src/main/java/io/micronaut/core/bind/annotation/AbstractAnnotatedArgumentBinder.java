@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.bind.annotation;
 
+import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -62,8 +63,26 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
         ArgumentConversionContext<T> context,
         ConvertibleValues<?> values,
         String annotationValue) {
+        return doBind(context, values, annotationValue, BindingResult.EMPTY);
+    }
 
-        return doConvert(doResolve(context, values, annotationValue), context);
+    /**
+     * Do binding.
+     *
+     * @param context         context
+     * @param values          values
+     * @param annotationValue annotationValue
+     * @param defaultResult   The default binding result if the value is null
+     * @return result
+     */
+    @SuppressWarnings("unchecked")
+    protected BindingResult<T> doBind(
+            ArgumentConversionContext<T> context,
+            ConvertibleValues<?> values,
+            String annotationValue,
+            ArgumentBinder.BindingResult<T> defaultResult) {
+
+        return doConvert(doResolve(context, values, annotationValue), context, defaultResult);
     }
 
     /**
@@ -118,10 +137,26 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
      * @return The binding result
      */
     protected BindingResult<T> doConvert(Object value, ArgumentConversionContext<T> context) {
-        Optional<T> result = conversionService.convert(value, context);
-        if (result.isPresent() && context.getArgument().getType() == Optional.class) {
-            return () -> (Optional<T>) result.get();
+        return doConvert(value, context, BindingResult.EMPTY);
+    }
+
+    /**
+     * Convert the value and return a binding result.
+     *
+     * @param value The value to convert
+     * @param context The conversion context
+     * @param defaultResult The binding result if the value is null
+     * @return The binding result
+     */
+    protected BindingResult<T> doConvert(Object value, ArgumentConversionContext<T> context, ArgumentBinder.BindingResult<T> defaultResult) {
+        if (value == null) {
+            return defaultResult;
+        } else {
+            Optional<T> result = conversionService.convert(value, context);
+            if (result.isPresent() && context.getArgument().getType() == Optional.class) {
+                return () -> (Optional<T>) result.get();
+            }
+            return () -> result;
         }
-        return () -> result;
     }
 }

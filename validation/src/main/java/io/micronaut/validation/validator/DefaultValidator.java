@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,15 @@
  */
 package io.micronaut.validation.validator;
 
+import io.micronaut.aop.Intercepted;
+import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.MessageSource;
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -36,8 +41,11 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
+import io.micronaut.inject.validation.BeanDefinitionValidator;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
@@ -50,42 +58,15 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import javax.validation.ClockProvider;
-import javax.validation.Constraint;
-import javax.validation.ConstraintViolation;
-import javax.validation.ConstraintViolationException;
-import javax.validation.ElementKind;
-import javax.validation.Path;
-import javax.validation.TraversableResolver;
-import javax.validation.Valid;
-import javax.validation.ValidationException;
+import javax.validation.*;
 import javax.validation.groups.Default;
-import javax.validation.metadata.BeanDescriptor;
-import javax.validation.metadata.ConstraintDescriptor;
-import javax.validation.metadata.ConstructorDescriptor;
-import javax.validation.metadata.ElementDescriptor;
-import javax.validation.metadata.MethodDescriptor;
-import javax.validation.metadata.MethodType;
-import javax.validation.metadata.PropertyDescriptor;
-import javax.validation.metadata.Scope;
+import javax.validation.metadata.*;
 import javax.validation.valueextraction.ValueExtractor;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -99,7 +80,7 @@ import java.util.stream.Collectors;
 @Singleton
 @Primary
 @Requires(property = ValidatorConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-public class DefaultValidator implements Validator, ExecutableMethodValidator, ReactiveValidator, AnnotatedElementValidator {
+public class DefaultValidator implements Validator, ExecutableMethodValidator, ReactiveValidator, AnnotatedElementValidator, BeanDefinitionValidator {
 
     private static final List<Class> DEFAULT_GROUPS = Collections.singletonList(Default.class);
     private final ConstraintValidatorRegistry constraintValidatorRegistry;
@@ -348,30 +329,36 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             @Nonnull Object[] parameterValues,
             @Nullable Class<?>... groups) {
         ArgumentUtils.requireNonNull("parameterValues", parameterValues);
+        ArgumentUtils.requireNonNull("object", object);
+        ArgumentUtils.requireNonNull("method", method);
         final Argument[] arguments = method.getArguments();
-        Collection<MutableArgumentValue<?>> argumentValues = toArgumentValues(parameterValues, arguments);
-        return validateParameters(
-                object,
-                method,
-                argumentValues,
-                groups
-        );
-    }
-
-    private Collection<MutableArgumentValue<?>> toArgumentValues(@Nonnull Object[] parameterValues, Argument[] arguments) {
         final int argLen = arguments.length;
         if (argLen != parameterValues.length) {
             throw new IllegalArgumentException("The method parameter array must have exactly " + argLen + " elements.");
         }
 
-        Collection<MutableArgumentValue<?>> argumentValues = new ArrayList<>(parameterValues.length);
-        for (int i = 0; i < arguments.length; i++) {
-            Argument argument = arguments[i];
-            final Object v = parameterValues[i];
-            final MutableArgumentValue<?> av = MutableArgumentValue.create(argument, v);
-            argumentValues.add(av);
+        DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(object, groups);
+        Set overallViolations = new HashSet<>(5);
+
+        final Path.Node node = context.addMethodNode(method.getMethodName(), method.getArgumentTypes());
+        try {
+            @SuppressWarnings("unchecked")
+            final Class<T> rootClass = (Class<T>) object.getClass();
+            validateParametersInternal(
+                    rootClass,
+                    object,
+                    parameterValues,
+                    arguments,
+                    argLen,
+                    context,
+                    overallViolations,
+                    node
+            );
+        } finally {
+            context.removeLast();
         }
-        return argumentValues;
+        //noinspection unchecked
+        return Collections.unmodifiableSet(overallViolations);
     }
 
     @Nonnull
@@ -400,7 +387,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             validateParametersInternal(
                     rootClass,
                     object,
-                    argumentValues,
+                    argumentValues.stream().map(ArgumentValue::getValue).toArray(),
                     arguments,
                     argLen,
                     context,
@@ -610,24 +597,28 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             @Nonnull Object[] parameterValues,
             @Nullable Class<?>... groups) {
         ArgumentUtils.requireNonNull("introspection", introspection);
+        final Class<? extends T> beanType = introspection.getBeanType();
+        final Argument<?>[] constructorArguments = introspection.getConstructorArguments();
+        return validateConstructorParameters(beanType, constructorArguments, parameterValues, groups);
+    }
+
+    @Override
+    public <T> Set<ConstraintViolation<T>> validateConstructorParameters(Class<? extends T> beanType, Argument<?>[] constructorArguments, @Nonnull Object[] parameterValues, @Nullable Class<?>[] groups) {
         //noinspection ConstantConditions
         parameterValues = parameterValues != null ? parameterValues : ArrayUtils.EMPTY_OBJECT_ARRAY;
-        final Argument<?>[] constructorArguments = introspection.getConstructorArguments();
         final int argLength = constructorArguments.length;
         if (parameterValues.length != argLength) {
             throw new IllegalArgumentException("Expected exactly [" + argLength + "] constructor arguments");
         }
-        final Collection<MutableArgumentValue<?>> argumentValues = toArgumentValues(parameterValues, constructorArguments);
-
         DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(groups);
         Set overallViolations = new HashSet<>(5);
 
-        final Path.Node node = context.addConstructorNode(introspection.getBeanType().getSimpleName(), constructorArguments);
+        final Path.Node node = context.addConstructorNode(beanType.getSimpleName(), constructorArguments);
         try {
             validateParametersInternal(
-                    introspection.getBeanType(),
+                    beanType,
                     null,
-                    argumentValues,
+                    parameterValues,
                     constructorArguments,
                     argLength,
                     context,
@@ -685,13 +676,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     private <T> void validateParametersInternal(
             @Nonnull Class<T> rootClass,
             @Nullable T object,
-            @Nonnull Collection<MutableArgumentValue<?>> argumentValues,
+            @Nonnull Object[] parameters,
             Argument[] arguments,
             int argLen,
             DefaultConstraintValidatorContext context,
             Set overallViolations,
             Path.Node parentNode) {
-        final Iterator<MutableArgumentValue<?>> iterator = argumentValues.iterator();
         for (int i = 0; i < argLen; i++) {
             Argument argument = arguments[i];
             final Class<?> parameterType = argument.getType();
@@ -701,13 +691,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             final boolean hasValid = annotationMetadata.hasStereotype(Valid.class);
             final boolean hasConstraint = annotationMetadata.hasStereotype(Constraint.class);
 
-            final MutableArgumentValue<Object> argumentValue = (MutableArgumentValue<Object>) iterator.next();
 
             if (!hasValid && !hasConstraint) {
                 continue;
             }
 
-            Object parameterValue = argumentValue.getValue();
+            Object parameterValue = parameters[i];
 
             ValueExtractor<Object> valueExtractor = null;
             final boolean hasValue = parameterValue != null;
@@ -717,13 +706,12 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 instrumentPublisherArgumentWithValidation(
                         rootClass,
                         object,
-                        argumentValues,
+                        parameters,
                         context,
                         i,
                         argument,
                         parameterType,
                         annotationMetadata,
-                        argumentValue,
                         parameterValue,
                         isValid
                 );
@@ -733,12 +721,11 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                     instrumentCompletionStageArgumentWithValidation(
                             rootClass,
                             object,
-                            argumentValues,
+                            parameters,
                             context,
                             i,
                             argument,
                             annotationMetadata,
-                            argumentValue,
                             parameterValue,
                             isValid
                     );
@@ -753,7 +740,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                         valueExtractor.extractValues(parameterValue, (SimpleValueReceiver) (nodeName, unwrappedValue) -> validateParameterInternal(
                                 rootClass,
                                 object,
-                                argumentValues,
+                                parameters,
                                 context,
                                 overallViolations,
                                 argument.getName(),
@@ -766,7 +753,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                         validateParameterInternal(
                                 rootClass,
                                 object,
-                                argumentValues,
+                                parameters,
                                 context,
                                 overallViolations,
                                 argument.getName(),
@@ -876,7 +863,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                         messageTemplate,
                                         new PathImpl(context.currentPath),
                                         null,
-                                        argumentValues));
+                                        parameters));
                                 context.removeLast();
                             }
                         }
@@ -892,18 +879,16 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     private <T> void instrumentPublisherArgumentWithValidation(
             @Nonnull Class<T> rootClass,
             @Nullable T object,
-            @Nonnull Collection<MutableArgumentValue<?>> argumentValues,
+            @Nonnull Object[] argumentValues,
             DefaultConstraintValidatorContext context,
             int argumentIndex,
             Argument argument,
             Class<?> parameterType,
             AnnotationMetadata annotationMetadata,
-            MutableArgumentValue<Object> argumentValue,
             Object parameterValue,
             boolean isValid) {
         final Flowable<Object> publisher = Publishers.convertPublisher(parameterValue, Flowable.class);
         PathImpl copied = new PathImpl(context.currentPath);
-        int finalIndex = argumentIndex;
         final Flowable<Object> finalFlowable = publisher.flatMap(o -> {
             DefaultConstraintValidatorContext newContext =
                     new DefaultConstraintValidatorContext(
@@ -914,7 +899,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             final BeanIntrospection<Object> beanIntrospection = !isValid || o == null || ClassUtils.isJavaBasicType(o.getClass()) ? null : getBeanIntrospection(o);
             if (beanIntrospection != null) {
                 try {
-                    context.addParameterNode(argument.getName(), finalIndex);
+                    context.addParameterNode(argument.getName(), argumentIndex);
                     cascadeToOneIntrospection(
                             newContext,
                             object,
@@ -936,7 +921,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                         newViolations,
                         argument.getName(),
                         t != null ? t : Object.class,
-                        finalIndex,
+                        argumentIndex,
                         annotationMetadata,
                         o
                 );
@@ -950,20 +935,17 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
             return Flowable.just(o);
         });
-        argumentValue.setValue(
-                Publishers.convertPublisher(finalFlowable, parameterType)
-        );
+        argumentValues[argumentIndex] = Publishers.convertPublisher(finalFlowable, parameterType);
     }
 
     private <T> void instrumentCompletionStageArgumentWithValidation(
             @Nonnull Class<T> rootClass,
             @Nullable T object,
-            @Nonnull Collection<MutableArgumentValue<?>> argumentValues,
+            @Nonnull Object[] argumentValues,
             DefaultConstraintValidatorContext context,
             int argumentIndex,
             Argument argument,
             AnnotationMetadata annotationMetadata,
-            MutableArgumentValue<Object> argumentValue,
             Object parameterValue,
             boolean isValid) {
         final CompletionStage<Object> publisher = (CompletionStage<Object>) parameterValue;
@@ -1012,16 +994,14 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
             return o;
         });
-        argumentValue.setValue(
-                validatedStage
-        );
+        argumentValues[argumentIndex] = validatedStage;
     }
 
     @SuppressWarnings("unchecked")
     private <T> void validateParameterInternal(
             @Nonnull Class<T> rootClass,
             @Nullable T object,
-            @Nonnull Collection<MutableArgumentValue<?>> argumentValues,
+            @Nonnull Object[] argumentValues,
             @Nonnull DefaultConstraintValidatorContext context,
             @Nonnull Set overallViolations,
             @Nonnull String parameterName,
@@ -1075,7 +1055,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     @SuppressWarnings("unchecked")
     private <T> void validatePojoInternal(@Nonnull Class<T> rootClass,
                                           @Nullable T object,
-                                          @Nonnull Collection<MutableArgumentValue<?>> argumentValues,
+                                          @Nonnull Object[] argumentValues,
                                           @Nonnull DefaultConstraintValidatorContext context,
                                           @Nonnull Set overallViolations,
                                           @Nonnull Class<?> parameterType,
@@ -1501,13 +1481,16 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         Set<AnnotationValue<? extends Annotation>> constraints = new HashSet<>(3);
         for (Class<?> group : context.groups) {
             for (AnnotationValue<? extends Annotation> annotationValue : annotationValues) {
-                //noinspection Convert2MethodRef for Arrays.asList to Arrays::asList because the behavior is not the same
-                final List<Class> constraintGroups = annotationValue.get("groups", Class[].class)
-                        .filter(ArrayUtils::isNotEmpty)
-                        .map((Class[] classes) -> Arrays.asList(classes))
-                        .orElse(DEFAULT_GROUPS);
-                if (constraintGroups.contains(group)) {
-                    constraints.add(annotationValue);
+                final Class<?>[] classValues = annotationValue.classValues("groups");
+                if (ArrayUtils.isEmpty(classValues)) {
+                    if (context.groups == DEFAULT_GROUPS || group == Default.class) {
+                        constraints.add(annotationValue);
+                    }
+                } else {
+                    final List<Class> constraintGroups = Arrays.asList(classValues);
+                    if (constraintGroups.contains(group)) {
+                        constraints.add(annotationValue);
+                    }
                 }
             }
         }
@@ -1532,7 +1515,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                                     messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
                                     messageTemplate,
                                     new PathImpl(context.currentPath),
-                                    new DefaultConstraintDescriptor(annotationMetadata, constraintType, annotationValue), null)
+                                    new DefaultConstraintDescriptor(annotationMetadata, constraintType, annotationValue))
+
                     );
                 }
             }
@@ -1561,7 +1545,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     }
 
     private String buildMessageTemplate(AnnotationValue<?> annotationValue, AnnotationMetadata annotationMetadata) {
-        return annotationValue.get("message", String.class)
+        return annotationValue.stringValue("message")
                 .orElseGet(() ->
                         annotationMetadata.getDefaultValue(annotationValue.getAnnotationName(), "message", String.class)
                             .orElse("{" + annotationValue.getAnnotationName() + ".message}")
@@ -1593,6 +1577,183 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             }
             return t;
         });
+    }
+
+    @Override
+    public <T> void validateBeanArgument(
+            @Nonnull BeanResolutionContext resolutionContext,
+            @Nonnull InjectionPoint injectionPoint,
+            @Nonnull Argument<T> argument,
+            int index,
+            @Nullable T value) throws BeanInstantiationException {
+
+
+        final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        final boolean hasValid = annotationMetadata.hasStereotype(Valid.class);
+        final boolean hasConstraint = annotationMetadata.hasStereotype(Constraint.class);
+        final Class<T> parameterType = argument.getType();
+        final Class rootClass = injectionPoint.getDeclaringBean().getBeanType();
+        DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(value);
+        Set overallViolations = new HashSet<>(5);
+        if (hasConstraint) {
+            final Path.Node parentNode = context.addConstructorNode(rootClass.getName(), injectionPoint.getDeclaringBean().getConstructor().getArguments());
+            ValueExtractor<Object> valueExtractor = (ValueExtractor<Object>) valueExtractorRegistry.findValueExtractor(parameterType).orElse(null);
+            if (valueExtractor != null) {
+                valueExtractor.extractValues(value, new ValueExtractor.ValueReceiver() {
+                    @Override
+                    public void value(String nodeName, Object object1) {
+                    }
+
+                    @Override
+                    public void iterableValue(String nodeName, Object iterableValue) {
+                        if (iterableValue != null && context.validatedObjects.contains(iterableValue)) {
+                            return;
+                        }
+                        cascadeToIterableValue(
+                                context,
+                                rootClass,
+                                null,
+                                value,
+                                parentNode,
+                                argument,
+                                iterableValue,
+                                overallViolations,
+                                null,
+                                null,
+                                true);
+                    }
+
+                    @Override
+                    public void indexedValue(String nodeName, int i, Object iterableValue) {
+                        if (iterableValue != null && context.validatedObjects.contains(iterableValue)) {
+                            return;
+                        }
+                        cascadeToIterableValue(
+                                context,
+                                rootClass,
+                                null,
+                                value,
+                                parentNode,
+                                argument,
+                                iterableValue,
+                                overallViolations,
+                                i,
+                                null,
+                                true);
+                    }
+
+                    @Override
+                    public void keyedValue(String nodeName, Object key, Object keyedValue) {
+                        if (keyedValue != null && context.validatedObjects.contains(keyedValue)) {
+                            return;
+                        }
+                        cascadeToIterableValue(
+                                context,
+                                rootClass,
+                                null,
+                                value,
+                                parentNode,
+                                argument,
+                                keyedValue,
+                                overallViolations,
+                                null,
+                                key,
+                                false);
+                    }
+                });
+            } else {
+                validateParameterInternal(
+                        rootClass,
+                        null,
+                        ArrayUtils.EMPTY_OBJECT_ARRAY,
+                        context,
+                        overallViolations,
+                        argument.getName(),
+                        parameterType,
+                        index,
+                        annotationMetadata,
+                        value
+                );
+            }
+            context.removeLast();
+        } else if (hasValid && value != null) {
+            final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(value, parameterType);
+            if (beanIntrospection != null) {
+                try {
+                    context.addParameterNode(argument.getName(), index);
+                    cascadeToOneIntrospection(
+                            context,
+                            null,
+                            value,
+                            beanIntrospection,
+                            overallViolations
+                    );
+                } finally {
+                    context.removeLast();
+                }
+            }
+        }
+
+        failOnError(resolutionContext, overallViolations, rootClass);
+    }
+
+    @Override
+    public <T> void validateBean(@Nonnull BeanResolutionContext resolutionContext, @Nonnull BeanDefinition<T> definition, @Nonnull T bean) throws BeanInstantiationException {
+        final BeanIntrospection<T> introspection = (BeanIntrospection<T>) getBeanIntrospection(bean);
+        if (introspection != null) {
+            Set<ConstraintViolation<T>> errors = validate(introspection, bean);
+            final Class<?> beanType = bean.getClass();
+            failOnError(resolutionContext, errors, beanType);
+        } else if (bean instanceof Intercepted && definition.hasStereotype(ConfigurationReader.class)) {
+            final Collection<ExecutableMethod<T, ?>> executableMethods = definition.getExecutableMethods();
+            if (CollectionUtils.isNotEmpty(executableMethods)) {
+                Set<ConstraintViolation<Object>> errors = new HashSet<>();
+                final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(bean);
+                final Class<T> beanType = definition.getBeanType();
+                final Class<?>[] interfaces = beanType.getInterfaces();
+                if (ArrayUtils.isNotEmpty(interfaces)) {
+                    context.addConstructorNode(interfaces[0].getSimpleName());
+                } else {
+                    context.addConstructorNode(beanType.getSimpleName());
+                }
+                for (ExecutableMethod executableMethod : executableMethods) {
+                    if (executableMethod.hasAnnotation(Property.class)) {
+                        final boolean hasConstraint = executableMethod.hasStereotype(Constraint.class);
+                        final boolean isValid = executableMethod.hasStereotype(Valid.class);
+                        if (hasConstraint || isValid) {
+                            final Object value = executableMethod.invoke(bean);
+                            validateConstrainedPropertyInternal(
+                                    beanType,
+                                    bean,
+                                    bean,
+                                    executableMethod,
+                                    executableMethod.getReturnType().getType(),
+                                    value,
+                                    context,
+                                    errors,
+                                    null
+                            );
+                        }
+                    }
+                }
+
+                failOnError(resolutionContext, errors, beanType);
+            }
+        }
+    }
+
+    private <T> void failOnError(@Nonnull BeanResolutionContext resolutionContext, Set<ConstraintViolation<T>> errors, Class<?> beanType) {
+        if (!errors.isEmpty()) {
+            StringBuilder builder = new StringBuilder();
+            builder.append("Validation failed for bean definition [");
+            builder.append(beanType.getName());
+            builder.append("]\nList of constraint violations:[\n");
+            for (ConstraintViolation<?> violation : errors) {
+                builder.append("\t").append(violation.getPropertyPath()).append(" - ").append(violation.getMessage()).append("\n");
+            }
+            builder.append("]");
+            throw new BeanInstantiationException(resolutionContext, builder.toString());
+        }
     }
 
     /**
@@ -1978,7 +2139,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         private final Class<T> rootBeanClass;
         private final Object leafBean;
         private final ConstraintDescriptor<?> constraintDescriptor;
-        private final Collection<MutableArgumentValue<?>> executableParams;
+        private final Object[] executableParams;
 
         private DefaultConstraintViolation(
                 @Nullable T rootBean,
@@ -1989,7 +2150,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 String messageTemplate,
                 Path path,
                 ConstraintDescriptor<?> constraintDescriptor,
-                @Nullable Collection<MutableArgumentValue<?>> executableParams) {
+                Object... executableParams) {
             this.rootBean = rootBean;
             this.rootBeanClass = rootBeanClass;
             this.invalidValue = invalidValue;
@@ -2029,7 +2190,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @Override
         public Object[] getExecutableParameters() {
             if (executableParams != null) {
-                return executableParams.stream().map(ArgumentValue::getValue).toArray();
+                return executableParams;
             } else {
                 return ArrayUtils.EMPTY_OBJECT_ARRAY;
             }

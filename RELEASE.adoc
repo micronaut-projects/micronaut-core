@@ -1,0 +1,17 @@
+# Micronaut Core Release Process
+
+1. Ensure all changes from previous branches are merged up
+1. Ensure there are no snapshot dependencies 
+1. Set the version to a release version in `gradle.properties`
+1. Commit the release `git commit -a -m "Release Micronaut XXX"`
+1. Tag the release `git tag vXXX` (Don't forget the `v` prefix!)
+1. Push the tag `git push --tags` and waiting for Travis to complete the tagged release https://travis-ci.org/micronaut-projects/micronaut-core/
+1. Login to the Bintray repo at https://bintray.com/micronaut/core-releases-local and click the button to publish the staged release.
+1. Update the release notes at https://github.com/micronaut-projects/micronaut-core/releases/tag/vXXX
+1. Run the Maven Central sync locally `./gradlew sWMC` (may take over an hour, repeat if fails at any point)
+1. Verify the release worked 
+ * Run `sdk install micronaut XXX` and perform smoke tests or creating an application etc.
+ * Check the documentation published to docs.micronaut.io/XXX
+1. Change the version in `gradle.properties` back to a snapshot of next release
+1. Push the code `git push` 
+1. Announce the Release

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,25 +98,48 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of((T) object);
         }
 
-        Optional<String> formattingAnn = context.getAnnotationMetadata().getAnnotationNameByStereotype(Format.class);
-        String formattingAnnotation = formattingAnn.orElse(null);
-        ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
-        TypeConverter typeConverter = converterCache.get(pair);
-        if (typeConverter == null) {
-            typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
+        final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
+        if (annotationMetadata.hasStereotype(Format.class)) {
+            Optional<String> formattingAnn = annotationMetadata.getAnnotationNameByStereotype(Format.class);
+            String formattingAnnotation = formattingAnn.orElse(null);
+            ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
+            TypeConverter typeConverter = converterCache.get(pair);
             if (typeConverter == null) {
-                return Optional.empty();
-            } else {
-                converterCache.put(pair, typeConverter);
-                if (typeConverter == UNCONVERTIBLE) {
+                typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
+                if (typeConverter == null) {
                     return Optional.empty();
                 } else {
-                    return typeConverter.convert(object, targetType, context);
+                    converterCache.put(pair, typeConverter);
+                    if (typeConverter == UNCONVERTIBLE) {
+                        return Optional.empty();
+                    } else {
+                        return typeConverter.convert(object, targetType, context);
+                    }
                 }
+            } else if (typeConverter != UNCONVERTIBLE) {
+                return typeConverter.convert(object, targetType, context);
             }
-        } else if (typeConverter != UNCONVERTIBLE) {
-            return typeConverter.convert(object, targetType, context);
+        } else {
+            ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, null);
+            TypeConverter typeConverter = converterCache.get(pair);
+            if (typeConverter == null) {
+                typeConverter = findTypeConverter(sourceType, targetType, null);
+                if (typeConverter == null) {
+                    converterCache.put(pair, UNCONVERTIBLE);
+                    return Optional.empty();
+                } else {
+                    converterCache.put(pair, typeConverter);
+                    if (typeConverter == UNCONVERTIBLE) {
+                        return Optional.empty();
+                    } else {
+                        return typeConverter.convert(object, targetType, context);
+                    }
+                }
+            } else if (typeConverter != UNCONVERTIBLE) {
+                return typeConverter.convert(object, targetType, context);
+            }
         }
+
         return Optional.empty();
     }
 

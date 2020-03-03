@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,6 +72,11 @@ public class NettyClientHttpRequestFactory implements HttpRequestFactory {
     @Override
     public <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri) {
         return new NettyClientHttpRequest<>(httpMethod, uri);
+    }
+
+    @Override
+    public <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri, String httpMethodName) {
+        return new NettyClientHttpRequest<>(httpMethod, uri, httpMethodName);
     }
 
     @SuppressWarnings("unchecked")

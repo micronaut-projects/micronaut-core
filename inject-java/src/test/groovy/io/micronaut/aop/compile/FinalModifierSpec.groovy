@@ -15,9 +15,109 @@
  */
 package io.micronaut.aop.compile
 
+import io.micronaut.aop.simple.Mutating
 import io.micronaut.inject.AbstractTypeElementSpec
+import spock.lang.Issue
 
 class FinalModifierSpec extends AbstractTypeElementSpec {
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2479')
+    void "test final modifier on inherited public method"() {
+        when:
+        def definition = buildBeanDefinition('test.CountryRepositoryImpl', '''
+package test;
+
+import io.micronaut.aop.simple.*;
+import io.micronaut.context.annotation.*;
+
+
+abstract class BaseRepositoryImpl {
+    public final Object getContext() {
+        return new Object();
+    }
+}
+
+interface CountryRepository {    
+}
+
+@javax.inject.Singleton
+@Mutating("someVal")
+class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
+    
+    public String someMethod() {
+        return "test";
+    }
+}
+''')
+        then:"Compilation passes"
+        definition != null
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2479')
+    void "test final modifier on inherited protected method"() {
+        when:
+        def definition = buildBeanDefinition('test.CountryRepositoryImpl', '''
+package test;
+
+import io.micronaut.aop.simple.*;
+import io.micronaut.context.annotation.*;
+
+
+abstract class BaseRepositoryImpl {
+    protected final Object getContext() {
+        return new Object();
+    }
+}
+
+interface CountryRepository {    
+}
+
+@javax.inject.Singleton
+@Mutating("someVal")
+class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
+    
+    public String someMethod() {
+        return "test";
+    }
+}
+''')
+        then:"Compilation passes"
+        definition != null
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2479')
+    void "test final modifier on inherited protected method - 2"() {
+        when:
+        def definition = buildBeanDefinition('test.CountryRepositoryImpl', '''
+package test;
+
+import io.micronaut.aop.simple.*;
+import io.micronaut.context.annotation.*;
+
+
+abstract class BaseRepositoryImpl {
+    protected final Object getContext() {
+        return new Object();
+    }
+}
+
+interface CountryRepository {  
+    @Mutating("someVal") 
+    public String someMethod();  
+}
+
+@javax.inject.Singleton
+class CountryRepositoryImpl extends BaseRepositoryImpl implements CountryRepository {
+    
+    @Override
+    public String someMethod() {
+        return "test";
+    }
+}
+''')
+        then:"Compilation passes"
+        definition != null
+    }
 
     void "test final modifier on factory with AOP advice doesn't compile"() {
         when:

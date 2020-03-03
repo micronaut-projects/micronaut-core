@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,9 @@ import java.util.Optional;
  *
  * @author James Kleeh
  * @since 1.2.6
+ * @deprecated Use either {@link ClientContextPathProvider} or {@link ServerContextPathProvider} instead.
  */
+@Deprecated
 public interface ContextPathProvider {
 
     /**

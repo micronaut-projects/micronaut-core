@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import io.micronaut.context.AbstractBeanConfiguration;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
-import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -59,10 +58,6 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
-        if (annotationMetadataWriter != null) {
-            annotationMetadataWriter.accept(classWriterOutputVisitor);
-        }
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName)) {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
@@ -85,6 +80,10 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
 
         } catch (NoSuchMethodException e) {
             throw new ClassGenerationException("Error generating configuration class. Incompatible JVM or Micronaut version?: " + e.getMessage(), e);
+        }
+        for (GeneratorAdapter method : loadTypeMethods.values()) {
+            method.visitMaxs(3, 1);
+            method.visitEnd();
         }
 
         return classWriter;

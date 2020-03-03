@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import io.micronaut.ast.groovy.utils.PublicAbstractMethodVisitor
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.order.OrderUtil
@@ -82,7 +83,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                 def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, compilationUnit, classNode)
                 def isIntroduction = annotationMetadata.hasStereotype(Introduction.class)
                 def visitor = new ElementVisitor(source, compilationUnit, classNode, values, visitorContext, !isIntroduction)
-                if (isIntroduction) {
+                if (isIntroduction || (annotationMetadata.hasStereotype(Introspected.class) && classNode.isAbstract())) {
                     visitor.visitClass(classNode)
                     new PublicAbstractMethodVisitor(source, compilationUnit) {
                         @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
@@ -207,6 +206,40 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
         @SuppressWarnings("unchecked") final Class<T2> aClass = (Class<T2>) bean.getClass();
         final BeanIntrospection<T2> introspection = BeanIntrospection.getIntrospection(aClass);
         return new DefaultBeanWrapper<>(bean, introspection);
+    }
+
+
+    /**
+     * Obtain a bean wrapper for the given bean.
+     * @param bean The bean
+     * @param <T2> The bean type
+     * @return The wrapper
+     * @throws io.micronaut.core.beans.exceptions.IntrospectionException If the wrapper cannot be created
+     */
+    @SuppressWarnings("unchecked")
+    static @Nonnull <T2>  Optional<BeanWrapper<T2>> findWrapper(@Nonnull T2 bean) {
+        ArgumentUtils.requireNonNull("bean", bean);
+        @SuppressWarnings("unchecked") final Class<T2> aClass = (Class<T2>) bean.getClass();
+        return BeanIntrospector.SHARED.findIntrospection(aClass).map(i ->
+                new DefaultBeanWrapper(bean, i)
+        );
+    }
+
+    /**
+     * Obtain a bean wrapper for the given bean.
+     * @param type the type
+     * @param bean The bean
+     * @param <T2> The bean type
+     * @return The wrapper
+     * @throws io.micronaut.core.beans.exceptions.IntrospectionException If the wrapper cannot be created
+     */
+    @SuppressWarnings("unchecked")
+    static @Nonnull <T2>  Optional<BeanWrapper<T2>> findWrapper(Class<T2> type, @Nonnull T2 bean) {
+        ArgumentUtils.requireNonNull("type", type);
+        ArgumentUtils.requireNonNull("bean", bean);
+        return BeanIntrospector.SHARED.findIntrospection(type).map(i ->
+                new DefaultBeanWrapper(bean, i)
+        );
     }
 
     /**

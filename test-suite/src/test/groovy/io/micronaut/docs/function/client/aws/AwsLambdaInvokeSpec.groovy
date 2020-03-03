@@ -21,7 +21,6 @@ import javax.inject.Named
 })
 class AwsLambdaInvokeSpec extends Specification {
 
-
     void "test setup function definitions"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
@@ -37,6 +36,8 @@ class AwsLambdaInvokeSpec extends Specification {
         definitions.first().invokeRequest.functionName == 'micronaut-function'
         definitions.first().invokeRequest.qualifier == 'something'
 
+        cleanup:
+        applicationContext.close()
     }
 
     void "test setup lambda config"() {
@@ -50,6 +51,9 @@ class AwsLambdaInvokeSpec extends Specification {
 
         expect:
         configuration.builder.region == 'us-east-1'
+
+        cleanup:
+        applicationContext.close()
     }
 
     @Ignore
@@ -107,6 +111,9 @@ class AwsLambdaInvokeSpec extends Specification {
         then:
         book != null
         book.title == "THE STAND"
+
+        cleanup:
+        applicationContext.close()
     }
 
     static class Book {

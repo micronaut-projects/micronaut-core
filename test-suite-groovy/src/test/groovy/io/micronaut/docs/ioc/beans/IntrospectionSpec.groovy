@@ -37,4 +37,22 @@ class IntrospectionSpec extends Specification {
         expect:
         newAge == 20
     }
+
+    void testVehicle() {
+        final BeanIntrospection<Vehicle> introspection = BeanIntrospection.getIntrospection(Vehicle)
+        Vehicle vehicle = introspection.instantiate("Subaru", "WRX", 2)
+
+        expect:
+        "Subaru" == vehicle.getMake()
+        "WRX" == vehicle.getModel()
+        2 == vehicle.getAxels()
+    }
+
+    void testBusiness() {
+        final BeanIntrospection<Business> introspection = BeanIntrospection.getIntrospection(Business)
+        Business business = introspection.instantiate("Apple")
+
+        expect:
+        "Apple" == business.getName()
+    }
 }

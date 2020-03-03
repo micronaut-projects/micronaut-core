@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -137,7 +137,7 @@ public class DefaultValueExtractors implements ValueExtractorRegistry {
      */
     @Inject
     protected DefaultValueExtractors(@Nullable BeanContext beanContext) {
-        BeanWrapper<DefaultValueExtractors> wrapper = BeanWrapper.getWrapper(this);
+        BeanWrapper<DefaultValueExtractors> wrapper = BeanWrapper.findWrapper(this).orElse(null);
         Map<Class, ValueExtractor> extractorMap = new HashMap<>();
 
         if (beanContext != null && beanContext.containsBean(ValueExtractor.class)) {
@@ -158,20 +158,25 @@ public class DefaultValueExtractors implements ValueExtractorRegistry {
             }
         }
 
-        final Collection<BeanProperty<DefaultValueExtractors, Object>> properties = wrapper.getBeanProperties();
-        for (BeanProperty<DefaultValueExtractors, Object> property : properties) {
-            if (ValueExtractor.class.isAssignableFrom(property.getType())) {
-                final ValueExtractor valueExtractor = wrapper
-                        .getProperty(property.getName(), ValueExtractor.class).orElse(null);
-                final Class<?> targetType = property.asArgument().getFirstTypeVariable().map(Argument::getType).orElse(null);
-                extractorMap.put(targetType, valueExtractor);
-                if (valueExtractor instanceof UnwrapByDefaultValueExtractor || valueExtractor.getClass().isAnnotationPresent(UnwrapByDefault.class)) {
-                    unwrapByDefaultTypes.add(targetType);
+        if (wrapper != null) {
+
+            final Collection<BeanProperty<DefaultValueExtractors, Object>> properties = wrapper.getBeanProperties();
+            for (BeanProperty<DefaultValueExtractors, Object> property : properties) {
+                if (ValueExtractor.class.isAssignableFrom(property.getType())) {
+                    final ValueExtractor valueExtractor = wrapper
+                            .getProperty(property.getName(), ValueExtractor.class).orElse(null);
+                    final Class<?> targetType = property.asArgument().getFirstTypeVariable().map(Argument::getType).orElse(null);
+                    extractorMap.put(targetType, valueExtractor);
+                    if (valueExtractor instanceof UnwrapByDefaultValueExtractor || valueExtractor.getClass().isAnnotationPresent(UnwrapByDefault.class)) {
+                        unwrapByDefaultTypes.add(targetType);
+                    }
                 }
             }
+            this.valueExtractors = new HashMap<>(extractorMap.size());
+            this.valueExtractors.putAll(extractorMap);
+        } else {
+            this.valueExtractors = Collections.emptyMap();
         }
-        this.valueExtractors = new HashMap<>(extractorMap.size());
-        this.valueExtractors.putAll(extractorMap);
     }
 
     /**

@@ -12,6 +12,8 @@ snippet::io.micronaut.docs.annotation.PetOperations[tags="imports, class", inden
 
 Note how the interface uses Micronaut's HTTP annotations which are usable on both the server and client side. Also, as you can see you can use `javax.validation` constraints to validate arguments.
 
+TIP: Be aware that some annotations, such as api:http.client.annotation.Produces[] and api:http.client.annotation.Consumes[], have different semantics between server and client side usage. For example, `@Produces` on a controller method (server side) indicates how the method's *return value* is formatted, while `@Produces` on a client indicates how the method's *parameters* are formatted when sent to the server. While this may seem a little confusing at first, it is actually logical considering the different semantics between a server producing/consuming vs a client: A server consumes an argument and *returns* a response to the client, whereas a client consumes an argument and *sends* output to a server.
+
 Additionally, to use the `javax.validation` features you should have the `validation` and `hibernate-validator` dependencies on your classpath. For example in `build.gradle`:
 
 .build.gradle

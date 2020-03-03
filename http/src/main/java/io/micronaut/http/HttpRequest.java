@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
+import java.security.cert.Certificate;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -55,6 +56,14 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The full request URI
      */
     @Nonnull URI getUri();
+
+    /**
+     *
+     * @return The name of the method (same as {@link HttpMethod} value for standard http methods).
+     */
+    default @Nonnull String getMethodName() {
+        return getMethod().name();
+    }
 
     /**
      * The user principal stored within the request.
@@ -141,6 +150,14 @@ public interface HttpRequest<B> extends HttpMessage<B> {
             .map(Locale::forLanguageTag);
     }
 
+    /**
+     * Retrieves the Certificate used for mutual authentication.
+     *
+     * @return A certificate used for authentication, if applicable.
+     */
+    default Optional<Certificate> getCertificate() {
+        return this.getAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
+    }
 
     /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.
@@ -346,7 +363,22 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri) {
         Objects.requireNonNull(httpMethod, "Argument [httpMethod] is required");
+        return create(httpMethod, uri, httpMethod.name());
+    }
+
+    /**
+     * Create a new {@link MutableHttpRequest} for the given method and URI.
+     *
+     * @param httpMethod The method
+     * @param uri        The URI
+     * @param <T>        The Http request type
+     * @param httpMethodName Method name - for standard http methods is equal to {@link HttpMethod#name()}
+     * @return The request
+     */
+    static <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri, String httpMethodName) {
+        Objects.requireNonNull(httpMethod, "Argument [httpMethod] is required");
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        return HttpRequestFactory.INSTANCE.create(httpMethod, uri);
+        Objects.requireNonNull(httpMethodName, "Argument [httpMethodName] is required");
+        return HttpRequestFactory.INSTANCE.create(httpMethod, uri, httpMethodName);
     }
 }

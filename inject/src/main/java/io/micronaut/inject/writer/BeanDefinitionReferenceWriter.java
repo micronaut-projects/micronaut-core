@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,9 +70,6 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
      */
     @Override
     public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
-        if (annotationMetadataWriter != null) {
-            annotationMetadataWriter.accept(outputVisitor);
-        }
         try (OutputStream outputStream = outputVisitor.visitClass(getBeanDefinitionQualifiedClassName())) {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
@@ -180,6 +177,10 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         }
 
         writeGetAnnotationMetadataMethod(classWriter);
+
+        for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
+            generatorAdapter.visitMaxs(3, 1);
+        }
 
         return classWriter;
     }

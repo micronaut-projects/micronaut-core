@@ -32,9 +32,7 @@ $ curl -X GET localhost:55838/date
 
 The api:management.endpoint.Read[] annotation accepts an optional `produces` argument, which sets the media type returned from the method (default is `application/json`):
 
-[source,groovy]
-
-snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, readImport, endpointClassBegin, currentDate, readArg, endpointClassEnd", indent=0, title="CurrentDateEndpoint.groovy"]
+snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, readImport, mediaTypeImport, endpointClassBegin, currentDate, readArg, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
 <1> Supported media types are represented by api:http.MediaType[]
 
@@ -52,7 +50,7 @@ the_date_is: Fri May 11 19:24:21 CDT
 
 Annotating a method with the api:management.endpoint.Write[] annotation will cause it to respond to `POST` requests.
 
-snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, readImport, endpointClassBegin, currentDate, simpleWrite, endpointClassEnd", indent=0, title="CurrentDateEndpoint.groovy"]
+snippet::io.micronaut.docs.server.endpoint.CurrentDateEndpoint[tags="endpointImport, writeImport, mediaTypeImport, endpointClassBegin, currentDate, simpleWrite, endpointClassEnd", indent=0, title="CurrentDateEndpoint"]
 
 The above method responds to the following request:
 
@@ -65,7 +63,7 @@ Current date reset
 
 The api:management.endpoint.Write[] annotation accepts an optional `consumes` argument, which sets the media type accepted by the method (default is `application/json`):
 
-snippet::io.micronaut.docs.server.endpoint.MessageEndpoint[tags="endpointImport, writeImport, mediaTypeImport, endpointClassBegin, message, writeArg, endpointClassEnd", indent=0, title="MessageEndpoint.groovy"]
+snippet::io.micronaut.docs.server.endpoint.MessageEndpoint[tags="endpointImport, writeImport, mediaTypeImport, endpointClassBegin, message, writeArg, endpointClassEnd", indent=0, title="MessageEndpoint"]
 
 The above method responds to the following request:
 
@@ -81,7 +79,7 @@ Message updated
 
 Annotating a method with the api:management.endpoint.Delete[] annotation will cause it to respond to `DELETE` requests.
 
-snippet::io.micronaut.docs.server.endpoint.MessageEndpoint[tags="endpointImport, deleteImport, endpointClassBegin, message, simpleDelete, endpointClassEnd", indent=0, title="MessageEndpoint.groovy"]
+snippet::io.micronaut.docs.server.endpoint.MessageEndpoint[tags="endpointImport, deleteImport, endpointClassBegin, message, simpleDelete, endpointClassEnd", indent=0, title="MessageEndpoint"]
 
 The above method responds to the following request:
 

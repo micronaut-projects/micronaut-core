@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,11 +21,14 @@ import io.micronaut.context.LifeCycle;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.scope.CustomScope;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.client.filter.HttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
@@ -38,9 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Provider;
 import javax.inject.Singleton;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -96,13 +97,19 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
                 new DependencyInjectionException(resolutionContext, argument, "No value specified for @Client")
         );
 
-        //noinspection unchecked
-        return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey -> {
-            String path = annotation.get("path", String.class).orElse(null);
-            HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(value)).orElse(null);
-            Optional<Class<?>> configurationClass = annotation.classValue("configuration");
+        AnnotationMetadata metadata = argument.getAnnotationMetadata();
+        Optional<AnnotationValue> filterAnnotation = metadata
+                .getAnnotationNameByStereotype(FilterMatcher.class)
+                .map(metadata::getAnnotation);
 
-            if (clientBean != null && path == null && !configurationClass.isPresent()) {
+        String path = annotation.get("path", String.class).orElse(null);
+        Optional<Class<?>> configurationClass = annotation.classValue("configuration");
+
+        //noinspection unchecked
+        return (T) clients.computeIfAbsent(new ClientKey(value, filterAnnotation.map(AnnotationValue::getAnnotationName).orElse(null), path, configurationClass.orElse(null)), clientKey -> {
+            HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(value)).orElse(null);
+
+            if (clientBean != null && path == null && !configurationClass.isPresent() && !filterAnnotation.isPresent()) {
                 return clientBean;
             }
 
@@ -134,12 +141,11 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
                 throw new IllegalStateException("Referenced HTTP client configuration class must be an instance of HttpClientConfiguration for injection point: " + segment);
             }
 
-            HttpClient client = (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration, contextPath);
-            if (client instanceof DefaultHttpClient) {
-                DefaultHttpClient defaultClient = (DefaultHttpClient) client;
-                defaultClient.setClientIdentifiers(value);
-            }
-            return client;
+            HttpClientFilterResolver filterResolver = beanContext.createBean(HttpClientFilterResolver.class,
+                    Collections.singleton(value),
+                    filterAnnotation.orElse(null));
+
+            return (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration, contextPath, filterResolver);
         });
     }
 
@@ -171,13 +177,17 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
     /**
      * Client key.
      */
-    private static class ClientKey {
-        final BeanIdentifier identifier;
-        final String value;
+    private static final class ClientKey {
+        final String clientId;
+        final String filterAnnotation;
+        final String path;
+        final Class<?> configurationClass;
 
-        public ClientKey(BeanIdentifier identifier, String value) {
-            this.identifier = identifier;
-            this.value = value;
+        ClientKey(String clientId, String filterAnnotation, String path, Class<?> configurationClass) {
+            this.clientId = clientId;
+            this.filterAnnotation = filterAnnotation;
+            this.path = path;
+            this.configurationClass = configurationClass;
         }
 
         @Override
@@ -189,13 +199,15 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
                 return false;
             }
             ClientKey clientKey = (ClientKey) o;
-            return Objects.equals(identifier, clientKey.identifier) &&
-                    Objects.equals(value, clientKey.value);
+            return Objects.equals(clientId, clientKey.clientId) &&
+                    Objects.equals(filterAnnotation, clientKey.filterAnnotation) &&
+                    Objects.equals(path, clientKey.path) &&
+                    Objects.equals(configurationClass, clientKey.configurationClass);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(identifier, value);
+            return Objects.hash(clientId, filterAnnotation, path, configurationClass);
         }
     }
 }

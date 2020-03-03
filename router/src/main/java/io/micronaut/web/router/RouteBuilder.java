@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import io.micronaut.inject.ProxyBeanDefinition;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -49,6 +50,11 @@ public interface RouteBuilder {
      * Used to signify to the route that the ID of the resource is used.
      */
     PropertyConvention ID = PropertyConvention.ID;
+
+    /**
+     * @return The exposed ports
+     */
+    Set<Integer> getExposedPorts();
 
     /**
      * @return The filter routes
@@ -1209,8 +1215,7 @@ public interface RouteBuilder {
          * @param id   the route id
          * @return The URI to use
          */
-        default @Nonnull
-        String resolveUri(Class type, PropertyConvention id) {
+        default @Nonnull String resolveUri(Class type, PropertyConvention id) {
             return resolveUri(type) + "/{" + id.lowerCaseName() + "}";
         }
 

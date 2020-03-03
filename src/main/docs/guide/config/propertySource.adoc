@@ -1,4 +1,4 @@
-Additional api:io.micronaut.context.env.PropertySource[] instances can be added to the environment prior to initializing the link:{api}/io/micronaut/context/ApplicationContext.html[ApplicationContext].
+Additional api:io.micronaut.context.env.PropertySource[] instances can be added to the environment prior to initializing the api:context.ApplicationContext[].
 
 snippet::io.micronaut.docs.context.env.EnvironmentSpec[tags="envProps",indent=0,title="Initializing the Environment"]
 
@@ -15,10 +15,11 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 3. Properties from `MICRONAUT_APPLICATION_JSON`
 4. Java System Properties
 5. OS environment variables
-6. Enviroment-specific properties from `application-{environment}.{extension}` (Either `.properties`, `.json`, `.yml` or `.groovy` property formats supported)
-7. Application-specific properties from `application.{extension}` (Either `.properties`, `.json`, `.yml` or `.groovy` property formats supported)
+6. Configuration files loaded in order from the system property 'micronaut.config.files' or the environment variable `MICRONAUT_CONFIG_FILES`. The value can be a comma separated list of paths with the last file having precedence. The files can be referenced from the file system as a path or the classpath with a `classpath:` prefix.
+7. Enviroment-specific properties from `application-{environment}.{extension}`
+8. Application-specific properties from `application.{extension}`
 
-TIP: To use custom properties from local files, you can either call your application with `-Dmicronaut.config.files=myfile.yml` or set the environment variable `MICRONAUT_CONFIG_FILES=myfile.yml`. The value can be a comma-separated list.
+TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
 
 === Property Value Placeholders
 
@@ -59,7 +60,7 @@ The above example tries to read a `server.address` property otherwise fallbacks 
 
 === Property Value Binding
 
-Note that these property references should always be in kebab case (lowercase and hyphen-separated) when placing references in code or in placeholder values. In other words you should use for example `micronaut.server.default-charset` and not `micronaut.server.defaultCharset`.
+Note that these property references should always be in kebab case (lowercase and hyphen-separated) when placing references in code or in placeholder values. For example, you should use `micronaut.server.default-charset` and not `micronaut.server.defaultCharset`.
 
 Micronaut still allows specifying the latter in configuration, but normalizes the properties into kebab case form to optimize memory consumption and reduce complexity when resolving properties. The following table summarizes how properties are normalized from different sources:
 
@@ -69,7 +70,7 @@ Micronaut still allows specifying the latter in configuration, but normalizes th
 
 |`myApp.myStuff` | `my-app.my-stuff` | Properties, YAML etc.
 
-|`myApp.myStuff` | `my-app.my-stuff` | Properties, YAML etc.
+|`my-app.myStuff` | `my-app.my-stuff` | Properties, YAML etc.
 |`myApp.my-stuff` | `my-app.my-stuff` | Properties, YAML etc.
 
 |`MYAPP_MYSTUFF` | `myapp.mystuff`, `myapp-mystuff` | Environment Variable
@@ -134,3 +135,16 @@ micronaut:
 For beans that inject required properties, the injection and potential failure will not occur until the bean is requested. To verify at startup that the properties exist and can be injected, the bean can be annotated with ann:io.micronaut.context.annotation.Context[]. Context scoped beans will be injected at startup time and thus will fail at startup time if any required properties are missing or could not be converted to the required type.
 
 IMPORTANT: To maintain a fast startup time, it is recommended to use this feature as sparingly as possible.
+
+=== Controlling Log Levels with Properties
+
+Log levels can be configured via properties defined in `application.yml` (and environment variables) with the `log.level` prefix:
+
+[source,yaml]
+----
+logger:
+    levels:
+        foo.bar: ERROR
+----
+
+Note that the ability to control log levels via config is controlled via the api:logging.LoggingSystem[] interface. Currently Micronaut ships with a single implementation that allows setting log levels for the Logback library. If another library is chosen you should provide a bean that implements this interface.

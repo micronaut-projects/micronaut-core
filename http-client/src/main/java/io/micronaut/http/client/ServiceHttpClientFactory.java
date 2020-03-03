@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.filter.HttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
 import io.micronaut.scheduling.TaskScheduler;
 import io.reactivex.Flowable;
@@ -92,15 +93,10 @@ public class ServiceHttpClientFactory {
 
         Optional<String> path = configuration.getPath();
         LoadBalancer loadBalancer = loadBalancerFactory.create(instanceList);
-        DefaultHttpClient httpClient;
-        if (path.isPresent()) {
-            httpClient = beanContext.createBean(DefaultHttpClient.class, loadBalancer, configuration, path.get());
-        } else {
-            httpClient = beanContext.createBean(DefaultHttpClient.class, loadBalancer, configuration);
-        }
+        HttpClientFilterResolver filterResolver = beanContext.createBean(HttpClientFilterResolver.class,
+                                                               Collections.singleton(configuration.getServiceId()), null);
 
-        httpClient.setClientIdentifiers(configuration.getServiceId());
-
+        DefaultHttpClient httpClient = beanContext.createBean(DefaultHttpClient.class, loadBalancer, configuration, path.orElse(null), filterResolver);
         if (isHealthCheck) {
             taskScheduler.scheduleWithFixedDelay(configuration.getHealthCheckInterval(), configuration.getHealthCheckInterval(), () -> Flowable.fromIterable(originalURLs).flatMap(originalURI -> {
                 URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());

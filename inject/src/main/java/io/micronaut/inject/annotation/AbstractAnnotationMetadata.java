@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -74,8 +73,8 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         if (hasAnnotation(annotationClass) || hasStereotype(annotationClass)) {
             String annotationName = annotationClass.getName();
             return (T) annotationMap.computeIfAbsent(annotationName, s -> {
-                ConvertibleValues<Object> annotationValues = findAnnotation(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());
-                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
+                final AnnotationValue<T> annotationValue = findAnnotation(annotationClass).orElse(null);
+                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
 
             });
         }
@@ -92,8 +91,8 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         String annotationName = annotationClass.getName();
         if (hasAnnotation(annotationName) || hasStereotype(annotationName)) {
             return (T) declaredAnnotationMap.computeIfAbsent(annotationName, s -> {
-                ConvertibleValues<Object> annotationValues = findAnnotation(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());
-                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
+                final AnnotationValue<T> annotationValue = findAnnotation(annotationClass).orElse(null);
+                return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValue);
 
             });
         }

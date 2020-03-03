@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,12 +19,15 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Part;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.server.multipart.MultipartBody;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
@@ -43,7 +46,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
@@ -306,6 +308,42 @@ public class UploadController {
                 @Override
                 public void onComplete() {
                     emitter.onSuccess(HttpResponse.ok(String.join("", datas)));
+                }
+            });
+        });
+    }
+
+    @Post(value =  "/receive-multipart-body", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    Single<String> go(@Body MultipartBody multipartBody) {
+        return Single.create(emitter -> {
+            multipartBody.subscribe(new Subscriber<CompletedPart>() {
+                private Subscription s;
+                List<String> datas = new ArrayList<>();
+                @Override
+                public void onSubscribe(Subscription s) {
+                    this.s = s;
+                    s.request(1);
+                }
+
+                @Override
+                public void onNext(CompletedPart data) {
+                    try {
+                        datas.add(new String(data.getBytes(), StandardCharsets.UTF_8));
+                        s.request(1);
+                    } catch (IOException e) {
+                        s.cancel();
+                        emitter.onError(e);
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    emitter.onError(t);
+                }
+
+                @Override
+                public void onComplete() {
+                    emitter.onSuccess(String.join("|", datas));
                 }
             });
         });

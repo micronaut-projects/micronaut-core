@@ -35,29 +35,26 @@ import javax.inject.Singleton
 @Retry
 class ClientSpecificLoggerSpec extends Specification {
 
-    @Shared
-    int port = SocketUtils.findAvailableTcpPort()
-
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run(
-            'micronaut.server.port': port,
-            'micronaut.http.services.clientOne.url': "http://localhost:$port",
-            'micronaut.http.services.clientOne.logger-name': "${ClientSpecificLoggerSpec.class}.client.one",
-            'micronaut.http.services.clientOne.read-timeout': '500s'
-
-    )
-
-    @Shared
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
     void "test client specific logger"() {
         given:
+        int port = SocketUtils.findAvailableTcpPort()
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.port': port,
+                'micronaut.http.services.clientOne.url': "http://localhost:$port",
+                'micronaut.http.services.clientOne.logger-name': "${ClientSpecificLoggerSpec.class}.client.one",
+                'micronaut.http.services.clientOne.read-timeout': '500s']
+        )
+        ApplicationContext context = server.applicationContext
+
+        when:
         MyService myService = context.getBean(MyService)
 
-        expect:
+        then:
         ((DefaultHttpClient) myService.client).log.name == "${ClientSpecificLoggerSpec.class}.client.one".toString()
         ((DefaultHttpClient) myService.rxHttpClient).log.name == "${ClientSpecificLoggerSpec.class}.client.two".toString()
+
+        cleanup:
+        context.close()
     }
 
     @Singleton

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -194,6 +194,16 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
      * @return This HTTP headers
      */
     default MutableHttpHeaders allow(Collection<HttpMethod> methods) {
+        return allowGeneric(methods);
+    }
+
+    /**
+     * Set the allowed HTTP methods.
+     *
+     * @param methods The methods to specify in the Allowed HTTP header
+     * @return This HTTP headers
+     */
+    default MutableHttpHeaders allowGeneric(Collection<? extends CharSequence> methods) {
         String value = methods.stream().distinct().collect(Collectors.joining(","));
         return add(ALLOW, value);
     }

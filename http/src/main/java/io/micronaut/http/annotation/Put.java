@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,15 @@ public @interface Put {
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
     @AliasFor(annotation = UriMapping.class, member = "value")
     String uri() default UriMapping.DEFAULT_URI;
+
+    /**
+     * Only to be used in the context of a server.
+     *
+     * @return The URIs of the PUT route
+     */
+    @AliasFor(annotation = HttpMethodMapping.class, member = "uris")
+    @AliasFor(annotation = UriMapping.class, member = "uris")
+    String[] uris() default {UriMapping.DEFAULT_URI};
 
     /**
      * @return The default consumes, otherwise override from controller

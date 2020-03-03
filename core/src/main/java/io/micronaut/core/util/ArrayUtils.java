@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,7 @@ package io.micronaut.core.util;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.Array;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 /**
  * Utility methods for working with arrays.
@@ -129,5 +128,110 @@ public class ArrayUtils {
         }
         List<Object> list = Arrays.asList(array);
         return CollectionUtils.toString(delimiter, list);
+    }
+
+    /**
+     * Produce an iterator for the given array.
+     * @param array The array
+     * @param <T> The array type
+     * @return The iterator
+     */
+    public static <T> Iterator<T> iterator(T...array) {
+        if (isNotEmpty(array)) {
+            return new ArrayIterator<>(array);
+        } else {
+            return Collections.emptyIterator();
+        }
+    }
+
+
+    /**
+     * Produce an iterator for the given array.
+     * @param array The array
+     * @param <T> The array type
+     * @return The iterator
+     */
+    public static <T> Iterator<T> reverseIterator(T...array) {
+        if (isNotEmpty(array)) {
+            return new ReverseArrayIterator<>(array);
+        } else {
+            return Collections.emptyIterator();
+        }
+    }
+
+    /**
+     * Iterator implementation used to efficiently expose contents of an
+     * Array as read-only iterator.
+     *
+     * @param <T> the type
+     */
+    private static final class ArrayIterator<T> implements Iterator<T>, Iterable<T> {
+
+        private final T[] _a;
+        private int _index;
+
+        private ArrayIterator(T[] a) {
+            _a = a;
+            _index = 0;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return _index < _a.length;
+        }
+
+        @Override
+        public T next() {
+            if (_index >= _a.length) {
+                throw new NoSuchElementException();
+            }
+            return _a[_index++];
+        }
+
+        @Override public void remove() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override public Iterator<T> iterator() {
+            return this;
+        }
+    }
+
+    /**
+     * Iterator implementation used to efficiently expose contents of an
+     * Array as read-only iterator.
+     *
+     * @param <T> the type
+     */
+    private static final class ReverseArrayIterator<T> implements Iterator<T>, Iterable<T> {
+
+        private final T[] _a;
+        private int _index;
+
+        private ReverseArrayIterator(T[] a) {
+            _a = a;
+            _index = a.length > 0 ? a.length : -1;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return _index > -1;
+        }
+
+        @Override
+        public T next() {
+            if (_index >= -1) {
+                throw new NoSuchElementException();
+            }
+            return _a[_index--];
+        }
+
+        @Override public void remove() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override public Iterator<T> iterator() {
+            return this;
+        }
     }
 }

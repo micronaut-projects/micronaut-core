@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.http.FullHttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +72,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
      * @param mediaTypeCodecRegistry The media type codec registry
      * @param byteBufferFactory      The byte buffer factory
      * @param bodyType               The body type
-     * @param errorStatus            The error status
+     * @param convertBody            Whether to auto convert the body to bodyType
      */
     FullNettyClientHttpResponse(
             FullHttpResponse fullHttpResponse,
@@ -79,7 +80,8 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             ByteBufferFactory<ByteBufAllocator,
             ByteBuf> byteBufferFactory,
-            Argument<B> bodyType, boolean errorStatus) {
+            Argument<B> bodyType,
+            boolean convertBody) {
 
         this.status = httpStatus;
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
@@ -93,12 +95,12 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
                 Optional<Argument<?>> responseBodyType = bodyType.getFirstTypeVariable();
                 if (responseBodyType.isPresent()) {
                     Argument<B> finalResponseBodyType = (Argument<B>) responseBodyType.get();
-                    this.body = !errorStatus || isParseableBodyType(finalResponseBodyType.getType()) ? getBody(finalResponseBodyType).orElse(null) : null;
+                    this.body = convertBody || isParseableBodyType(finalResponseBodyType.getType()) ? getBody(finalResponseBodyType).orElse(null) : null;
                 } else {
                     this.body = null;
                 }
             } else {
-                this.body = !errorStatus || isParseableBodyType(rawBodyType) ? getBody(bodyType).orElse(null) : null;
+                this.body = convertBody || isParseableBodyType(rawBodyType) ? getBody(bodyType).orElse(null) : null;
             }
         } else {
             this.body = null;
@@ -243,6 +245,8 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             if (CharSequence.class.isAssignableFrom(type.getType())) {
                 Charset charset = getContentType().flatMap(MediaType::getCharset).orElse(StandardCharsets.UTF_8);
                 return Optional.of(content.toString(charset));
+            } else if (type.getType() == byte[].class) {
+                return Optional.of(ByteBufUtil.getBytes(content));
             } else {
                 Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
                 if (foundCodec.isPresent()) {

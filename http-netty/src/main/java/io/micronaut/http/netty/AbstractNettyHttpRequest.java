@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     protected final ConversionService<?> conversionService;
     protected final HttpMethod httpMethod;
     protected final URI uri;
+    protected final String httpMethodName;
 
     private NettyHttpParameters httpParameters;
     private MediaType mediaType;
@@ -59,7 +60,8 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         this.conversionService = conversionService;
         String fullUri = nettyRequest.uri();
         this.uri = URI.create(fullUri);
-        this.httpMethod = HttpMethod.valueOf(nettyRequest.method().name());
+        this.httpMethodName = nettyRequest.method().name();
+        this.httpMethod = HttpMethod.parse(httpMethodName);
     }
 
     /**
@@ -176,6 +178,11 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
 
     private NettyHttpParameters decodeParameters(String uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
-        return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService);
+        return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService, null);
+    }
+
+    @Override
+    public String getMethodName() {
+        return httpMethodName;
     }
 }

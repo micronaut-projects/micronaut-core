@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,9 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.server.cors.CorsOriginConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.scheduling.executor.ThreadSelection;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import java.io.File;
@@ -95,6 +97,12 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_LOG_HANDLED_EXCEPTIONS = false;
 
+    /**
+     * The default value for enabling dual protocol (http/https).
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_DUAL_PROTOCOL = false;
+
     private Integer port;
     private String host;
     private Integer readTimeout;
@@ -110,9 +118,11 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private HostResolutionConfiguration hostResolution;
     private String clientAddressHeader;
     private String contextPath;
+    private boolean dualProtocol = DEFAULT_DUAL_PROTOCOL;
 
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
+    private ThreadSelection threadSelection = ThreadSelection.AUTO;
 
     /**
      * Default constructor.
@@ -131,6 +141,23 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         }
 
         this.applicationConfiguration = applicationConfiguration;
+    }
+
+    /**
+     * @return The {@link ThreadSelection} model to use for the server.
+     */
+    public @Nonnull ThreadSelection getThreadSelection() {
+        return threadSelection;
+    }
+
+    /**
+     * Sets the {@link ThreadSelection} model to use for the server.
+     * @param threadSelection The thread selection model
+     */
+    public void setThreadSelection(ThreadSelection threadSelection) {
+        if (threadSelection != null) {
+            this.threadSelection = threadSelection;
+        }
     }
 
     /**
@@ -252,6 +279,13 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public String getContextPath() {
         return contextPath;
+    }
+
+    /**
+     * @return if dual protocol has been enabled or not
+     */
+    public boolean isDualProtocol() {
+        return dualProtocol;
     }
 
     /**
@@ -393,6 +427,13 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public void setContextPath(String contextPath) {
         this.contextPath = contextPath;
+    }
+
+    /**
+     * @param dualProtocol the dual protocol (http/https) configuration
+     */
+    public void setDualProtocol(boolean dualProtocol) {
+        this.dualProtocol = dualProtocol;
     }
 
     /**

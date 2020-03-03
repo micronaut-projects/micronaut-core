@@ -12,7 +12,7 @@ class PreDestroyBeanSpec: StringSpec() {
     init {
         "test bean closing on context close" {
             // tag::start[]
-            val ctx = BeanContext.build().start()
+            val ctx = BeanContext.run()
             val preDestroyBean = ctx.getBean(PreDestroyBean::class.java)
             val connection = ctx.getBean(Connection::class.java)
             ctx.stop()

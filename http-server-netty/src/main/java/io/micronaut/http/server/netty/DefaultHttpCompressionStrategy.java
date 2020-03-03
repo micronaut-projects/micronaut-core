@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
@@ -37,6 +36,7 @@ import javax.inject.Singleton;
 class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
 
     private final int compressionThreshold;
+    private final int compressionLevel;
 
     /**
      * @param serverConfiguration The netty server configuration
@@ -44,13 +44,16 @@ class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
     @Inject
     DefaultHttpCompressionStrategy(NettyHttpServerConfiguration serverConfiguration) {
         this.compressionThreshold = serverConfiguration.getCompressionThreshold();
+        this.compressionLevel = serverConfiguration.getCompressionLevel();
     }
 
     /**
      * @param compressionThreshold The compression threshold
+     * @param compressionLevel The compression level (0-9)
      */
-    DefaultHttpCompressionStrategy(int compressionThreshold) {
+    DefaultHttpCompressionStrategy(int compressionThreshold, int compressionLevel) {
         this.compressionThreshold = compressionThreshold;
+        this.compressionLevel = compressionLevel;
     }
 
     @Override
@@ -62,5 +65,10 @@ class DefaultHttpCompressionStrategy implements HttpCompressionStrategy {
         return contentType != null &&
                 (contentLength == null || contentLength >= compressionThreshold) &&
                 MediaType.isTextBased(contentType);
+    }
+
+    @Override
+    public int getCompressionLevel() {
+        return compressionLevel;
     }
 }

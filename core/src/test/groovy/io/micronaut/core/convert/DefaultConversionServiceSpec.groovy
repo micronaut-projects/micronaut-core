@@ -88,7 +88,7 @@ class DefaultConversionServiceSpec extends Specification {
         then:
         def e = thrown(ConversionErrorException)
         e.conversionError.originalValue.get() == 'junk'
-        e.message == 'Failed to convert argument [integer] for value [junk] due to: For input string: "junk"'
+        e.message == 'Failed to convert argument [Integer] for value [junk] due to: For input string: "junk"'
     }
 
     void "test conversion service with type arguments"() {

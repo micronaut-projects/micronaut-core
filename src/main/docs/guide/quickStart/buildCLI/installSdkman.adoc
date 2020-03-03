@@ -19,7 +19,7 @@ You can also specify the version to the `sdk install` command.
 $ sdk install micronaut {version}
 ----
 
-You can find more information about SDKMAN usage on the http://sdkman.io/usage.html[SDKMAN Docs]
+You can find more information about SDKMAN usage on the http://sdkman.io/usage[SDKMAN Docs]
 
 You should now be able to run the Micronaut CLI.
 

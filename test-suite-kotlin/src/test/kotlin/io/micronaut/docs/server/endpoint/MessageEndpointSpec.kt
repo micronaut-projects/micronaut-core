@@ -22,7 +22,7 @@ class MessageEndpointSpec: StringSpec() {
 
     val embeddedServer = autoClose(
             ApplicationContext.run(EmbeddedServer::class.java,
-                    mapOf("spec.name" to HelloControllerSpec::class.java.simpleName, "endpoints.message.enabled" to true))
+                    mapOf("spec.name" to MessageEndpointSpec::class.java.simpleName, "endpoints.message.enabled" to true))
     )
 
     val client = autoClose(

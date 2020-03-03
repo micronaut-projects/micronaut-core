@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,9 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
+import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.reactivex.MaybeObserver;
 import io.reactivex.disposables.Disposable;
-
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -33,70 +29,79 @@ import java.util.List;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, Disposable, RxInstrumentedComponent {
-    private final MaybeObserver<T> downstream;
-    private Disposable upstream;
-    private final List<RunnableInstrumenter> instrumentations;
+final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstrumentedComponent {
+    private final MaybeObserver<T> source;
+    private final RxInstrumenterFactory instrumenterFactory;
 
     /**
      * Default constructor.
-     * @param downstream The downstream observer
-     * @param instrumentations The instrumentations
+     *
+     * @param source              The source observer
+     * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedMaybeObserver(
-            MaybeObserver<T> downstream, List<RunnableInstrumenter> instrumentations) {
-        this.downstream = downstream;
-        this.instrumentations = instrumentations;
+    RxInstrumentedMaybeObserver(MaybeObserver<T> source, RxInstrumenterFactory instrumenterFactory) {
+        this.source = source;
+        this.instrumenterFactory = instrumenterFactory;
     }
 
-    /**
-     * Default constructor.
-     * @param downstream The downstream observer
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedMaybeObserver(
-            MaybeObserver<T> downstream, Collection<ReactiveInstrumenter> instrumentations) {
-        this.downstream = downstream;
-        this.instrumentations = toRunnableInstrumenters(instrumentations);
-    }
-
-    @Override public void onSubscribe(Disposable d) {
-        if (!validate(upstream, d)) {
-            return;
+    @Override
+    public void onSubscribe(Disposable d) {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onSubscribe(d);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onSubscribe(d);
+            } finally {
+                instrumenter.afterInvocation();
+            }
         }
-        upstream = d;
-        downstream.onSubscribe(this);
     }
 
-    @Override public void onError(Throwable t) {
-        Runnable onError = () -> downstream.onError(t);
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onError = instrumentation.instrument(onError);
+    @Override
+    public void onError(Throwable t) {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onError(t);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onError(t);
+            } finally {
+                instrumenter.afterInvocation();
+            }
         }
-        onError.run();
     }
 
-    @Override public void onSuccess(T value) {
-        Runnable onSuccess = () -> downstream.onSuccess(value);
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onSuccess = instrumentation.instrument(onSuccess);
+    @Override
+    public void onSuccess(T value) {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onSuccess(value);
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onSuccess(value);
+            } finally {
+                instrumenter.afterInvocation();
+            }
         }
-        onSuccess.run();
     }
 
-    @Override public void onComplete() {
-        Runnable onComplete = downstream::onComplete;
-        for (RunnableInstrumenter instrumentation : instrumentations) {
-            onComplete = instrumentation.instrument(onComplete);
+    @Override
+    public void onComplete() {
+        InvocationInstrumenter instrumenter = instrumenterFactory.create();
+        if (instrumenter == null) {
+            source.onComplete();
+        } else {
+            try {
+                instrumenter.beforeInvocation();
+                source.onComplete();
+            } finally {
+                instrumenter.afterInvocation();
+            }
         }
-        onComplete.run();
     }
 
-    @Override public boolean isDisposed() {
-        return upstream.isDisposed();
-    }
-
-    @Override public void dispose() {
-        upstream.dispose();
-    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Named;
 import javax.inject.Singleton;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -61,8 +60,8 @@ public class JsonViewMediaTypeCodecFactory implements JsonViewCodecResolver {
      * @param codecConfiguration       The configuration for the codec
      */
     protected JsonViewMediaTypeCodecFactory(ObjectMapper objectMapper,
-                              ApplicationConfiguration applicationConfiguration,
-                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
+                          ApplicationConfiguration applicationConfiguration,
+                          @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this.objectMapper = objectMapper;
         this.applicationConfiguration = applicationConfiguration;
         this.codecConfiguration = codecConfiguration;

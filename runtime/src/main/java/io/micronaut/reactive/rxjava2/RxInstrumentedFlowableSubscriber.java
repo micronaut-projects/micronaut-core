@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,8 @@
 package io.micronaut.reactive.rxjava2;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
-import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 import io.reactivex.FlowableSubscriber;
 import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
-
-import java.util.Collection;
-import java.util.List;
 
 /**
  * Inspired by code in Brave. Provides general instrumentation abstraction for RxJava2.
@@ -34,32 +28,16 @@ import java.util.List;
  * @since 1.1
  */
 @Internal
-final class RxInstrumentedFlowableSubscriber<T> extends RxInstrumentedSubscriber<T>
-        implements FlowableSubscriber<T>, Subscription {
+final class RxInstrumentedFlowableSubscriber<T> extends RxInstrumentedSubscriber<T> implements FlowableSubscriber<T>, RxInstrumentedComponent {
 
     /**
      * Default constructor.
-     * @param downstream the downstream subscriber
-     * @param instrumentations The instrumentations
+     *
+     * @param downstream          the downstream subscriber
+     * @param instrumenterFactory The instrumenterFactory
      */
-    RxInstrumentedFlowableSubscriber(Subscriber<T> downstream, Collection<ReactiveInstrumenter> instrumentations) {
-        super(downstream, instrumentations);
+    RxInstrumentedFlowableSubscriber(Subscriber<T> downstream, RxInstrumenterFactory instrumenterFactory) {
+        super(downstream, instrumenterFactory);
     }
 
-    /**
-     * Default constructor.
-     * @param downstream the downstream subscriber
-     * @param instrumentations The instrumentations
-     */
-    RxInstrumentedFlowableSubscriber(Subscriber<T> downstream, List<RunnableInstrumenter> instrumentations) {
-        super(downstream, instrumentations);
-    }
-
-    @Override public void request(long n) {
-        upstream.request(n);
-    }
-
-    @Override public void cancel() {
-        upstream.cancel();
-    }
 }

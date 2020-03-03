@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
@@ -167,10 +166,10 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
     private AnnotationMetadata initializeAnnotationMetadata() {
         AnnotationMetadata annotationMetadata = resolveAnnotationMetadata();
-        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        if (annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
             // we make a copy of the result of annotation metadata which is normally a reference
             // to the class metadata
-            return new MethodAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+            return new MethodAnnotationMetadata(annotationMetadata);
         } else {
             return AnnotationMetadata.EMPTY_METADATA;
         }
@@ -240,7 +239,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
      * Internal environment aware annotation metadata delegate.
      */
     private final class MethodAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
-        MethodAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
+        MethodAnnotationMetadata(AnnotationMetadata targetMetadata) {
             super(targetMetadata);
         }
 

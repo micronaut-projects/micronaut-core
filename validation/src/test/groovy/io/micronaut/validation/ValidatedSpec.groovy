@@ -32,6 +32,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -40,6 +41,7 @@ import io.reactivex.Flowable
 import spock.lang.Specification
 
 import javax.validation.ConstraintViolationException
+import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Max
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotNull
@@ -293,6 +295,33 @@ class ValidatedSpec extends Specification {
         server.close()
     }
 
+    void "test a client can be validated"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        TestClient client = server.applicationContext.getBean(TestClient)
+
+        when:
+        client.test5("")
+
+        then:
+        thrown(ConstraintViolationException)
+
+        cleanup:
+        server.close()
+    }
+
+    void "test a java client can be validated"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        JavaClient client = server.applicationContext.getBean(JavaClient)
+
+        when:
+        client.test5("")
+
+        then:
+        thrown(ConstraintViolationException)
+    }
+
     void "test validated controller with non introspected pojo"() {
         given:
         ApplicationContext context = ApplicationContext.run([
@@ -338,6 +367,7 @@ class ValidatedSpec extends Specification {
 
     @Client("/validated/tests")
     static interface TestClient {
+
         @Get(value = "/test1/{value}", produces = MediaType.TEXT_PLAIN)
         String test1(String value)
 
@@ -349,6 +379,9 @@ class ValidatedSpec extends Specification {
 
         @Get(value = "/test4", produces = MediaType.TEXT_PLAIN)
         String test4()
+
+        @Get(value = "/validated")
+        String test5(@NotBlank @Header String header)
     }
 
     @Controller("/validated/tests")
@@ -387,8 +420,13 @@ class ValidatedSpec extends Specification {
     }
 
     @ConfigurationProperties("my.config")
-    @Introspected
-    static class Config extends AbstractConfig {
+    static class Config {
+
+        @NotNull
+        @Min(1L)
+        @Max(10L)
+        Integer count = 0
+
     }
 
     abstract static class AbstractConfig {

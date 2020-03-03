@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,4 +45,14 @@ public @interface ConfigurationReader {
      * @return The prefix to use
      */
     String prefix() default "";
+
+    /**
+     * @return The names of the properties to include
+     */
+    String[] includes() default {};
+
+    /**
+     * @return The names of the properties to exclude
+     */
+    String[] excludes() default {};
 }

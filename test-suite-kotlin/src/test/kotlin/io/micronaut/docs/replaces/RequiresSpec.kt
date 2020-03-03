@@ -13,5 +13,7 @@ class RequiresSpec : StringSpec({
         applicationContext.getBean(BookService::class.java).shouldBeInstanceOf<MockBookService>()
         applicationContext.getBean(Book::class.java).title.shouldBe("An OK Novel")
         applicationContext.getBean(TextBook::class.java).title.shouldBe("Learning 305")
+
+        applicationContext.close()
     }
 })

@@ -79,7 +79,7 @@ To see this in action use the following curl command to store a property called 
 curl -X PUT -d @- localhost:8500/v1/kv/config/application/foo.bar <<< myvalue
 ----
 
-If you know define a `@Value("${foo.bar}")` or call `environment.getProperty(..)` the value `myvalue` will be resolved from Consul.
+If you now define a `@Value("${foo.bar}")` or call `environment.getProperty(..)` the value `myvalue` will be resolved from Consul.
 
 == Storing Configuration in YAML, JSON etc.
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -189,7 +189,7 @@ public class CollectionUtils {
      */
     public static <T> Set<T> setOf(T... objects) {
         if (objects == null || objects.length == 0) {
-            return Collections.emptySet();
+            return new HashSet<>(0);
         }
         return new HashSet<>(Arrays.asList(objects));
     }
@@ -291,5 +291,43 @@ public class CollectionUtils {
             return Collections.emptyList();
         }
         return Collections.unmodifiableList(list);
+    }
+
+    /**
+     * Returns the last element of a collection.
+     *
+     * @param collection The collection
+     * @param <T> The generic type
+     * @return The last element of a collection or null
+     */
+    public static @Nullable <T> T last(@Nonnull Collection<T> collection) {
+        if (collection instanceof List) {
+            List<T> list = (List<T>) collection;
+            final int s = list.size();
+            if (s > 0) {
+                return list.get(s - 1);
+            } else {
+                return null;
+            }
+        } else if (collection instanceof Deque) {
+            final Iterator<T> i = ((Deque<T>) collection).descendingIterator();
+            if (i.hasNext()) {
+                return i.next();
+            }
+            return null;
+        } else if (collection instanceof NavigableSet) {
+            final Iterator<T> i = ((NavigableSet<T>) collection).descendingIterator();
+            if (i.hasNext()) {
+                return i.next();
+            }
+            return null;
+        } else {
+            T result = null;
+            for (T t : collection) {
+                result = t;
+            }
+            return result;
+        }
+
     }
 }

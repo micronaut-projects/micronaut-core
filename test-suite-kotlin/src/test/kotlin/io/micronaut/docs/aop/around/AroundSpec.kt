@@ -17,6 +17,7 @@ class AroundSpec: AnnotationSpec() {
             exampleBean.doWork(null)
         }
         exception.message shouldBe "Null parameter [taskName] not allowed"
+        applicationContext.close()
     }
     // end::test[]
 }
