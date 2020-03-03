@@ -62,11 +62,7 @@ public interface MessageSource {
      */
     default @NonNull Optional<String> getMessage(@NonNull String code, @NonNull MessageContext context) {
         Optional<String> rawMessage = getRawMessage(code, context);
-        if (context.getVariables().isEmpty()) {
-            return rawMessage;
-        } else {
-            return rawMessage.map(message -> this.interpolate(message, context));
-        }
+        return rawMessage.map(message -> this.interpolate(message, context));
     }
 
     /**
@@ -79,11 +75,7 @@ public interface MessageSource {
     default @NonNull String getMessage(@NonNull String code, @NonNull MessageContext context, @NonNull String defaultMessage) {
         ArgumentUtils.requireNonNull("defaultMessage", defaultMessage);
         String rawMessage = getRawMessage(code, context, defaultMessage);
-        if (context.getVariables().isEmpty()) {
-            return rawMessage;
-        } else {
-            return interpolate(rawMessage, context);
-        }
+        return interpolate(rawMessage, context);
     }
 
     /**
