@@ -115,6 +115,15 @@ public interface MessageSource {
         }
 
         /**
+         * The locale to use to resolve messages.
+         * @param defaultLocale The locale to use if no locale is present
+         * @return The locale
+         */
+        @Nonnull default Locale getLocale(@Nullable Locale defaultLocale) {
+            return defaultLocale != null ? defaultLocale : getLocale();
+        }
+
+        /**
          * @return The variables to use resolve message place holders
          */
         @Nonnull default Map<String, Object> getVariables() {
