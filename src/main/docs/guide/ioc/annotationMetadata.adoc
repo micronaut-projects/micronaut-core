@@ -21,9 +21,9 @@ for(BeanDefinition definition : definitions) {
 }
 ----
 
-The above example will find all api:inject.BeanDefinition[] annotated with `@Controller` regardless whether `@Controller` is used directly or inherited via an annotation stereotype.
+The above example will find all api:inject.BeanDefinition[] 's annotated with `@Controller` regardless whether `@Controller` is used directly or inherited via an annotation stereotype.
 
-Note that the `getAnnotation` method and the variations of the method return a api:core.annotation.AnnotationValue[] type and not a Java annotation. This is by design, and you should generally try to work with this API when reading annotation values, the reason being that synthesizing a proxy implementation is worse from a performance and memory consumption perspective.
+Note that the `getAnnotation` method and the variations of the method return an api:core.annotation.AnnotationValue[] type and not a Java annotation. This is by design, and you should generally try to work with this API when reading annotation values, the reason being that synthesizing a proxy implementation is worse from a performance and memory consumption perspective.
 
 If you absolutely require a reference to an annotation instance you can use the `synthesize` method, which will create a runtime proxy that implements the annotation interface:
 
@@ -53,7 +53,7 @@ include::http-client/src/main/java/io/micronaut/http/client/annotation/Client.ja
 
 With these aliases in place, regardless whether you define `@Client("foo")` or `@Client(id="foo")` both the `value` and `id` members are always set, making it much easier to parse and deal with the annotation.
 
-If you do not have control over the annotation then another approach is to use a api:io.micronaut.inject.annotation.AnnotationMapper[]. To create a `AnnotationMapper` you must following the following steps:
+If you do not have control over the annotation then another approach is to use an api:io.micronaut.inject.annotation.AnnotationMapper[]. To create an `AnnotationMapper` you must perform the following steps:
 
 * Implement the api:io.micronaut.inject.annotation.AnnotationMapper[] interface
 * Define a `META-INF/services/io.micronaut.inject.annotation.AnnotationMapper` file referencing the implementation class
@@ -61,7 +61,7 @@ If you do not have control over the annotation then another approach is to use a
 
 NOTE: Because `AnnotationMapper` implementations need to be on the annotation processor classpath they should generally be in a project that includes few external dependencies to avoid polluting the annotation processor classpath.
 
-As an example the  `AnnotationMapper` that improves the introspection capabilities of JPA entities
+The following is an example the  `AnnotationMapper` that improves the introspection capabilities of JPA entities
 
 .EntityIntrospectedAnnotationMapper Mapper Example
 [source,java]
