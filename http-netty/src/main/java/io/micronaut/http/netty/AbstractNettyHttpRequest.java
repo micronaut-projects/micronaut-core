@@ -21,7 +21,6 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.uri.UriBuilder;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.DefaultAttributeMap;
 

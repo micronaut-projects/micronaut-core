@@ -23,10 +23,8 @@ import io.micronaut.core.convert.value.ConvertibleMultiValuesMap;
 import io.micronaut.http.MutableHttpParameters;
 
 import javax.annotation.Nullable;
-import java.net.URI;
 import java.util.*;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -45,6 +43,7 @@ public class NettyHttpParameters implements MutableHttpParameters {
     /**
      * @param parameters        The parameters
      * @param conversionService The conversion service
+     * @param onChange A callback for changes
      */
     public NettyHttpParameters(Map<String, List<String>> parameters,
                                ConversionService<?> conversionService,
