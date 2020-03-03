@@ -8,7 +8,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.NettyClientHttpRequestFactory
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
