@@ -25,5 +25,5 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Constraint(validatedBy = {})
 @interface NameAndLastNameValidator {
-    String message() default "Both name and lastName can't be null";
+    String message() default "Both name and lastName can''t be null";
 }

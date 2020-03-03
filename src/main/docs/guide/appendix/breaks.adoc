@@ -193,3 +193,5 @@ Would now be output as `We love Micronauts documentation`. To achieve the desire
 ----
 my.message=We love Micronaut''s documentation
 ----
+
+NOTE: This change also applies to messages in custom constraint annotations, which interpolate the message via the message source api.
