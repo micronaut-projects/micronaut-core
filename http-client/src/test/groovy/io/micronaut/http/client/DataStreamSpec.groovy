@@ -163,8 +163,6 @@ class DataStreamSpec extends Specification {
     }
 
     void "test reading a byte array"() {
-        RxStreamingHttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
-
         when:
         byte[] data = client.toBlocking().retrieve("/datastream/data", byte[].class)
 
