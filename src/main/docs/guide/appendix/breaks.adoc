@@ -171,3 +171,7 @@ The no longer used group for Graal is no longer part of the bom. While upgrading
 === Cookie Configuration
 
 The `getCookieMaxAge` method has been changed to return a `java.time.Duration`.
+
+=== `@Retryable` and `@CircuitBreaker` Exception Handling
+
+`@Retryable` and `@CircuitBreaker` in previous versions of Micronaut resolved `includes` and `excludes` explicitly. Any exception thrown had to exactly match one of the exceptions specified. This has been changed to now also include subclasses of the exception types specified.
