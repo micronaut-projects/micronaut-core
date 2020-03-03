@@ -9,7 +9,7 @@ The following features are unsupported at this time:
 * Annotations on generic argument types since only the Java language supports this feature.
 * Any interaction with the https://beanvalidation.org/2.0/spec/#constraintmetadata[constraint metadata API], since Micronaut uses already computed compilation time metadata.
 * XML-based configuration
-* Instead of using `javax.validation.ConstraintValidator` you should use api:validation.validator.constraints.ConstraintValidator[] to define custom constraints, which supports validating annotations as compilation time.
+* Instead of using `javax.validation.ConstraintValidator` you should use api:validation.validator.constraints.ConstraintValidator[] (io.micronaut.validation.validator.constraints.ConstraintValidator) to define custom constraints, which supports validating annotations as compilation time.
 
 Micronaut's implementation includes the following benefits:
 
@@ -46,7 +46,7 @@ snippet::io.micronaut.docs.ioc.validation.PersonServiceSpec[tags="imports,test",
 
 === Validating Data Classes
 
-If you wish to validate data classes, such as POJOs and so on, typically used in JSON interchange, the class must be annotated with ann:core.annotation.Introspected[] (see the previous section on <<introspection, Bean Introspection>>) or if the class is external be imported by the `@Introspected` annotation.
+If you wish to validate data classes, such as POJOs and so on, typically used in JSON interchange, the class must be annotated with ann:core.annotation.Introspected[] (see the previous section on <<introspection, Bean Introspection>>) or, if the class is external, be imported by the `@Introspected` annotation.
 
 .POJO Validation Example
 snippet::io.micronaut.docs.ioc.validation.Person[tags="class"]
@@ -117,6 +117,9 @@ To verify the above examples validates the `duration` parameter you can define a
 
 .Testing Example Custom Constraint Usage
 snippet::io.micronaut.docs.ioc.validation.custom.DurationPatternValidatorSpec[tags="test", indent="0"]
+
+<1> A validated method is invoked
+<2> THe constraint violations are verified
 
 === Validating Annotations at Compilation Time
 
