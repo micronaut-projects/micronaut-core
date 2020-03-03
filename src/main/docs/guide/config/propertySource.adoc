@@ -78,7 +78,7 @@ Micronaut still allows specifying the latter in configuration, but normalizes th
 |`MY_APP_MY_STUFF` | `my.app.my.stuff`, `my.app.my-stuff`, `my.app-my.stuff`, `my.app-my-stuff`, `my-app.my.stuff`, `my-app.my-stuff`, `my-app-my.stuff`, `my-app-my-stuff`  | Environment Variable
 |===
 
-Environment variables are given special treatment to allow the definition of environment variables to be more flexible. Note that there is no way to specify an environment variable with camel-case.
+Environment variables are given special treatment to allow the definition of environment variables to be more flexible. Note that there is no way to reference an environment variable with camel-case.
 
 IMPORTANT: Because the number of properties generated is exponential based on the number of `_` characters in the environment variable, it is recommended to refine which, if any, environment variables are included in configuration if the number of environment variables with a large number of underscores is high.
 
