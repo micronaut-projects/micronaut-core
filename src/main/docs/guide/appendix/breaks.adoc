@@ -175,3 +175,21 @@ The `getCookieMaxAge` method has been changed to return a `java.time.Duration`.
 === `@Retryable` and `@CircuitBreaker` Exception Handling
 
 `@Retryable` and `@CircuitBreaker` in previous versions of Micronaut resolved `includes` and `excludes` explicitly. Any exception thrown had to exactly match one of the exceptions specified. This has been changed to now also include subclasses of the exception types specified.
+
+=== MessageSource API Changes
+
+The semantics of the `getMessage` method have been changed to also interpolate the message with any provided variables. In previous versions of Micronaut, the raw message was returned from the bundle. To support reading the raw message, a new method `getRawMessage` has been added.
+
+In addition, escaping of messages with single quotes is now implemented in accordance with the standard Java link:{javase}java/text/MessageFormat.html[MessageFormat] class. Messages that contain a single quote will now need escaping in order for the quote to output as it did previously. For example:
+
+[source,properties]
+----
+my.message=We love Micronaut's documentation
+----
+
+Would now be output as `We love Micronauts documentation`. To achieve the desired result, escape the single quote with another single quote.
+
+[source,properties]
+----
+my.message=We love Micronaut''s documentation
+----

@@ -28,47 +28,80 @@ import java.util.Objects;
  * @since 1.2
  */
 public abstract class AbstractMessageSource implements MessageSource {
+
+    private static final char QUOT = '\'';
+    private static final char L_BRACE = '{';
+    private static final char R_BRACE = '}';
+
     @NonNull
     @Override
     public String interpolate(@NonNull String template, @NonNull MessageContext context) {
         ArgumentUtils.requireNonNull("template", template);
         ArgumentUtils.requireNonNull("context", context);
-        int start = template.indexOf('{');
-        int end = template.indexOf('}');
-        boolean hasVar = start < end;
-        if (hasVar) {
-            StringBuilder builder = new StringBuilder();
-            while (hasVar) {
 
-                if (start > 0) {
-                    builder.append(template, 0, start);
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < template.length(); i++) {
+            char c = template.charAt(i);
+            if (c == QUOT) {
+                int next = i + 1;
+                if (next < template.length()) {
+                    c = template.charAt(next);
+                    if (c == QUOT) {
+                        i++;
+                        builder.append(QUOT);
+                    } else {
+                        StringBuilder escaped = new StringBuilder();
+                        while (c != QUOT) {
+                            escaped.append(c);
+                            if (++next < template.length()) {
+                                c = template.charAt(next);
+                            } else {
+                                break;
+                            }
+                        }
+                        if (escaped.length() > 0) {
+                            i = next;
+                            builder.append(escaped);
+                        }
+                    }
                 }
-                String message = template.substring(start + 1, end);
-                final Object val = context.getVariables().get(message);
-                if (val != null) {
-                    builder.append(val);
+            } else if (c == L_BRACE) {
+                StringBuilder variable = new StringBuilder();
+                int next = i + 1;
+                if (next < template.length()) {
+                    c = template.charAt(next);
+                    while (c != R_BRACE) {
+                        variable.append(c);
+                        if (++next < template.length()) {
+                            c = template.charAt(next);
+                        } else {
+                            break;
+                        }
+                    }
+                    if (variable.length() > 0) {
+                        i = next;
+                        String var = variable.toString();
+                        if (c == R_BRACE) {
+                            final Object val = context.getVariables().get(var);
+                            if (val != null) {
+                                builder.append(val);
+                            } else {
+                                final String resolved = getMessage(var, context).orElse(var);
+                                builder.append(resolved);
+                            }
+                        } else {
+                            builder.append(L_BRACE).append(var);
+                        }
+                    }
                 } else {
-
-                    final String resolved = getMessage(message, context)
-                            .map(msg -> interpolate(msg, context))
-                            .orElse(message);
-                    builder.append(resolved);
+                    builder.append(c);
                 }
-
-                final String remaining = template.substring(end + 1);
-                start = remaining.indexOf('{');
-                end = remaining.indexOf('}');
-                hasVar = start < end;
-                if (!hasVar) {
-                    builder.append(remaining);
-                } else {
-                    template = remaining;
-                }
+            } else {
+                builder.append(c);
             }
-
-            return builder.toString();
         }
-        return template;
+
+        return builder.toString();
     }
 
     /**

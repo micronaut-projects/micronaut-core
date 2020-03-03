@@ -64,7 +64,7 @@ public class StaticMessageSource extends AbstractMessageSource {
 
     @NonNull
     @Override
-    public Optional<String> getMessage(@NonNull String code, @NonNull MessageContext context) {
+    public Optional<String> getRawMessage(@NonNull String code, @NonNull MessageContext context) {
         ArgumentUtils.requireNonNull("code", code);
         ArgumentUtils.requireNonNull("context", context);
         final String msg = messageMap.get(new MessageKey(context.getLocale(), code));
