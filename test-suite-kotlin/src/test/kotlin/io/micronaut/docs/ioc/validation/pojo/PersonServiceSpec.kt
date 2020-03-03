@@ -22,7 +22,7 @@ class PersonServiceSpec {
     @Test
     fun testThatPersonIsValidWithValidator() {
         val person = Person("", 10)
-        val constraintViolations = validator.validate(person)
+        val constraintViolations = validator.validate(person)  // <1>
 
         assertEquals(2, constraintViolations.size) // <2>
     }
