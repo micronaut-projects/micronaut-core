@@ -103,7 +103,7 @@ public interface UriBuilder {
      * @param values The values
      * @return This builder
      */
-    @Nonnull UriBuilder replaceQueryParam(String name, Object...values);
+    @NonNull UriBuilder replaceQueryParam(String name, Object...values);
 
     /**
      * The constructed URI.

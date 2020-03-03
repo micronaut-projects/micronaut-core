@@ -65,7 +65,7 @@ class DefaultMessageContext implements MessageSource.MessageContext {
      * @param defaultLocale The locale to use if no locale is present
      * @return The locale
      */
-    @Nonnull
+    @NonNull
     public Locale getLocale(@Nullable Locale defaultLocale) {
         if (locale != null) {
             return locale;

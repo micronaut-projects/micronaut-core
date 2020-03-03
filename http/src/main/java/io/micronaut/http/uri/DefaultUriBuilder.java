@@ -255,7 +255,7 @@ class DefaultUriBuilder implements UriBuilder {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public URI build() {
         try {

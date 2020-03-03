@@ -119,7 +119,7 @@ public interface MessageSource {
          * @param defaultLocale The locale to use if no locale is present
          * @return The locale
          */
-        @Nonnull default Locale getLocale(@Nullable Locale defaultLocale) {
+        @NonNull default Locale getLocale(@Nullable Locale defaultLocale) {
             return defaultLocale != null ? defaultLocale : getLocale();
         }
 
