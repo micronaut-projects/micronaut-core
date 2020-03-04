@@ -31,7 +31,7 @@ import org.reactivestreams.Subscription;
 @Internal
 class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedComponent {
     private final Subscriber<T> source;
-    private final RxInstrumenterFactory instrumenterFactory;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -41,12 +41,11 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
      */
     RxInstrumentedSubscriber(Subscriber<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenterFactory = instrumenterFactory;
+        this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
     public final void onSubscribe(Subscription s) {
-        InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter == null) {
             source.onSubscribe(s);
         } else {
@@ -61,7 +60,6 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
 
     @Override
     public void onNext(T t) {
-        InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter == null) {
             source.onNext(t);
         } else {
@@ -77,7 +75,6 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
     @SuppressWarnings("Duplicates")
     @Override
     public void onError(Throwable t) {
-        InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter == null) {
             source.onError(t);
         } else {
@@ -92,7 +89,6 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
 
     @Override
     public void onComplete() {
-        InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter == null) {
             source.onComplete();
         } else {

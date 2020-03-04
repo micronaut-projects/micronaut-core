@@ -31,7 +31,7 @@ import io.reactivex.disposables.Disposable;
 @Internal
 final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComponent {
     private final Observer<T> source;
-    private final RxInstrumenterFactory instrumenterFactory;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -41,12 +41,11 @@ final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComp
      */
     RxInstrumentedObserver(Observer<T> source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenterFactory = instrumenterFactory;
+        this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter == null) {
             source.onSubscribe(d);
         } else {
@@ -61,7 +60,6 @@ final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComp
 
     @Override
     public void onNext(T t) {
-        InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter == null) {
             source.onNext(t);
         } else {
@@ -77,7 +75,6 @@ final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComp
     @SuppressWarnings("Duplicates")
     @Override
     public void onError(Throwable t) {
-        InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter == null) {
             source.onError(t);
         } else {
@@ -93,7 +90,6 @@ final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComp
     @SuppressWarnings("Duplicates")
     @Override
     public void onComplete() {
-        InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter == null) {
             source.onComplete();
         } else {
