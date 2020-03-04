@@ -402,7 +402,7 @@ ext {
                     name   : 'spock-core'
             ],
             swagger                    : [
-                    version: '2.0.4',
+                    version: '2.1.1',
                     group  : 'io.swagger.core.v3',
                     name   : 'swagger-core',
                     modules: ['swagger-models', 'swagger-annotations']
