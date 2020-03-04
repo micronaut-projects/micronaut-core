@@ -50,9 +50,17 @@ public interface InvocationInstrumenter {
 
     /**
      * After call.
-     * @param cleanup Whether to cleanup
+     * 
+     * @param cleanup Whether to enforce cleanup
      */
     void afterInvocation(boolean cleanup);
+
+    /**
+     * After call defaults to not enforcing cleanup.
+     */
+    default void afterInvocation() {
+        afterInvocation(false);
+    }
 
     /**
      * Combines multiple instrumenters into one.
