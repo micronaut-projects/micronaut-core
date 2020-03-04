@@ -58,7 +58,11 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
             public void afterInvocation() {
                 System.out.println("Thread.currentThread().getName() = " + Thread.currentThread().getName());
                 if (isSet) {
-                    System.out.println("afterInvocation() restore request = " + currentRequest.getPath());
+                    if (currentRequest != null) {
+                        System.out.println("afterInvocation() restore request = " + currentRequest.getPath());
+                    } else {
+                        System.out.println("Setting current request to null");
+                    }
                     ServerRequestContext.set(currentRequest);
                     isSet = false;
                 } else {

@@ -31,7 +31,7 @@ jobs:
       with:
         java-version: ${{ matrix.java }}   
     - name: Build with Gradle
-      run: ./gradlew http-server-netty:test --tests io.micronaut.http.server.netty.context.ServerRequestContextSpec
+      run: ./gradlew http-server-netty:test
     - name: Publish to JFrog OSS
       if: success() && github.event_name == 'push' && matrix.java == '8'
       env:
