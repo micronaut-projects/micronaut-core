@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Implementation of {@link InvocationInstrumenter} which invoked multiple instrumenters.
@@ -36,7 +35,6 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
 
     private final Collection<InvocationInstrumenter> invocationInstrumenters;
     private final Deque<InvocationInstrumenter> executedInstrumenters;
-    private final AtomicBoolean invoked = new AtomicBoolean(false);
 
     /**
      * Creates new instance.
@@ -53,11 +51,9 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
      */
     @Override
     public void beforeInvocation() {
-        if (invoked.compareAndSet(false, true)) {
-            for (InvocationInstrumenter instrumenter : invocationInstrumenters) {
-                instrumenter.beforeInvocation();
-                executedInstrumenters.push(instrumenter);
-            }
+        for (InvocationInstrumenter instrumenter : invocationInstrumenters) {
+            instrumenter.beforeInvocation();
+            executedInstrumenters.push(instrumenter);
         }
     }
 

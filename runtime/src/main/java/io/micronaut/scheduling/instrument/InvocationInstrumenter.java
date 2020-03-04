@@ -64,7 +64,7 @@ public interface InvocationInstrumenter {
             return NOOP;
         }
         if (invocationInstrumenters.size() == 1) {
-            return new SingleInvocationInstrumenter(invocationInstrumenters.iterator().next());
+            return invocationInstrumenters.iterator().next();
         }
         return new MultipleInvocationInstrumenter(invocationInstrumenters);
     }
