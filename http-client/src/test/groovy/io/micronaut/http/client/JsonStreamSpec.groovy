@@ -24,6 +24,8 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ScheduleOn
 import io.reactivex.Flowable
 import io.reactivex.Single
 import org.reactivestreams.Publisher
@@ -205,6 +207,7 @@ class JsonStreamSpec  extends Specification {
     }
 
     @Controller("/jsonstream/books")
+    @ScheduleOn(TaskExecutors.IO)
     static class BookController {
 
         @Get(produces = MediaType.APPLICATION_JSON_STREAM)

@@ -17,6 +17,7 @@ package io.micronaut.scheduling.exceptions;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.MethodReference;
 
 /**
  * @author graemerocher
@@ -29,6 +30,14 @@ public class SchedulerConfigurationException extends ConfigurationException {
      * @param message The detailed message
      */
     public SchedulerConfigurationException(ExecutableMethod<?, ?> method, String message) {
+        super("Invalid @Scheduled definition for method: " + method + " - Reason: " + message);
+    }
+
+    /**
+     * @param method  A compile time produced invocation of a method call
+     * @param message The detailed message
+     */
+    public SchedulerConfigurationException(MethodReference<?, ?> method, String message) {
         super("Invalid @Scheduled definition for method: " + method + " - Reason: " + message);
     }
 }

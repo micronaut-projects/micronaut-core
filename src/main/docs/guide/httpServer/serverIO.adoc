@@ -1,6 +1,6 @@
-=== Writing Data without Blocking
+=== Reactively Writing Response Data
 
-Micronaut's HTTP server supports writing data without blocking simply by returning a rs:Publisher[] the emits objects that can be encoded to the HTTP response.
+Micronaut's HTTP server supports writing chunks of response data by returning a rs:Publisher[] the emits objects that can be encoded to the HTTP response.
 
 The following table summarizes example return type signatures and the behaviour the server exhibits to handle each of them:
 
@@ -25,13 +25,15 @@ The following table summarizes example return type signatures and the behaviour 
 
 When returning reactive type the server will use a `Transfer-Encoding` of `chunked` and keep writing data until the rs:Publisher[]'s `onComplete` method is called.
 
-The server will request a single item from the rs:Publisher[], write the item, without blocking, and then request the next item, thus controlling back pressure.
+The server will request a single item from the rs:Publisher[], write the item and then request the next item, controlling back pressure.
+
+NOTE: It is up to the implementation of the rs:Publisher[] to schedule any blocking I/O work that may be done as a result of subscribing to the publisher.
 
 === Performing Blocking I/O
 
 In some cases you may wish to integrate with a library that does not support non-blocking I/O.
 
-In this you can return a api:core.io.Writable[] object from any controller method. The api:core.io.Writable[] has various signatures that allowing writing to traditional blocking streams like jdk:java.io.Writer[] or jdk:java.io.OutputStream[].
+In this case you can return a api:core.io.Writable[] object from any controller method. The api:core.io.Writable[] has various signatures that allowing writing to traditional blocking streams like jdk:java.io.Writer[] or jdk:java.io.OutputStream[].
 
 When returning a api:core.io.Writable[] object the blocking I/O operation will be shifted to the I/O thread pool so that the Netty event loop is not blocked.
 

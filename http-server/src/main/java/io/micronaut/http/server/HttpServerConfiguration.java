@@ -122,7 +122,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
-    private ThreadSelection threadSelection = ThreadSelection.AUTO;
+    private ThreadSelection threadSelection = ThreadSelection.MANUAL;
 
     /**
      * Default constructor.
