@@ -65,8 +65,6 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
                     }
                     ServerRequestContext.set(currentRequest);
                     isSet = false;
-                } else {
-                    System.out.println("No request to restore");
                 }
             }
 
