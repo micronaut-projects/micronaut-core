@@ -45,10 +45,8 @@ public final class ServerRequestContext {
      */
     public static void set(@Nullable HttpRequest request) {
         if (request == null) {
-            System.out.println("Removed request from thread = " + Thread.currentThread().getName());
             REQUEST.remove();
         } else {
-            System.out.println("Set request [" + request.getPath() + "] in Thread.currentThread().getName() = " + Thread.currentThread().getName());
             REQUEST.set(request);
         }
     }
