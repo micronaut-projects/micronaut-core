@@ -34,12 +34,11 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Returns 401 for {@link io.micronaut.management.endpoint.annotation.Endpoint} requests which have sensitive true. Disabled if micronaut.security is enabled.
+ * Returns 401 for {@link io.micronaut.management.endpoint.annotation.Endpoint} requests which have sensitive true.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(condition = EndpointsFilterCondition.class)
 @Filter("/**")
 public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
