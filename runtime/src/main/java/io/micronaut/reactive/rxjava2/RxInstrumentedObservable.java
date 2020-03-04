@@ -52,7 +52,7 @@ final class RxInstrumentedObservable<T> extends Observable<T> implements RxInstr
             instrumenter.beforeInvocation();
             source.subscribe(o);
         } finally {
-            instrumenter.afterInvocation();
+            instrumenter.afterInvocation(false);
         }
     }
 }

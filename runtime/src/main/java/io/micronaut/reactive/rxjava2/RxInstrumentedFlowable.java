@@ -57,7 +57,7 @@ final class RxInstrumentedFlowable<T> extends Flowable<T> implements RxInstrumen
             instrumenter.beforeInvocation();
             source.subscribe(s);
         } finally {
-            instrumenter.afterInvocation();
+            instrumenter.afterInvocation(false);
         }
     }
 }

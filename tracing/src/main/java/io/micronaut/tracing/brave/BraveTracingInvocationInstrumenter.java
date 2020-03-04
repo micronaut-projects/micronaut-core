@@ -67,7 +67,7 @@ public final class BraveTracingInvocationInstrumenter implements ReactiveInvocat
                 }
 
                 @Override
-                public void afterInvocation() {
+                public void afterInvocation(boolean cleanup) {
                     activeScope.close();
                 }
 

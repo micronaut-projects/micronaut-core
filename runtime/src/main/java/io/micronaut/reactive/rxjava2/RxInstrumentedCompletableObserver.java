@@ -30,7 +30,7 @@ import io.reactivex.disposables.Disposable;
 @Internal
 final class RxInstrumentedCompletableObserver implements CompletableObserver, RxInstrumentedComponent {
     private final CompletableObserver source;
-    private final RxInstrumenterFactory instrumenterFactory;
+    private final InvocationInstrumenter instrumenter;
 
     /**
      * Default constructor.
@@ -40,12 +40,11 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
      */
     RxInstrumentedCompletableObserver(CompletableObserver source, RxInstrumenterFactory instrumenterFactory) {
         this.source = source;
-        this.instrumenterFactory = instrumenterFactory;
+        this.instrumenter = instrumenterFactory.create();
     }
 
     @Override
     public void onSubscribe(Disposable d) {
-        InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter == null) {
             source.onSubscribe(d);
         } else {
@@ -53,14 +52,13 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
                 instrumenter.beforeInvocation();
                 source.onSubscribe(d);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
 
     @Override
     public void onError(Throwable t) {
-        InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter == null) {
             source.onError(t);
         } else {
@@ -68,14 +66,13 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
                 instrumenter.beforeInvocation();
                 source.onError(t);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
 
     @Override
     public void onComplete() {
-        InvocationInstrumenter instrumenter = instrumenterFactory.create();
         if (instrumenter == null) {
             source.onComplete();
         } else {
@@ -83,7 +80,7 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
                 instrumenter.beforeInvocation();
                 source.onComplete();
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }

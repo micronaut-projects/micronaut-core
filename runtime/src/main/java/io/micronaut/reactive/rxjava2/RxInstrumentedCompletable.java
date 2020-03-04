@@ -50,7 +50,7 @@ final class RxInstrumentedCompletable extends Completable implements RxInstrumen
             instrumenter.beforeInvocation();
             source.subscribe(o);
         } finally {
-            instrumenter.afterInvocation();
+            instrumenter.afterInvocation(false);
         }
     }
 }
