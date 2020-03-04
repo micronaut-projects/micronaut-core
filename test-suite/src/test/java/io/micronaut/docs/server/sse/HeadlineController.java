@@ -18,6 +18,8 @@ package io.micronaut.docs.server.sse;
 // tag::imports[]
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.sse.Event;
+import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.scheduling.annotation.ScheduleOn;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 // end::imports[]
@@ -27,6 +29,7 @@ import org.reactivestreams.Publisher;
 public class HeadlineController {
 
     @Get
+    @ScheduleOn(TaskExecutors.IO)
     public Publisher<Event<Headline>> index() { // <1>
         String[] versions = new String[]{"1.0", "2.0"}; // <2>
 

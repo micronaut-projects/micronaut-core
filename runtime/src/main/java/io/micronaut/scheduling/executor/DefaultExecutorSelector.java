@@ -15,14 +15,18 @@
  */
 package io.micronaut.scheduling.executor;
 
+import io.micronaut.context.BeanLocator;
+import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.NonBlocking;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.inject.MethodReference;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.scheduling.annotation.ScheduleOn;
+import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
@@ -37,38 +41,51 @@ import java.util.concurrent.ExecutorService;
 @Singleton
 public class DefaultExecutorSelector implements ExecutorSelector {
 
-    private final ExecutorService ioExecutor;
+    private final BeanLocator beanLocator;
 
     /**
-     * Construct a default implementation for the given executor service for asynchronous IO tasks.
-     *
-     * @param ioExecutor A service that provide method to manager termination and produce future for tracking
-     *                   progress of one or more asynchronous IO tasks.
+     * Default constructor.
+     * @param beanLocator The bean locator
      */
-    protected DefaultExecutorSelector(@Named(TaskExecutors.IO) ExecutorService ioExecutor) {
-        this.ioExecutor = ioExecutor;
+    protected DefaultExecutorSelector(BeanLocator beanLocator) {
+        this.beanLocator = beanLocator;
     }
 
     @Override
-    public Optional<ExecutorService> select(MethodReference method) {
-        if (method.hasStereotype(NonBlocking.class)) {
-            return Optional.empty();
-        } else {
-            Class returnType = method.getReturnType().getType();
-            if (isNonBlocking(returnType)) {
-                return Optional.empty();
+    public Optional<ExecutorService> select(MethodReference method, ThreadSelection threadSelection) {
+        final String name = method.stringValue(ScheduleOn.class).orElse(null);
+        if (name != null) {
+            final ExecutorService executorService;
+            try {
+                executorService = beanLocator.getBean(ExecutorService.class, Qualifiers.byName(name));
+                return Optional.of(executorService);
+            } catch (NoSuchBeanException e) {
+                throw new SchedulerConfigurationException(
+                        method,
+                        "No executor configured for name: " + name
+                );
             }
-            if (HttpResponse.class.isAssignableFrom(returnType)) {
-                Optional<Argument<?>> generic = method.getReturnType().getFirstTypeVariable();
-                if (generic.isPresent()) {
-                    Class argumentType = generic.get().getType();
-                    if (isNonBlocking(argumentType)) {
-                        return Optional.empty();
+        } else if (threadSelection == ThreadSelection.AUTO) {
+            if (method.hasStereotype(NonBlocking.class)) {
+                return Optional.empty();
+            } else {
+                Class returnType = method.getReturnType().getType();
+                if (isNonBlocking(returnType)) {
+                    return Optional.empty();
+                }
+                if (HttpResponse.class.isAssignableFrom(returnType)) {
+                    Optional<Argument<?>> generic = method.getReturnType().getFirstTypeVariable();
+                    if (generic.isPresent()) {
+                        Class argumentType = generic.get().getType();
+                        if (isNonBlocking(argumentType)) {
+                            return Optional.empty();
+                        }
                     }
                 }
+                return beanLocator.findBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO));
             }
         }
-        return Optional.of(ioExecutor);
+        return Optional.empty();
     }
 
     private boolean isNonBlocking(Class type) {

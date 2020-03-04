@@ -79,7 +79,7 @@ public class RequestArgumentSatisfier {
             // no required arguments so just execute
             argumentValues = Collections.emptyMap();
         } else {
-            argumentValues = new LinkedHashMap<>();
+            argumentValues = new LinkedHashMap<>(requiredArguments.size());
             // Begin try fulfilling the argument requirements
             for (Argument argument : requiredArguments) {
                 getValueForArgument(argument, request, satisfyOptionals).ifPresent((value) ->

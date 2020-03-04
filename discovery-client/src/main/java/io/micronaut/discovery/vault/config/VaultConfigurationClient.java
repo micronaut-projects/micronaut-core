@@ -98,11 +98,11 @@ public class VaultConfigurationClient implements ConfigurationClient {
 
         Scheduler scheduler = executorService != null ? Schedulers.from(executorService) : null;
 
-        buildVaultKeys(applicationName, activeNames).entrySet().forEach(entry -> {
+        buildVaultKeys(applicationName, activeNames).forEach((key, value) -> {
             Flowable<PropertySource> propertySourceFlowable = Flowable.fromPublisher(
-                    configHttpClient.readConfigurationValues(token, engine, entry.getValue()))
+                    configHttpClient.readConfigurationValues(token, engine, value))
                     .filter(data -> !data.getSecrets().isEmpty())
-                    .map(data -> PropertySource.of(entry.getValue(), data.getSecrets(), entry.getKey()))
+                    .map(data -> PropertySource.of(value, data.getSecrets(), key))
                     .onErrorResumeNext(throwable -> {
                         //TODO: Discover why the below hack is necessary
                         Throwable t = (Throwable) throwable;

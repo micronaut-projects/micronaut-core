@@ -32,8 +32,9 @@ public interface ExecutorSelector {
      * Select an {@link ExecutorService} for the given {@link MethodReference}.
      *
      * @param method The {@link MethodReference}
+     * @param threadSelection The thread selection mode
      * @return An optional {@link ExecutorService}. If an {@link ExecutorService} cannot be established
      * {@link Optional#empty()} is returned
      */
-    Optional<ExecutorService> select(MethodReference method);
+    Optional<ExecutorService> select(MethodReference method, ThreadSelection threadSelection);
 }

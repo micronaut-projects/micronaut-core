@@ -16,6 +16,7 @@
 package io.micronaut.runtime.executor
 
 import grails.gorm.transactions.Transactional
+import io.micronaut.scheduling.executor.ThreadSelection
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
@@ -43,7 +44,7 @@ class ExecutorSelectorSpec extends Specification {
         ExecutorSelector selector = applicationContext.getBean(ExecutorSelector)
         Optional<ExecutableMethod> method = applicationContext.findExecutableMethod(MyService, methodName)
 
-        Optional<ExecutorService> executorService = selector.select(method.get())
+        Optional<ExecutorService> executorService = selector.select(method.get(), ThreadSelection.AUTO)
 
         expect:
         executorService.isPresent() == present
