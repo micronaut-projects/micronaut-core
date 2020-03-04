@@ -44,32 +44,17 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
             @Override
             public void beforeInvocation() {
                 currentRequest = ServerRequestContext.currentRequest().orElse(null);
-                System.out.println("Thread.currentThread().getName() = " + Thread.currentThread().getName());
                 if (invocationRequest != currentRequest) {
                     isSet = true;
                     ServerRequestContext.set(invocationRequest);
-                    System.out.println("beforeInvocation() set request = " + invocationRequest.getPath());
-                    if (currentRequest != null) {
-                        System.out.println("Existing request bound = " + currentRequest.getPath());
-                    }
-                } else {
-                    System.out.println("beforeInvocation() not setting request = " + currentRequest);
                 }
             }
 
             @Override
             public void afterInvocation(boolean cleanup) {
                 if (isSet || cleanup) {
-                    System.out.println("Thread.currentThread().getName() = " + Thread.currentThread().getName());
-                    if (currentRequest != null) {
-                        System.out.println("afterInvocation() restore request = " + currentRequest.getPath());
-                    } else {
-                        System.out.println("Setting current request to null");
-                    }
                     ServerRequestContext.set(cleanup ? null : currentRequest);
                     isSet = false;
-                } else {
-                    System.out.println("afterInvocation not set");
                 }
             }
 
