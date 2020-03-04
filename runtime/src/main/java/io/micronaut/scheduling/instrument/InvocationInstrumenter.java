@@ -50,7 +50,7 @@ public interface InvocationInstrumenter {
 
     /**
      * After call.
-     * 
+     *
      * @param cleanup Whether to enforce cleanup
      */
     void afterInvocation(boolean cleanup);
