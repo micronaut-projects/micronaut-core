@@ -7,7 +7,7 @@ buildscript {
         classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
         classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
-        classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.0.0"
+        classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.2.1"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.1"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
