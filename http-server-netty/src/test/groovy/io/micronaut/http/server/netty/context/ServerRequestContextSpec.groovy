@@ -46,7 +46,12 @@ class ServerRequestContextSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    EmbeddedServer embeddedServer = ApplicationContext.run(
+            EmbeddedServer,
+            // limit number of threads to simulate thread sharing
+            ['micronaut.executors.io.type': 'FIXED',
+             'micronaut.executors.io.nThreads':'2',]
+    )
 
     @Unroll
     void "test server request context is available for #method"() {

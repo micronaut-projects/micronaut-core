@@ -53,7 +53,7 @@ final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComp
                 instrumenter.beforeInvocation();
                 source.onSubscribe(d);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
@@ -67,7 +67,7 @@ final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComp
                 instrumenter.beforeInvocation();
                 source.onNext(t);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
@@ -82,7 +82,7 @@ final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComp
                 instrumenter.beforeInvocation();
                 source.onError(t);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
@@ -97,7 +97,7 @@ final class RxInstrumentedObserver<T> implements Observer<T>, RxInstrumentedComp
                 instrumenter.beforeInvocation();
                 source.onComplete();
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }

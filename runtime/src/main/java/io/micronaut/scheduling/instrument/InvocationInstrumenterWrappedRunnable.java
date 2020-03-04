@@ -47,7 +47,7 @@ final class InvocationInstrumenterWrappedRunnable implements Runnable {
             invocationInstrumenter.beforeInvocation();
             runnable.run();
         } finally {
-            invocationInstrumenter.afterInvocation();
+            invocationInstrumenter.afterInvocation(true);
         }
     }
 }

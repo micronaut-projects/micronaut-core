@@ -58,15 +58,15 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
             }
 
             @Override
-            public void afterInvocation() {
-                if (isSet) {
+            public void afterInvocation(boolean cleanup) {
+                if (isSet || cleanup) {
                     System.out.println("Thread.currentThread().getName() = " + Thread.currentThread().getName());
                     if (currentRequest != null) {
                         System.out.println("afterInvocation() restore request = " + currentRequest.getPath());
                     } else {
                         System.out.println("Setting current request to null");
                     }
-                    ServerRequestContext.set(currentRequest);
+                    ServerRequestContext.set(cleanup ? null : currentRequest);
                     isSet = false;
                 } else {
                     System.out.println("afterInvocation not set");

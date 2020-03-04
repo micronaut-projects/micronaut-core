@@ -68,7 +68,7 @@ public class OpenTracingInvocationInstrumenter implements TracingInvocationInstr
                 }
 
                 @Override
-                public void afterInvocation() {
+                public void afterInvocation(boolean cleanup) {
                     activeScope.close();
                 }
 

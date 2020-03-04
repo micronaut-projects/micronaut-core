@@ -59,12 +59,13 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
 
     /**
      * Invokes afterInvocation for multiple instrumenters.
+     * @param cleanup Whether to cleanup
      */
     @Override
-    public void afterInvocation() {
+    public void afterInvocation(boolean cleanup) {
         while (!executedInstrumenters.isEmpty()) {
             try {
-                executedInstrumenters.pop().afterInvocation();
+                executedInstrumenters.pop().afterInvocation(cleanup);
             } catch (Exception e) {
                 LOG.warn("After instrumentation invocation error: {}", e.getMessage(), e);
             }

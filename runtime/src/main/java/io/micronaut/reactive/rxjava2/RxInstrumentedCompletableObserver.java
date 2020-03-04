@@ -52,7 +52,7 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
                 instrumenter.beforeInvocation();
                 source.onSubscribe(d);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
@@ -66,7 +66,7 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
                 instrumenter.beforeInvocation();
                 source.onError(t);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
@@ -80,7 +80,7 @@ final class RxInstrumentedCompletableObserver implements CompletableObserver, Rx
                 instrumenter.beforeInvocation();
                 source.onComplete();
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }

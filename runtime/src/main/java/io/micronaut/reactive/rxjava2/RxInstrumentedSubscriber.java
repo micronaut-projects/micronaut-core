@@ -53,7 +53,7 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
                 instrumenter.beforeInvocation();
                 source.onSubscribe(s);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
@@ -67,7 +67,7 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
                 instrumenter.beforeInvocation();
                 source.onNext(t);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
@@ -82,7 +82,7 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
                 instrumenter.beforeInvocation();
                 source.onError(t);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
@@ -96,7 +96,7 @@ class RxInstrumentedSubscriber<T> implements Subscriber<T>, RxInstrumentedCompon
                 instrumenter.beforeInvocation();
                 source.onComplete();
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }

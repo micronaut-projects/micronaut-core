@@ -54,7 +54,7 @@ final class InvocationInstrumenterWrappedCallable<V> implements Callable<V> {
             invocationInstrumenter.beforeInvocation();
             return callable.call();
         } finally {
-            invocationInstrumenter.afterInvocation();
+            invocationInstrumenter.afterInvocation(true);
         }
     }
 

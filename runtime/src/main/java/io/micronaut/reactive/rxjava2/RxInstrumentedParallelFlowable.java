@@ -68,7 +68,7 @@ final class RxInstrumentedParallelFlowable<T> extends ParallelFlowable<T> implem
                 instrumenter.beforeInvocation();
                 source.subscribe(parents);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         } else {
             source.subscribe(s);

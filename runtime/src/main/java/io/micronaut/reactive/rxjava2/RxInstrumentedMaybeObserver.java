@@ -53,7 +53,7 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstru
                 instrumenter.beforeInvocation();
                 source.onSubscribe(d);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
@@ -67,7 +67,7 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstru
                 instrumenter.beforeInvocation();
                 source.onError(t);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
@@ -81,7 +81,7 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstru
                 instrumenter.beforeInvocation();
                 source.onSuccess(value);
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
@@ -95,7 +95,7 @@ final class RxInstrumentedMaybeObserver<T> implements MaybeObserver<T>, RxInstru
                 instrumenter.beforeInvocation();
                 source.onComplete();
             } finally {
-                instrumenter.afterInvocation();
+                instrumenter.afterInvocation(false);
             }
         }
     }
