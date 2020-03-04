@@ -171,6 +171,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     protected void bodyRequested(ChannelHandlerContext ctx) {
     }
 
+    /**
+     * @return Whether this is the client stream handler.
+     */
+    protected abstract boolean isClient();
+
     @Override
     public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
 
@@ -230,7 +235,9 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Calling ctx.read() for cancelled subscription");
             }
-            ctx.read();
+            if (isClient()) {
+                ctx.read();
+            }
         }
     }
 
@@ -244,7 +251,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 consumedInMessage(ctx);
             }
         } else {
-            ReferenceCountUtil.release(content);
+            ReferenceCountUtil.release(content, isClient() ? 1 : 2);
             if (content instanceof LastHttpContent) {
                 ignoreBodyRead = false;
                 if (currentlyStreamedMessage != null) {
