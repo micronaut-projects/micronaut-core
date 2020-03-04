@@ -53,7 +53,7 @@ final class RxInstrumentedConnectableFlowable<T> extends ConnectableFlowable<T> 
             instrumenter.beforeInvocation();
             source.subscribe(s);
         } finally {
-            instrumenter.afterInvocation();
+            instrumenter.afterInvocation(false);
         }
     }
 
@@ -63,7 +63,7 @@ final class RxInstrumentedConnectableFlowable<T> extends ConnectableFlowable<T> 
             instrumenter.beforeInvocation();
             source.connect(connection);
         } finally {
-            instrumenter.afterInvocation();
+            instrumenter.afterInvocation(false);
         }
     }
 }

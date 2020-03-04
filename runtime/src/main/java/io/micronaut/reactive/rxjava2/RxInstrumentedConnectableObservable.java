@@ -53,7 +53,7 @@ final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable
             instrumenter.beforeInvocation();
             source.subscribe(o);
         } finally {
-            instrumenter.afterInvocation();
+            instrumenter.afterInvocation(false);
         }
     }
 
@@ -63,7 +63,7 @@ final class RxInstrumentedConnectableObservable<T> extends ConnectableObservable
             instrumenter.beforeInvocation();
             source.connect(connection);
         } finally {
-            instrumenter.afterInvocation();
+            instrumenter.afterInvocation(false);
         }
     }
 }

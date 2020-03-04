@@ -79,7 +79,7 @@ public final class RxJava1TracingInstrumentation {
                         instrumenter.beforeInvocation();
                         action0.call();
                     } finally {
-                        instrumenter.afterInvocation();
+                        instrumenter.afterInvocation(false);
                     }
                 };
             } else {

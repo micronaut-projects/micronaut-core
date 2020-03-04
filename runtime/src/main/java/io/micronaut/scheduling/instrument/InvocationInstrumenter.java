@@ -39,7 +39,7 @@ public interface InvocationInstrumenter {
         }
 
         @Override
-        public void afterInvocation() {
+        public void afterInvocation(boolean cleanup) {
         }
     };
 
@@ -50,8 +50,17 @@ public interface InvocationInstrumenter {
 
     /**
      * After call.
+     *
+     * @param cleanup Whether to enforce cleanup
      */
-    void afterInvocation();
+    void afterInvocation(boolean cleanup);
+
+    /**
+     * After call defaults to not enforcing cleanup.
+     */
+    default void afterInvocation() {
+        afterInvocation(false);
+    }
 
     /**
      * Combines multiple instrumenters into one.

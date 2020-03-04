@@ -52,7 +52,7 @@ final class RxInstrumentedMaybe<T> extends Maybe<T> implements RxInstrumentedCom
             instrumenter.beforeInvocation();
             source.subscribe(o);
         } finally {
-            instrumenter.afterInvocation();
+            instrumenter.afterInvocation(false);
         }
     }
 }

@@ -51,7 +51,7 @@ final class RxInstrumentedSingle<T> extends Single<T> implements RxInstrumentedC
             instrumenter.beforeInvocation();
             source.subscribe(o);
         } finally {
-            instrumenter.afterInvocation();
+            instrumenter.afterInvocation(false);
         }
     }
 }

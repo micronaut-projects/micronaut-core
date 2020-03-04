@@ -51,9 +51,9 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
             }
 
             @Override
-            public void afterInvocation() {
-                if (isSet) {
-                    ServerRequestContext.set(currentRequest);
+            public void afterInvocation(boolean cleanup) {
+                if (isSet || cleanup) {
+                    ServerRequestContext.set(cleanup ? null : currentRequest);
                     isSet = false;
                 }
             }
