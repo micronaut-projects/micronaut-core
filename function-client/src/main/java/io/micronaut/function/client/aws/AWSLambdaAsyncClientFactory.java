@@ -20,6 +20,8 @@ import com.amazonaws.services.lambda.AWSLambdaAsyncClientBuilder;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 
+import javax.inject.Singleton;
+
 /**
  * @author graemerocher
  * @since 1.0
@@ -43,6 +45,7 @@ public class AWSLambdaAsyncClientFactory {
      * @return client object
      */
     @Requires(beans = AWSLambdaConfiguration.class)
+    @Singleton
     AWSLambdaAsync awsLambdaAsyncClient() {
         AWSLambdaAsyncClientBuilder builder = configuration.getBuilder();
         return builder.build();
