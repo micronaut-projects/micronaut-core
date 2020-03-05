@@ -34,9 +34,16 @@ A method annotated with ann:websocket.annotation.OnError[] can be added to imple
 
 === Non-Blocking Message Handling
 
-The previous example uses the `broadcastSync` method of the api:websocket.WebSocketSession[] interface which blocks until the broadcast is complete. You can however implement non-blocking WebSocket servers by instead returning a rs:Publisher[] or a `Future` from each WebSocket handler method. For example:
+The previous example uses the `broadcastSync` method of the api:websocket.WebSocketBroadcaster[] interface which blocks until the broadcast is complete. A similar `sendSync` method exists in api:websocket.WebSocketSession[] to send a message to a single receiver in a blocking manner. You can however implement non-blocking WebSocket servers by instead returning a rs:Publisher[] or a jdk:java.util.concurrent.Future[] from each WebSocket handler method. For example:
 
 snippet::io.micronaut.docs.http.server.netty.websocket.ReactivePojoChatServerWebSocket[tags="onmessage", indent=0,title="WebSocket Chat Example"]
+
+The example above uses `broadcast`, which creates an instance of rs:Publisher[] and returns the value to Micronaut.
+Micronaut will then take care of sending the message asynchronously based on the Publisher interface.
+The similar `send` method can be used to send a single message asynchronously via Micronaut return value.
+
+For sending messages asynchronously outside Micronaut annotated handler methods, you can use `broadcastAsync` and `sendAsync` methods in their respective api:websocket.WebSocketBroadcaster[] and api:websocket.WebSocketSession[] interfaces.
+For blocking sends, the `broadcastSync` and `sendSync` methods can be used.
 
 === @ServerWebSocket and Scopes
 
