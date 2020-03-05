@@ -251,7 +251,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 consumedInMessage(ctx);
             }
         } else {
-            ReferenceCountUtil.release(content, isClient() ? 1 : 2);
+            ReferenceCountUtil.release(content, content.refCnt());
             if (content instanceof LastHttpContent) {
                 ignoreBodyRead = false;
                 if (currentlyStreamedMessage != null) {
