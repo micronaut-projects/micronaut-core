@@ -1343,8 +1343,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
 
             context.writeAndFlush(nettyResponse)
-                   .addListener(future -> cleanupRequest(context, nettyHttpRequest));
-            context.read();
+                   .addListener(future -> {
+                       context.read();
+                       cleanupRequest(context, nettyHttpRequest);
+                   });
+
         }
     }
 
