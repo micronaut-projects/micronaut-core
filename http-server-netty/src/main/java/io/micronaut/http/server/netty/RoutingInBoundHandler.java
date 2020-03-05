@@ -1448,7 +1448,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         final RouteMatch<?> routeMatch = !finalRoute.isExecutable() ? requestArgumentSatisfier.fulfillArgumentRequirements(finalRoute, requestReference.get(), true) : finalRoute;
                         Object result = routeMatch.execute();
                         MutableHttpResponse<Object> chunkedResponse = HttpResponse.ok(result);
-                        chunkedResponse.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                        chunkedResponse.getHeaders().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
                         emitter.onNext(chunkedResponse);
                         emitter.onComplete();
                         // should be no back pressure
@@ -1686,8 +1686,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(nativeResponse, httpContentPublisher);
         io.netty.handler.codec.http.HttpHeaders headers = streamedResponse.headers();
-        headers.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-        headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
+        headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+        headers.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
         context.writeAndFlush(streamedResponse);
         context.read();
     }

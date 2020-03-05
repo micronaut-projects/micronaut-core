@@ -40,4 +40,17 @@ public interface MutableHeaders extends Headers {
      * @return These headers
      */
     MutableHeaders remove(CharSequence header);
+
+    /**
+     * Sets an HTTP header overriding any existing value.
+     * @param header The header
+     * @param value The value
+     * @return This headers
+     * @since 1.3.3
+     */
+    default MutableHeaders set(CharSequence header, CharSequence value) {
+        remove(header);
+        add(header, value);
+        return this;
+    }
 }
