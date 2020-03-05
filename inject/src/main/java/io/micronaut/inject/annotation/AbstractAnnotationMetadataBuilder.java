@@ -319,6 +319,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract String getAnnotationTypeName(A annotationMirror);
 
     /**
+     * Get the name for the given element.
+     * @param element The element
+     * @return The name
+     */
+    protected abstract String getElementName(T element);
+
+    /**
      * Obtain the annotations for the given type.
      *
      * @param element The type element
@@ -887,11 +894,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             List<A> topLevel = new ArrayList<>();
             for (A annotationMirror : annotationMirrors) {
 
-                if (getTypeForAnnotation(annotationMirror) == element) {
+
+                String annotationName = getAnnotationTypeName(annotationMirror);
+                if (annotationName.equals(getElementName(element))) {
                     continue;
                 }
 
-                String annotationName = getAnnotationTypeName(annotationMirror);
                 if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName) && !excludes.contains(annotationName)) {
                     topLevel.add(annotationMirror);
 
