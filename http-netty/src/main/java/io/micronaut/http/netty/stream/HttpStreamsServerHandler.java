@@ -248,6 +248,11 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
     }
 
     @Override
+    protected final boolean isClient() {
+        return false;
+    }
+
+    @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         super.handlerRemoved(ctx);
         for (ChannelHandler dependent : dependentHandlers) {
