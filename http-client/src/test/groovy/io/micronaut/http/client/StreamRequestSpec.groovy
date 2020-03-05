@@ -25,6 +25,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.micronaut.runtime.server.EmbeddedServer
@@ -100,6 +101,21 @@ class StreamRequestSpec extends Specification {
         then:
         result.body().size() == 5
         result.body() == ["Number 0", "Number 1", "Number 2", "Number 3", "Number 4"]
+
+        cleanup:
+        client.stop()
+        client.close()
+    }
+
+    void "test stream get request with JSON strings"() {
+        given:
+        RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
+
+        when:
+        HttpResponse<?> result = client.exchangeStream(HttpRequest.GET('/stream/request/jsonstrings')).blockingFirst()
+
+        then:
+        result.headers.getAll(HttpHeaders.TRANSFER_ENCODING).size() == 1
 
         cleanup:
         client.stop()
@@ -284,6 +300,11 @@ class StreamRequestSpec extends Specification {
         Single<List<Long>> numbers(@Header MediaType contentType, @Body Single<List<Long>> numbers) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             numbers
+        }
+
+        @Get("/jsonstrings")
+        Flowable<String> jsonStrings() {
+            return Flowable.just("Hello World")
         }
 
         @Post(uri = "/strings", consumes = MediaType.TEXT_PLAIN)
