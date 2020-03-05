@@ -502,7 +502,7 @@ ext {
             'micronaut.security'       : [
                     version : micronautSecurityVersion,
                     group   : 'io.micronaut',
-                    modules : ['micronaut-security', 'micronaut-security-jwt', 'micronaut-security-session']
+                    modules : ['micronaut-security-jwt', 'micronaut-security-session']
             ],
             'micronaut.security.configuration'  : [
                     version : micronautSecurityVersion,
