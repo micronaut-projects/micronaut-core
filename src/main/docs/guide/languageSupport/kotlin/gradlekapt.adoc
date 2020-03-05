@@ -1,0 +1,16 @@
+To enable gradle incremental annotation processing with Kapt the arguments as specified <<incrementalannotationgradle, Incremental Annotation Processing with Gradle>> must be sent to Kapt
+
+The following example demonstrates how to enable and configure incremental annotation processing for annotations you have defined under the `com.example` and `io.example` packages:
+
+.Enabling Incremental Annotation Processing in Kapt
+[source,kotlin]
+----
+kapt {
+    arguments {
+        arg("micronaut.processing.incremental", true)
+        arg("micronaut.processing.annotations", "com.example.*,io.example.*")
+    }
+}
+----
+
+WARNING: If you do not enable processing for custom annotations you define these annotations will simple be ignored by Micronaut which may break your application.
