@@ -151,6 +151,26 @@ public class FilteredRouter implements Router {
         return router.route(originatingClass, error);
     }
 
+    @Override
+    public <R> Optional<RouteMatch<R>> findErrorRoute(@Nonnull Class<?> originatingClass, @Nonnull Throwable error, HttpRequest<?> request) {
+        return router.findErrorRoute(originatingClass, error, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findErrorRoute(@Nonnull Throwable error, HttpRequest<?> request) {
+        return router.findErrorRoute(error, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(@Nonnull Class<?> originatingClass, @Nonnull HttpStatus status, HttpRequest<?> request) {
+        return router.findStatusRoute(originatingClass, status, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(@Nonnull HttpStatus status, HttpRequest<?> request) {
+        return router.findStatusRoute(status, request);
+    }
+
     @Nonnull
     @Override
     public List<HttpFilter> findFilters(@Nonnull HttpRequest<?> request) {

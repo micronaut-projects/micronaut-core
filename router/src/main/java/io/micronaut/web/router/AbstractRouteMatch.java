@@ -66,7 +66,8 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
      */
     protected AbstractRouteMatch(DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
         this.abstractRoute = abstractRoute;
-        this.executableMethod = abstractRoute.targetMethod;
+        //noinspection unchecked
+        this.executableMethod = (MethodExecutionHandle<T, R>) abstractRoute.targetMethod;
         this.conversionService = conversionService;
         Argument[] requiredArguments = executableMethod.getArguments();
         this.requiredInputs = new LinkedHashMap<>(requiredArguments.length);
