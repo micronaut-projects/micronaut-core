@@ -2,21 +2,23 @@ package io.micronaut.http.server.netty
 
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
+import io.micronaut.http.server.netty.binding.FormDataBindingSpec.FormController.Person
 import io.micronaut.test.annotation.MicronautTest
 import spock.lang.Specification
 import spock.lang.Unroll
 
 import javax.inject.Inject
+
 import static io.micronaut.http.server.netty.ContentNegotiationSpec.NegotiatingController.*
 
 @MicronautTest
@@ -44,6 +46,29 @@ class ContentNegotiationSpec extends Specification {
         [MediaType.TEXT_PLAIN_TYPE]                                                       | TEXT
         [MediaType.ALL_TYPE]                                                              | JSON
 
+    }
+
+    @Unroll
+    void "test send and receive picks the correct content type for #contentType"() {
+        given: "No content type is sent"
+        def person = new Person(name: "Fred", age: 10)
+        def request = HttpRequest.POST('/negotiate/process', person)
+        if (contentType != null) {
+            request = request.contentType(contentType)
+                    .accept(contentType)
+        }
+        def response = client.exchange(request, String)
+                .blockingFirst()
+
+        expect: "the correct content type was used"
+        response.getContentType().get() == expectedContentType
+        response.body() == expectedBody
+
+        where:
+        contentType                     | expectedContentType             | expectedBody
+        null                            | MediaType.APPLICATION_JSON_TYPE | '{"name":"Fred","age":10}'
+        MediaType.APPLICATION_JSON_TYPE | MediaType.APPLICATION_JSON_TYPE | '{"name":"Fred","age":10}'
+        MediaType.APPLICATION_XML_TYPE  | MediaType.APPLICATION_XML_TYPE  | '<Person><name>Fred</name><age>10</age></Person>'
     }
 
     void "test send unacceptable type"() {
@@ -88,6 +113,12 @@ class ContentNegotiationSpec extends Specification {
         @Produces(MediaType.TEXT_PLAIN)
         String other() {
             return TEXT
+        }
+
+        @Post(value = "/process",
+                processes = [MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML])
+        Person process(Person person) {
+            return person
         }
     }
 }

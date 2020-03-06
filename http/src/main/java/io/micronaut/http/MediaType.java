@@ -22,10 +22,10 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.annotation.Produces;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,14 +37,7 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -57,7 +50,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @TypeHint(value = MediaType[].class)
-public class MediaType implements CharSequence, Comparable<MediaType> {
+public class MediaType implements CharSequence {
 
     /**
      * Default file extension used for JSON.
@@ -614,6 +607,54 @@ public class MediaType implements CharSequence, Comparable<MediaType> {
     }
 
     /**
+     * Returns the ordered media types for the given values.
+     * @param values The values
+     * @return The media types.
+     * @since 1.3.3
+     */
+    public static List<MediaType> orderedOf(CharSequence... values) {
+        return orderedOf(Arrays.asList(values));
+    }
+
+    /**
+     * Returns the ordered media types for the given values.
+     * @param values The values
+     * @return The media types.
+     * @since 1.3.3
+     */
+    public static List<MediaType> orderedOf(List<? extends CharSequence> values) {
+        if (CollectionUtils.isNotEmpty(values)) {
+            List<MediaType> mediaTypes = new ArrayList<>(values.size());
+            for (CharSequence value : values) {
+                final String[] tokens = value.toString().split(",");
+                for (String token : tokens) {
+                    try {
+                        mediaTypes.add(new MediaType(token));
+                    } catch (IllegalArgumentException e) {
+                        // ignore
+                    }
+                }
+            }
+            mediaTypes.sort((o1, o2) -> {
+                //The */* type is always last
+                if (o1.type.equals("*")) {
+                    return 1;
+                } else if (o2.type.equals("*")) {
+                    return -1;
+                }
+                if (o2.subtype.equals("*") && !o1.subtype.equals("*")) {
+                    return -1;
+                } else if (o1.subtype.equals("*") && !o2.subtype.equals("*")) {
+                    return 1;
+                }
+                return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
+            });
+            return Collections.unmodifiableList(mediaTypes);
+        }
+        return Collections.emptyList();
+    }
+
+    /**
      * Create a new {@link MediaType} from the given text.
      *
      * @param mediaType The text
@@ -737,21 +778,5 @@ public class MediaType implements CharSequence, Comparable<MediaType> {
         }
 
         return Collections.emptyMap();
-    }
-
-    @Override
-    public int compareTo(@NotNull MediaType other) {
-        //The */* type is always last
-        if (type.equals("*")) {
-            return 1;
-        } else if (other.type.equals("*")) {
-            return -1;
-        }
-        if (other.subtype.equals("*") && !subtype.equals("*")) {
-            return -1;
-        } else if (subtype.equals("*") && !other.subtype.equals("*")) {
-            return 1;
-        }
-        return other.getQualityAsNumber().compareTo(getQualityAsNumber());
     }
 }

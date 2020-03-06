@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding
 
+import groovy.transform.EqualsAndHashCode
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
@@ -175,6 +176,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
             "name: $person.name, age: $person.age"
         }
 
+        @EqualsAndHashCode
         static class Person {
             String name
             Integer age

@@ -63,21 +63,9 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     default Collection<MediaType> accept() {
         final HttpHeaders headers = getHeaders();
         if (headers.contains(HttpHeaders.ACCEPT)) {
-            final List<String> values = headers.getAll(HttpHeaders.ACCEPT);
-            if (!values.isEmpty()) {
-                Set<MediaType> mediaTypes = new TreeSet<>();
-                for (String value : values) {
-                    final String[] tokens = value.split(",");
-                    for (String token : tokens) {
-                        try {
-                            mediaTypes.add(new MediaType(token));
-                        } catch (IllegalArgumentException e) {
-                            // ignore
-                        }
-                    }
-                }
-                return Collections.unmodifiableSet(mediaTypes);
-            }
+            return MediaType.orderedOf(
+                    headers.getAll(HttpHeaders.ACCEPT)
+            );
         }
         return Collections.emptySet();
     }
