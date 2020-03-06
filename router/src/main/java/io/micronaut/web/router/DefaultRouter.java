@@ -331,7 +331,7 @@ public class DefaultRouter implements Router {
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonUll HttpStatus status, HttpRequest<?> request) {
+    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull HttpStatus status, HttpRequest<?> request) {
         return findStatusInternal(null, status, request);
     }
 
@@ -402,13 +402,6 @@ public class DefaultRouter implements Router {
         } else {
             return Collections.emptyList();
         }
-    }
-
-    @Deprecated
-    @NonNull
-    @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri) {
-        return findAny(uri, null);
     }
 
     @SuppressWarnings("unchecked")

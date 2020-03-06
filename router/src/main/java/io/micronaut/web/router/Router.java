@@ -40,19 +40,6 @@ public interface Router {
     /**
      * Find any {@link RouteMatch} regardless of HTTP method.
      *
-     * @param uri The URI
-     * @param <T> The target type
-     * @param <R> The return type
-     * @return A stream of route matches
-     * @deprecated Use {@link #findAny(CharSequence, HttpRequest)} instead
-     */
-    @Deprecated
-    @NonNull
-    <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri);
-
-    /**
-     * Find any {@link RouteMatch} regardless of HTTP method.
-     *
      * @param uri     The URI
      * @param context The optional {@link HttpRequest} context information to apply {@link io.micronaut.web.router.filter.RouteMatchFilter}.
      * @param <T>     The target type
@@ -78,20 +65,6 @@ public interface Router {
      *
      * @param httpMethod The HTTP method
      * @param uri        The URI route match
-     * @param <T>        The target type
-     * @param <R>        The type
-     * @return A {@link Stream} of possible {@link Route} instances.
-     * @deprecated Use {@link #find(HttpMethod, CharSequence, HttpRequest)} instead
-     */
-    @Deprecated
-    @NonNull
-    <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri);
-
-    /**
-     * Finds all of the possible routes for the given HTTP method and URI.
-     *
-     * @param httpMethod The HTTP method
-     * @param uri        The URI route match
      * @param context    The optional {@link HttpRequest} context information to apply {@link io.micronaut.web.router.filter.RouteMatchFilter}.
      * @param <T>        The target type
      * @param <R>        The type
@@ -99,22 +72,6 @@ public interface Router {
      */
     default @NonNull
     <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
-        return find(httpMethod, uri);
-    }
-
-    /**
-     * Finds all of the possible routes for the given HTTP method and URI.
-     *
-     * @param httpMethod The HTTP method
-     * @param uri        The URI
-     * @param <T>        The target type
-     * @param <R>        The URI route match
-     * @return A {@link Stream} of possible {@link Route} instances.
-     * @deprecated Use {@link #find(HttpMethod, URI, HttpRequest)} instead
-     */
-    @Deprecated
-    default @NonNull
-    <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri) {
         return find(httpMethod, uri, null);
     }
 
@@ -130,7 +87,7 @@ public interface Router {
      */
     default @NonNull
     <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri, @Nullable HttpRequest<?> context) {
-        return find(httpMethod, uri.toString());
+        return find(httpMethod, uri.toString(), context);
     }
 
     /**
