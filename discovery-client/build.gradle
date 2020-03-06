@@ -18,7 +18,7 @@ dependencies {
     // used by AWSParameterStoreConfigClient
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.683'
 
-    testImplementation "org.testcontainers:spock:1.12.5"
+    testImplementation "org.testcontainers:spock:1.13.0"
 
     testImplementation dependencyVersion("micronaut.aws"), {
         exclude module:'micronaut-http-client'
