@@ -40,6 +40,19 @@ public interface Router {
     /**
      * Find any {@link RouteMatch} regardless of HTTP method.
      *
+     * @param uri The URI
+     * @param <T> The target type
+     * @param <R> The return type
+     * @return A stream of route matches
+     * @deprecated Use {@link #findAny(CharSequence, HttpRequest)} instead
+     */
+    @Deprecated
+    @NonNull
+    <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri);
+
+    /**
+     * Find any {@link RouteMatch} regardless of HTTP method.
+     *
      * @param uri     The URI
      * @param context The optional {@link HttpRequest} context information to apply {@link io.micronaut.web.router.filter.RouteMatchFilter}.
      * @param <T>     The target type
@@ -65,12 +78,45 @@ public interface Router {
      *
      * @param httpMethod The HTTP method
      * @param uri        The URI route match
+     * @param <T>        The target type
+     * @param <R>        The type
+     * @return A {@link Stream} of possible {@link Route} instances.
+     * @deprecated Use {@link #find(HttpMethod, CharSequence, HttpRequest)} instead
+     */
+    @Deprecated
+    @NonNull
+    <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri);
+
+    /**
+     * Finds all of the possible routes for the given HTTP method and URI.
+     *
+     * @param httpMethod The HTTP method
+     * @param uri        The URI route match
      * @param context    The optional {@link HttpRequest} context information to apply {@link io.micronaut.web.router.filter.RouteMatchFilter}.
      * @param <T>        The target type
      * @param <R>        The type
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    @NonNull <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context);
+    default @NonNull
+    <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
+        return find(httpMethod, uri);
+    }
+
+    /**
+     * Finds all of the possible routes for the given HTTP method and URI.
+     *
+     * @param httpMethod The HTTP method
+     * @param uri        The URI
+     * @param <T>        The target type
+     * @param <R>        The URI route match
+     * @return A {@link Stream} of possible {@link Route} instances.
+     * @deprecated Use {@link #find(HttpMethod, URI, HttpRequest)} instead
+     */
+    @Deprecated
+    default @NonNull
+    <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri) {
+        return find(httpMethod, uri, null);
+    }
 
     /**
      * Finds all of the possible routes for the given HTTP method and URI.
@@ -78,13 +124,13 @@ public interface Router {
      * @param httpMethod The HTTP method
      * @param uri        The URI
      * @param context    The optional {@link HttpRequest} context
-     * @param <T> The target type
+     * @param <T>        The target type
      * @param <R>        The URI route match
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    @Deprecated
-    default @NonNull <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri, @Nullable HttpRequest<?> context) {
-        return find(httpMethod, uri.toString(), context);
+    default @NonNull
+    <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri, @Nullable HttpRequest<?> context) {
+        return find(httpMethod, uri.toString());
     }
 
     /**
@@ -95,7 +141,8 @@ public interface Router {
      * @param <R>     The URI route match
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    default @NonNull <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request) {
+    default @NonNull
+    <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request) {
         return find(request, request.getPath());
     }
 
@@ -103,9 +150,9 @@ public interface Router {
      * Find method, that should be used for non-standard http methods. For standards it should act
      * the same as {@link #find(HttpMethod, CharSequence, HttpRequest)}
      * @param request The request, that can have overridden {@link HttpRequest#getMethodName()}
-     * @param uri The URI route match.
-     * @param <T> The target type.
-     * @param <R> The type of what
+     * @param uri     The URI route match.
+     * @param <T>     The target type.
+     * @param <R>     The type of what
      * @return A {@link Stream} of possible {@link Route} instances.
      */
     default @NonNull  <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request, @NonNull CharSequence uri) {
@@ -116,8 +163,8 @@ public interface Router {
      * Finds the closest match for the given request.
      *
      * @param request The request
-     * @param <T> The target type
-     * @param <R>        The type
+     * @param <T>     The target type
+     * @param <R>     The type
      * @return A {@link List} of possible {@link Route} instances.
      * @since 1.2.1
      */
@@ -135,7 +182,7 @@ public interface Router {
      *
      * @param httpMethod The HTTP method
      * @param uri        The URI
-     * @param <T> The target type
+     * @param <T>        The target type
      * @param <R>        The URI route match
      * @return The route match
      */
@@ -154,8 +201,8 @@ public interface Router {
      * Found a {@link RouteMatch} for the given {@link io.micronaut.http.HttpStatus} code.
      *
      * @param originatingClass The class the error originates from
-     * @param status The HTTP status
-     * @param <R>    The matched route
+     * @param status           The HTTP status
+     * @param <R>              The matched route
      * @return The {@link RouteMatch}
      */
     <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull HttpStatus status);
@@ -178,6 +225,58 @@ public interface Router {
      * @return The {@link RouteMatch}
      */
     <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull Throwable error);
+
+    /**
+     * Match a route to an error.
+     *
+     * @param originatingClass The class the error originates from
+     * @param error            The error
+     * @param request          The request
+     * @param <R>              The matched route
+     * @return The {@link RouteMatch}
+     */
+    <R> Optional<RouteMatch<R>> findErrorRoute(
+            @NonNull Class<?> originatingClass,
+            @NonNull Throwable error,
+            HttpRequest<?> request);
+
+    /**
+     * Match a route to an error.
+     *
+     * @param error            The error
+     * @param request          The request
+     * @param <R>              The matched route
+     * @return The {@link RouteMatch}
+     */
+    <R> Optional<RouteMatch<R>> findErrorRoute(
+            @NonNull Throwable error,
+            HttpRequest<?> request);
+
+    /**
+     * Found a {@link RouteMatch} for the given {@link io.micronaut.http.HttpStatus} code.
+     *
+     * @param originatingClass The class the error originates from
+     * @param status           The HTTP status
+     * @param request          The request
+     * @param <R>              The matched route
+     * @return The {@link RouteMatch}
+     */
+    <R> Optional<RouteMatch<R>> findStatusRoute(
+            @NonNull Class<?> originatingClass,
+            @NonNull HttpStatus status,
+            HttpRequest<?> request);
+
+    /**
+     * Found a {@link RouteMatch} for the given {@link io.micronaut.http.HttpStatus} code.
+     *
+     * @param status           The HTTP status
+     * @param request          The request
+     * @param <R>              The matched route
+     * @return The {@link RouteMatch}
+     */
+    <R> Optional<RouteMatch<R>> findStatusRoute(
+            @NonNull HttpStatus status,
+            HttpRequest<?> request);
 
     /**
      * Build a filtered {@link org.reactivestreams.Publisher} for an action.

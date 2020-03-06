@@ -278,21 +278,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (cause instanceof UnsatisfiedRouteException) {
             if (declaringType != null) {
                 // handle error with a method that is non global with bad request
-                errorRoute = router.route(declaringType, HttpStatus.BAD_REQUEST).orElse(null);
+                errorRoute = router.findStatusRoute(declaringType, HttpStatus.BAD_REQUEST, nettyHttpRequest).orElse(null);
             }
             if (errorRoute == null) {
                 // handle error with a method that is global with bad request
-                errorRoute = router.route(HttpStatus.BAD_REQUEST).orElse(null);
+                errorRoute = router.findStatusRoute(HttpStatus.BAD_REQUEST, nettyHttpRequest).orElse(null);
             }
         } else if (cause instanceof HttpStatusException) {
             HttpStatusException statusException = (HttpStatusException) cause;
             if (declaringType != null) {
                 // handle error with a method that is non global with bad request
-                errorRoute = router.route(declaringType, statusException.getStatus()).orElse(null);
+                errorRoute = router.findStatusRoute(declaringType, statusException.getStatus(), nettyHttpRequest).orElse(null);
             }
             if (errorRoute == null) {
                 // handle error with a method that is global with bad request
-                errorRoute = router.route(statusException.getStatus()).orElse(null);
+                errorRoute = router.findStatusRoute(statusException.getStatus(), nettyHttpRequest).orElse(null);
             }
         } else if (cause instanceof BeanInstantiationException && declaringType != null) {
             // If the controller could not be instantiated, don't look for a local error route
@@ -308,10 +308,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         // any another other exception may arise. handle these with non global exception marked method or a global exception marked method.
         if (errorRoute == null) {
             if (declaringType != null) {
-                errorRoute = router.route(declaringType, cause).orElse(null);
+                errorRoute = router.findErrorRoute(declaringType, cause, nettyHttpRequest).orElse(null);
             }
             if (errorRoute == null) {
-                errorRoute = router.route(cause).orElse(null);
+                errorRoute = router.findErrorRoute(cause, nettyHttpRequest).orElse(null);
             }
         }
 
@@ -579,7 +579,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (optionalFile.isPresent()) {
                 route = new BasicObjectRouteMatch(optionalFile.get());
             } else {
-                Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.NOT_FOUND);
+                Optional<RouteMatch<Object>> statusRoute = router.findStatusRoute(HttpStatus.NOT_FOUND, request);
                 if (statusRoute.isPresent()) {
                     route = statusRoute.get();
                 } else {
@@ -618,7 +618,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             NettyHttpRequest nettyHttpRequest,
             MutableHttpResponse<Object> defaultResponse,
             String message) {
-        Optional<RouteMatch<Object>> statusRoute = router.route(defaultResponse.status());
+        Optional<RouteMatch<Object>> statusRoute = router.findStatusRoute(defaultResponse.status(), request);
         if (statusRoute.isPresent()) {
             RouteMatch<Object> routeMatch = statusRoute.get();
             handleRouteMatch(routeMatch, nettyHttpRequest, ctx);
@@ -1078,12 +1078,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     Optional<RouteMatch<Object>> statusRoute = Optional.empty();
                     // if declaringType is not null, this means its a locally marked method handler
                     if (declaringType != null) {
-                        statusRoute = router.route(declaringType, status);
-                    }
-                    if (!statusRoute.isPresent()) {
-                        statusRoute = router.route(status);
+                        statusRoute = router.findStatusRoute(declaringType, status, request);
                     }
                     io.micronaut.http.HttpRequest<?> httpRequest = requestReference.get();
+                    if (!statusRoute.isPresent()) {
+                        statusRoute = router.findStatusRoute(status, httpRequest);
+                    }
 
                     if (statusRoute.isPresent()) {
                         routeMatch = statusRoute.get();
@@ -1207,17 +1207,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private MediaType resolveDefaultResponseContentType(NettyHttpRequest<?> request, RouteMatch<?> finalRoute) {
-        MediaType defaultResponseMediaType;
+        final List<MediaType> producesList = finalRoute.getProduces();
         final Iterator<MediaType> i = request.accept().iterator();
         if (i.hasNext()) {
-            defaultResponseMediaType = i.next();
-        } else {
-            final Iterator<MediaType> produces = finalRoute.getProduces().iterator();
-            if (produces.hasNext()) {
-                defaultResponseMediaType = produces.next();
-            } else {
-                defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
+            final MediaType mt = i.next();
+            if (producesList.contains(mt)) {
+                return mt;
             }
+        }
+
+        MediaType defaultResponseMediaType;
+        final Iterator<MediaType> produces = producesList.iterator();
+        if (produces.hasNext()) {
+            defaultResponseMediaType = produces.next();
+        } else {
+            defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
         }
         return defaultResponseMediaType;
     }
@@ -1251,10 +1255,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Optional<RouteMatch<Object>> statusRoute = Optional.empty();
                 // if declaringType is not null, this means its a locally marked method handler
                 if (declaringType != null) {
-                    statusRoute = router.route(declaringType, HttpStatus.NOT_FOUND);
+                    statusRoute = router.findStatusRoute(declaringType, HttpStatus.NOT_FOUND, httpRequest);
                 }
                 if (!statusRoute.isPresent()) {
-                    statusRoute = router.route(HttpStatus.NOT_FOUND);
+                    statusRoute = router.findStatusRoute(HttpStatus.NOT_FOUND, httpRequest);
                 }
 
                 if (statusRoute.isPresent()) {

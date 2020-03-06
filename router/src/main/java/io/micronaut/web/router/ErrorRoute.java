@@ -66,4 +66,7 @@ public interface ErrorRoute extends MethodBasedRoute {
 
     @Override
     ErrorRoute where(Predicate<HttpRequest<?>> condition);
+
+    @Override
+    ErrorRoute produces(MediaType... mediaType);
 }

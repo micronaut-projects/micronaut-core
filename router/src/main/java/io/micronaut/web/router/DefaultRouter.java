@@ -24,6 +24,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.web.router.exceptions.RoutingException;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -45,10 +46,11 @@ import java.util.stream.Stream;
 @Singleton
 public class DefaultRouter implements Router {
 
+    private static final List<MediaType> ACCEPT_ALL = Collections.singletonList(MediaType.ALL_TYPE);
     private final Map<String, List<UriRoute>> routesByMethod = new HashMap<>();
-    private final Set<StatusRoute> statusRoutes = new HashSet<>();
+    private final List<StatusRoute> statusRoutes = new ArrayList<>();
     private final Collection<FilterRoute> filterRoutes = new ArrayList<>();
-    private final Set<ErrorRoute> errorRoutes = new HashSet<>();
+    private final List<ErrorRoute> errorRoutes = new ArrayList<>();
     private final Set<Integer> exposedPorts;
     private List<Integer> defaultPorts;
 
@@ -67,8 +69,20 @@ public class DefaultRouter implements Router {
                 routesByMethod.computeIfAbsent(key, x -> new ArrayList<>()).add(route);
             }
 
-            this.statusRoutes.addAll(builder.getStatusRoutes());
-            this.errorRoutes.addAll(builder.getErrorRoutes());
+            for (StatusRoute statusRoute : builder.getStatusRoutes()) {
+                if (statusRoutes.contains(statusRoute)) {
+                    final StatusRoute existing = statusRoutes.stream().filter(r -> r.equals(statusRoute)).findFirst().orElse(null);
+                    throw new RoutingException("Attempted to register multiple local routes for http status [" + statusRoute.status() + "]. New route: " + statusRoute + ". Existing: " + existing);
+                }
+                this.statusRoutes.add(statusRoute);
+            }
+            for (ErrorRoute errorRoute : builder.getErrorRoutes()) {
+                if (errorRoutes.contains(errorRoute)) {
+                    final ErrorRoute existing = errorRoutes.stream().filter(r -> r.equals(errorRoute)).findFirst().orElse(null);
+                    throw new RoutingException("Attempted to register multiple local routes for error [" + errorRoute.exceptionType().getSimpleName() + "]. New route: " + errorRoute + ". Existing: " + existing);
+                }
+                this.errorRoutes.add(errorRoute);
+            }
             this.filterRoutes.addAll(builder.getFilterRoutes());
             exposedPorts.addAll(builder.getExposedPorts());
         }
@@ -257,6 +271,109 @@ public class DefaultRouter implements Router {
     }
 
     @Override
+    public <R> Optional<RouteMatch<R>> findErrorRoute(
+            @NonNull Class<?> originatingClass,
+            @NonNull Throwable error,
+            HttpRequest<?> request) {
+        return findErrorRouteInternal(originatingClass, error, request);
+    }
+
+    private <R> Optional<RouteMatch<R>> findErrorRouteInternal(
+            @Nullable Class<?> originatingClass,
+            @NonNull Throwable error, HttpRequest<?> request) {
+        Collection<MediaType> accept =
+                request.accept();
+        final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
+        if (hasAcceptHeader) {
+
+            for (ErrorRoute errorRoute : errorRoutes) {
+                @SuppressWarnings("unchecked")
+                final RouteMatch<R> match = (RouteMatch<R>) errorRoute
+                        .match(originatingClass, error).orElse(null);
+                if (match != null) {
+                    if (match.doesProduce(accept)) {
+                        return Optional.of(match);
+                    }
+                }
+            }
+        } else {
+            RouteMatch<R> firstMatch = null;
+            for (ErrorRoute errorRoute : errorRoutes) {
+                @SuppressWarnings("unchecked")
+                final RouteMatch<R> match = (RouteMatch<R>) errorRoute
+                        .match(originatingClass, error).orElse(null);
+                if (match != null) {
+                    final List<MediaType> produces = match.getProduces();
+                    if (CollectionUtils.isEmpty(produces) || produces.contains(MediaType.ALL_TYPE)) {
+                        return Optional.of(match);
+                    } else if (firstMatch == null) {
+                        firstMatch = match;
+                    }
+                }
+            }
+
+            return Optional.ofNullable(firstMatch);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findErrorRoute(@NonNull Throwable error, HttpRequest<?> request) {
+        return findErrorRouteInternal(null, error, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(
+            @NonNull Class<?> originatingClass,
+            @NonNull HttpStatus status,
+            HttpRequest<?> request) {
+        return findStatusInternal(originatingClass, status, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonUll HttpStatus status, HttpRequest<?> request) {
+        return findStatusInternal(null, status, request);
+    }
+
+    private <R> Optional<RouteMatch<R>> findStatusInternal(@Nullable Class<?> originatingClass, @NonNull HttpStatus status, HttpRequest<?> request) {
+        Collection<MediaType> accept =
+                request.accept();
+        final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
+        if (hasAcceptHeader) {
+
+            for (StatusRoute statusRoute : statusRoutes) {
+                @SuppressWarnings("unchecked")
+                final RouteMatch<R> match = (RouteMatch<R>) statusRoute
+                        .match(originatingClass, status).orElse(null);
+                if (match != null) {
+                    if (match.doesProduce(accept)) {
+                        return Optional.of(match);
+                    }
+                }
+            }
+        } else {
+            RouteMatch<R> firstMatch = null;
+            for (StatusRoute errorRoute : statusRoutes) {
+                @SuppressWarnings("unchecked")
+                final RouteMatch<R> match = (RouteMatch<R>) errorRoute
+                        .match(originatingClass, status).orElse(null);
+                if (match != null) {
+                    final List<MediaType> produces = match.getProduces();
+                    if (CollectionUtils.isEmpty(produces) || produces.contains(MediaType.ALL_TYPE)) {
+                        return Optional.of(match);
+                    } else if (firstMatch == null) {
+                        firstMatch = match;
+                    }
+                }
+            }
+
+            return Optional.ofNullable(firstMatch);
+
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public <R> Optional<RouteMatch<R>> route(@NonNull Throwable error) {
         Map<ErrorRoute, RouteMatch<R>> matchedRoutes = new LinkedHashMap<>();
         for (ErrorRoute errorRoute : errorRoutes) {
@@ -285,6 +402,13 @@ public class DefaultRouter implements Router {
         } else {
             return Collections.emptyList();
         }
+    }
+
+    @Deprecated
+    @NonNull
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri) {
+        return findAny(uri, null);
     }
 
     @SuppressWarnings("unchecked")

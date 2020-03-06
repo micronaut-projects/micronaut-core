@@ -1,10 +1,13 @@
 package io.micronaut.http.server.netty
 
+import groovy.transform.InheritConstructors
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
@@ -84,6 +87,60 @@ class ContentNegotiationSpec extends Specification {
         response.body().toString().contains("Specified Accept Types [application/graphql] not supported. Supported types: [text/plain]")
     }
 
+    @Unroll
+    void 'test error handling for content type #contentType'() {
+        given: "No content type is sent"
+        def request = HttpRequest.GET('/negotiate/error')
+        if (contentType != null) {
+            request = request.accept(contentType)
+        }
+        HttpResponse<String> response = null
+        try {
+            client.exchange(request, String)
+                    .blockingFirst()
+        } catch (HttpClientResponseException e) {
+            response = e.response
+        }
+
+        expect: "the correct content type was used"
+        response != null
+        response.getContentType().get() == expectedContentType
+        response.body() == expectedBody
+
+        where:
+        contentType                     | expectedContentType             | expectedBody
+        null                            | MediaType.APPLICATION_XML_TYPE | '<bad>Bad things happened</bad>'
+        MediaType.APPLICATION_XML_TYPE  | MediaType.APPLICATION_XML_TYPE  | '<bad>Bad things happened</bad>'
+        MediaType.APPLICATION_JSON_TYPE | MediaType.APPLICATION_JSON_TYPE | '{"message":"Bad things happened"}'
+    }
+
+    @Unroll
+    void 'test status handling for content type #contentType'() {
+        given: "No content type is sent"
+        def request = HttpRequest.GET('/negotiate/status')
+        if (contentType != null) {
+            request = request.accept(contentType)
+        }
+        HttpResponse<String> response = null
+        try {
+            response = client.exchange(request, String)
+                    .blockingFirst()
+        } catch (HttpClientResponseException e) {
+            response = e.response
+        }
+
+        expect: "the correct content type was used"
+        response != null
+        response.getContentType().get() == expectedContentType
+        response.body() == expectedBody
+
+        where:
+        contentType                     | expectedContentType             | expectedBody
+        null                            | MediaType.APPLICATION_XML_TYPE | '<bad>not a good request</bad>'
+        MediaType.APPLICATION_XML_TYPE  | MediaType.APPLICATION_XML_TYPE  | '<bad>not a good request</bad>'
+        MediaType.APPLICATION_JSON_TYPE | MediaType.APPLICATION_JSON_TYPE | '{"message":"not a good request"}'
+    }
+
     @Controller("/negotiate")
     static class NegotiatingController {
 
@@ -120,5 +177,42 @@ class ContentNegotiationSpec extends Specification {
         Person process(Person person) {
             return person
         }
+
+        @Get(value = '/error', produces = [MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON])
+        Person error() {
+            throw new MyException("Bad things happened")
+        }
+
+        @Get(value = '/status', produces = [MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON])
+        HttpResponse<?> status() {
+            HttpResponse.badRequest()
+        }
+
+        @Error(MyException)
+        @Produces(MediaType.APPLICATION_JSON)
+        JsonError jsonError(MyException e) {
+            new JsonError(e.getMessage())
+        }
+
+        @Error(MyException)
+        @Produces([MediaType.APPLICATION_XML, MediaType.ALL])
+        String xmlError(MyException e) {
+            "<bad>${e.message}</bad>"
+        }
+
+        @Error(status = HttpStatus.BAD_REQUEST)
+        @Produces(MediaType.APPLICATION_JSON)
+        HttpResponse<JsonError> jsonBad() {
+            HttpResponse.badRequest(new JsonError("not a good request"))
+        }
+
+        @Error(status = HttpStatus.BAD_REQUEST)
+        @Produces([MediaType.APPLICATION_XML, MediaType.ALL])
+        HttpResponse<String> xmlBad() {
+            HttpResponse.badRequest("<bad>not a good request</bad>")
+        }
     }
+
+    @InheritConstructors
+    static class MyException extends RuntimeException {}
 }
