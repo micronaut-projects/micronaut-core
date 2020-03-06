@@ -49,9 +49,9 @@ public enum WatchEventType {
         if (kind == StandardWatchEventKinds.ENTRY_CREATE) {
             return CREATE;
         } else if (kind == StandardWatchEventKinds.ENTRY_MODIFY) {
-            return CREATE;
+            return MODIFY;
         } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
-            return CREATE;
+            return DELETE;
         } else {
             throw new IllegalArgumentException("Unsupported watch event kind: " + kind);
         }
