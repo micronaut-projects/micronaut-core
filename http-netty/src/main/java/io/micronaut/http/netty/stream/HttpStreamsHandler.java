@@ -237,6 +237,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             }
             if (isClient()) {
                 ctx.read();
+            } else {
+                ctx.fireChannelWritabilityChanged();
             }
         }
     }

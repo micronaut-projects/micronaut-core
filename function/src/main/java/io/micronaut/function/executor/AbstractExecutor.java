@@ -102,7 +102,7 @@ class AbstractExecutor<C> {
      * @return The {@link ApplicationContextBuilder}
      */
     protected @Nonnull ApplicationContextBuilder newApplicationContextBuilder() {
-        return ApplicationContext.build(Environment.FUNCTION);
+        return ApplicationContext.builder(Environment.FUNCTION);
     }
 
     /**

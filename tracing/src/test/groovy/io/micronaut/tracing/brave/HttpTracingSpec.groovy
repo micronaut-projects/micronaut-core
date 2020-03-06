@@ -159,10 +159,10 @@ class HttpTracingSpec extends Specification {
 
     void "tested nested http tracing with server without tracing"() {
         given:
-        ApplicationContext appWithoutTracing = ApplicationContext.build().start()
+        ApplicationContext appWithoutTracing = ApplicationContext.builder().start()
         EmbeddedServer embeddedServerWithoutTracing = appWithoutTracing.getBean(EmbeddedServer).start()
 
-        ApplicationContext context = ApplicationContext.build(
+        ApplicationContext context = ApplicationContext.builder(
                 'tracing.zipkin.enabled':true,
                 'tracing.zipkin.sampler.probability':1,
                 'micronaut.http.services.not-traced-client.urls[0]':"http://localhost:${embeddedServerWithoutTracing.port}",
@@ -252,7 +252,7 @@ class HttpTracingSpec extends Specification {
 
     ApplicationContext buildContext() {
         def reporter = new TestReporter()
-        ApplicationContext.build(
+        ApplicationContext.builder(
                 'tracing.zipkin.enabled':true,
                 'tracing.zipkin.sampler.probability':1
         )

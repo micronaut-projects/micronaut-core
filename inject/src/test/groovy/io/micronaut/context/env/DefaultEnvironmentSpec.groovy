@@ -317,7 +317,7 @@ class DefaultEnvironmentSpec extends Specification {
     // tag::disableEnvDeduction[]
     void "test disable environment deduction via builder"() {
         when:
-        ApplicationContext ctx = ApplicationContext.build().deduceEnvironment(false).start()
+        ApplicationContext ctx = ApplicationContext.builder().deduceEnvironment(false).start()
 
         then:
         !ctx.environment.activeNames.contains(Environment.TEST)
@@ -369,7 +369,7 @@ class DefaultEnvironmentSpec extends Specification {
     }
 
     void "test custom property source is not removed after refresh"() {
-        ApplicationContext context = ApplicationContext.build(['static': true]).start()
+        ApplicationContext context = ApplicationContext.builder(['static': true]).start()
 
         expect:
         context.getRequiredProperty("static", Boolean.class)

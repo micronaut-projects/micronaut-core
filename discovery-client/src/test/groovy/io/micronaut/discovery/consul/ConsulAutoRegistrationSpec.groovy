@@ -66,7 +66,7 @@ class ConsulAutoRegistrationSpec extends Specification {
         Map discoveryClientMap = ['consul.client.host': consulHost,
                                   'consul.client.port': consulPort,
                                   "micronaut.caches.discovery-client.enabled": false]
-        DiscoveryClient discoveryClient = ApplicationContext.build(discoveryClientMap)
+        DiscoveryClient discoveryClient = ApplicationContext.builder(discoveryClientMap)
                                                             .build()
                                                             .start()
                                                             .getBean(DiscoveryClient)
@@ -105,7 +105,7 @@ class ConsulAutoRegistrationSpec extends Specification {
         Map discoveryClientMap = ['consul.client.host': consulHost,
                                   'consul.client.port': consulPort,
                                   "micronaut.caches.discovery-client.enabled": false]
-        DiscoveryClient discoveryClient = ApplicationContext.build(discoveryClientMap)
+        DiscoveryClient discoveryClient = ApplicationContext.builder(discoveryClientMap)
                 .build()
                 .start()
                 .getBean(DiscoveryClient)
@@ -147,7 +147,7 @@ class ConsulAutoRegistrationSpec extends Specification {
                                   'consul.client.port': consulPort,
                                   "micronaut.caches.discovery-client.enabled": false,
                                   'consul.client.discovery.tags.myService'  : 'foo']
-        DiscoveryClient discoveryClient = ApplicationContext.build(discoveryClientMap)
+        DiscoveryClient discoveryClient = ApplicationContext.builder(discoveryClientMap)
                 .build()
                 .start()
                 .getBean(DiscoveryClient)
@@ -157,7 +157,7 @@ class ConsulAutoRegistrationSpec extends Specification {
                                    "micronaut.caches.discovery-client.enabled": false,
                                    'consul.client.discovery.tags.myService'  : ['someother']]
 
-        DiscoveryClient anotherClient = ApplicationContext.build(anotherClientConfig).run(DiscoveryClient)
+        DiscoveryClient anotherClient = ApplicationContext.builder(anotherClientConfig).run(DiscoveryClient)
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
         then: "the server is registered with Consul"

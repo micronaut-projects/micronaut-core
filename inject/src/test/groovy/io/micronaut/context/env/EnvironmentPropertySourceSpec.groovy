@@ -12,14 +12,14 @@ class EnvironmentPropertySourceSpec extends Specification {
 
     void "test disabling environment properties"() {
         environmentVariables.set("A_B_C_D", "abcd")
-        ApplicationContext context = ApplicationContext.build().start()
+        ApplicationContext context = ApplicationContext.builder().start()
 
         expect:
         context.getRequiredProperty("a.b.c.d", String) == "abcd"
 
         when:
         context.stop()
-        context = ApplicationContext.build().environmentPropertySource(false).start()
+        context = ApplicationContext.builder().environmentPropertySource(false).start()
 
         then:
         !context.getProperty("a.b.c.d", String).isPresent()
@@ -34,7 +34,7 @@ class EnvironmentPropertySourceSpec extends Specification {
         environmentVariables.set("A_B_C_F", "abcf")
         environmentVariables.set("A_B_C_G", "abcg")
         environmentVariables.set("A_B_C_H", "abch")
-        ApplicationContext context = ApplicationContext.build().environmentVariableIncludes("A_B_C_G", "A_B_C_E").start()
+        ApplicationContext context = ApplicationContext.builder().environmentVariableIncludes("A_B_C_G", "A_B_C_E").start()
 
         expect:
         !context.getProperty("a.b.c.d", String).isPresent()
@@ -45,7 +45,7 @@ class EnvironmentPropertySourceSpec extends Specification {
 
         when:
         context.stop()
-        context = ApplicationContext.build()
+        context = ApplicationContext.builder()
                 .environmentVariableIncludes("A_B_C_D", "A_B_C_F", "A_B_C_H")
                 .environmentVariableExcludes("A_B_C_H").start()
 
@@ -58,7 +58,7 @@ class EnvironmentPropertySourceSpec extends Specification {
 
         when:
         context.stop()
-        context = ApplicationContext.build()
+        context = ApplicationContext.builder()
                 .environmentVariableExcludes("A_B_C_G", "A_B_C_H").start()
 
         then:
@@ -74,7 +74,7 @@ class EnvironmentPropertySourceSpec extends Specification {
 
     void "test a very large environment variable"() {
         environmentVariables.set("A_B_C_D_E_F_G_H_I_J_K_L_M_N", "alphabet")
-        ApplicationContext context = ApplicationContext.build().start()
+        ApplicationContext context = ApplicationContext.builder().start()
 
         expect:
         context.getProperty("a.b.c.d.e.f.g.h.i.j.k.l.m.n", String).isPresent()

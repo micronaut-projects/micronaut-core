@@ -82,7 +82,7 @@ class HystrixSpec extends Specification {
 
     ApplicationContext buildContext() {
         def reporter = new TestReporter()
-        ApplicationContext.build(
+        ApplicationContext.builder(
                 'tracing.zipkin.enabled':true,
                 'tracing.zipkin.sampler.probability':1
         )

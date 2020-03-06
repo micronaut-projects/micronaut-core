@@ -81,7 +81,7 @@ class EurekaAutoRegistrationSpec extends Specification{
         )
 
         // run a Eureka client
-        EurekaClient eurekaClient = ApplicationContext.build(eurekaConfiguration).run(EurekaClient)
+        EurekaClient eurekaClient = ApplicationContext.builder(eurekaConfiguration).run(EurekaClient)
 
         // since Eureka is eventually consistent a long timeout/delay is required slowing this test down significantly
         PollingConditions conditions = new PollingConditions(timeout: 60, delay: 1)
