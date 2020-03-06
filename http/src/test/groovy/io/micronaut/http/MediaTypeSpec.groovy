@@ -106,12 +106,12 @@ class MediaTypeSpec extends Specification {
     @Unroll
     void "test order types: #commaSeparatedList"() {
         given:
-        List<MediaType> orderedList = MediaType.of(commaSeparatedList.split(',')).toList().sort()
+        List<MediaType> orderedList = MediaType.orderedOf(commaSeparatedList.split(','))
 
         expect:
-        orderedList.size == expectedList.size
+        orderedList.size() == expectedList.size()
         for (int i = 0; i < orderedList.size(); i++) {
-            assert (orderedList.get(i).equals(expectedList.get(i)) == true)
+            assert orderedList.get(i) == expectedList.get(i)
         }
 
         where:

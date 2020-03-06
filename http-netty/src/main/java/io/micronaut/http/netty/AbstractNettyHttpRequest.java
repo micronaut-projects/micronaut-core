@@ -26,6 +26,7 @@ import io.netty.util.DefaultAttributeMap;
 
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.util.Collection;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -50,6 +51,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     private Charset charset;
     private Locale locale;
     private String path;
+    private Collection<MediaType> accept;
 
     /**
      * @param nettyRequest      The Http netty request
@@ -84,6 +86,21 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             }
         }
         return httpParameters;
+    }
+
+    @Override
+    public Collection<MediaType> accept() {
+        Collection<MediaType> accept = this.accept;
+        if (accept == null) {
+            synchronized (this) { // double check
+                accept = this.accept;
+                if (accept == null) {
+                    accept = HttpRequest.super.accept();
+                    this.accept = accept;
+                }
+            }
+        }
+        return accept;
     }
 
     @Override

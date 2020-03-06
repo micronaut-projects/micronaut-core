@@ -318,7 +318,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 LOG.debug("Found matching exception handler for exception [{}]: {}", cause.getMessage(), errorRoute);
             }
             errorRoute = requestArgumentSatisfier.fulfillArgumentRequirements(errorRoute, nettyHttpRequest, false);
-            MediaType defaultResponseMediaType = errorRoute.getProduces().stream().findFirst().orElse(MediaType.APPLICATION_JSON_TYPE);
+            MediaType defaultResponseMediaType = resolveDefaultResponseContentType(
+                    nettyHttpRequest,
+                    errorRoute
+            );
             try {
                 final MethodBasedRouteMatch<?, ?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
                 Class<?> javaReturnType = errorRoute.getReturnType().getType();
@@ -1016,13 +1019,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
 
         route = route.decorate(finalRoute -> {
-            MediaType defaultResponseMediaType = finalRoute
-                .getProduces()
-                .stream()
-                .findFirst()
-                .orElse(MediaType.APPLICATION_JSON_TYPE);
-
-
+            MediaType defaultResponseMediaType = resolveDefaultResponseContentType(
+                    request,
+                    finalRoute
+            );
             ReturnType<?> genericReturnType = finalRoute.getReturnType();
             Class<?> javaReturnType = genericReturnType.getType();
 
@@ -1197,6 +1197,22 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             return null;
         });
         return route;
+    }
+
+    private MediaType resolveDefaultResponseContentType(NettyHttpRequest<?> request, RouteMatch<?> finalRoute) {
+        MediaType defaultResponseMediaType;
+        final Iterator<MediaType> i = request.accept().iterator();
+        if (i.hasNext()) {
+            defaultResponseMediaType = i.next();
+        } else {
+            final Iterator<MediaType> produces = finalRoute.getProduces().iterator();
+            if (produces.hasNext()) {
+                defaultResponseMediaType = produces.next();
+            } else {
+                defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
+            }
+        }
+        return defaultResponseMediaType;
     }
 
     private Flowable<MutableHttpResponse<?>> buildRoutePublisher(
