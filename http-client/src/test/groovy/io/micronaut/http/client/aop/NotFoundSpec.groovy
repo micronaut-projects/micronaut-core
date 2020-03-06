@@ -17,6 +17,7 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
@@ -54,6 +55,7 @@ class NotFoundSpec extends Specification {
     @Client('/not-found')
     static interface InventoryClient {
         @Get('/maybe/{isbn}')
+        @Consumes(MediaType.TEXT_PLAIN)
         Maybe<Boolean> maybe(String isbn)
 
         @Get(value = '/flowable/{isbn}', processes = MediaType.TEXT_EVENT_STREAM)

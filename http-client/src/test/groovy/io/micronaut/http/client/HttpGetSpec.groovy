@@ -786,7 +786,7 @@ class HttpGetSpec extends Specification {
     @Client("http://not.used")
     static interface OverrideUrlClient {
 
-        @Get("{+url}/get/simple")
+        @Get(value = "{+url}/get/simple", consumes = MediaType.TEXT_PLAIN)
         String overrideUrl(String url);
 
     }

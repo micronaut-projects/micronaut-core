@@ -16,6 +16,7 @@
 package io.micronaut.docs.server.sse;
 
 // tag::imports[]
+import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.sse.Event;
 import io.micronaut.scheduling.TaskExecutors;
@@ -28,8 +29,8 @@ import org.reactivestreams.Publisher;
 @Controller("/headlines")
 public class HeadlineController {
 
-    @Get
     @ScheduleOn(TaskExecutors.IO)
+    @Get(produces = MediaType.TEXT_EVENT_STREAM)
     public Publisher<Event<Headline>> index() { // <1>
         String[] versions = new String[]{"1.0", "2.0"}; // <2>
 

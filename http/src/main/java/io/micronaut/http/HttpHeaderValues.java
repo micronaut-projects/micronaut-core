@@ -24,6 +24,11 @@ package io.micronaut.http;
 public interface HttpHeaderValues {
 
     /**
+     * {@code "keep-alive"}.
+     */
+    String CONNECTION_KEEP_ALIVE = "keep-alive";
+
+    /**
      * {@code "Bearer"}.
      */
     String AUTHORIZATION_PREFIX_BEARER = "Bearer";

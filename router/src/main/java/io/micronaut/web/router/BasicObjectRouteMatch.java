@@ -21,10 +21,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 
 /**
@@ -90,7 +87,17 @@ public class BasicObjectRouteMatch implements RouteMatch<Object> {
     }
 
     @Override
-    public boolean accept(@Nullable MediaType contentType) {
+    public boolean doesConsume(@Nullable MediaType contentType) {
+        return true;
+    }
+
+    @Override
+    public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
+        return true;
+    }
+
+    @Override
+    public boolean doesProduce(@Nullable MediaType acceptableType) {
         return true;
     }
 

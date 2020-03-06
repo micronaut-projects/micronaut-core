@@ -148,7 +148,7 @@ public class MultipartFileUploadSpec {
     @Controller("/multipart")
     static class MultipartController {
 
-        @Post(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA)
+        @Post(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
         HttpResponse<String> upload(byte[] data) {
             return HttpResponse.ok("Uploaded " + data.length + " bytes");
         }

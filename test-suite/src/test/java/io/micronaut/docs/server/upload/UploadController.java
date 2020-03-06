@@ -30,7 +30,7 @@ import java.io.IOException;
 @Controller("/upload")
 public class UploadController {
 
-    @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
+    @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN) // <1>
     public Single<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
         File tempFile;
         try {

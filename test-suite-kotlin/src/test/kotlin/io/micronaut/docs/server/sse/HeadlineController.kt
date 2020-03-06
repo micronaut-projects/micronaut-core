@@ -17,6 +17,7 @@ package io.micronaut.docs.server.sse
 
 // tag::imports[]
 
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.sse.Event
@@ -34,8 +35,8 @@ import java.util.concurrent.Callable
 @Controller("/headlines")
 class HeadlineController {
 
-    @Get
     @ScheduleOn(TaskExecutors.IO)
+    @Get(produces = [MediaType.TEXT_EVENT_STREAM])
     fun index(): Publisher<Event<Headline>> { // <1>
         val versions = arrayOf("1.0", "2.0") // <2>
 
