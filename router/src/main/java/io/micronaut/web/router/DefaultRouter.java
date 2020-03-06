@@ -134,7 +134,7 @@ public class DefaultRouter implements Router {
     public <T, R> Stream<UriRouteMatch<T, R>> find(@Nonnull HttpRequest<?> request) {
         boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
         return this.<T, R>find(request, request.getPath())
-                .filter((match) -> match.test(request) && (!permitsBody || match.accept(request.getContentType().orElse(null))));
+                .filter((match) -> match.test(request) && (!permitsBody || match.doesConsume(request.getContentType().orElse(null))));
     }
 
     @SuppressWarnings("unchecked")
@@ -155,28 +155,38 @@ public class DefaultRouter implements Router {
         final HttpMethod httpMethod = request.getMethod();
         final MediaType contentType = request.getContentType().orElse(null);
         boolean permitsBody = HttpMethod.permitsRequestBody(httpMethod);
+        final Collection<MediaType> acceptedProducedTypes = request.accept();
         List<UriRouteMatch<T, R>> uriRoutes = this.find(request.getMethodName(), request.getPath());
         uriRoutes.removeIf(routeMatch ->
-                !(routeMatch.test(request) && (!permitsBody || routeMatch.accept(contentType)))
+                !(routeMatch.test(request) && (!permitsBody || routeMatch.doesConsume(contentType)) && routeMatch.doesProduce(acceptedProducedTypes))
         );
-
         int routeCount = uriRoutes.size();
+        if (routeCount <= 1) {
+            return uriRoutes;
+        }
+
+        if (CollectionUtils.isNotEmpty(acceptedProducedTypes)) {
+            // take the highest priority accepted type
+            final MediaType mediaType = acceptedProducedTypes.iterator().next();
+            uriRoutes.removeIf(routeMatch -> !routeMatch.doesProduce(mediaType));
+        }
+        routeCount = uriRoutes.size();
         if (routeCount > 1 && permitsBody) {
 
-            List<UriRouteMatch<T, R>> explicitAcceptRoutes = new ArrayList<>(routeCount);
-            List<UriRouteMatch<T, R>> acceptRoutes = new ArrayList<>(routeCount);
+            List<UriRouteMatch<T, R>> explicitlyConsumedRoutes = new ArrayList<>(routeCount);
+            List<UriRouteMatch<T, R>> consumesRoutes = new ArrayList<>(routeCount);
 
 
             for (UriRouteMatch<T, R> match: uriRoutes) {
-                if (match.explicitAccept(contentType != null ? contentType : MediaType.ALL_TYPE)) {
-                    explicitAcceptRoutes.add(match);
+                if (match.explicitlyConsumes(contentType != null ? contentType : MediaType.ALL_TYPE)) {
+                    explicitlyConsumedRoutes.add(match);
                 }
-                if (explicitAcceptRoutes.isEmpty() && match.accept(contentType)) {
-                    acceptRoutes.add(match);
+                if (explicitlyConsumedRoutes.isEmpty() && match.doesConsume(contentType)) {
+                    consumesRoutes.add(match);
                 }
             }
 
-            uriRoutes = explicitAcceptRoutes.isEmpty() ? acceptRoutes : explicitAcceptRoutes;
+            uriRoutes = explicitlyConsumedRoutes.isEmpty() ? consumesRoutes : explicitlyConsumedRoutes;
         }
 
         /*

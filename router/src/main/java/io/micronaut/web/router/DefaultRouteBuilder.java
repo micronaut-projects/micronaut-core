@@ -483,7 +483,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Route acceptAll() {
+        public Route consumesAll() {
             this.acceptedMediaTypes = Collections.emptyList();
             return this;
         }
@@ -603,7 +603,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Route acceptAll() {
+        public Route consumesAll() {
             return this;
         }
 
@@ -718,7 +718,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Route acceptAll() {
+        public Route consumesAll() {
             return this;
         }
 
@@ -911,8 +911,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute acceptAll() {
-            return (UriRoute) super.acceptAll();
+        public UriRoute consumesAll() {
+            return (UriRoute) super.consumesAll();
         }
 
         @Override
@@ -1049,7 +1049,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Route acceptAll() {
+        public Route consumesAll() {
             return consumes(MediaType.EMPTY_ARRAY);
         }
 

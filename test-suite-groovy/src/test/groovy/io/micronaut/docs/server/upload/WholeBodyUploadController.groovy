@@ -30,7 +30,9 @@ import org.reactivestreams.Subscription
 @Controller("/upload")
 class WholeBodyUploadController {
 
-    @Post(value = "/whole-body", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
+    @Post(value = "/whole-body",
+            consumes = MediaType.MULTIPART_FORM_DATA,
+            produces = MediaType.TEXT_PLAIN) // <1>
     Single<String> uploadBytes(@Body MultipartBody body) { // <2>
         Single.<String>create({ emitter ->
             body.subscribe(new Subscriber<CompletedPart>() {

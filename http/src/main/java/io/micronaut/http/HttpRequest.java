@@ -24,7 +24,6 @@ import java.net.URI;
 import java.security.Principal;
 import java.security.cert.Certificate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * <p>Common interface for HTTP request implementations.</p>
@@ -62,23 +61,25 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return A list of zero or many {@link MediaType} instances
      */
     default Collection<MediaType> accept() {
-        final List<String> values = getHeaders().getAll(HttpHeaders.ACCEPT);
-        if (!values.isEmpty()) {
-            Set<MediaType> mediaTypes = new TreeSet<>();
-            for (String value : values) {
-                final String[] tokens = value.split(",");
-                for (String token : tokens) {
-                    try {
-                        mediaTypes.add(new MediaType(token));
-                    } catch (IllegalArgumentException e) {
-                        // ignore
+        final HttpHeaders headers = getHeaders();
+        if (headers.contains(HttpHeaders.ACCEPT)) {
+            final List<String> values = headers.getAll(HttpHeaders.ACCEPT);
+            if (!values.isEmpty()) {
+                Set<MediaType> mediaTypes = new TreeSet<>();
+                for (String value : values) {
+                    final String[] tokens = value.split(",");
+                    for (String token : tokens) {
+                        try {
+                            mediaTypes.add(new MediaType(token));
+                        } catch (IllegalArgumentException e) {
+                            // ignore
+                        }
                     }
                 }
+                return Collections.unmodifiableSet(mediaTypes);
             }
-            return Collections.unmodifiableSet(mediaTypes);
-        } else {
-            return Collections.emptySet();
         }
+        return Collections.emptySet();
     }
 
     /**

@@ -563,7 +563,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             } else {
                 BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
 
-                if (void.class != javaReturnType) {
+                if (void.class != javaReturnType && httpMethod != HttpMethod.HEAD) {
                     request.accept(acceptTypes);
                 }
 

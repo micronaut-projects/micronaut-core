@@ -117,7 +117,7 @@ class ClientFilterSpec extends Specification{
     @Requires(property = 'spec.name', value = "ClientFilterSpec")
     @Client('/filters')
     static interface MyApi {
-        @Get('/name')
+        @Get(value = '/name', consumes = MediaType.TEXT_PLAIN)
         String name()
     }
 

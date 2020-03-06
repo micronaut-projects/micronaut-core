@@ -16,7 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Headers;
 
 import java.time.LocalDateTime;
@@ -25,8 +24,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html.
@@ -534,7 +531,7 @@ public interface HttpHeaders extends Headers {
      */
     default boolean isKeepAlive() {
         return getFirst(CONNECTION, ConversionContext.STRING)
-                 .map(val -> val.equalsIgnoreCase("keep-alive")).orElse(false);
+                 .map(val -> val.equalsIgnoreCase(HttpHeaderValues.CONNECTION_KEEP_ALIVE)).orElse(false);
     }
 
     /**

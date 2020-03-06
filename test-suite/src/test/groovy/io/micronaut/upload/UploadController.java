@@ -56,29 +56,29 @@ import java.util.concurrent.atomic.LongAdder;
 @Controller("/upload")
 public class UploadController {
 
-    @Post(value = "/receive-json", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-json", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public String receiveJson(Data data, String title) {
         return title + ": " + data.toString();
     }
 
-    @Post(value = "/receive-plain", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-plain", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public String receivePlain(String data, String title) {
         return title + ": " + data;
     }
 
-    @Post(value = "/receive-bytes", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-bytes", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public String receiveBytes(byte[] data, String title) {
         return title + ": " + data.length;
     }
 
-    @Post(value = "/receive-file-upload", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-file-upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Publisher<MutableHttpResponse<?>> receiveFileUpload(StreamingFileUpload data, String title) {
         long size = data.getDefinedSize();
         return Flowable.fromPublisher(data.transferTo(title + ".json"))
                        .map(success -> success ? HttpResponse.ok( "Uploaded " + size  ) : HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened")).onErrorReturnItem(HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"));
     }
 
-    @Post(value = "/receive-completed-file-upload", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-completed-file-upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public String receiveCompletedFileUpload(CompletedFileUpload data) {
         try {
             return data.getFilename() + ": " + data.getBytes().length;
@@ -87,7 +87,7 @@ public class UploadController {
         }
     }
 
-    @Post(value = "/receive-publisher", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-publisher", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Single<HttpResponse> receivePublisher(Flowable<byte[]> data) {
         return data.reduce(new StringBuilder(), (stringBuilder, bytes) ->
 
@@ -201,7 +201,7 @@ public class UploadController {
         return subject.toFlowable(BackpressureStrategy.ERROR);
     }
 
-    @Post(value = "/receive-multiple-streaming", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-multiple-streaming", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Single<HttpResponse> receiveMultipleStreaming(
             Flowable<StreamingFileUpload> data) {
         return data.subscribeOn(Schedulers.io()).flatMap((StreamingFileUpload upload) -> {
@@ -219,7 +219,7 @@ public class UploadController {
                 });
     }
 
-    @Post(value = "/receive-partdata", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-partdata", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Single<HttpResponse> receivePartdata(
             Flowable<PartData> data) {
         return data.subscribeOn(Schedulers.io())
@@ -236,7 +236,7 @@ public class UploadController {
                 });
     }
 
-    @Post(value = "/receive-multiple-publishers", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-multiple-publishers", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Single<HttpResponse> receiveMultiplePublishers(Flowable<Flowable<byte[]>> data) {
         return data.subscribeOn(Schedulers.io()).flatMap((Flowable<byte[]> upload) -> {
             return upload.map((bytes) -> bytes);

@@ -306,7 +306,7 @@ class ClientScopeSpec extends Specification {
     @JacksonFeatures(disabledDeserializationFeatures = DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE)
     static interface MyServiceJacksonFeatures {
 
-        @Get
+        @Get(consumes = MediaType.TEXT_PLAIN)
         String name()
     }
 }

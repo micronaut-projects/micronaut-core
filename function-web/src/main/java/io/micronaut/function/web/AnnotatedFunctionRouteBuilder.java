@@ -159,7 +159,7 @@ public class AnnotatedFunctionRouteBuilder
                                     }
                                 } else {
                                     route.body(method.getArgumentNames()[0])
-                                            .acceptAll();
+                                            .consumesAll();
                                 }
                             }
                         }

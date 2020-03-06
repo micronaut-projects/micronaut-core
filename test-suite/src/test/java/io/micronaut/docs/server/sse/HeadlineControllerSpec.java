@@ -38,7 +38,8 @@ public class HeadlineControllerSpec {
 
         List<Event<Headline>> events = new ArrayList<>();
 
-        client.eventStream(HttpRequest.GET("/headlines"), Headline.class).subscribe(events::add);
+        client.eventStream(HttpRequest.GET("/headlines"), Headline.class)
+                .subscribe(events::add);
 
         await().until(() -> events.size() == 2);
         assertEquals("Micronaut 1.0 Released", events.get(0).getData().getTitle());

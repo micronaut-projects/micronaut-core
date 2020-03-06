@@ -28,7 +28,7 @@ import java.io.File
 @Controller("/upload")
 class UploadController {
 
-    @Post(value = "/", consumes = [MediaType.MULTIPART_FORM_DATA]) // <1>
+    @Post(value = "/", consumes = [MediaType.MULTIPART_FORM_DATA], produces = [MediaType.TEXT_PLAIN]) // <1>
     fun upload(file: StreamingFileUpload): Single<HttpResponse<String>> { // <2>
         val tempFile = File.createTempFile(file.filename, "temp")
         val uploadPublisher = file.transferTo(tempFile) // <3>

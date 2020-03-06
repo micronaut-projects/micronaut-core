@@ -17,7 +17,10 @@ dependencies {
     testImplementation project(":http-client")
     testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.5'
     testImplementation group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.5'
-
+    testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
+        exclude module:'micronaut-runtime'
+        exclude module:'micronaut-inject'
+    }
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation dependencyModuleVersion("groovy", "groovy-templates")
     testImplementation dependencyVersion("rxjava2")

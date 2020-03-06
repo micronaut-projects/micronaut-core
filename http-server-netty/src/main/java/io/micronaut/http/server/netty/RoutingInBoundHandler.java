@@ -29,6 +29,7 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -491,56 +492,79 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         RouteMatch<?> route;
 
+        final String requestMethodName = request.getMethodName();
         if (routeMatch == null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("No matching route found for URI {} and method {}", request.getUri(), httpMethod);
             }
 
-            // if there is no route present try to locate a route that matches a different content type
-            Set<MediaType> existingRouteConsumes = router
-                    .find(httpMethod, requestPath, request)
-                    .map(UriRouteMatch::getRoute)
-                    .flatMap(r -> r.getConsumes().stream())
-                    .collect(Collectors.toSet());
 
-            if (!existingRouteConsumes.isEmpty() && !existingRouteConsumes.contains(MediaType.ALL_TYPE)) {
-                MediaType contentType = request.getContentType().orElse(null);
-                if (contentType != null) {
-                    if (!existingRouteConsumes.contains(contentType)) {
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(),
-                                    request.getMethodName(), contentType);
-                        }
+            // if there is no route present try to locate a route that matches a different HTTP method
+            final List<UriRouteMatch<?, ?>> anyMatchingRoutes = router
+                    .findAny(request.getUri().toString(), request)
+                    .collect(Collectors.toList());
+            MediaType contentType = request.getContentType().orElse(null);
+            final Collection<MediaType> acceptedTypes = request.accept();
+            final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
 
-                        handleStatusError(
-                                ctx,
-                                request,
-                                nettyHttpRequest,
-                                HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-                                "Content Type [" + contentType + "] not allowed. Allowed types: " + existingRouteConsumes);
-                        return;
-                    }
+            Set<MediaType> acceptableContentTypes = contentType != null ? new HashSet<>(5) : null;
+            Set<String> allowedMethods = new HashSet<>(5);
+            Set<MediaType> produceableContentTypes = hasAcceptHeader ? new HashSet<>(5) : null;
+            for (UriRouteMatch<?, ?> anyRoute : anyMatchingRoutes) {
+                final String routeMethod = anyRoute.getRoute().getHttpMethodName();
+                if (!requestMethodName.equals(routeMethod)) {
+                    allowedMethods.add(routeMethod);
+                }
+                if (contentType != null && !anyRoute.doesConsume(contentType)) {
+                    acceptableContentTypes.addAll(anyRoute.getRoute().getConsumes());
+                }
+                if (hasAcceptHeader && !anyRoute.doesProduce(acceptedTypes)) {
+                    produceableContentTypes.addAll(anyRoute.getRoute().getProduces());
                 }
             }
 
-            // if there is no route present try to locate a route that matches a different HTTP method
-            Set<String> existingRouteMethods = router
-                    .findAny(request.getUri().toString(), request)
-                    .map(UriRouteMatch::getRoute)
-                    .map(UriRoute::getHttpMethodName)
-                    .collect(Collectors.toSet());
-
-            if (!existingRouteMethods.isEmpty()) {
+            if (CollectionUtils.isNotEmpty(acceptableContentTypes)) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Method not allowed for URI {} and method {}", request.getUri(), request.getMethodName());
+                    LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(),
+                            requestMethodName, contentType);
                 }
 
                 handleStatusError(
                         ctx,
                         request,
                         nettyHttpRequest,
-                        HttpResponse.notAllowedGeneric(existingRouteMethods),
-                        "Method [" + request.getMethodName() + "] not allowed for URI [" + request.getUri() + "]. Allowed methods: " + existingRouteMethods);
+                        HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+                        "Content Type [" + contentType + "] not allowed. Allowed types: " + acceptableContentTypes);
+                return;
+            }
+
+            if (CollectionUtils.isNotEmpty(produceableContentTypes)) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(),
+                            requestMethodName, contentType);
+                }
+
+                handleStatusError(
+                        ctx,
+                        request,
+                        nettyHttpRequest,
+                        HttpResponse.status(HttpStatus.NOT_ACCEPTABLE),
+                        "Specified Accept Types " + acceptedTypes + " not supported. Supported types: " + produceableContentTypes);
+                return;
+            }
+
+            if (!allowedMethods.isEmpty()) {
+
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Method not allowed for URI {} and method {}", request.getUri(), requestMethodName);
+                }
+
+                handleStatusError(
+                        ctx,
+                        request,
+                        nettyHttpRequest,
+                        HttpResponse.notAllowedGeneric(allowedMethods),
+                        "Method [" + requestMethodName + "] not allowed for URI [" + request.getUri() + "]. Allowed methods: " + allowedMethods);
                 return;
             }
 
@@ -564,9 +588,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         if (LOG.isDebugEnabled()) {
             if (route instanceof MethodBasedRouteMatch) {
-                LOG.debug("Matched route {} - {} to controller {}", request.getMethodName(), requestPath, route.getDeclaringType());
+                LOG.debug("Matched route {} - {} to controller {}", requestMethodName, requestPath, route.getDeclaringType());
             } else {
-                LOG.debug("Matched route {} - {}", request.getMethodName(), requestPath);
+                LOG.debug("Matched route {} - {}", requestMethodName, requestPath);
             }
         }
         // all ok proceed to try and execute the route
@@ -594,7 +618,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             handleRouteMatch(routeMatch, nettyHttpRequest, ctx);
         } else {
 
-            if (HttpMethod.permitsRequestBody(request.getMethod())) {
+            if (request.getMethod() != HttpMethod.HEAD) {
                 JsonError error = newError(request, message);
                 defaultResponse.body(error);
             }

@@ -35,7 +35,7 @@ import java.util.*;
 @Internal
 public class DefaultArgument<T> implements Argument<T> {
 
-    static final Set<Class> CONTAINER_TYPES = CollectionUtils.setOf(
+    static final Set<Class<?>> CONTAINER_TYPES = CollectionUtils.setOf(
         List.class,
         Set.class,
         Map.class,

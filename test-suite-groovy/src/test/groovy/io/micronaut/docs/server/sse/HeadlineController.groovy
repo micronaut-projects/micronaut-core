@@ -15,6 +15,8 @@
  */
 package io.micronaut.docs.server.sse
 
+import io.micronaut.http.MediaType
+
 // tag::imports[]
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -34,7 +36,7 @@ import org.reactivestreams.Publisher
 @Controller("/headlines")
 class HeadlineController {
 
-    @Get
+    @Get(produces = MediaType.TEXT_EVENT_STREAM)
     Publisher<Event<Headline>> index() { // <1>
         String[] versions = ["1.0", "2.0"] // <2>
 

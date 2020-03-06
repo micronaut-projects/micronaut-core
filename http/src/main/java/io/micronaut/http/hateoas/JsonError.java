@@ -16,6 +16,7 @@
 package io.micronaut.http.hateoas;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
@@ -30,6 +31,13 @@ import java.util.Optional;
  */
 @Produces(MediaType.APPLICATION_JSON)
 public class JsonError extends AbstractResource<JsonError> {
+
+    /**
+     * The argument type.
+     *
+     * @since 1.3.3
+     */
+    public static final Argument<JsonError> TYPE = Argument.of(JsonError.class);
 
     private String message;
     private String logref;

@@ -30,6 +30,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
@@ -83,6 +84,8 @@ class ValidatedSpec extends Specification {
         then:
         result == "\$100.00"
 
+        cleanup:
+        beanContext.close()
     }
 
     def "test validated return value"() {
@@ -96,6 +99,9 @@ class ValidatedSpec extends Specification {
         then:
         def e = thrown(ConstraintViolationException)
         e.message == "string: must not be null"
+
+        cleanup:
+        beanContext.close()
     }
 
     def "test validated return value without cascade"() {
@@ -109,6 +115,9 @@ class ValidatedSpec extends Specification {
         then:
         def e = thrown(ConstraintViolationException)
         e.message == "bar: must not be null"
+
+        cleanup:
+        beanContext.close()
     }
 
     def "test validate return value with cascading"() {
@@ -122,6 +131,9 @@ class ValidatedSpec extends Specification {
         then:
         def e = thrown(ConstraintViolationException)
         e.message == "bar.prop: must not be null"
+
+        cleanup:
+        beanContext.close()
     }
 
     def "test validate list return value with cascading"() {
@@ -135,6 +147,9 @@ class ValidatedSpec extends Specification {
         then:
         def e = thrown(ConstraintViolationException)
         e.message == "list[0].prop: must not be null"
+
+        cleanup:
+        beanContext.close()
     }
 
     def "test validate map return value with cascading"() {
@@ -148,6 +163,9 @@ class ValidatedSpec extends Specification {
         then:
         def e = thrown(ConstraintViolationException)
         e.message == "map[barObj].prop: must not be null"
+
+        cleanup:
+        beanContext.close()
     }
 
     def "test validated controller validates @Valid classes"() {
@@ -366,6 +384,7 @@ class ValidatedSpec extends Specification {
     }
 
     @Client("/validated/tests")
+    @Consumes(MediaType.TEXT_PLAIN)
     static interface TestClient {
 
         @Get(value = "/test1/{value}", produces = MediaType.TEXT_PLAIN)

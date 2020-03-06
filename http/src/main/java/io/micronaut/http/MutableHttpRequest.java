@@ -85,6 +85,20 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
         return this;
     }
 
+    /**
+     * Sets the acceptable {@link MediaType} instances via the {@link HttpHeaders#ACCEPT} header.
+     *
+     * @param mediaTypes The media types
+     * @return This request
+     */
+    default MutableHttpRequest<B> accept(CharSequence... mediaTypes) {
+        if (ArrayUtils.isNotEmpty(mediaTypes)) {
+            String acceptString = String.join(",", mediaTypes);
+            header(HttpHeaders.ACCEPT, acceptString);
+        }
+        return this;
+    }
+
     @Override
     default MutableHttpRequest<B> headers(Consumer<MutableHttpHeaders> headers) {
         return (MutableHttpRequest<B>) MutableHttpMessage.super.headers(headers);

@@ -1914,6 +1914,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     } else {
                         channelPool.release(ch);
                     }
+                } else {
+                    // just close it to prevent any future reads without a handler registered
+                    ctx.close();
                 }
             }
 
