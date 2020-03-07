@@ -24,7 +24,7 @@ package io.micronaut.http;
 public interface HttpResponseFactory {
 
     /**
-     * The default {@link io.micronaut.http.cookie.CookieFactory} instance.
+     * The default {@link HttpResponseFactory} instance.
      */
     HttpResponseFactory INSTANCE = DefaultHttpFactories.resolveDefaultResponseFactory();
 
