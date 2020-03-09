@@ -18,6 +18,7 @@ package io.micronaut.http.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.MutableHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 
@@ -118,6 +119,12 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public MutableHttpHeaders add(CharSequence header, CharSequence value) {
         nettyHeaders.add(header, value);
+        return this;
+    }
+
+    @Override
+    public MutableHeaders set(CharSequence header, CharSequence value) {
+        nettyHeaders.set(header, value);
         return this;
     }
 

@@ -28,7 +28,9 @@ import java.nio.file.Paths
 @Controller("/upload")
 class BytesUploadController {
 
-    @Post(value = "/bytes", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
+    @Post(value = "/bytes",
+            consumes = MediaType.MULTIPART_FORM_DATA,
+            produces = MediaType.TEXT_PLAIN) // <1>
     HttpResponse<String> uploadBytes(byte[] file, String fileName) { // <2>
         try {
             File tempFile = File.createTempFile(fileName, "temp")

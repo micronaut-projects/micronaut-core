@@ -974,9 +974,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(beanMethod, producedElement);
 
+            Map<String, Map<String, Object>> beanTypeArguments = null;
             if (returnType instanceof DeclaredType) {
                 DeclaredType dt = (DeclaredType) returnType;
-                Map<String, Map<String, Object>> beanTypeArguments = genericUtils.buildGenericTypeArgumentInfo(dt);
+                beanTypeArguments = genericUtils.buildGenericTypeArgumentInfo(dt);
                 beanMethodWriter.visitTypeArguments(beanTypeArguments);
             }
 
@@ -1037,6 +1038,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         true,
                         constructorData,
                         interceptorTypes);
+                if (beanTypeArguments != null) {
+                    proxyWriter.visitTypeArguments(beanTypeArguments);
+                }
 
                 returnType.accept(new PublicMethodVisitor<Object, AopProxyWriter>(typeUtils) {
                     @Override

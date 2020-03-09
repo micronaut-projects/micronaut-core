@@ -79,7 +79,7 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
     UriRoute produces(MediaType... mediaType);
 
     @Override
-    UriRoute acceptAll();
+    UriRoute consumesAll();
 
     @Override
     UriRoute where(Predicate<HttpRequest<?>> condition);

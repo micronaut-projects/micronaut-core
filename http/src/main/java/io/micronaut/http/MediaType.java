@@ -22,12 +22,14 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.annotation.Produces;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,14 +37,7 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -403,6 +398,7 @@ public class MediaType implements CharSequence {
         if (name == null) {
             throw new IllegalArgumentException("Argument [name] cannot be null");
         }
+        name = name.trim();
         String withoutArgs;
         this.parameters = new LinkedHashMap<>();
         if (name.contains(SEMICOLON)) {
@@ -445,6 +441,24 @@ public class MediaType implements CharSequence {
         }
 
         this.strRepr = toString0();
+    }
+
+    /**
+     * Determine if this requested content type can be satisfied by a given content type. e.g. text/* will be satisfied by test/html.
+     *
+     * @param expectedContentType   Content type to match against
+     * @return if successful match
+     */
+    public boolean matches(@Nonnull MediaType expectedContentType) {
+        //noinspection ConstantConditions
+        if (expectedContentType == null) {
+            return false;
+        }
+        String expectedType = expectedContentType.getType();
+        String expectedSubtype = expectedContentType.getSubtype();
+        boolean typeMatch = type.equals("*") || type.equalsIgnoreCase(expectedType);
+        boolean subtypeMatch = subtype.equals("*") || subtype.equalsIgnoreCase(expectedSubtype);
+        return typeMatch && subtypeMatch;
     }
 
     /**
@@ -590,6 +604,54 @@ public class MediaType implements CharSequence {
     @Override
     public int hashCode() {
         return name.hashCode();
+    }
+
+    /**
+     * Returns the ordered media types for the given values.
+     * @param values The values
+     * @return The media types.
+     * @since 1.3.3
+     */
+    public static List<MediaType> orderedOf(CharSequence... values) {
+        return orderedOf(Arrays.asList(values));
+    }
+
+    /**
+     * Returns the ordered media types for the given values.
+     * @param values The values
+     * @return The media types.
+     * @since 1.3.3
+     */
+    public static List<MediaType> orderedOf(List<? extends CharSequence> values) {
+        if (CollectionUtils.isNotEmpty(values)) {
+            List<MediaType> mediaTypes = new ArrayList<>(values.size());
+            for (CharSequence value : values) {
+                final String[] tokens = value.toString().split(",");
+                for (String token : tokens) {
+                    try {
+                        mediaTypes.add(new MediaType(token));
+                    } catch (IllegalArgumentException e) {
+                        // ignore
+                    }
+                }
+            }
+            mediaTypes.sort((o1, o2) -> {
+                //The */* type is always last
+                if (o1.type.equals("*")) {
+                    return 1;
+                } else if (o2.type.equals("*")) {
+                    return -1;
+                }
+                if (o2.subtype.equals("*") && !o1.subtype.equals("*")) {
+                    return -1;
+                } else if (o1.subtype.equals("*") && !o2.subtype.equals("*")) {
+                    return 1;
+                }
+                return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
+            });
+            return Collections.unmodifiableList(mediaTypes);
+        }
+        return Collections.emptyList();
     }
 
     /**

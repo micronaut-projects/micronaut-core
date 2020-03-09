@@ -36,7 +36,7 @@ class MediaTypeSpec extends Specification {
         mediaType.toString() == fullName
         mediaType.name == expectedName
         mediaType.extension == expectedExt
-        mediaType.parameters == OptionalValues.of(String,expectedParams)
+        mediaType.parameters == OptionalValues.of(String, expectedParams)
         mediaType.qualityAsNumber == quality
         mediaType.subtype == subtype
         mediaType.type == type
@@ -75,22 +75,22 @@ class MediaTypeSpec extends Specification {
         MediaType.isTextBased(contentType) == expected
 
         where:
-        contentType                  | expected
-        "application/hal+xml;q=1.1"  | true
-        "application/hal+xml;q=1.1"  | true
-        "application/hal+json"       | true
-        "application/hal+xml"        | true
-        "application/json"           | true
-        "application/xml"            | true
-        "text/html;charset=utf-8"    | true
-        "text/foo"                   | true
-        "application/hal+text"       | true
-        "application/javascript"     | true
-        "image/png"                  | false
-        "image/jpg"                  | false
-        "multipart/form-data"        | false
-        "application/x-json-stream"  | false
-        "invalid"                    | false
+        contentType                 | expected
+        "application/hal+xml;q=1.1" | true
+        "application/hal+xml;q=1.1" | true
+        "application/hal+json"      | true
+        "application/hal+xml"       | true
+        "application/json"          | true
+        "application/xml"           | true
+        "text/html;charset=utf-8"   | true
+        "text/foo"                  | true
+        "application/hal+text"      | true
+        "application/javascript"    | true
+        "image/png"                 | false
+        "image/jpg"                 | false
+        "multipart/form-data"       | false
+        "application/x-json-stream" | false
+        "invalid"                   | false
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2746")
@@ -101,5 +101,43 @@ class MediaTypeSpec extends Specification {
         then:
         noExceptionThrown()
         mt.getParameters().get("charset").get() == "UTF-8"
+    }
+
+    @Unroll
+    void "test order types: #commaSeparatedList"() {
+        given:
+        List<MediaType> orderedList = MediaType.orderedOf(commaSeparatedList.split(','))
+
+        expect:
+        orderedList.size() == expectedList.size()
+        for (int i = 0; i < orderedList.size(); i++) {
+            assert orderedList.get(i) == expectedList.get(i)
+        }
+
+        where:
+        commaSeparatedList                                | expectedList
+        "audio/basic;q=.5, application/json"              | [new MediaType("application/json"), new MediaType("audio/basic;q=.5")]
+        "text/html"                                       | [new MediaType("text/html")]
+        "*/*, text/*, text/html"                          | [new MediaType("text/html"), new MediaType("text/*"), new MediaType("*/*")]
+        "text/html;level=1, text/html;level=2;q=.3"       | [new MediaType("text/html;level=1"), new MediaType("text/html;level=2;q=.3")]
+        "text/*;blah=1, text/html;q=.3, audio/basic;q=.4" | [new MediaType("audio/basic;q=.4"), new MediaType("text/html;q=.3"), new MediaType("text/*;blah=1")]
+        "text/plain, text/html, application/json;q=1"     | [new MediaType("text/plain"), new MediaType("text/html"), new MediaType("application/json;q=1")]
+    }
+
+    @Unroll
+    void "test type match #desiredType"() {
+        given:
+        boolean match = new MediaType(desiredType).matches(new MediaType(expectedType))
+
+        expect:
+        match == expectedMatch
+
+        where:
+        desiredType             | expectedType          | expectedMatch
+        "text/html"             | "text/html"           | true
+        "text/*"                | "text/html"           | true
+        "*/*"                   | "application/xml"     | true
+        "text/plain"            | "text/hml"            | false
+        "text/*"                | "application/json"    | false
     }
 }

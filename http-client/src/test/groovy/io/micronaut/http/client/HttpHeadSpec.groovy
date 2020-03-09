@@ -505,7 +505,7 @@ class HttpHeadSpec extends Specification {
         @Head("/dateTimeQuery")
         String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate)
 
-        @Head("/no-head")
+        @Head(value = "/no-head")
         String noHead()
 
         @Head("/multiple")

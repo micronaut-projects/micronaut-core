@@ -65,9 +65,13 @@ class AwsLambdaInvokeSpec extends Specification {
                 'aws.lambda.region':'us-east-1'
         )
         AWSLambdaConfiguration configuration = applicationContext.getBean(AWSLambdaConfiguration)
+        FunctionDefinition definition = applicationContext.getBean(FunctionDefinition)
+        FunctionInvokerChooser chooser = applicationContext.getBean(FunctionInvokerChooser)
+        Optional<FunctionInvoker> invoker = chooser.choose(definition)
 
         expect:
         configuration.builder.region == 'us-east-1'
+        invoker.isPresent()
     }
 
     @Ignore

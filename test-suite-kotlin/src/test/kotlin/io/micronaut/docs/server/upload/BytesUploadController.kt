@@ -30,7 +30,9 @@ import java.nio.file.Paths
 @Controller("/upload")
 class BytesUploadController {
 
-    @Post(value = "/bytes", consumes = [MediaType.MULTIPART_FORM_DATA]) // <1>
+    @Post(value = "/bytes",
+            consumes = [MediaType.MULTIPART_FORM_DATA],
+            produces = [MediaType.TEXT_PLAIN]) // <1>
     fun uploadBytes(file: ByteArray, fileName: String): HttpResponse<String> { // <2>
         return try {
             val tempFile = File.createTempFile(fileName, "temp")

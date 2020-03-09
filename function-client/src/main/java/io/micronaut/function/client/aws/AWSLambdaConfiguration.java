@@ -45,6 +45,7 @@ import javax.inject.Inject;
  */
 @ConfigurationProperties(AWSLambdaConfiguration.PREFIX)
 @Requires(classes = AWSLambdaAsyncClientBuilder.class)
+@Requires(property = AWSLambdaConfiguration.PREFIX)
 public class AWSLambdaConfiguration {
 
     /**

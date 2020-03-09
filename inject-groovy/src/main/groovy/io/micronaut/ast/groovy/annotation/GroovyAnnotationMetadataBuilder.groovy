@@ -35,8 +35,11 @@ import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.PackageNode
 import org.codehaus.groovy.ast.Parameter
+import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.ast.expr.AnnotationConstantExpression
 import org.codehaus.groovy.ast.expr.ClassExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
@@ -190,6 +193,22 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     @Override
     protected String getAnnotationTypeName(AnnotationNode annotationMirror) {
         return annotationMirror.classNode.name
+    }
+
+    @Override
+    protected String getElementName(AnnotatedNode element) {
+        if (element instanceof ClassNode) {
+            return ((ClassNode) element).getName()
+        } else if (element instanceof MethodNode) {
+            return ((MethodNode) element).getName()
+        } else if (element instanceof FieldNode) {
+            return ((FieldNode) element).getName()
+        } else if (element instanceof PropertyNode) {
+            return ((PropertyNode) element).getName()
+        } else if (element instanceof PackageNode) {
+            return ((PackageNode) element).getName()
+        }
+        throw new IllegalArgumentException("Cannot establish name for node type: " + element.getClass().getName())
     }
 
     @Override

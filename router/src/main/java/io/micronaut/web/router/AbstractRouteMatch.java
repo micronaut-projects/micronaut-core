@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -54,7 +55,8 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     protected final ConversionService<?> conversionService;
     protected final Map<String, Argument> requiredInputs;
     protected final DefaultRouteBuilder.AbstractRoute abstractRoute;
-    protected final List<MediaType> acceptedMediaTypes;
+    protected final List<MediaType> consumedMediaTypes;
+    protected final List<MediaType> producedMediaTypes;
 
     /**
      * Constructor.
@@ -64,7 +66,8 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
      */
     protected AbstractRouteMatch(DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
         this.abstractRoute = abstractRoute;
-        this.executableMethod = abstractRoute.targetMethod;
+        //noinspection unchecked
+        this.executableMethod = (MethodExecutionHandle<T, R>) abstractRoute.targetMethod;
         this.conversionService = conversionService;
         Argument[] requiredArguments = executableMethod.getArguments();
         this.requiredInputs = new LinkedHashMap<>(requiredArguments.length);
@@ -73,7 +76,8 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             requiredInputs.put(inputName, requiredArgument);
         }
 
-        this.acceptedMediaTypes = abstractRoute.getConsumes();
+        this.consumedMediaTypes = abstractRoute.getConsumes();
+        this.producedMediaTypes = abstractRoute.getProduces();
     }
 
     @Override
@@ -190,17 +194,17 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public R invoke(Object... arguments) {
-        ConversionService conversionService = this.conversionService;
+        ConversionService<?> conversionService = this.conversionService;
 
         Argument[] targetArguments = getArguments();
         if (targetArguments.length == 0) {
             return executableMethod.invoke();
         } else {
-            List argumentList = new ArrayList();
+            List<Object> argumentList = new ArrayList<>(arguments.length);
             Map<String, Object> variables = getVariableValues();
             Iterator<Object> valueIterator = variables.values().iterator();
             int i = 0;
-            for (Argument targetArgument : targetArguments) {
+            for (Argument<?> targetArgument : targetArguments) {
                 String name = targetArgument.getName();
                 Object value = variables.get(name);
                 if (value != null) {
@@ -227,9 +231,9 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (targetArguments.length == 0) {
             return executableMethod.invoke();
         } else {
-            ConversionService conversionService = this.conversionService;
+            ConversionService<?> conversionService = this.conversionService;
             Map<String, Object> uriVariables = getVariableValues();
-            List argumentList = new ArrayList();
+            List<Object> argumentList = new ArrayList<>(argumentValues.size());
 
             for (Map.Entry<String, Argument> entry : requiredInputs.entrySet()) {
                 Argument argument = entry.getValue();
@@ -308,13 +312,39 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     @Override
-    public boolean accept(MediaType contentType) {
-        return acceptedMediaTypes.isEmpty() || contentType == null || acceptedMediaTypes.contains(MediaType.ALL_TYPE) || explicitAccept(contentType);
+    public boolean doesConsume(MediaType contentType) {
+        return consumedMediaTypes.isEmpty() || contentType == null || consumedMediaTypes.contains(MediaType.ALL_TYPE) || explicitlyConsumes(contentType);
     }
 
     @Override
-    public boolean explicitAccept(MediaType contentType) {
-        return acceptedMediaTypes.contains(contentType);
+    public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
+        return producedMediaTypes == null || producedMediaTypes.isEmpty() || anyMediaTypesMatch(producedMediaTypes, acceptableTypes);
+    }
+
+    @Override
+    public boolean doesProduce(@Nullable MediaType acceptableType) {
+        return producedMediaTypes == null || producedMediaTypes.isEmpty() || producedMediaTypes.contains(acceptableType);
+    }
+
+    private boolean anyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
+        if (CollectionUtils.isEmpty(acceptableTypes)) {
+            return true;
+        } else {
+            if (producedMediaTypes.contains(MediaType.ALL_TYPE)) {
+                return true;
+            }
+            for (MediaType acceptableType : acceptableTypes) {
+                if (acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean explicitlyConsumes(MediaType contentType) {
+        return consumedMediaTypes.contains(contentType);
     }
 
     @Override

@@ -143,6 +143,11 @@ public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, H
     }
 
     @Override
+    protected final boolean isClient() {
+        return true;
+    }
+
+    @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 
         if (msg instanceof HttpResponse && awaiting100Continue != null && withServer == 0) {

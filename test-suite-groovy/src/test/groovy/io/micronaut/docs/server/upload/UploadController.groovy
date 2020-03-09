@@ -28,7 +28,7 @@ import org.reactivestreams.Publisher
 @Controller("/upload")
 class UploadController {
 
-    @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
+    @Post(value = "/", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN) // <1>
     Single<HttpResponse<String>> upload(StreamingFileUpload file) { // <2>
         File tempFile = File.createTempFile(file.filename, "temp")
         Publisher<Boolean> uploadPublisher = file.transferTo(tempFile) // <3>

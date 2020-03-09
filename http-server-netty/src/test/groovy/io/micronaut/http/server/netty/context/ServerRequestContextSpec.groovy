@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
@@ -72,6 +73,7 @@ class ServerRequestContextSpec extends Specification {
     }
 
     @Client('/test-context')
+    @Consumes(MediaType.TEXT_PLAIN)
     static interface TestClient {
 
         @Get("/method")

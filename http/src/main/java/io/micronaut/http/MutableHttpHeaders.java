@@ -50,6 +50,11 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
     @Override
     MutableHttpHeaders remove(CharSequence header);
 
+    @Override
+    default MutableHeaders set(CharSequence header, CharSequence value) {
+        return MutableHeaders.super.set(header, value);
+    }
+
     /**
      * Set the allowed HTTP methods.
      *

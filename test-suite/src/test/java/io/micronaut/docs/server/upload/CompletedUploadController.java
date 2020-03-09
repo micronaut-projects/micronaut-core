@@ -31,7 +31,9 @@ import java.nio.file.Paths;
 @Controller("/upload")
 public class CompletedUploadController {
 
-    @Post(value = "/completed", consumes = MediaType.MULTIPART_FORM_DATA) // <1>
+    @Post(value = "/completed",
+            consumes = MediaType.MULTIPART_FORM_DATA,
+            produces = MediaType.TEXT_PLAIN) // <1>
     public HttpResponse<String> uploadCompleted(CompletedFileUpload file) { // <2>
         try {
             File tempFile = File.createTempFile(file.getFilename(), "temp"); //<3>

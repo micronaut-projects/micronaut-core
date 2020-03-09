@@ -16,6 +16,7 @@
 package io.micronaut.docs.server.intro
 
 // tag::imports[]
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.reactivex.Single
@@ -29,7 +30,7 @@ import io.reactivex.Single
 @Client("/hello") // <1>
 interface HelloClient {
 
-    @Get // <2>
+    @Get(consumes = [MediaType.TEXT_PLAIN]) // <2>
     fun hello(): Single<String>  // <3>
 }
 // end::class[]

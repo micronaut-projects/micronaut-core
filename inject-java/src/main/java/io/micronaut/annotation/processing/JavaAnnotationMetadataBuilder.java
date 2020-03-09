@@ -343,6 +343,14 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return JavaModelUtils.getClassName((TypeElement) annotationMirror.getAnnotationType().asElement());
     }
 
+    @Override
+    protected String getElementName(Element element) {
+        if (element instanceof TypeElement) {
+            return ((TypeElement) element).getQualifiedName().toString();
+        }
+        return element.getSimpleName().toString();
+    }
+
     private void populateTypeHierarchy(Element element, List<Element> hierarchy) {
         final boolean isInterface = JavaModelUtils.resolveKind(element, ElementKind.INTERFACE).isPresent();
         if (isInterface) {
