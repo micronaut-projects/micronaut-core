@@ -835,7 +835,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 if (query) {
                     return encoded;
                 } else {
-                    return encoded.replaceAll("\\+", "%20");
+                    return encoded.replace("+", "%20");
                 }
             } catch (UnsupportedEncodingException e) {
                 throw new IllegalStateException("No available encoding", e);
