@@ -48,10 +48,6 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
 
       # If there is a tag present then this becomes the latest
       if [[ -n $TRAVIS_TAG ]]; then
-          mkdir -p latest
-          cp -r ../build/docs/. ./latest/
-          git add latest/*
-
           version="$TRAVIS_TAG"
           version=${version:1}
           majorVersion=${version:0:4}
