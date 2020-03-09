@@ -24,6 +24,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.session.Session;
@@ -48,7 +49,7 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
     /**
      * The order of the filter.
      */
-    public static final Integer ORDER = 0;
+    public static final Integer ORDER = ServerFilterPhase.SESSION.order();
 
     /**
      * Constant for Micronaut SESSION attribute.

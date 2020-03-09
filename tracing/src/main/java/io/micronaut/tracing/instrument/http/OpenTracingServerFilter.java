@@ -22,6 +22,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.tracing.brave.instrument.http.BraveTracingServerFilter;
 import io.micronaut.tracing.instrument.util.TracingPublisher;
 import io.opentracing.Span;
@@ -102,4 +103,8 @@ public class OpenTracingServerFilter extends AbstractOpenTracingFilter implement
         }
     }
 
+    @Override
+    public int getOrder() {
+        return ServerFilterPhase.TRACING.order();
+    }
 }

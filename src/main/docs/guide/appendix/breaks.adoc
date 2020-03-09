@@ -30,6 +30,10 @@ String result = client.toBlocking().retrieve(
 
 If the server implementation does not declare the route as `@Produces("text/plain")` the request will be rejected with a `NOT_ACCEPTABLE` HTTP status code.
 
+=== Server Filter Ordering
+
+In Micronaut 1.x almost all built in filters operated on order 0, meaning the order was non deterministic. That caused some compatibility issues with the metrics and security modules. A new class has been added api:http.filter.ServerFilterPhase[] that defines the phases of server filtering and sets an order. Many filters have been updated to now have their order reflect the phase they participate in.
+
 === Heartbeat Events No Longer Published if no Discovery Clients present
 
 A api:health.HeartbeatEvent[] is no longer published automatically if there are no api:discovery.DiscoveryClient[] instances present.

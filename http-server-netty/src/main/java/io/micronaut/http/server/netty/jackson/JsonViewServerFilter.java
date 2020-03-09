@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
@@ -87,5 +88,10 @@ public class JsonViewServerFilter implements HttpServerFilter {
         } else {
             return responsePublisher;
         }
+    }
+
+    @Override
+    public int getOrder() {
+        return ServerFilterPhase.VIEWS.order();
     }
 }
