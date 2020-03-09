@@ -25,7 +25,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
-import io.micronaut.scheduling.annotation.ScheduleOn
+import io.micronaut.scheduling.annotation.ExecuteOn
 import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -121,7 +121,7 @@ class ServerSentEventStreamingSpec extends Specification {
     }
 
     @Controller("/stream/sse")
-    @ScheduleOn(TaskExecutors.IO)
+    @ExecuteOn(TaskExecutors.IO)
     static class SseController {
 
 

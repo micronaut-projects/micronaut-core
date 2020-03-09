@@ -24,7 +24,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.annotation.ScheduleOn;
+import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 
 import javax.inject.Singleton;
@@ -53,7 +53,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
 
     @Override
     public Optional<ExecutorService> select(MethodReference method, ThreadSelection threadSelection) {
-        final String name = method.stringValue(ScheduleOn.class).orElse(null);
+        final String name = method.stringValue(ExecuteOn.class).orElse(null);
         if (name != null) {
             final ExecutorService executorService;
             try {

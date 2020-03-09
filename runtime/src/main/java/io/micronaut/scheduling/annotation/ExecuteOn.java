@@ -26,8 +26,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * Annotation used to indicate which executor service a particular task should run on.
  *
  * <p>Micronaut will by default run end user operations in the same thread that executes the request.
- * This annotation can be used to indicate that a different thread should be used when scheduling
- * the execution of an operation.</p>
+ * This annotation can be used to indicate that a different thread should be used when executing an operation.</p>
  *
  * <p>Used to, for example, offload blocking I/O operations to specifically configured thread pool.</p>
  *
@@ -38,7 +37,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE, ElementType.TYPE})
-public @interface ScheduleOn {
+public @interface ExecuteOn {
     /**
      * @return The name of a configured executor service.
      * @see io.micronaut.scheduling.TaskExecutors#IO

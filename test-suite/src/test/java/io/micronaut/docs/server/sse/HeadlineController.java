@@ -20,7 +20,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.sse.Event;
 import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.annotation.ScheduleOn;
+import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 // end::imports[]
@@ -29,7 +29,7 @@ import org.reactivestreams.Publisher;
 @Controller("/headlines")
 public class HeadlineController {
 
-    @ScheduleOn(TaskExecutors.IO)
+    @ExecuteOn(TaskExecutors.IO)
     @Get(produces = MediaType.TEXT_EVENT_STREAM)
     public Publisher<Event<Headline>> index() { // <1>
         String[] versions = new String[]{"1.0", "2.0"}; // <2>

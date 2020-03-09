@@ -8,11 +8,11 @@ This approach caused some confusion and created a false association between reac
 
 Micronaut 2.x now leaves it up to the user to specify the thread pool to schedule operations on, including blocking operations.
 
-If you are upgrading from Micronaut 1.x and have a controller that executes blocking I/O operations (such as JDBC or JPA) it is recommended that you add the ann:scheduling.annotation.ScheduleOn[] annotation to schedule the blocking operations on a different thread.
+If you are upgrading from Micronaut 1.x and have a controller that executes blocking I/O operations (such as JDBC or JPA) it is recommended that you add the ann:scheduling.annotation.ExecuteOn[] annotation to execute the blocking operations on a different thread.
 
-snippet::io.micronaut.docs.http.server.scheduleon.PersonController[tags="imports,class", indent=0,title="Using @ScheduleOn"]
+snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,class", indent=0,title="Using @ExecuteOn"]
 
-<1> The ann:scheduling.annotation.ScheduleOn[] annotation is used to schedule the operation on the I/O thread pool
+<1> The ann:scheduling.annotation.ExecuteOn[] annotation is used to execute the operation on the I/O thread pool
 
 NOTE: If you wish to return to the previous behaviour as defined in Micronaut 1.x you can set `micronaut.server.thread-selection` to `AUTO` in configuration.
 
@@ -121,7 +121,6 @@ Instead you should always use ann:http.client.annotation.Client[]:
 RxHttpClient httpClient;
 ----
 
-
 === Source Retention Annotations No Longer Retained in Runtime Metadata
 
 In Micronaut 1.x annotations specified as source retention were still retained in the api:core.annotation.AnnotationMetadata[] interface. As of Micronaut 2.x this is no longer the case with source retention annotations only available within the compiler APIs.
@@ -150,10 +149,6 @@ NOTE: This change does not apply to an explicit primary defined in the annotatio
 === Invalid Configuration File Locations
 
 Specifying a file with `micronaut.config.files`, either through the system property or environment variable, that does not exist or cannot be read will now result in the application failing to startup. In previous versions of Micronaut a warning would be logged and the file would be ignored.
-
-=== Graal Dependency
-
-The old Graal group name `com.oracle.substratevm` is no longer part of the Micronaut BOM.
 
 === PropertySourceLoader Changes
 

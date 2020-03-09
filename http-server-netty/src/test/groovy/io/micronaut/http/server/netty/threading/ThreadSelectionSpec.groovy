@@ -8,7 +8,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
-import io.micronaut.scheduling.annotation.ScheduleOn
+import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.scheduling.executor.ThreadSelection
 import io.reactivex.Single
 import spock.lang.Specification
@@ -87,13 +87,13 @@ class ThreadSelectionSpec extends Specification {
         }
 
         @Get("/scheduleblocking")
-        @ScheduleOn(TaskExecutors.IO)
+        @ExecuteOn(TaskExecutors.IO)
         String scheduleBlocking() {
             return "thread: ${Thread.currentThread().name}"
         }
 
         @Get("/schedulereactive")
-        @ScheduleOn(TaskExecutors.IO)
+        @ExecuteOn(TaskExecutors.IO)
         Single<String> scheduleReactive() {
             Single.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
         }

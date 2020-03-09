@@ -1,4 +1,4 @@
-package io.micronaut.docs.http.server.scheduleon;
+package io.micronaut.docs.http.server.executeon;
 
 import io.micronaut.docs.http.server.reactive.PersonService;
 import io.micronaut.docs.ioc.beans.Person;
@@ -6,11 +6,11 @@ import io.micronaut.docs.ioc.beans.Person;
 // tag::imports[]
 import io.micronaut.http.annotation.*;
 import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.annotation.ScheduleOn;
+import io.micronaut.scheduling.annotation.ExecuteOn;
 // end::imports[]
 
 // tag::class[]
-@Controller("/scheduleOn/people")
+@Controller("/executeOn/people")
 public class PersonController {
 
     private final PersonService personService;
@@ -21,7 +21,7 @@ public class PersonController {
     }
 
     @Get("/{name}")
-    @ScheduleOn(TaskExecutors.IO) // <1>
+    @ExecuteOn(TaskExecutors.IO) // <1>
     Person byName(String name) {
         return personService.findByName(name);
     }

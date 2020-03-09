@@ -14,17 +14,17 @@ micronaut:
             nThreads: 75
 ----
 
-To use this thread pool in a ann:http.annotation.Controller[] bean you have a number of options. The simplest option is to use the ann:scheduling.annotation.ScheduleOn[] annotation which can be declared at the type or method level to indicate which configured thread pool you wish to run the method or methods of the controller on:
+To use this thread pool in a ann:http.annotation.Controller[] bean you have a number of options. The simplest option is to use the ann:scheduling.annotation.ExecuteOn[] annotation which can be declared at the type or method level to indicate which configured thread pool you wish to run the method or methods of the controller on:
 
-snippet::io.micronaut.docs.http.server.scheduleon.PersonController[tags="imports,class", indent=0,title="Using @ScheduleOn"]
+snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,class", indent=0,title="Using @ExecuteOn"]
 
-<1> The ann:scheduling.annotation.ScheduleOn[] annotation is used to schedule the operation on the I/O thread pool
+<1> The ann:scheduling.annotation.ExecuteOn[] annotation is used to execute the operation on the I/O thread pool
 
-The value of the ann:scheduling.annotation.ScheduleOn[] annotation can be any named executor defined under `micronaut.executors`.
+The value of the ann:scheduling.annotation.ExecuteOn[] annotation can be any named executor defined under `micronaut.executors`.
 
 TIP: Generally speaking for database operations you will want a thread pool configured that matches maximum number of connections you have specified in the database connection pool.
 
-An alternative to the ann:scheduling.annotation.ScheduleOn[] annotation is to use the facility provided by the reactive library you have chosen. RxJava for example features a `subscribeOn` method which allows you to alter which thread executes user code. For example:
+An alternative to the ann:scheduling.annotation.ExecuteOn[] annotation is to use the facility provided by the reactive library you have chosen. RxJava for example features a `subscribeOn` method which allows you to alter which thread executes user code. For example:
 
 snippet::io.micronaut.docs.http.server.reactive.PersonController[tags="imports,class", indent=0,title="RxJava subscribeOn Example"]
 
