@@ -19,7 +19,10 @@ dependencies {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'
     }
-    testImplementation 'io.micronaut.xml:micronaut-jackson-xml:1.0.0'
+    testImplementation 'io.micronaut.xml:micronaut-jackson-xml:1.0.0', {
+        exclude module:'micronaut-inject'
+        exclude module:'micronaut-http'
+    }
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation dependencyModuleVersion("groovy", "groovy-templates")
     testImplementation dependencyVersion("rxjava2")

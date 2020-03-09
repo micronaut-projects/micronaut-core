@@ -345,7 +345,7 @@ class ClientScopeSpec extends Specification {
     @Client
     static interface NoBasePathService {
 
-        @Get("{+uri}")
+        @Get(value = "{+uri}", consumes = MediaType.TEXT_PLAIN)
         String name(String uri)
     }
 }

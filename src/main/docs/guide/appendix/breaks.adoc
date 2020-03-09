@@ -16,6 +16,20 @@ snippet::io.micronaut.docs.http.server.scheduleon.PersonController[tags="imports
 
 NOTE: If you wish to return to the previous behaviour as defined in Micronaut 1.x you can set `micronaut.server.thread-selection` to `AUTO` in configuration.
 
+=== Server Side Content Negotiation May Require Test Changes
+
+The new support for server side content negotiation may require changes to tests. For example a test that that makes a call such as:
+
+[source,java]
+----
+String result = client.toBlocking().retrieve(
+    HttpRequest.GET('/test')
+        .accept("text/plain"), String
+)
+----
+
+If the server implementation does not declare the route as `@Produces("text/plain")` the request will be rejected with a `NOT_ACCEPTABLE` HTTP status code.
+
 === Heartbeat Events No Longer Published if no Discovery Clients present
 
 A api:health.HeartbeatEvent[] is no longer published automatically if there are no api:discovery.DiscoveryClient[] instances present.

@@ -1,14 +1,29 @@
 Micronaut {version} includes the following changes:
 
+=== Improved Support for Server-Side Content Negotiation
+
+Micronaut will now correctly handle the HTTP `Accept` header and pick the most appropriate route for the specified accepted media types using https://developer.mozilla.org/en-US/docs/Web/HTTP/Content_negotiation[Server-Side Content Negotiation].
+
+NOTE: This also applies to `@Error` routes making it possible to send different error responses for different content types
+
+TIP: To add XML support see the https://github.com/micronaut-projects/micronaut-jackson-xml[Jackson XML] plugin
+
 === Event Loop Group Improvements
 
 Micronaut 2.0 uses a new shared default Netty `EventLoopGroup` for server worker threads and client request threads. This reduces context switching and improves resource utilization.
 
 See the <<clientConfiguration, HTTP Client Configuration>> section for information on how to configure the default `EventLoopGroup` and add additional `EventLoopGroup`'s that are configured per client.
 
-=== Clients With No Base Path
+=== HTTP Client Improvements
 
-For the situations when the host of a client call is variable, it is no longer required to pass a service id or URL to ann:http.client.annotation.Client[]. If no host is provided at the time of a request, a api:http.client.exceptions.NoHostException[] will be thrown.
+It is no longer necessary to use `@Client(..)` to inject a default api:http.client.RxHttpClient[] instance. You can now inject the default client simply with:
+
+[source,java]
+----
+@Inject RxHttpClient client;
+----
+
+If no host is provided at the time of a request, a api:http.client.exceptions.NoHostException[] will be thrown.
 
 === Spot Bugs Instead of JSR-305 Nullable/NonNull Annotations
 
