@@ -16,6 +16,9 @@ dependencies {
     shadowCompile "org.ow2.asm:asm:$asmVersion"
     shadowCompile "org.ow2.asm:asm-commons:$asmVersion"
     shadowCompile "org.ow2.asm:asm-tree:$asmVersion"
-    shadowCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
+    shadowCompile("com.github.ben-manes.caffeine:caffeine:$caffeineVersion") {
+        exclude group: "com.google.errorprone", module: "error_prone_annotations"
+        exclude group: "org.checkerframework", module: "checker-qual"
+    }
 }
 
