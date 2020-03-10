@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.server.cors.CorsOriginConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -119,7 +120,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private String clientAddressHeader;
     private String contextPath;
     private boolean dualProtocol = DEFAULT_DUAL_PROTOCOL;
-
+    private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
@@ -141,6 +142,24 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         }
 
         this.applicationConfiguration = applicationConfiguration;
+    }
+
+    /**
+     * The HTTP version to use. Defaults to {@link HttpVersion#HTTP_1_1}.
+     * @return The http version
+     */
+    public HttpVersion getHttpVersion() {
+        return httpVersion;
+    }
+
+    /**
+     * Sets the HTTP version to use. Defaults to {@link HttpVersion#HTTP_1_1}.
+     * @param httpVersion The http version
+     */
+    public void setHttpVersion(HttpVersion httpVersion) {
+        if (httpVersion != null) {
+            this.httpVersion = httpVersion;
+        }
     }
 
     /**

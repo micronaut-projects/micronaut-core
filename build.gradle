@@ -365,7 +365,7 @@ ext {
                               'netty-codec-xml', 'netty-common', 'netty-dev-tools', 'netty-handler',
                               'netty-handler-proxy', 'netty-resolver', 'netty-resolver-dns', 'netty-transport',
                               'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt',
-                              'netty-transport-native-epoll', 'netty-transport-native-kqueue']
+                              'netty-transport-native-epoll', 'netty-transport-native-kqueue', 'netty-codec-http2']
             ],
             opentracing                : [
                     version: opentracingVersion,

@@ -11,6 +11,8 @@ dependencies {
 
     api dependencyVersion("netty")
     api dependencyModuleVersion("netty", "netty-handler")
+    api dependencyModuleVersion("netty", "netty-codec-http2")
 
     implementation dependencyVersion("rxjava2")
+
 }

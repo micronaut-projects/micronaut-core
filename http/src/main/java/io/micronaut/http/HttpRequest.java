@@ -56,6 +56,13 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     @NonNull URI getUri();
 
     /**
+     * @return The http version of the request.
+     */
+    default HttpVersion getHttpVersion() {
+        return HttpVersion.HTTP_1_1;
+    }
+
+    /**
      * A list of accepted {@link MediaType} instances sorted by their quality rating.
      *
      * @return A list of zero or many {@link MediaType} instances

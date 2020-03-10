@@ -18,10 +18,10 @@ package io.micronaut.http.client.netty.ssl;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.ssl.*;
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.codec.http2.Http2SecurityUtil;
+import io.netty.handler.ssl.*;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
 import javax.inject.Inject;
@@ -55,18 +55,26 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
     @SuppressWarnings("Duplicates")
     @Override
     public Optional<SslContext> build(SslConfiguration ssl) {
+        return build(ssl, HttpVersion.HTTP_1_1);
+    }
+
+    @Override
+    public Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
         if (!ssl.isEnabled()) {
             return Optional.empty();
         }
+        final boolean isHttp2 = httpVersion == HttpVersion.HTTP_2_0;
         SslContextBuilder sslBuilder = SslContextBuilder
-            .forClient()
-            .keyManager(getKeyManagerFactory(ssl))
-            .trustManager(getTrustManagerFactory(ssl));
+                .forClient()
+                .keyManager(getKeyManagerFactory(ssl))
+                .trustManager(getTrustManagerFactory(ssl));
         if (ssl.getProtocols().isPresent()) {
             sslBuilder.protocols(ssl.getProtocols().get());
         }
         if (ssl.getCiphers().isPresent()) {
             sslBuilder = sslBuilder.ciphers(Arrays.asList(ssl.getCiphers().get()));
+        } else if (isHttp2) {
+            sslBuilder.ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE);
         }
         if (ssl.getClientAuthentication().isPresent()) {
             ClientAuthentication clientAuth = ssl.getClientAuthentication().get();
@@ -75,6 +83,17 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
             } else if (clientAuth == ClientAuthentication.WANT) {
                 sslBuilder = sslBuilder.clientAuth(ClientAuth.OPTIONAL);
             }
+        }
+        if (isHttp2) {
+            SslProvider provider = SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
+            sslBuilder.sslProvider(provider);
+            sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
+                    ApplicationProtocolConfig.Protocol.ALPN,
+                    ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                    ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                    ApplicationProtocolNames.HTTP_1_1,
+                    ApplicationProtocolNames.HTTP_2
+            ));
         }
 
         try {

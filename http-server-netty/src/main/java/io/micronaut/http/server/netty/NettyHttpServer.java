@@ -28,6 +28,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.discovery.event.ServiceReadyEvent;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.*;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
@@ -58,15 +59,19 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
-import io.netty.handler.codec.http.HttpContentDecompressor;
-import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
+import io.netty.handler.codec.http2.*;
 import io.netty.handler.flow.FlowControlHandler;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.ssl.ApplicationProtocolNames;
+import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.AsciiString;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import org.slf4j.Logger;
@@ -78,6 +83,7 @@ import javax.inject.Singleton;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.net.*;
+import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -108,11 +114,13 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     public static final String HTTP_KEEP_ALIVE_HANDLER = "http-keep-alive-handler";
     @SuppressWarnings("WeakerAccess")
     public static final String MICRONAUT_HANDLER = "micronaut-inbound-handler";
+    public static final String HTTP2_HANDLER = "htt2-handler";
+    public static final String FLOW_CONTROL_HANDLER = "flow-control-handler";
+
     @SuppressWarnings("WeakerAccess")
     public static final String OUTBOUND_KEY = "-outbound-";
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
-
     private final ExecutorService ioExecutor;
     private final ExecutorSelector executorSelector;
     private final List<ChannelOutboundHandler> outboundHandlers;
@@ -131,6 +139,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final HttpCompressionStrategy httpCompressionStrategy;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
+    private final HttpVersion httpVersion;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final SslContext sslContext;
@@ -207,6 +216,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             this.sslContext = null;
         }
 
+        this.httpVersion = serverConfiguration.getHttpVersion();
         this.serverPort = getPortOrDefault(port);
         this.executorSelector = executorSelector;
         OrderUtil.sort(outboundHandlers);
@@ -234,9 +244,13 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @return http port
      */
     private int getHttpPort(NettyHttpServerConfiguration serverConfiguration) {
-        Optional<Integer> configPort = serverConfiguration.getPort();
-        if (configPort.isPresent()) {
-            return configPort.get();
+        Integer configPort = serverConfiguration.getPort().orElse(null);
+        return getHttpPort(configPort);
+    }
+
+    private int getHttpPort(Integer configPort) {
+        if (configPort != null) {
+            return configPort;
         } else {
             if (environment.getActiveNames().contains(Environment.TEST)) {
                 return -1;
@@ -276,77 +290,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
                 .channel(eventLoopGroupFactory.serverSocketChannelClass(workerConfig))
-                .childHandler(new ChannelInitializer() {
-                    final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
-                    final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
-                    final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
-                    final RoutingInBoundHandler routingHandler = new RoutingInBoundHandler(
-                        applicationContext,
-                        router,
-                        mediaTypeCodecRegistry,
-                        customizableResponseTypeHandlerRegistry,
-                        staticResourceResolver,
-                        serverConfiguration,
-                        requestArgumentSatisfier,
-                        executorSelector,
-                        ioExecutor,
-                            httpContentProcessorResolver
-                    );
-                    final LoggingHandler loggingHandler = serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(serverConfiguration.getLogLevel().get()) : null;
-
-                    @Override
-                    protected void initChannel(Channel ch) {
-                        ChannelPipeline pipeline = ch.pipeline();
-
-                        int port = ((InetSocketAddress) ch.localAddress()).getPort();
-                        boolean ssl = sslContext != null && sslConfiguration != null && port == sslConfiguration.getPort();
-                        if (ssl) {
-                            pipeline.addLast(sslContext.newHandler(ch.alloc()));
-                        }
-
-                        if (loggingHandler != null) {
-                            pipeline.addLast(loggingHandler);
-                        }
-
-                        final Duration idleTime = serverConfiguration.getIdleTimeout();
-                        if (!idleTime.isNegative()) {
-                            pipeline.addLast(new IdleStateHandler(
-                                    (int) serverConfiguration.getReadIdleTimeout().getSeconds(),
-                                    (int) serverConfiguration.getWriteIdleTimeout().getSeconds(),
-                                    (int) idleTime.getSeconds()));
-                        }
-
-                        pipeline.addLast(HTTP_CODEC, new HttpServerCodec(
-                                serverConfiguration.getMaxInitialLineLength(),
-                                serverConfiguration.getMaxHeaderSize(),
-                                serverConfiguration.getMaxChunkSize(),
-                                serverConfiguration.isValidateHeaders(),
-                                serverConfiguration.getInitialBufferSize()
-                        ));
-
-                        pipeline.addLast(new FlowControlHandler());
-                        pipeline.addLast(HTTP_KEEP_ALIVE_HANDLER, new HttpServerKeepAliveHandler());
-                        pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor(httpCompressionStrategy));
-                        pipeline.addLast(HTTP_DECOMPRESSOR, new HttpContentDecompressor());
-                        pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
-                        pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
-                        pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
-                        if (ssl) {
-                            pipeline.addLast(requestCertificateHandler);
-                        }
-                        pipeline.addLast(HttpResponseEncoder.ID, responseDecoder);
-                        pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
-                                getWebSocketSessionRepository(),
-                                router,
-                                requestArgumentSatisfier.getBinderRegistry(),
-                                webSocketBeanRegistry,
-                                mediaTypeCodecRegistry,
-                                applicationContext
-                        ));
-                        pipeline.addLast(MICRONAUT_HANDLER, routingHandler);
-                        registerMicronautChannelHandlers(pipeline);
-                    }
-                });
+                .childHandler(new NettyHttpServerInitializer());
 
             Optional<String> host = serverConfiguration.getHost();
 
@@ -656,5 +600,171 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      */
     public WebSocketSessionRepository getWebSocketSessionRepository() {
         return this;
+    }
+
+    private HttpToHttp2ConnectionHandler newHttpToHttp2ConnectionHandler() {
+        Http2Connection connection = new DefaultHttp2Connection(true);
+        final InboundHttp2ToHttpAdapter http2ToHttpAdapter = new InboundHttp2ToHttpAdapterBuilder(connection)
+                .validateHttpHeaders(true)
+                .maxContentLength((int) serverConfiguration.getMaxRequestSize())
+                .build();
+
+        final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder()
+                .frameListener(http2ToHttpAdapter);
+
+        serverConfiguration.getLogLevel().ifPresent(logLevel ->
+                builder.frameLogger(new Http2FrameLogger(logLevel, NettyHttpServer.class))
+        );
+        return builder.connection(connection).build();
+    }
+
+    /**
+     * Negotiates with the browser if HTTP2 or HTTP is going to be used. Once decided, the Netty
+     * pipeline is setup with the correct handlers for the selected protocol.
+     */
+    private final class Http2OrHttpHandler extends ApplicationProtocolNegotiationHandler {
+
+        private final SslContext sslContext;
+
+        /**
+         * Default constructor.
+         * @param sslContext The SSL context
+         * @param fallbackProtocol The fallback protocol
+         */
+        Http2OrHttpHandler(SslContext sslContext, String fallbackProtocol) {
+            super(fallbackProtocol);
+            this.sslContext = sslContext;
+        }
+
+        @Override
+        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+            if (evt instanceof SslHandshakeCompletionEvent) {
+                SslHandshakeCompletionEvent event = (SslHandshakeCompletionEvent) evt;
+                if (!event.isSuccess()) {
+                    final Throwable cause = event.cause();
+                    if (!(cause instanceof ClosedChannelException)) {
+                        super.userEventTriggered(ctx, evt);
+                    } else {
+                        return;
+                    }
+                }
+            }
+            super.userEventTriggered(ctx, evt);
+        }
+
+        @Override
+        protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
+            final ChannelPipeline pipeline = ctx.pipeline();
+            configurePipeline(protocol, pipeline);
+        }
+
+        private void configurePipeline(String protocol, ChannelPipeline pipeline) {
+            final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
+            final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
+            final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
+            final RoutingInBoundHandler routingHandler = new RoutingInBoundHandler(
+                    applicationContext,
+                    router,
+                    mediaTypeCodecRegistry,
+                    customizableResponseTypeHandlerRegistry,
+                    staticResourceResolver,
+                    serverConfiguration,
+                    requestArgumentSatisfier,
+                    executorSelector,
+                    ioExecutor,
+                    httpContentProcessorResolver
+            );
+            final Duration idleTime = serverConfiguration.getIdleTimeout();
+            if (!idleTime.isNegative()) {
+                pipeline.addLast(new IdleStateHandler(
+                        (int) serverConfiguration.getReadIdleTimeout().getSeconds(),
+                        (int) serverConfiguration.getWriteIdleTimeout().getSeconds(),
+                        (int) idleTime.getSeconds()));
+            }
+            if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
+                final HttpToHttp2ConnectionHandler httpToHttp2ConnectionHandler = newHttpToHttp2ConnectionHandler();
+                pipeline.addLast(HTTP2_HANDLER, httpToHttp2ConnectionHandler);
+                pipeline.addLast(FLOW_CONTROL_HANDLER, new FlowControlHandler());
+            } else {
+                pipeline.addLast(HTTP_CODEC, new HttpServerCodec(
+                        serverConfiguration.getMaxInitialLineLength(),
+                        serverConfiguration.getMaxHeaderSize(),
+                        serverConfiguration.getMaxChunkSize(),
+                        serverConfiguration.isValidateHeaders(),
+                        serverConfiguration.getInitialBufferSize()
+                ));
+                pipeline.addLast(FLOW_CONTROL_HANDLER, new FlowControlHandler());
+                pipeline.addLast(HTTP_KEEP_ALIVE_HANDLER, new HttpServerKeepAliveHandler());
+            }
+
+            pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor(httpCompressionStrategy));
+            pipeline.addLast(HTTP_DECOMPRESSOR, new HttpContentDecompressor());
+            pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
+            pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
+            pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
+            if (sslContext != null) {
+                pipeline.addLast(requestCertificateHandler);
+            }
+            pipeline.addLast(HttpResponseEncoder.ID, responseDecoder);
+            pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
+                    getWebSocketSessionRepository(),
+                    router,
+                    requestArgumentSatisfier.getBinderRegistry(),
+                    webSocketBeanRegistry,
+                    mediaTypeCodecRegistry,
+                    applicationContext
+            ));
+            pipeline.addLast(MICRONAUT_HANDLER, routingHandler);
+            registerMicronautChannelHandlers(pipeline);
+        }
+    }
+
+    /**
+     * An HTTP server initializer for Netty.
+     */
+    private class NettyHttpServerInitializer extends ChannelInitializer<SocketChannel> {
+
+        final LoggingHandler loggingHandler =
+                serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(serverConfiguration.getLogLevel().get()) : null;
+
+        @Override
+        protected void initChannel(SocketChannel ch) {
+            ChannelPipeline pipeline = ch.pipeline();
+
+            int port = ch.localAddress().getPort();
+            boolean ssl = sslContext != null && sslConfiguration != null && port == serverPort;
+            if (ssl) {
+                pipeline.addLast(sslContext.newHandler(ch.alloc()));
+            }
+
+            if (loggingHandler != null) {
+                pipeline.addLast(loggingHandler);
+            }
+
+            if (httpVersion != io.micronaut.http.HttpVersion.HTTP_2_0) {
+                new Http2OrHttpHandler(sslContext, serverConfiguration.getFallbackProtocol()).configurePipeline(ApplicationProtocolNames.HTTP_1_1, pipeline);
+            } else {
+                final Http2OrHttpHandler http2OrHttpHandler = new Http2OrHttpHandler(sslContext, serverConfiguration.getFallbackProtocol());
+                if (ssl) {
+                    pipeline.addLast(http2OrHttpHandler);
+                } else {
+                    final HttpToHttp2ConnectionHandler connectionHandler = newHttpToHttp2ConnectionHandler();
+                    HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
+                        if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
+                            return new Http2ServerUpgradeCodec(connectionHandler);
+                        } else {
+                            return null;
+                        }
+                    };
+                    final HttpServerCodec sourceCodec = new HttpServerCodec();
+                    final HttpServerUpgradeHandler upgradeHandler = new HttpServerUpgradeHandler(sourceCodec, upgradeCodecFactory);
+                    final CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
+                            new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, connectionHandler);
+
+                    pipeline.addLast(cleartextHttp2ServerUpgradeHandler);
+                    new Http2OrHttpHandler(sslContext, serverConfiguration.getFallbackProtocol()).configurePipeline(ApplicationProtocolNames.HTTP_1_1, pipeline);
+                }
+            }
+        }
     }
 }

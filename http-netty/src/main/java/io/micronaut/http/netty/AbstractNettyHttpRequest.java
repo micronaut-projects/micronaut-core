@@ -17,11 +17,9 @@ package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpParameters;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
+import io.micronaut.http.*;
 import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.DefaultAttributeMap;
 
 import java.net.URI;
@@ -64,6 +62,14 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         this.uri = URI.create(fullUri);
         this.httpMethodName = nettyRequest.method().name();
         this.httpMethod = HttpMethod.parse(httpMethodName);
+    }
+
+    @Override
+    public HttpVersion getHttpVersion() {
+        if (nettyRequest.headers().contains(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text())) {
+            return HttpVersion.HTTP_2_0;
+        }
+        return HttpVersion.HTTP_1_1;
     }
 
     /**

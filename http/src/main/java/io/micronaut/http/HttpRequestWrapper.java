@@ -15,10 +15,16 @@
  */
 package io.micronaut.http;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.http.cookie.Cookies;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.security.Principal;
+import java.security.cert.Certificate;
+import java.util.Collection;
+import java.util.Locale;
+import java.util.Optional;
 
 /**
  * A wrapper around a {@link HttpRequest}.
@@ -39,6 +45,43 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
     @Override
     public HttpRequest<B> getDelegate() {
         return (HttpRequest<B>) super.getDelegate();
+    }
+
+    @Override
+    public HttpVersion getHttpVersion() {
+        return getDelegate().getHttpVersion();
+    }
+
+    @Override
+    public Collection<MediaType> accept() {
+        return getDelegate().accept();
+    }
+
+    @NonNull
+    @Override
+    public Optional<Principal> getUserPrincipal() {
+        return getDelegate().getUserPrincipal();
+    }
+
+    @NonNull
+    @Override
+    public <T extends Principal> Optional<T> getUserPrincipal(Class<T> principalType) {
+        return getDelegate().getUserPrincipal(principalType);
+    }
+
+    @Override
+    public HttpRequest<B> setAttribute(CharSequence name, Object value) {
+        return getDelegate().setAttribute(name, value);
+    }
+
+    @Override
+    public Optional<Locale> getLocale() {
+        return getDelegate().getLocale();
+    }
+
+    @Override
+    public Optional<Certificate> getCertificate() {
+        return getDelegate().getCertificate();
     }
 
     @Override

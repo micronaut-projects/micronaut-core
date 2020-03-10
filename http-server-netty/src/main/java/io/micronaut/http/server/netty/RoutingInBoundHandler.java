@@ -109,9 +109,11 @@ import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.reactivex.BackpressureStrategy;
@@ -1353,20 +1355,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void writeFinalNettyResponse(MutableHttpResponse<?> message, AtomicReference<HttpRequest<?>> requestReference, ChannelHandlerContext context) {
-        NettyMutableHttpResponse nettyHttpResponse = (NettyMutableHttpResponse) message;
+        NettyMutableHttpResponse<?> nettyHttpResponse = (NettyMutableHttpResponse<?>) message;
         FullHttpResponse nettyResponse = nettyHttpResponse.getNativeResponse();
 
         HttpRequest<?> httpRequest = requestReference.get();
         io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyResponse.headers();
 
         // default Connection header if not set explicitly
-        if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
-            boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || httpRequest.getHeaders().isKeepAlive();
-            HttpStatus status = nettyHttpResponse.status();
-            if (!expectKeepAlive || status.getCode() > 299) {
-                nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-            } else {
-                nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+        final io.micronaut.http.HttpVersion httpVersion = httpRequest.getHttpVersion();
+        final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
+        if (!isHttp2) {
+            if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
+                boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || httpRequest.getHeaders().isKeepAlive();
+                HttpStatus status = nettyHttpResponse.status();
+                if (!expectKeepAlive || status.getCode() > 299) {
+                    nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                } else {
+                    nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                }
             }
         }
 
@@ -1380,8 +1386,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             }
             // close handled by HttpServerKeepAliveHandler
-            final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
+            final NettyHttpRequest<?> nettyHttpRequest = (NettyHttpRequest<?>) requestReference.get();
 
+            if (isHttp2) {
+                final io.netty.handler.codec.http.HttpHeaders nativeHeaders = nettyHttpRequest.getNativeRequest().headers();
+                final String streamId = nativeHeaders.get(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
+                if (streamId != null) {
+                    nettyResponse.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), streamId);
+                }
+            }
             context.writeAndFlush(nettyResponse)
                    .addListener(future -> {
                        context.read();
