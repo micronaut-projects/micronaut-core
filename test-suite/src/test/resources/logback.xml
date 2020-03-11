@@ -13,4 +13,5 @@
     </root>
     <logger name="io.micronaut.http.server.netty" level="TRACE"/>
     <logger name="io.micronaut.http.client" level="TRACE"/>
+
 </configuration>

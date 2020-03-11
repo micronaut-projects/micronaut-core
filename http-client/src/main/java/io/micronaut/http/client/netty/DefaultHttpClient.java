@@ -2371,6 +2371,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 });
                 HttpToHttp2ConnectionHandler connectionHandler = builder
                         .build();
+                System.out.println("INIT HTTP/2 channel sslContext = " + sslContext);
                 if (sslContext != null) {
                     configureHttp2Ssl(this, ch, sslContext, host, port, connectionHandler);
                 } else {
@@ -2517,6 +2518,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         protected void channelRead0(ChannelHandlerContext ctx, Http2Settings msg) {
             promise.setSuccess();
 
+            System.out.println("RECEIVED HTTP/2 settings = " + msg);
             // Only care about the first settings message
             ctx.pipeline().remove(this);
         }
@@ -2552,6 +2554,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             // Done with this handler, remove it from the pipeline.
             final ChannelPipeline pipeline = ctx.pipeline();
 
+            System.out.println("SENDING HTTP2 UPGRADE REQUEST");
             pipeline.addLast(HANDLER_HTTP2_SETTINGS, initializer.settingsHandler);
             DefaultFullHttpRequest upgradeRequest =
                     new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER);
@@ -2563,7 +2566,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 hostString = remote.getAddress().getHostAddress();
             }
             upgradeRequest.headers().set(HttpHeaderNames.HOST, hostString + ':' + remote.getPort());
-
             ctx.writeAndFlush(upgradeRequest);
 
             ctx.fireChannelActive();
