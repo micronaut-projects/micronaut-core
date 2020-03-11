@@ -91,7 +91,7 @@ class Http2RequestSpec extends Specification {
         server.close()
     }
 
-//    @Ignore
+    @Ignore
     void "test make HTTP/2 client with HTTP/1 server - HTTPS"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
