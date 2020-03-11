@@ -2371,7 +2371,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 });
                 HttpToHttp2ConnectionHandler connectionHandler = builder
                         .build();
-                System.out.println("INIT HTTP/2 channel sslContext = " + sslContext);
                 if (sslContext != null) {
                     configureHttp2Ssl(this, ch, sslContext, host, port, connectionHandler);
                 } else {
@@ -2518,7 +2517,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         protected void channelRead0(ChannelHandlerContext ctx, Http2Settings msg) {
             promise.setSuccess();
 
-            System.out.println("RECEIVED HTTP/2 settings = " + msg);
             // Only care about the first settings message
             ctx.pipeline().remove(this);
         }
@@ -2554,7 +2552,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             // Done with this handler, remove it from the pipeline.
             final ChannelPipeline pipeline = ctx.pipeline();
 
-            System.out.println("SENDING HTTP2 UPGRADE REQUEST");
             pipeline.addLast(HANDLER_HTTP2_SETTINGS, initializer.settingsHandler);
             DefaultFullHttpRequest upgradeRequest =
                     new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER);
@@ -2677,7 +2674,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             ChannelFuture channelFuture;
             final ChannelPipeline pipeline = channel.pipeline();
             if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                System.out.println("HTTP/2 client request");
                 final boolean isSecure = sslContext != null && "https".equalsIgnoreCase(scheme);
                 if (isSecure) {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
@@ -2685,7 +2681,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTP);
                     final UpgradeRequestHandler upgradeRequestHandler = (UpgradeRequestHandler) pipeline.get(HANDLER_HTTP2_UPGRADE_REQUEST);
                     final Http2SettingsHandler settingsHandler;
-                    System.out.println("upgradeRequestHandler = " + upgradeRequestHandler);
                     if (upgradeRequestHandler != null) {
                         settingsHandler = upgradeRequestHandler.getSettingsHandler();
                     } else {
@@ -2693,7 +2688,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     }
                     if (settingsHandler != null) {
                         settingsHandler.promise.addListener(future -> {
-                            System.out.println("Writing netty request");
                             channel.writeAndFlush(nettyRequest);
                         });
                         return;
@@ -2705,7 +2699,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 channel.write(nettyRequest);
                 channelFuture = channel.writeAndFlush(encoder);
             } else {
-                System.out.println("Writing netty request");
                 channelFuture = channel.writeAndFlush(nettyRequest);
             }
 

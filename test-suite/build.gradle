@@ -67,22 +67,22 @@ dependencies {
     testImplementation "io.netty:netty-tcnative-boringssl-static:2.0.29.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
 }
 
-tasks.withType(Test) {
-    useJUnitPlatform()
-
-    jvmArgs('-Dio.netty.leakDetection.level=paranoid')
-    testLogging {
-        showStandardStreams = true
-    }
-    beforeTest {
-        System.out.println("STARTING: ${it.className}.$it.name")
-        System.out.flush()
-    }
-    afterTest {
-        System.out.println("FINISHED: ${it.className}.$it.name")
-        System.out.flush()
-    }
-}
+//tasks.withType(Test) {
+//    useJUnitPlatform()
+//
+//    jvmArgs('-Dio.netty.leakDetection.level=paranoid')
+//    testLogging {
+//        showStandardStreams = true
+//    }
+//    beforeTest {
+//        System.out.println("STARTING: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//    afterTest {
+//        System.out.println("FINISHED: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//}
 
 //compileTestJava.options.fork = true
 //compileTestJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
