@@ -11,8 +11,6 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.RxStreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
-import spock.lang.Ignore
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 // Netty + HTTP/2 on JDKs less than 9 require tcnative setup
@@ -46,7 +44,8 @@ class Http2RequestSpec extends Specification {
         result == 'Version: HTTP_2_0'
 
         when:"A non stream request is executed"
-        def people = client.retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person)).blockingFirst()
+        def people = client.retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person))
+                            .blockingFirst()
 
         then:
         people == Http2Controller.people
@@ -69,8 +68,8 @@ class Http2RequestSpec extends Specification {
                 "micronaut.server.http-version" : "2.0",
                 "micronaut.http.client.http-version" : "2.0",
                 "micronaut.http.client.read-timeout": -1,
-                "micronaut.http.client.log-level" : "TRACE"
-//                "micronaut.server.netty.log-level" : "TRACE"
+                "micronaut.http.client.log-level" : "TRACE",
+                "micronaut.server.netty.log-level" : "TRACE"
         ])
         RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
 
@@ -84,27 +83,6 @@ class Http2RequestSpec extends Specification {
         result = client.retrieve("${server.URL}/http2").blockingFirst()
 
         then:
-        result == 'Version: HTTP_2_0'
-
-        cleanup:
-        server.close()
-    }
-
-    @Ignore
-    void "test make HTTP/2 client with HTTP/1 server - HTTPS"() {
-        given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.ssl.enabled': true,
-                "micronaut.http.client.http-version" : "2.0",
-                'micronaut.ssl.buildSelfSigned': true,
-                'micronaut.ssl.port': -1,
-                "micronaut.http.client.log-level" : "TRACE",
-                "micronaut.server.netty.log-level" : "TRACE"
-        ])
-        RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
-        def result = client.retrieve("http://localhost:${server.port}/http2").blockingFirst()
-
-        expect:
         result == 'Version: HTTP_2_0'
 
         cleanup:
