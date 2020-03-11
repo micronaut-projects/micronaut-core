@@ -459,7 +459,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     }
                 }
             } else {
-                ctx.close();
+                writeCloseFrameAndTerminate(ctx, cr);
             }
         }
     }
