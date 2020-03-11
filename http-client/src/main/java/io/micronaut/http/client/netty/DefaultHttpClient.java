@@ -2678,20 +2678,26 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             final ChannelPipeline pipeline = channel.pipeline();
             if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
                 System.out.println("HTTP/2 client request");
-                if (sslContext != null && "https".equalsIgnoreCase(scheme)) {
+                final boolean isSecure = sslContext != null && "https".equalsIgnoreCase(scheme);
+                if (isSecure) {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
                 } else {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTP);
-                }
-                final UpgradeRequestHandler upgradeRequestHandler = (UpgradeRequestHandler) pipeline.get(HANDLER_HTTP2_UPGRADE_REQUEST);
-                System.out.println("upgradeRequestHandler = " + upgradeRequestHandler);
-                if (upgradeRequestHandler != null) {
-                    final Http2SettingsHandler settingsHandler = upgradeRequestHandler.getSettingsHandler();
-                    settingsHandler.promise.addListener(future -> {
-                        System.out.println("Writing netty request");
-                        channel.writeAndFlush(nettyRequest);
-                    });
-                    return;
+                    final UpgradeRequestHandler upgradeRequestHandler = (UpgradeRequestHandler) pipeline.get(HANDLER_HTTP2_UPGRADE_REQUEST);
+                    final Http2SettingsHandler settingsHandler;
+                    System.out.println("upgradeRequestHandler = " + upgradeRequestHandler);
+                    if (upgradeRequestHandler != null) {
+                        settingsHandler = upgradeRequestHandler.getSettingsHandler();
+                    } else {
+                        settingsHandler = (Http2SettingsHandler) pipeline.get(HANDLER_HTTP2_SETTINGS);
+                    }
+                    if (settingsHandler != null) {
+                        settingsHandler.promise.addListener(future -> {
+                            System.out.println("Writing netty request");
+                            channel.writeAndFlush(nettyRequest);
+                        });
+                        return;
+                    }
                 }
             }
             if (encoder != null && encoder.isChunked()) {
