@@ -76,6 +76,7 @@ import io.netty.util.AsciiString;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -547,7 +548,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
     }
 
-    private void registerMicronautChannelHandlers(ChannelPipeline pipeline) {
+    private void registerMicronautChannelHandlers(Map<String, ChannelHandler> channelHandlerMap) {
         int i = 0;
         for (ChannelHandler outboundHandlerAdapter : outboundHandlers) {
             String name;
@@ -556,7 +557,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             } else {
                 name = NettyHttpServer.MICRONAUT_HANDLER + NettyHttpServer.OUTBOUND_KEY + ++i;
             }
-            pipeline.addAfter(NettyHttpServer.HTTP_CODEC, name, outboundHandlerAdapter);
+            channelHandlerMap.put(name, outboundHandlerAdapter);
         }
     }
 
@@ -661,6 +662,12 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
 
         private void configurePipeline(String protocol, ChannelPipeline pipeline) {
+            Map<String, ChannelHandler> handlers = getHandlerForProtocol(protocol);
+            handlers.forEach(pipeline::addLast);
+        }
+
+        @NotNull
+        private Map<String, ChannelHandler> getHandlerForProtocol(@Nullable String protocol) {
             final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
             final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
             final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
@@ -677,40 +684,43 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     httpContentProcessorResolver
             );
             final Duration idleTime = serverConfiguration.getIdleTimeout();
+            Map<String, ChannelHandler> handlers = new LinkedHashMap<>(15);
             if (!idleTime.isNegative()) {
-                pipeline.addLast(new IdleStateHandler(
+                handlers.put("idle-state-handler", new IdleStateHandler(
                         (int) serverConfiguration.getReadIdleTimeout().getSeconds(),
                         (int) serverConfiguration.getWriteIdleTimeout().getSeconds(),
                         (int) idleTime.getSeconds()));
             }
             if (protocol == null) {
-                pipeline.addLast(FLOW_CONTROL_HANDLER, new FlowControlHandler());
+                handlers.put(FLOW_CONTROL_HANDLER, new FlowControlHandler());
             } else if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                 final HttpToHttp2ConnectionHandler httpToHttp2ConnectionHandler = newHttpToHttp2ConnectionHandler();
-                pipeline.addLast(HTTP2_HANDLER, httpToHttp2ConnectionHandler);
-                pipeline.addLast(FLOW_CONTROL_HANDLER, new FlowControlHandler());
+                handlers.put(HTTP2_HANDLER, httpToHttp2ConnectionHandler);
+                registerMicronautChannelHandlers(handlers);
+                handlers.put(FLOW_CONTROL_HANDLER, new FlowControlHandler());
             } else {
-                pipeline.addLast(HTTP_CODEC, new HttpServerCodec(
+                handlers.put(HTTP_CODEC, new HttpServerCodec(
                         serverConfiguration.getMaxInitialLineLength(),
                         serverConfiguration.getMaxHeaderSize(),
                         serverConfiguration.getMaxChunkSize(),
                         serverConfiguration.isValidateHeaders(),
                         serverConfiguration.getInitialBufferSize()
                 ));
-                pipeline.addLast(FLOW_CONTROL_HANDLER, new FlowControlHandler());
-                pipeline.addLast(HTTP_KEEP_ALIVE_HANDLER, new HttpServerKeepAliveHandler());
-                pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor(httpCompressionStrategy));
-                pipeline.addLast(HTTP_DECOMPRESSOR, new HttpContentDecompressor());
+                registerMicronautChannelHandlers(handlers);
+                handlers.put(FLOW_CONTROL_HANDLER, new FlowControlHandler());
+                handlers.put(HTTP_KEEP_ALIVE_HANDLER, new HttpServerKeepAliveHandler());
+                handlers.put(HTTP_COMPRESSOR, new SmartHttpContentCompressor(httpCompressionStrategy));
+                handlers.put(HTTP_DECOMPRESSOR, new HttpContentDecompressor());
             }
 
-            pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
-            pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
-            pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
+            handlers.put(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
+            handlers.put(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
+            handlers.put(HttpRequestDecoder.ID, requestDecoder);
             if (sslContext != null) {
-                pipeline.addLast(requestCertificateHandler);
+                handlers.put("request-certificate-handler", requestCertificateHandler);
             }
-            pipeline.addLast(HttpResponseEncoder.ID, responseDecoder);
-            pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
+            handlers.put(HttpResponseEncoder.ID, responseDecoder);
+            handlers.put(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
                     getWebSocketSessionRepository(),
                     router,
                     requestArgumentSatisfier.getBinderRegistry(),
@@ -718,8 +728,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     mediaTypeCodecRegistry,
                     applicationContext
             ));
-            pipeline.addLast(MICRONAUT_HANDLER, routingHandler);
-            registerMicronautChannelHandlers(pipeline);
+            handlers.put(MICRONAUT_HANDLER, routingHandler);
+            return handlers;
         }
     }
 
@@ -757,12 +767,15 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     final String fallbackHandlerName = "http1-fallback-handler";
                     HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
                         if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
-                            return new Http2ServerUpgradeCodec(connectionHandler) {
+
+                            return new Http2ServerUpgradeCodec(HTTP2_HANDLER, connectionHandler) {
                                 @Override
                                 public void upgradeTo(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest) {
+                                    final ChannelPipeline p = ctx.pipeline();
+                                    p.remove(fallbackHandlerName);
+                                    http2OrHttpHandler.getHandlerForProtocol(null)
+                                            .forEach(p::addLast);
                                     super.upgradeTo(ctx, upgradeRequest);
-                                    ctx.pipeline().remove(fallbackHandlerName);
-                                    http2OrHttpHandler.configurePipeline(ctx, null);
                                 }
                             };
                         } else {
@@ -781,7 +794,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
                     pipeline.addLast(fallbackHandlerName, new SimpleChannelInboundHandler<HttpMessage>() {
                         @Override
-                        protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) throws Exception {
+                        protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) {
                             // If this handler is hit then no upgrade has been attempted and the client is just talking HTTP.
                             if (msg instanceof HttpRequest) {
                                 HttpRequest req = (HttpRequest) msg;
