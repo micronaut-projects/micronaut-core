@@ -2561,6 +2561,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
+            // Done with this handler, remove it from the pipeline.
+            final ChannelPipeline pipeline = ctx.pipeline();
+
+            pipeline.addLast(HANDLER_HTTP2_SETTINGS, initializer.settingsHandler);
             DefaultFullHttpRequest upgradeRequest =
                     new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER);
 
@@ -2576,10 +2580,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
             ctx.fireChannelActive();
 
-            // Done with this handler, remove it from the pipeline.
-            final ChannelPipeline pipeline = ctx.pipeline();
+
             pipeline.remove(this);
-            pipeline.addLast(HANDLER_HTTP2_SETTINGS, initializer.settingsHandler);
             initializer.addFinalHandler(pipeline);
         }
     }
