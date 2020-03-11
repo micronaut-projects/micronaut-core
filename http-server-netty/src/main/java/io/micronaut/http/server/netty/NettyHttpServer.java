@@ -766,19 +766,15 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                     final HttpToHttp2ConnectionHandler connectionHandler = newHttpToHttp2ConnectionHandler();
                     final String fallbackHandlerName = "http1-fallback-handler";
                     HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
-                        System.out.println("UPGRADE protocol = " + protocol);
                         if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
 
                             return new Http2ServerUpgradeCodec(HTTP2_HANDLER, connectionHandler) {
                                 @Override
                                 public void upgradeTo(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest) {
                                     final ChannelPipeline p = ctx.pipeline();
-                                    System.out.println("Removing fallback handler");
                                     p.remove(fallbackHandlerName);
-                                    System.out.println("Configuring Micronaut Handlers");
                                     http2OrHttpHandler.getHandlerForProtocol(null)
                                             .forEach(p::addLast);
-                                    System.out.println("Upgrading request");
                                     super.upgradeTo(ctx, upgradeRequest);
                                 }
                             };
@@ -804,7 +800,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                                 HttpRequest req = (HttpRequest) msg;
                                 if (req.headers().contains(AbstractNettyHttpRequest.STREAM_ID)) {
                                     ChannelPipeline pipeline = ctx.pipeline();
-                                    System.out.println("Received stream request, removing and re-sending through pipeline");
                                     pipeline.remove(this);
                                     pipeline.fireChannelRead(ReferenceCountUtil.retain(msg));
                                     return;
@@ -812,14 +807,12 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                             }
                             ChannelPipeline pipeline = ctx.pipeline();
                             final HttpServerCodec upgradeCodec = pipeline.get(HttpServerCodec.class);
-                            System.out.println("Upgrade failed reconfiguring pipeline for HTTP/1");
                             pipeline.remove(upgradeCodec);
                             pipeline.remove(upgradeHandler);
                             pipeline.remove(this);
                             // reconfigure for http1
                             http2OrHttpHandler.getHandlerForProtocol(ApplicationProtocolNames.HTTP_1_1)
                                     .forEach(pipeline::addLast);
-                            System.out.println("Resending HTTP message through pipeline");
                             pipeline.fireChannelRead(ReferenceCountUtil.retain(msg));
                         }
                     });

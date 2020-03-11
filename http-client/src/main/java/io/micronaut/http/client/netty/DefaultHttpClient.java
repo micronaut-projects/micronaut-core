@@ -2513,27 +2513,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             this.promise = promise;
         }
 
-        /**
-         * Wait for this handler to be added after the upgrade to HTTP/2, and for initial preface
-         * handshake to complete.
-         *
-         * @param timeout Time to wait
-         * @param unit {@link java.util.concurrent.TimeUnit} for {@code timeout}
-         */
-        public void awaitSettings(long timeout, TimeUnit unit) {
-            if (!promise.awaitUninterruptibly(timeout, unit)) {
-                throw new HttpClientException("HTTP/2 Timed out waiting for settings");
-            }
-            if (!promise.isSuccess()) {
-                throw new HttpClientException("HTTP/2 upgrade negotiation error", promise.cause());
-            }
-        }
-
-        @Override
-        public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-            ctx.read();
-        }
-
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, Http2Settings msg) {
             promise.setSuccess();
@@ -2549,6 +2528,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private final class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
 
         private final HttpClientInitializer initializer;
+        private final Http2SettingsHandler settingsHandler;
 
         /**
          * Default constructor.
@@ -2557,10 +2537,18 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
          */
         public UpgradeRequestHandler(HttpClientInitializer initializer) {
             this.initializer = initializer;
+            this.settingsHandler = initializer.settingsHandler;
+        }
+
+        /**
+         * @return The settings handler
+         */
+        public Http2SettingsHandler getSettingsHandler() {
+            return settingsHandler;
         }
 
         @Override
-        public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        public void channelActive(ChannelHandlerContext ctx) {
             // Done with this handler, remove it from the pipeline.
             final ChannelPipeline pipeline = ctx.pipeline();
 
@@ -2579,8 +2567,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             ctx.writeAndFlush(upgradeRequest);
 
             ctx.fireChannelActive();
-
-
             pipeline.remove(this);
             initializer.addFinalHandler(pipeline);
         }
@@ -2696,17 +2682,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTP);
                 }
                 final UpgradeRequestHandler upgradeRequestHandler = (UpgradeRequestHandler) pipeline.get(HANDLER_HTTP2_UPGRADE_REQUEST);
+                System.out.println("upgradeRequestHandler = " + upgradeRequestHandler);
                 if (upgradeRequestHandler != null) {
-                    final Http2SettingsHandler settingsHandler = upgradeRequestHandler.initializer.settingsHandler;
-                    if (settingsHandler != null) {
-                        System.out.println("Awaiting settings");
-                        if (readTimeoutMillis != null) {
-                            settingsHandler.awaitSettings(readTimeoutMillis, TimeUnit.MILLISECONDS);
-                        } else {
-                            settingsHandler.awaitSettings(10, TimeUnit.SECONDS);
-                        }
-                        System.out.println("Settings received, ready to send request");
-                    }
+                    final Http2SettingsHandler settingsHandler = upgradeRequestHandler.getSettingsHandler();
+                    settingsHandler.promise.addListener(future -> {
+                        System.out.println("Writing netty request");
+                        channel.writeAndFlush(nettyRequest);
+                    });
+                    return;
                 }
             }
             if (encoder != null && encoder.isChunked()) {
