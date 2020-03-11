@@ -2685,29 +2685,35 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
          */
         protected void writeAndClose(Channel channel, ChannelPool channelPool, FlowableEmitter<?> emitter) {
             ChannelFuture channelFuture;
+            final ChannelPipeline pipeline = channel.pipeline();
             if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+                System.out.println("HTTP/2 client request");
                 if (sslContext != null && "https".equalsIgnoreCase(scheme)) {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
                 } else {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTP);
                 }
-                final UpgradeRequestHandler upgradeRequestHandler = (UpgradeRequestHandler) channel.pipeline().get(HANDLER_HTTP2_UPGRADE_REQUEST);
+                final UpgradeRequestHandler upgradeRequestHandler = (UpgradeRequestHandler) pipeline.get(HANDLER_HTTP2_UPGRADE_REQUEST);
                 if (upgradeRequestHandler != null) {
                     final Http2SettingsHandler settingsHandler = upgradeRequestHandler.initializer.settingsHandler;
                     if (settingsHandler != null) {
+                        System.out.println("Awaiting settings");
                         if (readTimeoutMillis != null) {
                             settingsHandler.awaitSettings(readTimeoutMillis, TimeUnit.MILLISECONDS);
                         } else {
                             settingsHandler.awaitSettings(10, TimeUnit.SECONDS);
                         }
+                        pipeline.remove(settingsHandler);
+                        System.out.println("Settings received, ready to send request");
                     }
                 }
             }
             if (encoder != null && encoder.isChunked()) {
-                channel.pipeline().replace(HANDLER_STREAM, HANDLER_CHUNK, new ChunkedWriteHandler());
+                pipeline.replace(HANDLER_STREAM, HANDLER_CHUNK, new ChunkedWriteHandler());
                 channel.write(nettyRequest);
                 channelFuture = channel.writeAndFlush(encoder);
             } else {
+                System.out.println("Writing netty request");
                 channelFuture = channel.writeAndFlush(nettyRequest);
             }
 
