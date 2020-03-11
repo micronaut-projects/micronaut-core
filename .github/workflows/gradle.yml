@@ -31,7 +31,7 @@ jobs:
       with:
         java-version: ${{ matrix.java }}   
     - name: Build with Gradle
-      run: ./gradlew check --no-daemon --parallel --continue
+      run: ./gradlew test-suite:test --tests io.micronaut.http.client.http2.Http2RequestSpec
     - name: Publish to JFrog OSS
       if: success() && github.event_name == 'push' && matrix.java == '8'
       env:
