@@ -2703,7 +2703,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         } else {
                             settingsHandler.awaitSettings(10, TimeUnit.SECONDS);
                         }
-                        pipeline.remove(settingsHandler);
                         System.out.println("Settings received, ready to send request");
                     }
                 }
