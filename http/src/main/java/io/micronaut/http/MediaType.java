@@ -532,9 +532,9 @@ public class MediaType implements CharSequence {
      * @return Whether the media type is text based
      */
     public boolean isTextBased() {
-        boolean matches = textTypePatterns.stream().anyMatch((p) -> p.matcher(name).matches());
+        boolean matches = textTypePatterns.stream().anyMatch(p -> p.matcher(name).matches());
         if (!matches) {
-            matches = subtype.equalsIgnoreCase("json") || subtype.equalsIgnoreCase("xml");
+            matches = subtype.equalsIgnoreCase("json") || subtype.equalsIgnoreCase("xml") || subtype.equalsIgnoreCase("x-yaml");
         }
         return matches;
     }
