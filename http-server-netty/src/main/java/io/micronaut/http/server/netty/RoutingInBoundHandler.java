@@ -1397,8 +1397,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             context.writeAndFlush(nettyResponse)
                    .addListener(future -> {
-                       context.read();
-                       cleanupRequest(context, nettyHttpRequest);
+                       try {
+                           if (!future.isSuccess()) {
+                               final Throwable throwable = future.cause();
+                               if (LOG.isErrorEnabled()) {
+                                   LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
+                               }
+                           } else {
+                               context.read();
+                           }
+                       } finally {
+
+                           cleanupRequest(context, nettyHttpRequest);
+                       }
+
                    });
 
         }

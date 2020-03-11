@@ -136,7 +136,7 @@ class Http2RequestSpec extends Specification {
     @Controller("/http2")
     static class Http2Controller {
 
-        @Get(produces = MediaType.TEXT_PLAIN)
+        @Get(produces = MediaType.TEXT_HTML)
         String index(HttpRequest<?> request) {
             return "Version: ${request.httpVersion}"
         }

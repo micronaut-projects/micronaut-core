@@ -3,7 +3,6 @@ package io.micronaut.http.client.http2;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.runtime.Micronaut;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.testcontainers.shaded.okhttp3.internal.http2.Http2Connection;
 
 public class Http2Application {
 

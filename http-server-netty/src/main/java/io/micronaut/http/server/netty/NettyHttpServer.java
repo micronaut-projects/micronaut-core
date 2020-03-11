@@ -698,10 +698,10 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 ));
                 pipeline.addLast(FLOW_CONTROL_HANDLER, new FlowControlHandler());
                 pipeline.addLast(HTTP_KEEP_ALIVE_HANDLER, new HttpServerKeepAliveHandler());
+                pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor(httpCompressionStrategy));
+                pipeline.addLast(HTTP_DECOMPRESSOR, new HttpContentDecompressor());
             }
 
-            pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor(httpCompressionStrategy));
-            pipeline.addLast(HTTP_DECOMPRESSOR, new HttpContentDecompressor());
             pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
             pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
             pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
@@ -728,7 +728,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private class NettyHttpServerInitializer extends ChannelInitializer<SocketChannel> {
 
         final LoggingHandler loggingHandler =
-                serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(serverConfiguration.getLogLevel().get()) : null;
+                serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(NettyHttpServer.class, serverConfiguration.getLogLevel().get()) : null;
 
         @Override
         protected void initChannel(SocketChannel ch) {
@@ -791,11 +791,15 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                                     return;
                                 }
                             }
+                            ChannelPipeline pipeline = ctx.pipeline();
+                            final HttpServerCodec upgradeCodec = pipeline.get(HttpServerCodec.class);
+                            pipeline.remove(upgradeCodec);
+                            pipeline.remove(upgradeHandler);
+                            pipeline.remove(this);
+                            // reconfigure for http1
                             new Http2OrHttpHandler(sslContext, serverConfiguration.getFallbackProtocol())
                                     .configurePipeline(ApplicationProtocolNames.HTTP_1_1, ctx.pipeline());
-                            ChannelPipeline pipeline = ctx.pipeline();
-                            pipeline.remove(this);
-                            ctx.fireChannelRead(ReferenceCountUtil.retain(msg));
+                            ctx.pipeline().fireChannelRead(ReferenceCountUtil.retain(msg));
                         }
                     });
 
