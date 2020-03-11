@@ -257,58 +257,35 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             Object key = keyGenerator.generateKey(context, params);
             CompletableFuture<Object> thisFuture = new CompletableFuture<>();
             Argument<?> firstTypeVariable = returnTypeObject.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            asyncCache.get(key, firstTypeVariable).whenComplete((BiConsumer<Optional<?>, Throwable>) (o, throwable) -> {
-                if (throwable == null && o.isPresent()) {
-                    // cache hit, return result
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Value found in cache [" + asyncCache.getName() + "] for invocation: " + context);
-                    }
-                    thisFuture.complete(o.get());
-                } else {
-                    // cache miss proceed with original future
-                    try {
-                        if (throwable != null) {
-                            if (errorHandler.handleLoadError(asyncCache, key, asRuntimeException(throwable))) {
-                                thisFuture.completeExceptionally(throwable);
-                                return;
-                            }
-                        }
-                        CompletableFuture<?> completableFuture = (CompletableFuture<?>) context.proceed();
-                        if (completableFuture == null) {
-                            thisFuture.complete(null);
+            asyncCache.get(key, firstTypeVariable).whenComplete(
+                    (BiConsumer<Optional<?>, Throwable>) (o, throwable) -> {
+                        if (throwable == null && o.isPresent() && !o.get().toString().contains("io.micronaut.cache.interceptor.CacheInterceptor$CompletableFutureWrapper")) {
+                            CompletableFutureWrapper wrapper = new CompletableFutureWrapper();
+                            wrapper.value = CompletableFuture.completedFuture(o.get());
+                            completableFutureCacheResultFound(
+                                    context,
+                                    asyncCache,
+                                    thisFuture,
+                                    wrapper
+                            );
+                        } else if (throwable != null) {
+                            completableFutureErrorResultFound(asyncCache, key, thisFuture, throwable);
                         } else {
-                            completableFuture.whenComplete((BiConsumer<Object, Throwable>) (o1, t2) -> {
-                                if (t2 != null) {
-                                    thisFuture.completeExceptionally(t2);
-                                } else {
-                                    // new cacheable result, cache it
-                                    BiConsumer<Boolean, Throwable> completionHandler = (aBoolean, throwable1) -> {
-                                        if (throwable1 == null) {
-                                            thisFuture.complete(o1);
+                            asyncCache.get(key, CompletableFutureWrapper.class).whenComplete(
+                                    (BiConsumer<Optional<?>, Throwable>) (o1, throwable1) -> {
+                                        if (throwable1 == null && o1.isPresent()) {
+                                            CompletableFutureWrapper wrapper = (CompletableFutureWrapper)o1.get();
+                                            completableFutureCacheResultFound(context, asyncCache, thisFuture, wrapper);
+                                        } else if (throwable1 != null) {
+                                            completableFutureErrorResultFound(asyncCache, key, thisFuture, throwable1);
                                         } else {
-                                            thisFuture.completeExceptionally(throwable1);
+                                            completableFutureNoCacheFound(context, asyncCache, key, thisFuture);
                                         }
-                                    };
-                                    if (o1 != null) {
-                                        if (LOG.isTraceEnabled()) {
-                                            LOG.trace("Storing in the cache [{}] with key [{}] the result of invocation [{}]: {}", asyncCache.getName(), key, context, o1);
-                                        }
-                                        asyncCache.put(key, o1).whenComplete(completionHandler);
-                                    } else {
-                                        if (LOG.isTraceEnabled()) {
-                                            LOG.trace("Invalidating the key [{}] of the cache [{}] since the result of invocation [{}] was null", key, asyncCache.getName(), context);
-                                        }
-                                        asyncCache.invalidate(key).whenComplete(completionHandler);
                                     }
-
-                                }
-                            });
+                            );
                         }
-                    } catch (RuntimeException e) {
-                        thisFuture.completeExceptionally(e);
                     }
-                }
-            });
+            );
             returnFuture = thisFuture;
         } else {
             returnFuture = (CompletableFuture<Object>) context.proceed();
@@ -317,6 +294,76 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             returnFuture = processFuturePutOperations(context, cacheOperation, returnFuture);
         }
         return returnFuture;
+    }
+
+    private void completableFutureNoCacheFound(MethodInvocationContext<Object, Object> context, AsyncCache<?> asyncCache, Object key, CompletableFuture<Object> thisFuture) {
+        CompletableFuture<Object> cachedFuture = new CompletableFuture<>();
+        CompletableFutureWrapper wrapper = new CompletableFutureWrapper();
+        wrapper.value = cachedFuture;
+        asyncCache.put(key, wrapper).whenComplete(
+                (BiConsumer<Object, Throwable>) (o, t) -> {
+                    CompletableFuture<?> completableFuture = (CompletableFuture<?>) context.proceed();
+                    if (completableFuture == null) {
+                        cachedFuture.complete(null);
+                    } else {
+                        // new cacheable result, cache it
+                        BiConsumer<Boolean, Throwable> completionHandler = (aBoolean, throwable1) -> {
+                            if (throwable1 == null) {
+                                thisFuture.complete(o);
+                            } else {
+                                thisFuture.completeExceptionally(throwable1);
+                            }
+                        };
+                        completableFuture.whenComplete(
+                                (BiConsumer<Object, Throwable>) (o2, t2) -> {
+                                    if (o2 != null) {
+                                        if (LOG.isTraceEnabled()) {
+                                            LOG.trace("Storing in the cache [{}] with key [{}] the result of invocation [{}]: {}", asyncCache.getName(), key, context, o2);
+                                        }
+                                        cachedFuture.complete(o2);
+                                        thisFuture.complete(o2);
+                                        asyncCache.put(key, o2);
+                                    } else {
+                                        if (LOG.isTraceEnabled()) {
+                                            LOG.trace("Invalidating the key [{}] of the cache [{}] since the result of invocation [{}] was null", key, asyncCache.getName(), context);
+                                        }
+                                        asyncCache.invalidate(key);
+                                        cachedFuture.complete(null);
+                                        thisFuture.complete(null);
+                                    }
+                                }
+                        );
+                    }
+                }
+        );
+        BiConsumer<Object, Throwable> completionHandler = (value, throwable1) -> {
+            if (throwable1 == null) {
+                thisFuture.complete(value);
+            } else {
+                thisFuture.completeExceptionally(throwable1);
+            }
+        };
+        cachedFuture.whenComplete(completionHandler);
+    }
+
+    private void completableFutureErrorResultFound(AsyncCache<?> asyncCache, Object key, CompletableFuture<Object> thisFuture, Throwable throwable) {
+        if (errorHandler.handleLoadError(asyncCache, key, asRuntimeException(throwable))) {
+            thisFuture.completeExceptionally(throwable);
+        }
+    }
+
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+    private void completableFutureCacheResultFound(MethodInvocationContext<Object, Object> context, AsyncCache<?> asyncCache, CompletableFuture<Object> thisFuture, CompletableFutureWrapper wrapper) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Value found in cache [" + asyncCache.getName() + "] for invocation: " + context);
+        }
+        //noinspection OptionalGetWithoutIsPresent
+        wrapper.value.whenComplete((BiConsumer<Object, Throwable>) (o2, t2) -> {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Reporting value from cache [" + asyncCache.getName() + "] for invocation: " + context + " to the callee");
+            }
+            thisFuture.complete(o2);
+        });
     }
 
     /**
@@ -964,5 +1011,9 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     private class ValueWrapper {
         Object value;
         boolean optional;
+    }
+
+    private class CompletableFutureWrapper {
+        CompletableFuture<?> value;
     }
 }
