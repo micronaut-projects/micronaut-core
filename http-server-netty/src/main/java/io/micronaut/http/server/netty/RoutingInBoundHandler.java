@@ -113,7 +113,6 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.reactivex.BackpressureStrategy;
@@ -1390,11 +1389,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             if (isHttp2) {
                 final io.netty.handler.codec.http.HttpHeaders nativeHeaders = nettyHttpRequest.getNativeRequest().headers();
-                final String streamId = nativeHeaders.get(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
+                final String streamId = nativeHeaders.get(NettyHttpRequest.STREAM_ID);
                 if (streamId != null) {
-                    nettyResponse.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), streamId);
+                    nettyResponse.headers().set(NettyHttpRequest.STREAM_ID, streamId);
                 }
             }
+
             context.writeAndFlush(nettyResponse)
                    .addListener(future -> {
                        context.read();

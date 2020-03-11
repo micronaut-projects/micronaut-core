@@ -28,28 +28,44 @@ class Http2RequestSpec extends Specification {
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
         RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
+
+        when:
         def result = client.retrieve("${server.URL}/http2").blockingFirst()
 
-        expect:
+        then:
+        result == 'Version: HTTP_2_0'
+
+        when:"operation repeated to use same connection"
+        result = client.retrieve("${server.URL}/http2").blockingFirst()
+
+        then:
         result == 'Version: HTTP_2_0'
 
         cleanup:
         server.close()
     }
 
-    @PendingFeature(reason = "Not yet implemented")
     void "test make HTTP/2 request - upgrade over HTTP"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 "micronaut.server.http-version" : "2.0",
                 "micronaut.http.client.http-version" : "2.0",
-                "micronaut.http.client.log-level" : "TRACE",
-                "micronaut.server.netty.log-level" : "TRACE"
+                "micronaut.http.client.read-timeout": -1,
+                "micronaut.http.client.log-level" : "TRACE"
+//                "micronaut.server.netty.log-level" : "TRACE"
         ])
         RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
+
+        when:
         def result = client.retrieve("${server.URL}/http2").blockingFirst()
 
-        expect:
+        then:
+        result == 'Version: HTTP_2_0'
+
+        when:"operation repeated to use same connection"
+        result = client.retrieve("${server.URL}/http2").blockingFirst()
+
+        then:
         result == 'Version: HTTP_2_0'
 
         cleanup:
@@ -57,6 +73,25 @@ class Http2RequestSpec extends Specification {
     }
 
     @Ignore
+    void "test make HTTP/2 request - upgrade over HTTP 2"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                "micronaut.http.client.http-version" : "2.0",
+                "micronaut.http.client.read-timeout": -1,
+                "micronaut.http.client.log-level" : "TRACE",
+                "micronaut.server.netty.log-level" : "TRACE"
+        ])
+        RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
+        def result = client.retrieve("http://localhost:8080").blockingFirst()
+
+        expect:
+        result == 'Version: HTTP_2_0'
+
+        cleanup:
+        server.close()
+    }
+
+//    @Ignore
     void "test make HTTP/2 client with HTTP/1 server - HTTPS"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [

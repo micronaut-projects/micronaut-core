@@ -39,7 +39,9 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.multipart.AbstractHttpData;
+import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
 
@@ -59,6 +61,8 @@ import java.util.function.Supplier;
  */
 @Internal
 public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T> {
+
+    public static final AsciiString STREAM_ID = HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text();
 
     private static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
 

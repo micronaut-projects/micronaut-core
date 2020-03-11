@@ -104,6 +104,7 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
@@ -168,6 +169,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
     private static final String HANDLER_HTTP_CLIENT_INIT = "handler-http-client-init";
+    private static final String HANDLER_HTTP2_SETTINGS = "handler-http2-settings";
+    private static final String HANDLER_HTTP2_UPGRADE_REQUEST = "handler-http2-upgrade-request";
 
     protected final Bootstrap bootstrap;
     protected EventLoopGroup group;
@@ -214,7 +217,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              MediaTypeCodecRegistry codecRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              HttpClientFilter... filters) {
-        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1,  configuration, contextPath, new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)), threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class);
+        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1, configuration, contextPath, new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)), threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class);
     }
 
     /**
@@ -419,7 +422,18 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 for (Map.Entry<RequestKey, ChannelPool> entry : i) {
                     ChannelPool cp = entry.getValue();
                     try {
-                        cp.close();
+                        if (cp instanceof SimpleChannelPool) {
+                            ((SimpleChannelPool) cp).closeAsync().addListener(future -> {
+                                if (!future.isSuccess()) {
+                                    final Throwable cause = future.cause();
+                                    if (cause != null) {
+                                        log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
+                                    }
+                                }
+                            });
+                        } else {
+                            cp.close();
+                        }
                     } catch (Exception cause) {
                         log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
                     }
@@ -1475,7 +1489,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         } catch (MalformedURLException e) {
                             //should never happen
                         }
-                        return new NettyRequestWriter(nettyRequest, null);
+                        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, null);
                     } else if (bodyValue instanceof CharSequence) {
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
                     } else if (mediaTypeCodecRegistry != null) {
@@ -1499,7 +1513,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         } catch (MalformedURLException e) {
             //should never happen
         }
-        return new NettyRequestWriter(nettyRequest, postRequestEncoder);
+        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, postRequestEncoder);
     }
 
     /**
@@ -1560,8 +1574,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
         final ChannelPipeline pipeline = ch.pipeline();
         pipeline.addLast(HANDLER_HTTP_CLIENT_CODEC, sourceCodec);
-        httpClientInitializer.addEventStreamHandlerIfNecessary(pipeline);
-        pipeline.addLast(upgradeHandler, new UpgradeRequestHandler(httpClientInitializer));
+        httpClientInitializer.settingsHandler = new Http2SettingsHandler(ch.newPromise());
+        pipeline.addLast(upgradeHandler);
+        pipeline.addLast(HANDLER_HTTP2_UPGRADE_REQUEST, new UpgradeRequestHandler(httpClientInitializer));
     }
 
     /**
@@ -1571,7 +1586,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param configuration The configuration
      * @return The {@link HttpToHttp2ConnectionHandlerBuilder}
      */
-    protected @NonNull HttpToHttp2ConnectionHandlerBuilder newHttp2ConnectionHandlerBuilder(
+    protected @NonNull
+    HttpToHttp2ConnectionHandlerBuilder newHttp2ConnectionHandlerBuilder(
             @NonNull Http2Connection connection, @NonNull HttpClientConfiguration configuration) {
         final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder();
         builder.validateHeaders(true);
@@ -2299,6 +2315,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         final int port;
         final boolean stream;
         final boolean acceptsEvents;
+        Http2SettingsHandler settingsHandler;
 
         /**
          * @param sslContext    The ssl context
@@ -2482,6 +2499,51 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     /**
+     * Reads the first {@link Http2Settings} object and notifies a {@link io.netty.channel.ChannelPromise}.
+     */
+    private final class Http2SettingsHandler extends SimpleChannelInboundHandler<Http2Settings> {
+        private final ChannelPromise promise;
+
+        /**
+         * Create new instance.
+         *
+         * @param promise Promise object used to notify when first settings are received
+         */
+        Http2SettingsHandler(ChannelPromise promise) {
+            this.promise = promise;
+        }
+
+        /**
+         * Wait for this handler to be added after the upgrade to HTTP/2, and for initial preface
+         * handshake to complete.
+         *
+         * @param timeout Time to wait
+         * @param unit {@link java.util.concurrent.TimeUnit} for {@code timeout}
+         */
+        public void awaitSettings(long timeout, TimeUnit unit) {
+            if (!promise.awaitUninterruptibly(timeout, unit)) {
+                throw new HttpClientException("HTTP/2 Timed out waiting for settings");
+            }
+            if (!promise.isSuccess()) {
+                throw new HttpClientException("HTTP/2 upgrade negotiation error", promise.cause());
+            }
+        }
+
+        @Override
+        public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+            ctx.read();
+        }
+
+        @Override
+        protected void channelRead0(ChannelHandlerContext ctx, Http2Settings msg) {
+            promise.setSuccess();
+
+            // Only care about the first settings message
+            ctx.pipeline().remove(this);
+        }
+    }
+
+    /**
      * A handler that triggers the cleartext upgrade to HTTP/2 by sending an initial HTTP request.
      */
     private final class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
@@ -2515,9 +2577,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             ctx.fireChannelActive();
 
             // Done with this handler, remove it from the pipeline.
-            ctx.pipeline().remove(this);
-
-            initializer.addFinalHandler(ctx.pipeline());
+            final ChannelPipeline pipeline = ctx.pipeline();
+            pipeline.remove(this);
+            pipeline.addLast(HANDLER_HTTP2_SETTINGS, initializer.settingsHandler);
+            initializer.addFinalHandler(pipeline);
         }
     }
 
@@ -2602,14 +2665,17 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
         private final HttpRequest nettyRequest;
         private final HttpPostRequestEncoder encoder;
+        private final String scheme;
 
         /**
+         * @param scheme       The scheme
          * @param nettyRequest The Netty request
          * @param encoder      The encoder
          */
-        NettyRequestWriter(HttpRequest nettyRequest, HttpPostRequestEncoder encoder) {
+        NettyRequestWriter(String scheme, HttpRequest nettyRequest, HttpPostRequestEncoder encoder) {
             this.nettyRequest = nettyRequest;
             this.encoder = encoder;
+            this.scheme = scheme;
         }
 
         /**
@@ -2619,18 +2685,29 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
          */
         protected void writeAndClose(Channel channel, ChannelPool channelPool, FlowableEmitter<?> emitter) {
             ChannelFuture channelFuture;
+            if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+                if (sslContext != null && "https".equalsIgnoreCase(scheme)) {
+                    nettyRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), HttpScheme.HTTPS);
+                } else {
+                    nettyRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), HttpScheme.HTTP);
+                }
+                final UpgradeRequestHandler upgradeRequestHandler = (UpgradeRequestHandler) channel.pipeline().get(HANDLER_HTTP2_UPGRADE_REQUEST);
+                if (upgradeRequestHandler != null) {
+                    final Http2SettingsHandler settingsHandler = upgradeRequestHandler.initializer.settingsHandler;
+                    if (settingsHandler != null) {
+                        if (readTimeoutMillis != null) {
+                            settingsHandler.awaitSettings(readTimeoutMillis, TimeUnit.MILLISECONDS);
+                        } else {
+                            settingsHandler.awaitSettings(10, TimeUnit.SECONDS);
+                        }
+                    }
+                }
+            }
             if (encoder != null && encoder.isChunked()) {
                 channel.pipeline().replace(HANDLER_STREAM, HANDLER_CHUNK, new ChunkedWriteHandler());
                 channel.write(nettyRequest);
                 channelFuture = channel.writeAndFlush(encoder);
             } else {
-                if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                    if (sslContext != null) {
-                        nettyRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), HttpScheme.HTTPS);
-                    } else {
-                        nettyRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), HttpScheme.HTTP);
-                    }
-                }
                 channelFuture = channel.writeAndFlush(nettyRequest);
             }
 

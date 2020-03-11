@@ -72,6 +72,7 @@ import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import org.slf4j.Logger;
@@ -114,7 +115,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     public static final String HTTP_KEEP_ALIVE_HANDLER = "http-keep-alive-handler";
     @SuppressWarnings("WeakerAccess")
     public static final String MICRONAUT_HANDLER = "micronaut-inbound-handler";
-    public static final String HTTP2_HANDLER = "htt2-handler";
+    public static final String HTTP2_HANDLER = "http2-handler";
     public static final String FLOW_CONTROL_HANDLER = "flow-control-handler";
 
     @SuppressWarnings("WeakerAccess")
@@ -681,7 +682,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         (int) serverConfiguration.getWriteIdleTimeout().getSeconds(),
                         (int) idleTime.getSeconds()));
             }
-            if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
+            if (protocol == null) {
+                pipeline.addLast(FLOW_CONTROL_HANDLER, new FlowControlHandler());
+            } else if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                 final HttpToHttp2ConnectionHandler httpToHttp2ConnectionHandler = newHttpToHttp2ConnectionHandler();
                 pipeline.addLast(HTTP2_HANDLER, httpToHttp2ConnectionHandler);
                 pipeline.addLast(FLOW_CONTROL_HANDLER, new FlowControlHandler());
@@ -742,27 +745,60 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
 
             if (httpVersion != io.micronaut.http.HttpVersion.HTTP_2_0) {
-                new Http2OrHttpHandler(sslContext, serverConfiguration.getFallbackProtocol()).configurePipeline(ApplicationProtocolNames.HTTP_1_1, pipeline);
+                new Http2OrHttpHandler(sslContext, serverConfiguration.getFallbackProtocol())
+                        .configurePipeline(ApplicationProtocolNames.HTTP_1_1, pipeline);
             } else {
                 final Http2OrHttpHandler http2OrHttpHandler = new Http2OrHttpHandler(sslContext, serverConfiguration.getFallbackProtocol());
                 if (ssl) {
                     pipeline.addLast(http2OrHttpHandler);
                 } else {
                     final HttpToHttp2ConnectionHandler connectionHandler = newHttpToHttp2ConnectionHandler();
+                    final String fallbackHandlerName = "http1-fallback-handler";
                     HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
                         if (AsciiString.contentEquals(Http2CodecUtil.HTTP_UPGRADE_PROTOCOL_NAME, protocol)) {
-                            return new Http2ServerUpgradeCodec(connectionHandler);
+                            return new Http2ServerUpgradeCodec(connectionHandler) {
+                                @Override
+                                public void upgradeTo(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest) {
+                                    super.upgradeTo(ctx, upgradeRequest);
+                                    ctx.pipeline().remove(fallbackHandlerName);
+                                    http2OrHttpHandler.configurePipeline(ctx, null);
+                                }
+                            };
                         } else {
                             return null;
                         }
                     };
                     final HttpServerCodec sourceCodec = new HttpServerCodec();
-                    final HttpServerUpgradeHandler upgradeHandler = new HttpServerUpgradeHandler(sourceCodec, upgradeCodecFactory);
+                    final HttpServerUpgradeHandler upgradeHandler = new HttpServerUpgradeHandler(
+                            sourceCodec,
+                            upgradeCodecFactory
+                    );
                     final CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
                             new CleartextHttp2ServerUpgradeHandler(sourceCodec, upgradeHandler, connectionHandler);
 
                     pipeline.addLast(cleartextHttp2ServerUpgradeHandler);
-                    new Http2OrHttpHandler(sslContext, serverConfiguration.getFallbackProtocol()).configurePipeline(ApplicationProtocolNames.HTTP_1_1, pipeline);
+
+                    pipeline.addLast(fallbackHandlerName, new SimpleChannelInboundHandler<HttpMessage>() {
+                        @Override
+                        protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) throws Exception {
+                            // If this handler is hit then no upgrade has been attempted and the client is just talking HTTP.
+                            if (msg instanceof HttpRequest) {
+                                HttpRequest req = (HttpRequest) msg;
+                                if (req.headers().contains(NettyHttpRequest.STREAM_ID)) {
+                                    ChannelPipeline pipeline = ctx.pipeline();
+                                    pipeline.remove(this);
+                                    ctx.fireChannelRead(ReferenceCountUtil.retain(msg));
+                                    return;
+                                }
+                            }
+                            new Http2OrHttpHandler(sslContext, serverConfiguration.getFallbackProtocol())
+                                    .configurePipeline(ApplicationProtocolNames.HTTP_1_1, ctx.pipeline());
+                            ChannelPipeline pipeline = ctx.pipeline();
+                            pipeline.remove(this);
+                            ctx.fireChannelRead(ReferenceCountUtil.retain(msg));
+                        }
+                    });
+
                 }
             }
         }
