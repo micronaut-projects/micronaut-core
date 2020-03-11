@@ -18,13 +18,13 @@ package io.micronaut.http.server.netty.types.files;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.stream.ChunkedStream;
 
 import java.io.InputStream;
@@ -98,9 +98,9 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
             if (isHttp2) {
                 if (request instanceof NettyHttpRequest) {
                     final io.netty.handler.codec.http.HttpHeaders nativeHeaders = ((NettyHttpRequest<?>) request).getNativeRequest().headers();
-                    final String streamId = nativeHeaders.get(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
+                    final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
                     if (streamId != null) {
-                        finalResponse.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), streamId);
+                        finalResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
                     }
                 }
             }

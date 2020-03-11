@@ -30,6 +30,7 @@ import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.channel.*;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
@@ -784,7 +785,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                             // If this handler is hit then no upgrade has been attempted and the client is just talking HTTP.
                             if (msg instanceof HttpRequest) {
                                 HttpRequest req = (HttpRequest) msg;
-                                if (req.headers().contains(NettyHttpRequest.STREAM_ID)) {
+                                if (req.headers().contains(AbstractNettyHttpRequest.STREAM_ID)) {
                                     ChannelPipeline pipeline = ctx.pipeline();
                                     pipeline.remove(this);
                                     ctx.fireChannelRead(ReferenceCountUtil.retain(msg));

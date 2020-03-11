@@ -71,7 +71,7 @@ tasks.withType(Test) {
     useJUnitPlatform()
 
     jvmArgs('-Dio.netty.leakDetection.level=paranoid')
-/*    testLogging {
+    testLogging {
         showStandardStreams = true
     }
     beforeTest {
@@ -81,7 +81,7 @@ tasks.withType(Test) {
     afterTest {
         System.out.println("FINISHED: ${it.className}.$it.name")
         System.out.flush()
-    }*/
+    }
 }
 
 //compileTestJava.options.fork = true

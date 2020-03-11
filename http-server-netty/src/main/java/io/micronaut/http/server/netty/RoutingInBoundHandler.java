@@ -70,6 +70,7 @@ import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
@@ -1389,9 +1390,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             if (isHttp2) {
                 final io.netty.handler.codec.http.HttpHeaders nativeHeaders = nettyHttpRequest.getNativeRequest().headers();
-                final String streamId = nativeHeaders.get(NettyHttpRequest.STREAM_ID);
+                final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
                 if (streamId != null) {
-                    nettyResponse.headers().set(NettyHttpRequest.STREAM_ID, streamId);
+                    nettyResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
                 }
             }
 

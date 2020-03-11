@@ -52,6 +52,7 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.multipart.MultipartException;
+import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
@@ -2686,9 +2687,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             ChannelFuture channelFuture;
             if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
                 if (sslContext != null && "https".equalsIgnoreCase(scheme)) {
-                    nettyRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), HttpScheme.HTTPS);
+                    nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
                 } else {
-                    nettyRequest.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), HttpScheme.HTTP);
+                    nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTP);
                 }
                 final UpgradeRequestHandler upgradeRequestHandler = (UpgradeRequestHandler) channel.pipeline().get(HANDLER_HTTP2_UPGRADE_REQUEST);
                 if (upgradeRequestHandler != null) {

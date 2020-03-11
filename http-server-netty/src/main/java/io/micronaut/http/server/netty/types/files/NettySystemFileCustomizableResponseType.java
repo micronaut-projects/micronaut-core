@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
@@ -32,7 +33,6 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
 import org.slf4j.Logger;
@@ -124,9 +124,9 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
             if (isHttp2) {
                 if (request instanceof NettyHttpRequest) {
                     final io.netty.handler.codec.http.HttpHeaders nativeHeaders = ((NettyHttpRequest<?>) request).getNativeRequest().headers();
-                    final String streamId = nativeHeaders.get(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
+                    final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
                     if (streamId != null) {
-                        finalResponse.headers().set(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), streamId);
+                        finalResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
                     }
                 }
             }
