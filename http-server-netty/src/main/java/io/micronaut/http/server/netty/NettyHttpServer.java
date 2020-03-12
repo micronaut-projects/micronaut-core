@@ -143,6 +143,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
     private final HttpVersion httpVersion;
+    private final HttpRequestCertificateHandler requestCertificateHandler;
+    private final RoutingInBoundHandler routingHandler;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final SslContext sslContext;
@@ -230,6 +232,19 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(applicationContext);
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
+        this.requestCertificateHandler = new HttpRequestCertificateHandler();
+        this.routingHandler = new RoutingInBoundHandler(
+                applicationContext,
+                router,
+                mediaTypeCodecRegistry,
+                customizableResponseTypeHandlerRegistry,
+                staticResourceResolver,
+                serverConfiguration,
+                requestArgumentSatisfier,
+                executorSelector,
+                ioExecutor,
+                httpContentProcessorResolver
+        );
     }
 
     /**
@@ -608,7 +623,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private HttpToHttp2ConnectionHandler newHttpToHttp2ConnectionHandler() {
         Http2Connection connection = new DefaultHttp2Connection(true);
         final InboundHttp2ToHttpAdapter http2ToHttpAdapter = new InboundHttp2ToHttpAdapterBuilder(connection)
-                .validateHttpHeaders(true)
+                .validateHttpHeaders(serverConfiguration.isValidateHeaders())
                 .maxContentLength((int) serverConfiguration.getMaxRequestSize())
                 .build();
 
@@ -669,20 +684,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         @NotNull
         private Map<String, ChannelHandler> getHandlerForProtocol(@Nullable String protocol) {
             final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
-            final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
             final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
-            final RoutingInBoundHandler routingHandler = new RoutingInBoundHandler(
-                    applicationContext,
-                    router,
-                    mediaTypeCodecRegistry,
-                    customizableResponseTypeHandlerRegistry,
-                    staticResourceResolver,
-                    serverConfiguration,
-                    requestArgumentSatisfier,
-                    executorSelector,
-                    ioExecutor,
-                    httpContentProcessorResolver
-            );
             final Duration idleTime = serverConfiguration.getIdleTimeout();
             Map<String, ChannelHandler> handlers = new LinkedHashMap<>(15);
             if (!idleTime.isNegative()) {

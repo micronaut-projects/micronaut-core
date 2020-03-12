@@ -1680,7 +1680,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (message instanceof ByteBuf) {
                     httpContent = new DefaultHttpContent((ByteBuf) message);
                 } else if (message instanceof ByteBuffer) {
-                    ByteBuffer byteBuffer = (ByteBuffer) message;
+                    ByteBuffer<?> byteBuffer = (ByteBuffer<?>) message;
                     Object nativeBuffer = byteBuffer.asNativeBuffer();
                     if (nativeBuffer instanceof ByteBuf) {
                         httpContent = new DefaultHttpContent((ByteBuf) nativeBuffer);
@@ -1699,8 +1699,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Encoding emitted response object [{}] using codec: {}", message, codec);
                     }
-                    ByteBuffer encoded = codec.encode(message, byteBufferFactory);
-                    httpContent = new DefaultHttpContent((ByteBuf) encoded.asNativeBuffer());
+                    ByteBuffer<ByteBuf> encoded = codec.encode(message, byteBufferFactory);
+                    httpContent = new DefaultHttpContent(encoded.asNativeBuffer());
                 }
                 if (!isJson || first) {
                     first = false;

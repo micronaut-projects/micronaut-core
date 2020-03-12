@@ -76,10 +76,11 @@ public interface MediaTypeCodec {
      * @param object    The object to encode
      * @param allocator The allocator
      * @param <T>       The generic type
+     * @param <B>       The buffer type
      * @return The decoded result
      * @throws CodecException When the result cannot be encoded
      */
-    <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException;
+    <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) throws CodecException;
 
     /**
      * Decode the given type from the given {@link InputStream}.
