@@ -36,6 +36,16 @@ import java.util.*;
 public interface HttpRequest<B> extends HttpMessage<B> {
 
     /**
+     * Constant for HTTP scheme.
+     */
+    String SCHEME_HTTP = "http";
+
+    /**
+     * Constant for HTTPS scheme.
+     */
+    String SCHEME_HTTPS = "https";
+
+    /**
      * @return The {@link Cookies} instance
      */
     @NonNull Cookies getCookies();

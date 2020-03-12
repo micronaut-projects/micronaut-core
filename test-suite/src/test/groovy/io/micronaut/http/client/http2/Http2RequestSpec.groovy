@@ -50,13 +50,14 @@ class Http2RequestSpec extends Specification {
         then:
         people == Http2Controller.people
 
-//      TODO: Not working yet, client JSON stream handling broken with HTTP/2
-//
 //        when:"A stream request is executed"
-//        def people = client.jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person).toList().blockingGet()
+//        def streamPeople = client.jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person)
+//                .take(2)
+//                .toList()
+//                .blockingGet()
 //
 //        then:
-//        people == Http2Controller.people
+//        streamPeople == Http2Controller.people
 
         cleanup:
         server.close()

@@ -387,7 +387,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     @Override
     public String getScheme() {
-        return (sslConfiguration != null && sslConfiguration.isEnabled()) ? "https" : "http";
+        return (sslConfiguration != null && sslConfiguration.isEnabled()) ? io.micronaut.http.HttpRequest.SCHEME_HTTPS : io.micronaut.http.HttpRequest.SCHEME_HTTP;
     }
 
     @Override
