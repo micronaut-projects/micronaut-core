@@ -529,7 +529,12 @@ ext {
                     version:micronautCacheVersion,
                     group:'io.micronaut.cache',
                     modules: ['micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop']
-            ]
+            ],
+            'micronaut.servlet': [
+                version:micronautServlet,
+                group:'io.micronaut.servlet',
+                modules: ['micronaut-http-server-tomcat', 'micronaut-http-server-jetty', 'micronaut-http-server-undertow']
+            ],
     ]
 
     dependencyVersion = { String name ->
