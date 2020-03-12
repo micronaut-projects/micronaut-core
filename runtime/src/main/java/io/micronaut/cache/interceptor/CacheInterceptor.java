@@ -260,13 +260,11 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             asyncCache.get(key, firstTypeVariable).whenComplete(
                     (BiConsumer<Optional<?>, Throwable>) (o, throwable) -> {
                         if (throwable == null && o.isPresent() && !o.get().toString().contains("io.micronaut.cache.interceptor.CacheInterceptor$CompletableFutureWrapper")) {
-                            CompletableFutureWrapper wrapper = new CompletableFutureWrapper();
-                            wrapper.value = CompletableFuture.completedFuture(o.get());
                             completableFutureCacheResultFound(
                                     context,
                                     asyncCache,
                                     thisFuture,
-                                    wrapper
+                                    o.get()
                             );
                         } else if (throwable != null) {
                             completableFutureErrorResultFound(asyncCache, key, thisFuture, throwable);
@@ -364,6 +362,15 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             }
             thisFuture.complete(o2);
         });
+    }
+
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+    private void completableFutureCacheResultFound(MethodInvocationContext<Object, Object> context, AsyncCache<?> asyncCache, CompletableFuture<Object> thisFuture, Object result) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Value found in cache [" + asyncCache.getName() + "] for invocation: " + context);
+            LOG.debug("Reporting value from cache [" + asyncCache.getName() + "] for invocation: " + context + " to the callee");
+        }
+        thisFuture.complete(result);
     }
 
     /**
