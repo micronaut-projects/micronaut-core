@@ -4,28 +4,7 @@ Micronaut {version} includes the following changes:
 
 Micronaut's Netty-based HTTP client and server have been updated to support HTTP/2.
 
-HTTP/2 support on the server can be enabled by configuring <<https, HTTPS>> and then setting the supported HTTP version:
-
-.HTTP/2 Server
-[source,yaml]
-----
-micronaut:
-    ssl:
-        enabled: true
-        buildSelfSigned: true
-    server:
-        http-version: 2.0
-----
-
-You can inject an HTTP/2 client by specifying `version` in the ann:http.client.annotation.Client[] annotation:
-
-.HTTP/2 Client
-[source,java]
-----
-@Inject
-@Client(version=HttpVersion.HTTP_2_0)
-RxHttpClient client;
-----
+See the <<http2Server, HTTP/2 documentation>> for more information on how to enable support for HTTP/2.
 
 === Improved Support for Server-Side Content Negotiation
 

@@ -78,5 +78,5 @@ public @interface Client {
      *
      * @return The HTTP version of the client.
      */
-    HttpVersion version() default HttpVersion.HTTP_1_1;
+    HttpVersion httpVersion() default HttpVersion.HTTP_1_1;
 }
