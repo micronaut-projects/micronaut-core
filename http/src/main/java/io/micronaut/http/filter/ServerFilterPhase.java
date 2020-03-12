@@ -20,32 +20,59 @@ package io.micronaut.http.filter;
  * There are gaps between phases to account for additions of future phases. Filters
  * relying on phases must ensure the order is within the selected phases range. For example
  * {@code ServerFilterPhase.TRACING.before() - 500} is considered an invalid usage of the TRACING
- * phase because that would place the order at 2251, which is outside of the range of the
- * phase (2501-3500).
+ * phase because that would place the order at 18251, which is outside of the range of the
+ * phase (18501-19500).
  *
  * @author James Kleeh
  * @since 2.0.0
  */
 public enum ServerFilterPhase {
 
+    /**
+     * The first phase, invoked before all others
+     */
     FIRST(-1000, -1249, -750),
-    METRICS(1000, 751, 1250),
-    TRACING(3000, 2751, 3250),
-    SESSION(5000, 4751, 5250),
-    SECURITY(7000, 6751, 7250),
-    VIEWS(9000, 8751, 9250),
-    LAST(11000, 10751, 11250);
 
-    private final Integer order;
-    private final Integer before;
-    private final Integer after;
+    /**
+     * Any filters related to collecting metrics
+     */
+    METRICS(9000, 8751, 9250),
+
+    /**
+     * Any filters related to tracing HTTP calls
+     */
+    TRACING(19000, 18751, 19250),
+
+    /**
+     * Any filters related to creating or reading the HTTP session
+     */
+    SESSION(29000, 28751, 29250),
+
+    /**
+     * Any filters related to authentication or authorization
+     */
+    SECURITY(39000, 38751, 39250),
+
+    /**
+     * Any filters related to rendering the response body
+     */
+    RENDERING(49000, 48751, 49250),
+
+    /**
+     * The last phase, invoked after all other phases
+     */
+    LAST(59000, 58751, 59250);
+
+    private final int order;
+    private final int before;
+    private final int after;
 
     /**
      * @param order The order
      * @param before The order to run before
      * @param after The order to run after
      */
-    ServerFilterPhase(Integer order, Integer before, Integer after) {
+    ServerFilterPhase(int order, int before, int after) {
         this.order = order;
         this.before = before;
         this.after = after;
@@ -54,21 +81,21 @@ public enum ServerFilterPhase {
     /**
      * @return The order of the phase
      */
-    public Integer order() {
+    public int order() {
         return order;
     }
 
     /**
      * @return The order before the phase, but after any previous phases
      */
-    public Integer before() {
+    public int before() {
         return before;
     }
 
     /**
      * @return The order after the phase, but before any future phases
      */
-    public Integer after() {
+    public int after() {
         return after;
     }
 }

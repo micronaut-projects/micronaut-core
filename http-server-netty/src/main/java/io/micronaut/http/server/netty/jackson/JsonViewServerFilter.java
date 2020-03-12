@@ -92,6 +92,6 @@ public class JsonViewServerFilter implements HttpServerFilter {
 
     @Override
     public int getOrder() {
-        return ServerFilterPhase.VIEWS.order();
+        return ServerFilterPhase.RENDERING.order();
     }
 }
