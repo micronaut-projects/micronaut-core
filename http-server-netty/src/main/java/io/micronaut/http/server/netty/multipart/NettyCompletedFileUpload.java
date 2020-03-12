@@ -70,7 +70,11 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
      */
     @Override
     public InputStream getInputStream() throws IOException {
-        return new ByteBufInputStream(fileUpload.getByteBuf(), controlRelease);
+        if (fileUpload.isInMemory()) {
+            return new ByteBufInputStream(fileUpload.getByteBuf(), controlRelease);
+        } else {
+            return new NettyFileUploadInputStream(fileUpload, controlRelease);
+        }
     }
 
     /**
