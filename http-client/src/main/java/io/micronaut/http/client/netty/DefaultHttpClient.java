@@ -1548,11 +1548,15 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                     ChannelPipeline p = ctx.pipeline();
                     if (readTimeoutMillis != null && !httpClientInitializer.stream) {
-                        pipeline.replace(
-                                HANDLER_READ_TIMEOUT,
-                                HANDLER_READ_TIMEOUT,
-                                new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
-                        );
+                        if (pipeline.get(HANDLER_READ_TIMEOUT) != null) {
+                            pipeline.replace(
+                                    HANDLER_READ_TIMEOUT,
+                                    HANDLER_READ_TIMEOUT,
+                                    new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
+                            );
+                        } else {
+                            pipeline.addLast(HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+                        }
                     }
                     if (httpClientInitializer.stream) {
                         ctx.channel().config().setAutoRead(false);
