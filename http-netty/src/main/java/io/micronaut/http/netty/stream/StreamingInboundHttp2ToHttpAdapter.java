@@ -20,6 +20,9 @@ import io.netty.buffer.EmptyByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.*;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static io.netty.handler.codec.http2.Http2Error.INTERNAL_ERROR;
 import static io.netty.handler.codec.http2.Http2Error.PROTOCOL_ERROR;
 import static io.netty.handler.codec.http2.Http2Exception.connectionError;
@@ -101,6 +104,8 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
      * @param message The message which contains the HTTP semantics.
      */
     protected final void putMessage(Http2Stream stream, HttpMessage message) {
+        // reset the data read key
+        stream.setProperty(dataReadKey, new AtomicInteger(0));
         stream.setProperty(messageKey, message);
     }
 
@@ -263,26 +268,28 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
             throws Http2Exception {
         Http2Stream stream = connection.stream(streamId);
         HttpMessage msg = getMessage(stream);
-        int dataRead = getDataRead(stream);
+        AtomicInteger dataRead = getDataRead(stream);
         if (msg == null) {
             throw connectionError(PROTOCOL_ERROR, "Data Frame received for unknown stream id %d", streamId);
         }
 
         final int dataReadableBytes = data.readableBytes();
-        if (dataRead > maxContentLength - dataReadableBytes) {
+        final int readSoFar = dataRead.getAndAdd(dataReadableBytes);
+        if (readSoFar > maxContentLength - dataReadableBytes) {
             throw connectionError(INTERNAL_ERROR,
                     "Content length exceeded max of %d for stream id %d", maxContentLength, streamId);
 
         }
 
-        dataRead += dataReadableBytes;
-        stream.setProperty(dataReadKey, dataRead);
-
         if (endOfStream) {
             // end of stream, emits a LastHttpContent
             // will be released by HttpStreamsHandler
-            final DefaultLastHttpContent content = new DefaultLastHttpContent(data.retain());
-            fireChannelRead(ctx, content, stream);
+            if (dataReadableBytes > 0) {
+                final DefaultLastHttpContent content = new DefaultLastHttpContent(data.retain());
+                fireChannelRead(ctx, content, stream);
+            } else {
+                fireChannelRead(ctx, LastHttpContent.EMPTY_LAST_CONTENT, stream);
+            }
         } else {
             // will be released by HttpStreamsHandler
             final DefaultHttpContent content = new DefaultHttpContent(data.retain());
@@ -293,12 +300,15 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
         return dataReadableBytes + padding;
     }
 
-    private int getDataRead(Http2Stream stream) {
+    private AtomicInteger getDataRead(Http2Stream stream) {
         final Object demand = stream.getProperty(dataReadKey);
-        if (demand instanceof Number) {
-            return ((Number) demand).intValue();
+        if (demand instanceof AtomicInteger) {
+            return ((AtomicInteger) demand);
+        } else {
+            final AtomicInteger newValue = new AtomicInteger(0);
+            stream.setProperty(dataReadKey, newValue);
+            return newValue;
         }
-        return 0;
     }
 
     @Override
