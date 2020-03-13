@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.channels.ClosedChannelException;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -1401,8 +1402,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                        try {
                            if (!future.isSuccess()) {
                                final Throwable throwable = future.cause();
-                               if (LOG.isErrorEnabled()) {
-                                   LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
+                               if (!(throwable instanceof ClosedChannelException)) {
+                                   if (LOG.isErrorEnabled()) {
+                                       LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
+                                   }
                                }
                            } else {
                                context.read();
