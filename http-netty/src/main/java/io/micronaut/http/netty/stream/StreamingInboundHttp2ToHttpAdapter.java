@@ -16,7 +16,7 @@
 package io.micronaut.http.netty.stream;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.EmptyByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http2.*;
@@ -239,7 +239,7 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
                         HttpVersion.HTTP_1_1,
                         existing.method(),
                         existing.uri(),
-                        new EmptyByteBuf(ctx.alloc()),
+                        Unpooled.EMPTY_BUFFER,
                         existing.headers(),
                         EmptyHttpHeaders.INSTANCE);
             } else {
@@ -247,7 +247,7 @@ public class StreamingInboundHttp2ToHttpAdapter extends Http2EventAdapter {
                 msg = new DefaultFullHttpResponse(
                         existing.protocolVersion(),
                         existing.status(),
-                        new EmptyByteBuf(ctx.alloc()),
+                        Unpooled.EMPTY_BUFFER,
                         existing.headers(),
                         EmptyHttpHeaders.INSTANCE
                 );
