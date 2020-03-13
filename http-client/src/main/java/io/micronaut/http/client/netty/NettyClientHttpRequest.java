@@ -55,6 +55,7 @@ import java.util.Set;
 @Internal
 class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
+    static final CharSequence CHANNEL = "netty_channel";
     private final NettyHttpHeaders headers = new NettyHttpHeaders();
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
     private final HttpMethod httpMethod;

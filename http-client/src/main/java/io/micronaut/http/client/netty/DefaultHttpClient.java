@@ -112,6 +112,7 @@ import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
 import io.reactivex.Scheduler;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Action;
 import io.reactivex.functions.Cancellable;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
@@ -846,6 +847,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                 }
                             };
                         });
+            }).doOnTerminate(() -> {
+                final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
+                if (o instanceof Channel) {
+                    final Channel c = (Channel) o;
+                    if (c.isOpen()) {
+                        c.close();
+                    }
+                }
             });
         };
     }
@@ -896,6 +905,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 return Flowable.fromPublisher(jacksonProcessor).map(jsonNode ->
                         mediaTypeCodec.decode(type, jsonNode)
                 );
+            }).doOnTerminate(() -> {
+                final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
+                if (o instanceof Channel) {
+                    final Channel c = (Channel) o;
+                    if (c.isOpen()) {
+                        c.close();
+                    }
+                }
             });
         };
     }
@@ -920,6 +937,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
                 return httpContentFlowable.filter(message -> !(message.content() instanceof EmptyByteBuf)).map(contentMapper);
+            }).doOnTerminate(() -> {
+                final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
+                if (o instanceof Channel) {
+                    final Channel c = (Channel) o;
+                    if (c.isOpen()) {
+                        c.close();
+                    }
+                }
             });
         };
     }
@@ -933,7 +958,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      */
     @SuppressWarnings("MagicNumber")
     protected <I> Flowable<io.micronaut.http.HttpResponse<Object>> buildStreamExchange(
-            io.micronaut.http.HttpRequest<?> parentRequest,
+            @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI) {
         SslContext sslContext = buildSslContext(requestURI);
@@ -947,12 +972,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                     channelFuture = doConnect(request, requestURI, sslContext, true, channelHandlerContext -> {
                         try {
+                            final Channel channel = channelHandlerContext.channel();
+                            request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
                             streamRequestThroughChannel(
                                     parentRequest,
                                     requestURI,
                                     requestWrapper,
                                     emitter,
-                                    channelHandlerContext.channel()
+                                    channel
                             );
                         } catch (Throwable e) {
                             emitter.onError(e);
@@ -964,7 +991,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             .addListener((ChannelFutureListener) f -> {
                                 if (f.isSuccess()) {
                                     Channel channel = f.channel();
-
+                                    request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
                                     streamRequestThroughChannel(
                                             parentRequest,
                                             requestURI,
