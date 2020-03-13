@@ -4,9 +4,12 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.docs.server.json.Person
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.RxStreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -17,6 +20,38 @@ import spock.lang.Specification
 // which is not included in this test suite
 //@IgnoreIf({ !Jvm.current.isJava9Compatible() })
 class Http2RequestSpec extends Specification {
+    void "test make HTTP/2 stream request"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.ssl.enabled': true,
+                "micronaut.server.http-version" : "2.0",
+                "micronaut.http.client.http-version" : "2.0",
+                'micronaut.ssl.buildSelfSigned': true,
+                'micronaut.ssl.port': -1,
+                "micronaut.http.client.log-level" : "TRACE",
+                "micronaut.server.netty.log-level" : "TRACE"
+        ])
+        RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
+
+
+        when:"A non stream request is executed"
+        def people = ((RxStreamingHttpClient)client).jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person)
+                .toList().blockingGet()
+
+        then:
+        people == Http2Controller.people
+
+        when:"posting a data"
+        def response = client.exchange(HttpRequest.POST("${server.URL}/http2/personStream", Http2Controller.people), Argument.listOf(Person))
+                .blockingFirst()
+
+        then:"The response is correct"
+        response.body() == Http2Controller.people
+
+
+        cleanup:
+        server.close()
+    }
 
     void "test make HTTP/2 request - HTTPS"() {
         given:
@@ -29,7 +64,7 @@ class Http2RequestSpec extends Specification {
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE"
         ])
-        RxStreamingHttpClient client = server.getApplicationContext().getBean(RxStreamingHttpClient)
+        RxHttpClient client = server.getApplicationContext().getBean(RxHttpClient)
 
         when:
         def result = client.retrieve("${server.URL}/http2").blockingFirst()
@@ -44,20 +79,11 @@ class Http2RequestSpec extends Specification {
         result == 'Version: HTTP_2_0'
 
         when:"A non stream request is executed"
-        def people = client.retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person))
-                            .blockingFirst()
+        List<Person> people = client.retrieve(HttpRequest.GET("${server.URL}/http2/personStream"), Argument.listOf(Person))
+                .blockingFirst()
 
         then:
         people == Http2Controller.people
-
-//        when:"A stream request is executed"
-//        def streamPeople = client.jsonStream(HttpRequest.GET("${server.URL}/http2/personStream"), Person)
-//                .take(2)
-//                .toList()
-//                .blockingGet()
-//
-//        then:
-//        streamPeople == Http2Controller.people
 
         cleanup:
         server.close()
@@ -89,6 +115,7 @@ class Http2RequestSpec extends Specification {
         cleanup:
         server.close()
     }
+
 
     void "test HTTP/2 server with HTTP/1 client request works"() {
         given:
@@ -132,6 +159,13 @@ class Http2RequestSpec extends Specification {
 
         @Get(value = '/personStream', produces = MediaType.APPLICATION_JSON)
         Flowable<Person> personStream(HttpRequest<?> request) {
+            return Flowable.fromIterable(
+                    people
+            )
+        }
+
+        @Post(value = '/personStream', processes = MediaType.APPLICATION_JSON)
+        Flowable<Person> postStream(@Body Flowable<Person> body) {
             return Flowable.fromIterable(
                     people
             )

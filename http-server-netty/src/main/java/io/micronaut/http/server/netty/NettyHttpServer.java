@@ -33,6 +33,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.channel.*;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
+import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
@@ -622,10 +623,12 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     private HttpToHttp2ConnectionHandler newHttpToHttp2ConnectionHandler() {
         Http2Connection connection = new DefaultHttp2Connection(true);
-        final InboundHttp2ToHttpAdapter http2ToHttpAdapter = new InboundHttp2ToHttpAdapterBuilder(connection)
-                .validateHttpHeaders(serverConfiguration.isValidateHeaders())
-                .maxContentLength((int) serverConfiguration.getMaxRequestSize())
-                .build();
+        final Http2FrameListener http2ToHttpAdapter = new StreamingInboundHttp2ToHttpAdapter(
+                connection,
+                (int) serverConfiguration.getMaxRequestSize(),
+                serverConfiguration.isValidateHeaders(),
+                true
+        );
 
         final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder()
                 .frameListener(http2ToHttpAdapter);
@@ -674,6 +677,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
             final ChannelPipeline pipeline = ctx.pipeline();
             configurePipeline(protocol, pipeline);
+            ctx.read();
         }
 
         private void configurePipeline(String protocol, ChannelPipeline pipeline) {
