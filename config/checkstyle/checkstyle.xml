@@ -98,7 +98,9 @@
             <property name="excludeScope" value="private"/>
         </module>
         <module name="JavadocType"/>
-        <module name="JavadocStyle"/>
+        <module name="JavadocStyle">
+            <property name="checkFirstSentence" value="false"/>
+        </module>
 
         <!-- Checks for Naming Conventions.                  -->
         <!-- See http://checkstyle.sf.net/config_naming.html -->

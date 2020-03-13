@@ -23,6 +23,7 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.ServerRequestTracingPublisher;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.filter.ServerFilterPhase;
 import org.reactivestreams.Publisher;
 
 import java.util.function.Supplier;
@@ -36,10 +37,16 @@ import java.util.function.Supplier;
 @Filter("/**")
 @Internal
 public final class ServerRequestContextFilter implements HttpServerFilter {
+
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         return ServerRequestContext.with(request, (Supplier<Publisher<MutableHttpResponse<?>>>) () ->
                 new ServerRequestTracingPublisher(request, chain.proceed(request))
         );
+    }
+
+    @Override
+    public int getOrder() {
+        return ServerFilterPhase.FIRST.order();
     }
 }
