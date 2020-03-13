@@ -91,7 +91,7 @@ public class CorsFilter implements HttpServerFilter {
 
     @Override
     public int getOrder() {
-        return ServerFilterPhase.TRACING.after();
+        return ServerFilterPhase.METRICS.after();
     }
 
     /**
