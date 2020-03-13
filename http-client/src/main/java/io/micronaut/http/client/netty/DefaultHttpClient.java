@@ -199,7 +199,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
 
-
     /**
      * Construct a client for the given arguments.
      *
@@ -813,7 +812,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         }, BackpressureStrategy.ERROR);
     }
 
-
     /**
      * @param request The request
      * @param <I>     The input type
@@ -1137,7 +1135,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         };
     }
 
-
     /**
      * @param channel The channel to close asynchronously
      */
@@ -1216,14 +1213,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return null;
     }
 
-
     /**
      * Creates an initial connection to the given remote host.
      *
-     * @param request  The request
-     * @param uri      The URI to connect to
-     * @param sslCtx   The SslContext instance
-     * @param isStream Is the connection a stream connection
+     * @param request         The request
+     * @param uri             The URI to connect to
+     * @param sslCtx          The SslContext instance
+     * @param isStream        Is the connection a stream connection
      * @param contextConsumer The logic to run once the channel is configured correctly
      * @return A ChannelFuture
      * @throws HttpClientException If the URI is invalid
@@ -1242,11 +1238,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     /**
      * Creates an initial connection to the given remote host.
      *
-     * @param request  The request
-     * @param host     The host
-     * @param port     The port
-     * @param sslCtx   The SslContext instance
-     * @param isStream Is the connection a stream connection
+     * @param request         The request
+     * @param host            The host
+     * @param port            The port
+     * @param sslCtx          The SslContext instance
+     * @param isStream        Is the connection a stream connection
      * @param contextConsumer The logic to run once the channel is configured correctly
      * @return A ChannelFuture
      */
@@ -1258,15 +1254,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             boolean isStream, Consumer<ChannelHandlerContext> contextConsumer) {
         Bootstrap localBootstrap = this.bootstrap.clone();
         localBootstrap.handler(new HttpClientInitializer(
-                        sslCtx,
-                        host,
-                        port,
-                        isStream,
-                        request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT, String.class).map(ct -> ct.equals(MediaType.TEXT_EVENT_STREAM)).orElse(false), contextConsumer)
+                sslCtx,
+                host,
+                port,
+                isStream,
+                request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT, String.class).map(ct -> ct.equals(MediaType.TEXT_EVENT_STREAM)).orElse(false), contextConsumer)
         );
         return doConnect(localBootstrap, host, port);
     }
-
 
     /**
      * Creates the {@link NioEventLoopGroup} for this client.
@@ -1331,7 +1326,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         }
         return sslCtx;
     }
-
 
     /**
      * Configures the HTTP proxy for the pipeline.
@@ -1612,17 +1606,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
                 if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                     ChannelPipeline p = ctx.pipeline();
-                    if (readTimeoutMillis != null && !httpClientInitializer.stream) {
-                        if (pipeline.get(HANDLER_READ_TIMEOUT) != null) {
-                            pipeline.replace(
-                                    HANDLER_READ_TIMEOUT,
-                                    HANDLER_READ_TIMEOUT,
-                                    new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
-                            );
-                        } else {
-                            pipeline.addLast(HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
-                        }
-                    }
                     if (httpClientInitializer.stream) {
                         ctx.channel().config().setAutoRead(false);
                     }
@@ -2103,6 +2086,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             @Override
             public void handlerRemoved(ChannelHandlerContext ctx) {
                 if (channelPool != null) {
+                    if (readTimeoutMillis != null) {
+                        ctx.pipeline().remove(HANDLER_READ_TIMEOUT);
+                    }
                     final Channel ch = ctx.channel();
                     if (!keepAlive) {
                         ch.closeFuture().addListener((future ->
@@ -2114,6 +2100,24 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 } else {
                     // just close it to prevent any future reads without a handler registered
                     ctx.close();
+                }
+            }
+
+            @Override
+            public void handlerAdded(ChannelHandlerContext ctx) {
+                if (readTimeoutMillis != null) {
+                    if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+                        pipeline.addBefore(
+                                HANDLER_HTTP2_CONNECTION,
+                                HANDLER_READ_TIMEOUT,
+                                new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
+                        );
+                    } else {
+                        pipeline.addBefore(
+                                HANDLER_HTTP_CLIENT_CODEC,
+                                HANDLER_READ_TIMEOUT,
+                                new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+                    }
                 }
             }
 
@@ -2146,28 +2150,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             }
         };
         pipeline.addLast(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, newHandler);
-        if (readTimeoutMillis != null) {
-            // reset read timeout
-            if (httpVersion != io.micronaut.http.HttpVersion.HTTP_2_0) {
-                pipeline.addBefore(
-                        HANDLER_HTTP_CLIENT_CODEC,
-                        HANDLER_READ_TIMEOUT,
-                        new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
-                );
-            } else {
-                final ChannelHandler channelHandler = pipeline.get(HANDLER_READ_TIMEOUT);
-                if (channelHandler != null) {
-                    pipeline.replace(HANDLER_READ_TIMEOUT, HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
-                } else {
-                    pipeline.addBefore(
-                            HANDLER_HTTP2_CONNECTION,
-                            HANDLER_READ_TIMEOUT,
-                            new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
-                    );
-                }
-            }
-        }
-
     }
 
     private void setRedirectHeaders(@Nullable HttpRequest request, MutableHttpRequest<Object> redirectRequest) {
