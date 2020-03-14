@@ -16,6 +16,7 @@
 package io.micronaut.jackson.env;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import io.micronaut.context.env.MapPropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
 
 import java.io.IOException;
@@ -27,14 +28,14 @@ import java.util.Map;
  * which is used by CloudFoundry.</p>
  *
  * @author Fabian Nonnenmacher
- * @since 3.4
+ * @since 2.0
  */
 public class CloudFoundryVcapApplicationPropertySourceLoader extends EnvJsonPropertySourceLoader {
 
     /**
      * Position for the system property source loader in the chain.
      */
-    public static final int POSITION = EnvJsonPropertySourceLoader.POSITION + 30;
+    public static final int POSITION = EnvJsonPropertySourceLoader.POSITION + 10;
 
     private static final String VCAP_APPLICATION = "VCAP_APPLICATION";
 
@@ -56,5 +57,10 @@ public class CloudFoundryVcapApplicationPropertySourceLoader extends EnvJsonProp
         } catch (JsonParseException e) {
             throw new ConfigurationException("Could not parse '" + VCAP_APPLICATION + "'." + e.getMessage(), e);
         }
+    }
+
+    @Override
+    protected MapPropertySource createPropertySource(String name, Map<String, Object> map, int order) {
+        return super.createPropertySource("cloudfoundry-vcap-application", map, order);
     }
 }
