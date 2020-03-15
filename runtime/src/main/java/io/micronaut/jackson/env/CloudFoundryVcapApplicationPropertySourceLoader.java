@@ -18,11 +18,13 @@ package io.micronaut.jackson.env;
 import com.fasterxml.jackson.core.JsonParseException;
 import io.micronaut.context.env.MapPropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.io.ResourceLoader;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -48,12 +50,20 @@ public class CloudFoundryVcapApplicationPropertySourceLoader extends EnvJsonProp
 
     @Override
     public Set<String> getExtensions() {
-        return Collections.emptySet();
+        return Collections.singleton(VCAP_APPLICATION);
     }
 
     @Override
     protected String getEnvValue() {
         return System.getenv(VCAP_APPLICATION);
+    }
+
+    @Override
+    protected Optional<InputStream> readInput(ResourceLoader resourceLoader, String fileName) {
+        if (fileName.equals("application." + VCAP_APPLICATION)) {
+            return getEnvValueAsStream();
+        }
+        return Optional.empty();
     }
 
     @Override

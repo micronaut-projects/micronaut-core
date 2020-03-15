@@ -18,13 +18,11 @@ package io.micronaut.jackson.env;
 import com.fasterxml.jackson.core.JsonParseException;
 import io.micronaut.context.env.MapPropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.io.ResourceLoader;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * <p>A {@link io.micronaut.context.env.PropertySourceLoader} that reads from the environment variable VCAP_SERVICES
@@ -54,7 +52,15 @@ public class CloudFoundryVcapServicesPropertySourceLoader extends EnvJsonPropert
 
     @Override
     public Set<String> getExtensions() {
-        return Collections.emptySet();
+        return Collections.singleton(VCAP_SERVICES);
+    }
+
+    @Override
+    protected Optional<InputStream> readInput(ResourceLoader resourceLoader, String fileName) {
+        if (fileName.equals("application." + VCAP_SERVICES)) {
+            return getEnvValueAsStream();
+        }
+        return Optional.empty();
     }
 
     @Override
