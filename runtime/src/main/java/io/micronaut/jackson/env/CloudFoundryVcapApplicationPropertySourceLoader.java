@@ -21,7 +21,9 @@ import io.micronaut.context.exceptions.ConfigurationException;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * <p>A {@link io.micronaut.context.env.PropertySourceLoader} that reads from the environment variable VCAP_APPLICATION
@@ -42,6 +44,11 @@ public class CloudFoundryVcapApplicationPropertySourceLoader extends EnvJsonProp
     @Override
     public int getOrder() {
         return POSITION;
+    }
+
+    @Override
+    public Set<String> getExtensions() {
+        return Collections.emptySet();
     }
 
     @Override

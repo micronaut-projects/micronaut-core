@@ -55,6 +55,7 @@ class CloudFoundryVcapPropertySourceLoaderSpec extends Specification {
         PropertySource propertySource = result.get()
 
         then:
+        propertySource.name == "cloudfoundry-vcap-application"
         propertySource.get("vcap.application.instance_id") == '2ce0ac627a6c8e47e936d829a3a47b5b'
         propertySource.get("vcap.application.instance_index") == 0
         propertySource.get("vcap.application.version") == '0138c4a6-2a73-416b-aca0-572c09f7ca53'
@@ -131,6 +132,7 @@ class CloudFoundryVcapPropertySourceLoaderSpec extends Specification {
         PropertySource propertySource = result.get()
 
         then:
+        propertySource.name == "cloudfoundry-vcap-services"
         propertySource.get("vcap.services.mysql.name") == "mysql"
         propertySource.get("vcap.services.mysql.credentials.port") == 3306
         propertySource.get("vcap.services.mysql.credentials.ssl") == true
