@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.*;
 
 public class RefreshEventSpec {
@@ -70,6 +72,10 @@ public class RefreshEventSpec {
                 , response);
 
         String thirdResponse = fetchForecast();
+
+        await().atMost(5, SECONDS).until(() ->
+                !thirdResponse.equals(secondResponse)
+        );
 
         assertNotEquals(thirdResponse, secondResponse);
         assertTrue(thirdResponse.contains("\"forecast\":\"Scattered Clouds"));
