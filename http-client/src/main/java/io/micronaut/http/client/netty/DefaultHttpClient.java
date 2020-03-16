@@ -851,6 +851,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                     return Optional.of(byteBuffer);
                                 }
                             };
+                        }).doAfterNext(res -> {
+                            ByteBuffer<?> buffer = res.body();
+                            if (buffer instanceof ReferenceCounted) {
+                                ((ReferenceCounted) buffer).release();
+                            }
                         });
             }).doOnTerminate(() -> {
                 final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
