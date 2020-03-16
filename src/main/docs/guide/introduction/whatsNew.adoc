@@ -1,10 +1,21 @@
 Micronaut {version} includes the following changes:
 
-=== Initial Support for HTTP/2
+=== Support for HTTP/2
 
 Micronaut's Netty-based HTTP client and server have been updated to support HTTP/2.
 
 See the <<http2Server, HTTP/2 documentation>> for more information on how to enable support for HTTP/2.
+
+=== Micronaut Servlet
+
+Micronaut now includes support for creating https://github.com/micronaut-projects/micronaut-servlet[Servlet applications] and users can use the command line to create an application that targets popular Servlet containers:
+
+[source,bash]
+----
+$ mn create-app myapp --features jetty-server    # for Jetty
+$ mn create-app myapp --features tomcat-server   # for Tomcat
+$ mn create-app myapp --features undertow-server # for Undertow
+----
 
 === Improved Support for Server-Side Content Negotiation
 
@@ -12,7 +23,13 @@ Micronaut will now correctly handle the HTTP `Accept` header and pick the most a
 
 NOTE: This also applies to `@Error` routes making it possible to send different error responses for different content types
 
-TIP: To add XML support see the https://github.com/micronaut-projects/micronaut-jackson-xml[Jackson XML] plugin
+TIP: To add XML support use the https://github.com/micronaut-projects/micronaut-jackson-xml[Jackson XML] module
+
+=== Improved Support for Cloud Foundry
+
+Micronaut will now process the `VCAP_APPLICATION` and `VCAP_SERVICES` environment variables and treat them as property sources.
+
+Thanks to https://github.com/fnonnenmacher[Fabian Nonnenmacher] for this contribution.
 
 === Event Loop Group Improvements
 
