@@ -27,6 +27,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
@@ -114,8 +115,15 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
 
     @NonNull
     @Override
-    public RxHttpClient getClient(@NonNull String clientId, @Nullable String path) {
-        final ClientKey key = new ClientKey(clientId, null, path, null, null);
+    public RxHttpClient getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path) {
+        final ClientKey key = new ClientKey(
+                httpVersion,
+                clientId,
+                null,
+                path,
+                null,
+                null
+        );
         return getClient(key, beanContext);
     }
 
@@ -228,6 +236,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
 
             final DefaultHttpClient client = buildClient(
                     loadBalancer,
+                    clientKey.httpVersion,
                     configuration,
                     clientIdentifiers,
                     filterAnnotation,
@@ -289,6 +298,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
 
     private DefaultHttpClient buildClient(
             LoadBalancer loadBalancer,
+            HttpVersion httpVersion,
             HttpClientConfiguration configuration,
             List<String> clientIdentifiers,
             String filterAnnotation,
@@ -303,6 +313,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
         Class<? extends SocketChannel> socketChannelClass = resolveSocketChannel(configuration, beanContext);
         return new DefaultHttpClient(
                 loadBalancer,
+                httpVersion,
                 configuration,
                 contextPath,
                 filterResolver,
@@ -342,6 +353,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
             Class<? extends SocketChannel> socketChannelClass = resolveSocketChannel(configuration, beanContext);
             return new DefaultHttpClient(
                     loadBalancer,
+                    null,
                     configuration != null ? configuration : defaultHttpClientConfiguration,
                     loadBalancer.getContextPath().orElse(null),
                     filterResolver,
@@ -376,6 +388,8 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
     }
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {
+        final HttpVersion httpVersion =
+                metadata.enumValue(Client.class, "version", HttpVersion.class).orElse(null);
         String clientId = metadata.stringValue(Client.class).orElse(null);
         String path = metadata.stringValue(Client.class, "path").orElse(null);
         String filterAnnotation = metadata
@@ -384,7 +398,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                 metadata.classValue(Client.class, "configuration").orElse(null);
         AnnotationValue<JacksonFeatures> jacksonFeaturesAnn = metadata.findAnnotation(JacksonFeatures.class).orElse(null);
 
-        return new ClientKey(clientId, filterAnnotation, path, configurationClass, jacksonFeaturesAnn);
+        return new ClientKey(httpVersion, clientId, filterAnnotation, path, configurationClass, jacksonFeaturesAnn);
     }
 
     private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, io.micronaut.jackson.codec.JacksonFeatures jacksonFeatures) {
@@ -403,13 +417,21 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
      */
     @Internal
     private static final class ClientKey {
+        final HttpVersion httpVersion;
         final String clientId;
         final String filterAnnotation;
         final String path;
-        final Class configurationClass;
+        final Class<?> configurationClass;
         final AnnotationValue<JacksonFeatures> jacksonFeaturesAnn;
 
-        ClientKey(String clientId, String filterAnnotation, String path, Class configurationClass, AnnotationValue<JacksonFeatures> jacksonFeaturesAnn) {
+        ClientKey(
+                HttpVersion httpVersion,
+                String clientId,
+                String filterAnnotation,
+                String path,
+                Class<?> configurationClass,
+                AnnotationValue<JacksonFeatures> jacksonFeaturesAnn) {
+            this.httpVersion = httpVersion;
             this.clientId = clientId;
             this.filterAnnotation = filterAnnotation;
             this.path = path;
@@ -426,7 +448,8 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
                 return false;
             }
             ClientKey clientKey = (ClientKey) o;
-            return Objects.equals(clientId, clientKey.clientId) &&
+            return httpVersion == clientKey.httpVersion &&
+                    Objects.equals(clientId, clientKey.clientId) &&
                     Objects.equals(filterAnnotation, clientKey.filterAnnotation) &&
                     Objects.equals(path, clientKey.path) &&
                     Objects.equals(configurationClass, clientKey.configurationClass) &&
@@ -435,7 +458,7 @@ public class RxNettyHttpClientRegistry implements AutoCloseable, RxHttpClientReg
 
         @Override
         public int hashCode() {
-            return Objects.hash(clientId, filterAnnotation, path, configurationClass, jacksonFeaturesAnn);
+            return Objects.hash(httpVersion, clientId, filterAnnotation, path, configurationClass, jacksonFeaturesAnn);
         }
     }
 }

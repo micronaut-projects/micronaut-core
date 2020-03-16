@@ -111,12 +111,15 @@ class ServerRedirectSpec extends Specification {
         RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
 
         when:
-        HttpResponse<ByteBuffer> response = ((RxStreamingHttpClient) client).exchangeStream(
-                HttpRequest.GET("/redirect/stream/title").accept(MediaType.TEXT_EVENT_STREAM_TYPE)).blockingFirst()
+        String response = ((RxStreamingHttpClient) client).exchangeStream(
+                HttpRequest.GET("/redirect/stream/title").accept(MediaType.TEXT_EVENT_STREAM_TYPE))
+                .map({res ->
+                    new String(res.body().toByteArray())
+                })
+                .blockingFirst()
 
         then:
-        response.status() == HttpStatus.OK
-        new String(response.body().toByteArray()) == "data: The Stand\n\n"
+        response == "data: The Stand\n\n"
     }
 
     void "test redirect headers"() {

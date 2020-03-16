@@ -28,12 +28,15 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.*;
@@ -52,11 +55,13 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.multipart.MultipartException;
+import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
+import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -82,13 +87,18 @@ import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.multipart.*;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
+import io.netty.handler.codec.http2.*;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
+import io.netty.handler.ssl.ApplicationProtocolNames;
+import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
@@ -105,7 +115,6 @@ import io.reactivex.FlowableEmitter;
 import io.reactivex.Scheduler;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Cancellable;
-import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
@@ -130,6 +139,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -158,16 +168,21 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private static final String HANDLER_MICRONAUT_SSE_EVENT_STREAM = "handler-micronaut-sse-event-stream";
     private static final String HANDLER_MICRONAUT_SSE_CONTENT = "handler-micronaut-sse-content";
     private static final String HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM = "handler-micronaut-http-response-stream";
+    private static final String HANDLER_HTTP2_CONNECTION = "handler-http2-connection";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
     private static final String HANDLER_HTTP_CLIENT_INIT = "handler-http-client-init";
+    private static final String HANDLER_HTTP2_SETTINGS = "handler-http2-settings";
+    private static final String HANDLER_HTTP2_UPGRADE_REQUEST = "handler-http2-upgrade-request";
+    private static final String HANDLER_HTTP_2_PROTOCOL_NEGOTIATOR = "handler-http2-protocol-negotiator";
 
     protected final Bootstrap bootstrap;
     protected EventLoopGroup group;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
+    private final io.micronaut.http.HttpVersion httpVersion;
     private final Scheduler scheduler;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
@@ -185,7 +200,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private final HttpClientFilterResolver filterResolver;
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
-
 
     /**
      * Construct a client for the given arguments.
@@ -207,13 +221,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              MediaTypeCodecRegistry codecRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              HttpClientFilter... filters) {
-        this(loadBalancer, configuration, contextPath, new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)), threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class);
+        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1, configuration, contextPath, new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)), threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class);
     }
 
     /**
      * Construct a client for the given arguments.
      *
      * @param loadBalancer          The {@link LoadBalancer} to use for selecting servers
+     * @param httpVersion           The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
      * @param configuration         The {@link HttpClientConfiguration} object
      * @param contextPath           The base URI to prepend to request uris
      * @param filterResolver        The http client filter resolver
@@ -226,6 +241,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param socketChannelClass    The socket channel class
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
+                             @Nullable io.micronaut.http.HttpVersion httpVersion,
                              @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
                              @NonNull HttpClientFilterResolver filterResolver,
@@ -244,6 +260,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         ArgumentUtils.requireNonNull("filterResolver", filterResolver);
         ArgumentUtils.requireNonNull("socketChannelClass", socketChannelClass);
         this.loadBalancer = loadBalancer;
+        this.httpVersion = httpVersion != null ? httpVersion : configuration.getHttpVersion();
         this.defaultCharset = configuration.getDefaultCharset();
         if (StringUtils.isNotEmpty(contextPath)) {
             if (contextPath.charAt(0) != '/') {
@@ -255,7 +272,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         }
         this.bootstrap = new Bootstrap();
         this.configuration = configuration;
-        this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration()).orElse(null);
+        this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), this.httpVersion).orElse(null);
         if (eventLoopGroup != null) {
             this.group = eventLoopGroup;
             this.shutdownGroup = false;
@@ -276,7 +293,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.connectionTimeAliveMillis = connectTtl.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
 
         HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration = configuration.getConnectionPoolConfiguration();
-        if (connectionPoolConfiguration.isEnabled()) {
+        // HTTP/2 defaults to keep alive connections so should we should always use a pool
+        if (connectionPoolConfiguration.isEnabled() || this.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
             int maxConnections = connectionPoolConfiguration.getMaxConnections();
             if (maxConnections > -1) {
                 poolMap = new AbstractChannelPoolMap<RequestKey, ChannelPool>() {
@@ -286,7 +304,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         newBootstrap.remoteAddress(key.getRemoteAddress());
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
-                        final Long acquireTimeoutMillis = connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L);
+                        final long acquireTimeoutMillis = connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L);
                         return new FixedChannelPool(
                                 newBootstrap,
                                 channelPoolHandler,
@@ -339,33 +357,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     /**
-     * @param url                   The URL
-     * @param configuration         The {@link HttpClientConfiguration} object
-     * @param nettyClientSslBuilder The SSL builder
-     * @param codecRegistry         The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
-     * @param filters               The filters to use
-     */
-    public DefaultHttpClient(URL url,
-                             HttpClientConfiguration configuration,
-                             NettyClientSslBuilder nettyClientSslBuilder,
-                             MediaTypeCodecRegistry codecRegistry,
-                             HttpClientFilter... filters) {
-        this(LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class), nettyClientSslBuilder, codecRegistry, AnnotationMetadataResolver.DEFAULT, filters);
-    }
-
-    /**
-     * @param loadBalancer The {@link LoadBalancer} to use for selecting servers
-     */
-    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer) {
-        this(loadBalancer,
-                new DefaultHttpClientConfiguration(),
-                null,
-                new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ResourceResolver()),
-                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
-    }
-
-    /**
      * @param url The URL
      */
     public DefaultHttpClient(URL url) {
@@ -390,35 +381,12 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     /**
-     * @param url           The URL
-     * @param configuration The {@link HttpClientConfiguration} object
-     * @param contextPath   The base URI to prepend to request uris
-     */
-    public DefaultHttpClient(URL url, HttpClientConfiguration configuration, String contextPath) {
-        this(
-                LoadBalancer.fixed(url), configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ResourceResolver()), createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
-    }
-
-    /**
      * @param loadBalancer  The {@link LoadBalancer} to use for selecting servers
      * @param configuration The {@link HttpClientConfiguration} object
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
         this(loadBalancer,
                 configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ResourceResolver()),
-                createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
-    }
-
-    /**
-     * @param loadBalancer  The {@link LoadBalancer} to use for selecting servers
-     * @param configuration The {@link HttpClientConfiguration} object
-     * @param contextPath   The base URI to prepend to request uris
-     */
-    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration, String contextPath) {
-        this(loadBalancer,
-                configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
                 new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
@@ -458,7 +426,18 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 for (Map.Entry<RequestKey, ChannelPool> entry : i) {
                     ChannelPool cp = entry.getValue();
                     try {
-                        cp.close();
+                        if (cp instanceof SimpleChannelPool) {
+                            ((SimpleChannelPool) cp).closeAsync().addListener(future -> {
+                                if (!future.isSuccess()) {
+                                    final Throwable cause = future.cause();
+                                    if (cause != null) {
+                                        log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
+                                    }
+                                }
+                            });
+                        } else {
+                            cp.close();
+                        }
                     } catch (Exception cause) {
                         log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
                     }
@@ -512,7 +491,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return new BlockingHttpClient() {
 
             @Override
-            public void close() throws IOException {
+            public void close() {
                 DefaultHttpClient.this.close();
             }
 
@@ -576,14 +555,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                             event
                                     );
                                 } finally {
-                                    currentEvent.data.release();
                                     currentEvent = null;
                                 }
                             } else {
                                 if (currentEvent == null) {
-                                    currentEvent = new CurrentEvent(
-                                            byteBufferFactory.getNativeAllocator().compositeBuffer(10)
-                                    );
+                                    currentEvent = new CurrentEvent();
                                 }
                                 int colonIndex = buffer.indexOf((byte) ':');
                                 // SSE comments start with colon, so skip
@@ -600,8 +576,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                         switch (type) {
                                             case "data":
                                                 ByteBuffer content = buffer.slice(fromIndex, toIndex);
-                                                ByteBuf nativeBuffer = (ByteBuf) content.asNativeBuffer();
-                                                currentEvent.data.addComponent(true, nativeBuffer);
+                                                byte[] d = currentEvent.data;
+                                                if (d == null) {
+                                                    currentEvent.data = content.toByteArray();
+                                                } else {
+                                                    currentEvent.data = ArrayUtils.concat(d, content.toByteArray());
+                                                }
+
 
                                                 break;
                                             case "id":
@@ -636,6 +617,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             }
                         } catch (Throwable e) {
                             onError(e);
+                        } finally {
+                             if (buffer instanceof ReferenceCounted) {
+                                 ((ReferenceCounted) buffer).release();
+                             }
                         }
                     }
 
@@ -679,7 +664,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         });
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <I> Flowable<ByteBuffer<?>> dataStream(io.micronaut.http.HttpRequest<I> request) {
         return Flowable.fromPublisher(resolveRequestURI(request))
@@ -781,7 +765,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     requestKey.getHost(),
                     requestKey.getPort(),
                     false,
-                    false
+                    false,
+                    null
             ) {
                 @Override
                 protected void addFinalHandler(ChannelPipeline pipeline) {
@@ -835,7 +820,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         }, BackpressureStrategy.ERROR);
     }
 
-
     /**
      * @param request The request
      * @param <I>     The input type
@@ -867,7 +851,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                     return Optional.of(byteBuffer);
                                 }
                             };
+                        }).doAfterNext(res -> {
+                            ByteBuffer<?> buffer = res.body();
+                            if (buffer instanceof ReferenceCounted) {
+                                ((ReferenceCounted) buffer).release();
+                            }
                         });
+            }).doOnTerminate(() -> {
+                final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
+                if (o instanceof Channel) {
+                    final Channel c = (Channel) o;
+                    if (c.isOpen()) {
+                        c.close();
+                    }
+                }
             });
         };
     }
@@ -918,6 +915,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 return Flowable.fromPublisher(jacksonProcessor).map(jsonNode ->
                         mediaTypeCodec.decode(type, jsonNode)
                 );
+            }).doOnTerminate(() -> {
+                final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
+                if (o instanceof Channel) {
+                    final Channel c = (Channel) o;
+                    if (c.isOpen()) {
+                        c.close();
+                    }
+                }
             });
         };
     }
@@ -942,6 +947,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 NettyStreamedHttpResponse nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
                 return httpContentFlowable.filter(message -> !(message.content() instanceof EmptyByteBuf)).map(contentMapper);
+            }).doOnTerminate(() -> {
+                final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
+                if (o instanceof Channel) {
+                    final Channel c = (Channel) o;
+                    if (c.isOpen()) {
+                        c.close();
+                    }
+                }
             });
         };
     }
@@ -955,7 +968,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      */
     @SuppressWarnings("MagicNumber")
     protected <I> Flowable<io.micronaut.http.HttpResponse<Object>> buildStreamExchange(
-            io.micronaut.http.HttpRequest<?> parentRequest,
+            @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI) {
         SslContext sslContext = buildSslContext(requestURI);
@@ -965,7 +978,45 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
             ChannelFuture channelFuture;
             try {
-                channelFuture = doConnect(request, requestURI, sslContext, true);
+                if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+
+                    channelFuture = doConnect(request, requestURI, sslContext, true, channelHandlerContext -> {
+                        try {
+                            final Channel channel = channelHandlerContext.channel();
+                            request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
+                            streamRequestThroughChannel(
+                                    parentRequest,
+                                    requestURI,
+                                    requestWrapper,
+                                    emitter,
+                                    channel
+                            );
+                        } catch (Throwable e) {
+                            emitter.onError(e);
+                        }
+                    });
+                } else {
+                    channelFuture = doConnect(request, requestURI, sslContext, true, null);
+                    channelFuture
+                            .addListener((ChannelFutureListener) f -> {
+                                if (f.isSuccess()) {
+                                    Channel channel = f.channel();
+                                    request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
+                                    streamRequestThroughChannel(
+                                            parentRequest,
+                                            requestURI,
+                                            requestWrapper,
+                                            emitter,
+                                            channel
+                                    );
+                                } else {
+                                    Throwable cause = f.cause();
+                                    emitter.onError(
+                                            new HttpClientException("Connect error:" + cause.getMessage(), cause)
+                                    );
+                                }
+                            });
+                }
             } catch (HttpClientException e) {
                 emitter.onError(e);
                 return;
@@ -974,20 +1025,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             Disposable disposable = buildDisposableChannel(channelFuture);
             emitter.setDisposable(disposable);
             emitter.setCancellable(disposable::dispose);
-
-            channelFuture
-                    .addListener((ChannelFutureListener) f -> {
-                        if (f.isSuccess()) {
-                            Channel channel = f.channel();
-
-                            streamRequestThroughChannel(parentRequest, requestURI, requestWrapper, emitter, channel);
-                        } else {
-                            Throwable cause = f.cause();
-                            emitter.onError(
-                                    new HttpClientException("Connect error:" + cause.getMessage(), cause)
-                            );
-                        }
-                    });
         }, BackpressureStrategy.BUFFER);
 
         // apply filters
@@ -1050,26 +1087,25 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     }
                 } else {
                     SslContext sslContext = buildSslContext(requestURI);
-                    ChannelFuture connectionFuture = doConnect(request, requestURI, sslContext, false);
+                    ChannelFuture connectionFuture = doConnect(request, requestURI, sslContext, false, null);
                     connectionFuture.addListener(future -> {
-                        if (future.isSuccess()) {
+                        if (!future.isSuccess()) {
+                            Throwable cause = future.cause();
+                            emitter.onError(
+                                    new HttpClientException("Connect Error: " + cause.getMessage(), cause)
+                            );
+                        } else {
                             try {
-                                Channel channel = connectionFuture.channel();
                                 sendRequestThroughChannel(
                                         requestWrapper,
                                         bodyType,
                                         errorType,
                                         emitter,
-                                        channel,
+                                        connectionFuture.channel(),
                                         null);
-                            } catch (Exception e) {
+                            } catch (Throwable e) {
                                 emitter.onError(e);
                             }
-                        } else {
-                            Throwable cause = future.cause();
-                            emitter.onError(
-                                    new HttpClientException("Connect Error: " + cause.getMessage(), cause)
-                            );
                         }
                     });
                 }
@@ -1111,7 +1147,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             return finalFlowable;
         };
     }
-
 
     /**
      * @param channel The channel to close asynchronously
@@ -1191,14 +1226,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return null;
     }
 
-
     /**
      * Creates an initial connection to the given remote host.
      *
-     * @param request  The request
-     * @param uri      The URI to connect to
-     * @param sslCtx   The SslContext instance
-     * @param isStream Is the connection a stream connection
+     * @param request         The request
+     * @param uri             The URI to connect to
+     * @param sslCtx          The SslContext instance
+     * @param isStream        Is the connection a stream connection
+     * @param contextConsumer The logic to run once the channel is configured correctly
      * @return A ChannelFuture
      * @throws HttpClientException If the URI is invalid
      */
@@ -1206,20 +1241,22 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             io.micronaut.http.HttpRequest<?> request,
             URI uri,
             @Nullable SslContext sslCtx,
-            boolean isStream) throws HttpClientException {
+            boolean isStream,
+            Consumer<ChannelHandlerContext> contextConsumer) throws HttpClientException {
 
         RequestKey requestKey = new RequestKey(uri);
-        return doConnect(request, requestKey.getHost(), requestKey.getPort(), sslCtx, isStream);
+        return doConnect(request, requestKey.getHost(), requestKey.getPort(), sslCtx, isStream, contextConsumer);
     }
 
     /**
      * Creates an initial connection to the given remote host.
      *
-     * @param request  The request
-     * @param host     The host
-     * @param port     The port
-     * @param sslCtx   The SslContext instance
-     * @param isStream Is the connection a stream connection
+     * @param request         The request
+     * @param host            The host
+     * @param port            The port
+     * @param sslCtx          The SslContext instance
+     * @param isStream        Is the connection a stream connection
+     * @param contextConsumer The logic to run once the channel is configured correctly
      * @return A ChannelFuture
      */
     protected ChannelFuture doConnect(
@@ -1227,18 +1264,17 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             String host,
             int port,
             @Nullable SslContext sslCtx,
-            boolean isStream) {
+            boolean isStream, Consumer<ChannelHandlerContext> contextConsumer) {
         Bootstrap localBootstrap = this.bootstrap.clone();
         localBootstrap.handler(new HttpClientInitializer(
                 sslCtx,
                 host,
                 port,
                 isStream,
-                request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT, String.class).map(ct -> ct.equals(MediaType.TEXT_EVENT_STREAM)).orElse(false))
+                request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT, String.class).map(ct -> ct.equals(MediaType.TEXT_EVENT_STREAM)).orElse(false), contextConsumer)
         );
         return doConnect(localBootstrap, host, port);
     }
-
 
     /**
      * Creates the {@link NioEventLoopGroup} for this client.
@@ -1292,7 +1328,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      */
     protected SslContext buildSslContext(URI uriObject) {
         final SslContext sslCtx;
-        if (uriObject.getScheme().equals("https")) {
+        if (io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(uriObject.getScheme())) {
             sslCtx = sslContext;
             //Allow https requests to be sent if SSL is disabled but a proxy is present
             if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
@@ -1303,7 +1339,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         }
         return sslCtx;
     }
-
 
     /**
      * Configures the HTTP proxy for the pipeline.
@@ -1394,20 +1429,22 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     /**
-     * @param request            The request
-     * @param requestURI         The URI of the request
-     * @param requestContentType The request content type
-     * @param permitsBody        Whether permits body
-     * @param onError            Called when the body publisher encounters an error
+     * @param request                The request
+     * @param requestURI             The URI of the request
+     * @param requestContentType     The request content type
+     * @param permitsBody            Whether permits body
+     * @param onError                Called when the body publisher encounters an error
+     * @param closeChannelAfterWrite Whether to close the channel. For stream requests we don't close the channel until disposed of.
      * @return A {@link NettyRequestWriter}
      * @throws HttpPostRequestEncoder.ErrorDataEncoderException if there is an encoder exception
      */
     protected NettyRequestWriter buildNettyRequest(
-            io.micronaut.http.MutableHttpRequest request,
+            MutableHttpRequest request,
             URI requestURI,
             MediaType requestContentType,
             boolean permitsBody,
-            Consumer<? super Throwable> onError) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+            io.reactivex.functions.Consumer<? super Throwable> onError,
+            boolean closeChannelAfterWrite) throws HttpPostRequestEncoder.ErrorDataEncoderException {
 
         io.netty.handler.codec.http.HttpRequest nettyRequest;
         NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) request;
@@ -1515,7 +1552,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         } catch (MalformedURLException e) {
                             //should never happen
                         }
-                        return new NettyRequestWriter(nettyRequest, null);
+                        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, null, closeChannelAfterWrite);
                     } else if (bodyValue instanceof CharSequence) {
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
                     } else if (mediaTypeCodecRegistry != null) {
@@ -1539,7 +1576,131 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         } catch (MalformedURLException e) {
             //should never happen
         }
-        return new NettyRequestWriter(nettyRequest, postRequestEncoder);
+        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, postRequestEncoder, closeChannelAfterWrite);
+    }
+
+    /**
+     * Configures HTTP/2 for the channel when SSL is enabled.
+     *
+     * @param httpClientInitializer The client initializer
+     * @param ch                    The channel
+     * @param sslCtx                The SSL context
+     * @param host                  The host
+     * @param port                  The port
+     * @param connectionHandler     The connection handler
+     */
+    protected void configureHttp2Ssl(
+            HttpClientInitializer httpClientInitializer,
+            @NonNull SocketChannel ch,
+            @NonNull SslContext sslCtx,
+            String host,
+            int port,
+            HttpToHttp2ConnectionHandler connectionHandler) {
+        ChannelPipeline pipeline = ch.pipeline();
+        // Specify Host in SSLContext New Handler to add TLS SNI Extension
+        pipeline.addLast(HANDLER_SSL, sslCtx.newHandler(ch.alloc(), host, port));
+        // We must wait for the handshake to finish and the protocol to be negotiated before configuring
+        // the HTTP/2 components of the pipeline.
+        pipeline.addLast(HANDLER_HTTP_2_PROTOCOL_NEGOTIATOR, new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_2) {
+
+            @Override
+            public void handlerRemoved(ChannelHandlerContext ctx) {
+                // the logic to send the request should only be executed once the HTTP/2
+                // Connection Preface request has been sent. Once the Preface has been sent and
+                // removed then this handler is removed so we invoke the remaining logic once
+                // this handler removed
+                final Consumer<ChannelHandlerContext> contextConsumer = httpClientInitializer.contextConsumer;
+                if (contextConsumer != null) {
+                    contextConsumer.accept(ctx);
+                }
+            }
+
+            @Override
+            protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
+                if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
+                    ChannelPipeline p = ctx.pipeline();
+                    if (httpClientInitializer.stream) {
+                        ctx.channel().config().setAutoRead(false);
+                    }
+                    p.addLast(HANDLER_HTTP2_SETTINGS, new Http2SettingsHandler(ch.newPromise()));
+                    httpClientInitializer.addEventStreamHandlerIfNecessary(p);
+                    httpClientInitializer.addFinalHandler(p);
+                } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
+                    httpClientInitializer.addHttp1Handlers(ctx.pipeline());
+                } else {
+                    ctx.close();
+                    throw new HttpClientException("unknown protocol: " + protocol);
+                }
+            }
+        });
+        pipeline.addLast(HANDLER_HTTP2_CONNECTION, connectionHandler);
+
+    }
+
+    /**
+     * Configures HTTP/2 handling for plaintext (non-SSL) connections.
+     *
+     * @param httpClientInitializer The client initializer
+     * @param ch                    The channel
+     * @param connectionHandler     The connection handler
+     */
+    protected void configureHttp2ClearText(
+            HttpClientInitializer httpClientInitializer,
+            @NonNull SocketChannel ch,
+            @NonNull HttpToHttp2ConnectionHandler connectionHandler) {
+        HttpClientCodec sourceCodec = new HttpClientCodec();
+        Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(HANDLER_HTTP2_CONNECTION, connectionHandler);
+        HttpClientUpgradeHandler upgradeHandler = new HttpClientUpgradeHandler(sourceCodec, upgradeCodec, 65536);
+
+        final ChannelPipeline pipeline = ch.pipeline();
+        pipeline.addLast(HANDLER_HTTP_CLIENT_CODEC, sourceCodec);
+        httpClientInitializer.settingsHandler = new Http2SettingsHandler(ch.newPromise());
+        pipeline.addLast(upgradeHandler);
+        pipeline.addLast(HANDLER_HTTP2_UPGRADE_REQUEST, new UpgradeRequestHandler(httpClientInitializer) {
+            @Override
+            public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+                final Consumer<ChannelHandlerContext> contextConsumer = httpClientInitializer.contextConsumer;
+                if (contextConsumer != null) {
+                    contextConsumer.accept(ctx);
+                }
+            }
+        });
+    }
+
+    /**
+     * Creates a new {@link HttpToHttp2ConnectionHandlerBuilder} for the given HTTP/2 connection object and config.
+     *
+     * @param connection    The connection
+     * @param configuration The configuration
+     * @param stream        Whether this is a stream request
+     * @return The {@link HttpToHttp2ConnectionHandlerBuilder}
+     */
+    protected @NonNull
+    HttpToHttp2ConnectionHandlerBuilder newHttp2ConnectionHandlerBuilder(
+            @NonNull Http2Connection connection, @NonNull HttpClientConfiguration configuration, boolean stream) {
+        final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder();
+        builder.validateHeaders(true);
+        final Http2FrameListener http2ToHttpAdapter;
+
+        if (!stream) {
+            http2ToHttpAdapter = new InboundHttp2ToHttpAdapterBuilder(connection)
+                    .maxContentLength(configuration.getMaxContentLength())
+                    .validateHttpHeaders(true)
+                    .propagateSettings(true)
+                    .build();
+
+        } else {
+            http2ToHttpAdapter = new StreamingInboundHttp2ToHttpAdapter(
+                    connection,
+                    configuration.getMaxContentLength()
+            );
+        }
+        return builder
+                .connection(connection)
+                .frameListener(new DelegatingDecompressorFrameListener(
+                        connection,
+                        http2ToHttpAdapter));
+
     }
 
     private <I, O, E> void sendRequestThroughChannel(
@@ -1558,7 +1719,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(finalRequest.getMethod());
 
         NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) finalRequest;
-        NettyRequestWriter requestWriter = buildNettyRequest(clientHttpRequest, requestURI, requestContentType, permitsBody, emitter::tryOnError);
+        NettyRequestWriter requestWriter = buildNettyRequest(
+                clientHttpRequest, requestURI, requestContentType, permitsBody, emitter::tryOnError, true);
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
 
         prepareHttpHeaders(
@@ -1593,7 +1755,12 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             FlowableEmitter<io.micronaut.http.HttpResponse<Object>> emitter,
             Channel channel) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        NettyRequestWriter requestWriter = prepareRequest(requestWrapper.get(), requestURI, emitter);
+        NettyRequestWriter requestWriter = prepareRequest(
+                requestWrapper.get(),
+                requestURI,
+                emitter,
+                false
+        );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
         ChannelPipeline pipeline = channel.pipeline();
         pipeline.addLast(HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandler<StreamedHttpResponse>() {
@@ -1712,17 +1879,25 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return host.toString();
     }
 
-    private <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody, boolean closeConnection) {
+    private <I> void prepareHttpHeaders(
+            URI requestURI,
+            io.micronaut.http.HttpRequest<I> request,
+            io.netty.handler.codec.http.HttpRequest nettyRequest,
+            boolean permitsBody,
+            boolean closeConnection) {
         HttpHeaders headers = nettyRequest.headers();
 
         if (!headers.contains(HttpHeaderNames.HOST)) {
             headers.set(HttpHeaderNames.HOST, getHostHeader(requestURI));
         }
 
-        if (closeConnection) {
-            headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-        } else {
-            headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+        // HTTP/2 assumes keep-alive connections
+        if (httpVersion != io.micronaut.http.HttpVersion.HTTP_2_0) {
+            if (closeConnection) {
+                headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+            } else {
+                headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+            }
         }
 
         if (permitsBody) {
@@ -1924,6 +2099,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             @Override
             public void handlerRemoved(ChannelHandlerContext ctx) {
                 if (channelPool != null) {
+                    if (readTimeoutMillis != null) {
+                        ctx.pipeline().remove(HANDLER_READ_TIMEOUT);
+                    }
                     final Channel ch = ctx.channel();
                     if (!keepAlive) {
                         ch.closeFuture().addListener((future ->
@@ -1935,6 +2113,24 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 } else {
                     // just close it to prevent any future reads without a handler registered
                     ctx.close();
+                }
+            }
+
+            @Override
+            public void handlerAdded(ChannelHandlerContext ctx) {
+                if (readTimeoutMillis != null) {
+                    if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+                        pipeline.addBefore(
+                                HANDLER_HTTP2_CONNECTION,
+                                HANDLER_READ_TIMEOUT,
+                                new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
+                        );
+                    } else {
+                        pipeline.addBefore(
+                                HANDLER_HTTP_CLIENT_CODEC,
+                                HANDLER_READ_TIMEOUT,
+                                new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
+                    }
                 }
             }
 
@@ -1967,11 +2163,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             }
         };
         pipeline.addLast(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, newHandler);
-        if (readTimeoutMillis != null) {
-            // reset read timeout
-            pipeline.addBefore(HANDLER_HTTP_CLIENT_CODEC, HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
-        }
-
     }
 
     private void setRedirectHeaders(@Nullable HttpRequest request, MutableHttpRequest<Object> redirectRequest) {
@@ -2152,14 +2343,25 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         );
     }
 
-    private <I> NettyRequestWriter prepareRequest(io.micronaut.http.HttpRequest<I> request, URI requestURI, FlowableEmitter<io.micronaut.http.HttpResponse<Object>> emitter) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+    private <I> NettyRequestWriter prepareRequest(
+            io.micronaut.http.HttpRequest<I> request,
+            URI requestURI,
+            FlowableEmitter<HttpResponse<Object>> emitter,
+            boolean closeChannelAfterWrite) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         MediaType requestContentType = request
                 .getContentType()
                 .orElse(MediaType.APPLICATION_JSON_TYPE);
 
         boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod());
         NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) request;
-        NettyRequestWriter requestWriter = buildNettyRequest(clientHttpRequest, requestURI, requestContentType, permitsBody, emitter::tryOnError);
+        NettyRequestWriter requestWriter = buildNettyRequest(
+                clientHttpRequest,
+                requestURI,
+                requestContentType,
+                permitsBody,
+                emitter::tryOnError,
+                closeChannelAfterWrite
+        );
         io.netty.handler.codec.http.HttpRequest nettyRequest = requestWriter.getNettyRequest();
         prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody, true);
         return requestWriter;
@@ -2167,22 +2369,21 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
     private Disposable buildDisposableChannel(ChannelFuture channelFuture) {
         return new Disposable() {
-            boolean disposed = false;
+            private AtomicBoolean disposed = new AtomicBoolean(false);
 
             @Override
             public void dispose() {
-                if (!disposed) {
+                if (disposed.compareAndSet(false, true)) {
                     Channel channel = channelFuture.channel();
                     if (channel.isOpen()) {
                         closeChannelAsync(channel);
                     }
-                    disposed = true;
                 }
             }
 
             @Override
             public boolean isDisposed() {
-                return disposed;
+                return disposed.get();
             }
         };
     }
@@ -2196,7 +2397,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         key.getHost(),
                         key.getPort(),
                         false,
-                        false
+                        false,
+                        null
                 ) {
                     @Override
                     protected void addFinalHandler(ChannelPipeline pipeline) {
@@ -2234,74 +2436,112 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     /**
      * Initializes the HTTP client channel.
      */
-    protected class HttpClientInitializer extends ChannelInitializer<Channel> {
+    protected class HttpClientInitializer extends ChannelInitializer<SocketChannel> {
 
         final SslContext sslContext;
         final String host;
         final int port;
         final boolean stream;
         final boolean acceptsEvents;
+        Http2SettingsHandler settingsHandler;
+        private final Consumer<ChannelHandlerContext> contextConsumer;
 
         /**
-         * @param sslContext    The ssl context
-         * @param host          The host
-         * @param port          The port
-         * @param stream        Whether is stream
-         * @param acceptsEvents Whether an event stream is accepted
+         * @param sslContext      The ssl context
+         * @param host            The host
+         * @param port            The port
+         * @param stream          Whether is stream
+         * @param acceptsEvents   Whether an event stream is accepted
+         * @param contextConsumer The context consumer
          */
         protected HttpClientInitializer(
                 SslContext sslContext,
                 String host,
                 int port,
                 boolean stream,
-                boolean acceptsEvents) {
+                boolean acceptsEvents,
+                Consumer<ChannelHandlerContext> contextConsumer) {
             this.sslContext = sslContext;
             this.stream = stream;
             this.host = host;
             this.port = port;
             this.acceptsEvents = acceptsEvents;
+            this.contextConsumer = contextConsumer;
         }
 
         /**
          * @param ch The channel
          */
-        protected void initChannel(Channel ch) {
+        protected void initChannel(SocketChannel ch) {
             ChannelPipeline p = ch.pipeline();
-
-            if (stream) {
-                // for streaming responses we disable auto read
-                // so that the consumer is in charge of back pressure
-                ch.config().setAutoRead(false);
-            }
 
             Proxy proxy = configuration.resolveProxy(sslContext != null, host, port);
             if (!Proxy.NO_PROXY.equals(proxy)) {
                 configureProxy(p, proxy);
             }
 
-            if (sslContext != null) {
-                SslHandler sslHandler = sslContext.newHandler(
-                        ch.alloc(),
-                        host,
-                        port
-                );
-                p.addLast(HANDLER_SSL, sslHandler);
-            }
+            if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+                final Http2Connection connection = new DefaultHttp2Connection(false);
+                final HttpToHttp2ConnectionHandlerBuilder builder =
+                        newHttp2ConnectionHandlerBuilder(connection, configuration, stream);
 
-            // Pool connections require alternative timeout handling
-            if (poolMap == null) {
-                // read timeout settings are not applied to streamed requests.
-                // instead idle timeout settings are applied.
-                if (stream && readTimeoutMillis == null) {
-                    Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
-                    if (readIdleTime.isPresent()) {
-                        Duration duration = readIdleTime.get();
-                        if (!duration.isNegative()) {
-                            p.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                configuration.getLogLevel().ifPresent(logLevel -> {
+                    try {
+                        final io.netty.handler.logging.LogLevel nettyLevel = io.netty.handler.logging.LogLevel.valueOf(
+                                logLevel.name()
+                        );
+                        builder.frameLogger(new Http2FrameLogger(nettyLevel, DefaultHttpClient.class));
+                    } catch (IllegalArgumentException e) {
+                        throw new HttpClientException("Unsupported log level: " + logLevel);
+                    }
+                });
+                HttpToHttp2ConnectionHandler connectionHandler = builder
+                        .build();
+                if (sslContext != null) {
+                    configureHttp2Ssl(this, ch, sslContext, host, port, connectionHandler);
+                } else {
+                    configureHttp2ClearText(this, ch, connectionHandler);
+                }
+            } else {
+                if (stream) {
+                    // for streaming responses we disable auto read
+                    // so that the consumer is in charge of back pressure
+                    ch.config().setAutoRead(false);
+                }
+                if (sslContext != null) {
+                    SslHandler sslHandler = sslContext.newHandler(
+                            ch.alloc(),
+                            host,
+                            port
+                    );
+                    p.addLast(HANDLER_SSL, sslHandler);
+                }
+
+                // Pool connections require alternative timeout handling
+                if (poolMap == null) {
+                    // read timeout settings are not applied to streamed requests.
+                    // instead idle timeout settings are applied.
+                    if (stream && readTimeoutMillis == null) {
+                        Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
+                        if (readIdleTime.isPresent()) {
+                            Duration duration = readIdleTime.get();
+                            if (!duration.isNegative()) {
+                                p.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(
+                                        duration.toMillis(),
+                                        duration.toMillis(),
+                                        duration.toMillis(),
+                                        TimeUnit.MILLISECONDS
+                                ));
+                            }
                         }
                     }
                 }
+
+                addHttp1Handlers(p);
             }
+        }
+
+        private void addHttp1Handlers(ChannelPipeline p) {
             p.addLast(HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec());
 
             p.addLast(HANDLER_DECODER, new HttpContentDecompressor());
@@ -2320,29 +2560,28 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     }
                 });
             }
+            addEventStreamHandlerIfNecessary(p);
+            addFinalHandler(p);
+        }
 
+        private void addEventStreamHandlerIfNecessary(ChannelPipeline p) {
             // if the content type is a SSE event stream we add a decoder
             // to delimit the content by lines
             if (acceptsEventStream()) {
-                p.addLast(HANDLER_MICRONAUT_SSE_EVENT_STREAM, new SimpleChannelInboundHandler<HttpContent>() {
-
-                    LineBasedFrameDecoder decoder = new LineBasedFrameDecoder(
-                            configuration.getMaxContentLength(),
-                            true,
-                            true
-                    );
+                p.addLast(HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), true, true) {
 
                     @Override
-                    public boolean acceptInboundMessage(Object msg) {
-                        return msg instanceof HttpContent && !(msg instanceof LastHttpContent);
+                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                        if (msg instanceof HttpContent) {
+                            if (msg instanceof LastHttpContent) {
+                                super.channelRead(ctx, msg);
+                            } else {
+                                super.channelRead(ctx, ((HttpContent) msg).content());
+                            }
+                        } else {
+                            super.channelRead(ctx, msg);
+                        }
                     }
-
-                    @Override
-                    protected void channelRead0(ChannelHandlerContext ctx, HttpContent msg) throws Exception {
-                        ByteBuf content = msg.content();
-                        decoder.channelRead(ctx, content);
-                    }
-
                 });
 
                 p.addLast(HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandler<ByteBuf>(false) {
@@ -2354,11 +2593,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                     @Override
                     protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
-                        ctx.fireChannelRead(new DefaultHttpContent(msg));
+                        try {
+                            ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
+                        } finally {
+                            msg.release();
+                        }
                     }
                 });
             }
-            addFinalHandler(p);
         }
 
         /**
@@ -2386,15 +2628,88 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     /**
+     * Reads the first {@link Http2Settings} object and notifies a {@link io.netty.channel.ChannelPromise}.
+     */
+    private static final class Http2SettingsHandler extends SimpleChannelInboundHandler<Http2Settings> {
+        private final ChannelPromise promise;
+
+        /**
+         * Create new instance.
+         *
+         * @param promise Promise object used to notify when first settings are received
+         */
+        Http2SettingsHandler(ChannelPromise promise) {
+            this.promise = promise;
+        }
+
+        @Override
+        protected void channelRead0(ChannelHandlerContext ctx, Http2Settings msg) {
+            promise.setSuccess();
+
+            // Only care about the first settings message
+            ctx.pipeline().remove(this);
+        }
+    }
+
+    /**
+     * A handler that triggers the cleartext upgrade to HTTP/2 by sending an initial HTTP request.
+     */
+    private class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
+
+        private final HttpClientInitializer initializer;
+        private final Http2SettingsHandler settingsHandler;
+
+        /**
+         * Default constructor.
+         *
+         * @param initializer The initializer
+         */
+        public UpgradeRequestHandler(HttpClientInitializer initializer) {
+            this.initializer = initializer;
+            this.settingsHandler = initializer.settingsHandler;
+        }
+
+        /**
+         * @return The settings handler
+         */
+        public Http2SettingsHandler getSettingsHandler() {
+            return settingsHandler;
+        }
+
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) {
+            // Done with this handler, remove it from the pipeline.
+            final ChannelPipeline pipeline = ctx.pipeline();
+
+            pipeline.addLast(HANDLER_HTTP2_SETTINGS, initializer.settingsHandler);
+            DefaultFullHttpRequest upgradeRequest =
+                    new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER);
+
+            // Set HOST header as the remote peer may require it.
+            InetSocketAddress remote = (InetSocketAddress) ctx.channel().remoteAddress();
+            String hostString = remote.getHostString();
+            if (hostString == null) {
+                hostString = remote.getAddress().getHostAddress();
+            }
+            upgradeRequest.headers().set(HttpHeaderNames.HOST, hostString + ':' + remote.getPort());
+            ctx.writeAndFlush(upgradeRequest);
+
+            ctx.fireChannelActive();
+            pipeline.remove(this);
+            initializer.addFinalHandler(pipeline);
+        }
+    }
+
+    /**
      * Key used for connection pooling and determining host/port.
      */
-    private final class RequestKey {
+    private static final class RequestKey {
         private final String host;
         private final int port;
         private final boolean secure;
 
         public RequestKey(URI requestURI) {
-            this.secure = "https".equalsIgnoreCase(requestURI.getScheme());
+            this.secure = io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(requestURI.getScheme());
             String host = requestURI.getHost();
             int port;
             if (host == null) {
@@ -2466,14 +2781,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
         private final HttpRequest nettyRequest;
         private final HttpPostRequestEncoder encoder;
+        private final String scheme;
+        private final boolean closeChannelAfterWrite;
 
         /**
-         * @param nettyRequest The Netty request
-         * @param encoder      The encoder
+         * @param scheme                 The scheme
+         * @param nettyRequest           The Netty request
+         * @param encoder                The encoder
+         * @param closeChannelAfterWrite Whether to close the after write
          */
-        NettyRequestWriter(HttpRequest nettyRequest, HttpPostRequestEncoder encoder) {
+        NettyRequestWriter(String scheme, HttpRequest nettyRequest, HttpPostRequestEncoder encoder, boolean closeChannelAfterWrite) {
             this.nettyRequest = nettyRequest;
             this.encoder = encoder;
+            this.scheme = scheme;
+            this.closeChannelAfterWrite = closeChannelAfterWrite;
         }
 
         /**
@@ -2482,22 +2803,68 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
          * @param emitter     The emitter
          */
         protected void writeAndClose(Channel channel, ChannelPool channelPool, FlowableEmitter<?> emitter) {
+            final ChannelPipeline pipeline = channel.pipeline();
+            if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+                final boolean isSecure = sslContext != null &&
+                        io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme);
+                if (isSecure) {
+                    nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
+                } else {
+                    nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTP);
+                }
+
+                // for HTTP/2 over cleartext we have to wait for the protocol upgrade to complete
+                // so we get the Http2SettingsHandler and await receiving the Http2Settings object
+                // which indicates the protocol negotiation has completed successfully
+                final UpgradeRequestHandler upgradeRequestHandler =
+                        (UpgradeRequestHandler) pipeline.get(HANDLER_HTTP2_UPGRADE_REQUEST);
+                final Http2SettingsHandler settingsHandler;
+                if (upgradeRequestHandler != null) {
+                    settingsHandler = upgradeRequestHandler.getSettingsHandler();
+                } else {
+                    // upgrade request already received to handler must have been removed
+                    // therefore the Http2SettingsHandler is in the pipeline
+                    settingsHandler = (Http2SettingsHandler) pipeline.get(HANDLER_HTTP2_SETTINGS);
+                }
+                // if the settings handler is null and no longer in the pipeline, fall through
+                // since this means the HTTP/2 clear text upgrade completed, otherwise
+                // add a listener to the future that writes once the upgrade completes
+                if (settingsHandler != null) {
+                    settingsHandler.promise.addListener(future -> {
+                        if (future.isSuccess()) {
+                            processRequestWrite(channel, channelPool, emitter, pipeline);
+                        } else {
+                            throw new HttpClientException("HTTP/2 clear text upgrade failed to complete", future.cause());
+                        }
+                    });
+                    return;
+                }
+            }
+            processRequestWrite(channel, channelPool, emitter, pipeline);
+        }
+
+        private void processRequestWrite(Channel channel, ChannelPool channelPool, FlowableEmitter<?> emitter, ChannelPipeline pipeline) {
             ChannelFuture channelFuture;
             if (encoder != null && encoder.isChunked()) {
-                channel.pipeline().replace(HANDLER_STREAM, HANDLER_CHUNK, new ChunkedWriteHandler());
+                pipeline.replace(HANDLER_STREAM, HANDLER_CHUNK, new ChunkedWriteHandler());
                 channel.write(nettyRequest);
                 channelFuture = channel.writeAndFlush(encoder);
             } else {
                 channelFuture = channel.writeAndFlush(nettyRequest);
-
             }
 
-            if (channelPool == null) {
-                closeChannel(channel, emitter, channelFuture);
+            if (channelPool != null) {
+                closeChannelIfNecessary(channel, emitter, channelFuture, false);
+            } else {
+                closeChannelIfNecessary(channel, emitter, channelFuture, closeChannelAfterWrite);
             }
         }
 
-        private void closeChannel(Channel channel, FlowableEmitter<?> emitter, ChannelFuture channelFuture) {
+        private void closeChannelIfNecessary(
+                Channel channel,
+                FlowableEmitter<?> emitter,
+                ChannelFuture channelFuture,
+                boolean closeChannelAfterWrite) {
             channelFuture.addListener(f -> {
                 try {
                     if (!f.isSuccess()) {
@@ -2505,13 +2872,16 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             emitter.onError(f.cause());
                         }
                     } else {
+                        // reset to read mode
                         channel.read();
                     }
                 } finally {
                     if (encoder != null) {
                         encoder.cleanFiles();
                     }
-                    closeChannelAsync(channel);
+                    if (closeChannelAfterWrite) {
+                        closeChannelAsync(channel);
+                    }
                 }
             });
         }
@@ -2527,14 +2897,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     /**
      * Used as a holder for the current SSE event.
      */
-    private class CurrentEvent {
-        final CompositeByteBuf data;
+    private static class CurrentEvent {
+        byte[] data;
         String id;
         String name;
         Duration retry;
-
-        CurrentEvent(CompositeByteBuf data) {
-            this.data = data;
-        }
     }
 }

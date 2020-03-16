@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.channels.ClosedChannelException;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -70,6 +71,7 @@ import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
@@ -109,6 +111,7 @@ import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
@@ -1353,20 +1356,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void writeFinalNettyResponse(MutableHttpResponse<?> message, AtomicReference<HttpRequest<?>> requestReference, ChannelHandlerContext context) {
-        NettyMutableHttpResponse nettyHttpResponse = (NettyMutableHttpResponse) message;
+        NettyMutableHttpResponse<?> nettyHttpResponse = (NettyMutableHttpResponse<?>) message;
         FullHttpResponse nettyResponse = nettyHttpResponse.getNativeResponse();
 
         HttpRequest<?> httpRequest = requestReference.get();
         io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyResponse.headers();
 
         // default Connection header if not set explicitly
-        if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
-            boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || httpRequest.getHeaders().isKeepAlive();
-            HttpStatus status = nettyHttpResponse.status();
-            if (!expectKeepAlive || status.getCode() > 299) {
-                nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-            } else {
-                nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+        final io.micronaut.http.HttpVersion httpVersion = httpRequest.getHttpVersion();
+        final boolean isHttp2 = httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0;
+        if (!isHttp2) {
+            if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
+                boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || httpRequest.getHeaders().isKeepAlive();
+                HttpStatus status = nettyHttpResponse.status();
+                if (!expectKeepAlive || status.getCode() > 299) {
+                    nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                } else {
+                    nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                }
             }
         }
 
@@ -1380,12 +1387,34 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             }
             // close handled by HttpServerKeepAliveHandler
-            final NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) requestReference.get();
+            final NettyHttpRequest<?> nettyHttpRequest = (NettyHttpRequest<?>) requestReference.get();
+
+            if (isHttp2) {
+                final io.netty.handler.codec.http.HttpHeaders nativeHeaders = nettyHttpRequest.getNativeRequest().headers();
+                final String streamId = nativeHeaders.get(AbstractNettyHttpRequest.STREAM_ID);
+                if (streamId != null) {
+                    nettyResponse.headers().set(AbstractNettyHttpRequest.STREAM_ID, streamId);
+                }
+            }
 
             context.writeAndFlush(nettyResponse)
                    .addListener(future -> {
-                       context.read();
-                       cleanupRequest(context, nettyHttpRequest);
+                       try {
+                           if (!future.isSuccess()) {
+                               final Throwable throwable = future.cause();
+                               if (!(throwable instanceof ClosedChannelException)) {
+                                   if (LOG.isErrorEnabled()) {
+                                       LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
+                                   }
+                               }
+                           } else {
+                               context.read();
+                           }
+                       } finally {
+
+                           cleanupRequest(context, nettyHttpRequest);
+                       }
+
                    });
 
         }
@@ -1654,7 +1683,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (message instanceof ByteBuf) {
                     httpContent = new DefaultHttpContent((ByteBuf) message);
                 } else if (message instanceof ByteBuffer) {
-                    ByteBuffer byteBuffer = (ByteBuffer) message;
+                    ByteBuffer<?> byteBuffer = (ByteBuffer<?>) message;
                     Object nativeBuffer = byteBuffer.asNativeBuffer();
                     if (nativeBuffer instanceof ByteBuf) {
                         httpContent = new DefaultHttpContent((ByteBuf) nativeBuffer);
@@ -1673,8 +1702,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Encoding emitted response object [{}] using codec: {}", message, codec);
                     }
-                    ByteBuffer encoded = codec.encode(message, byteBufferFactory);
-                    httpContent = new DefaultHttpContent((ByteBuf) encoded.asNativeBuffer());
+                    ByteBuffer<ByteBuf> encoded = codec.encode(message, byteBufferFactory);
+                    httpContent = new DefaultHttpContent(encoded.asNativeBuffer());
                 }
                 if (!isJson || first) {
                     first = false;

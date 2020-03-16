@@ -16,6 +16,7 @@
 package io.micronaut.http.ssl;
 
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.http.HttpVersion;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
@@ -47,6 +48,13 @@ public abstract class SslBuilder<T> {
      * @return Builds the SSL configuration wrapped inside an optional
      */
     public abstract Optional<T> build(SslConfiguration ssl);
+
+    /**
+     * @param ssl The ssl configuration
+     * @param httpVersion  The http version
+     * @return Builds the SSL configuration wrapped inside an optional
+     */
+    public abstract Optional<T> build(SslConfiguration ssl, HttpVersion httpVersion);
 
     /**
      * @param ssl The ssl configuration

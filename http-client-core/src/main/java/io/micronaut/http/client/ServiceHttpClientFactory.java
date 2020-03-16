@@ -92,7 +92,11 @@ public class ServiceHttpClientFactory {
             return event -> {
                     final List<URI> originalURLs = configuration.getUrls();
                     Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
-                    final RxHttpClient httpClient = clientFactory.get().getClient(configuration.getServiceId(), configuration.getPath().orElse(null));
+                    final RxHttpClient httpClient = clientFactory.get()
+                            .getClient(
+                                    configuration.getHttpVersion(),
+                                    configuration.getServiceId(),
+                                    configuration.getPath().orElse(null));
                     taskScheduler.scheduleWithFixedDelay(configuration.getHealthCheckInterval(), configuration.getHealthCheckInterval(), () -> Flowable.fromIterable(originalURLs).flatMap(originalURI -> {
                         URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());
                         return httpClient.exchange(HttpRequest.GET(healthCheckURI)).onErrorResumeNext(throwable -> {

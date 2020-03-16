@@ -1,5 +1,11 @@
 Micronaut {version} includes the following changes:
 
+=== Initial Support for HTTP/2
+
+Micronaut's Netty-based HTTP client and server have been updated to support HTTP/2.
+
+See the <<http2Server, HTTP/2 documentation>> for more information on how to enable support for HTTP/2.
+
 === Improved Support for Server-Side Content Negotiation
 
 Micronaut will now correctly handle the HTTP `Accept` header and pick the most appropriate route for the specified accepted media types using https://developer.mozilla.org/en-US/docs/Web/HTTP/Content_negotiation[Server-Side Content Negotiation].

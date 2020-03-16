@@ -20,6 +20,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Type;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice;
 import io.micronaut.http.hateoas.JsonError;
@@ -72,4 +73,10 @@ public @interface Client {
      * @return The http client configuration bean to use
      */
     Class<? extends HttpClientConfiguration> configuration() default HttpClientConfiguration.class;
+    /**
+     * The HTTP version.
+     *
+     * @return The HTTP version of the client.
+     */
+    HttpVersion httpVersion() default HttpVersion.HTTP_1_1;
 }

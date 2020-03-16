@@ -141,7 +141,7 @@ public class TextStreamCodec implements MediaTypeCodec {
 
     @SuppressWarnings("MagicNumber")
     @Override
-    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
+    public <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) throws CodecException {
         Event<Object> event;
         if (object instanceof Event) {
             event = (Event<Object>) object;

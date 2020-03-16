@@ -98,6 +98,7 @@ httpServer:
     title: WebSocket Support
     websocketServer: Using @ServerWebSocket
     websocketClient: Using @ClientWebSocket
+  http2Server: HTTP/2 Support
   serverEvents: Server Events
   serverConfiguration:
     title: Configuring the HTTP Server

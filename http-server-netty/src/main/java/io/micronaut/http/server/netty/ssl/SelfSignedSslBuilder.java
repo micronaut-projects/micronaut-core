@@ -18,12 +18,14 @@ package io.micronaut.http.server.netty.ssl;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.http.HttpVersion;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.codec.http2.Http2SecurityUtil;
+import io.netty.handler.ssl.*;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 
 import javax.inject.Singleton;
@@ -45,14 +47,20 @@ import static io.micronaut.core.util.StringUtils.TRUE;
 public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
 
     private final ServerSslConfiguration ssl;
+    private final HttpServerConfiguration serverConfiguration;
 
     /**
-     * @param ssl              The SSL configuration
-     * @param resourceResolver The resource resolver
+     * @param serverConfiguration The server configuration
+     * @param ssl                 The SSL configuration
+     * @param resourceResolver    The resource resolver
      */
-    public SelfSignedSslBuilder(ServerSslConfiguration ssl, ResourceResolver resourceResolver) {
+    public SelfSignedSslBuilder(
+            HttpServerConfiguration serverConfiguration,
+            ServerSslConfiguration ssl,
+            ResourceResolver resourceResolver) {
         super(resourceResolver);
         this.ssl = ssl;
+        this.serverConfiguration = serverConfiguration;
     }
 
     @Override
@@ -68,9 +76,28 @@ public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements Serv
     @SuppressWarnings("Duplicates")
     @Override
     public Optional<SslContext> build(SslConfiguration ssl) {
+        final HttpVersion httpVersion = serverConfiguration.getHttpVersion();
+        return build(ssl, httpVersion);
+    }
+
+    @Override
+    public Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
         try {
             SelfSignedCertificate ssc = new SelfSignedCertificate();
-            return Optional.of(SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).build());
+            final SslContextBuilder sslBuilder = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey());
+            final boolean isHttp2 = httpVersion == HttpVersion.HTTP_2_0;
+            if (isHttp2) {
+                SslProvider provider = SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
+                sslBuilder.sslProvider(provider);
+                sslBuilder.ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE);
+                sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
+                        ApplicationProtocolConfig.Protocol.ALPN,
+                        ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                        ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                        ApplicationProtocolNames.HTTP_2,
+                        ApplicationProtocolNames.HTTP_1_1));
+            }
+            return Optional.of(sslBuilder.build());
         } catch (CertificateException | SSLException e) {
             throw new SslConfigurationException("Encountered an error while building a self signed certificate", e);
         }

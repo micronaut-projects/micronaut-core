@@ -25,6 +25,7 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
+import io.netty.handler.ssl.ApplicationProtocolNames;
 
 import javax.inject.Inject;
 import java.util.Collections;
@@ -109,6 +110,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int compressionThreshold = DEFAULT_COMPRESSIONTHRESHOLD;
     private int compressionLevel = DEFAULT_COMPRESSIONLEVEL;
     private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
+    private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
 
     /**
      * Default empty constructor.
@@ -122,6 +124,26 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @Inject
     public NettyHttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
+    }
+
+    /**
+     * @return The fallback protocol to use when negotiating via ALPN
+     * @see ApplicationProtocolNames
+     */
+    public String getFallbackProtocol() {
+        return fallbackProtocol;
+    }
+
+    /**
+     * Sets the fallback protocol to use when negotiating via ALPN.
+     *
+     * @param fallbackProtocol The fallback protocol to use when negotiating via ALPN
+     * @see ApplicationProtocolNames
+     */
+    public void setFallbackProtocol(String fallbackProtocol) {
+        if (fallbackProtocol != null) {
+            this.fallbackProtocol = fallbackProtocol;
+        }
     }
 
     /**

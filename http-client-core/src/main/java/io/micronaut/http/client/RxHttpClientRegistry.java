@@ -19,6 +19,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpVersion;
 
 /**
  * Internal interface for managing the construction and lifecycle of instances of {@link RxHttpClient}.
@@ -32,11 +33,13 @@ public interface RxHttpClientRegistry {
     /**
      * Return the client for the client ID and path.
      *
-     * @param clientId The client ID
-     * @param path The path (Optional)
+     * @param httpVersion The HTTP version
+     * @param clientId    The client ID
+     * @param path        The path (Optional)
      * @return The client
      */
-    @NonNull RxHttpClient getClient(@NonNull String clientId, @Nullable String path);
+    @NonNull
+    RxHttpClient getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path);
 
     /**
      * Return the client for the given annotation metadata.
@@ -44,10 +47,12 @@ public interface RxHttpClientRegistry {
      * @param annotationMetadata The annotation metadata.
      * @return The client
      */
-    @NonNull RxHttpClient getClient(@NonNull AnnotationMetadata annotationMetadata);
+    @NonNull
+    RxHttpClient getClient(@NonNull AnnotationMetadata annotationMetadata);
 
     /**
      * Dispose of the client defined by the given metadata.
+     *
      * @param annotationMetadata The annotation metadata
      */
     void disposeClient(AnnotationMetadata annotationMetadata);

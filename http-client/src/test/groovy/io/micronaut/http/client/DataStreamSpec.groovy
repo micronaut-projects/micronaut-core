@@ -126,7 +126,7 @@ class DataStreamSpec extends Specification {
         when:
         List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(
                 '/datastream/books'
-        )).blockingIterable().toList().collect { res -> res.body.get().toByteArray() }
+        )).map { res -> res.body.get().toByteArray() }.blockingIterable().toList()
 
         then:
         arrays.size() == 2

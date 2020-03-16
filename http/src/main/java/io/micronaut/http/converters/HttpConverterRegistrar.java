@@ -22,6 +22,7 @@ import io.micronaut.core.io.Readable;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
 
 import javax.inject.Singleton;
@@ -52,6 +53,14 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
 
     @Override
     public void register(ConversionService<?> conversionService) {
+        conversionService.addConverter(String.class, HttpVersion.class, s -> {
+            try {
+                return HttpVersion.valueOf(Double.parseDouble(s));
+            } catch (NumberFormatException e) {
+                return HttpVersion.valueOf(s);
+            }
+        });
+        conversionService.addConverter(Number.class, HttpVersion.class, s -> HttpVersion.valueOf(s.doubleValue()));
         conversionService.addConverter(
                 CharSequence.class,
                 Readable.class,

@@ -19,6 +19,7 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
@@ -70,7 +71,7 @@ public abstract class DiscoveryServerInstanceList  implements ServiceInstanceLis
             if (!allZones.isEmpty()) {
                 return allZones;
             } else {
-                String spec = (configuration.isSecure() ? "https" : "http") + "://" + configuration.getHost() + ":" + configuration.getPort();
+                String spec = (configuration.isSecure() ? HttpRequest.SCHEME_HTTPS : HttpRequest.SCHEME_HTTP) + "://" + configuration.getHost() + ":" + configuration.getPort();
                 return Collections.singletonList(
                         ServiceInstance.builder(getID(), URI.create(spec)).build()
                 );
