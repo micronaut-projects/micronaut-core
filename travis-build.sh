@@ -21,9 +21,9 @@ if [[ -n $TRAVIS_TAG ]]; then
                 git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-docs.git -b gh-pages gh-pages --single-branch > /dev/null
 
                 cd gh-pages
-                mkdir -p latest
-                cp -r ../build/docs/. ./latest/
-                git add latest/*
+#                mkdir -p latest
+#                cp -r ../build/docs/. ./latest/
+#                git add latest/*
 
                 version="$TRAVIS_TAG"
                 version=${version:1}
