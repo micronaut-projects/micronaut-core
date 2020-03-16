@@ -63,6 +63,7 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
 
     @Override
     protected void doOnError(Throwable t) {
+        t.printStackTrace();
         currentDownstreamSubscriber().ifPresent(subscriber ->
             subscriber.onError(t)
         );

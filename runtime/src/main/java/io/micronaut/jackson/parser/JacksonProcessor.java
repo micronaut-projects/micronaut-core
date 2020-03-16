@@ -17,8 +17,10 @@ package io.micronaut.jackson.parser;
 
 import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.core.async.ByteArrayFeeder;
+import com.fasterxml.jackson.core.base.ParserBase;
 import com.fasterxml.jackson.core.io.JsonEOFException;
 import com.fasterxml.jackson.core.json.async.NonBlockingJsonParser;
+import com.fasterxml.jackson.core.json.async.NonBlockingJsonParserBase;
 import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
@@ -128,6 +131,25 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     @Override
     protected void doOnComplete() {
         if (needMoreInput()) {
+            //if (LOG.isTraceEnabled()) {
+                LOG.trace("Complete called but need more input");
+                LOG.trace(nodeStack.toString());
+                try {
+                    Field field = ParserBase.class.getDeclaredField("_inputPtr");
+                    field.setAccessible(true);
+                    LOG.trace("inputPtr = {}", field.get(currentNonBlockingJsonParser.getNonBlockingInputFeeder()));
+                    field = ParserBase.class.getDeclaredField("_inputEnd");
+                    field.setAccessible(true);
+                    LOG.trace("inputEnd = {}", field.get(currentNonBlockingJsonParser.getNonBlockingInputFeeder()));
+                    field = NonBlockingJsonParserBase.class.getDeclaredField("_endOfInput");
+                    field.setAccessible(true);
+                    LOG.trace("endOfInput = {}", field.get(currentNonBlockingJsonParser.getNonBlockingInputFeeder()));
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                } catch (NoSuchFieldException e) {
+                    e.printStackTrace();
+                }
+            //}
             doOnError(new JsonEOFException(currentNonBlockingJsonParser, JsonToken.NOT_AVAILABLE, "Unexpected end-of-input"));
         } else {
             super.doOnComplete();
@@ -136,6 +158,10 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
 
     @Override
     protected void onUpstreamMessage(byte[] message) {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Upstream demand - {}", upstreamDemand);
+            LOG.trace("Started processing - {}", System.identityHashCode(message));
+        }
         try {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Received upstream bytes of length: " + message.length);
@@ -144,7 +170,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
             if (message.length == 0) {
                 if (needMoreInput()) {
                     if (LOG.isTraceEnabled()) {
-                        LOG.trace("More input required to parse JSON. Demanding more.");
+                        LOG.trace("Message length 0, More input required to parse JSON. Demanding more.");
                     }
                     upstreamSubscription.request(1);
                     upstreamDemand++;
@@ -206,6 +232,11 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
             }
         } catch (IOException e) {
             onError(e);
+        } finally {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Upstream demand - {}", upstreamDemand);
+                LOG.trace("Finished processing - {}", System.identityHashCode(message));
+            }
         }
     }
 
