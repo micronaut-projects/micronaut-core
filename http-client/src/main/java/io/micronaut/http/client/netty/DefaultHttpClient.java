@@ -28,10 +28,12 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.HttpResponse;
@@ -553,14 +555,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                             event
                                     );
                                 } finally {
-                                    currentEvent.data.release();
                                     currentEvent = null;
                                 }
                             } else {
                                 if (currentEvent == null) {
-                                    currentEvent = new CurrentEvent(
-                                            byteBufferFactory.getNativeAllocator().compositeBuffer(10)
-                                    );
+                                    currentEvent = new CurrentEvent();
                                 }
                                 int colonIndex = buffer.indexOf((byte) ':');
                                 // SSE comments start with colon, so skip
@@ -577,8 +576,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                         switch (type) {
                                             case "data":
                                                 ByteBuffer content = buffer.slice(fromIndex, toIndex);
-                                                ByteBuf nativeBuffer = (ByteBuf) content.asNativeBuffer();
-                                                currentEvent.data.addComponent(true, nativeBuffer);
+                                                byte[] d = currentEvent.data;
+                                                if (d == null) {
+                                                    currentEvent.data = content.toByteArray();
+                                                } else {
+                                                    currentEvent.data = ArrayUtils.concat(d, content.toByteArray());
+                                                }
+
 
                                                 break;
                                             case "id":
@@ -613,6 +617,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             }
                         } catch (Throwable e) {
                             onError(e);
+                        } finally {
+                             if (buffer instanceof ReferenceCounted) {
+                                 ((ReferenceCounted) buffer).release();
+                             }
                         }
                     }
 
@@ -2555,25 +2563,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             // if the content type is a SSE event stream we add a decoder
             // to delimit the content by lines
             if (acceptsEventStream()) {
-                p.addLast(HANDLER_MICRONAUT_SSE_EVENT_STREAM, new SimpleChannelInboundHandler<HttpContent>() {
-
-                    LineBasedFrameDecoder decoder = new LineBasedFrameDecoder(
-                            configuration.getMaxContentLength(),
-                            true,
-                            true
-                    );
+                p.addLast(HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), true, true) {
 
                     @Override
-                    public boolean acceptInboundMessage(Object msg) {
-                        return msg instanceof HttpContent && !(msg instanceof LastHttpContent);
+                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                        if (msg instanceof HttpContent) {
+                            if (msg instanceof LastHttpContent) {
+                                super.channelRead(ctx, msg);
+                            } else {
+                                super.channelRead(ctx, ((HttpContent) msg).content());
+                            }
+                        } else {
+                            super.channelRead(ctx, msg);
+                        }
                     }
-
-                    @Override
-                    protected void channelRead0(ChannelHandlerContext ctx, HttpContent msg) throws Exception {
-                        ByteBuf content = msg.content();
-                        decoder.channelRead(ctx, content);
-                    }
-
                 });
 
                 p.addLast(HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandler<ByteBuf>(false) {
@@ -2585,7 +2588,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                     @Override
                     protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
-                        ctx.fireChannelRead(new DefaultHttpContent(msg));
+                        try {
+                            ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
+                        } finally {
+                            msg.release();
+                        }
                     }
                 });
             }
@@ -2886,13 +2893,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * Used as a holder for the current SSE event.
      */
     private static class CurrentEvent {
-        final CompositeByteBuf data;
+        byte[] data;
         String id;
         String name;
         Duration retry;
-
-        CurrentEvent(CompositeByteBuf data) {
-            this.data = data;
-        }
     }
 }
