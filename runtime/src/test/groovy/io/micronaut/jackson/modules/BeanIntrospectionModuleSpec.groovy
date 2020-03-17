@@ -38,10 +38,32 @@ class BeanIntrospectionModuleSpec extends Specification {
         ctx.close()
     }
 
+    void "Bean introspection works with a bean without JsonInclude annotations - serializationInclusion ALWAYS"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true,
+                'jackson.serializationInclusion':'ALWAYS'
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        GuideWithoutJsonIncludeAnnotations guide = new GuideWithoutJsonIncludeAnnotations()
+        guide.name = 'Bean Introspection Guide'
+        String json = objectMapper.writeValueAsString(guide)
+
+        then:
+        noExceptionThrown()
+        json == '{"name":"Bean Introspection Guide","author":null}'
+
+        cleanup:
+        ctx.close()
+    }
+
     void "Bean introspection works with JsonInclude.Include.NON_NULL"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
-                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
+                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true,
+                'jackson.serializationInclusion':'ALWAYS'
         )
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
@@ -61,7 +83,8 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "Bean introspection works with JsonInclude.Include.ALWAYS"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(
-                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
+                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true,
+                'jackson.serializationInclusion':'ALWAYS'
         )
         ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
 
