@@ -55,3 +55,7 @@ In Micronaut 1.x the Google distributed JSR-305 annotations library (`com.google
 Due to the fact that JSR-305 has been cancelled and that this dependency has potential licensing issues (by using the `javax` namespace) as well as problems with the cross packages on Java 9+ with the module system Micronaut 2.x switches to the `spotbugs-annotations` module provided by the https://spotbugs.github.io/[SpotBugs project].
 
 It is recommended users of Micronaut use this API instead (although the `javax.annotation.Nullable` and `javax.annotation.NotNull` annotations continue to be supported).
+
+==== Module Upgrades
+
+* Micronaut Neo4j - `1.3.0` -> `2.0.0`
