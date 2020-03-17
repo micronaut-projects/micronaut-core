@@ -1,6 +1,7 @@
 package io.micronaut.jackson.modules
 
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonView
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -8,9 +9,74 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.jackson.JacksonConfiguration
+import org.checkerframework.checker.nullness.qual.NonNull
+import spock.lang.Issue
 import spock.lang.Specification
 
+import javax.annotation.Nullable
+import javax.validation.constraints.NotBlank
+
 class BeanIntrospectionModuleSpec extends Specification {
+
+    void "Bean introspection works with a bean without JsonInclude annotations"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        GuideWithoutJsonIncludeAnnotations guide = new GuideWithoutJsonIncludeAnnotations()
+        guide.name = 'Bean Introspection Guide'
+        String json = objectMapper.writeValueAsString(guide)
+
+        then:
+        noExceptionThrown()
+        json == '{"name":"Bean Introspection Guide"}'
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "Bean introspection works with JsonInclude.Include.NON_NULL"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        Guide guide = new Guide()
+        guide.name = 'Bean Introspection Guide'
+        String json = objectMapper.writeValueAsString(guide)
+
+        then:
+        noExceptionThrown()
+        json == '{"name":"Bean Introspection Guide"}'
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "Bean introspection works with JsonInclude.Include.ALWAYS"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                (JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION):true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        GuideWithNull guide = new GuideWithNull()
+        guide.name = 'Bean Introspection Guide'
+        String json = objectMapper.writeValueAsString(guide)
+
+        then:
+        noExceptionThrown()
+        json == '{"name":"Bean Introspection Guide","author":null}'
+
+        cleanup:
+        ctx.close()
+    }
 
     void "test that introspected serialization works"() {
         given:
@@ -104,6 +170,26 @@ class BeanIntrospectionModuleSpec extends Specification {
         @JsonCreator Book(@JsonProperty("book_title") String title) {
             this.title = title
         }
+    }
+
+    @Introspected
+    static class GuideWithoutJsonIncludeAnnotations {
+        String name
+        String author
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Introspected
+    static class Guide {
+        String name
+        String author
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    @Introspected
+    static class GuideWithNull {
+        String name
+        String author
     }
 
     @Introspected
