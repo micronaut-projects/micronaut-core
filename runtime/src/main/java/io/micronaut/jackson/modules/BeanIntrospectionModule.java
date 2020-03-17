@@ -15,6 +15,7 @@
  */
 package io.micronaut.jackson.modules;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -491,6 +492,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         final BeanProperty<Object, Object> beanProperty;
         final SerializableString fastName;
         private final JavaType type;
+        private final boolean shouldSuppressNulls;
 
         BeanIntrospectionPropertyWriter(BeanPropertyWriter src,
                                         BeanProperty<Object, Object> introspection,
@@ -515,6 +517,7 @@ public class BeanIntrospectionModule extends SimpleModule {
             this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = (ser == null) ? PropertySerializerMap
                     .emptyForProperties() : null;
+            shouldSuppressNulls = shouldSuppressNulls(_suppressNulls);
         }
 
         BeanIntrospectionPropertyWriter(
@@ -527,11 +530,17 @@ public class BeanIntrospectionModule extends SimpleModule {
             this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = PropertySerializerMap
                     .emptyForProperties();
+            shouldSuppressNulls = shouldSuppressNulls(_suppressNulls);
         }
 
         @Override
         public String getName() {
             return fastName.getValue();
+        }
+
+        @Override
+        public boolean willSuppressNulls() {
+            return shouldSuppressNulls || super.willSuppressNulls();
         }
 
         @Override
@@ -562,6 +571,29 @@ public class BeanIntrospectionModule extends SimpleModule {
             return false;
         }
 
+        /**
+         * @see <a href="https://github.com/micronaut-projects/micronaut-core/issues/2933">Issue 2933</a>
+         */
+        private boolean shouldSuppressNulls(boolean defaultSupressNull) {
+            JsonInclude.Include include = beanProperty.enumValue(JsonInclude.class, JsonInclude.Include.class).orElse(null);
+            if (include == null) {
+                include = beanProperty.getDeclaringBean().enumValue(JsonInclude.class, JsonInclude.Include.class).orElse(null);
+            }
+            if (include != null) {
+                switch (include) {
+                    case ALWAYS:
+                        return false;
+                    case NON_NULL:
+                    case NON_ABSENT:
+                    case NON_EMPTY:
+                        return true;
+                    default:
+                        return defaultSupressNull;
+                }
+            }
+            return defaultSupressNull;
+        }
+
         @Override
         public final void serializeAsField(Object bean, JsonGenerator gen, SerializerProvider prov) throws Exception {
             if (!inView(prov.getActiveView())) {
@@ -571,10 +603,11 @@ public class BeanIntrospectionModule extends SimpleModule {
             Object value = beanProperty.get(bean);
             // Null (etc) handling; copied from super-class impl
             if (value == null) {
-                if (_nullSerializer != null) {
+                boolean willSuppressNulls = willSuppressNulls();
+                if (!willSuppressNulls && _nullSerializer != null) {
                     gen.writeFieldName(fastName);
                     _nullSerializer.serialize(null, gen, prov);
-                } else if (!_suppressNulls) {
+                } else if (!willSuppressNulls) {
                     gen.writeFieldName(fastName);
                     prov.defaultSerializeNull(gen);
                 }
@@ -622,9 +655,10 @@ public class BeanIntrospectionModule extends SimpleModule {
             Object value = beanProperty.get(bean);
             // Null (etc) handling; copied from super-class impl
             if (value == null) {
-                if (_nullSerializer != null) {
+                boolean willSuppressNulls = willSuppressNulls();
+                if (!willSuppressNulls && _nullSerializer != null) {
                     _nullSerializer.serialize(null, gen, prov);
-                } else if (_suppressNulls) {
+                } else if (willSuppressNulls) {
                     serializeAsPlaceholder(bean, gen, prov);
                 } else {
                     prov.defaultSerializeNull(gen);
