@@ -3,6 +3,7 @@ package io.micronaut.http.client
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -11,6 +12,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -18,6 +20,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Inject
+import java.util.concurrent.atomic.AtomicBoolean
 
 class HeaderValidationSpec extends Specification {
 
@@ -32,6 +35,7 @@ class HeaderValidationSpec extends Specification {
 
         expect:
         body == "Hello World"
+        !embeddedServer.applicationContext.getBean(HelloController).methodCalled.get()
     }
 
     /**
@@ -40,10 +44,14 @@ class HeaderValidationSpec extends Specification {
      */
     void "test self exploitation"() {
         HttpRequest<String> request = HttpRequest.GET("/hello/self-exploit");
-        String body = client.toBlocking().retrieve(request);
 
-        expect:
-        body == "Hello World"
+        when:
+        client.toBlocking().retrieve(request);
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.INTERNAL_SERVER_ERROR
+        !embeddedServer.applicationContext.getBean(HelloController).methodCalled.get()
     }
 
     /**
@@ -71,16 +79,22 @@ class HeaderValidationSpec extends Specification {
                         .queryParam("header-value", headerValue)
                         .build();
         HttpRequest<String> request = HttpRequest.GET(theURI)
-        String body = client.toBlocking().retrieve(request)
 
-        expect:
-        body == "Hello World"
+        when:
+        client.toBlocking().retrieve(request)
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.INTERNAL_SERVER_ERROR
+        !embeddedServer.applicationContext.getBean(HelloController).methodCalled.get()
     }
 
 
     @Requires(property = "spec.name", value = "HeaderValidationSpec")
     @Controller("/hello")
     static class HelloController {
+
+        AtomicBoolean methodCalled = new AtomicBoolean()
 
         /**
          * Imagine that this client actually points to another micro-service instead of pointing back to itself.
@@ -106,9 +120,9 @@ class HeaderValidationSpec extends Specification {
         @Post("/super-secret")
         @Produces(MediaType.TEXT_PLAIN)
         String superSecretEndpoint(@Body String body) {
+            methodCalled.set(true)
             println("This method was called but it shouldn't have been!")
             println(body)
-
             body
         }
 
@@ -134,11 +148,7 @@ class HeaderValidationSpec extends Specification {
             String fullHeaderValue = String.join("\r\n", headerData)
             String headerValue = "H\r\n" + fullHeaderValue
 
-            HttpRequest request = HttpRequest.GET("/hello")
-            try {
-                request.header("Test", headerValue)
-            } catch (IllegalArgumentException e) {
-            }
+            HttpRequest request = HttpRequest.GET("/hello").header("Test", headerValue)
             client.toBlocking().retrieve(request)
         }
 
@@ -149,11 +159,7 @@ class HeaderValidationSpec extends Specification {
         @Get("/external-exploit")
         @Produces(MediaType.TEXT_PLAIN)
         String externalExploit(@QueryValue("header-value") String headerValue) {
-            HttpRequest request = HttpRequest.GET("/hello")
-            try {
-                request.header("Test", headerValue)
-            } catch (IllegalArgumentException e) {
-            }
+            HttpRequest request = HttpRequest.GET("/hello").header("Test", headerValue)
             client.toBlocking().retrieve(request)
         }
     }

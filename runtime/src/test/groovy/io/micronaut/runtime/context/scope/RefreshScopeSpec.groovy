@@ -39,7 +39,7 @@ class RefreshScopeSpec extends Specification {
     void "test fire refresh event that refreshes all"() {
         given:
         System.setProperty("foo.bar", "test")
-        ApplicationContext beanContext = ApplicationContext.build().start()
+        ApplicationContext beanContext = ApplicationContext.builder().start()
 
         // override IO executor with synchronous impl
         beanContext.registerSingleton(Executor.class, new Executor() {
@@ -73,7 +73,7 @@ class RefreshScopeSpec extends Specification {
     void "test fire refresh event that refreshes environment diff"() {
         given:
         System.setProperty("foo.bar", "test")
-        ApplicationContext beanContext = ApplicationContext.build().start()
+        ApplicationContext beanContext = ApplicationContext.builder().start()
 
         // override IO executor with synchronous impl
         beanContext.registerSingleton(Executor.class, new Executor() {
@@ -110,7 +110,7 @@ class RefreshScopeSpec extends Specification {
         file.write("foo.bar: test")
         System.setProperty("micronaut.config.files", file.absolutePath)
 
-        ApplicationContext beanContext = ApplicationContext.build().start()
+        ApplicationContext beanContext = ApplicationContext.builder().start()
 
         // override IO executor with synchronous impl
         beanContext.registerSingleton(Executor.class, new Executor() {
@@ -148,7 +148,7 @@ class RefreshScopeSpec extends Specification {
         System.setProperty("micronaut.config.files", file.absolutePath)
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
 
-        ApplicationContext beanContext = ApplicationContext.build(["bootstrap-env": true]).start()
+        ApplicationContext beanContext = ApplicationContext.builder(["bootstrap-env": true]).start()
 
         // override IO executor with synchronous impl
         beanContext.registerSingleton(Executor.class, new Executor() {

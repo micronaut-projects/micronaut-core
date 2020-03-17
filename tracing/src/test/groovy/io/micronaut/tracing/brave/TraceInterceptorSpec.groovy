@@ -107,7 +107,7 @@ class TraceInterceptorSpec extends Specification {
 
     ApplicationContext buildContext() {
         def reporter = new TestReporter()
-        ApplicationContext.build(
+        ApplicationContext.builder(
                 'tracing.instrument-threads':true,
                 'tracing.zipkin.enabled':true,
                 'tracing.zipkin.sampler.probability':1

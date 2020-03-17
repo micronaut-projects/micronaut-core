@@ -346,7 +346,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
         for (Parameter param : parametersWithBasePath.parameters) {
             String key = param.getName().substring(parametersWithBasePath.basePath.length());
             if (key.length() > 1) {
-                key = key.substring(1).replaceAll("/", ".");
+                key = key.substring(1).replace("/", ".");
             }
 
             if (param.getType().equals("StringList")) {

@@ -27,7 +27,7 @@ class MyConfig {
     }
 }''')
             BeanFactory factory = beanDefinition
-            ApplicationContext applicationContext = ApplicationContext.build(["my.host": "abc"]).start()
+            ApplicationContext applicationContext = ApplicationContext.builder(["my.host": "abc"]).start()
             def bean = factory.build(applicationContext, beanDefinition)
 
         then:

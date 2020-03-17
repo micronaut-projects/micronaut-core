@@ -468,7 +468,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract Object readAnnotationValue(T originatingElement, T member, String memberName, Object annotationValue);
 
-
     /**
      * Read the raw default annotation values from the given annotation.
      *

@@ -15,10 +15,14 @@
  */
 package io.micronaut.inject.failures.ctorcirculardependency
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.exceptions.CircularDependencyException
 import spock.lang.Specification
+
+import javax.inject.Singleton
 
 class ConstructorCircularDependencyFailureSpec extends Specification {
 
@@ -43,5 +47,16 @@ B.a --> new A([C c]) --> new C([B b])
 |                                  |
 +----------------------------------+'''
     }
+
+    void "test multiple optionals do not cause a circular dependency exception"() {
+        ApplicationContext ctx = ApplicationContext.run()
+
+        when:
+        ctx.createBean(ParameterizedBean, "foo")
+
+        then:
+        noExceptionThrown()
+    }
+
 }
 

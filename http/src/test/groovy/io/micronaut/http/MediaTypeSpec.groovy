@@ -81,6 +81,7 @@ class MediaTypeSpec extends Specification {
         "application/hal+json"      | true
         "application/hal+xml"       | true
         "application/json"          | true
+        "application/x-yaml"         | true
         "application/xml"           | true
         "text/html;charset=utf-8"   | true
         "text/foo"                  | true

@@ -28,7 +28,7 @@ class BraveWithEurekaSpec extends Specification {
     void "test that brave does not cause early init of beans"() {
 
         given:
-        ApplicationContext ctx = ApplicationContext.build()
+        ApplicationContext ctx = ApplicationContext.builder()
             .properties(
                 'eureka.client.registration.enabled':true,
                 'eureka.client.defaultZone':'${EUREKA_HOST:localhost}:${EUREKA_PORT:9001}',

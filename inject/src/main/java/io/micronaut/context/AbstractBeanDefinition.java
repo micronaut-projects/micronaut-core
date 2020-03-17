@@ -1089,10 +1089,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 );
             }
 
-            path.pop();
             return result;
         } catch (NoSuchBeanException | BeanInstantiationException e) {
             throw new DependencyInjectionException(resolutionContext, argument, e);
+        } finally {
+            path.pop();
         }
     }
 

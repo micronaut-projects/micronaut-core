@@ -13,7 +13,7 @@ class DefaultEnvironmentSpec : StringSpec({
 
     // tag::disableEnvDeduction[]
     "test disable environment deduction via builder"() {
-        val ctx = ApplicationContext.build().deduceEnvironment(false).start()
+        val ctx = ApplicationContext.builder().deduceEnvironment(false).start()
         assertFalse(ctx.environment.activeNames.contains(Environment.TEST))
         ctx.close()
     }

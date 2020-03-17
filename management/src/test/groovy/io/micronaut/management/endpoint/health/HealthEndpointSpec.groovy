@@ -45,7 +45,7 @@ class HealthEndpointSpec extends Specification {
 
     void "test the beans are available"() {
         given:
-        ApplicationContext context = ApplicationContext.build("test").build()
+        ApplicationContext context = ApplicationContext.builder("test").build()
         context.registerSingleton(Mock(DataSource))
         context.start()
 

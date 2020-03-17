@@ -13,7 +13,7 @@ public class DefaultEnvironmentSpec {
     // tag::disableEnvDeduction[]
     @Test
     public void testDisableEnvironmentDeductionViaBuilder() {
-        ApplicationContext ctx = ApplicationContext.build().deduceEnvironment(false).start();
+        ApplicationContext ctx = ApplicationContext.builder().deduceEnvironment(false).start();
         assertFalse(ctx.getEnvironment().getActiveNames().contains(Environment.TEST));
         ctx.close();
     }
