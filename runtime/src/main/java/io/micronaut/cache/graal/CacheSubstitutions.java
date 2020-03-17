@@ -20,10 +20,18 @@ package io.micronaut.cache.graal;
 import com.oracle.svm.core.annotate.Alias;
 import com.oracle.svm.core.annotate.RecomputeFieldValue;
 import com.oracle.svm.core.annotate.TargetClass;
+import io.micronaut.core.annotation.TypeHint;
 
 /**
  * Substitutions for Caffeine UnsafeRefArrayAccess.
  */
+@TypeHint(
+        typeNames = {
+                "io.micronaut.caffeine.cache.SSLA",
+                "io.micronaut.caffeine.cache.PSW"
+        },
+        accessType = TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS
+)
 @TargetClass(className = "io.micronaut.caffeine.cache.UnsafeRefArrayAccess")
 final class Target_io_micronaut_caffeine_cache_UnsafeRefArrayAccess {
     @Alias
