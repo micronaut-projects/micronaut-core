@@ -47,14 +47,14 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
 
     private static final Logger LOG = LoggerFactory.getLogger(JacksonProcessor.class);
 
-    private NonBlockingJsonParser currentNonBlockingJsonParser;
+    private volatile NonBlockingJsonParser currentNonBlockingJsonParser;
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
     private final JsonFactory jsonFactory;
     private final @Nullable DeserializationConfig deserializationConfig;
-    private String currentFieldName;
-    private boolean streamArray;
-    private boolean rootIsArray;
-    private boolean jsonStream;
+    private volatile String currentFieldName;
+    private volatile boolean streamArray;
+    private volatile boolean rootIsArray;
+    private volatile boolean jsonStream;
 
     /**
      * Creates a new JacksonProcessor.
@@ -133,8 +133,13 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         if (needMoreInput()) {
             //if (LOG.isTraceEnabled()) {
                 LOG.trace("Complete called but need more input");
+                LOG.trace("Instance - {}", System.identityHashCode(this));
                 LOG.trace(nodeStack.toString());
-                try {
+                LOG.trace("byteFeeder = {}", System.identityHashCode(currentNonBlockingJsonParser.getNonBlockingInputFeeder()));
+                LOG.trace("byteFeeder without method = {}", System.identityHashCode(currentNonBlockingJsonParser));
+                new Exception().printStackTrace();
+
+            try {
                     Field field = ParserBase.class.getDeclaredField("_inputPtr");
                     field.setAccessible(true);
                     LOG.trace("inputPtr = {}", field.get(currentNonBlockingJsonParser.getNonBlockingInputFeeder()));
@@ -159,6 +164,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     @Override
     protected void onUpstreamMessage(byte[] message) {
         if (LOG.isTraceEnabled()) {
+            LOG.trace("Instance - {}", System.identityHashCode(this));
             LOG.trace("Upstream demand - {}", upstreamDemand);
             LOG.trace("Started processing - {}", System.identityHashCode(message));
         }
@@ -220,9 +226,25 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 }
                 event = currentNonBlockingJsonParser.nextToken();
             }
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("jsonStream - {}", jsonStream);
+                LOG.trace("nodestack empty - {}", nodeStack.isEmpty());
+                LOG.trace("need more input - {}", needMoreInput());
+            }
             if (jsonStream && nodeStack.isEmpty()) {
                 byteFeeder.endOfInput();
             }
+
+            try {
+                Field field = NonBlockingJsonParserBase.class.getDeclaredField("_endOfInput");
+                field.setAccessible(true);
+                LOG.trace("endOfInput = {}", field.get(byteFeeder));
+                LOG.trace("byteFeeder = {}", System.identityHashCode(byteFeeder));
+                LOG.trace("byteFeeder from parser = {}", System.identityHashCode(currentNonBlockingJsonParser.getNonBlockingInputFeeder()));
+            } catch (IllegalAccessException | NoSuchFieldException e) {
+                e.printStackTrace();
+            }
+
             if (jsonStream || needMoreInput()) {
                 if (LOG.isTraceEnabled()) {
                     LOG.trace("More input required to parse JSON. Demanding more.");

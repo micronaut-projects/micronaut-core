@@ -395,6 +395,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object message) {
         if (acceptInboundMessage(message)) {
+            doOnConsume(ctx);
             switch (state) {
                 case IDLE:
                     if (LOG.isTraceEnabled()) {
@@ -434,6 +435,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
         }
     }
 
+    protected void doOnConsume(ChannelHandlerContext ctx) {
+    }
+
     private Object messageForTrace(Object message) {
         Object msg = message;
         if (message instanceof HttpContent) {
@@ -444,6 +448,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
     }
 
     private void publishMessage(Object message) {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("HandlerPublisher (state: {}) publish message: {}", state, System.identityHashCode(this));
+        }
         if (COMPLETE.equals(message)) {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("HandlerPublisher (state: {}) complete. Calling onComplete()", state);
@@ -477,11 +484,17 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("HandlerPublisher (state: {}) channel inactive: {}", state, System.identityHashCode(this));
+        }
         complete();
     }
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("HandlerPublisher (state: {}) handler removed: {}", state, System.identityHashCode(this));
+        }
         complete();
     }
 

@@ -17,6 +17,8 @@ package io.micronaut.core.async.subscriber;
 
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
 import java.util.Queue;
@@ -30,6 +32,8 @@ import java.util.Queue;
  * @since 1.0
  */
 public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber<T>, Emitter<T> {
+    private static final Logger LOG = LoggerFactory.getLogger("io.micronaut.jackson.parser.JacksonProcessor");
+
     protected final Queue<T> upstreamBuffer = new LinkedList<>();
     protected volatile BackPressureState upstreamState = BackPressureState.NO_SUBSCRIBER;
     protected volatile long upstreamDemand = 0;
@@ -58,6 +62,8 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
 
     @Override
     public final void onComplete() {
+        LOG.trace("On complete");
+        LOG.trace("Upstream state = {}", upstreamState);
         switch (upstreamState) {
             case DONE:
                 return;
@@ -74,6 +80,8 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
 
     @Override
     public final void onNext(T message) {
+        LOG.trace("On Next");
+        LOG.trace("Upstream state = {}", upstreamState);
         switch (upstreamState) {
             case IDLE:
                 upstreamBuffer.add(message);

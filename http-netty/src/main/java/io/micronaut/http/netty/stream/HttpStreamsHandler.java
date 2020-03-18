@@ -63,7 +63,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      * This is used in conjunction with currentlyStreamedMessage, as well as in situations where we have received the
      * full body, but still might be expecting a last http content message.
      */
-    private boolean ignoreBodyRead;
+    private volatile boolean ignoreBodyRead;
 
     /**
      * Whether a LastHttpContent message needs to be written once the incoming publisher completes.
@@ -178,29 +178,38 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     @Override
     public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
-
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Reading message");
+        }
         if (isValidInMessage(msg)) {
 
             receivedInMessage(ctx);
             final In inMsg = inClass.cast(msg);
 
             if (inMsg instanceof FullHttpMessage) {
-
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("full message");
+                }
                 // Forward as is
                 ctx.fireChannelRead(inMsg);
                 consumedInMessage(ctx);
 
             } else if (!hasBody(inMsg)) {
-
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("empty message");
+                }
                 // Wrap in empty message
                 ctx.fireChannelRead(createEmptyMessage(inMsg));
                 consumedInMessage(ctx);
 
                 // There will be a LastHttpContent message coming after this, ignore it
+                LOG.trace("setting ignore body read to true (empty). instance = {}", System.identityHashCode(this));
                 ignoreBodyRead = true;
 
             } else {
-
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("streaming");
+                }
                 currentlyStreamedMessage = inMsg;
                 // It has a body, stream it
                 HandlerPublisher<HttpContent> publisher = new HandlerPublisher<HttpContent>(ctx.executor(), HttpContent.class) {
@@ -230,6 +239,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     private void handleCancelled(ChannelHandlerContext ctx, In msg) {
         if (currentlyStreamedMessage == msg) {
+            LOG.trace("setting ignore body read to true (cancelled). instance = {}", System.identityHashCode(this));
             ignoreBodyRead = true;
             // Need to do a read in case the subscriber ignored a read completed.
             if (LOG.isTraceEnabled()) {
@@ -244,6 +254,10 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     }
 
     private void handleReadHttpContent(ChannelHandlerContext ctx, HttpContent content) {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("content is last content = {}", content instanceof LastHttpContent);
+            LOG.trace("ignore body read = {}", ignoreBodyRead);
+        }
         if (!ignoreBodyRead) {
             ctx.fireChannelRead(content);
 
@@ -255,6 +269,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         } else {
             ReferenceCountUtil.release(content, content.refCnt());
             if (content instanceof LastHttpContent) {
+                LOG.trace("setting ignore body read to false (reset). instance = {}", System.identityHashCode(this));
                 ignoreBodyRead = false;
                 if (currentlyStreamedMessage != null) {
                     removeHandlerIfActive(ctx, ctx.name() + "-body-publisher");
@@ -268,6 +283,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         if (ignoreBodyRead) {
             ctx.read();
+            ignoreBodyRead = false;
         } else {
             ctx.fireChannelReadComplete();
         }
