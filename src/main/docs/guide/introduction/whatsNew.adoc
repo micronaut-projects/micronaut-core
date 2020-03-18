@@ -6,6 +6,14 @@ Micronaut's Netty-based HTTP client and server have been updated to support HTTP
 
 See the <<http2Server, HTTP/2 documentation>> for more information on how to enable support for HTTP/2.
 
+=== Threading Model and Event Loop Group Improvements
+
+Micronaut 2.0 uses a new shared default Netty `EventLoopGroup` for server worker threads and client request threads. This reduces context switching and improves resource utilization.
+
+See the <<clientConfiguration, HTTP Client Configuration>> section for information on how to configure the default `EventLoopGroup` and add additional `EventLoopGroup`'s that are configured per client.
+
+In addition, as of Micronaut 2.0 all operations are by default executed on the `EventLoop` and users can optionally use the new ann:scheduling.annotation.ExecuteOn[] annotation to specify a named executor to execute an operation on if required (for example to offload blocking operations such as interactions with JPA/JDBC to a specific thread pool).
+
 === Micronaut Servlet
 
 Micronaut now includes support for creating https://github.com/micronaut-projects/micronaut-servlet[Servlet applications] and users can use the command line to create an application that targets popular Servlet containers:
@@ -31,11 +39,6 @@ Micronaut will now process the `VCAP_APPLICATION` and `VCAP_SERVICES` environmen
 
 Thanks to https://github.com/fnonnenmacher[Fabian Nonnenmacher] for this contribution.
 
-=== Event Loop Group Improvements
-
-Micronaut 2.0 uses a new shared default Netty `EventLoopGroup` for server worker threads and client request threads. This reduces context switching and improves resource utilization.
-
-See the <<clientConfiguration, HTTP Client Configuration>> section for information on how to configure the default `EventLoopGroup` and add additional `EventLoopGroup`'s that are configured per client.
 
 === HTTP Client Improvements
 
@@ -56,6 +59,15 @@ Due to the fact that JSR-305 has been cancelled and that this dependency has pot
 
 It is recommended users of Micronaut use this API instead (although the `javax.annotation.Nullable` and `javax.annotation.NotNull` annotations continue to be supported).
 
+==== Micronaut SQL 2.0.0 Upgrade
+
+Micronaut SQL has been improved to default to Micronaut transaction management (making Spring management optional) and includes https://micronaut-projects.github.io/micronaut-sql/2.0.x/guide/#jdbi[support for Jdbi] (Thanks to https://github.com/drmaas[Dan Maas] for this contirubtion).
+
 ==== Module Upgrades
 
 * Micronaut Neo4j - `1.3.0` -> `2.0.0`
+* Micronaut SQL - `1.3.0` -> `2.0.0.M1`
+
+==== Dependency Upgrades
+
+* Hibernate `5.4.10.Final` -> `5.4.12.Final`
