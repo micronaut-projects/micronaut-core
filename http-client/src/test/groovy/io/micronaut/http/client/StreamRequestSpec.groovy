@@ -122,21 +122,6 @@ class StreamRequestSpec extends Specification {
         client.close()
     }
 
-    void "test stream get request with JSON strings"() {
-        given:
-        RxStreamingHttpClient client = RxStreamingHttpClient.create(embeddedServer.getURL())
-
-        when:
-        HttpResponse<?> result = client.exchangeStream(HttpRequest.GET('/stream/request/jsonstrings')).blockingFirst()
-
-        then:
-        result.headers.getAll(HttpHeaders.TRANSFER_ENCODING).size() == 1
-
-        cleanup:
-        client.stop()
-        client.close()
-    }
-
     void "test stream post request with byte chunks"() {
         when:
         int i = 0
