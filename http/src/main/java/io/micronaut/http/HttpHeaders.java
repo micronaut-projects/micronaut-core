@@ -360,6 +360,11 @@ public interface HttpHeaders extends Headers {
     String SET_COOKIE2 = "Set-Cookie2";
 
     /**
+     * {@code "Source-Map"}.
+     */
+    String SOURCE_MAP = "SourceMap";
+
+    /**
      * {@code "TE"}.
      */
     String TE = "TE";
