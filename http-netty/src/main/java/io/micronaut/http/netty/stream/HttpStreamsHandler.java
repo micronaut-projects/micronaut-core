@@ -268,6 +268,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         if (ignoreBodyRead) {
             ctx.read();
+            ignoreBodyRead = false;
         } else {
             ctx.fireChannelReadComplete();
         }
