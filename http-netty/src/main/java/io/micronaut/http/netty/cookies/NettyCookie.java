@@ -17,10 +17,14 @@ package io.micronaut.http.netty.cookies;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.SameSite;
 import io.netty.handler.codec.http.cookie.DefaultCookie;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * A wrapper around a Netty cookie.
@@ -96,6 +100,25 @@ public class NettyCookie implements Cookie {
     @Override
     public @Nonnull Cookie maxAge(long maxAge) {
         nettyCookie.setMaxAge(maxAge);
+        return this;
+    }
+
+    @Override
+    public Optional<SameSite> getSameSite() {
+        if (nettyCookie instanceof io.netty.handler.codec.http.cookie.DefaultCookie) {
+            io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite sameSite = ((io.netty.handler.codec.http.cookie.DefaultCookie) nettyCookie).sameSite();
+            if (sameSite != null) {
+                return Optional.of(SameSite.valueOf(sameSite.name()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public @Nonnull Cookie sameSite(@Nullable SameSite sameSite) {
+        if (nettyCookie instanceof io.netty.handler.codec.http.cookie.DefaultCookie) {
+            ((io.netty.handler.codec.http.cookie.DefaultCookie) nettyCookie).setSameSite(sameSite == null ? null : io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite.valueOf(sameSite.name()));
+        }
         return this;
     }
 

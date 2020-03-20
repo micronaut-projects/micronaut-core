@@ -63,4 +63,11 @@ public interface CookieConfiguration {
      * @return The max age to use for the cookie
      */
     Optional<TemporalAmount> getCookieMaxAge();
+
+    /**
+     * @return return the SameSite to use for the cookie.
+     */
+    default Optional<SameSite> getCookieSameSite() {
+        return Optional.empty();
+    }
 }
