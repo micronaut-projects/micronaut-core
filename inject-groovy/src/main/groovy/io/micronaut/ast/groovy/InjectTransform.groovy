@@ -1665,7 +1665,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 genericTypeMap
                         )
                         beanWriter.setValidated(
-                                qualifierTypes.values().any { it.hasStereotype(ANN_CONSTRAINT) || it.hasStereotype(ANN_VALID) }
+                                qualifierTypes.values().any { AnnotationMetadata am -> am.hasStereotype(ANN_CONSTRAINT.toString()) || am.hasStereotype(ANN_VALID.toString()) }
                         )
                     } else {
                         addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", classNode)

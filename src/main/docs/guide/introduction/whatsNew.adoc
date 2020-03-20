@@ -1,5 +1,9 @@
 Micronaut {version} includes the following changes:
 
+=== Support for JDK 14
+
+Micronaut has been updated to support JDK 14.
+
 === Support for HTTP/2
 
 Micronaut's Netty-based HTTP client and server have been updated to support HTTP/2.
@@ -71,3 +75,4 @@ Micronaut SQL has been improved to default to Micronaut transaction management (
 ==== Dependency Upgrades
 
 * Hibernate `5.4.10.Final` -> `5.4.12.Final`
+* Groovy `2.5.8` -> `2.5.10`
