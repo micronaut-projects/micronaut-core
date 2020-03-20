@@ -215,6 +215,11 @@ public interface HttpHeaders extends Headers {
     String EXPIRES = "Expires";
 
     /**
+     * {@code "Feature-Policy"}.
+     */
+    String FEATURE_POLICY = "Feature-Policy";
+
+    /**
      * {@code "Forwarded"}.
      */
     String FORWARDED = "Forwarded";
