@@ -21,7 +21,7 @@ import javax.inject.Singleton
 @Singleton
 class V6Engine : Engine {  // <2>
 
-    override var cylinders: Int = 6
+    override val cylinders: Int = 6
 
     override fun start(): String {
         return "Starting V6"
