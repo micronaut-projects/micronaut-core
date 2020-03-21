@@ -16,9 +16,11 @@
 package io.micronaut.http.simple.cookies;
 
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.SameSite;
 
 import javax.annotation.Nonnull;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Simple {@link Cookie} implementation.
@@ -35,6 +37,7 @@ public class SimpleCookie implements Cookie {
     private boolean httpOnly;
     private boolean secure;
     private long maxAge;
+    private SameSite sameSite;
 
     /**
      * Constructor.
@@ -80,6 +83,17 @@ public class SimpleCookie implements Cookie {
     @Override
     public long getMaxAge() {
         return maxAge;
+    }
+
+    @Override
+    public Optional<SameSite> getSameSite() {
+         return Optional.ofNullable(sameSite);
+    }
+
+    @Override
+    public @Nonnull Cookie sameSite(SameSite sameSite) {
+        this.sameSite = sameSite;
+        return this;
     }
 
     @Override
@@ -214,6 +228,9 @@ public class SimpleCookie implements Cookie {
         }
         if (isHttpOnly()) {
             buf.append(", HTTPOnly");
+        }
+        if (getSameSite().isPresent()) {
+            buf.append(", SameSite=").append(getSameSite().get());
         }
         return buf.toString();
     }

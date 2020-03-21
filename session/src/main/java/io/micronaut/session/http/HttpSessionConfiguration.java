@@ -18,6 +18,7 @@ package io.micronaut.session.http;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.cookie.CookieConfiguration;
+import io.micronaut.http.cookie.SameSite;
 import io.micronaut.session.SessionConfiguration;
 
 import java.time.Duration;
@@ -61,6 +62,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
     private boolean base64Encode = DEFAULT_BASE64ENCODE;
     private Duration cookieMaxAge;
     private Boolean cookieSecure;
+    private SameSite sameSite;
     private String cookiePath = DEFAULT_COOKIEPATH;
     private String domainName;
     private String cookieName = DEFAULT_COOKIENAME;
@@ -168,7 +170,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
      * @param cookieDomain Set the domain name to use for the cookie
      */
     public void setCookieDomain(String cookieDomain) {
-        this.domainName = domainName;
+        this.domainName = cookieDomain;
     }
 
     /**
@@ -215,5 +217,23 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
      */
     public void setCookieSecure(Boolean cookieSecure) {
         this.cookieSecure = cookieSecure;
+    }
+
+    /**
+     * @return return the SameSite to use for the cookie.
+     */
+    @Override
+    public Optional<SameSite> getCookieSameSite() {
+        return Optional.ofNullable(sameSite);
+    }
+
+    /**
+     * Determines if this this {@link Cookie} can be sent along cross-site requests.
+     * For more information, please look
+     *  <a href="https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-05">here</a>
+     * @param sameSite SameSite value
+     */
+    public void setCookieSameSite(SameSite sameSite) {
+        this.sameSite = sameSite;
     }
 }

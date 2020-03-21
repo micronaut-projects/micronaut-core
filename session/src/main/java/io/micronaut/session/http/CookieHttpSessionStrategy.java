@@ -113,6 +113,7 @@ public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
 
         configuration.getCookiePath().ifPresent(cookie::path);
         configuration.getDomainName().ifPresent(cookie::domain);
+        configuration.getCookieSameSite().ifPresent(cookie::sameSite);
 
         response.cookie(cookie);
     }
