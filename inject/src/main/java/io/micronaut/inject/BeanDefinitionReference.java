@@ -80,6 +80,7 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
 
     /**
      * @return Is this bean a singleton.
+     * @since 2.0
      */
     default boolean isSingleton() {
         AnnotationMetadata am = getAnnotationMetadata();
@@ -89,6 +90,7 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
 
     /**
      * @return Is this bean a configuration properties.
+     * @since 2.0
      */
     default  boolean isConfigurationProperties() {
         return getAnnotationMetadata().hasDeclaredStereotype(ConfigurationReader.class);
