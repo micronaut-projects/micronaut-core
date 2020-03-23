@@ -62,7 +62,6 @@ import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
@@ -761,7 +760,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 postConstructInstanceIndex,
                 ADD_POST_CONSTRUCT_METHOD);
     }
-
 
     /**
      * Visits a pre-destroy method injection point.
