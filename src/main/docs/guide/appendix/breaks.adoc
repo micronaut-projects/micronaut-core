@@ -16,6 +16,12 @@ snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,
 
 NOTE: If you wish to return to the previous behaviour as defined in Micronaut 1.x you can set `micronaut.server.thread-selection` to `AUTO` in configuration.
 
+=== Support for RxJava 1.x Removed from Core
+
+RxJava 1.x support is no longer included in core by default. You can re-enable suppot by adding the following dependency:
+
+dependency:io.micronaut.rxjava1:micronaut-rxjava1[scope="compile", version="1.0.0"]
+
 === Server Side Content Negotiation May Require Test Changes
 
 The new support for server side content negotiation may require changes to tests. For example a test that that makes a call such as:
