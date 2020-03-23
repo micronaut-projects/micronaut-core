@@ -392,7 +392,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter implement
 
         Type superType = Type.getType(AbstractBeanIntrospectionReference.class);
         final String referenceName = targetClassType.getClassName();
-        classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, referenceName, getOriginatingElement());
+        classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, referenceName);
 
         try (OutputStream referenceStream = classWriterOutputVisitor.visitClass(referenceName, getOriginatingElement())) {
             startPublicFinalClass(referenceWriter, targetClassType.getInternalName(), superType);

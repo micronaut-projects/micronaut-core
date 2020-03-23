@@ -35,6 +35,7 @@ import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.util.Context;
+import io.micronaut.annotation.processing.MetadataProcessor;
 import io.micronaut.annotation.processing.PackageConfigurationInjectProcessor;
 import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
@@ -130,6 +131,7 @@ public final class Parser {
             processors.add(new TypeElementVisitorProcessor());
             processors.add(new PackageConfigurationInjectProcessor());
             processors.add(new BeanDefinitionInjectProcessor());
+            processors.add(new MetadataProcessor());
             task.setProcessors(processors);
             task.generate();
 

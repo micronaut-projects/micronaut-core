@@ -35,7 +35,6 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
-import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessedTypes;
@@ -197,46 +196,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         processing round.
         */
         if (processingOver) {
-            try {
-                writeConfigurationMetadata();
-                writeBeanDefinitionsToMetaInf();
-            } finally {
-                AnnotationUtils.invalidateCache();
-                AbstractAnnotationMetadataBuilder.clearMutated();
-            }
+            MetadataProcessor.setMetadataBuilder(metadataBuilder);
+            MetadataProcessor.setOutputVisitor(classWriterOutputVisitor);
+            AnnotationUtils.invalidateCache();
+            AbstractAnnotationMetadataBuilder.clearMutated();
         }
 
         return false;
-    }
-
-    private void writeConfigurationMetadata() {
-        if (metadataBuilder.hasMetadata()) {
-            ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
-
-            try {
-                for (ConfigurationMetadataWriter writer : writers) {
-                    try {
-                        writer.write(metadataBuilder, classWriterOutputVisitor);
-                    } catch (IOException e) {
-                        error("Error occurred writing configuration metadata: %s", e.getMessage());
-                    }
-                }
-            } catch (ServiceConfigurationError e) {
-                warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
-            }
-        }
-    }
-
-    /**
-     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io.micronaut.inject.BeanDefinitionReference.
-     */
-    private void writeBeanDefinitionsToMetaInf() {
-        try {
-            classWriterOutputVisitor.finish();
-        } catch (Exception e) {
-            String message = e.getMessage();
-            error("Error occurred writing META-INF files: %s", message != null ? message : e);
-        }
     }
 
     private JavaClassElement newClassElement(TypeElement typeElement, AnnotationMetadata annotationMetadata) {

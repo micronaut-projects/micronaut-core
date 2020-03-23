@@ -87,9 +87,7 @@ public interface ClassWriterOutputVisitor {
      * @param path               The path to the file
      * @return An optional file it was possible to create it
      * @throws IOException If the file couldn't be created
-     * @deprecated Use {@link #visitMetaInfFile(String, Element)}
      */
-    @Deprecated
     Optional<GeneratedFile> visitMetaInfFile(String path);
 
     /**
@@ -147,9 +145,7 @@ public interface ClassWriterOutputVisitor {
      * @param type               The service type
      * @param classname          the fully qualified classname
      * @throws IOException If the file couldn't be created
-     * @deprecated Use @deprecated Use {@link #visitServiceDescriptor(Class, String, Element)}
      */
-    @Deprecated
     default void visitServiceDescriptor(Class type, String classname) {
         visitServiceDescriptor(type.getName(), classname, null);
     }
