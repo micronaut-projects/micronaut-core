@@ -47,11 +47,37 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private List<String> envVarIncludes = new ArrayList<>();
     private List<String> envVarExcludes = new ArrayList<>();
     private String[] args = new String[0];
+    private boolean eagerInitConfiguration;
+    private boolean eagerInitSingletons;
 
     /**
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
+    }
+
+    @Override
+    public boolean isEagerInitSingletons() {
+        return eagerInitSingletons;
+    }
+
+    @Override
+    public boolean isEagerInitConfiguration() {
+        return eagerInitSingletons;
+    }
+
+    @NonNull
+    @Override
+    public ApplicationContextBuilder eagerInitConfiguration(boolean eagerInitConfiguration) {
+        this.eagerInitConfiguration = eagerInitConfiguration;
+        return this;
+    }
+
+    @NonNull
+    @Override
+    public ApplicationContextBuilder eagerInitSingletons(boolean eagerInitSingletons) {
+        this.eagerInitSingletons = eagerInitSingletons;
+        return this;
     }
 
     @Override

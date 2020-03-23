@@ -1,16 +1,77 @@
 Micronaut {version} includes the following changes:
 
-=== Support for JDK 14
+=== Core Features
+
+==== Support for JDK 14
 
 Micronaut has been updated to support JDK 14.
 
-=== Support for HTTP/2
+==== Support for Analyzing the Injection Point
+
+Micronaut's Dependency Injection implementation has been improved such that you can now receive an api:inject.InjectionPoint[] instance to any ann:context.annotation.Factory[] method. This makes it possible to customize how the bean is created based on the annotation metadata at the point at which the bean is injected.
+
+For example consider the following definition:
+
+[source,java]
+----
+@Inject @Client("http://foo.com") RxHttpClient client;
+----
+
+A factory method can receive the injection point and create a client based off of the value:
+
+[source,java]
+----
+@Bean
+protected DefaultHttpClient httpClient(InjectionPoint<?> injectionPoint) {
+    String url = metadata.stringValue(Client.class).orElse(null);
+    if (url != null) {
+        return new DefaultHttpClient(url);
+    } else {
+        return new DefaultHttpClient();
+    }
+}
+----
+
+==== Support for Eager Initialization of Beans
+
+Eager initialization of beans is useful in certain cases, such as on AWS Lambda where more CPU resources are assigned to Lamdba construction than execution. Therefore as for Micronaut 2.0, you can specify whether you want to eager initialization configuration or all singletons using the api:context.ApplicationContextBuilder[] interface:
+
+.Enabling Eager Initialization
+[source,java]
+----
+public class Application {
+
+    public static void main(String[] args) {
+        Micronaut.build(args)
+            .eagerInitSingletons(true) // <1>
+            .mainClass(Application.class)
+            .start();
+    }
+}
+----
+
+<1> Setting eager init to true initializes all singletons
+
+It is also possible to just eager init configuration using `eagerInitConfiguration` which will initialize all ann:context.annotation.ConfigurationProperties[] beans.
+
+==== Spot Bugs Instead of JSR-305 Nullable/NonNull Annotations
+
+In Micronaut 1.x the Google distributed JSR-305 annotations library (`com.google.code.findbugs:jsr305`) was used to specify `@Nullable` and `@NonNull` on interfaces of the Micronaut API using the annotations contained within the `javax.annotation` package.
+
+Due to the fact that JSR-305 has been cancelled and that this dependency has potential licensing issues (by using the `javax` namespace) as well as problems with the cross packages on Java 9+ with the module system Micronaut 2.x switches to the `spotbugs-annotations` module provided by the https://spotbugs.github.io/[SpotBugs project].
+
+It is recommended users of Micronaut use this API instead (although the `javax.annotation.Nullable` and `javax.annotation.NotNull` annotations continue to be supported).
+
+=== HTTP Features
+
+==== Support for HTTP/2
 
 Micronaut's Netty-based HTTP client and server have been updated to support HTTP/2.
 
 See the <<http2Server, HTTP/2 documentation>> for more information on how to enable support for HTTP/2.
 
-=== Threading Model and Event Loop Group Improvements
+
+==== Threading Model and Event Loop Group Improvements
 
 Micronaut 2.0 uses a new shared default Netty `EventLoopGroup` for server worker threads and client request threads. This reduces context switching and improves resource utilization.
 
@@ -18,7 +79,7 @@ See the <<clientConfiguration, HTTP Client Configuration>> section for informati
 
 In addition, as of Micronaut 2.0 all operations are by default executed on the `EventLoop` and users can optionally use the new ann:scheduling.annotation.ExecuteOn[] annotation to specify a named executor to execute an operation on if required (for example to offload blocking operations such as interactions with JPA/JDBC to a specific thread pool).
 
-=== Micronaut Servlet
+==== Micronaut Servlet
 
 Micronaut now includes support for creating https://github.com/micronaut-projects/micronaut-servlet[Servlet applications] and users can use the command line to create an application that targets popular Servlet containers:
 
@@ -29,7 +90,7 @@ $ mn create-app myapp --features tomcat-server   # for Tomcat
 $ mn create-app myapp --features undertow-server # for Undertow
 ----
 
-=== Improved Support for Server-Side Content Negotiation
+==== Improved Support for Server-Side Content Negotiation
 
 Micronaut will now correctly handle the HTTP `Accept` header and pick the most appropriate route for the specified accepted media types using https://developer.mozilla.org/en-US/docs/Web/HTTP/Content_negotiation[Server-Side Content Negotiation].
 
@@ -37,14 +98,14 @@ NOTE: This also applies to `@Error` routes making it possible to send different 
 
 TIP: To add XML support use the https://github.com/micronaut-projects/micronaut-jackson-xml[Jackson XML] module
 
-=== Improved Support for Cloud Foundry
+==== Improved Support for Cloud Foundry
 
 Micronaut will now process the `VCAP_APPLICATION` and `VCAP_SERVICES` environment variables and treat them as property sources.
 
 Thanks to https://github.com/fnonnenmacher[Fabian Nonnenmacher] for this contribution.
 
 
-=== HTTP Client Improvements
+==== HTTP Client Improvements
 
 It is no longer necessary to use `@Client(..)` to inject a default api:http.client.RxHttpClient[] instance. You can now inject the default client simply with:
 
@@ -55,13 +116,7 @@ It is no longer necessary to use `@Client(..)` to inject a default api:http.clie
 
 If no host is provided at the time of a request, a api:http.client.exceptions.NoHostException[] will be thrown.
 
-=== Spot Bugs Instead of JSR-305 Nullable/NonNull Annotations
-
-In Micronaut 1.x the Google distributed JSR-305 annotations library (`com.google.code.findbugs:jsr305`) was used to specify `@Nullable` and `@NonNull` on interfaces of the Micronaut API using the annotations contained within the `javax.annotation` package.
-
-Due to the fact that JSR-305 has been cancelled and that this dependency has potential licensing issues (by using the `javax` namespace) as well as problems with the cross packages on Java 9+ with the module system Micronaut 2.x switches to the `spotbugs-annotations` module provided by the https://spotbugs.github.io/[SpotBugs project].
-
-It is recommended users of Micronaut use this API instead (although the `javax.annotation.Nullable` and `javax.annotation.NotNull` annotations continue to be supported).
+=== Other Improvements
 
 ==== Micronaut SQL 2.0.0 Upgrade
 

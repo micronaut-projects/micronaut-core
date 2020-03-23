@@ -109,6 +109,8 @@ public class DefaultBeanContext implements BeanContext {
     final Map<BeanKey, Object> scopedProxies = new ConcurrentHashMap<>(20);
     Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
 
+    private final boolean eagerInitConfig;
+    private final boolean eagerInitSingletons;
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     private final Map<String, BeanConfiguration> beanConfigurations = new HashMap<>(10);
     private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
@@ -183,6 +185,8 @@ public class DefaultBeanContext implements BeanContext {
         System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, "true");
         this.classLoader = contextConfiguration.getClassLoader();
         this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
+        this.eagerInitSingletons = contextConfiguration.isEagerInitSingletons();
+        this.eagerInitConfig = contextConfiguration.isEagerInitConfiguration();
     }
 
     @Override
@@ -2569,7 +2573,7 @@ public class DefaultBeanContext implements BeanContext {
                     }
                 }
             }
-            if (beanDefinitionReference.isContextScope()) {
+            if (isEagerInit(beanDefinitionReference)) {
                 contextScopeBeans.add(beanDefinitionReference);
             }
             if (beanDefinitionReference.requiresMethodProcessing()) {
@@ -2579,6 +2583,12 @@ public class DefaultBeanContext implements BeanContext {
 
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans);
+    }
+
+    private boolean isEagerInit(BeanDefinitionReference beanDefinitionReference) {
+        return beanDefinitionReference.isContextScope() ||
+                (eagerInitSingletons && beanDefinitionReference.isSingleton()) ||
+                (eagerInitConfig && beanDefinitionReference.isConfigurationProperties());
     }
 
     @NonNull
