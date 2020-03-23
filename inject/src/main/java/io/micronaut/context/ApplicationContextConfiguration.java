@@ -82,5 +82,4 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     default @NonNull ClassPathResourceLoader getResourceLoader() {
         return ClassPathResourceLoader.defaultLoader(getClassLoader());
     }
-
 }

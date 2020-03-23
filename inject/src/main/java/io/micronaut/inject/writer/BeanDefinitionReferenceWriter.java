@@ -16,6 +16,8 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractBeanDefinitionReference;
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
@@ -24,6 +26,7 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
+import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.OutputStream;
 
@@ -177,6 +180,11 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         }
 
         writeGetAnnotationMetadataMethod(classWriter);
+        writeBooleanMethod(classWriter, "isSingleton", () ->
+                annotationMetadata.hasDeclaredStereotype(Singleton.class) ||
+                        annotationMetadata.classValue(DefaultScope.class).map(t -> t == Singleton.class).orElse(false));
+        writeBooleanMethod(classWriter, "isConfigurationProperties", () ->
+                annotationMetadata.hasDeclaredStereotype(ConfigurationReader.class));
 
         for (GeneratorAdapter generatorAdapter : loadTypeMethods.values()) {
             generatorAdapter.visitMaxs(3, 1);

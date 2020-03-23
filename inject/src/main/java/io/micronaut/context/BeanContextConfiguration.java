@@ -32,4 +32,22 @@ public interface BeanContextConfiguration {
     default @NonNull ClassLoader getClassLoader() {
         return ApplicationContextConfiguration.class.getClassLoader();
     }
+
+    /**
+     * Whether eager initialization of singletons is enabled.
+     * @return True if eager initialization of singletons is enabled
+     * @since 2.0
+     */
+    default boolean isEagerInitSingletons() {
+        return false;
+    }
+
+    /**
+     * Whether eager initialization of {@link io.micronaut.context.annotation.ConfigurationProperties} is enabled.
+     * @return True if eager initialization of configuration is enabled
+     * @since 2.0
+     */
+    default boolean isEagerInitConfiguration() {
+        return false;
+    }
 }
