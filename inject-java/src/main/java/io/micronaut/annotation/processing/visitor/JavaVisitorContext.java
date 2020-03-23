@@ -182,8 +182,38 @@ public class JavaVisitorContext implements VisitorContext {
     }
 
     @Override
+    public OutputStream visitClass(String classname, io.micronaut.inject.ast.Element originatingElement) throws IOException {
+        return outputVisitor.visitClass(classname, originatingElement);
+    }
+
+    @Override
     public OutputStream visitClass(String classname) throws IOException {
-        return outputVisitor.visitClass(classname);
+        return outputVisitor.visitClass(classname, null);
+    }
+
+    @Override
+    public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
+        outputVisitor.visitServiceDescriptor(type, classname, originatingElement);
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitMetaInfFile(String path, io.micronaut.inject.ast.Element originatingElement) {
+        return outputVisitor.visitGeneratedFile(path, originatingElement);
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path, io.micronaut.inject.ast.Element originatingElement) {
+        return outputVisitor.visitGeneratedFile(path, originatingElement);
+    }
+
+    @Override
+    public void visitServiceDescriptor(Class type, String classname, io.micronaut.inject.ast.Element originatingElement) {
+        outputVisitor.visitServiceDescriptor(type, classname, originatingElement);
+    }
+
+    @Override
+    public void visitServiceDescriptor(Class type, String classname) {
+        outputVisitor.visitServiceDescriptor(type, classname);
     }
 
     @Override

@@ -23,6 +23,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementProcessor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -42,7 +44,7 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter implements Opcodes {
+public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter implements Opcodes, ElementProcessor {
 
     /**
      * Constant for parent field.
@@ -70,6 +72,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final boolean isInterface;
     private final boolean isAbstract;
     private final boolean isSuspend;
+    private final Element originatingElement;
     private String outerClassName = null;
     private boolean isStatic = false;
 
@@ -79,6 +82,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param methodProxyShortName The method proxy short name
      * @param isInterface          Whether is an interface
      * @param isSuspend            Whether the method is Kotlin suspend function
+     * @param originatingElement   The annotation metadata
      * @param annotationMetadata   The annotation metadata
      */
     public ExecutableMethodWriter(
@@ -87,6 +91,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             String methodProxyShortName,
             boolean isInterface,
             boolean isSuspend,
+            Element originatingElement,
             AnnotationMetadata annotationMetadata) {
         super(methodClassName, annotationMetadata, true);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -98,8 +103,8 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.isInterface = isInterface;
         this.isAbstract = isInterface;
         this.isSuspend = isSuspend;
+        this.originatingElement = originatingElement;
     }
-
 
     /**
      * @param beanFullClassName    The bean full class name
@@ -108,6 +113,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param isInterface          Whether is an interface
      * @param isAbstract           Whether the method is abstract
      * @param isSuspend            Whether the method is Kotlin suspend function
+     * @param originatingElement   The originating element
      * @param annotationMetadata   The annotation metadata
      */
     public ExecutableMethodWriter(
@@ -117,6 +123,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             boolean isInterface,
             boolean isAbstract,
             boolean isSuspend,
+            Element originatingElement,
             AnnotationMetadata annotationMetadata) {
         super(methodClassName, annotationMetadata, true);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -128,6 +135,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         this.isInterface = isInterface;
         this.isAbstract = isInterface || isAbstract;
         this.isSuspend = isSuspend;
+        this.originatingElement = originatingElement;
     }
 
     /**
@@ -365,7 +373,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className)) {
+        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, getOriginatingElement())) {
             outputStream.write(classWriter.toByteArray());
         }
     }
@@ -461,5 +469,10 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         getTargetMethod.returnValue();
         getTargetMethod.visitMaxs(1, 1);
         getTargetMethod.endMethod();
+    }
+
+    @Override
+    public Element getOriginatingElement() {
+        return originatingElement;
     }
 }

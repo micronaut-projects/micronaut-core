@@ -15,28 +15,15 @@
  */
 package io.micronaut.inject.ast;
 
-import org.jetbrains.annotations.NotNull;
-
-import javax.annotation.Nonnull;
-
 /**
- * Represents a parameter to a method or constructor.
+ * An interface for a processor that originates from an element within the AST.
  *
  * @author graemerocher
- * @since 1.0
+ * @since 1.3.4
  */
-public interface ParameterElement extends TypedElement {
-
+public interface ElementProcessor {
     /**
-     * Zero params.
+     * @return The originating element. Never null.
      */
-    ParameterElement[] ZERO_PARAMETERS = new ParameterElement[0];
-
-    /**
-     * @return The type of the parameter
-     */
-    @NotNull
-    @Override
-    @Nonnull
-    ClassElement getType();
+    Element getOriginatingElement();
 }

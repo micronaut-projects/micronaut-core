@@ -15,6 +15,8 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaClassElement;
+import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
@@ -237,6 +239,23 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
     }
 
+    private JavaClassElement newClassElement(TypeElement typeElement, AnnotationMetadata annotationMetadata) {
+        return new JavaClassElement(
+                typeElement,
+                annotationMetadata,
+                javaVisitorContext
+        );
+    }
+
+    private JavaMethodElement newMethodElement(TypeElement beanClass, ExecutableElement method, AnnotationMetadata annotationMetadata) {
+        return new JavaMethodElement(
+                newClassElement(beanClass, annotationMetadata),
+                method,
+                annotationMetadata,
+                javaVisitorContext
+        );
+    }
+
     private void processBeanDefinitions(TypeElement beanClassElement, BeanDefinitionVisitor beanDefinitionWriter) {
         try {
             beanDefinitionWriter.visitBeanDefinitionEnd();
@@ -266,7 +285,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             AnnotationMetadata annotationMetadata = beanDefinitionWriter.getAnnotationMetadata();
             BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                    new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionName, annotationMetadata);
+                    new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionName, annotationMetadata, newClassElement(beanClassElement, annotationMetadata));
             beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
 
             String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();
@@ -696,6 +715,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
 
 
+                    JavaMethodElement originatingElement = newMethodElement(
+                            classElement,
+                            method,
+                            annotationMetadata
+                    );
                     if (isAbstract) {
                         aopProxyWriter.visitIntroductionMethod(
                                 owningType,
@@ -707,6 +731,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
+                                originatingElement,
                                 annotationMetadata
                         );
                     } else {
@@ -721,6 +746,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
+                                originatingElement,
                                 annotationMetadata,
                                 JavaModelUtils.isInterface(method.getEnclosingElement())
                         );
@@ -937,7 +963,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             String producedTypeName = producedElement.getQualifiedName().toString();
             ExecutableElementParamInfo beanMethodParams = populateParameterData(producedTypeName, beanMethod, Collections.emptyMap());
 
-            BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(beanMethod, producedElement);
+            BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(concreteClass, beanMethod, producedElement);
 
             Map<String, Map<String, Object>> beanTypeArguments = null;
             if (returnType instanceof DeclaredType) {
@@ -1058,6 +1084,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             );
                         }
 
+                        JavaMethodElement originatingElement = newMethodElement(
+                                concreteClass,
+                                method,
+                                methodAnnotationMetadata
+                        );
                         ExecutableMethodWriter executableMethodWriter = beanMethodWriter.visitExecutableMethod(
                                 owningType,
                                 modelUtils.resolveTypeReference(returnTypeMirror),
@@ -1068,7 +1099,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                annotationMetadata,
+                                originatingElement,
+                                methodAnnotationMetadata,
                                 JavaModelUtils.isInterface(method.getEnclosingElement())
                         );
 
@@ -1082,6 +1114,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
+                                originatingElement,
                                 !isAnnotationReference ? new AnnotationMetadataReference(executableMethodWriter.getClassName(), annotationMetadata) : annotationMetadata,
                                 JavaModelUtils.isInterface(method.getEnclosingElement())
 
@@ -1139,7 +1172,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 genericParameters,
                                 methodQualifier,
                                 methodGenericTypes,
-                                annotationMetadata,
+                                newMethodElement(
+                                        concreteClass,
+                                        method,
+                                        methodAnnotationMetadata
+                                ),
+                                methodAnnotationMetadata,
                                 JavaModelUtils.isInterface(enclosingElement)
                         );
 
@@ -1224,6 +1262,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             final AopProxyWriter proxyWriter = resolveAopWriter(beanWriter);
             ExecutableMethodWriter executableMethodWriter = null;
+            JavaMethodElement methodElement = newMethodElement(
+                    concreteClass,
+                    method,
+                    methodAnnotationMetadata
+            );
             if (proxyWriter == null || proxyWriter.isProxyTarget()) {
                 executableMethodWriter = beanWriter.visitExecutableMethod(
                         typeRef,
@@ -1235,6 +1278,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         params.getGenericParameters(),
                         params.getParameterMetadata(),
                         params.getGenericTypes(),
+                        methodElement,
                         methodAnnotationMetadata,
                         JavaModelUtils.isInterface(enclosingElement));
             }
@@ -1297,6 +1341,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                             params.getGenericParameters(),
                                             params.getParameterMetadata(),
                                             params.getGenericTypes(),
+                                            methodElement,
                                             methodAnnotationMetadata,
                                             JavaModelUtils.isInterface(enclosingElement));
                                 }
@@ -1315,7 +1360,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 params.getGenericParameters(),
                                 params.getParameterMetadata(),
                                 params.getGenericTypes(),
-                                aroundMethodMetadata,
+                                methodElement,
+                                methodAnnotationMetadata,
                                 JavaModelUtils.isInterface(enclosingElement));
                     }
 
@@ -1330,6 +1376,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             params.getGenericParameters(),
                             params.getParameterMetadata(),
                             params.getGenericTypes(),
+                            methodElement,
                             methodAnnotationMetadata,
                             JavaModelUtils.isInterface(enclosingElement));
                 }
@@ -1366,9 +1413,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 beanClassName,
                                 true,
                                 false,
+                                newMethodElement(concreteClass, method, methodAnnotationMetadata),
                                 methodAnnotationMetadata,
                                 new Object[]{modelUtils.resolveTypeReference(typeToImplement)},
-                                ArrayUtils.EMPTY_OBJECT_ARRAY);
+                                ArrayUtils.EMPTY_OBJECT_ARRAY
+                        );
 
                         aopProxyWriter.visitBeanDefinitionConstructor(methodAnnotationMetadata, false);
 
@@ -1518,6 +1567,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                             genericParameters,
                                             methodQualifier,
                                             methodGenericTypes,
+                                            newMethodElement(
+                                                concreteClass,
+                                                method,
+                                                annotationMetadata
+                                            ),
                                             annotationMetadata,
                                             JavaModelUtils.isInterface(method.getEnclosingElement())
                                     );
@@ -2048,6 +2102,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             ? elementUtils.getBinaryName(typeElement).toString()
                             : providerTypeParam.toString(),
                     isInterface,
+                    newClassElement(typeElement, annotationMetadata),
                     annotationMetadata);
 
             visitTypeArguments(typeElement, beanDefinitionWriter);
@@ -2087,6 +2142,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     packageElement.getQualifiedName().toString(),
                     beanClassName,
                     isInterface,
+                    newClassElement(typeElement, annotationMetadata),
                     annotationMetadata,
                     interfaceTypes,
                     interceptorTypes);
@@ -2144,24 +2200,26 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
         }
 
-        private BeanDefinitionWriter createFactoryBeanMethodWriterFor(ExecutableElement method, TypeElement producedElement) {
+        private BeanDefinitionWriter createFactoryBeanMethodWriterFor(TypeElement beanClass, ExecutableElement method, TypeElement producedElement) {
             AnnotationMetadata annotationMetadata = annotationUtils.newAnnotationBuilder().buildForParent(producedElement, method, true);
             PackageElement producedPackageElement = elementUtils.getPackageOf(producedElement);
-            PackageElement definingPackageElement = elementUtils.getPackageOf(concreteClass);
+            PackageElement definingPackageElement = elementUtils.getPackageOf(this.concreteClass);
 
             boolean isInterface = JavaModelUtils.isInterface(producedElement);
             String packageName = producedPackageElement.getQualifiedName().toString();
             String beanDefinitionPackage = definingPackageElement.getQualifiedName().toString();
             String shortClassName = modelUtils.simpleBinaryNameFor(producedElement);
             String upperCaseMethodName = NameUtils.capitalize(method.getSimpleName().toString());
-            String factoryMethodBeanDefinitionName = beanDefinitionPackage + ".$" + concreteClass.getSimpleName().toString() + "$" + upperCaseMethodName + factoryMethodIndex.getAndIncrement() + "Definition";
+            String factoryMethodBeanDefinitionName = beanDefinitionPackage + ".$" + this.concreteClass.getSimpleName().toString() + "$" + upperCaseMethodName + factoryMethodIndex.getAndIncrement() + "Definition";
             return new BeanDefinitionWriter(
                     packageName,
                     shortClassName,
                     factoryMethodBeanDefinitionName,
                     modelUtils.resolveTypeReference(producedElement).toString(),
                     isInterface,
-                    annotationMetadata);
+                    newMethodElement(beanClass, method, annotationMetadata),
+                    annotationMetadata
+            );
         }
 
         private ExecutableElementParamInfo populateParameterData(@Nullable String declaringTypeName, ExecutableElement element, Map<String, Object> boundTypes) {

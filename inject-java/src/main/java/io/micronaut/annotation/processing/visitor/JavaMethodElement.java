@@ -38,7 +38,7 @@ import java.util.function.Function;
  * @since 1.0
  */
 @Internal
-class JavaMethodElement extends AbstractJavaElement implements MethodElement {
+public class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
     private final ExecutableElement executableElement;
     private final JavaVisitorContext visitorContext;
@@ -50,7 +50,7 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
      * @param annotationMetadata The annotation metadata
      * @param visitorContext The visitor context
      */
-    JavaMethodElement(
+    public JavaMethodElement(
             JavaClassElement declaringClass,
             ExecutableElement executableElement,
             AnnotationMetadata annotationMetadata,

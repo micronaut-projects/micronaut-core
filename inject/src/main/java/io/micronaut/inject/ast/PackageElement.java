@@ -15,28 +15,11 @@
  */
 package io.micronaut.inject.ast;
 
-import org.jetbrains.annotations.NotNull;
-
-import javax.annotation.Nonnull;
-
 /**
- * Represents a parameter to a method or constructor.
+ * Represents a package.
  *
  * @author graemerocher
- * @since 1.0
+ * @since 1.3.4
  */
-public interface ParameterElement extends TypedElement {
-
-    /**
-     * Zero params.
-     */
-    ParameterElement[] ZERO_PARAMETERS = new ParameterElement[0];
-
-    /**
-     * @return The type of the parameter
-     */
-    @NotNull
-    @Override
-    @Nonnull
-    ClassElement getType();
+public interface PackageElement extends Element {
 }

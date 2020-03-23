@@ -19,6 +19,8 @@ import io.micronaut.context.AbstractBeanConfiguration;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementProcessor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -35,7 +37,7 @@ import java.io.OutputStream;
  * @since 1.0
  */
 @Internal
-public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
+public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter implements ElementProcessor {
 
     /**
      * Suffix for generated configuration classes.
@@ -44,25 +46,28 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
     private final String packageName;
     private final String configurationClassName;
     private final String configurationClassInternalName;
+    private final Element originatingElement;
 
     /**
      * @param packageName        The package name
      * @param annotationMetadata The annotation metadata
+     * @param originatingElement The originating element
      */
-    public BeanConfigurationWriter(String packageName, AnnotationMetadata annotationMetadata) {
+    public BeanConfigurationWriter(String packageName, AnnotationMetadata annotationMetadata, Element originatingElement) {
         super(packageName + '.' + CLASS_SUFFIX, annotationMetadata, true);
         this.packageName = packageName;
         this.configurationClassName = targetClassType.getClassName();
         this.configurationClassInternalName = targetClassType.getInternalName();
+        this.originatingElement = originatingElement;
     }
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName)) {
+        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName, getOriginatingElement())) {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }
-        classWriterOutputVisitor.visitServiceDescriptor(BeanConfiguration.class, configurationClassName);
+        classWriterOutputVisitor.visitServiceDescriptor(BeanConfiguration.class, configurationClassName, originatingElement);
     }
 
     private ClassWriter generateClassBytes() {
@@ -105,5 +110,10 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
         // MAXSTACK = 2
         // MAXLOCALS = 1
         cv.visitMaxs(2, 1);
+    }
+
+    @Override
+    public Element getOriginatingElement() {
+        return originatingElement;
     }
 }

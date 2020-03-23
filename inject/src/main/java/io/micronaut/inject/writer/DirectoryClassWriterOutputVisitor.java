@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.ast.Element;
 
 import java.io.File;
 import java.io.IOException;
@@ -42,13 +43,27 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
-    public OutputStream visitClass(String className) throws IOException {
+    public OutputStream visitClass(String className, Element originatingElement) throws IOException {
         File targetFile = new File(targetDir, getClassFileName(className)).getCanonicalFile();
         File parentDir = targetFile.getParentFile();
         if (!parentDir.exists() && !parentDir.mkdirs()) {
             throw new IOException("Cannot create parent directory: " + targetFile.getParentFile());
         }
         return Files.newOutputStream(targetFile.toPath());
+    }
+
+    @Override
+    public OutputStream visitClass(String classname) throws IOException {
+        return visitClass(classname, null);
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitMetaInfFile(String path, Element originatingElement) {
+        return Optional.ofNullable(targetDir).map(root ->
+                new FileBackedGeneratedFile(
+                        new File(root, "META-INF" + File.separator + path)
+                )
+        );
     }
 
     @Override
@@ -61,7 +76,7 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
-    public Optional<GeneratedFile> visitGeneratedFile(String path) {
+    public Optional<GeneratedFile> visitGeneratedFile(String path, Element originatingElement) {
         File parentFile = targetDir.getParentFile();
         File generatedDir = new File(parentFile, "generated");
         File f = new File(generatedDir, path);
@@ -69,6 +84,11 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
             return Optional.of(new FileBackedGeneratedFile(f));
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path) {
+        return visitGeneratedFile(path, null);
     }
 
     private String getClassFileName(String className) {

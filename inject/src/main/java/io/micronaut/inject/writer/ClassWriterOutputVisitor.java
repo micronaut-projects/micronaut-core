@@ -15,6 +15,8 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.inject.ast.Element;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collections;
@@ -33,37 +35,82 @@ public interface ClassWriterOutputVisitor {
      * Visits a new class and returns the output stream with which should be written the bytes of the class to be
      * generated.
      *
-     * @param classname the fully qualified classname
+     * @param classname          the fully qualified classname
+     * @param originatingElement The originating element
      * @return the output stream to write to
      * @throws IOException if an error occurs creating the output stream
      */
+    default OutputStream visitClass(String classname, Element originatingElement) throws IOException {
+        return visitClass(classname);
+    }
+
+
+    /**
+     * Visits a new class and returns the output stream with which should be written the bytes of the class to be
+     * generated.
+     *
+     * @param classname          the fully qualified classname
+     * @return the output stream to write to
+     * @throws IOException if an error occurs creating the output stream
+     * @deprecated Use {@link #visitClass(String, Element)}
+     */
+    @Deprecated
     OutputStream visitClass(String classname) throws IOException;
 
     /**
      * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
      * name.
      *
-     * @param type      the fully qualified service name
-     * @param classname the fully qualified classname
+     * @param type               the fully qualified service name
+     * @param classname          the fully qualified classname
+     * @param originatingElement The originating element
      * @throws IOException If the file couldn't be created
      */
-    void visitServiceDescriptor(String type, String classname);
+    void visitServiceDescriptor(String type, String classname, Element originatingElement);
 
     /**
      * Visit a file within the META-INF directory of the classes directory.
      *
-     * @param path The path to the file
+     * @param path               The path to the file
+     * @param originatingElement The originating element
      * @return An optional file it was possible to create it
      * @throws IOException If the file couldn't be created
      */
+    default Optional<GeneratedFile> visitMetaInfFile(String path, Element originatingElement) {
+        return visitMetaInfFile(path);
+    }
+
+
+    /**
+     * Visit a file within the META-INF directory of the classes directory.
+     *
+     * @param path               The path to the file
+     * @return An optional file it was possible to create it
+     * @throws IOException If the file couldn't be created
+     * @deprecated Use {@link #visitMetaInfFile(String, Element)}
+     */
+    @Deprecated
     Optional<GeneratedFile> visitMetaInfFile(String path);
 
     /**
      * Visit a file that will be generated within the generated sources directory.
      *
-     * @param path The path
+     * @param path               The path
+     * @param originatingElement The originating element
      * @return The file if it was possible to create it
      */
+    default Optional<GeneratedFile> visitGeneratedFile(String path, Element originatingElement) {
+        return visitGeneratedFile(path);
+    }
+
+    /**
+     * Visit a file that will be generated within the generated sources directory.
+     *
+     * @param path               The path
+     * @return The file if it was possible to create it
+     * @deprecated Use {@link #visitGeneratedFile(String, Element)}
+     */
+    @Deprecated
     Optional<GeneratedFile> visitGeneratedFile(String path);
 
     /**
@@ -84,11 +131,40 @@ public interface ClassWriterOutputVisitor {
      * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
      * name.
      *
-     * @param type      The service type
-     * @param classname the fully qualified classname
+     * @param type               The service type
+     * @param classname          the fully qualified classname
+     * @param originatingElement The originating element
      * @throws IOException If the file couldn't be created
      */
+    default void visitServiceDescriptor(Class type, String classname, Element originatingElement) {
+        visitServiceDescriptor(type.getName(), classname, originatingElement);
+    }
+
+    /**
+     * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
+     * name.
+     *
+     * @param type               The service type
+     * @param classname          the fully qualified classname
+     * @throws IOException If the file couldn't be created
+     * @deprecated Use @deprecated Use {@link #visitServiceDescriptor(Class, String, Element)}
+     */
+    @Deprecated
     default void visitServiceDescriptor(Class type, String classname) {
-        visitServiceDescriptor(type.getName(), classname);
+        visitServiceDescriptor(type.getName(), classname, null);
+    }
+
+    /**
+     * Allows adding a class that will be written to the {@code META-INF/services} file under the given type and class
+     * name.
+     *
+     * @param type               The service type
+     * @param classname          the fully qualified classname
+     * @throws IOException If the file couldn't be created
+     * @deprecated Use {@link #visitServiceDescriptor(String, String, Element)}
+     */
+    @Deprecated
+    default void visitServiceDescriptor(String type, String classname) {
+        visitServiceDescriptor(type, classname, null);
     }
 }

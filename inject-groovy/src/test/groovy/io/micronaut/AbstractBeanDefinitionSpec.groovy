@@ -22,6 +22,7 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.ast.Element
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
@@ -94,7 +95,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
 
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
         def stream = new ByteArrayOutputStream()
-        new AnnotationMetadataWriter(className, toWrite, true)
+        new AnnotationMetadataWriter(className, toWrite, Mock(Element), true)
                 .writeTo(stream)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
         ClassLoader classLoader = new ClassLoader() {

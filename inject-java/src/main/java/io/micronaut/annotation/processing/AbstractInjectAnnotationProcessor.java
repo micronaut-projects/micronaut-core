@@ -83,7 +83,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     public Set<String> getSupportedOptions() {
         final Set<String> options;
         if (incremental) {
-            options = CollectionUtils.setOf("org.gradle.annotation.processing.aggregating");
+            options = CollectionUtils.setOf("org.gradle.annotation.processing.isolating");
         } else {
             options = new HashSet<>(5);
         }

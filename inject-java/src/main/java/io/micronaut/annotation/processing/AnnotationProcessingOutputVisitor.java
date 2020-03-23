@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ClassGenerationException;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -55,22 +56,47 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     }
 
     @Override
+    public OutputStream visitClass(String classname, Element originatingElement) throws IOException {
+        if (originatingElement != null) {
+            javax.lang.model.element.Element nativeElement =
+                    (javax.lang.model.element.Element) originatingElement.getNativeType();
+            JavaFileObject javaFileObject = filer.createClassFile(classname, nativeElement);
+            return javaFileObject.openOutputStream();
+        } else {
+            JavaFileObject javaFileObject = filer.createClassFile(classname);
+            return javaFileObject.openOutputStream();
+        }
+    }
+
+    @Override
     public OutputStream visitClass(String classname) throws IOException {
-        JavaFileObject javaFileObject = filer.createClassFile(classname);
-        return javaFileObject.openOutputStream();
+        return visitClass(classname, null);
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitMetaInfFile(String path, Element originatingElement) {
+        return metaInfFiles.computeIfAbsent(path, s -> {
+            String finalPath = "META-INF/" + path;
+            return Optional.of(new GeneratedFileObject(finalPath, originatingElement));
+        });
     }
 
     @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path) {
         return metaInfFiles.computeIfAbsent(path, s -> {
             String finalPath = "META-INF/" + path;
-            return Optional.of(new GeneratedFileObject(finalPath));
+            return Optional.of(new GeneratedFileObject(finalPath, null));
         });
     }
 
     @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path, Element originatingElement) {
+        return generatedFiles.computeIfAbsent(path, s -> Optional.of(new GeneratedFileObject(path, StandardLocation.SOURCE_OUTPUT, originatingElement)));
+    }
+
+    @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
-        return generatedFiles.computeIfAbsent(path, s -> Optional.of(new GeneratedFileObject(path, StandardLocation.SOURCE_OUTPUT)));
+        return visitGeneratedFile(path, null);
     }
 
     private FileObject openFileForReading(String path) {
@@ -90,24 +116,29 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
         private final String path;
         private final StandardLocation classOutput;
+        private final Element originatingElement;
         private FileObject inputObject;
         private FileObject outputObject;
 
         /**
-         * @param path The path for the generated file
+         * @param path               The path for the generated file
+         * @param originatingElement The originating element
          */
-        GeneratedFileObject(String path) {
+        GeneratedFileObject(String path, Element originatingElement) {
             this.path = path;
+            this.originatingElement = originatingElement;
             classOutput = StandardLocation.CLASS_OUTPUT;
         }
 
         /**
-         * @param path The path for the generated file
+         * @param path     The path for the generated file
          * @param location The location
+         * @param originatingElement The originating element
          */
-        GeneratedFileObject(String path, StandardLocation location) {
+        GeneratedFileObject(String path, StandardLocation location, Element originatingElement) {
             this.path = path;
             this.classOutput = location;
+            this.originatingElement = originatingElement;
         }
 
         @Override
@@ -164,7 +195,11 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
         private FileObject getOutputObject() throws IOException {
             if (outputObject == null) {
-                outputObject = filer.createResource(classOutput, "", path);
+                if (originatingElement != null) {
+                    outputObject = filer.createResource(classOutput, "", path, (javax.lang.model.element.Element) originatingElement.getNativeType());
+                } else {
+                    outputObject = filer.createResource(classOutput, "", path);
+                }
             }
             return outputObject;
         }

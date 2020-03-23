@@ -19,9 +19,12 @@ import groovy.transform.CompileDynamic
 import io.micronaut.aop.Adapter
 import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
+import io.micronaut.ast.groovy.visitor.GroovyClassElement
+import io.micronaut.ast.groovy.visitor.GroovyMethodElement
+import io.micronaut.ast.groovy.visitor.GroovyPackageElement
+import io.micronaut.ast.groovy.visitor.GroovyPropertyMethodElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.annotation.ConfigurationInject
-import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.DefaultScope
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.PropertySource
@@ -32,6 +35,8 @@ import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.Element
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
@@ -149,7 +154,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (classNode.nameWithoutPackage == 'package-info') {
                 PackageNode packageNode = classNode.getPackage()
                 if (AstAnnotationUtils.hasStereotype(source, unit, packageNode, Configuration)) {
-                    BeanConfigurationWriter writer = new BeanConfigurationWriter(classNode.packageName, AstAnnotationUtils.getAnnotationMetadata(source, unit, packageNode))
+                    def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, unit, packageNode)
+                    BeanConfigurationWriter writer = new BeanConfigurationWriter(
+                            classNode.packageName,
+                            annotationMetadata,
+                            new GroovyPackageElement(packageNode, annotationMetadata)
+                    )
                     try {
                         writer.accept(outputVisitor)
                         outputVisitor.finish()
@@ -200,10 +210,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 }
 
+                ClassNode classNode
+                if (beanClassNode instanceof ClassNode) {
+                    classNode = (ClassNode) beanClassNode
+                } else {
+                    classNode = ClassHelper.make(beanTypeName)
+                }
+                def annotationMetadata = beanDefWriter.annotationMetadata
+                def classElement = newClassElement(source, classNode, annotationMetadata)
                 BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(
                         beanTypeName,
                         beanDefinitionName,
-                        beanDefWriter.annotationMetadata
+                        annotationMetadata,
+                        classElement
                 )
 
                 beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing())
@@ -219,6 +238,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     ClassWriterOutputVisitor visitor = new ClassWriterOutputVisitor() {
                         @Override
                         OutputStream visitClass(String classname) throws IOException {
+                            ByteArrayOutputStream stream = new ByteArrayOutputStream()
+                            classStreams.put(classname, stream)
+                            return stream
+                        }
+
+                        @Override
+                        void visitServiceDescriptor(String type, String classname, Element originatingElement) {
+                            // no-op
+                        }
+
+                        @Override
+                        OutputStream visitClass(String classname, Element originatingElement) throws IOException {
                             ByteArrayOutputStream stream = new ByteArrayOutputStream()
                             classStreams.put(classname, stream)
                             return stream
@@ -285,6 +316,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         AstAnnotationUtils.invalidateCache()
     }
 
+    @CompileDynamic
+    private GroovyClassElement newClassElement(SourceUnit source, ClassNode cn, AnnotationMetadata annotationMetadata) {
+        new GroovyClassElement(source, unit, cn, annotationMetadata)
+    }
+
     @Override
     void setCompilationUnit(CompilationUnit unit) {
         this.unit = unit
@@ -295,6 +331,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         public static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction"
         final SourceUnit sourceUnit
         final ClassNode concreteClass
+        final GroovyClassElement concreteElement
         final AnnotationMetadata annotationMetadata
         final boolean isConfigurationProperties
         final boolean isFactoryClass
@@ -323,6 +360,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.concreteClass = targetClassNode
             def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, targetClassNode)
             this.annotationMetadata = annotationMetadata
+            this.concreteElement = newClassElement(sourceUnit, targetClassNode, annotationMetadata);
             this.isFactoryClass = annotationMetadata.hasStereotype(Factory)
             this.isAopProxyType = annotationMetadata.hasStereotype(AROUND_TYPE) && !targetClassNode.isAbstract()
             this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
@@ -390,9 +428,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         packageName,
                         beanClassName,
                         isInterface,
+                        concreteElement,
                         annotationMetadata,
                         interfaceTypes,
-                        interceptorTypes)
+                        interceptorTypes
+                )
                 populateProxyWriterConstructor(node, aopProxyWriter)
                 beanDefinitionWriters.put(node, aopProxyWriter)
                 visitIntroductionTypePublicMethods(aopProxyWriter, node)
@@ -431,6 +471,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 super.visitClass(node)
             }
+        }
+
+        @CompileDynamic
+        private GroovyClassElement newClassElement(SourceUnit source, ClassNode cn, AnnotationMetadata annotationMetadata) {
+            new GroovyClassElement(sourceUnit, compilationUnit, cn, annotationMetadata)
         }
 
         private void populateIntroducedInterfaces(List<AnnotationNode> annotationNodes, Set<ClassNode> interfacesToVisit) {
@@ -580,6 +625,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 targetGenericParams,
                                 targetAnnotationMetadata,
                                 targetMethodGenericTypeMap,
+                                newGroovyMethodElement(methodNode, annotationMetadata),
                                 annotationMetadata
                         )
                     } else {
@@ -593,6 +639,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 targetGenericParams,
                                 targetAnnotationMetadata,
                                 targetMethodGenericTypeMap,
+                                newGroovyMethodElement(methodNode, annotationMetadata),
                                 annotationMetadata,
                                 methodNode.declaringClass.isInterface()
                         )
@@ -656,6 +703,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         factoryMethodBeanDefinitionName,
                         producedType.name,
                         producedType.isInterface(),
+                        newGroovyMethodElement(methodNode, methodAnnotationMetadata),
                         methodAnnotationMetadata
                 )
 
@@ -782,6 +830,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     targetGenericParams,
                                     targetAnnotationMetadata,
                                     targetMethodGenericTypeMap,
+                                    newGroovyMethodElement(methodNode, annotationMetadata),
                                     annotationMetadata,
                                     targetBeanMethodNode.declaringClass.isInterface()
                             )
@@ -796,6 +845,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     targetGenericParams,
                                     targetAnnotationMetadata,
                                     targetMethodGenericTypeMap,
+                                    newGroovyMethodElement(methodNode, annotationMetadata),
                                     new AnnotationMetadataReference(writer.getClassName(), annotationMetadata),
                                     targetBeanMethodNode.declaringClass.isInterface()
                             )
@@ -986,6 +1036,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        @CompileDynamic
+        private GroovyMethodElement newGroovyMethodElement(MethodNode methodNode, AnnotationMetadata methodAnnotationMetadata) {
+            new GroovyMethodElement(concreteElement, sourceUnit, compilationUnit, methodNode, methodAnnotationMetadata)
+        }
+
         private AnnotationMetadata addPropertyMetadata(AnnotationMetadata methodAnnotationMetadata, PropertyMetadata propertyMetadata) {
             DefaultAnnotationMetadata.mutateMember(
                     methodAnnotationMetadata,
@@ -1077,6 +1132,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         genericParams,
                         argumentAnnotationMetadata,
                         genericTypeMap,
+                        newGroovyMethodElement(methodNode, methodAnnotationMetadata),
                         methodAnnotationMetadata,
                         methodNode.declaringClass.isInterface()
                 )
@@ -1121,6 +1177,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                     genericParams,
                                     argumentAnnotationMetadata,
                                     genericTypeMap,
+                                    newGroovyMethodElement(methodNode, methodAnnotationMetadata),
                                     new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata),
                                     methodNode.declaringClass.isInterface()
                             )
@@ -1461,6 +1518,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         resolvedAnnotationMetadata = emptyMap
                     }
 
+                    def propertyMethodElement = new GroovyPropertyMethodElement(propertyNode, fieldAnnotationMetadata)
                     beanWriter.visitExecutableMethod(
                             propertyNode.getDeclaringClass().name,
                             void.class,
@@ -1471,6 +1529,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             resolvedArguments,
                             resolvedAnnotationMetadata,
                             resolvedGenericTypes,
+                            propertyMethodElement,
                             fieldAnnotationMetadata,
                             propertyNode.declaringClass.isInterface()
                     )
@@ -1485,6 +1544,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             resolvedArguments,
                             resolvedAnnotationMetadata,
                             resolvedGenericTypes,
+                            propertyMethodElement,
                             fieldAnnotationMetadata,
                             propertyNode.declaringClass.isInterface()
                     )
@@ -1501,6 +1561,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             emptyMap,
                             emptyMap,
                             emptyMap,
+                            propertyMethodElement,
                             fieldAnnotationMetadata,
                             propertyNode.declaringClass.isInterface()
                     )
@@ -1515,6 +1576,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             emptyMap,
                             emptyMap,
                             emptyMap,
+                            propertyMethodElement,
                             fieldAnnotationMetadata,
                             propertyNode.getDeclaringClass().isInterface()
                     )
@@ -1574,12 +1636,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             classNode.nameWithoutPackage,
                             providerGenericType.name,
                             classNode.isInterface(),
+                            newClassElement(sourceUnit, classNode, annotationMetadata),
                             annotationMetadata)
                 } else {
 
                     beanWriter = new BeanDefinitionWriter(
                             classNode.packageName,
                             classNode.nameWithoutPackage,
+                            newClassElement(sourceUnit, classNode, annotationMetadata),
                             annotationMetadata)
                 }
 

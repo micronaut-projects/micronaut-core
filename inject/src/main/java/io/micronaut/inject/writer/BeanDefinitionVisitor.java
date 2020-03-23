@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.objectweb.asm.Type;
 
@@ -293,7 +294,8 @@ public interface BeanDefinitionVisitor {
      *                                   Can be null or empty.
      * @param argumentAnnotationMetadata The argument annotation metadata
      * @param genericTypes               The generic types of each argument. Can be null.
-     * @param annotationMetadata         The annotation metadata for the method
+     * @param originatingElement         The originating element
+     * @param annotationMetadata         The annotation metadata
      * @param isInterface                If the method belongs to an interface
      * @return The {@link ExecutableMethodWriter}.
      */
@@ -306,7 +308,8 @@ public interface BeanDefinitionVisitor {
                                                  Map<String, Object> genericArgumentTypes,
                                                  Map<String, AnnotationMetadata> argumentAnnotationMetadata,
                                                  Map<String, Map<String, Object>> genericTypes,
-                                                 @Nullable AnnotationMetadata annotationMetadata,
+                                                 MethodElement originatingElement,
+                                                 AnnotationMetadata annotationMetadata,
                                                  boolean isInterface);
 
     /**
@@ -393,12 +396,12 @@ public interface BeanDefinitionVisitor {
     /**
      * Visit a configuration builder method.
      *
-     * @param prefix              The prefix used for the method
-     * @param returnType          The return type
-     * @param methodName          The method name
-     * @param paramType           The method type
-     * @param generics            The generic types of the method
-     * @param path                The property path
+     * @param prefix     The prefix used for the method
+     * @param returnType The return type
+     * @param methodName The method name
+     * @param paramType  The method type
+     * @param generics   The generic types of the method
+     * @param path       The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderMethod(
@@ -412,10 +415,10 @@ public interface BeanDefinitionVisitor {
     /**
      * Visit a configuration builder method that accepts a long and a TimeUnit.
      *
-     * @param prefix              The prefix used for the method
-     * @param returnType          The return type
-     * @param methodName          The method name
-     * @param path                The property path
+     * @param prefix     The prefix used for the method
+     * @param returnType The return type
+     * @param methodName The method name
+     * @param path       The property path
      * @see io.micronaut.context.annotation.ConfigurationBuilder
      */
     void visitConfigBuilderDurationMethod(

@@ -167,13 +167,13 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
-    public OutputStream visitClass(String classname) throws IOException {
+    public OutputStream visitClass(String classname, Element originatingElement) throws IOException {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                     classesDir
             );
-            return outputVisitor.visitClass(classname);
+            return outputVisitor.visitClass(classname, originatingElement);
         } else {
             // should only arrive here in testing scenarios
             if (compilationUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader) {
@@ -196,14 +196,19 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
-    public void visitServiceDescriptor(String type, String classname) {
+    public OutputStream visitClass(String classname) throws IOException {
+        return visitClass(classname, null);
+    }
+
+    @Override
+    public void visitServiceDescriptor(String type, String classname, Element originatingElement) {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
 
             DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
                     classesDir
             );
-            outputVisitor.visitServiceDescriptor(type, classname);
+            outputVisitor.visitServiceDescriptor(type, classname, originatingElement);
             outputVisitor.finish();
         }
     }

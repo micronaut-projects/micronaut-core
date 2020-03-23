@@ -25,10 +25,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.*;
 import io.micronaut.core.beans.AbstractBeanProperty;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -51,7 +49,7 @@ import java.util.Map;
  * @since 1.1
  */
 @Internal
-class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
+class BeanPropertyWriter extends AbstractClassFileWriter implements Named, ElementProcessor {
 
     private static final Type TYPE_BEAN_PROPERTY = getTypeReference(AbstractBeanProperty.class);
     private static final Method METHOD_READ_INTERNAL = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanProperty.class, "readInternal", Object.class));
@@ -69,6 +67,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
     private final TypedElement typeElement;
     private final ClassElement declaringElement;
+    private final Element originatingElement;
 
     /**
      * Default constructor.
@@ -80,7 +79,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
      * @param writeMethod The write method name
      * @param isReadOnly Is the property read only
      * @param index The index for the type
-     * @param annotationMetadata The annotation metadata
+     * @param originatingElement The originating element
      * @param typeArguments The type arguments for the property
      */
     BeanPropertyWriter(
@@ -92,7 +91,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             @Nullable MethodElement writeMethod,
             boolean isReadOnly,
             int index,
-            @Nullable AnnotationMetadata annotationMetadata,
+            Element originatingElement,
             @Nullable Map<String, ClassElement> typeArguments) {
 
         Type introspectionType = introspectionWriter.getIntrospectionType();
@@ -104,6 +103,8 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         this.writeMethod = writeMethod;
         this.propertyName = propertyName;
         this.readOnly = isReadOnly;
+        this.originatingElement = originatingElement;
+        AnnotationMetadata annotationMetadata = originatingElement.getAnnotationMetadata();
         this.annotationMetadata = annotationMetadata == AnnotationMetadata.EMPTY_METADATA ? null : annotationMetadata;
         this.type = getTypeReference(introspectionType.getClassName() + "$$" + index);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -138,7 +139,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        try (OutputStream classOutput = classWriterOutputVisitor.visitClass(getName())) {
+        try (OutputStream classOutput = classWriterOutputVisitor.visitClass(getName(), getOriginatingElement())) {
             startFinalClass(classWriter, type.getInternalName(), TYPE_BEAN_PROPERTY);
 
             writeConstructor();
@@ -269,5 +270,10 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         constructor.visitMaxs(20, 2);
 
         constructor.visitEnd();
+    }
+
+    @Override
+    public Element getOriginatingElement() {
+        return originatingElement;
     }
 }

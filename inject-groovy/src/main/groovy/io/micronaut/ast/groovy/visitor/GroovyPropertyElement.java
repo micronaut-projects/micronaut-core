@@ -30,7 +30,7 @@ import org.codehaus.groovy.control.SourceUnit;
  * @since 1.0
  */
 @Internal
-abstract class GroovyPropertyElement extends AbstractGroovyElement implements PropertyElement {
+public abstract class GroovyPropertyElement extends AbstractGroovyElement implements PropertyElement {
     private final String name;
     private final boolean readOnly;
     private final Object nativeType;
@@ -48,7 +48,7 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
      * @param readOnly Whether it is read only
      * @param nativeType the native underlying type
      */
-    GroovyPropertyElement(
+    protected GroovyPropertyElement(
             SourceUnit sourceUnit,
             CompilationUnit compilationUnit,
             GroovyClassElement declaringElement,

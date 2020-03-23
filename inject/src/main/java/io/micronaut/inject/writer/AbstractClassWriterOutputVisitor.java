@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.ast.Element;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -45,7 +46,7 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
     }
 
     @Override
-    public final void visitServiceDescriptor(String type, String classname) {
+    public final void visitServiceDescriptor(String type, String classname, Element originatingElement) {
         if (StringUtils.isNotEmpty(type) && StringUtils.isNotEmpty(classname)) {
             serviceDescriptors.computeIfAbsent(type, s -> new HashSet<>()).add(classname);
         }

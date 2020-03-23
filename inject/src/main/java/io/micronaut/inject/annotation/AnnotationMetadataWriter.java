@@ -17,7 +17,10 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementProcessor;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassGenerationException;
@@ -38,7 +41,7 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-public class AnnotationMetadataWriter extends AbstractClassFileWriter {
+public class AnnotationMetadataWriter extends AbstractClassFileWriter implements ElementProcessor {
 
     private static final Type TYPE_DEFAULT_ANNOTATION_METADATA = Type.getType(DefaultAnnotationMetadata.class);
     private static final Type TYPE_DEFAULT_ANNOTATION_METADATA_HIERARCHY = Type.getType(AnnotationMetadataHierarchy.class);
@@ -146,15 +149,18 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     private final AnnotationMetadata annotationMetadata;
     private final AnnotationMetadata parent;
     private final boolean writeAnnotationDefaults;
+    private final Element originatingElement;
 
     /**
      * Constructs a new writer for the given class name and metadata.
      *
      * @param className               The class name for which the metadata relates
      * @param annotationMetadata      The annotation metadata
+     * @param originatingElement      The originating element
      * @param writeAnnotationDefaults Whether annotations defaults should be written
      */
-    public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata, boolean writeAnnotationDefaults) {
+    public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata, Element originatingElement, boolean writeAnnotationDefaults) {
+        ArgumentUtils.requireNonNull("originatingElement", originatingElement);
         this.className = className + AnnotationMetadata.CLASS_NAME_SUFFIX;
         if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             this.parent = null;
@@ -162,22 +168,23 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
             final AnnotationMetadataHierarchy hierarchy = (AnnotationMetadataHierarchy) annotationMetadata;
             this.annotationMetadata = hierarchy.getDeclaredMetadata();
-           this.parent = hierarchy.getRootMetadata();
+            this.parent = hierarchy.getRootMetadata();
         } else {
             throw new ClassGenerationException("Compile time metadata required to generate class: " + className);
         }
         this.writeAnnotationDefaults = writeAnnotationDefaults;
+        this.originatingElement = originatingElement;
     }
-
 
     /**
      * Constructs a new writer for the given class name and metadata.
      *
      * @param className          The class name for which the metadata relates
      * @param annotationMetadata The annotation metadata
+     * @param originatingElement The originating element
      */
-    public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata) {
-        this(className, annotationMetadata, false);
+    public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata, Element originatingElement) {
+        this(className, annotationMetadata, originatingElement, false);
     }
 
     /**
@@ -197,7 +204,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         ClassWriter classWriter = generateClassBytes();
         if (classWriter != null) {
 
-            try (OutputStream outputStream = outputVisitor.visitClass(className)) {
+            try (OutputStream outputStream = outputVisitor.visitClass(className, getOriginatingElement())) {
                 outputStream.write(classWriter.toByteArray());
             }
         }
@@ -236,11 +243,11 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     /**
      * Writes out the byte code necessary to instantiate the given {@link AnnotationMetadataHierarchy}.
      *
-     * @param owningType           The owning type
-     * @param classWriter The declaring class writer
-     * @param generatorAdapter     The generator adapter
-     * @param hierarchy   The annotation metadata
-     * @param loadTypeMethods      The generated load type methods
+     * @param owningType       The owning type
+     * @param classWriter      The declaring class writer
+     * @param generatorAdapter The generator adapter
+     * @param hierarchy        The annotation metadata
+     * @param loadTypeMethods  The generated load type methods
      */
     @Internal
     @UsedByGeneratedCode
@@ -250,8 +257,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             GeneratorAdapter generatorAdapter,
             AnnotationMetadataHierarchy hierarchy,
             Map<String, GeneratorAdapter> loadTypeMethods) {
-            generatorAdapter.visitTypeInsn(NEW, TYPE_DEFAULT_ANNOTATION_METADATA_HIERARCHY.getInternalName());
-            generatorAdapter.visitInsn(DUP);
+        generatorAdapter.visitTypeInsn(NEW, TYPE_DEFAULT_ANNOTATION_METADATA_HIERARCHY.getInternalName());
+        generatorAdapter.visitInsn(DUP);
 
         pushNewArray(generatorAdapter, AnnotationMetadata.class, 2);
         pushStoreInArray(generatorAdapter, 0, 2, () -> {
@@ -288,10 +295,10 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     /**
      * Writes out the byte code necessary to instantiate the given {@link DefaultAnnotationMetadata}.
      *
-     * @param annotationMetadata   The annotation metadata
-     * @param classWriter          The class writer
-     * @param owningType           The owning type
-     * @param loadTypeMethods      The generated load type methods
+     * @param annotationMetadata The annotation metadata
+     * @param classWriter        The class writer
+     * @param owningType         The owning type
+     * @param loadTypeMethods    The generated load type methods
      */
     @Internal
     public static void writeAnnotationDefaults(DefaultAnnotationMetadata annotationMetadata, ClassWriter classWriter, Type owningType, Map<String, GeneratorAdapter> loadTypeMethods) {
@@ -311,11 +318,12 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
     /**
      * Write annotation defaults into the given static init block.
-     * @param owningType The owning type
-     * @param classWriter The class writer
-     * @param staticInit The staitc init
+     *
+     * @param owningType         The owning type
+     * @param classWriter        The class writer
+     * @param staticInit         The staitc init
      * @param annotationMetadata The annotation metadata
-     * @param loadTypeMethods The load type methods
+     * @param loadTypeMethods    The load type methods
      */
     @Internal
     public static void writeAnnotationDefaults(
@@ -642,7 +650,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             loadTypeGenerator.visitLabel(tryEnd);
             loadTypeGenerator.returnValue();
             loadTypeGenerator.visitLabel(exceptionHandler);
-            loadTypeGenerator.visitFrame(Opcodes.F_NEW, 0, new Object[] {}, 1, new Object[] {"java/lang/Throwable"});
+            loadTypeGenerator.visitFrame(Opcodes.F_NEW, 0, new Object[]{}, 1, new Object[]{"java/lang/Throwable"});
             // Try load the class
 
             // fallback to return a class value that is just a string
@@ -656,5 +664,10 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         });
 
         methodVisitor.visitMethodInsn(Opcodes.INVOKESTATIC, declaringType.getInternalName(), loadTypeGeneratorMethod.getName(), desc, false);
+    }
+
+    @Override
+    public Element getOriginatingElement() {
+        return originatingElement;
     }
 }

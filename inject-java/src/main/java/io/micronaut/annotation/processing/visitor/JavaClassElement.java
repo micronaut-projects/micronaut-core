@@ -58,7 +58,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
      * @param annotationMetadata The annotation metadata
      * @param visitorContext     The visitor context
      */
-    protected JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
+    public JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
         super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
