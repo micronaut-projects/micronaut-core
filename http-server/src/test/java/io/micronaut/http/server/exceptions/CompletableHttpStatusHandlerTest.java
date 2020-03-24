@@ -39,10 +39,11 @@ public class CompletableHttpStatusHandlerTest {
         assertEquals(response.code(), HttpStatus.CREATED.getCode());
     }
 
-    @Test(expected = CompletionException.class)
+    @Test
     public void testWrappedUnknownExceptionHandling() {
         CompletableHttpStatusHandler cut = ctx.createBean(CompletableHttpStatusHandler.class);
-        cut.handle(request, new CompletionException(new RuntimeException("test msg")));
+        HttpResponse response = cut.handle(request, new CompletionException(new RuntimeException("test msg")));
+        assertEquals(response.code(), HttpStatus.INTERNAL_SERVER_ERROR.getCode());
     }
 
 }
