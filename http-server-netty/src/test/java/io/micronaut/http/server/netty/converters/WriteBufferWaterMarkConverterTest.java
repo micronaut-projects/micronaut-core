@@ -25,6 +25,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.WriteBufferWaterMark;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -45,10 +46,9 @@ public class WriteBufferWaterMarkConverterTest {
 
     @Before
     public void init() {
-        Map<String, Object> params = Map.of(
-                "micronaut.server.netty.childOptions.write_buffer_water_mark.high", 262143,
-                "micronaut.server.netty.childOptions.write_buffer_water_mark.low", 65535
-        );
+        Map<String, Object> params = new HashMap<>();
+        params.put("micronaut.server.netty.childOptions.write_buffer_water_mark.high", 262143);
+        params.put("micronaut.server.netty.childOptions.write_buffer_water_mark.low", 65535);
 
         ApplicationContext ctx = ApplicationContext.run(params, (String) null);
         micronautConfig = ctx.createBean(NettyHttpServerConfiguration.class);
