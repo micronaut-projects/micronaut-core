@@ -125,9 +125,12 @@ Micronaut SQL has been improved to default to Micronaut transaction management (
 ==== Module Upgrades
 
 * Micronaut Neo4j - `1.3.0` -> `2.0.0`
+* Micronaut Mongo - `1.3.0` -> `2.0.0`
 * Micronaut SQL - `1.3.0` -> `2.0.0.M1`
 
 ==== Dependency Upgrades
 
 * Hibernate `5.4.10.Final` -> `5.4.12.Final`
 * Groovy `2.5.8` -> `2.5.10`
+* Mongo Reactive Streams `1.13.0` -> `4.0.1`
+* Mongo Java Driver `3.12.0` -> `4.0.1`

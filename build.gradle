@@ -318,7 +318,8 @@ ext {
             'micronaut.mongo': [
                     version:micronautMongoVersion,
                     group:'io.micronaut.configuration',
-                    name:'micronaut-mongo-reactive'
+                    name:'micronaut-mongo-reactive',
+                    modules:['micronaut-mongo-core', 'micronaut-mongo-sync']
             ],
             'micronaut.redis': [
                     version:micronautRedisVersion,
