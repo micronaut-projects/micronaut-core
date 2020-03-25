@@ -44,7 +44,10 @@ import spock.lang.Stepwise
  * @author Rvanderwerf
  * @since 1.0
  */
-@IgnoreIf({!System.getenv('ENABLE_AWS_PARAMETER_STORE')})
+@IgnoreIf({
+    System.out.println(System.getenv('ENABLE_AWS_PARAMETER_STORE'))
+    !System.getenv('ENABLE_AWS_PARAMETER_STORE')
+})
 @Stepwise
 class AWSParameterStoreClientSpec extends Specification {
 
