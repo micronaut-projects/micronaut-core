@@ -23,7 +23,6 @@ import io.micronaut.core.async.publisher.Publishers;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
 /**
