@@ -33,6 +33,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
@@ -44,10 +45,7 @@ import spock.lang.Stepwise
  * @author Rvanderwerf
  * @since 1.0
  */
-@IgnoreIf({
-    System.out.println(System.getenv('ENABLE_AWS_PARAMETER_STORE'))
-    !System.getenv('ENABLE_AWS_PARAMETER_STORE')
-})
+@Ignore
 @Stepwise
 class AWSParameterStoreClientSpec extends Specification {
 
