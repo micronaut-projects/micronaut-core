@@ -15,12 +15,15 @@
  */
 package io.micronaut.web.router;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -402,7 +405,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Abstract class for base {@link MethodBasedRoute}.
      */
-    abstract class AbstractRoute implements MethodBasedRoute {
+    abstract class AbstractRoute implements MethodBasedRoute, RouteInfo<Object> {
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
         protected final MethodExecutionHandle<?, ?> targetMethod;
         protected final ConversionService<?> conversionService;
@@ -410,6 +413,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected List<MediaType> producesMediaTypes;
         protected String bodyArgumentName;
         protected Argument<?> bodyArgument;
+        private final boolean isVoid;
+        private final boolean suspended;
+        private final boolean reactive;
+        private final boolean single;
+        private final boolean async;
 
         /**
          * @param targetMethod The target method execution handle
@@ -429,6 +437,47 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             if (ArrayUtils.isNotEmpty(types)) {
                 this.consumesMediaTypes = Arrays.asList(types);
             }
+            suspended = targetMethod.getExecutableMethod().isSuspend();
+            reactive = RouteInfo.super.isReactive();
+            async = RouteInfo.super.isAsync();
+            single = RouteInfo.super.isSingleResult();
+            isVoid = RouteInfo.super.isVoid();
+        }
+
+        @NonNull
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return targetMethod.getAnnotationMetadata();
+        }
+
+        @Override
+        public ReturnType<?> getReturnType() {
+            return targetMethod.getReturnType();
+        }
+
+        @Override
+        public boolean isSuspended() {
+            return suspended;
+        }
+
+        @Override
+        public boolean isReactive() {
+            return reactive;
+        }
+
+        @Override
+        public boolean isSingleResult() {
+            return single;
+        }
+
+        @Override
+        public boolean isAsync() {
+            return async;
+        }
+
+        @Override
+        public boolean isVoid() {
+            return isVoid;
         }
 
         @Override

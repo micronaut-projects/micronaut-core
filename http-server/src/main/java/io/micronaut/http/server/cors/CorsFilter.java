@@ -75,9 +75,9 @@ public class CorsFilter implements HttpServerFilter {
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         boolean originHeaderPresent = request.getHeaders().getOrigin().isPresent();
         if (originHeaderPresent) {
-            Optional<MutableHttpResponse<?>> response = handleRequest(request);
-            if (response.isPresent()) {
-                return Publishers.just(response.get());
+            MutableHttpResponse<?> response = handleRequest(request).orElse(null);
+            if (response != null) {
+                return Publishers.just(response);
             } else {
                 return Publishers.map(chain.proceed(request), mutableHttpResponse -> {
                     handleResponse(request, mutableHttpResponse);

@@ -95,6 +95,7 @@ import io.netty.handler.codec.http.multipart.*;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.codec.http2.*;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
@@ -2508,6 +2509,18 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     // so that the consumer is in charge of back pressure
                     ch.config().setAutoRead(false);
                 }
+
+                configuration.getLogLevel().ifPresent(logLevel -> {
+                    try {
+                        final io.netty.handler.logging.LogLevel nettyLevel = io.netty.handler.logging.LogLevel.valueOf(
+                                logLevel.name()
+                        );
+                        p.addLast(new LoggingHandler(DefaultHttpClient.class, nettyLevel));
+                    } catch (IllegalArgumentException e) {
+                        throw new HttpClientException("Unsupported log level: " + logLevel);
+                    }
+                });
+
                 if (sslContext != null) {
                     SslHandler sslHandler = sslContext.newHandler(
                             ch.alloc(),

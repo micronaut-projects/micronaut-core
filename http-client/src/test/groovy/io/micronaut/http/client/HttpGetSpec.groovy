@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client
 
-
+import io.micronaut.context.annotation.Property
 import io.micronaut.core.convert.format.Format
 import io.micronaut.core.type.Argument
 import io.micronaut.http.*
@@ -45,6 +45,8 @@ import java.time.LocalDate
  * @since 1.0
  */
 @MicronautTest
+@Property(name = "micronaut.server.netty.log-level", value = 'trace')
+@Property(name = "micronaut.http.client.log-level", value = 'trace')
 class HttpGetSpec extends Specification {
 
     @Inject
@@ -421,10 +423,11 @@ class HttpGetSpec extends Specification {
     void "test completable returns 200"() {
         when:
         MyGetClient client = this.myGetClient
+        def returnsNull = client.completable().blockingGet()
         def ex = client.completableError().blockingGet()
 
         then:
-        client.completable().blockingGet() == null
+        returnsNull == null
         ex instanceof HttpClientResponseException
         ex.message.contains("completable error")
     }

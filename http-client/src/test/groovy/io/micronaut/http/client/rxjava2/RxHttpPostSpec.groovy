@@ -43,7 +43,7 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
-class   RxHttpPostSpec extends Specification {
+class RxHttpPostSpec extends Specification {
 
     @Shared
     @AutoCleanup
