@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -341,6 +341,14 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected String getAnnotationTypeName(AnnotationMirror annotationMirror) {
         return JavaModelUtils.getClassName((TypeElement) annotationMirror.getAnnotationType().asElement());
+    }
+
+    @Override
+    protected String getElementName(Element element) {
+        if (element instanceof TypeElement) {
+            return ((TypeElement) element).getQualifiedName().toString();
+        }
+        return element.getSimpleName().toString();
     }
 
     private void populateTypeHierarchy(Element element, List<Element> hierarchy) {

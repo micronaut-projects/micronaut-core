@@ -18,6 +18,7 @@ package io.micronaut.inject.configproperties
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
+import io.micronaut.core.util.CollectionUtils
 import spock.lang.Specification
 
 class ConfigurationPropertiesSpec extends Specification {
@@ -113,5 +114,27 @@ class ConfigurationPropertiesSpec extends Specification {
 
         expect:
         config.inner.enabled
+    }
+
+    void "test binding to a map field"() {
+        ApplicationContext context = ApplicationContext.run(CollectionUtils.mapOf("map.field.yyy.zzz", 3, "map.field.yyy.xxx", 2, "map.field.yyy.yyy", 3))
+        MapProperties config = context.getBean(MapProperties.class)
+
+        expect:
+        config.field.containsKey('yyy')
+
+        cleanup:
+        context.close()
+    }
+
+    void "test binding to a map setter"() {
+        ApplicationContext context = ApplicationContext.run(CollectionUtils.mapOf("map.setter.yyy.zzz", 3, "map.setter.yyy.xxx", 2, "map.setter.yyy.yyy", 3))
+        MapProperties config = context.getBean(MapProperties.class)
+
+        expect:
+        config.setter.containsKey('yyy')
+
+        cleanup:
+        context.close()
     }
 }

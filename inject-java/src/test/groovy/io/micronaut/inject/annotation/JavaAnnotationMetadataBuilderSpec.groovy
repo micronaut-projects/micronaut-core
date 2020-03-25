@@ -36,6 +36,53 @@ import javax.inject.Singleton
  */
 class JavaAnnotationMetadataBuilderSpec extends AbstractTypeElementSpec {
 
+    void "test self referencing annotation"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
+package test;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
+import io.micronaut.inject.annotation.*;
+
+@TestAnnotation
+class Test {
+}
+
+@Target({ElementType.PACKAGE, ElementType.TYPE, ElementType.FIELD, ElementType.CONSTRUCTOR, ElementType.METHOD})
+@TestAnnotation
+@interface TestAnnotation { }
+''')
+
+        expect:
+        metadata != null
+        metadata.hasAnnotation('test.TestAnnotation')
+    }
+
+    void "test self referencing annotation - 2"() {
+        given:
+        AnnotationMetadata metadata = buildBeanDefinition('test.Test', '''\
+package test;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
+import io.micronaut.inject.annotation.*;
+
+@TestAnnotation
+@javax.inject.Singleton
+class Test {
+}
+
+@Target({ElementType.PACKAGE, ElementType.TYPE, ElementType.FIELD, ElementType.CONSTRUCTOR, ElementType.METHOD})
+@TestAnnotation
+@interface TestAnnotation { }
+''')
+
+        expect:
+        metadata != null
+        metadata.hasAnnotation('test.TestAnnotation')
+    }
+
     void "test find closest stereotype"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\

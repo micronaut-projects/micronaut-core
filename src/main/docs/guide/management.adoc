@@ -7,7 +7,7 @@ $ mn create-app my-app --features management
 ----
 ====
 
-Inspired by Spring Boot and Grails, the Micronaut `management` dependency adds support for monitoring of your application via *endpoints*: special URIs that return details about the health and state of your application. The `management` endpoints are also integrated with Micronaut's `security` dependency, allowing for sensitive data to be restricted to authenticated users in your security system (see <<builtInEndpointsAccess, Built-in Endpoints Access>> in the Security section).
+Inspired by Spring Boot and Grails, the Micronaut `management` dependency adds support for monitoring of your application via *endpoints*: special URIs that return details about the health and state of your application. The `management` endpoints are also integrated with Micronaut's `security` dependency, allowing for sensitive data to be restricted to authenticated users in your security system (see https://micronaut-projects.github.io/micronaut-security/latest/guide/#builtInEndpointsAccess[Built-in Endpoints Access] in the Security section).
 
 To use the `management` features described in this section, add the dependency on your classpath.
 

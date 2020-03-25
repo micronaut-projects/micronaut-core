@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.web.router.exceptions.RoutingException;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -45,10 +46,11 @@ import java.util.stream.Stream;
 @Singleton
 public class DefaultRouter implements Router {
 
+    private static final List<MediaType> ACCEPT_ALL = Collections.singletonList(MediaType.ALL_TYPE);
     private final Map<String, List<UriRoute>> routesByMethod = new HashMap<>();
-    private final Set<StatusRoute> statusRoutes = new HashSet<>();
+    private final List<StatusRoute> statusRoutes = new ArrayList<>();
     private final Collection<FilterRoute> filterRoutes = new ArrayList<>();
-    private final Set<ErrorRoute> errorRoutes = new HashSet<>();
+    private final List<ErrorRoute> errorRoutes = new ArrayList<>();
     private final Set<Integer> exposedPorts;
     private List<Integer> defaultPorts;
 
@@ -67,8 +69,20 @@ public class DefaultRouter implements Router {
                 routesByMethod.computeIfAbsent(key, x -> new ArrayList<>()).add(route);
             }
 
-            this.statusRoutes.addAll(builder.getStatusRoutes());
-            this.errorRoutes.addAll(builder.getErrorRoutes());
+            for (StatusRoute statusRoute : builder.getStatusRoutes()) {
+                if (statusRoutes.contains(statusRoute)) {
+                    final StatusRoute existing = statusRoutes.stream().filter(r -> r.equals(statusRoute)).findFirst().orElse(null);
+                    throw new RoutingException("Attempted to register multiple local routes for http status [" + statusRoute.status() + "]. New route: " + statusRoute + ". Existing: " + existing);
+                }
+                this.statusRoutes.add(statusRoute);
+            }
+            for (ErrorRoute errorRoute : builder.getErrorRoutes()) {
+                if (errorRoutes.contains(errorRoute)) {
+                    final ErrorRoute existing = errorRoutes.stream().filter(r -> r.equals(errorRoute)).findFirst().orElse(null);
+                    throw new RoutingException("Attempted to register multiple local routes for error [" + errorRoute.exceptionType().getSimpleName() + "]. New route: " + errorRoute + ". Existing: " + existing);
+                }
+                this.errorRoutes.add(errorRoute);
+            }
             this.filterRoutes.addAll(builder.getFilterRoutes());
             exposedPorts.addAll(builder.getExposedPorts());
         }
@@ -120,7 +134,7 @@ public class DefaultRouter implements Router {
     public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request) {
         boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
         return this.<T, R>find(request, request.getPath())
-                .filter((match) -> match.test(request) && (!permitsBody || match.accept(request.getContentType().orElse(null))));
+                .filter((match) -> match.test(request) && (!permitsBody || match.doesConsume(request.getContentType().orElse(null))));
     }
 
     @SuppressWarnings("unchecked")
@@ -142,28 +156,38 @@ public class DefaultRouter implements Router {
         final HttpMethod httpMethod = request.getMethod();
         final MediaType contentType = request.getContentType().orElse(null);
         boolean permitsBody = HttpMethod.permitsRequestBody(httpMethod);
+        final Collection<MediaType> acceptedProducedTypes = request.accept();
         List<UriRouteMatch<T, R>> uriRoutes = this.find(request.getMethodName(), request.getPath());
         uriRoutes.removeIf(routeMatch ->
-                !(routeMatch.test(request) && (!permitsBody || routeMatch.accept(contentType)))
+                !(routeMatch.test(request) && (!permitsBody || routeMatch.doesConsume(contentType)) && routeMatch.doesProduce(acceptedProducedTypes))
         );
-
         int routeCount = uriRoutes.size();
+        if (routeCount <= 1) {
+            return uriRoutes;
+        }
+
+        if (CollectionUtils.isNotEmpty(acceptedProducedTypes)) {
+            // take the highest priority accepted type
+            final MediaType mediaType = acceptedProducedTypes.iterator().next();
+            uriRoutes.removeIf(routeMatch -> !routeMatch.doesProduce(mediaType));
+        }
+        routeCount = uriRoutes.size();
         if (routeCount > 1 && permitsBody) {
 
-            List<UriRouteMatch<T, R>> explicitAcceptRoutes = new ArrayList<>(routeCount);
-            List<UriRouteMatch<T, R>> acceptRoutes = new ArrayList<>(routeCount);
+            List<UriRouteMatch<T, R>> explicitlyConsumedRoutes = new ArrayList<>(routeCount);
+            List<UriRouteMatch<T, R>> consumesRoutes = new ArrayList<>(routeCount);
 
 
             for (UriRouteMatch<T, R> match: uriRoutes) {
-                if (match.explicitAccept(contentType != null ? contentType : MediaType.ALL_TYPE)) {
-                    explicitAcceptRoutes.add(match);
+                if (match.explicitlyConsumes(contentType != null ? contentType : MediaType.ALL_TYPE)) {
+                    explicitlyConsumedRoutes.add(match);
                 }
-                if (explicitAcceptRoutes.isEmpty() && match.accept(contentType)) {
-                    acceptRoutes.add(match);
+                if (explicitlyConsumedRoutes.isEmpty() && match.doesConsume(contentType)) {
+                    consumesRoutes.add(match);
                 }
             }
 
-            uriRoutes = explicitAcceptRoutes.isEmpty() ? acceptRoutes : explicitAcceptRoutes;
+            uriRoutes = explicitlyConsumedRoutes.isEmpty() ? consumesRoutes : explicitlyConsumedRoutes;
         }
 
         /*
@@ -244,6 +268,109 @@ public class DefaultRouter implements Router {
             });
         }
         return findRouteMatch(matchedRoutes, error);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findErrorRoute(
+            @NonNull Class<?> originatingClass,
+            @NonNull Throwable error,
+            HttpRequest<?> request) {
+        return findErrorRouteInternal(originatingClass, error, request);
+    }
+
+    private <R> Optional<RouteMatch<R>> findErrorRouteInternal(
+            @Nullable Class<?> originatingClass,
+            @NonNull Throwable error, HttpRequest<?> request) {
+        Collection<MediaType> accept =
+                request.accept();
+        final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
+        if (hasAcceptHeader) {
+
+            for (ErrorRoute errorRoute : errorRoutes) {
+                @SuppressWarnings("unchecked")
+                final RouteMatch<R> match = (RouteMatch<R>) errorRoute
+                        .match(originatingClass, error).orElse(null);
+                if (match != null) {
+                    if (match.doesProduce(accept)) {
+                        return Optional.of(match);
+                    }
+                }
+            }
+        } else {
+            RouteMatch<R> firstMatch = null;
+            for (ErrorRoute errorRoute : errorRoutes) {
+                @SuppressWarnings("unchecked")
+                final RouteMatch<R> match = (RouteMatch<R>) errorRoute
+                        .match(originatingClass, error).orElse(null);
+                if (match != null) {
+                    final List<MediaType> produces = match.getProduces();
+                    if (CollectionUtils.isEmpty(produces) || produces.contains(MediaType.ALL_TYPE)) {
+                        return Optional.of(match);
+                    } else if (firstMatch == null) {
+                        firstMatch = match;
+                    }
+                }
+            }
+
+            return Optional.ofNullable(firstMatch);
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findErrorRoute(@NonNull Throwable error, HttpRequest<?> request) {
+        return findErrorRouteInternal(null, error, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(
+            @NonNull Class<?> originatingClass,
+            @NonNull HttpStatus status,
+            HttpRequest<?> request) {
+        return findStatusInternal(originatingClass, status, request);
+    }
+
+    @Override
+    public <R> Optional<RouteMatch<R>> findStatusRoute(@NonNull HttpStatus status, HttpRequest<?> request) {
+        return findStatusInternal(null, status, request);
+    }
+
+    private <R> Optional<RouteMatch<R>> findStatusInternal(@Nullable Class<?> originatingClass, @NonNull HttpStatus status, HttpRequest<?> request) {
+        Collection<MediaType> accept =
+                request.accept();
+        final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
+        if (hasAcceptHeader) {
+
+            for (StatusRoute statusRoute : statusRoutes) {
+                @SuppressWarnings("unchecked")
+                final RouteMatch<R> match = (RouteMatch<R>) statusRoute
+                        .match(originatingClass, status).orElse(null);
+                if (match != null) {
+                    if (match.doesProduce(accept)) {
+                        return Optional.of(match);
+                    }
+                }
+            }
+        } else {
+            RouteMatch<R> firstMatch = null;
+            for (StatusRoute errorRoute : statusRoutes) {
+                @SuppressWarnings("unchecked")
+                final RouteMatch<R> match = (RouteMatch<R>) errorRoute
+                        .match(originatingClass, status).orElse(null);
+                if (match != null) {
+                    final List<MediaType> produces = match.getProduces();
+                    if (CollectionUtils.isEmpty(produces) || produces.contains(MediaType.ALL_TYPE)) {
+                        return Optional.of(match);
+                    } else if (firstMatch == null) {
+                        firstMatch = match;
+                    }
+                }
+            }
+
+            return Optional.ofNullable(firstMatch);
+
+        }
+        return Optional.empty();
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.logging.LogLevel;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import java.net.*;
@@ -122,6 +124,10 @@ public abstract class HttpClientConfiguration {
 
     private String eventLoopGroup = "default";
 
+    private HttpVersion httpVersion = HttpVersion.HTTP_1_1;
+
+    private LogLevel logLevel;
+
     /**
      * Default constructor.
      */
@@ -164,7 +170,42 @@ public abstract class HttpClientConfiguration {
             this.shutdownTimeout = copy.shutdownTimeout;
             this.sslConfiguration = copy.sslConfiguration;
             this.threadFactory = copy.threadFactory;
+            this.httpVersion = copy.httpVersion;
         }
+    }
+
+    /**
+     * The HTTP version to use. Defaults to {@link HttpVersion#HTTP_1_1}.
+     * @return The http version
+     */
+    public HttpVersion getHttpVersion() {
+        return httpVersion;
+    }
+
+    /**
+     * Sets the HTTP version to use. Defaults to {@link HttpVersion#HTTP_1_1}.
+     * @param httpVersion The http version
+     */
+    public void setHttpVersion(HttpVersion httpVersion) {
+        if (httpVersion != null) {
+            this.httpVersion = httpVersion;
+        }
+    }
+
+    /**
+     * @return The trace logging level
+     */
+    public Optional<LogLevel> getLogLevel() {
+        return Optional.ofNullable(logLevel);
+    }
+
+    /**
+     * Sets the level to enable trace logging at. Depending on the implementation this
+     * may activate additional handlers. For example in Netty this will activate {@code LoggingHandler} at the given level.
+     * @param logLevel The trace logging level
+     */
+    public void setLogLevel(@Nullable LogLevel logLevel) {
+        this.logLevel = logLevel;
     }
 
     /**

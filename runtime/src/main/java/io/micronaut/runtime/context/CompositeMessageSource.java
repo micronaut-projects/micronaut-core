@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.runtime.context;
 
 import io.micronaut.context.AbstractMessageSource;
@@ -55,11 +54,11 @@ public final class CompositeMessageSource extends AbstractMessageSource {
 
     @NonNull
     @Override
-    public Optional<String> getMessage(@NonNull String code, @NonNull MessageContext context) {
+    public Optional<String> getRawMessage(@NonNull String code, @NonNull MessageContext context) {
         ArgumentUtils.requireNonNull("code", code);
         ArgumentUtils.requireNonNull("context", context);
         for (MessageSource messageSource : messageSources) {
-            final Optional<String> message = messageSource.getMessage(code, context);
+            final Optional<String> message = messageSource.getRawMessage(code, context);
             if (message.isPresent()) {
                 return message;
             }

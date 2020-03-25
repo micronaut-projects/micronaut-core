@@ -49,15 +49,15 @@ class EndpointsFilterRequiresSpec extends Specification {
         context.close()
     }
 
-    def "EndpointsFilter is not loaded if micronaut.security.enabled=true"() {
+    def "EndpointsFilter is loaded by default"() {
         given:
-        ApplicationContext context = ApplicationContext.run(['micronaut.security.enabled': true])
+        ApplicationContext context = ApplicationContext.run()
 
         when:
         context.getBean(EndpointsFilter.class)
 
         then:
-        thrown(NoSuchBeanException)
+        noExceptionThrown()
 
         cleanup:
         context.close()

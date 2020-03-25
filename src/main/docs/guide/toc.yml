@@ -98,6 +98,7 @@ httpServer:
     title: WebSocket Support
     websocketServer: Using @ServerWebSocket
     websocketClient: Using @ClientWebSocket
+  http2Server: HTTP/2 Support
   serverEvents: Server Events
   serverConfiguration:
     title: Configuring the HTTP Server
@@ -194,11 +195,18 @@ configurations:
     flywaySupport: Configuring Flyway
 languageSupport:
   title: Language Support
-  java: Micronaut for Java
+  java:
+    title: Micronaut for Java
+    java9: Using Micronaut with Java 9+
+    incrementalannotationgradle: Incremental Annotation Processing with Gradle
+    lombok: Using Project Lombok
+    ide: Configuring an IDE
+    retainparameternames: Retaining Parameter Names
   groovy: Micronaut for Groovy
   kotlin:
     title: Micronaut for Kotlin
     kaptintellij: Kotlin, Kapt and IntelliJ
+    gradlekapt: Incremental Annotation Processing with Gradle and Kapt
     openandaop: Kotlin and AOP Advice
     kotlinretainparamnames: Kotlin and Retaining Parameter Names
     coroutines: Coroutines Support

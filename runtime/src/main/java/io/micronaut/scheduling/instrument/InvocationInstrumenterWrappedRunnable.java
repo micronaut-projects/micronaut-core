@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ final class InvocationInstrumenterWrappedRunnable implements Runnable {
             invocationInstrumenter.beforeInvocation();
             runnable.run();
         } finally {
-            invocationInstrumenter.afterInvocation();
+            invocationInstrumenter.afterInvocation(true);
         }
     }
 }

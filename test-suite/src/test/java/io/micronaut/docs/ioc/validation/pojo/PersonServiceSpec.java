@@ -26,7 +26,7 @@ class PersonServiceSpec {
         person.setName("");
         person.setAge(10);
 
-        final Set<ConstraintViolation<Person>> constraintViolations = validator.validate(person);
+        final Set<ConstraintViolation<Person>> constraintViolations = validator.validate(person);  // <1>
 
         assertEquals(2, constraintViolations.size()); // <2>
     }

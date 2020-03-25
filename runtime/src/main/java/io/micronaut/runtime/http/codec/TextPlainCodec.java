@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -123,7 +123,7 @@ public class TextPlainCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
+    public <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) throws CodecException {
         byte[] bytes = encode(object);
         int len = bytes.length;
 

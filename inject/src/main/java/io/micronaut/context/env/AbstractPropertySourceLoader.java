@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,18 +68,28 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 Map<String, Object> finalMap = loadProperties(resourceLoader, fileName, fileExt);
 
                 if (!finalMap.isEmpty()) {
-                    MapPropertySource newPropertySource = new MapPropertySource(fileName, finalMap) {
-                        @Override
-                        public int getOrder() {
-                            return order;
-                        }
-                    };
-                    return Optional.of(newPropertySource);
+                    return Optional.of(createPropertySource(fileName, finalMap, order));
                 }
             }
         }
 
         return Optional.empty();
+    }
+
+    /**
+     *
+     * @param name The name of the property source
+     * @param map  The map
+     * @param order The order of the property source
+     * @return property source
+     */
+    protected MapPropertySource createPropertySource(String name, Map<String, Object> map, int order) {
+        return new MapPropertySource(name, map) {
+                            @Override
+                            public int getOrder() {
+                                return order;
+                            }
+                        };
     }
 
     private Map<String, Object> loadProperties(ResourceLoader resourceLoader, String qualifiedName, String fileName) {

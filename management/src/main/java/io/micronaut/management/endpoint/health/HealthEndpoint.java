@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -150,7 +150,7 @@ public class HealthEndpoint {
      */
     @ConfigurationProperties("status")
     public static class StatusConfiguration {
-        private Map<String, HttpStatus> httpMapping = new HashMap<>();
+        private Map<String, HttpStatus> httpMapping = new HashMap<>(5);
 
         /**
          * Default constructor.

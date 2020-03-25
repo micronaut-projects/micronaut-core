@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ import com.amazonaws.services.lambda.AWSLambdaAsync;
 import com.amazonaws.services.lambda.AWSLambdaAsyncClientBuilder;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
+
+import javax.inject.Singleton;
 
 /**
  * @author graemerocher
@@ -43,6 +45,7 @@ public class AWSLambdaAsyncClientFactory {
      * @return client object
      */
     @Requires(beans = AWSLambdaConfiguration.class)
+    @Singleton
     AWSLambdaAsync awsLambdaAsyncClient() {
         AWSLambdaAsyncClientBuilder builder = configuration.getBuilder();
         return builder.build();

@@ -337,7 +337,7 @@ class HttpTracingSpec extends Specification {
 
     ApplicationContext buildContext() {
         def reporter = new InMemoryReporter()
-        ApplicationContext.build(
+        ApplicationContext.builder(
             'tracing.jaeger.enabled':true,
             'tracing.jaeger.sampler.probability':1
         ).singletons(reporter)

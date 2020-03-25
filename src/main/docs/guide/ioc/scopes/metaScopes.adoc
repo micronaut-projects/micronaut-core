@@ -20,7 +20,7 @@ class Foo {}
 ----
 // TODO should this be converted? it would be the same in every language I think
 
-If you wish for the scope to be overridable you should instead using the api:context.annotation.DefaultScope[] annotation on `@Driver` which allows a default scope to be specified if none other is present:
+If you wish for the scope to be overridable you should instead use the api:context.annotation.DefaultScope[] annotation on `@Driver` which allows a default scope to be specified if none other is present:
 
 .Using @DefaultScope
 

@@ -66,8 +66,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/validated/receive-file-upload", requestBody)
-                        .contentType(MediaType.MULTIPART_FORM_DATA)
-                        .accept(MediaType.TEXT_PLAIN_TYPE), String
+                        .contentType(MediaType.MULTIPART_FORM_DATA), String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
 
@@ -84,8 +83,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         when:
         HttpResponse response = client.toBlocking().exchange(
                 HttpRequest.POST("/upload/receive-flow-parts", requestBody)
-                        .contentType(MediaType.MULTIPART_FORM_DATA)
-                        .accept(MediaType.TEXT_PLAIN_TYPE), Boolean)
+                        .contentType(MediaType.MULTIPART_FORM_DATA), Boolean)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -216,7 +214,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-flow-data", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                        .accept(MediaType.TEXT_PLAIN),
                 String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
@@ -259,7 +257,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-multiple-flow-data", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                        .accept(MediaType.TEXT_PLAIN),
                 String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
@@ -412,7 +410,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-multipart-body", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                        .accept(MediaType.TEXT_PLAIN),
                 String
         ))
         HttpResponse<String> response = flowable.blockingFirst()

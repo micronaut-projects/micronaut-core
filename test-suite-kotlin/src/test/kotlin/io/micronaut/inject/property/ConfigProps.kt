@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,4 +23,14 @@ class ConfigProps {
 
     @setparam:MapFormat(transformation = MapFormat.MapTransformation.FLAT)
     var properties: Map<String, Any>? = null
+
+    var otherProperties: Map<String, Any>? = null
+
+    private var setterProperties: Map<String, Any>? = null
+
+    fun setSetterProperties(setterProperties: Map<String, Any>) {
+        this.setterProperties = setterProperties
+    }
+
+    fun getSetterProperties() = setterProperties
 }

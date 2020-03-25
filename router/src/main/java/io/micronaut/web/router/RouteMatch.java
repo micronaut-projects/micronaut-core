@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -157,7 +157,23 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Anno
      * @param contentType The content type
      * @return True if it is
      */
-    boolean accept(@Nullable MediaType contentType);
+    boolean doesConsume(@Nullable MediaType contentType);
+
+    /**
+     * Whether the route does produce any of the given types.
+     *
+     * @param acceptableTypes The acceptable types
+     * @return True if it is
+     */
+    boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes);
+
+    /**
+     * Whether the route does produce any of the given types.
+     *
+     * @param acceptableType The acceptable type
+     * @return True if it is
+     */
+    boolean doesProduce(@Nullable MediaType acceptableType);
 
     /**
      * Whether the specified content type is explicitly an accepted type.
@@ -165,6 +181,18 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Anno
      * @param contentType The content type
      * @return True if it is
      */
+    default boolean explicitlyConsumes(@Nullable MediaType contentType) {
+        return false;
+    }
+
+    /**
+     * Whether the specified content type is explicitly an accepted type.
+     *
+     * @param contentType The content type
+     * @return True if it is
+     * @deprecated Use {@link #explicitlyConsumes(MediaType)} instead
+     */
+    @Deprecated
     default boolean explicitAccept(@Nullable MediaType contentType) {
         return false;
     }
@@ -178,5 +206,17 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Anno
     default boolean isSatisfied(String name) {
         Object val = getVariableValues().get(name);
         return val != null && !(val instanceof UnresolvedArgument);
+    }
+
+    /**
+     * Whether the specified content type is an accepted type.
+     *
+     * @param contentType The content type
+     * @return True if it is
+     * @deprecated Use {@link #doesConsume(MediaType)} instead.
+     */
+    @Deprecated
+    default boolean accept(@Nullable MediaType contentType) {
+        return doesConsume(contentType);
     }
 }

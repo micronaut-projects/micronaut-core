@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,7 +79,7 @@ public class RequestArgumentSatisfier {
             // no required arguments so just execute
             argumentValues = Collections.emptyMap();
         } else {
-            argumentValues = new LinkedHashMap<>();
+            argumentValues = new LinkedHashMap<>(requiredArguments.size());
             // Begin try fulfilling the argument requirements
             for (Argument argument : requiredArguments) {
                 getValueForArgument(argument, request, satisfyOptionals).ifPresent((value) ->

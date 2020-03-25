@@ -7,9 +7,9 @@ buildscript {
         classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
         classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
-        classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.0.0"
+        classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.2.1"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
-        classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.1"
+        classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.2"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
         classpath "io.micronaut.docs:micronaut-docs-asciidoc-extensions:$micronautDocsVersion"
         classpath "io.micronaut.docs:micronaut-docs-gradle-plugins:$micronautDocsVersion", {
@@ -313,12 +313,13 @@ ext {
                     version:micronautSqlVersion,
                     group:'io.micronaut.configuration',
                     name:'micronaut-hibernate-jpa',
-                    modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-dbcp', 'micronaut-postgres-reactive', 'micronaut-jasync-sql', 'micronaut-jooq']
+                    modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-dbcp', 'micronaut-postgres-reactive', 'micronaut-jasync-sql', 'micronaut-jooq', 'micronaut-jdbi']
             ],
             'micronaut.mongo': [
                     version:micronautMongoVersion,
                     group:'io.micronaut.configuration',
-                    name:'micronaut-mongo-reactive'
+                    name:'micronaut-mongo-reactive',
+                    modules:['micronaut-mongo-core', 'micronaut-mongo-sync']
             ],
             'micronaut.redis': [
                     version:micronautRedisVersion,
@@ -365,7 +366,7 @@ ext {
                               'netty-codec-xml', 'netty-common', 'netty-dev-tools', 'netty-handler',
                               'netty-handler-proxy', 'netty-resolver', 'netty-resolver-dns', 'netty-transport',
                               'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt',
-                              'netty-transport-native-epoll', 'netty-transport-native-kqueue']
+                              'netty-transport-native-epoll', 'netty-transport-native-kqueue', 'netty-codec-http2']
             ],
             opentracing                : [
                     version: opentracingVersion,
@@ -407,7 +408,7 @@ ext {
                     name   : 'spock-core'
             ],
             swagger                    : [
-                    version: '2.0.4',
+                    version: '2.1.1',
                     group  : 'io.swagger.core.v3',
                     name   : 'swagger-core',
                     modules: ['swagger-models', 'swagger-annotations']
@@ -502,7 +503,7 @@ ext {
             'micronaut.security'       : [
                     version : micronautSecurityVersion,
                     group   : 'io.micronaut',
-                    modules : ['micronaut-security', 'micronaut-security-jwt', 'micronaut-security-session']
+                    modules : ['micronaut-security-jwt', 'micronaut-security-session']
             ],
             'micronaut.security.configuration'  : [
                     version : micronautSecurityVersion,
@@ -529,7 +530,12 @@ ext {
                     version:micronautCacheVersion,
                     group:'io.micronaut.cache',
                     modules: ['micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop']
-            ]
+            ],
+            'micronaut.servlet': [
+                version:micronautServlet,
+                group:'io.micronaut.servlet',
+                modules: ['micronaut-http-server-tomcat', 'micronaut-http-server-jetty', 'micronaut-http-server-undertow']
+            ],
     ]
 
     dependencyVersion = { String name ->
@@ -750,88 +756,6 @@ subprojects { Project subproject ->
         testAnnotationProcessor "org.ow2.asm:asm-commons:$asmVersion"
     }
 
-    task moveConfigProps() {
-        group 'documentation'
-        doLast {
-            ant.mkdir(dir: "${rootProject.buildDir}/config-props")
-            ant.move(file: "${subproject.buildDir}/classes/java/main/META-INF/config-properties.adoc", tofile: "${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc", failonerror: false, quiet: true)
-        }
-    }
-
-    task javaDocAtReplacement(type: io.micronaut.docs.JavaDocAtValueReplacementTask, dependsOn: moveConfigProps) {
-        adocFile = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
-        rootProjectDir = rootProject.projectDir
-    }
-
-    task replaceAtLink(dependsOn: moveConfigProps) {
-        group 'documentation'
-
-        doLast {
-            File file = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
-            if (file.exists()) {
-                def atLinkReplacer = { String str ->
-                    String newLine = str.substring(0, str.indexOf('{@link io.micronaut.'))
-                    String sub = "api:" + str.substring(str.indexOf('{@link io.micronaut.') + '{@link io.micronaut.'.length())
-                    newLine += sub.substring(0, sub.indexOf('}')) + '[]'
-                    newLine += sub.substring(sub.indexOf('}') + '}'.length())
-                    newLine
-                }
-
-                List<String> lines = file.readLines()
-                List<String> outputLines = []
-                for (String line : lines) {
-                    String proccessedLine = line
-                    while (proccessedLine.contains('{@link io.micronaut.')) {
-                        proccessedLine = atLinkReplacer(proccessedLine)
-                    }
-                    outputLines << proccessedLine
-                }
-                file.text = outputLines.join('\n')
-            }
-        }
-    }
-    task processConfigProps(dependsOn: [replaceAtLink, javaDocAtReplacement]) {
-        group 'documentation'
-        ext {
-            individualConfigPropsFolder = "${rootProject.buildDir}/generated/configurationProperties"
-        }
-        doFirst {
-            if (!new File("${rootProject.buildDir}/generated").exists()) {
-                new File("${rootProject.buildDir}/generated").mkdir()
-            }
-            if (!new File("${rootProject.buildDir}/generated/configurationProperties").exists()) {
-                new File("${rootProject.buildDir}/generated/configurationProperties").mkdir()
-            }
-        }
-        doLast {
-
-            def f = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
-            if (f.exists()) {
-                def lines = f.readLines()
-                def separator = "<<<"
-                List<String> accumulator = []
-                String configurationPropertyName = ''
-                for (String line : lines) {
-
-                    if (line.startsWith('<a id="')) {
-                        String sub = line.substring(line.indexOf('id="') + 'id="'.length())
-                        sub = sub.substring(0, sub.indexOf('"'))
-                        configurationPropertyName = sub
-                    }
-                    if (line == separator) {
-                        File outputfile = new File("${individualConfigPropsFolder}/${configurationPropertyName}.adoc")
-                        outputfile.createNewFile()
-                        outputfile.text = accumulator.join('\n')
-                        accumulator = []
-                        configurationPropertyName = null
-                    } else {
-                        accumulator << line
-                    }
-                }
-            }
-        }
-    }
-
     groovydoc {
         classpath += project.configurations.documentation
     }
@@ -839,7 +763,7 @@ subprojects { Project subproject ->
     task allDeps(type: DependencyReportTask) {}
 }
 
-apply from: "gradle/docs.gradle"
+apply from:"https://raw.githubusercontent.com/micronaut-projects/micronaut-docs/v$micronautDocsVersion/gradle/docs.gradle"
 
 // IDEA 2017.2 made a breaking change with IDE build output vs gradle build output
 // [see https://youtrack.jetbrains.com/issue/IDEA-175172]

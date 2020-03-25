@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ import io.micronaut.retry.annotation.Retryable;
 
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Builds a {@link RetryState} from {@link AnnotationMetadata}.
@@ -59,8 +59,8 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
                                                              .orElseThrow(() -> new IllegalStateException("Missing @Retryable annotation"));
         int attempts = retry.get(ATTEMPTS, Integer.class).orElse(DEFAULT_RETRY_ATTEMPTS);
         Duration delay = retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1));
-        Set<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);
-        Set<Class<? extends Throwable>> excludes = resolveIncludes(retry, EXCLUDES);
+        List<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);
+        List<Class<? extends Throwable>> excludes = resolveIncludes(retry, EXCLUDES);
 
         return new SimpleRetry(
             attempts,
@@ -72,11 +72,9 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
         );
     }
 
-    @SuppressWarnings("unchecked")
-    private Set<Class<? extends Throwable>> resolveIncludes(AnnotationValue<Retryable> retry, String includes) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private List<Class<? extends Throwable>> resolveIncludes(AnnotationValue<Retryable> retry, String includes) {
         Class<?>[] values = retry.classValues(includes);
-        Set classes = new HashSet<>(values.length);
-        classes.addAll(Arrays.asList(values));
-        return classes;
+        return (List) Collections.unmodifiableList(Arrays.asList(values));
     }
 }

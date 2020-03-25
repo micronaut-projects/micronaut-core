@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,12 @@
 package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+
+import javax.inject.Singleton;
 
 /**
  * <p>A bean definition reference provides a reference to a {@link BeanDefinition} thus
@@ -72,4 +77,22 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
      * @return Is the underlying bean type present on the classpath
      */
     boolean isPresent();
+
+    /**
+     * @return Is this bean a singleton.
+     * @since 2.0
+     */
+    default boolean isSingleton() {
+        AnnotationMetadata am = getAnnotationMetadata();
+        return am.hasDeclaredStereotype(Singleton.class) ||
+               am.classValue(DefaultScope.class).map(t -> t == Singleton.class).orElse(false);
+    }
+
+    /**
+     * @return Is this bean a configuration properties.
+     * @since 2.0
+     */
+    default  boolean isConfigurationProperties() {
+        return getAnnotationMetadata().hasDeclaredStereotype(ConfigurationReader.class);
+    }
 }

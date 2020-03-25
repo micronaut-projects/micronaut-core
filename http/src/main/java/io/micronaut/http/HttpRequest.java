@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
 import java.security.cert.Certificate;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * <p>Common interface for HTTP request implementations.</p>
@@ -36,6 +34,16 @@ import java.util.Optional;
  */
 @SuppressWarnings("MethodName")
 public interface HttpRequest<B> extends HttpMessage<B> {
+
+    /**
+     * Constant for HTTP scheme.
+     */
+    String SCHEME_HTTP = "http";
+
+    /**
+     * Constant for HTTPS scheme.
+     */
+    String SCHEME_HTTPS = "https";
 
     /**
      * @return The {@link Cookies} instance
@@ -56,6 +64,28 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The full request URI
      */
     @NonNull URI getUri();
+
+    /**
+     * @return The http version of the request.
+     */
+    default HttpVersion getHttpVersion() {
+        return HttpVersion.HTTP_1_1;
+    }
+
+    /**
+     * A list of accepted {@link MediaType} instances sorted by their quality rating.
+     *
+     * @return A list of zero or many {@link MediaType} instances
+     */
+    default Collection<MediaType> accept() {
+        final HttpHeaders headers = getHeaders();
+        if (headers.contains(HttpHeaders.ACCEPT)) {
+            return MediaType.orderedOf(
+                    headers.getAll(HttpHeaders.ACCEPT)
+            );
+        }
+        return Collections.emptySet();
+    }
 
     /**
      *

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,10 +44,10 @@ import java.util.function.Consumer;
  *     ApplicationContext context = ApplicationContext.run();
  * </pre>
  *
- * <p>Alternatively, the {@link #build()} method can be used to customize the {@code ApplicationContext} using the {@link ApplicationContextBuilder} interface
+ * <p>Alternatively, the {@link #builder()} method can be used to customize the {@code ApplicationContext} using the {@link ApplicationContextBuilder} interface
  * prior to running. For example:</p>
  * <pre class="code">
- *     ApplicationContext context = ApplicationContext.build().environments("test").start();
+ *     ApplicationContext context = ApplicationContext.builder().environments("test").start();
  * </pre>
  *
  * <p>The {@link #getEnvironment()} method can be used to obtain a reference to the application {@link Environment}, which contains the loaded configuration
@@ -259,9 +259,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The built, but not yet running {@link ApplicationContext}
      */
     static @NonNull ApplicationContextBuilder build(@NonNull String... environments) {
-        ArgumentUtils.requireNonNull("environments", environments);
-        return new DefaultApplicationContextBuilder()
-            .environments(environments);
+        return builder(environments);
     }
 
     /**
@@ -272,11 +270,34 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The built, but not yet running {@link ApplicationContext}
      */
     static @NonNull ApplicationContextBuilder build(@NonNull Map<String, Object> properties, @NonNull String... environments) {
+        return builder(properties, environments);
+    }
+
+    /**
+     * Build a {@link ApplicationContext}.
+     *
+     * @param environments The environments to use
+     * @return The built, but not yet running {@link ApplicationContext}
+     */
+    static @NonNull ApplicationContextBuilder builder(@NonNull String... environments) {
+        ArgumentUtils.requireNonNull("environments", environments);
+        return new DefaultApplicationContextBuilder()
+                .environments(environments);
+    }
+
+    /**
+     * Build a {@link ApplicationContext}.
+     *
+     * @param properties   The properties
+     * @param environments The environments to use
+     * @return The built, but not yet running {@link ApplicationContext}
+     */
+    static @NonNull ApplicationContextBuilder builder(@NonNull Map<String, Object> properties, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("properties", properties);
         return new DefaultApplicationContextBuilder()
-            .properties(properties)
-            .environments(environments);
+                .properties(properties)
+                .environments(environments);
     }
 
     /**
@@ -285,6 +306,15 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The built, but not yet running {@link ApplicationContext}
      */
     static @NonNull ApplicationContextBuilder build() {
+        return builder();
+    }
+
+    /**
+     * Build a {@link ApplicationContext}.
+     *
+     * @return The built, but not yet running {@link ApplicationContext}
+     */
+    static @NonNull ApplicationContextBuilder builder() {
         return new DefaultApplicationContextBuilder();
     }
 
@@ -298,7 +328,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
     static @NonNull ApplicationContext run(@NonNull ClassLoader classLoader, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("classLoader", classLoader);
-        return build(classLoader, environments).start();
+        return builder(classLoader, environments).start();
     }
 
     /**
@@ -309,11 +339,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The built, but not yet running {@link ApplicationContext}
      */
     static @NonNull ApplicationContextBuilder build(@NonNull ClassLoader classLoader, @NonNull String... environments) {
-        ArgumentUtils.requireNonNull("environments", environments);
-        ArgumentUtils.requireNonNull("classLoader", classLoader);
-
-        return build(environments)
-            .classLoader(classLoader);
+        return builder(classLoader, environments);
     }
 
     /**
@@ -324,10 +350,36 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @return The built, but not yet running {@link ApplicationContext}
      */
     static @NonNull ApplicationContextBuilder build(@NonNull Class mainClass, @NonNull String... environments) {
+        return builder(mainClass, environments);
+    }
+
+    /**
+     * Build a {@link ApplicationContext}.
+     *
+     * @param classLoader  The classloader to use
+     * @param environments The environment to use
+     * @return The built, but not yet running {@link ApplicationContext}
+     */
+    static @NonNull ApplicationContextBuilder builder(@NonNull ClassLoader classLoader, @NonNull String... environments) {
+        ArgumentUtils.requireNonNull("environments", environments);
+        ArgumentUtils.requireNonNull("classLoader", classLoader);
+
+        return builder(environments)
+                .classLoader(classLoader);
+    }
+
+    /**
+     * Build a {@link ApplicationContext}.
+     *
+     * @param mainClass    The main class of the application
+     * @param environments The environment to use
+     * @return The built, but not yet running {@link ApplicationContext}
+     */
+    static @NonNull ApplicationContextBuilder builder(@NonNull Class mainClass, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("mainClass", mainClass);
 
-        return build(environments)
-            .mainClass(mainClass);
+        return builder(environments)
+                .mainClass(mainClass);
     }
 }

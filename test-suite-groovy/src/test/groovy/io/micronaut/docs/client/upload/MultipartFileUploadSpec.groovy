@@ -6,6 +6,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
 
 import io.micronaut.runtime.server.EmbeddedServer
@@ -228,6 +229,7 @@ class MultipartFileUploadSpec extends Specification {
     }
 
     @Controller('/multipart')
+    @Produces(MediaType.TEXT_PLAIN)
     static class MultipartController {
 
 

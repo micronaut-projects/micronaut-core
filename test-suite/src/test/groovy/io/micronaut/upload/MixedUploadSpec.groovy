@@ -181,7 +181,7 @@ class MixedUploadSpec extends AbstractMicronautSpec {
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-flow-data", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                        .accept(MediaType.TEXT_PLAIN),
                 String
         ))
         HttpResponse<String> response = flowable.blockingFirst()
@@ -224,7 +224,7 @@ class MixedUploadSpec extends AbstractMicronautSpec {
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-multiple-flow-data", requestBody)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                        .accept(MediaType.TEXT_PLAIN),
                 String
         ))
         HttpResponse<String> response = flowable.blockingFirst()

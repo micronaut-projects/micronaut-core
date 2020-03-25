@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -105,7 +104,7 @@ public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
             if (configuration.isRememberMe()) {
                 cookie.maxAge(Integer.MAX_VALUE);
             } else {
-                configuration.getCookieMaxAge().ifPresent(maxAge -> cookie.maxAge(maxAge.get(ChronoUnit.SECONDS)));
+                configuration.getCookieMaxAge().ifPresent(cookie::maxAge);
             }
         }
 

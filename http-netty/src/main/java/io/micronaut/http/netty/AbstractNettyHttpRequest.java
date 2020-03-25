@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,15 +17,15 @@ package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpParameters;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
+import io.micronaut.http.*;
 import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.handler.codec.http2.HttpConversionUtil;
+import io.netty.util.AsciiString;
 import io.netty.util.DefaultAttributeMap;
 
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.util.Collection;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -39,6 +39,8 @@ import java.util.Optional;
 @Internal
 public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap implements HttpRequest<B> {
 
+    public static final AsciiString STREAM_ID = HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text();
+    public static final AsciiString HTTP2_SCHEME = HttpConversionUtil.ExtensionHeaderNames.SCHEME.text();
     protected final io.netty.handler.codec.http.HttpRequest nettyRequest;
     protected final ConversionService<?> conversionService;
     protected final HttpMethod httpMethod;
@@ -50,6 +52,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     private Charset charset;
     private Locale locale;
     private String path;
+    private Collection<MediaType> accept;
 
     /**
      * @param nettyRequest      The Http netty request
@@ -62,6 +65,14 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         this.uri = URI.create(fullUri);
         this.httpMethodName = nettyRequest.method().name();
         this.httpMethod = HttpMethod.parse(httpMethodName);
+    }
+
+    @Override
+    public HttpVersion getHttpVersion() {
+        if (nettyRequest.headers().contains(STREAM_ID)) {
+            return HttpVersion.HTTP_2_0;
+        }
+        return HttpVersion.HTTP_1_1;
     }
 
     /**
@@ -84,6 +95,21 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
             }
         }
         return httpParameters;
+    }
+
+    @Override
+    public Collection<MediaType> accept() {
+        Collection<MediaType> accept = this.accept;
+        if (accept == null) {
+            synchronized (this) { // double check
+                accept = this.accept;
+                if (accept == null) {
+                    accept = HttpRequest.super.accept();
+                    this.accept = accept;
+                }
+            }
+        }
+        return accept;
     }
 
     @Override
@@ -178,7 +204,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
 
     private NettyHttpParameters decodeParameters(String uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
-        return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService);
+        return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService, null);
     }
 
     @Override

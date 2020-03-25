@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,6 +52,8 @@ import org.objectweb.asm.signature.SignatureWriter;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
+import javax.inject.Scope;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -147,6 +149,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final Type TYPE_ABSTRACT_BEAN_DEFINITION = Type.getType(AbstractBeanDefinition.class);
     private static final Type TYPE_ABSTRACT_PARAMETRIZED_BEAN_DEFINITION = Type.getType(AbstractParametrizedBeanDefinition.class);
+    private static final org.objectweb.asm.commons.Method METHOD_OPTIONAL_EMPTY = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(Optional.class, "empty")
+    );
+    private static final Type TYPE_OPTIONAL = Type.getType(Optional.class);
+    private static final org.objectweb.asm.commons.Method METHOD_OPTIONAL_OF = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(Optional.class, "of", Object.class)
+    );
     private final ClassWriter classWriter;
     private final String beanFullClassName;
     private final String beanDefinitionName;
@@ -567,6 +576,49 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             annotationMetadataMethod.visitMaxs(1, 1);
             annotationMetadataMethod.visitEnd();
         }
+
+        // method: boolean isSingleton()
+
+        AnnotationMetadata annotationMetadata = this.annotationMetadata != null ? this.annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
+        writeBooleanMethod(classWriter, "isSingleton", () ->
+                annotationMetadata.hasDeclaredStereotype(Singleton.class) ||
+                        annotationMetadata.classValue(DefaultScope.class).map(t -> t == Singleton.class).orElse(false));
+
+        // method: boolean isIterable()
+        writeBooleanMethod(classWriter, "isIterable", () ->
+                annotationMetadata.hasDeclaredStereotype(EachProperty.class) ||
+                        annotationMetadata.hasDeclaredStereotype(EachBean.class));
+
+        // method: boolean isPrimary()
+        writeBooleanMethod(classWriter, "isPrimary", () ->
+                annotationMetadata.hasDeclaredStereotype(Primary.class));
+
+        // method: boolean isProvided()
+        writeBooleanMethod(classWriter, "isProvided", () ->
+                annotationMetadata.hasDeclaredStereotype(Provided.class));
+
+        // method: Optional<Class> getScope()
+        GeneratorAdapter getScopeMethod = startPublicMethodZeroArgs(
+                classWriter,
+                Optional.class,
+                "getScope"
+        );
+        getScopeMethod.loadThis();
+        Optional<String> scope = annotationMetadata.getDeclaredAnnotationNameByStereotype(Scope.class.getName());
+        if (scope.isPresent()) {
+            getScopeMethod.push(getTypeReferenceForName(scope.get()));
+            getScopeMethod.invokeStatic(
+                    TYPE_OPTIONAL,
+                    METHOD_OPTIONAL_OF
+            );
+        } else {
+            getScopeMethod.invokeStatic(TYPE_OPTIONAL, METHOD_OPTIONAL_EMPTY);
+        }
+
+        getScopeMethod.returnValue();
+        getScopeMethod.visitMaxs(1, 1);
+        getScopeMethod.visitEnd();
+
     }
 
     /**
@@ -708,7 +760,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 postConstructInstanceIndex,
                 ADD_POST_CONSTRUCT_METHOD);
     }
-
 
     /**
      * Visits a pre-destroy method injection point.

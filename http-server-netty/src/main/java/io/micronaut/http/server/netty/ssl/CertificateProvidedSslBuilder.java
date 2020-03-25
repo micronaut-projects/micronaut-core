@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,11 @@ package io.micronaut.http.server.netty.ssl;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.http.HttpVersion;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.ssl.*;
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.codec.http2.Http2SecurityUtil;
+import io.netty.handler.ssl.*;
 
 import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
@@ -43,16 +44,22 @@ import static io.micronaut.core.util.StringUtils.TRUE;
 public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
 
     private final ServerSslConfiguration ssl;
+    private final HttpServerConfiguration httpServerConfiguration;
     private KeyStore keyStoreCache = null;
     private KeyStore trustStoreCache = null;
 
     /**
-     * @param ssl              The ssl configuration
-     * @param resourceResolver The resource resolver
+     * @param httpServerConfiguration The HTTP server configuration
+     * @param ssl                     The ssl configuration
+     * @param resourceResolver        The resource resolver
      */
-    public CertificateProvidedSslBuilder(ServerSslConfiguration ssl, ResourceResolver resourceResolver) {
+    public CertificateProvidedSslBuilder(
+            HttpServerConfiguration httpServerConfiguration,
+            ServerSslConfiguration ssl,
+            ResourceResolver resourceResolver) {
         super(resourceResolver);
         this.ssl = ssl;
+        this.httpServerConfiguration = httpServerConfiguration;
     }
 
     @Override
@@ -68,15 +75,24 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
     @SuppressWarnings("Duplicates")
     @Override
     public Optional<SslContext> build(SslConfiguration ssl) {
+        final HttpVersion httpVersion = httpServerConfiguration.getHttpVersion();
+        return build(ssl, httpVersion);
+    }
+
+    @Override
+    public Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
         SslContextBuilder sslBuilder = SslContextBuilder
-            .forServer(getKeyManagerFactory(ssl))
-            .trustManager(getTrustManagerFactory(ssl));
+                .forServer(getKeyManagerFactory(ssl))
+                .trustManager(getTrustManagerFactory(ssl));
 
         if (ssl.getProtocols().isPresent()) {
             sslBuilder.protocols(ssl.getProtocols().get());
         }
+        final boolean isHttp2 = httpVersion == HttpVersion.HTTP_2_0;
         if (ssl.getCiphers().isPresent()) {
             sslBuilder = sslBuilder.ciphers(Arrays.asList(ssl.getCiphers().get()));
+        } else if (isHttp2) {
+            sslBuilder.ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE);
         }
         if (ssl.getClientAuthentication().isPresent()) {
             ClientAuthentication clientAuth = ssl.getClientAuthentication().get();
@@ -87,6 +103,17 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
             }
         }
 
+        if (isHttp2) {
+            SslProvider provider = SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
+            sslBuilder.sslProvider(provider);
+            sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
+                    ApplicationProtocolConfig.Protocol.ALPN,
+                    ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                    ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                    ApplicationProtocolNames.HTTP_1_1,
+                    ApplicationProtocolNames.HTTP_2
+            ));
+        }
         try {
             return Optional.of(sslBuilder.build());
         } catch (SSLException ex) {

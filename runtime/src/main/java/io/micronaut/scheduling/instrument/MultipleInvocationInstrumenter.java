@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,12 +59,13 @@ final class MultipleInvocationInstrumenter implements InvocationInstrumenter {
 
     /**
      * Invokes afterInvocation for multiple instrumenters.
+     * @param cleanup Whether to cleanup
      */
     @Override
-    public void afterInvocation() {
+    public void afterInvocation(boolean cleanup) {
         while (!executedInstrumenters.isEmpty()) {
             try {
-                executedInstrumenters.pop().afterInvocation();
+                executedInstrumenters.pop().afterInvocation(cleanup);
             } catch (Exception e) {
                 LOG.warn("After instrumentation invocation error: {}", e.getMessage(), e);
             }

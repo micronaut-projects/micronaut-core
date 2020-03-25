@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -147,7 +147,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
         ArgumentUtils.requireNonNull("configuration", configuration);
         configuration.getCookiePath().ifPresent(this::path);
         configuration.getCookieDomain().ifPresent(this::domain);
-        configuration.getCookieMaxAge().ifPresent(maxAge -> this.maxAge(maxAge.get(ChronoUnit.SECONDS)));
+        configuration.getCookieMaxAge().ifPresent(this::maxAge);
         configuration.isCookieHttpOnly().ifPresent(this::httpOnly);
         if (isSecure) {
             configuration.isCookieSecure().ifPresent(this::secure);

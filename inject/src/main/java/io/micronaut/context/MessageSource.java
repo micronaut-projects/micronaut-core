@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.NoSuchMessageException;
@@ -44,7 +43,7 @@ public interface MessageSource {
     MessageSource EMPTY = new MessageSource() {
         @NonNull
         @Override
-        public Optional<String> getMessage(@NonNull String code, @NonNull MessageContext context) {
+        public Optional<String> getRawMessage(@NonNull String code, @NonNull MessageContext context) {
             return Optional.empty();
         }
 
@@ -61,7 +60,10 @@ public interface MessageSource {
      * @param context The context
      * @return A message if present
      */
-    @NonNull Optional<String> getMessage(@NonNull String code, @NonNull MessageContext context);
+    default @NonNull Optional<String> getMessage(@NonNull String code, @NonNull MessageContext context) {
+        Optional<String> rawMessage = getRawMessage(code, context);
+        return rawMessage.map(message -> this.interpolate(message, context));
+    }
 
     /**
      * Resolve a message for the given code and context.
@@ -72,7 +74,28 @@ public interface MessageSource {
      */
     default @NonNull String getMessage(@NonNull String code, @NonNull MessageContext context, @NonNull String defaultMessage) {
         ArgumentUtils.requireNonNull("defaultMessage", defaultMessage);
-        return getMessage(code, context).orElse(defaultMessage);
+        String rawMessage = getRawMessage(code, context, defaultMessage);
+        return interpolate(rawMessage, context);
+    }
+
+    /**
+     * Resolve a message for the given code and context.
+     * @param code The code
+     * @param context The context
+     * @return A message if present
+     */
+    @NonNull Optional<String> getRawMessage(@NonNull String code, @NonNull MessageContext context);
+
+    /**
+     * Resolve a message for the given code and context.
+     * @param code The code
+     * @param context The context
+     * @param defaultMessage The default message to use if no other message is found
+     * @return A message if present
+     */
+    default @NonNull String getRawMessage(@NonNull String code, @NonNull MessageContext context, @NonNull String defaultMessage) {
+        ArgumentUtils.requireNonNull("defaultMessage", defaultMessage);
+        return getRawMessage(code, context).orElse(defaultMessage);
     }
 
     /**
@@ -99,6 +122,20 @@ public interface MessageSource {
     }
 
     /**
+     * Resolve a message for the given code and context or throw an exception.
+     *
+     * @param code The code
+     * @param context The context
+     * @return The message
+     * @throws NoSuchMessageException if the message is not found
+     */
+    default @NonNull String getRequiredRawMessage(@NonNull String code, @NonNull MessageContext context) {
+        return getRawMessage(code, context).orElseThrow(() ->
+                new NoSuchMessageException(code)
+        );
+    }
+
+    /**
      * The context to use.
      */
     interface MessageContext {
@@ -113,6 +150,15 @@ public interface MessageSource {
          */
         @NonNull default Locale getLocale() {
             return Locale.getDefault();
+        }
+
+        /**
+         * The locale to use to resolve messages.
+         * @param defaultLocale The locale to use if no locale is present
+         * @return The locale
+         */
+        @NonNull default Locale getLocale(@Nullable Locale defaultLocale) {
+            return defaultLocale != null ? defaultLocale : getLocale();
         }
 
         /**

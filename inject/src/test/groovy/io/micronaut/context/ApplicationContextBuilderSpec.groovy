@@ -6,7 +6,7 @@ class ApplicationContextBuilderSpec extends Specification {
 
     void "test context configuration"() {
         given:
-        ApplicationContextBuilder builder = ApplicationContext.build()
+        ApplicationContextBuilder builder = ApplicationContext.builder()
         def loader = new GroovyClassLoader()
         builder.classLoader(loader)
                .environments("foo")

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,10 +76,11 @@ public interface MediaTypeCodec {
      * @param object    The object to encode
      * @param allocator The allocator
      * @param <T>       The generic type
+     * @param <B>       The buffer type
      * @return The decoded result
      * @throws CodecException When the result cannot be encoded
      */
-    <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException;
+    <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) throws CodecException;
 
     /**
      * Decode the given type from the given {@link InputStream}.

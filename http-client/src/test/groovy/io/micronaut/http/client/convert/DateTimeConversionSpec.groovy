@@ -47,7 +47,7 @@ class DateTimeConversionSpec extends Specification {
     }
 
     static interface TimeApi {
-        @Get(uri = "/offset", produces = MediaType.TEXT_PLAIN)
+        @Get(uri = "/offset", processes = MediaType.TEXT_PLAIN)
         String time(@NotNull @QueryValue OffsetDateTime time)
     }
 

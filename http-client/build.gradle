@@ -1,3 +1,5 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
 dependencies {
     annotationProcessor project(":inject-java")
     api dependencyVersion("rxjava2")    
@@ -27,9 +29,16 @@ dependencies {
 }
 
 //tasks.withType(Test) {
+//    jvmArgs('-Dio.netty.leakDetection.level=paranoid')
 //    testLogging {
 //        showStandardStreams = true
-//        exceptionFormat = 'full'
+//    }
+//    beforeTest {
+//        System.out.println("STARTING: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//    afterTest {
+//        System.out.println("FINISHED: ${it.className}.$it.name")
+//        System.out.flush()
 //    }
 //}
-//

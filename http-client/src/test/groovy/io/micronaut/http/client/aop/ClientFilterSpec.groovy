@@ -81,7 +81,7 @@ class ClientFilterSpec extends Specification{
 
     void "test a root url matching a manually service client"() {
         given:
-        ApplicationContext ctx = ApplicationContext.build([
+        ApplicationContext ctx = ApplicationContext.builder([
                 'spec.name': 'ClientFilterSpec',
                 'micronaut.http.services.my-service.url': embeddedServer.getURL().toString()
         ]).start()
@@ -117,7 +117,7 @@ class ClientFilterSpec extends Specification{
     @Requires(property = 'spec.name', value = "ClientFilterSpec")
     @Client('/filters')
     static interface MyApi {
-        @Get('/name')
+        @Get(value = '/name', consumes = MediaType.TEXT_PLAIN)
         String name()
     }
 

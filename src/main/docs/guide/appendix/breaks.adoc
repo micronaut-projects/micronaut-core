@@ -1,5 +1,73 @@
 This section will document breaking changes between Micronaut 1.0 and Micronaut 2.0
 
+=== Thread Pool Selection Now Manual
+
+In Micronaut 1.x, Micronaut would attempt to automatically deduce the thread pool to use based on the return type of the controller method.
+
+This approach caused some confusion and created a false association between reactive types and blocking operations.
+
+Micronaut 2.x now leaves it up to the user to specify the thread pool to schedule operations on, including blocking operations.
+
+If you are upgrading from Micronaut 1.x and have a controller that executes blocking I/O operations (such as JDBC or JPA) it is recommended that you add the ann:scheduling.annotation.ExecuteOn[] annotation to execute the blocking operations on a different thread.
+
+snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,class", indent=0,title="Using @ExecuteOn"]
+
+<1> The ann:scheduling.annotation.ExecuteOn[] annotation is used to execute the operation on the I/O thread pool
+
+NOTE: If you wish to return to the previous behaviour as defined in Micronaut 1.x you can set `micronaut.server.thread-selection` to `AUTO` in configuration.
+
+=== Support for RxJava 1.x Removed from Core
+
+RxJava 1.x support is no longer included in core by default. You can re-enable suppot by adding the following dependency:
+
+dependency:io.micronaut.rxjava1:micronaut-rxjava1[scope="compile", version="1.0.0"]
+
+=== Server Side Content Negotiation May Require Test Changes
+
+The new support for server side content negotiation may require changes to tests. For example a test that that makes a call such as:
+
+[source,java]
+----
+String result = client.toBlocking().retrieve(
+    HttpRequest.GET('/test')
+        .accept("text/plain"), String
+)
+----
+
+If the server implementation does not declare the route as `@Produces("text/plain")` the request will be rejected with a `NOT_ACCEPTABLE` HTTP status code.
+
+=== Server Filter Ordering
+
+In Micronaut 1.x almost all built in filters operated on order 0, meaning the order was non deterministic. That caused some compatibility issues with the metrics and security modules. A new class has been added api:http.filter.ServerFilterPhase[] that defines the phases of server filtering and sets an order. Many filters have been updated to now have their order reflect the phase they participate in.
+
+=== Heartbeat Events No Longer Published if no Discovery Clients present
+
+A api:health.HeartbeatEvent[] is no longer published automatically if there are no api:discovery.DiscoveryClient[] instances present.
+
+This behaviour can be changed by setting `micronaut.heartbeat.enabled` to `true` explicitly in configuration.
+
+=== Several TypeConverters Are No Longer Beans
+
+Many `TypeConverter` instances that were previously beans are no longer beans and are deprecated including:
+
+* api:http.MediaTypeConverter[]
+* api:convext.converters.StringToClassConverter[]
+* api:convext.converters.StringArrayToClassArrayConverter[]
+* api:http.client.converters.SocketAddressConverter[]
+* api:reactive.reactor.converters.PublisherToMonoConverter[]
+* api:reactive.reactor.converters.PublisherToFluxConverter[]
+* api:reactive.reactor.converters.ObjectToFluxConverter[]
+* api:reactive.reactor.converters.ObjectToMonoConverter[]
+* api:jackson.convert.JsonNodeToObjectConverter[]
+* api:jackson.convert.MapToObjectConverter[]
+* api:jackson.convert.ObjectToJsonNodeConverter[]
+* api:jackson.convert.ArrayNodeToArrayConverter[]
+* api:jackson.convert.ArrayNodeToIterableConverter[]
+* api:jackson.convert.ObjectNodeToConvertibleValuesConverter[]
+* api:runtime.http.converters.HttpStatusConverter[]
+
+These should not be injected directly but instead used through the api:core.convert.ConversionService[] API.
+
 === @Executable No Longer Stereotype of @Around
 
 In Micronaut 1.x the ann:context.annotation.Executable[] annotation was a meta-annotation specified on the ann:aop.Around[] and ann:aop.Introduction[] annotations. This meant that an api:inject.ExecutableMethod[] reference was generated for every usage of AOP advice which consumed additional memory unnecessarily.
@@ -63,7 +131,6 @@ Instead you should always use ann:http.client.annotation.Client[]:
 RxHttpClient httpClient;
 ----
 
-
 === Source Retention Annotations No Longer Retained in Runtime Metadata
 
 In Micronaut 1.x annotations specified as source retention were still retained in the api:core.annotation.AnnotationMetadata[] interface. As of Micronaut 2.x this is no longer the case with source retention annotations only available within the compiler APIs.
@@ -93,10 +160,6 @@ NOTE: This change does not apply to an explicit primary defined in the annotatio
 
 Specifying a file with `micronaut.config.files`, either through the system property or environment variable, that does not exist or cannot be read will now result in the application failing to startup. In previous versions of Micronaut a warning would be logged and the file would be ignored.
 
-=== Graal Dependency
-
-The old Graal group name `com.oracle.substratevm` is no longer part of the Micronaut BOM.
-
 === PropertySourceLoader Changes
 
 Some default interface methods are no longer default and require implementation.
@@ -104,3 +167,66 @@ Some default interface methods are no longer default and require implementation.
 === Deprecation Removal
 
 Most if not all deprecated classes and methods have been removed.
+
+=== Map Property Binding
+
+In Micronaut 1.x `java.util.Map` properties being bound from config were inconsistently bound as either a nested or flat. Now maps are bound as nested by default and the ann:core.convert.format.MapFormat[] annotation's default value for `transformation` has been changed to reflect that.
+
+For example given the config:
+
+[source,yaml]
+----
+persons:
+  joe:
+    age: 30
+  sally:
+    age: 25
+----
+
+A map property injected via `@Property(name ="persons")` may have been injected flat or nested depending on a couple factors.
+
+[source,json]
+.Flat
+----
+{"joe.age": 30, "sally.age": 25}
+----
+
+[source,json]
+.Nested
+----
+{"joe": {"age": 30}, "sally": {"age": 25}}
+----
+
+To bind to a map with flat keys, add the ann:core.convert.format.MapFormat[] annotation and set the `transformation` member.
+
+=== GraalVM BOM Entry
+
+The no longer used group for Graal is no longer part of the bom. While upgrading if you depend on Graal you may see `Could not find com.oracle.substratevm:svm:.`. To resolve the issue, change the dependency group to `org.graalvm.nativeimage`.
+
+=== Cookie Configuration
+
+The `getCookieMaxAge` method has been changed to return a `java.time.Duration`.
+
+=== `@Retryable` and `@CircuitBreaker` Exception Handling
+
+`@Retryable` and `@CircuitBreaker` in previous versions of Micronaut resolved `includes` and `excludes` explicitly. Any exception thrown had to exactly match one of the exceptions specified. This has been changed to now also include subclasses of the exception types specified.
+
+=== MessageSource API Changes
+
+The semantics of the `getMessage` method have been changed to also interpolate the message with any provided variables. In previous versions of Micronaut, the raw message was returned from the bundle. To support reading the raw message, a new method `getRawMessage` has been added.
+
+In addition, escaping of messages with single quotes is now implemented in accordance with the standard Java link:{javase}java/text/MessageFormat.html[MessageFormat] class. Messages that contain a single quote will now need escaping in order for the quote to output as it did previously. For example:
+
+[source,properties]
+----
+my.message=We love Micronaut's documentation
+----
+
+Would now be output as `We love Micronauts documentation`. To achieve the desired result, escape the single quote with another single quote.
+
+[source,properties]
+----
+my.message=We love Micronaut''s documentation
+----
+
+NOTE: This change also applies to messages in custom constraint annotations, which interpolate the message via the message source api.

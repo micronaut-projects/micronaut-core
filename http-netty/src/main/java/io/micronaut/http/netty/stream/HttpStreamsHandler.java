@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,6 +171,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     protected void bodyRequested(ChannelHandlerContext ctx) {
     }
 
+    /**
+     * @return Whether this is the client stream handler.
+     */
+    protected abstract boolean isClient();
+
     @Override
     public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
 
@@ -230,7 +235,11 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Calling ctx.read() for cancelled subscription");
             }
-            ctx.read();
+            if (isClient()) {
+                ctx.read();
+            } else {
+                ctx.fireChannelWritabilityChanged();
+            }
         }
     }
 
@@ -244,7 +253,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 consumedInMessage(ctx);
             }
         } else {
-            ReferenceCountUtil.release(content);
+            ReferenceCountUtil.release(content, content.refCnt());
             if (content instanceof LastHttpContent) {
                 ignoreBodyRead = false;
                 if (currentlyStreamedMessage != null) {
@@ -259,6 +268,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         if (ignoreBodyRead) {
             ctx.read();
+            ignoreBodyRead = false;
         } else {
             ctx.fireChannelReadComplete();
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,14 @@ package io.micronaut.web.router.version;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.filter.FilteredRouter;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+
+import static io.micronaut.web.router.version.RoutesVersioningConfiguration.PREFIX;
 
 /**
  * Configuration to decorate {@link Router} with version matching logic.
@@ -31,6 +34,7 @@ import javax.inject.Singleton;
  * @since 1.1.0
  */
 @Singleton
+@Requires(property = PREFIX + ".enabled", value = StringUtils.TRUE)
 @Requires(beans = RoutesVersioningConfiguration.class)
 public class VersionAwareRouterListener implements BeanCreatedEventListener<Router> {
 

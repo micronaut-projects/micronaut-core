@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ public class WebSocketMessageEncoder {
     public WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
         if (message instanceof byte[]) {
             return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((byte[]) message));
-        } else if (ClassUtils.isJavaLangType(message.getClass())) {
+        } else if (ClassUtils.isJavaLangType(message.getClass()) || message instanceof CharSequence) {
             String s = message.toString();
             return new TextWebSocketFrame(s);
         } else if (message instanceof ByteBuf) {

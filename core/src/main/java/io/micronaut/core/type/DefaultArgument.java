@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package io.micronaut.core.type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -33,6 +34,17 @@ import java.util.*;
  */
 @Internal
 public class DefaultArgument<T> implements Argument<T> {
+
+    static final Set<Class<?>> CONTAINER_TYPES = CollectionUtils.setOf(
+        List.class,
+        Set.class,
+        Map.class,
+        Collection.class,
+        Queue.class,
+        SortedSet.class,
+        Deque.class,
+        Vector.class,
+        ArrayList.class);
 
     private final Class<T> type;
     private final String name;

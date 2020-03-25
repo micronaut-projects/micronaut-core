@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.session.Session;
@@ -48,7 +49,7 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
     /**
      * The order of the filter.
      */
-    public static final Integer ORDER = 0;
+    public static final Integer ORDER = ServerFilterPhase.SESSION.order();
 
     /**
      * Constant for Micronaut SESSION attribute.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,11 +47,37 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private List<String> envVarIncludes = new ArrayList<>();
     private List<String> envVarExcludes = new ArrayList<>();
     private String[] args = new String[0];
+    private boolean eagerInitConfiguration;
+    private boolean eagerInitSingletons;
 
     /**
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
+    }
+
+    @Override
+    public boolean isEagerInitSingletons() {
+        return eagerInitSingletons;
+    }
+
+    @Override
+    public boolean isEagerInitConfiguration() {
+        return eagerInitConfiguration;
+    }
+
+    @NonNull
+    @Override
+    public ApplicationContextBuilder eagerInitConfiguration(boolean eagerInitConfiguration) {
+        this.eagerInitConfiguration = eagerInitConfiguration;
+        return this;
+    }
+
+    @NonNull
+    @Override
+    public ApplicationContextBuilder eagerInitSingletons(boolean eagerInitSingletons) {
+        this.eagerInitSingletons = eagerInitSingletons;
+        return this;
     }
 
     @Override

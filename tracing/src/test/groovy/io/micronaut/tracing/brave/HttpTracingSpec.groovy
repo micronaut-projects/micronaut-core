@@ -19,11 +19,13 @@ import brave.SpanCustomizer
 import brave.propagation.StrictCurrentTraceContext
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
@@ -83,6 +85,12 @@ class HttpTracingSpec extends Specification {
         reporter.spans[1].id() == reporter.spans[1].id()
         reporter.spans[1].kind() == Span.Kind.CLIENT
 
+
+        when:"An observeOn call is used"
+        response = client.toBlocking().exchange('/traced/rxjava/observe', String)
+
+        then:"The response is correct"
+        response.body() == 'hello'
 
         cleanup:
         context.close()
@@ -151,10 +159,10 @@ class HttpTracingSpec extends Specification {
 
     void "tested nested http tracing with server without tracing"() {
         given:
-        ApplicationContext appWithoutTracing = ApplicationContext.build().start()
+        ApplicationContext appWithoutTracing = ApplicationContext.builder().start()
         EmbeddedServer embeddedServerWithoutTracing = appWithoutTracing.getBean(EmbeddedServer).start()
 
-        ApplicationContext context = ApplicationContext.build(
+        ApplicationContext context = ApplicationContext.builder(
                 'tracing.zipkin.enabled':true,
                 'tracing.zipkin.sampler.probability':1,
                 'micronaut.http.services.not-traced-client.urls[0]':"http://localhost:${embeddedServerWithoutTracing.port}",
@@ -244,7 +252,7 @@ class HttpTracingSpec extends Specification {
 
     ApplicationContext buildContext() {
         def reporter = new TestReporter()
-        ApplicationContext.build(
+        ApplicationContext.builder(
                 'tracing.zipkin.enabled':true,
                 'tracing.zipkin.sampler.probability':1
         )
@@ -262,6 +270,17 @@ class HttpTracingSpec extends Specification {
         String hello(String name) {
             spanCustomizer.tag("foo", "bar")
             return name
+        }
+
+        @Get(value = "/rxjava/observe", produces = MediaType.TEXT_PLAIN)
+        Single<String> index() {
+            return Single.just("hello").observeOn(Schedulers.computation()).map( { r ->
+                if (ServerRequestContext.currentRequest().isPresent()) {
+                    return r;
+                } else {
+                    throw new RuntimeException("fail");
+                }
+            });
         }
 
         @Get("/rxjava/{name}")

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import io.micronaut.http.cookie.CookieConfiguration;
 import io.micronaut.session.SessionConfiguration;
 
 import java.time.Duration;
-import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
 /**
@@ -174,7 +173,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
     /**
      * @return The max age to use for the cookie
      */
-    public Optional<TemporalAmount> getCookieMaxAge() {
+    public Optional<Duration> getCookieMaxAge() {
         return Optional.ofNullable(cookieMaxAge);
     }
 

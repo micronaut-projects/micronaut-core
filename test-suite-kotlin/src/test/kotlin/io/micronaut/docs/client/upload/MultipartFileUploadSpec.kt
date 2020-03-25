@@ -114,7 +114,7 @@ class MultipartFileUploadSpec: StringSpec() {
     @Controller("/multipart")
     internal class MultipartController {
 
-        @Post(value = "/upload", consumes = [MediaType.MULTIPART_FORM_DATA])
+        @Post(value = "/upload", consumes = [MediaType.MULTIPART_FORM_DATA], produces = [MediaType.TEXT_PLAIN])
         fun upload(data: ByteArray): HttpResponse<String> {
             return HttpResponse.ok("Uploaded " + data.size + " bytes")
         }

@@ -15,7 +15,7 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 3. Properties from `MICRONAUT_APPLICATION_JSON`
 4. Java System Properties
 5. OS environment variables
-6. Configuration files loaded in order from the system property 'micronaut.config.files' or the environment variable `MICRONAUT_CONFIG_FILES`. The value can be a comma separated list of paths with the last file have precedence. The files can be referenced from the file system as a path or the classpath with a `classpath:` prefix.
+6. Configuration files loaded in order from the system property 'micronaut.config.files' or the environment variable `MICRONAUT_CONFIG_FILES`. The value can be a comma separated list of paths with the last file having precedence. The files can be referenced from the file system as a path or the classpath with a `classpath:` prefix.
 7. Enviroment-specific properties from `application-{environment}.{extension}`
 8. Application-specific properties from `application.{extension}`
 
@@ -60,7 +60,7 @@ The above example tries to read a `server.address` property otherwise fallbacks 
 
 === Property Value Binding
 
-Note that these property references should always be in kebab case (lowercase and hyphen-separated) when placing references in code or in placeholder values. In other words you should use for example `micronaut.server.default-charset` and not `micronaut.server.defaultCharset`.
+Note that these property references should always be in kebab case (lowercase and hyphen-separated) when placing references in code or in placeholder values. For example, you should use `micronaut.server.default-charset` and not `micronaut.server.defaultCharset`.
 
 Micronaut still allows specifying the latter in configuration, but normalizes the properties into kebab case form to optimize memory consumption and reduce complexity when resolving properties. The following table summarizes how properties are normalized from different sources:
 
@@ -78,7 +78,7 @@ Micronaut still allows specifying the latter in configuration, but normalizes th
 |`MY_APP_MY_STUFF` | `my.app.my.stuff`, `my.app.my-stuff`, `my.app-my.stuff`, `my.app-my-stuff`, `my-app.my.stuff`, `my-app.my-stuff`, `my-app-my.stuff`, `my-app-my-stuff`  | Environment Variable
 |===
 
-Environment variables are given special treatment to allow the definition of environment variables to be more flexible.
+Environment variables are given special treatment to allow the definition of environment variables to be more flexible. Note that there is no way to reference an environment variable with camel-case.
 
 IMPORTANT: Because the number of properties generated is exponential based on the number of `_` characters in the environment variable, it is recommended to refine which, if any, environment variables are included in configuration if the number of environment variables with a large number of underscores is high.
 

@@ -7,6 +7,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.scheduling.executor.ThreadSelection
 import io.reactivex.Single
 import spock.lang.Specification
@@ -30,10 +32,10 @@ class ThreadSelectionSpec extends Specification {
         embeddedServer.close()
 
         where:
-        strategy               | blocking            | nonBlocking         | reactive            | blockingReactive
-        ThreadSelection.AUTO   | 'pool-'             | 'nioEventLoopGroup' | 'nioEventLoopGroup' | 'pool-'
-        ThreadSelection.IO     | 'pool-'             | 'pool-'             | 'pool-'             | 'pool-'
-        ThreadSelection.MANUAL | 'nioEventLoopGroup' | 'nioEventLoopGroup' | 'nioEventLoopGroup' | 'nioEventLoopGroup'
+        strategy               | blocking            | nonBlocking         | reactive            | blockingReactive    | scheduleBlocking | scheduleReactive
+        ThreadSelection.AUTO   | 'pool-'             | 'nioEventLoopGroup' | 'nioEventLoopGroup' | 'pool-'             | "pool-"          | "pool-"
+        ThreadSelection.IO     | 'pool-'             | 'pool-'             | 'pool-'             | 'pool-'             | "pool-"          | "pool-"
+        ThreadSelection.MANUAL | 'nioEventLoopGroup' | 'nioEventLoopGroup' | 'nioEventLoopGroup' | 'nioEventLoopGroup' | "pool-"          | "pool-"
 
 
     }
@@ -51,6 +53,13 @@ class ThreadSelectionSpec extends Specification {
 
         @Get("/reactiveblocking")
         Single<String> reactiveBlocking()
+
+        @Get("/scheduleblocking")
+        String scheduleBlocking()
+
+        @Get("/schedulereactive")
+        Single<String> scheduleReactive()
+
     }
 
     @Controller("/thread-selection")
@@ -74,6 +83,18 @@ class ThreadSelectionSpec extends Specification {
         @Get("/reactiveblocking")
         @Blocking
         Single<String> reactiveBlocking() {
+            Single.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
+        }
+
+        @Get("/scheduleblocking")
+        @ExecuteOn(TaskExecutors.IO)
+        String scheduleBlocking() {
+            return "thread: ${Thread.currentThread().name}"
+        }
+
+        @Get("/schedulereactive")
+        @ExecuteOn(TaskExecutors.IO)
+        Single<String> scheduleReactive() {
             Single.fromCallable({ -> "thread: ${Thread.currentThread().name}" })
         }
     }

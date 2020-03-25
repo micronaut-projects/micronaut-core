@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,11 +69,10 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         // checks if the variable is defined with modifier char *
         // eg. ?pojo*
         boolean bindAll = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class)
-                .flatMap(umi -> umi.getVariables()
-                        .stream()
-                        .filter(v -> v.getName().equals(parameterName))
-                        .findFirst()
-                        .map(UriMatchVariable::isExploded)).orElse(false);
+                .map(umi -> {
+                    UriMatchVariable uriMatchVariable = umi.getVariableMap().get(parameterName);
+                    return uriMatchVariable != null && uriMatchVariable.isExploded();
+                }).orElse(false);
 
 
         BindingResult<T> result;
@@ -102,8 +101,9 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         }
         Optional<T> val = result.getValue();
         if (!val.isPresent() && !hasAnnotation) {
-            // try attribute
-            result = doBind(context, source.getAttributes(), parameterName);
+            // attributes are sometimes added by filters, so this should return unsatisfied if not found
+            // so it can be picked up after the filters are executed
+            result = doBind(context, source.getAttributes(), parameterName, BindingResult.UNSATISFIED);
         }
 
         Class argumentType;

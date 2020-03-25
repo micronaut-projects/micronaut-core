@@ -451,7 +451,7 @@ class MyProperties {
 
         when:
         BeanFactory factory = beanDefinition
-        ApplicationContext applicationContext = ApplicationContext.build().start()
+        ApplicationContext applicationContext = ApplicationContext.builder().start()
         def bean = factory.build(applicationContext, beanDefinition)
 
         then:
@@ -519,7 +519,7 @@ class Parent {
 
         when:
         BeanFactory factory = beanDefinition
-        ApplicationContext applicationContext = ApplicationContext.build().start()
+        ApplicationContext applicationContext = ApplicationContext.builder().start()
         def bean = factory.build(applicationContext, beanDefinition)
 
         then:
@@ -598,7 +598,7 @@ class MyConfig {
     }
 }''')
         BeanFactory factory = beanDefinition
-        ApplicationContext applicationContext = ApplicationContext.build(["my.host": "abc"]).start()
+        ApplicationContext applicationContext = ApplicationContext.builder(["my.host": "abc"]).start()
         def bean = factory.build(applicationContext, beanDefinition)
 
         then:

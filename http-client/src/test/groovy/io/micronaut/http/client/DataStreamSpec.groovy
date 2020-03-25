@@ -126,7 +126,7 @@ class DataStreamSpec extends Specification {
         when:
         List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(
                 '/datastream/books'
-        )).blockingIterable().toList().collect { res -> res.body.get().toByteArray() }
+        )).map { res -> res.body.get().toByteArray() }.blockingIterable().toList()
 
         then:
         arrays.size() == 2
@@ -162,6 +162,14 @@ class DataStreamSpec extends Specification {
 
     }
 
+    void "test reading a byte array"() {
+        when:
+        byte[] data = client.toBlocking().retrieve("/datastream/data", byte[].class)
+
+        then:
+        data == [188309,188310] as byte[]
+    }
+
     static class Book {
         String title
     }
@@ -177,6 +185,12 @@ class DataStreamSpec extends Specification {
         @Post(uri = "/books", consumes = "custom/content", produces = MediaType.TEXT_PLAIN)
         Publisher<String> list(@Body Publisher<String> body) {
             return body
+        }
+
+        //testing that the client will ignore the content type if the type requested is byte[]
+        @Get(uri = "/data", produces = MediaType.TEXT_PLAIN)
+        byte[] data() {
+            [188309,188310] as byte[]
         }
     }
 }

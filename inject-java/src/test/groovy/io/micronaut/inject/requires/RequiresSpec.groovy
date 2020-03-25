@@ -27,7 +27,7 @@ class MyBean {
 }
 ''')
 
-        ApplicationContext applicationContext = ApplicationContext.build().build()
+        ApplicationContext applicationContext = ApplicationContext.builder().build()
         applicationContext.environment.addPropertySource(PropertySource.of("foo":"test"))
         applicationContext.environment.start()
 
@@ -36,7 +36,7 @@ class MyBean {
 
         when:
         applicationContext.close()
-        applicationContext = ApplicationContext.build().build()
+        applicationContext = ApplicationContext.builder().build()
         applicationContext.environment.addPropertySource(PropertySource.of("foo":"bar"))
         applicationContext.environment.start()
 
@@ -45,7 +45,7 @@ class MyBean {
 
         when:
         applicationContext.close()
-        applicationContext = ApplicationContext.build().build()
+        applicationContext = ApplicationContext.builder().build()
         applicationContext.environment.start()
 
         then:
@@ -122,7 +122,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
-                .build('foo.bar':"test")
+                .builder('foo.bar':"test")
                 .build()
         context.environment.start()
 
@@ -253,7 +253,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build("foo").build()
+        def context = ApplicationContext.builder("foo").build()
 
         then:
         beanDefinition.isEnabled(context)
@@ -275,7 +275,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build().build()
+        def context = ApplicationContext.builder().build()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -297,7 +297,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build("foo").build()
+        def context = ApplicationContext.builder("foo").build()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -319,7 +319,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build("foo").build()
+        def context = ApplicationContext.builder("foo").build()
 
         then:
         !beanDefinition.isEnabled(context)
@@ -341,7 +341,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build().build()
+        def context = ApplicationContext.builder().build()
 
         then:
         beanDefinition.isEnabled(context)
@@ -363,7 +363,7 @@ class MyBean {
 }
 ''')
 
-        def context = ApplicationContext.build().build()
+        def context = ApplicationContext.builder().build()
 
         then:
         beanDefinition.isEnabled(context)
@@ -386,7 +386,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
-                .build('foo.bar':true)
+                .builder('foo.bar':true)
                 .build()
 
         context.environment.start()
@@ -416,7 +416,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
-                .build()
+                .builder()
                 .build()
 
         context.environment.start()
@@ -443,7 +443,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
-                .build('foo.bar':"test")
+                .builder('foo.bar':"test")
                 .build()
 
         context.environment.start()
@@ -469,7 +469,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
-                .build()
+                .builder()
                 .build()
 
         context.environment.start()
@@ -496,7 +496,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
-                .build('foo.bar':"blah")
+                .builder('foo.bar':"blah")
                 .build()
 
         context.environment.start()
@@ -525,7 +525,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
-                .build('foo.bar':"10")
+                .builder('foo.bar':"10")
                 .build()
 
         context.environment.start()
@@ -551,7 +551,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
-                .build()
+                .builder()
                 .build()
 
         context.environment.start()
@@ -578,7 +578,7 @@ class MyBean {
 ''')
 
         def context = ApplicationContext
-                .build('foo.bar':"blah")
+                .builder('foo.bar':"blah")
                 .build()
 
         context.environment.start()
@@ -605,7 +605,7 @@ class MyBean {
 ''')
         OperatingSystem.instance = new OperatingSystem(Requires.Family.LINUX)
         def context = ApplicationContext
-                .build()
+                .builder()
                 .build()
 
         context.environment.start()
@@ -617,7 +617,7 @@ class MyBean {
         context.close()
         OperatingSystem.instance = new OperatingSystem(Requires.Family.WINDOWS)
         context = ApplicationContext
-                .build()
+                .builder()
                 .build()
 
         context.environment.start()
@@ -644,7 +644,7 @@ class MyBean {
 ''')
         OperatingSystem.instance = new OperatingSystem(Requires.Family.WINDOWS)
         def context = ApplicationContext
-                .build()
+                .builder()
                 .build()
 
         context.environment.start()
@@ -656,7 +656,7 @@ class MyBean {
         context.close()
         OperatingSystem.instance = new OperatingSystem(Requires.Family.LINUX)
         context = ApplicationContext
-                .build()
+                .builder()
                 .build()
 
         context.environment.start()

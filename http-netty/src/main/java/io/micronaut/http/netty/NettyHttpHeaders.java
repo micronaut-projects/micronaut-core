@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package io.micronaut.http.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.MutableHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 
@@ -53,7 +54,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
      * Default constructor.
      */
     public NettyHttpHeaders() {
-        this.nettyHeaders = new DefaultHttpHeaders(false);
+        this.nettyHeaders = new DefaultHttpHeaders();
         this.conversionService = ConversionService.SHARED;
     }
 
@@ -118,6 +119,12 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public MutableHttpHeaders add(CharSequence header, CharSequence value) {
         nettyHeaders.add(header, value);
+        return this;
+    }
+
+    @Override
+    public MutableHeaders set(CharSequence header, CharSequence value) {
+        nettyHeaders.set(header, value);
         return this;
     }
 

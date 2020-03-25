@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -108,6 +108,11 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
     }
 
     @Override
+    public boolean isWritable() {
+        return channel.isWritable();
+    }
+
+    @Override
     public boolean isSecure() {
         return isSecure;
     }
@@ -137,8 +142,12 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
         if (isOpen()) {
             if (message != null) {
                 CompletableFuture<T> future = new CompletableFuture<>();
-
-                WebSocketFrame frame = messageEncoder.encodeMessage(message, mediaType);
+                WebSocketFrame frame;
+                if (message instanceof WebSocketFrame) {
+                    frame = (WebSocketFrame) message;
+                } else {
+                    frame = messageEncoder.encodeMessage(message, mediaType);
+                }
                 channel.writeAndFlush(frame).addListener(f -> {
                     if (f.isSuccess()) {
                         future.complete(message);
@@ -160,7 +169,12 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
         if (isOpen()) {
             if (message != null) {
                 try {
-                    WebSocketFrame frame = messageEncoder.encodeMessage(message, mediaType);
+                    WebSocketFrame frame;
+                    if (message instanceof WebSocketFrame) {
+                        frame = (WebSocketFrame) message;
+                    } else {
+                        frame = messageEncoder.encodeMessage(message, mediaType);
+                    }
                     channel.writeAndFlush(frame).sync().get();
                 } catch (InterruptedException e) {
                     throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
@@ -183,7 +197,12 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
             if (!isOpen()) {
                 emitter.onError(new WebSocketSessionException("Session closed"));
             } else {
-                WebSocketFrame frame = messageEncoder.encodeMessage(message, mediaType);
+                WebSocketFrame frame;
+                if (message instanceof WebSocketFrame) {
+                    frame = (WebSocketFrame) message;
+                } else {
+                    frame = messageEncoder.encodeMessage(message, mediaType);
+                }
 
                 ChannelFuture channelFuture = channel.writeAndFlush(frame);
                 channelFuture.addListener(future -> {

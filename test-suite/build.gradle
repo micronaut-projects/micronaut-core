@@ -1,3 +1,5 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
 buildscript {
     repositories {
         maven { url "https://plugins.gradle.org/m2/" }
@@ -45,7 +47,7 @@ dependencies {
     testImplementation dependencyVersion("jaeger")
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     // tag::testcontainers-dependencies[]
-    testImplementation "org.testcontainers:spock:1.12.5"
+    testImplementation "org.testcontainers:spock:1.13.0"
     // end::testcontainers-dependencies[]
     testImplementation 'org.awaitility:awaitility:4.0.2'
 
@@ -58,24 +60,29 @@ dependencies {
     testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junit5Version"
     testRuntimeOnly "ch.qos.logback:logback-classic:1.2.3"
     testRuntimeOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
+
+    // needed for HTTP/2 tests
+    testImplementation 'io.netty:netty-tcnative:2.0.29.Final'
+    testImplementation 'io.netty:netty-tcnative-boringssl-static:2.0.29.Final'
+    testImplementation "io.netty:netty-tcnative-boringssl-static:2.0.29.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
 }
 
-tasks.withType(Test) {
-    useJUnitPlatform()
-
-    jvmArgs('-Dio.netty.leakDetection.level=paranoid')
-/*    testLogging {
-        showStandardStreams = true
-    }
-    beforeTest {
-        System.out.println("STARTING: ${it.className}.$it.name")
-        System.out.flush()
-    }
-    afterTest {
-        System.out.println("FINISHED: ${it.className}.$it.name")
-        System.out.flush()
-    }*/
-}
+//tasks.withType(Test) {
+//    useJUnitPlatform()
+//
+//    jvmArgs('-Dio.netty.leakDetection.level=paranoid')
+//    testLogging {
+//        showStandardStreams = true
+//    }
+//    beforeTest {
+//        System.out.println("STARTING: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//    afterTest {
+//        System.out.println("FINISHED: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//}
 
 //compileTestJava.options.fork = true
 //compileTestJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

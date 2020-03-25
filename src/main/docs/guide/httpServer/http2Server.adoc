@@ -1,0 +1,69 @@
+Since Micronaut 2.x, Micronaut's Netty-based HTTP server can be configured to support HTTP/2.
+
+==== Configuring the Server for HTTP/2
+
+The first step to doing so is setting the supported HTTP version is the server configuration:
+
+.Enabling HTTP/2 Support
+[source,yaml]
+----
+micronaut:
+  server:
+      http-version: 2.0
+----
+
+With this configuration in place Micronaut will enable support for the `h2c` protocol (see https://http2.github.io/http2-spec/#discover-http[HTTP/2 over cleartext]) which is fine for development.
+
+Since browsers don't support `h2c` and in general https://http2.github.io/http2-spec/#discover-https[HTTP/2 over TLS] (the `h2` protocol) is recommended for production you should enable <<https, HTTPS support>> support. For development this can be done with:
+
+.Enabling `h2` Protocol Support
+[source,yaml]
+----
+micronaut:
+  ssl:
+      enabled: true
+      buildSelfSigned: true
+  server:
+      http-version: 2.0
+----
+
+For production, see the <<https, configuring HTTPS>> section of the documentation.
+
+Note that if you deployment environment is JDK 8 or if you wish for improved support for OpenSSL you will need to define the following dependencies on Netty Tomcat Native:
+
+dependency:io.netty:netty-tcnative:2.0.29.Final[scope="runtimeOnly"]
+
+dependency:io.netty:netty-tcnative-boringssl-static:2.0.29.Final[scope="runtimeOnly"]
+
+In addition to a dependency on the appropriate native library for your architecture. For example:
+
+.Configuring Tomcat Native
+[source,groovy]
+----
+runtimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.29.Final:${Os.isFamily(Os.FAMILY_MAC) ? 'osx-x86_64' : 'linux-x86_64'}"
+----
+
+See the documentation on https://netty.io/wiki/forked-tomcat-native.html[Tomcat Native] for more information.
+
+==== HTTP/2 Clients
+
+By default Micronaut's HTTP client is configured to support HTTP 1.1. To enable support for HTTP/2 you can do so globally by setting the supported HTTP version if configuration:
+
+.Enabling HTTP/2 in Clients
+[source,yaml]
+----
+micronaut:
+    http:
+        client:
+            http-version: 2.0
+----
+
+Or by specifying the HTTP version to use when injecting the client:
+
+.Injecting a HTTP/2 Client
+[source,java]
+----
+@Inject
+@Client(httpVersion=HttpVersion.HTTP_2_0)
+RxHttpClient client;
+----

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ public interface Route {
      *
      * @return A new route with the media type applied
      */
-    Route acceptAll();
+    Route consumesAll();
 
     /**
      * Defines routes nested within this route.
@@ -110,5 +110,16 @@ public interface Route {
      */
     default List<MediaType> getConsumes() {
         return Collections.emptyList();
+    }
+
+    /**
+     * Accept all {@link MediaType} references.
+     *
+     * @return A new route with the media type applied
+     * @deprecated Use {@link #consumesAll()} instead.
+     */
+    @Deprecated
+    default Route acceptAll() {
+        return consumesAll();
     }
 }

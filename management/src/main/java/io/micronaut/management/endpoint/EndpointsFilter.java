@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,7 @@
  */
 package io.micronaut.management.endpoint;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -25,6 +23,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
@@ -35,12 +34,11 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Returns 401 for {@link io.micronaut.management.endpoint.annotation.Endpoint} requests which have sensitive true. Disabled if micronaut.security is enabled.
+ * Returns 401 for {@link io.micronaut.management.endpoint.annotation.Endpoint} requests which have sensitive true.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = "micronaut.security.enabled", notEquals = StringUtils.TRUE)
 @Filter("/**")
 public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
@@ -71,5 +69,10 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
             }
         }
         return chain.proceed(request);
+    }
+
+    @Override
+    public int getOrder() {
+        return ServerFilterPhase.SECURITY.order();
     }
 }

@@ -64,7 +64,7 @@ In the above example the `PersonConfiguration` class will generate introspection
 
 NOTE: You can also use the `packages` member of the ann:core.annotation.Introspected[] which will package scan at compilation time and generate introspections for all classes within a package. Note however this feature is currently regarded as experimental.
 
-==== Write a `AnnotationMapper` to Introspect Existing Annotations
+==== Write an `AnnotationMapper` to Introspect Existing Annotations
 
 If there is an existing annotation that you wish to introspect by default you can write an api:inject.annotation.AnnotationMapper[].
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import io.micronaut.http.cookie.Cookie;
 
 import javax.inject.Singleton;
 import java.io.Serializable;
-import java.time.temporal.ChronoUnit;
 
 /**
  *  Writes the tenantId to in a cookie.
@@ -58,7 +57,7 @@ public class CookieTenantWriter implements TenantWriter {
             );
             cookie.configure(cookieTenantWriterConfiguration, request.isSecure());
             if (cookieTenantWriterConfiguration.getCookieMaxAge().isPresent()) {
-                cookie.maxAge(cookieTenantWriterConfiguration.getCookieMaxAge().get().get(ChronoUnit.SECONDS));
+                cookie.maxAge(cookieTenantWriterConfiguration.getCookieMaxAge().get());
             } else {
                 cookie.maxAge(Integer.MAX_VALUE);
             }

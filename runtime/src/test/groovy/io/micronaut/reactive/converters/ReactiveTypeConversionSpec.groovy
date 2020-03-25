@@ -22,8 +22,6 @@ import io.micronaut.core.convert.ConversionService
 import io.reactivex.Maybe
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import rx.Observable
-import rx.Single
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -46,27 +44,11 @@ class ReactiveTypeConversionSpec extends Specification {
 
         where:
         from                            | target
-        Single.just(1)                  | Flowable
-        Single.just(1)                  | io.reactivex.Single
-        Single.just(1)                  | Mono
-        Single.just(1)                  | Flux
-        Observable.just(1)              | io.reactivex.Observable
-        Observable.just(1)              | Flowable
-        Observable.just(1)              | Mono
-        Observable.just(1)              | Flux
         Completable.complete()          | io.reactivex.Observable
         Completable.complete()          | Flowable
         Completable.complete()          | Mono
         Completable.complete()          | Flux
         Completable.complete()          | io.reactivex.Single
         Completable.complete()          | Maybe
-        Flux.just(1)                    | Single
-        Mono.just(1)                    | Single
-        Flux.just(1)                    | Observable
-        Mono.just(1)                    | Observable
-        io.reactivex.Single.just(1)     | Single
-        io.reactivex.Observable.just(1) | Single
-        Flux.just(1)                    | Observable
-        Mono.just(1)                    | Observable
     }
 }

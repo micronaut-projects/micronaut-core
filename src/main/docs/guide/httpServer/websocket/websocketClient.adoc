@@ -40,6 +40,14 @@ public abstract io.reactivex.Single<String> send(String message);
 
 The above example defines a send method that returns an rx:Single[].
 
+.WebSocket Send Methods
+[source,java]
+----
+public abstract java.util.concurrent.Future<String> sendAsync(String message);
+----
+
+The above example defines a send method that executes asynchronously and returns a jdk:java.util.concurrent.Future[] to access the results.
+
 Once you have defined a client class you can connect to the client socket and start sending messages:
 
 

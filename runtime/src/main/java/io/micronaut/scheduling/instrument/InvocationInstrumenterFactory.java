@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.micronaut.scheduling.instrument;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.core.annotation.Indexed;
 
 /**
  * An factory interface for invocation instrumentation, factory method decides if instrumentation is needed.
@@ -24,6 +25,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
  * @author graemerocher
  * @since 1.3
  */
+@Indexed(InvocationInstrumenterFactory.class)
 public interface InvocationInstrumenterFactory {
 
     /**

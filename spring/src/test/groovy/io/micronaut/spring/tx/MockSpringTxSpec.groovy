@@ -23,7 +23,7 @@ class MockSpringTxSpec extends Specification {
 
     void "test spring tx management"() {
         given:
-        TransactionalBean transactionalBean = ApplicationContext.build().singletons(new MockTransactionManager())
+        TransactionalBean transactionalBean = ApplicationContext.builder().singletons(new MockTransactionManager())
                           .start().getBean(TransactionalBean)
 
         expect:
@@ -32,7 +32,7 @@ class MockSpringTxSpec extends Specification {
 
     void "test meta spring tx management"() {
         given:
-        MetaTransactionalBean transactionalBean = ApplicationContext.build().singletons(new MockTransactionManager())
+        MetaTransactionalBean transactionalBean = ApplicationContext.builder().singletons(new MockTransactionManager())
                 .start().getBean(MetaTransactionalBean)
 
         expect:

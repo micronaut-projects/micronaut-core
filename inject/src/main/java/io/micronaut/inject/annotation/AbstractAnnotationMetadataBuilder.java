@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -346,6 +346,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract String getAnnotationTypeName(A annotationMirror);
 
     /**
+     * Get the name for the given element.
+     * @param element The element
+     * @return The name
+     */
+    protected abstract String getElementName(T element);
+
+    /**
      * Obtain the annotations for the given type.
      *
      * @param element The type element
@@ -460,7 +467,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The object
      */
     protected abstract Object readAnnotationValue(T originatingElement, T member, String memberName, Object annotationValue);
-
 
     /**
      * Read the raw default annotation values from the given annotation.
@@ -1008,12 +1014,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             for (A annotationMirror : annotationMirrors) {
 
                 final T annotationTypeMirror = getTypeForAnnotation(annotationMirror);
-                if (annotationTypeMirror == element) {
-                    continue;
-                }
 
                 String annotationName = getAnnotationTypeName(annotationMirror);
                 final RetentionPolicy retentionPolicy = getRetentionPolicy(annotationTypeMirror);
+                if (annotationName.equals(getElementName(element))) {
+                    continue;
+                }
+
                 if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName) && !excludes.contains(annotationName)) {
                     topLevel.add(annotationMirror);
 

@@ -11,7 +11,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-class MessageControllerSpec {
+public class MessageControllerSpec {
 
     private static EmbeddedServer server;
     private static HttpClient client;

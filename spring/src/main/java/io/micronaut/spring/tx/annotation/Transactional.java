@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,6 +55,7 @@ import java.lang.annotation.Target;
  * @see org.springframework.transaction.interceptor.DefaultTransactionAttribute
  * @see org.springframework.transaction.interceptor.RuleBasedTransactionAttribute
  * @since 1.2
+ * @deprecated Use Spring's {@link org.springframework.transaction.annotation.Transactional} directly or switch to Micronaut Data's {@code TransactionalAdvice}
  */
 @SuppressWarnings("JavadocStyle")
 @Target({ElementType.METHOD, ElementType.TYPE})
@@ -64,6 +65,7 @@ import java.lang.annotation.Target;
 @Around
 @Type(TransactionInterceptor.class)
 @Blocking
+@Deprecated
 public @interface Transactional {
 
     /**

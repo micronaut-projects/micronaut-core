@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -173,7 +173,7 @@ public class CacheConfiguration {
     }
 
     /**
-     * Set whether record stats is enabled. Default value ({@value #DEFAULT_RECORD_STATS}).
+     * Set whether record stats is enabled. Default value ({@value io.micronaut.cache.CacheConfiguration#DEFAULT_RECORD_STATS}).
      *
      * @param recordStats True if record status is enabled
      */
@@ -199,7 +199,7 @@ public class CacheConfiguration {
     }
 
     /**
-     * Set whether test mode is enabled. Default value ({@value #DEFAULT_TESTMODE}).
+     * Set whether test mode is enabled. Default value ({@value io.micronaut.cache.CacheConfiguration#DEFAULT_TESTMODE}).
      *
      * @param testMode True if test mode is eanbled
      */

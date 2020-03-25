@@ -45,7 +45,7 @@ class ClientScopeSpec extends Specification implements MockConsulSpec  {
         ])
         waitForService(consulServer, 'messageService')
 
-        MessageService messageClient = ApplicationContext.build([
+        MessageService messageClient = ApplicationContext.builder([
                 'consul.client.port': consulServer.port
         ]).start().getBean(MessageService)
 
@@ -73,7 +73,7 @@ class ClientScopeSpec extends Specification implements MockConsulSpec  {
                 'micronaut.application.name': 'messageService'
         ])
 
-        MessageService messageClient = ApplicationContext.build([
+        MessageService messageClient = ApplicationContext.builder([
                 'consul.client.port': consulServer.port
         ]).start().getBean(MessageService)
 

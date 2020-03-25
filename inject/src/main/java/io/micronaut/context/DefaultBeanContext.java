@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -108,6 +109,8 @@ public class DefaultBeanContext implements BeanContext {
     final Map<BeanKey, Object> scopedProxies = new ConcurrentHashMap<>(20);
     Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
 
+    private final boolean eagerInitConfig;
+    private final boolean eagerInitSingletons;
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     private final Map<String, BeanConfiguration> beanConfigurations = new HashMap<>(10);
     private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
@@ -121,6 +124,7 @@ public class DefaultBeanContext implements BeanContext {
     private final ClassLoader classLoader;
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
     private final Set<Class> indexedTypes = CollectionUtils.setOf(
+            ResourceLoader.class,
             TypeConverter.class,
             TypeConverterRegistrar.class,
             ApplicationEventListener.class,
@@ -181,6 +185,8 @@ public class DefaultBeanContext implements BeanContext {
         System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, "true");
         this.classLoader = contextConfiguration.getClassLoader();
         this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
+        this.eagerInitSingletons = contextConfiguration.isEagerInitSingletons();
+        this.eagerInitConfig = contextConfiguration.isEagerInitConfiguration();
     }
 
     @Override
@@ -2073,7 +2079,7 @@ public class DefaultBeanContext implements BeanContext {
             if (concreteCandidate.isPresent()) {
                 BeanDefinition<T> definition = concreteCandidate.get();
 
-                bean = findExistingCompatibleSingleton(beanType, qualifier, definition);
+                bean = findExistingCompatibleSingleton(definition.getBeanType(), qualifier, definition);
                 if (bean != null) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Resolved existing bean [{}] for type [{}] and qualifier [{}]", bean, beanType, qualifier);
@@ -2567,7 +2573,7 @@ public class DefaultBeanContext implements BeanContext {
                     }
                 }
             }
-            if (beanDefinitionReference.isContextScope()) {
+            if (isEagerInit(beanDefinitionReference)) {
                 contextScopeBeans.add(beanDefinitionReference);
             }
             if (beanDefinitionReference.requiresMethodProcessing()) {
@@ -2577,6 +2583,12 @@ public class DefaultBeanContext implements BeanContext {
 
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans);
+    }
+
+    private boolean isEagerInit(BeanDefinitionReference beanDefinitionReference) {
+        return beanDefinitionReference.isContextScope() ||
+                (eagerInitSingletons && beanDefinitionReference.isSingleton()) ||
+                (eagerInitConfig && beanDefinitionReference.isConfigurationProperties());
     }
 
     @NonNull

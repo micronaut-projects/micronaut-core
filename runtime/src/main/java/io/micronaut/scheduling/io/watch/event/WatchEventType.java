@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,9 +49,9 @@ public enum WatchEventType {
         if (kind == StandardWatchEventKinds.ENTRY_CREATE) {
             return CREATE;
         } else if (kind == StandardWatchEventKinds.ENTRY_MODIFY) {
-            return CREATE;
+            return MODIFY;
         } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
-            return CREATE;
+            return DELETE;
         } else {
             throw new IllegalArgumentException("Unsupported watch event kind: " + kind);
         }

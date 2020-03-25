@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package io.micronaut.context.env;
 
-import io.micronaut.context.annotation.Property;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -408,7 +407,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 MapFormat.class,
                 "transformation",
                 MapFormat.MapTransformation.class)
-                .orElse(conversionContext.isAnnotationPresent(Property.class) ? MapFormat.MapTransformation.FLAT : MapFormat.MapTransformation.NESTED);
+                .orElse(MapFormat.MapTransformation.NESTED);
         return resolveSubMap(name, entries, conversionContext, keyConvention, transformation);
     }
 

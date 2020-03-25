@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.function.Supplier;
 
 /**
  * Abstract class that writes generated classes to disk and provides convenience methods for building classes.
@@ -517,6 +518,24 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         return map;
     }
 
+    /**
+     * Writes a method that returns a boolean value with the value supplied by the given supplier.
+     * @param classWriter The class writer
+     * @param methodName The method name
+     * @param valueSupplier The supplier
+     */
+    protected void writeBooleanMethod(ClassWriter classWriter, String methodName, Supplier<Boolean> valueSupplier) {
+        GeneratorAdapter isSingletonMethod = startPublicMethodZeroArgs(
+                classWriter,
+                boolean.class,
+                methodName
+        );
+        isSingletonMethod.loadThis();
+        isSingletonMethod.push(valueSupplier.get());
+        isSingletonMethod.returnValue();
+        isSingletonMethod.visitMaxs(1, 1);
+        isSingletonMethod.visitEnd();
+    }
 
     /**
      * Accept a ClassWriterOutputVisitor to write this writer to disk.
@@ -1049,8 +1068,9 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         classWriter.visit(V1_8, ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
     }
 
-
     /**
+     * Starts a public final class.
+     *
      * @param classWriter The current class writer
      * @param className   The class name
      * @param superType   The super type
@@ -1111,6 +1131,25 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         Type methodType = Type.getMethodType(Type.getType(returnType));
 
         return new GeneratorAdapter(classWriter.visitMethod(ACC_PUBLIC, methodName, methodType.getDescriptor(), null, null), ACC_PUBLIC, methodName, methodType.getDescriptor());
+    }
+
+    /**
+     * @param classWriter The current class writer
+     * @param returnType  The return type
+     * @param methodName  The method name
+     * @return TheThe {@link GeneratorAdapter} for the method
+     */
+    protected GeneratorAdapter startPublicFinalMethodZeroArgs(ClassWriter classWriter, Class returnType, String methodName) {
+        Type methodType = Type.getMethodType(Type.getType(returnType));
+
+        return new GeneratorAdapter(
+                classWriter.visitMethod(
+                        ACC_PUBLIC | ACC_FINAL,
+                        methodName,
+                        methodType.getDescriptor(),
+                        null,
+                        null
+                ), ACC_PUBLIC, methodName, methodType.getDescriptor());
     }
 
     /**

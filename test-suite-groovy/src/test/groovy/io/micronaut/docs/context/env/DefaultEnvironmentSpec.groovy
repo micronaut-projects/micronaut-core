@@ -9,7 +9,7 @@ class DefaultEnvironmentSpec extends Specification {
     // tag::disableEnvDeduction[]
     void "test disable environment deduction via builder"() {
         when:
-        ApplicationContext ctx = ApplicationContext.build().deduceEnvironment(false).start()
+        ApplicationContext ctx = ApplicationContext.builder().deduceEnvironment(false).start()
 
         then:
         !ctx.environment.activeNames.contains(Environment.TEST)

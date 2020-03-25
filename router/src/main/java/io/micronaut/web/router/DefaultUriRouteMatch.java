@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ import io.micronaut.http.uri.UriMatchVariable;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +73,7 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
         return new DefaultUriRouteMatch<T, R>(matchInfo, uriRoute, defaultCharset, conversionService) {
             @Override
             public List<Argument> getRequiredArguments() {
-                return Collections.unmodifiableList(arguments);
+                return arguments;
             }
 
             @Override
@@ -95,7 +94,7 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
 
             @Override
             public List<Argument> getRequiredArguments() {
-                return Collections.unmodifiableList(requiredArguments);
+                return requiredArguments;
             }
 
             @Override
@@ -144,6 +143,11 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
     @Override
     public List<UriMatchVariable> getVariables() {
         return matchInfo.getVariables();
+    }
+
+    @Override
+    public Map<String, UriMatchVariable> getVariableMap() {
+        return matchInfo.getVariableMap();
     }
 
     @Override

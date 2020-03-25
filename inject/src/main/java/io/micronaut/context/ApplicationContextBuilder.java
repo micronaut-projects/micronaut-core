@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,22 @@ import java.util.Map;
  * @since 1.0
  */
 public interface ApplicationContextBuilder {
+
+    /**
+     * Whether to eager initialize {@link io.micronaut.context.annotation.ConfigurationProperties} beans.
+     * @param eagerInitConfiguration True if configuration properties should be eagerly initialized
+     * @return The context builder
+     * @since 2.0
+     */
+    @NonNull ApplicationContextBuilder eagerInitConfiguration(boolean eagerInitConfiguration);
+
+    /**
+     * Whether to eager initialize singleton beans.
+     * @param eagerInitSingletons True if singletons should be eagerly initialized
+     * @return The context builder
+     * @since 2.0
+     */
+    @NonNull ApplicationContextBuilder eagerInitSingletons(boolean eagerInitSingletons);
 
     /**
      * Additional singletons to register prior to startup.

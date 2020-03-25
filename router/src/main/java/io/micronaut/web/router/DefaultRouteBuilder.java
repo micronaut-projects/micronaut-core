@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchInfo;
@@ -157,11 +158,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, Class[] parameterTypes) {
-        // do not allow multiple local status routes in the same controller
-        // locally declared @Error routes will be allowed and will take precedence over globally defined ones
-        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == originatingClass)) {
-            throw new RoutingException("Attempted to register multiple local routes for http status " + String.valueOf(status.getCode()));
-        }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -175,10 +171,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public StatusRoute status(HttpStatus status, Class type, String method, Class[] parameterTypes) {
-        // do not allow multiple @Error global routes defined for one status
-        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == null)) {
-            throw new RoutingException("Attempted to register multiple global routes for http status " + String.valueOf(status.getCode()));
-        }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -192,9 +184,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public ErrorRoute error(Class originatingClass, Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
-        if (this.errorRoutes.stream().anyMatch((route) -> route.exceptionType() == error && route.originatingType() == originatingClass)) {
-            throw new RoutingException("Attempted to register multiple local error routes for exception " + error.getName());
-        }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -208,9 +197,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public ErrorRoute error(Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
-        if (this.errorRoutes.stream().anyMatch((route) -> route.exceptionType() == error && route.originatingType() == null)) {
-            throw new RoutingException("Attempted to register multiple global error routes for exception " + error.getName());
-        }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -418,9 +404,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      */
     abstract class AbstractRoute implements MethodBasedRoute {
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
-        protected final MethodExecutionHandle targetMethod;
+        protected final MethodExecutionHandle<?, ?> targetMethod;
         protected final ConversionService<?> conversionService;
-        protected List<MediaType> acceptedMediaTypes;
+        protected List<MediaType> consumesMediaTypes;
         protected List<MediaType> producesMediaTypes;
         protected String bodyArgumentName;
         protected Argument<?> bodyArgument;
@@ -433,30 +419,38 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         AbstractRoute(MethodExecutionHandle targetMethod, ConversionService<?> conversionService, List<MediaType> mediaTypes) {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
-            this.acceptedMediaTypes = mediaTypes;
+            this.consumesMediaTypes = mediaTypes;
 
             MediaType[] types = MediaType.of(targetMethod.stringValues(Produces.class));
             if (ArrayUtils.isNotEmpty(types)) {
                 this.producesMediaTypes = Arrays.asList(types);
+            }
+            types = MediaType.of(targetMethod.stringValues(Consumes.class));
+            if (ArrayUtils.isNotEmpty(types)) {
+                this.consumesMediaTypes = Arrays.asList(types);
             }
         }
 
         @Override
         public Route consumes(MediaType... mediaTypes) {
             if (mediaTypes != null) {
-                this.acceptedMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaTypes));
+                this.consumesMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaTypes));
             }
             return this;
         }
 
         @Override
         public List<MediaType> getConsumes() {
-            return acceptedMediaTypes;
+            if (consumesMediaTypes != null) {
+                return consumesMediaTypes;
+            } else {
+                return Collections.emptyList();
+            }
         }
 
         @Override
-        public Route acceptAll() {
-            this.acceptedMediaTypes = Collections.emptyList();
+        public Route consumesAll() {
+            this.consumesMediaTypes = Collections.emptyList();
             return this;
         }
 
@@ -509,6 +503,24 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         protected boolean permitsRequestBody() {
             return true;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof AbstractRoute)) {
+                return false;
+            }
+            AbstractRoute that = (AbstractRoute) o;
+            return Objects.equals(consumesMediaTypes, that.consumesMediaTypes) &&
+                    Objects.equals(producesMediaTypes, that.producesMediaTypes);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(consumesMediaTypes, producesMediaTypes);
+        }
     }
 
     /**
@@ -534,7 +546,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public  DefaultErrorRoute(Class originatingClass, Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+        public DefaultErrorRoute(
+                Class originatingClass, Class<? extends Throwable> error,
+                MethodExecutionHandle targetMethod,
+                ConversionService<?> conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
             this.error = error;
@@ -571,11 +586,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public ErrorRoute consumes(MediaType... mediaType) {
-            return this;
+            return (ErrorRoute) super.consumes(mediaType);
         }
 
         @Override
-        public Route acceptAll() {
+        public ErrorRoute produces(MediaType... mediaType) {
+            return (ErrorRoute) super.produces(mediaType);
+        }
+
+        @Override
+        public Route consumesAll() {
+            super.consumesAll();
             return this;
         }
 
@@ -597,27 +618,24 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-
-            DefaultErrorRoute that = (DefaultErrorRoute) o;
-
-            if (error != null ? !error.equals(that.error) : that.error != null) {
+            if (!super.equals(o)) {
                 return false;
             }
-            return originatingClass != null ? originatingClass.equals(that.originatingClass) : that.originatingClass == null;
+            DefaultErrorRoute that = (DefaultErrorRoute) o;
+            return error.equals(that.error) &&
+                    Objects.equals(originatingClass, that.originatingClass);
         }
 
         @Override
         public int hashCode() {
-            int result = error != null ? error.hashCode() : 0;
-            result = 31 * result + (originatingClass != null ? originatingClass.hashCode() : 0);
-            return result;
+            return Objects.hash(super.hashCode(), error, originatingClass);
         }
 
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
             return builder.append(' ')
-                .append(error.getName())
+                .append(error.getSimpleName())
                 .append(" -> ")
                 .append(targetMethod.getDeclaringType().getSimpleName())
                 .append('#')
@@ -690,7 +708,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Route acceptAll() {
+        public Route consumesAll() {
             return this;
         }
 
@@ -716,23 +734,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             if (this == o) {
                 return true;
             }
-            if (o == null || getClass() != o.getClass()) {
+            if (!(o instanceof DefaultStatusRoute)) {
                 return false;
             }
-
+            if (!super.equals(o)) {
+                return false;
+            }
             DefaultStatusRoute that = (DefaultStatusRoute) o;
-
-            if (status != null ? !status.equals(that.status) : that.status != null) {
-                return false;
-            }
-            return originatingClass != null ? originatingClass.equals(that.originatingClass) : that.originatingClass == null;
+            return status == that.status &&
+                    Objects.equals(originatingClass, that.originatingClass);
         }
 
         @Override
         public int hashCode() {
-            int result = status != null ? status.hashCode() : 0;
-            result = 31 * result + (originatingClass != null ? originatingClass.hashCode() : 0);
-            return result;
+            return Objects.hash(super.hashCode(), status, originatingClass);
         }
     }
 
@@ -844,7 +859,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 .append('#')
                 .append(targetMethod)
                 .append(" (")
-                .append(String.join(",", acceptedMediaTypes))
+                .append(String.join(",", consumesMediaTypes))
                 .append(" )")
                 .toString();
         }
@@ -883,8 +898,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute acceptAll() {
-            return (UriRoute) super.acceptAll();
+        public UriRoute consumesAll() {
+            return (UriRoute) super.consumesAll();
         }
 
         @Override
@@ -1021,7 +1036,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public Route acceptAll() {
+        public Route consumesAll() {
             return consumes(MediaType.EMPTY_ARRAY);
         }
 

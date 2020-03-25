@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,48 +36,46 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class CorsOriginConverter implements TypeConverter<Object, CorsOriginConfiguration> {
+public class CorsOriginConverter implements TypeConverter<Map<String, Object>, CorsOriginConfiguration> {
 
-    private static final String ALLOWED_ORIGINS = "allowedOrigins";
-    private static final String ALLOWED_METHODS = "allowedMethods";
-    private static final String ALLOWED_HEADERS = "allowedHeaders";
-    private static final String EXPOSED_HEADERS = "exposedHeaders";
-    private static final String ALLOW_CREDENTIALS = "allowCredentials";
-    private static final String MAX_AGE = "maxAge";
+    private static final String ALLOWED_ORIGINS = "allowed-origins";
+    private static final String ALLOWED_METHODS = "allowed-methods";
+    private static final String ALLOWED_HEADERS = "allowed-headers";
+    private static final String EXPOSED_HEADERS = "exposed-headers";
+    private static final String ALLOW_CREDENTIALS = "allow-credentials";
+    private static final String MAX_AGE = "max-age";
 
     private static final ArgumentConversionContext<List<HttpMethod>> CONVERSION_CONTEXT_LIST_OF_HTTP_METHOD = ConversionContext.of(Argument.listOf(HttpMethod.class));
 
     @Override
-    public Optional<CorsOriginConfiguration> convert(Object object, Class<CorsOriginConfiguration> targetType, ConversionContext context) {
+    public Optional<CorsOriginConfiguration> convert(Map<String, Object> object, Class<CorsOriginConfiguration> targetType, ConversionContext context) {
         CorsOriginConfiguration configuration = new CorsOriginConfiguration();
-        if (object instanceof Map) {
-            Map mapConfig = (Map) object;
-            ConvertibleValues<Object> convertibleValues = new ConvertibleValuesMap<>(mapConfig);
+        ConvertibleValues<Object> convertibleValues = new ConvertibleValuesMap<>(object);
 
-            convertibleValues
-                .get(ALLOWED_ORIGINS, ConversionContext.LIST_OF_STRING)
-                .ifPresent(configuration::setAllowedOrigins);
+        convertibleValues
+            .get(ALLOWED_ORIGINS, ConversionContext.LIST_OF_STRING)
+            .ifPresent(configuration::setAllowedOrigins);
 
-            convertibleValues
-                .get(ALLOWED_METHODS, CONVERSION_CONTEXT_LIST_OF_HTTP_METHOD)
-                .ifPresent(configuration::setAllowedMethods);
+        convertibleValues
+            .get(ALLOWED_METHODS, CONVERSION_CONTEXT_LIST_OF_HTTP_METHOD)
+            .ifPresent(configuration::setAllowedMethods);
 
-            convertibleValues
-                .get(ALLOWED_HEADERS, ConversionContext.LIST_OF_STRING)
-                .ifPresent(configuration::setAllowedHeaders);
+        convertibleValues
+            .get(ALLOWED_HEADERS, ConversionContext.LIST_OF_STRING)
+            .ifPresent(configuration::setAllowedHeaders);
 
-            convertibleValues
-                .get(EXPOSED_HEADERS, ConversionContext.LIST_OF_STRING)
-                .ifPresent(configuration::setExposedHeaders);
+        convertibleValues
+            .get(EXPOSED_HEADERS, ConversionContext.LIST_OF_STRING)
+            .ifPresent(configuration::setExposedHeaders);
 
-            convertibleValues
-                .get(ALLOW_CREDENTIALS, ConversionContext.BOOLEAN)
-                .ifPresent(configuration::setAllowCredentials);
+        convertibleValues
+            .get(ALLOW_CREDENTIALS, ConversionContext.BOOLEAN)
+            .ifPresent(configuration::setAllowCredentials);
 
-            convertibleValues
-                .get(MAX_AGE, ConversionContext.LONG)
-                .ifPresent(configuration::setMaxAge);
-        }
+        convertibleValues
+            .get(MAX_AGE, ConversionContext.LONG)
+            .ifPresent(configuration::setMaxAge);
+
         return Optional.of(configuration);
     }
 }

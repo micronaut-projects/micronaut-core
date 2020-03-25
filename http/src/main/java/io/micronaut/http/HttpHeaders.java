@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Headers;
 
 import java.time.LocalDateTime;
@@ -24,12 +23,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-import java.util.OptionalLong;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.*;
 
 /**
  * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html.
@@ -499,8 +493,12 @@ public interface HttpHeaders extends Headers {
      * @return The content type
      */
     default OptionalLong contentLength() {
-        Optional<Long> optional = getFirst(HttpHeaders.CONTENT_LENGTH, ConversionContext.LONG);
-        return optional.map(OptionalLong::of).orElseGet(OptionalLong::empty);
+        final Long aLong = getFirst(HttpHeaders.CONTENT_LENGTH, ConversionContext.LONG).orElse(null);
+        if (aLong != null) {
+            return OptionalLong.of(aLong);
+        } else {
+            return OptionalLong.empty();
+        }
     }
 
     /**
@@ -509,19 +507,31 @@ public interface HttpHeaders extends Headers {
      * @return A list of zero or many {@link MediaType} instances
      */
     default List<MediaType> accept() {
-        return getAll(HttpHeaders.ACCEPT)
-            .stream()
-            .flatMap(x -> Arrays.stream(x.split(",")))
-            .flatMap(s -> ConversionService.SHARED.convert(s, MediaType.CONVERSION_CONTEXT).map(Stream::of).orElse(Stream.empty()))
-            .distinct()
-            .collect(Collectors.toList());
+        final List<String> values = getAll(HttpHeaders.ACCEPT);
+        if (!values.isEmpty()) {
+            List<MediaType> mediaTypes = new ArrayList<>(10);
+            for (String value : values) {
+                final String[] tokens = value.split(",");
+                for (String token : tokens) {
+                    try {
+                        mediaTypes.add(new MediaType(token));
+                    } catch (IllegalArgumentException e) {
+                        // ignore
+                    }
+                }
+            }
+            return mediaTypes;
+        } else {
+            return Collections.emptyList();
+        }
     }
 
     /**
      * @return Whether the {@link HttpHeaders#CONNECTION} header is set to Keep-Alive
      */
     default boolean isKeepAlive() {
-        return getFirst(CONNECTION, ConversionContext.STRING).map(val -> val.equalsIgnoreCase("keep-alive")).orElse(false);
+        return getFirst(CONNECTION, ConversionContext.STRING)
+                 .map(val -> val.equalsIgnoreCase(HttpHeaderValues.CONNECTION_KEEP_ALIVE)).orElse(false);
     }
 
     /**

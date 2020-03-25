@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,9 @@
  */
 package io.micronaut.runtime.http.converters;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.http.HttpStatus;
-
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -28,9 +25,9 @@ import java.util.Optional;
  *
  * @author graemerocher
  * @since 1.0
+ * @deprecated Replaced by {@link io.micronaut.http.converters.HttpConverterRegistrar}
  */
-@Requires(classes = HttpStatus.class)
-@Singleton
+@Deprecated
 public class HttpStatusConverter implements TypeConverter<Number, HttpStatus> {
     @Override
     public Optional<HttpStatus> convert(Number object, Class<HttpStatus> targetType, ConversionContext context) {

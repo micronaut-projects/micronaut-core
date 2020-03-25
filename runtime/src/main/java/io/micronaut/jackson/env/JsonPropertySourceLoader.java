@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,11 +48,21 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
 
     @Override
     protected void processInput(String name, InputStream input, Map<String, Object> finalMap) throws IOException {
+        Map<String, Object> map = readJsonAsMap(input);
+        processMap(finalMap, map, "");
+    }
+
+    /**
+     * @param input    The input stream
+     * @throws IOException If the input stream doesn't exist
+     *
+     * @return map representation of the json
+     */
+    protected Map<String, Object> readJsonAsMap(InputStream input) throws IOException {
         ObjectMapper objectMapper = new ObjectMapper(new JsonFactory());
         TypeFactory factory = TypeFactory.defaultInstance();
         MapType mapType = factory.constructMapType(LinkedHashMap.class, String.class, Object.class);
 
-        Map<String, Object> map = objectMapper.readValue(input, mapType);
-        processMap(finalMap, map, "");
+        return objectMapper.readValue(input, mapType);
     }
 }

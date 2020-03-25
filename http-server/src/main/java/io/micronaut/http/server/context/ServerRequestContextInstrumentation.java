@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,9 +51,9 @@ final class ServerRequestContextInstrumentation implements InvocationInstrumente
             }
 
             @Override
-            public void afterInvocation() {
-                if (isSet) {
-                    ServerRequestContext.set(currentRequest);
+            public void afterInvocation(boolean cleanup) {
+                if (isSet || cleanup) {
+                    ServerRequestContext.set(cleanup ? null : currentRequest);
                     isSet = false;
                 }
             }

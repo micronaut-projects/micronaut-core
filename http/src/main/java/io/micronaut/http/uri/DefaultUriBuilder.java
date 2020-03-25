@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -242,6 +242,21 @@ class DefaultUriBuilder implements UriBuilder {
 
     @NonNull
     @Override
+    public UriBuilder replaceQueryParam(String name, Object... values) {
+        if (StringUtils.isNotEmpty(name) && ArrayUtils.isNotEmpty(values)) {
+            List<String> strings = new ArrayList<>(values.length);
+            for (Object value : values) {
+                if (value != null) {
+                    strings.add(value.toString());
+                }
+            }
+            queryParams.put(name, strings);
+        }
+        return this;
+    }
+
+    @NonNull
+    @Override
     public URI build() {
         try {
             return new URI(reconstructAsString(null));
@@ -346,10 +361,10 @@ class DefaultUriBuilder implements UriBuilder {
             StringBuilder builder = new StringBuilder();
             final Iterator<String> nameIterator = queryParams.names().iterator();
             while (nameIterator.hasNext()) {
-                String name = nameIterator.next();
-                name = expandOrEncode(name, values);
+                String rawName = nameIterator.next();
+                String name = expandOrEncode(rawName, values);
 
-                final Iterator<String> i = queryParams.getAll(name).iterator();
+                final Iterator<String> i = queryParams.getAll(rawName).iterator();
                 while (i.hasNext()) {
                     String v = expandOrEncode(i.next(), values);
                     builder.append(name).append('=').append(v);

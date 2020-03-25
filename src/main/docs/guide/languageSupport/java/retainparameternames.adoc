@@ -1,0 +1,31 @@
+By default with Java, the parameter name data for method parameters is not retained at compile time. This can be a problem for Micronaut if you do not define parameter names explicitly and depend on an external JAR that is already compiled.
+
+Consider this interface:
+
+.Client Interface
+[source,java]
+----
+interface HelloOperations {
+    @Get("/hello/{name}")
+    String hello(String name);
+}
+----
+
+At compile time the parameter name `name` is lost and becomes simply `arg0` when compiled against or read via reflection later. To avoid this problem you have two options. You can either declare the parameter name explicitly:
+
+.Client Interface
+[source,java]
+----
+interface HelloOperations {
+    @Get("/hello/{name}")
+    String hello(@QueryValue("name") String name);
+}
+----
+
+Or alternatively it is recommended that you compile all byte code with `-parameters` flag to `javac`. See https://docs.oracle.com/javase/tutorial/reflect/member/methodparameterreflection.html[Obtaining Names of Method Parameters]. For example in `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compileJava.options.compilerArgs += '-parameters'
+----

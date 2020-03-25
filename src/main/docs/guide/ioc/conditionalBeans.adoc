@@ -73,16 +73,16 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotati
 |Require a property to not be part of the configuration
 |`@Requires(missingProperty="data-source.url")`
 
-|Requires the presence of one of more files in the file system
+|Require the presence of one or more files in the file system
 |`@Requires(resources="file:/path/to/file")`
 
-|Requires the presence of one of more classpath resources
+|Require the presence of one or more classpath resources
 |`@Requires(resources="classpath:myFile.properties")`
 
-|Requires the current operating system to be in the list
+|Require the current operating system to be in the list
 |`@Requires(os={Requires.Family.WINDOWS})`
 
-|Requires the current operating system to *not* be in the list
+|Require the current operating system to *not* be in the list
 |`@Requires(notOs={Requires.Family.WINDOWS})`
 |===
 

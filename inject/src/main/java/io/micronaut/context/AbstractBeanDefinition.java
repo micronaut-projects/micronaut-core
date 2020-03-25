@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,16 +96,14 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @SuppressWarnings("WeakerAccess")
     protected final List<FieldInjectionPoint> fieldInjectionPoints = new ArrayList<>(3);
     @SuppressWarnings("WeakerAccess")
-    protected final List<MethodInjectionPoint> postConstructMethods = new ArrayList<>(1);
+    protected List<MethodInjectionPoint> postConstructMethods;
     @SuppressWarnings("WeakerAccess")
-    protected final List<MethodInjectionPoint> preDestroyMethods = new ArrayList<>(1);
+    protected List<MethodInjectionPoint> preDestroyMethods;
     @SuppressWarnings("WeakerAccess")
-    protected final Map<MethodKey, ExecutableMethod<T, ?>> executableMethodMap = new LinkedHashMap<>(3);
+    protected Map<MethodKey, ExecutableMethod<T, ?>> executableMethodMap;
 
     private final Class<T> type;
     private final boolean isAbstract;
-    private final boolean singleton;
-    private final boolean isProvided;
     private final boolean isConfigurationProperties;
     private final Class<?> declaringType;
     private final ConstructorInjectionPoint<T> constructor;
@@ -134,8 +132,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                                      Argument... arguments) {
 
         AnnotationMetadata beanAnnotationMetadata = getAnnotationMetadata();
-        this.singleton = beanAnnotationMetadata.hasDeclaredStereotype(Singleton.class);
-        this.isProvided = beanAnnotationMetadata.hasDeclaredStereotype(Provided.class);
         this.type = producedType;
         this.isAbstract = false; // factory beans are never abstract
         this.declaringType = declaringType;
@@ -180,8 +176,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         AnnotationMetadata beanAnnotationMetadata = getAnnotationMetadata();
         this.type = type;
         this.isAbstract = Modifier.isAbstract(this.type.getModifiers());
-        this.isProvided = beanAnnotationMetadata.hasDeclaredStereotype(Provided.class);
-        this.singleton = beanAnnotationMetadata.hasDeclaredStereotype(Singleton.class);
         this.declaringType = type;
         if (requiresReflection) {
             this.constructor = new ReflectionConstructorInjectionPoint<>(
@@ -241,26 +235,28 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @SuppressWarnings("unchecked")
     @Override
     public <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class... argumentTypes) {
-        MethodKey methodKey = new MethodKey(name, argumentTypes);
-        ExecutableMethod<T, R> invocableMethod = (ExecutableMethod<T, R>) executableMethodMap.get(methodKey);
-        if (invocableMethod != null) {
-            return Optional.of(invocableMethod);
-        } else {
-            return Optional.empty();
+        if (executableMethodMap != null) {
+            MethodKey methodKey = new MethodKey(name, argumentTypes);
+            ExecutableMethod<T, R> invocableMethod = (ExecutableMethod<T, R>) executableMethodMap.get(methodKey);
+            if (invocableMethod != null) {
+                return Optional.of(invocableMethod);
+            }
         }
+        return Optional.empty();
     }
 
     @Override
     @SuppressWarnings({"unchecked"})
     public Stream<ExecutableMethod<T, ?>> findPossibleMethods(String name) {
-        if (executableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
-            return executableMethodMap
-                    .values()
-                    .stream()
-                    .filter((method) -> method.getMethodName().equals(name));
-        } else {
-            return Stream.empty();
+        if (executableMethodMap != null) {
+            if (executableMethodMap.keySet().stream().anyMatch(methodKey -> methodKey.name.equals(name))) {
+                return executableMethodMap
+                        .values()
+                        .stream()
+                        .filter((method) -> method.getMethodName().equals(name));
+            }
         }
+        return Stream.empty();
     }
 
     @Override
@@ -289,12 +285,12 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     @Override
     public boolean isProvided() {
-        return isProvided;
+        return getAnnotationMetadata().hasDeclaredStereotype(Provided.class);
     }
 
     @Override
     public boolean isSingleton() {
-        return singleton;
+        return getAnnotationMetadata().hasDeclaredStereotype(Singleton.class);
     }
 
     @Override
@@ -303,17 +299,17 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     @Override
-    public Class<T> getBeanType() {
+    public final Class<T> getBeanType() {
         return type;
     }
 
     @Override
-    public Optional<Class<?>> getDeclaringType() {
+    public final Optional<Class<?>> getDeclaringType() {
         return Optional.ofNullable(declaringType);
     }
 
     @Override
-    public ConstructorInjectionPoint<T> getConstructor() {
+    public final ConstructorInjectionPoint<T> getConstructor() {
         return constructor;
     }
 
@@ -323,23 +319,31 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     @Override
-    public Collection<MethodInjectionPoint> getInjectedMethods() {
+    public final Collection<MethodInjectionPoint> getInjectedMethods() {
         return Collections.unmodifiableCollection(methodInjectionPoints);
     }
 
     @Override
-    public Collection<FieldInjectionPoint> getInjectedFields() {
+    public final Collection<FieldInjectionPoint> getInjectedFields() {
         return Collections.unmodifiableCollection(fieldInjectionPoints);
     }
 
     @Override
-    public Collection<MethodInjectionPoint> getPostConstructMethods() {
-        return Collections.unmodifiableCollection(postConstructMethods);
+    public final Collection<MethodInjectionPoint> getPostConstructMethods() {
+        if (postConstructMethods != null) {
+            return Collections.unmodifiableCollection(postConstructMethods);
+        } else {
+            return Collections.emptyList();
+        }
     }
 
     @Override
-    public Collection<MethodInjectionPoint> getPreDestroyMethods() {
-        return Collections.unmodifiableCollection(preDestroyMethods);
+    public final Collection<MethodInjectionPoint> getPreDestroyMethods() {
+        if (preDestroyMethods != null) {
+            return Collections.unmodifiableCollection(preDestroyMethods);
+        } else {
+            return Collections.emptyList();
+        }
     }
 
     @Override
@@ -361,7 +365,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     @Override
     public Collection<ExecutableMethod<T, ?>> getExecutableMethods() {
-        return Collections.unmodifiableCollection(this.executableMethodMap.values());
+        if (executableMethodMap != null) {
+            return Collections.unmodifiableCollection(this.executableMethodMap.values());
+        } else {
+            return Collections.emptyList();
+        }
     }
 
     /**
@@ -386,9 +394,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 }
             }
 
-            for (ExecutableMethod<T, ?> executableMethod : executableMethodMap.values()) {
-                if (executableMethod instanceof EnvironmentConfigurable) {
-                    ((EnvironmentConfigurable) executableMethod).configure(environment);
+            if (executableMethodMap != null) {
+                for (ExecutableMethod<T, ?> executableMethod : executableMethodMap.values()) {
+                    if (executableMethod instanceof EnvironmentConfigurable) {
+                        ((EnvironmentConfigurable) executableMethod).configure(environment);
+                    }
                 }
             }
         }
@@ -449,6 +459,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @UsedByGeneratedCode
     protected final AbstractBeanDefinition<T> addExecutableMethod(ExecutableMethod<T, ?> executableMethod) {
         MethodKey key = new MethodKey(executableMethod.getMethodName(), executableMethod.getArgumentTypes());
+        if (executableMethodMap == null) {
+            executableMethodMap = new LinkedHashMap<>(3);
+        }
         executableMethodMap.put(key, executableMethod);
         return this;
     }
@@ -549,6 +562,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                                                             @Nullable Argument[] arguments,
                                                             @Nullable AnnotationMetadata annotationMetadata,
                                                             boolean requiresReflection) {
+        if (postConstructMethods == null) {
+            postConstructMethods = new ArrayList<>(1);
+        }
         return addInjectionPointInternal(declaringType, method, arguments, annotationMetadata, requiresReflection, this.postConstructMethods);
     }
 
@@ -570,6 +586,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                                                          Argument[] arguments,
                                                          AnnotationMetadata annotationMetadata,
                                                          boolean requiresReflection) {
+        if (preDestroyMethods == null) {
+            preDestroyMethods = new ArrayList<>(1);
+        }
         return addInjectionPointInternal(declaringType, method, arguments, annotationMetadata, requiresReflection, this.preDestroyMethods);
     }
 
@@ -621,7 +640,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @UsedByGeneratedCode
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
-        boolean addInCreationHandling = singleton && !postConstructMethods.isEmpty();
+        boolean addInCreationHandling = isSingleton() && !CollectionUtils.isNotEmpty(postConstructMethods);
         DefaultBeanContext.BeanKey key = null;
         if (addInCreationHandling) {
             // ensure registration as an inflight bean if a post construct is present
@@ -1060,7 +1079,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 ArgumentConversionContext<?> conversionContext = ConversionContext.of(argument);
                 Optional<?> value = resolveValue(propertyResolver, conversionContext, valAnn.isPresent(), prop);
                 if (argument.getType() == Optional.class) {
-                    path.pop();
                     return resolveOptionalObject(value);
                 } else {
                     // can't use orElseThrow here due to compiler bug
@@ -1089,10 +1107,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 );
             }
 
-            path.pop();
             return result;
         } catch (NoSuchBeanException | BeanInstantiationException e) {
             throw new DependencyInjectionException(resolutionContext, argument, e);
+        } finally {
+            path.pop();
         }
     }
 

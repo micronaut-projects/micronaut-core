@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import io.micronaut.http.*;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
 import org.reactivestreams.Publisher;
 
@@ -67,6 +68,11 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
                 openTracer,
                 span
         );
+    }
+
+    @Override
+    public int getOrder() {
+        return ServerFilterPhase.TRACING.order();
     }
 
     private HttpServerRequest mapRequest(HttpRequest<?> request) {

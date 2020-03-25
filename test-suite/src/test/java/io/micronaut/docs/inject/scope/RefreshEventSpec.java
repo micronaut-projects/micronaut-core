@@ -23,7 +23,10 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.*;
 
 public class RefreshEventSpec {
@@ -69,10 +72,17 @@ public class RefreshEventSpec {
 // end::evictResponse[]
                 , response);
 
-        String thirdResponse = fetchForecast();
+        AtomicReference<String> thirdResponse = new AtomicReference<>(fetchForecast());
+        await().atMost(5, SECONDS).until(() -> {
+            if (!thirdResponse.get().equals(secondResponse)) {
+                return true;
+            }
+            thirdResponse.set(fetchForecast());
+            return false;
+        });
 
-        assertNotEquals(thirdResponse, secondResponse);
-        assertTrue(thirdResponse.contains("\"forecast\":\"Scattered Clouds"));
+        assertNotEquals(thirdResponse.get(), secondResponse);
+        assertTrue(thirdResponse.get().contains("\"forecast\":\"Scattered Clouds"));
     }
 
     public String fetchForecast() {

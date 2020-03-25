@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1267,7 +1267,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 return
             }
             boolean isInject = fieldAnnotationMetadata.hasStereotype(Inject)
-            boolean isValue = isValueInjection(isInject, fieldNode, fieldAnnotationMetadata)
+            boolean isValue = isValueInjection(fieldNode, fieldAnnotationMetadata)
 
             if ((isInject || isValue) && declaringClass.getProperty(fieldNode.getName()) == null) {
                 defineBeanDefinition(concreteClass)
@@ -1390,7 +1390,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 return
             }
             boolean isInject = fieldNode != null && fieldAnnotationMetadata.hasStereotype(Inject)
-            boolean isValue = isValueInjection(isInject, fieldNode, fieldAnnotationMetadata)
+            boolean isValue = isValueInjection(fieldNode, fieldAnnotationMetadata)
 
             String propertyName = propertyNode.name
             if (!propertyNode.isStatic() && (isInject || isValue)) {
@@ -1558,8 +1558,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        private boolean isValueInjection(boolean isInject, FieldNode fieldNode, AnnotationMetadata fieldAnnotationMetadata) {
-            !isInject && fieldNode != null && (
+        private boolean isValueInjection(FieldNode fieldNode, AnnotationMetadata fieldAnnotationMetadata) {
+            fieldNode != null && (
                     fieldAnnotationMetadata.hasStereotype(Value) ||
                             fieldAnnotationMetadata.hasStereotype(Property) ||
                             isConfigurationProperties
@@ -1665,7 +1665,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 genericTypeMap
                         )
                         beanWriter.setValidated(
-                                qualifierTypes.values().any { it.hasStereotype(ANN_CONSTRAINT) || it.hasStereotype(ANN_VALID) }
+                                qualifierTypes.values().any { AnnotationMetadata am -> am.hasStereotype(ANN_CONSTRAINT.toString()) || am.hasStereotype(ANN_VALID.toString()) }
                         )
                     } else {
                         addError("Class must have at least one non private constructor in order to be a candidate for dependency injection", classNode)

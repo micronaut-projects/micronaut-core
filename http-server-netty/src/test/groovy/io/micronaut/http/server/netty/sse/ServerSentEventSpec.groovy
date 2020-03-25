@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.sse.Event
@@ -104,6 +105,7 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
     static class SseController {
 
         @Get('/object')
+        @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> object() {
             int i = 0
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
@@ -118,6 +120,7 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
         }
 
         @Get('/rich')
+        @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> rich() {
             Integer i = 0
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
@@ -137,6 +140,7 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
         }
 
         @Get('/string')
+        @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> string() {
             int i = 0
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
@@ -151,6 +155,7 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
         }
 
         @Get('/exception')
+        @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> exception() {
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
                 throw new RuntimeException("bad things happened")
@@ -158,6 +163,7 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
         }
 
         @Get('on-error')
+        @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> onError() {
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
                 emitter.onError(new RuntimeException("bad things happened"))

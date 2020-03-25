@@ -37,6 +37,28 @@ import javax.inject.Singleton
  */
 class BeanDefinitionAnnotationMetadataSpec extends AbstractTypeElementSpec {
 
+    void "test bean definition computed state"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.context.annotation.Primary;
+
+@javax.inject.Singleton
+@Primary
+class Test {
+
+}
+''')
+        expect:
+        definition != null
+        definition.isSingleton()
+        !definition.isIterable()
+        definition.isPrimary()
+        !definition.isProvided()
+        definition.getScope().get() == Singleton
+    }
+
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1607')
     void "test recursive generics"() {
         given:

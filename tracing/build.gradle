@@ -20,8 +20,6 @@ dependencies {
 
     compileOnly dependencyVersion("jaeger")
     compileOnly dependencyVersion("reactor")
-    compileOnly dependencyVersion("rxjava1.interop")
-
 
     testImplementation dependencyModuleVersion('micronaut.netflix', 'micronaut-netflix-hystrix'), {
         exclude group:"io.micronaut", module:'micronaut-runtime'

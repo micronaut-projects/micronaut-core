@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,11 @@
  */
 package io.micronaut.http.resource;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.env.Environment;
-import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.core.io.Readable;
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.file.DefaultFileSystemResourceLoader;
@@ -28,12 +27,9 @@ import io.micronaut.core.io.file.FileSystemResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.scan.DefaultClassPathResourceLoader;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.net.URL;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Creates beans for {@link ResourceLoader}s to handle static resource requests. Registers a resource resolver that
@@ -83,36 +79,8 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @BootstrapContextCompatible
+    @Indexed(ResourceResolver.class)
     protected @NonNull ResourceResolver resourceResolver(@NonNull List<ResourceLoader> resourceLoaders) {
         return new ResourceResolver(resourceLoaders);
-    }
-
-    /**
-     * Type converter for {@link Readable} types.
-     * @param resourceResolver The resource resolver.
-     * @return The type converter
-     * @since 1.1.0
-     */
-    @Singleton
-    protected @NonNull TypeConverter<CharSequence, Readable> readableTypeConverter(ResourceResolver resourceResolver) {
-        return (object, targetType, context) -> {
-            String pathStr = object.toString();
-            Optional<ResourceLoader> supportingLoader = resourceResolver.getSupportingLoader(pathStr);
-            if (!supportingLoader.isPresent()) {
-                context.reject(pathStr, new ConfigurationException(
-                        "No supported resource loader for path [" + pathStr + "]. Prefix the path with a supported prefix such as 'classpath:' or 'file:'"
-                ));
-                return Optional.empty();
-            } else {
-                final Optional<URL> resource = resourceResolver.getResource(pathStr);
-                if (resource.isPresent()) {
-                    return Optional.of(Readable.of(resource.get()));
-                } else {
-                    context.reject(object, new ConfigurationException("No resource exists for value: " + object));
-                    return Optional.empty();
-                }
-            }
-
-        };
     }
 }
