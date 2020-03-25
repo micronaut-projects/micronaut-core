@@ -63,7 +63,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
 
     @Override
     public boolean isEagerInitConfiguration() {
-        return eagerInitSingletons;
+        return eagerInitConfiguration;
     }
 
     @NonNull
