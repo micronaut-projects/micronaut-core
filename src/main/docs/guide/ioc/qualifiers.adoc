@@ -11,7 +11,7 @@ snippet::io.micronaut.docs.inject.qualifiers.named.Engine,io.micronaut.docs.inje
 <1> The `Engine` interface defines the common contract
 <2> The `V6Engine` class is the first implementation
 <3> The `V8Engine` class is the second implementation
-<4> The link:{jeeapi}/javax/inject/Named.html[Named] annotation is used to indicate the `V8Engine` implementation is required
+<4> The link:{jeeapi}/javax/inject/Named.html[javax.inject.Named] annotation is used to indicate the `V8Engine` implementation is required
 <5> Calling the start method prints: `"Starting V8"`
 
 You can also declare link:{jeeapi}/javax/inject/Named.html[@Named] at the class level of a bean to explicitly define the name of the bean.
