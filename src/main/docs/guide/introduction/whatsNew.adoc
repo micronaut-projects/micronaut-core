@@ -6,6 +6,12 @@ Micronaut {version} includes the following changes:
 
 Micronaut has been updated to support JDK 14.
 
+==== Support for RxJava 3
+
+You can now add support for RxJava 3 to your projects with the following dependency:
+
+dependency:io.micronaut.rxjava3:micronaut-rxjava3[scope="compile"]
+
 ==== Support for Analyzing the Injection Point
 
 Micronaut's Dependency Injection implementation has been improved such that you can now receive an api:inject.InjectionPoint[] instance to any ann:context.annotation.Factory[] method. This makes it possible to customize how the bean is created based on the annotation metadata at the point at which the bean is injected.
