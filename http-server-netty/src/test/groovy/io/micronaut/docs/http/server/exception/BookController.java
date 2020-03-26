@@ -37,13 +37,17 @@ public class BookController {
     @Produces(MediaType.TEXT_PLAIN)
     @Get("/stock/future/{isbn}")
     CompletableFuture<Integer> stockFuture(String isbn) {
-        return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.OK, 1234));
+        CompletableFuture future = new CompletableFuture();
+        future.completeExceptionally(new HttpStatusException(HttpStatus.OK, 1234));
+        return future;
     }
 
     @Produces(MediaType.TEXT_PLAIN)
     @Get("/stock/blocking/{isbn}")
     Integer stockBlocking(String isbn) throws InterruptedException, ExecutionException {
-        return CompletableFuture.<Integer>failedFuture(new HttpStatusException(HttpStatus.OK, 1234)).get();
+        CompletableFuture<Integer> future = new CompletableFuture<>();
+        future.completeExceptionally(new HttpStatusException(HttpStatus.OK, 1234));
+        return future.get();
     }
 
     @Produces(MediaType.TEXT_PLAIN)
