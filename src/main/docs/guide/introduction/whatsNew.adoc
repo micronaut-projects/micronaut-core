@@ -120,7 +120,7 @@ If no host is provided at the time of a request, a api:http.client.exceptions.No
 
 ==== Micronaut SQL 2.0.0 Upgrade
 
-Micronaut SQL has been improved to default to Micronaut transaction management (making Spring management optional) and includes https://micronaut-projects.github.io/micronaut-sql/2.0.x/guide/#jdbi[support for Jdbi] (Thanks to https://github.com/drmaas[Dan Maas] for this contirubtion).
+Micronaut SQL has been improved to default to Micronaut transaction management (making Spring management optional) and includes https://micronaut-projects.github.io/micronaut-sql/2.0.x/guide/#jdbi[support for Jdbi] (Thanks to https://github.com/drmaas[Dan Maas] for this contribution).
 
 ==== Module Upgrades
 
