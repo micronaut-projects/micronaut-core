@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
@@ -41,7 +42,8 @@ import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.*;
 import io.micronaut.http.client.exceptions.*;
-import io.micronaut.http.client.filter.HttpClientFilterResolver;
+import io.micronaut.http.client.filter.ClientFilterResolutionContext;
+import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.filters.ClientServerContextFilter;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
@@ -54,6 +56,8 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
+import io.micronaut.http.filter.HttpClientFilterResolver;
+import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -183,6 +187,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
+    private final List<HttpFilterResolver.FilterEntry<HttpClientFilter>> clientFilterEntries;
     private final io.micronaut.http.HttpVersion httpVersion;
     private final Scheduler scheduler;
     private final LoadBalancer loadBalancer;
@@ -198,7 +203,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     Long readTimeoutMillis;
     private final @Nullable
     Long connectionTimeAliveMillis;
-    private final HttpClientFilterResolver filterResolver;
+    private final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
 
@@ -222,7 +227,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              MediaTypeCodecRegistry codecRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
                              HttpClientFilter... filters) {
-        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1, configuration, contextPath, new HttpClientFilterResolver(null, null, annotationMetadataResolver, Arrays.asList(filters)), threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class);
+        this(loadBalancer, io.micronaut.http.HttpVersion.HTTP_1_1, configuration, contextPath, new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)), null, threadFactory, nettyClientSslBuilder, codecRegistry, WebSocketBeanRegistry.EMPTY, new DefaultRequestBinderRegistry(ConversionService.SHARED), null, NioSocketChannel.class);
     }
 
     /**
@@ -233,6 +238,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param configuration         The {@link HttpClientConfiguration} object
      * @param contextPath           The base URI to prepend to request uris
      * @param filterResolver        The http client filter resolver
+     * @param clientFilterEntries   The client filter entries
      * @param threadFactory         The thread factory to use for client threads
      * @param nettyClientSslBuilder The SSL builder
      * @param codecRegistry         The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
@@ -245,7 +251,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                              @Nullable io.micronaut.http.HttpVersion httpVersion,
                              @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
-                             @NonNull HttpClientFilterResolver filterResolver,
+                             @NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
+                             List<HttpFilterResolver.FilterEntry<HttpClientFilter>> clientFilterEntries,
                              @Nullable ThreadFactory threadFactory,
                              @NonNull NettyClientSslBuilder nettyClientSslBuilder,
                              @NonNull MediaTypeCodecRegistry codecRegistry,
@@ -353,6 +360,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.mediaTypeCodecRegistry = codecRegistry;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(LOG);
         this.filterResolver = filterResolver;
+        if (clientFilterEntries != null) {
+            this.clientFilterEntries = clientFilterEntries;
+        } else {
+            this.clientFilterEntries = filterResolver.resolveFilterEntries(
+                    new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
+            );
+        }
         this.webSocketRegistry = webSocketBeanRegistry != null ? webSocketBeanRegistry : WebSocketBeanRegistry.EMPTY;
         this.requestBinderRegistry = requestBinderRegistry;
     }
@@ -1407,7 +1421,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         if (request instanceof MutableHttpRequest) {
             ((MutableHttpRequest<I>) request).uri(requestURI);
 
-            List<HttpClientFilter> filters = filterResolver.resolveFilters(request);
+            List<HttpClientFilter> filters = (List<HttpClientFilter>)
+                    filterResolver.resolveFilters(request, clientFilterEntries);
             if (parentRequest != null) {
                 filters.add(new ClientServerContextFilter(parentRequest));
             }

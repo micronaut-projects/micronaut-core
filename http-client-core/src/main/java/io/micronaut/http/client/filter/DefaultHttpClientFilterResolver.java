@@ -16,8 +16,6 @@
 package io.micronaut.http.client.filter;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.context.annotation.Parameter;
-import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
@@ -30,9 +28,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.HttpClientFilter;
-import io.micronaut.http.filter.HttpFilterResolver;
-
-import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.http.filter.HttpClientFilterResolver;
+import javax.inject.Singleton;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -44,63 +41,58 @@ import java.util.stream.Collectors;
  * @since 1.3.0
  */
 @Internal
-@Prototype
+@Singleton
 @BootstrapContextCompatible
-public class HttpClientFilterResolver implements HttpFilterResolver {
+public class DefaultHttpClientFilterResolver implements HttpClientFilterResolver<ClientFilterResolutionContext> {
 
-    private final List<HttpClientFilterEntry> clientFilters;
+    private final List<HttpClientFilter> clientFilters;
+    private final AnnotationMetadataResolver annotationMetadataResolver;
 
     /**
      * Default constructor.
      *
-     * @param clientIdentifiers          The client identifiers
-     * @param filterAnnotation            The filter annotation
      * @param annotationMetadataResolver The annotation metadata resolver
      * @param clientFilters              All client filters
      */
-    public HttpClientFilterResolver(
-            @Parameter @Nullable Collection<String> clientIdentifiers,
-            @Parameter @Nullable String filterAnnotation,
-            @Nullable AnnotationMetadataResolver annotationMetadataResolver,
+    public DefaultHttpClientFilterResolver(
+            AnnotationMetadataResolver annotationMetadataResolver,
             List<HttpClientFilter> clientFilters) {
-        if (clientIdentifiers == null) {
-            clientIdentifiers = Collections.emptyList();
-        }
-        if (annotationMetadataResolver == null) {
-            annotationMetadataResolver = AnnotationMetadataResolver.DEFAULT;
-        }
-        AnnotationMetadataResolver finalAnnotationMetadataResolver = annotationMetadataResolver;
-        Collection<String> finalClientIdentifiers = clientIdentifiers;
-        this.clientFilters = clientFilters.stream()
+        this.annotationMetadataResolver = annotationMetadataResolver;
+        this.clientFilters = clientFilters;
+    }
+
+    @Override
+    public List<FilterEntry<HttpClientFilter>> resolveFilterEntries(ClientFilterResolutionContext context) {
+        return clientFilters.stream()
                 .map(httpClientFilter -> {
-                    AnnotationMetadata annotationMetadata;
-                    annotationMetadata = finalAnnotationMetadataResolver.resolveMetadata(httpClientFilter);
+                    AnnotationMetadata annotationMetadata = annotationMetadataResolver.resolveMetadata(httpClientFilter);
                     HttpMethod[] methods = annotationMetadata.enumValues(Filter.class, "methods", HttpMethod.class);
-                    final List<HttpMethod> httpMethods = new ArrayList<>(Arrays.asList(methods));
+                    final Set<HttpMethod> httpMethods = new HashSet<>(Arrays.asList(methods));
                     if (annotationMetadata.hasStereotype(FilterMatcher.class)) {
                         httpMethods.addAll(
-                            Arrays.asList(annotationMetadata.enumValues(FilterMatcher.class, "methods", HttpMethod.class))
+                                Arrays.asList(annotationMetadata.enumValues(FilterMatcher.class, "methods", HttpMethod.class))
                         );
                     }
 
-                    return new HttpClientFilterEntry(
+                    return FilterEntry.of(
                             httpClientFilter,
                             annotationMetadata,
                             httpMethods,
                             annotationMetadata.stringValues(Filter.class)
                     );
                 }).filter(entry -> {
-                    AnnotationMetadata annotationMetadata = entry.annotationMetadata;
+                    AnnotationMetadata annotationMetadata = entry.getAnnotationMetadata();
                     boolean matches = !annotationMetadata.hasStereotype(FilterMatcher.class);
+                    String filterAnnotation = annotationMetadata.getAnnotationNameByStereotype(FilterMatcher.class).orElse(null);
                     if (filterAnnotation != null && !matches) {
-                        matches = annotationMetadata.hasAnnotation(filterAnnotation);
+                        matches = context.getAnnotationMetadata().hasAnnotation(filterAnnotation);
                     }
 
                     if (matches) {
                         String[] clients = annotationMetadata.stringValues(Filter.class, "serviceId");
                         boolean hasClients = ArrayUtils.isNotEmpty(clients);
                         if (hasClients) {
-                            matches = containsIdentifier(finalClientIdentifiers, clients);
+                            matches = containsIdentifier(context.getClientIds(), clients);
                         }
                     }
                     return matches;
@@ -108,21 +100,21 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
     }
 
     @Override
-    public List<HttpClientFilter> resolveFilters(HttpRequest<?> request) {
+    public List<HttpClientFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry<HttpClientFilter>> filterEntries) {
         String requestPath = StringUtils.prependUri("/", request.getUri().getPath());
         io.micronaut.http.HttpMethod method = request.getMethod();
-        List<HttpClientFilter> filterList = new ArrayList<>(clientFilters.size());
-        for (HttpClientFilterEntry filterEntry : clientFilters) {
-            final HttpClientFilter filter = filterEntry.httpClientFilter;
+        List<HttpClientFilter> filterList = new ArrayList<>(filterEntries.size());
+        for (FilterEntry<HttpClientFilter> filterEntry : filterEntries) {
+            final HttpClientFilter filter = filterEntry.getFilter();
             if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
                 continue;
             }
             boolean matches = true;
-            if (filterEntry.hasMethods) {
-                matches = anyMethodMatches(method, filterEntry.filterMethods);
+            if (filterEntry.hasMethods()) {
+                matches = anyMethodMatches(method, filterEntry.getFilterMethods());
             }
-            if (filterEntry.hasPatterns) {
-                matches = matches && anyPatternMatches(requestPath, filterEntry.patterns);
+            if (filterEntry.hasPatterns()) {
+                matches = matches && anyPatternMatches(requestPath, filterEntry.getPatterns());
             }
 
             if (matches) {
@@ -140,32 +132,8 @@ public class HttpClientFilterResolver implements HttpFilterResolver {
         return Arrays.stream(patterns).anyMatch(pattern -> PathMatcher.ANT.matches(pattern, requestPath));
     }
 
-    private boolean anyMethodMatches(HttpMethod requestMethod, List<HttpMethod> methods) {
+    private boolean anyMethodMatches(HttpMethod requestMethod, Collection<HttpMethod> methods) {
         return methods.contains(requestMethod);
     }
 
-    /**
-     * Internal entry to match a filter.
-     */
-    private final class HttpClientFilterEntry {
-        private final HttpClientFilter httpClientFilter;
-        private final AnnotationMetadata annotationMetadata;
-        private final List<HttpMethod> filterMethods;
-        private final String[] patterns;
-        private final boolean hasMethods;
-        private final boolean hasPatterns;
-
-        HttpClientFilterEntry(
-                HttpClientFilter httpClientFilter,
-                AnnotationMetadata annotationMetadata,
-                List<HttpMethod> httpMethods,
-                String[] patterns) {
-            this.httpClientFilter = httpClientFilter;
-            this.annotationMetadata = annotationMetadata;
-            this.filterMethods = httpMethods;
-            this.patterns = patterns;
-            this.hasMethods = !filterMethods.isEmpty();
-            this.hasPatterns = ArrayUtils.isNotEmpty(patterns);
-        }
-    }
 }
