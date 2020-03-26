@@ -55,7 +55,9 @@ public class Publishers {
         List<String> typeNames = Arrays.asList(
             "io.reactivex.Observable",
             "reactor.core.publisher.Flux",
-            "kotlinx.coroutines.flow.Flow"
+            "kotlinx.coroutines.flow.Flow",
+            "io.reactivex.rxjava3.core.Flowable",
+            "io.reactivex.rxjava3.core.Observable"
         );
         for (String name : typeNames) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
@@ -64,7 +66,10 @@ public class Publishers {
         for (String name : Arrays.asList(
                 "io.reactivex.Single",
                 "reactor.core.publisher.Mono",
-                "io.reactivex.Maybe")) {
+                "io.reactivex.Maybe",
+                "io.reactivex.rxjava3.core.Single",
+                "io.reactivex.rxjava3.core.Maybe"
+                )) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             aClass.ifPresent(aClass1 -> {
                 Publishers.SINGLE_TYPES.add(aClass1);
@@ -72,7 +77,7 @@ public class Publishers {
             });
         }
 
-        for (String name : Collections.singletonList("io.reactivex.Completable")) {
+        for (String name : Arrays.asList("io.reactivex.Completable", "io.reactivex.rxjava3.core.Completable")) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             aClass.ifPresent(aClass1 -> {
                 Publishers.COMPLETABLE_TYPES.add(aClass1);
