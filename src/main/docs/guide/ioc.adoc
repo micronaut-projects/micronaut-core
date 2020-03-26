@@ -20,7 +20,7 @@ Note that the IoC part of Micronaut can be used completely independently of Micr
 [source,groovy,subs="attributes"]
 ----
 plugins {
-  id "net.ltgt.apt" version "0.18" // <1>
+  id "net.ltgt.apt" version "0.21" // <1>
 }
 
 ...
