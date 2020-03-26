@@ -34,7 +34,7 @@ dependencies {
 
 ----
 
-<1> Apply the Annotation Processing plugin
+<1> Apply net.ltgt.apt Gradle plugin which makes it easier/safer to use Java annotation processors
 <2> Include the minimal dependencies required to perform dependency injection
 <3> This is necessary to create beans in the `test` directory
 
