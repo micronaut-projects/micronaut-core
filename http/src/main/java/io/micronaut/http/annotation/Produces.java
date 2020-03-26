@@ -17,6 +17,8 @@ package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.MediaType;
 
 import java.lang.annotation.Documented;
@@ -55,5 +57,6 @@ public @interface Produces {
      *
      * @return True if only a single result is emitted
      */
+    @AliasFor(annotation = SingleResult.class, member = "value")
     boolean single() default false;
 }

@@ -102,7 +102,6 @@ public interface Route {
         return DEFAULT_PRODUCES;
     }
 
-
     /**
      * The media types able to produced by this route.
      *

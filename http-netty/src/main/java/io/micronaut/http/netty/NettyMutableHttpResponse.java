@@ -58,7 +58,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
     private final ConversionService conversionService;
     private B body;
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
-    private final MutableConvertibleValues<Object> attributes;
+    private MutableConvertibleValues<Object> attributes;
 
     private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
 
@@ -70,7 +70,6 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
     public NettyMutableHttpResponse(FullHttpResponse nettyResponse, ConversionService conversionService) {
         this.nettyResponse = nettyResponse;
         this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
-        this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.conversionService = conversionService;
     }
 
@@ -81,7 +80,6 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
     public NettyMutableHttpResponse(ConversionService conversionService) {
         this.nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
         this.headers = new NettyHttpHeaders(nettyResponse.headers(), conversionService);
-        this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.conversionService = conversionService;
     }
 
@@ -112,6 +110,16 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes == null) {
+            synchronized (this) { // double check
+                attributes = this.attributes;
+                if (attributes == null) {
+                    attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4));
+                    this.attributes = attributes;
+                }
+            }
+        }
         return attributes;
     }
 
@@ -182,9 +190,14 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public NettyMutableHttpResponse<B> body(B body) {
-        this.body = body;
-        if (body instanceof ByteBuf) {
-            replace((ByteBuf) body);
+        if (this.body != body) {
+            if (this.body instanceof ByteBuf) {
+                ((ByteBuf) this.body).release();
+            }
+            this.body = body;
+            if (body instanceof ByteBuf) {
+                replace((ByteBuf) body);
+            }
         }
         return this;
     }

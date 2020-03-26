@@ -15,11 +15,15 @@
  */
 package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.AnnotationSource;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.core.async.publisher.Publishers;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Models a return type of an {@link Executable} method in Micronaut.
@@ -28,7 +32,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ReturnType<T> extends TypeVariableResolver, AnnotationSource {
+public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataProvider {
 
     /**
      * @return The type of the argument
@@ -41,6 +45,84 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationSource {
     default Argument<T> asArgument() {
         Collection<Argument<?>> values = getTypeVariables().values();
         return Argument.of(getType(), values.toArray(new Argument[0]));
+    }
+
+    /**
+     * @return Is this route match a suspended function (Kotlin).
+     * @since 2.0.0
+     */
+    default boolean isSuspended() {
+        return false;
+    }
+
+    /**
+     * @return Is the route a reactive route.
+     * @since 2.0.0
+     */
+    default boolean isReactive() {
+        return Publishers.isConvertibleToPublisher(getType());
+    }
+
+    /**
+     * @return Is the route a reactive route.
+     * @since 2.0.0
+     */
+    default boolean isCompletable() {
+        return Publishers.isCompletable(getType());
+    }
+
+    /**
+     * @return Does the route emit a single result or multiple results
+     * @since 2.0
+     */
+    default boolean isSingleResult() {
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        boolean single = annotationMetadata.booleanValue(SingleResult.class).orElse(false);
+        if (single) {
+            return true;
+        } else {
+            if (isReactive()) {
+                Class<T> returnType = getType();
+                return Publishers.isSingle(returnType);
+            } else {
+                return true;
+            }
+        }
+    }
+
+    /**
+     * @return Is the route an async route.
+     * @since 2.0.0
+     */
+    default boolean isAsync() {
+        Class<T> type = getType();
+        return CompletionStage.class.isAssignableFrom(type);
+    }
+
+    /**
+     * @return Is the route an async or reactive route.
+     * @since 2.0.0
+     */
+    default boolean isAsyncOrReactive() {
+        return isAsync() || isReactive();
+    }
+
+    /**
+     * @return Does the route return void
+     * @since 2.0.0
+     */
+    default boolean isVoid() {
+        Class<T> javaReturnType = getType();
+        if (javaReturnType == void.class) {
+            return true;
+        } else {
+            if (isReactive() || isAsync()) {
+                return Publishers.isCompletable(javaReturnType) ||
+                        getFirstTypeVariable()
+                                .filter(arg -> arg.getType() == Void.class).isPresent();
+            }
+        }
+        return false;
     }
 
     /**

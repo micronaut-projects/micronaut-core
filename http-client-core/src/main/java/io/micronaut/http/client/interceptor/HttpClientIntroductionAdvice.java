@@ -23,6 +23,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
@@ -391,7 +392,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             boolean isFuture = CompletionStage.class.isAssignableFrom(javaReturnType);
             final Class<?> methodDeclaringType = declaringType;
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
-                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.isTrue(Consumes.class, "single");
+                boolean isSingle = Publishers.isCompletable(javaReturnType) || Publishers.isSingle(javaReturnType) || isFuture || context.isTrue(SingleResult.class, AnnotationMetadata.VALUE_MEMBER);
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
 

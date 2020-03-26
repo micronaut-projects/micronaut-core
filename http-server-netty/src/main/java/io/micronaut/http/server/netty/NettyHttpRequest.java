@@ -66,7 +66,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
-    private final MutableConvertibleValues<Object> attributes;
+    private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
     private Map<Integer, AbstractHttpData> receivedData = new LinkedHashMap<>();
@@ -95,7 +95,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             channel.attr(KEY).set(this);
         }
         this.serverConfiguration = serverConfiguration;
-        this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = SupplierUtil.memoizedNonEmpty(() -> Optional.ofNullable((T) buildBody()));
@@ -167,7 +166,17 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
-        return this.attributes;
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes == null) {
+            synchronized (this) { // double check
+                attributes = this.attributes;
+                if (attributes == null) {
+                    attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4));
+                    this.attributes = attributes;
+                }
+            }
+        }
+        return attributes;
     }
 
     @Override
@@ -258,9 +267,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             ReferenceCounted referenceCounted = (ReferenceCounted) this.body;
             releaseIfNecessary(referenceCounted);
         }
-        for (Map.Entry<String, Object> attribute : attributes) {
-            Object value = attribute.getValue();
-            releaseIfNecessary(value);
+        if (attributes != null) {
+            for (Object value : attributes.values()) {
+                releaseIfNecessary(value);
+            }
         }
         if (nettyRequest instanceof StreamedHttpRequest) {
             ((StreamedHttpRequest) nettyRequest).closeIfNoSubscriber();

@@ -20,6 +20,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.reactivex.Flowable;
+import io.reactivex.Maybe;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -39,6 +41,11 @@ import java.util.Optional;
 class ReactorConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(ConversionService<?> conversionService) {
+        conversionService.addConverter(
+                Mono.class,
+                Maybe.class,
+                (TypeConverter<Mono, Maybe>) (object, targetType, context) -> Optional.of(Flowable.fromPublisher(object).firstElement())
+        );
         conversionService.addConverter(
                 Publisher.class,
                 Flux.class,
