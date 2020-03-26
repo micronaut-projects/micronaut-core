@@ -20,6 +20,9 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.annotation.Error;
+import io.micronaut.http.exceptions.HttpStatusException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 @Requires(property = "spec.name", value = "ExceptionHandlerSpec")
 //tag::clazz[]
@@ -29,6 +32,18 @@ public class BookController {
     @Get("/stock/{isbn}")
     Integer stock(String isbn) {
         throw new OutOfStockException();
+    }
+
+    @Produces(MediaType.TEXT_PLAIN)
+    @Get("/stock/future/{isbn}")
+    CompletableFuture<Integer> stockFuture(String isbn) {
+        return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.OK, 1234));
+    }
+
+    @Produces(MediaType.TEXT_PLAIN)
+    @Get("/stock/blocking/{isbn}")
+    Integer stockBlocking(String isbn) throws InterruptedException, ExecutionException {
+        return CompletableFuture.<Integer>failedFuture(new HttpStatusException(HttpStatus.OK, 1234)).get();
     }
 
     @Produces(MediaType.TEXT_PLAIN)
