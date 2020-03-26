@@ -25,10 +25,10 @@ plugins {
 
 ...
 dependencies {
-    annotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <2>
-    implementation "io.micronaut:micronaut-inject:{version}"
+    annotationProcessor("io.micronaut:micronaut-inject-java:{version}") // <2>
+    implementation("io.micronaut:micronaut-inject:{version}")
     ...
-    testAnnotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <3>
+    testAnnotationProcessor("io.micronaut:micronaut-inject-java:{version}") // <3>
     ...
 }
 
