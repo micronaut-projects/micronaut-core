@@ -20,8 +20,6 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.cookie.CookieConfiguration;
 import io.micronaut.http.cookie.SameSite;
 import io.micronaut.session.SessionConfiguration;
-
-import java.time.Duration;
 import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 

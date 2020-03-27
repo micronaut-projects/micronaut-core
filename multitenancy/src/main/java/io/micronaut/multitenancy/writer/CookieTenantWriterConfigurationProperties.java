@@ -20,7 +20,6 @@ import io.micronaut.http.cookie.SameSite;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import java.time.Duration;
 import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
