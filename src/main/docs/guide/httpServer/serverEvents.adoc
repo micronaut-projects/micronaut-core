@@ -10,10 +10,10 @@ The HTTP server will emit a number of <<events, Bean Events>>, defined in the pk
 |api:runtime.server.event.ServerShutdownEvent[]
 |Emitted when the server shuts down
 
-|api:discovery.event.ServiceStartedEvent[]
+|api:discovery.event.ServiceReadyEvent[]
 |Emitted after all api:runtime.server.event.ServerStartupEvent[] listeners have been executed and exposes the api:runtime.server.EmbeddedServerInstance[]
 
-|api:discovery.event.ServiceShutdownEvent[]
+|api:discovery.event.ServiceStoppedEvent[]
 |Emitted after all api:runtime.server.event.ServerShutdownEvent[] listeners have been executed and exposes the api:runtime.server.EmbeddedServerInstance[]
 
 |===

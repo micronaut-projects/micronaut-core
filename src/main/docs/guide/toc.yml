@@ -23,7 +23,9 @@ ioc:
   qualifiers: Bean Qualifiers
   scopes:
     title: Scopes
-    builtInScopes: Built-In Scopes
+    builtInScopes:
+      title: Built-In Scopes
+      eagerInit: Eager Initialization of Singletons
     refreshable: Refreshable Scope
     metaScopes: Scopes on Meta Annotations
   factories: Bean Factories
