@@ -22,6 +22,7 @@ import io.micronaut.http.cookie.SameSite;
 import io.micronaut.session.SessionConfiguration;
 
 import java.time.Duration;
+import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
 /**
@@ -59,7 +60,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
 
     private boolean rememberMe = DEFAULT_REMEMBERME;
     private boolean base64Encode = DEFAULT_BASE64ENCODE;
-    private Duration cookieMaxAge;
+    private TemporalAmount cookieMaxAge;
     private Boolean cookieSecure;
     private SameSite sameSite;
     private String cookiePath = DEFAULT_COOKIEPATH;
@@ -175,7 +176,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
     /**
      * @return The max age to use for the cookie
      */
-    public Optional<Duration> getCookieMaxAge() {
+    public Optional<TemporalAmount> getCookieMaxAge() {
         return Optional.ofNullable(cookieMaxAge);
     }
 
@@ -183,7 +184,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
      * Sets the maximum age of the cookie.
      * @param cookieMaxAge The maximum age of the cookie
      */
-    public void setCookieMaxAge(Duration cookieMaxAge) {
+    public void setCookieMaxAge(TemporalAmount cookieMaxAge) {
         this.cookieMaxAge = cookieMaxAge;
     }
 
@@ -227,7 +228,7 @@ public class HttpSessionConfiguration extends SessionConfiguration implements Co
     }
 
     /**
-     * Determines if this this {@link Cookie} can be sent along cross-site requests.
+     * Determines if this this {@link io.micronaut.http.cookie.Cookie} can be sent along cross-site requests.
      * For more information, please look
      *  <a href="https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-05">here</a>
      * @param sameSite SameSite value
