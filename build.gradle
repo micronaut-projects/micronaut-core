@@ -309,6 +309,11 @@ ext {
                     name:'micronaut-spring-annotation',
                     modules:['micronaut-spring-boot', 'micronaut-spring-boot-annotation', 'micronaut-spring-context', 'micronaut-spring-web', 'micronaut-spring-web-annotation']
             ],
+            'micronaut.spring.core': [
+                    version:micronautSpringCoreVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-spring'
+            ],
             'micronaut.sql': [
                     version:micronautSqlVersion,
                     group:'io.micronaut.configuration',
