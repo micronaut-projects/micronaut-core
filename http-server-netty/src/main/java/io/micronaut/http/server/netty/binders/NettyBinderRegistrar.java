@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.binders;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
@@ -38,11 +39,11 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
      * @param httpServerConfiguration      The server config
      */
     NettyBinderRegistrar(
-            ConversionService<?> conversionService,
+            @Nullable ConversionService<?> conversionService,
             HttpContentProcessorResolver httpContentProcessorResolver,
             BeanLocator beanLocator,
             HttpServerConfiguration httpServerConfiguration) {
-        this.conversionService = conversionService;
+        this.conversionService = conversionService == null ? ConversionService.SHARED : conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;

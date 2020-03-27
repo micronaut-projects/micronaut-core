@@ -28,16 +28,10 @@ import io.micronaut.discovery.metadata.ServiceInstanceMetadataContributor;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-
-import javax.inject.Provider;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * Implements the {@link EmbeddedServerInstance} interface for Netty.
