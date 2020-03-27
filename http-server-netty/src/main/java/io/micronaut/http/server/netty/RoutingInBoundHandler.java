@@ -151,13 +151,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final Router router;
     private final ExecutorSelector executorSelector;
     private final StaticResourceResolver staticResourceResolver;
-    private final ExecutorService ioExecutor;
     private final BeanContext beanContext;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
+    private final Supplier<ExecutorService> ioExecutorSupplier;
+    private ExecutorService ioExecutor;
 
     /**
      * @param beanContext                             The bean locator
@@ -180,13 +181,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             NettyHttpServerConfiguration serverConfiguration,
             RequestArgumentSatisfier requestArgumentSatisfier,
             ExecutorSelector executorSelector,
-            ExecutorService ioExecutor,
+            Supplier<ExecutorService> ioExecutor,
             HttpContentProcessorResolver httpContentProcessorResolver) {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
         this.beanContext = beanContext;
         this.staticResourceResolver = staticResourceResolver;
-        this.ioExecutor = ioExecutor;
+        this.ioExecutorSupplier = ioExecutor;
         this.executorSelector = executorSelector;
         this.router = router;
         this.requestArgumentSatisfier = requestArgumentSatisfier;
@@ -777,7 +778,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                 namedSubject.onNext(new NettyStreamingFileUpload(
                                                         (FileUpload) data,
                                                         serverConfiguration.getMultipart(),
-                                                        ioExecutor,
+                                                        getIoExecutor(),
                                                         flowable));
                                             } else {
                                                 namedSubject.onNext(flowable);
@@ -820,7 +821,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             return new NettyStreamingFileUpload(
                                                     (FileUpload) data,
                                                     serverConfiguration.getMultipart(),
-                                                    ioExecutor,
+                                                    getIoExecutor(),
                                                     processFlowable(subject, dataKey, true));
                                         }
                                         return upload;
@@ -931,6 +932,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         };
     }
 
+    private ExecutorService getIoExecutor() {
+        ExecutorService executor = this.ioExecutor;
+        if (executor == null) {
+            synchronized (this) { // double check
+                executor = this.ioExecutor;
+                if (executor == null) {
+                    executor = this.ioExecutorSupplier.get();
+                    this.ioExecutor = executor;
+                }
+            }
+        }
+        return executor;
+    }
+
     private RouteMatch<?> prepareRouteForExecution(RouteMatch<?> route, NettyHttpRequest<?> request, boolean skipOncePerRequest) {
         ChannelHandlerContext context = request.getChannelHandlerContext();
         // Select the most appropriate Executor
@@ -945,7 +960,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
                 break;
             case IO:
-                executor = ioExecutor;
+                executor = getIoExecutor();
                 break;
             case AUTO:
             default:
@@ -1418,7 +1433,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         boolean isNotHead = nettyRequest.getMethod() != HttpMethod.HEAD;
         if (isNotHead && body instanceof Writable) {
             Writable writable = (Writable) body;
-            ioExecutor.execute(() -> {
+            getIoExecutor().execute(() -> {
                 ByteBuf byteBuf = context.alloc().ioBuffer(128);
                 ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
                 try {
