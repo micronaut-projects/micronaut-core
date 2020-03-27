@@ -1,0 +1,9 @@
+To add support for RxJava 3 add the following module:
+
+dependency:io.micronaut.rxjava3:micronaut-rxjava3[scope="compile"]
+
+To use the RxJava 3 HTTP client add the following dependency:
+
+dependency:io.micronaut.rxjava3:micronaut-rxjava3-http-client[scope="compile"]
+
+For more information see the documentation for https://micronaut-projects.github.io/micronaut-rxjava3/latest/guide/[Micronaut RxJava 3].

@@ -1031,7 +1031,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         boolean isReactive = finalRoute.isAsyncOrReactive() || Publishers.isConvertibleToPublisher(body);
                         if (isReactive && Publishers.isConvertibleToPublisher(body)) {
                             Class<?> bodyClass = body.getClass();
-                            boolean isSingle = finalRoute.isSingleResult() && (finalRoute.isAsync() || finalRoute.isSuspended() || Publishers.isSingle(bodyClass));
+                            boolean isSingle = finalRoute.isSpecifiedSingle() || (finalRoute.isSingleResult() &&
+                                    (finalRoute.isAsync() || finalRoute.isSuspended() || Publishers.isSingle(bodyClass)));
                             boolean isCompletable = !isSingle && finalRoute.isVoid() && Publishers.isCompletable(bodyClass);
                             if (isSingle || isCompletable) {
                                 // full response case

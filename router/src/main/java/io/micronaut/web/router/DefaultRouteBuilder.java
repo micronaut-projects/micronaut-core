@@ -418,6 +418,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final boolean reactive;
         private final boolean single;
         private final boolean async;
+        private final boolean specifiedSingle;
 
         /**
          * @param targetMethod The target method execution handle
@@ -442,6 +443,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             async = RouteInfo.super.isAsync();
             single = RouteInfo.super.isSingleResult();
             isVoid = RouteInfo.super.isVoid();
+            specifiedSingle = RouteInfo.super.isSpecifiedSingle();
         }
 
         @NonNull
@@ -468,6 +470,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public boolean isSingleResult() {
             return single;
+        }
+
+        @Override
+        public boolean isSpecifiedSingle() {
+            return specifiedSingle;
         }
 
         @Override

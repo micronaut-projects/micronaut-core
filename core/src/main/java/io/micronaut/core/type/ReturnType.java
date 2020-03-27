@@ -48,7 +48,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
     }
 
     /**
-     * @return Is this route match a suspended function (Kotlin).
+     * @return Is the return type suspended function (Kotlin).
      * @since 2.0.0
      */
     default boolean isSuspended() {
@@ -56,7 +56,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
     }
 
     /**
-     * @return Is the route a reactive route.
+     * @return Is the return type reactive.
      * @since 2.0.0
      */
     default boolean isReactive() {
@@ -64,7 +64,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
     }
 
     /**
-     * @return Is the route a reactive route.
+     * @return Is the return the return type a reactive completable type.
      * @since 2.0.0
      */
     default boolean isCompletable() {
@@ -72,13 +72,11 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
     }
 
     /**
-     * @return Does the route emit a single result or multiple results
+     * @return Is the return type a single result or multiple results
      * @since 2.0
      */
     default boolean isSingleResult() {
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-        boolean single = annotationMetadata.booleanValue(SingleResult.class).orElse(false);
-        if (single) {
+        if (isSpecifiedSingle()) {
             return true;
         } else {
             if (isReactive()) {
@@ -91,7 +89,18 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
     }
 
     /**
-     * @return Is the route an async route.
+     * @return Has the return type been specified to emit a single result with {@link SingleResult}.
+     * @since 2.0
+     */
+    default boolean isSpecifiedSingle() {
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        return annotationMetadata.hasStereotype(SingleResult.class) ?
+                annotationMetadata.booleanValue(SingleResult.NAME).orElse(true) :
+                false;
+    }
+
+    /**
+     * @return Is the return type asynchronous.
      * @since 2.0.0
      */
     default boolean isAsync() {
@@ -100,7 +109,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
     }
 
     /**
-     * @return Is the route an async or reactive route.
+     * @return Is the return type either async or reactive.
      * @since 2.0.0
      */
     default boolean isAsyncOrReactive() {
@@ -108,7 +117,11 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
     }
 
     /**
-     * @return Does the route return void
+     * Returns whether the return type is logically void. This includes
+     * reactive times that emit nothing (such as {@link io.micronaut.core.async.subscriber.Completable})
+     * and asynchronous types that emit {@link Void}.
+     *
+     * @return Is the return type logically void.
      * @since 2.0.0
      */
     default boolean isVoid() {
@@ -117,7 +130,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationMetadataP
             return true;
         } else {
             if (isReactive() || isAsync()) {
-                return Publishers.isCompletable(javaReturnType) ||
+                return isCompletable() ||
                         getFirstTypeVariable()
                                 .filter(arg -> arg.getType() == Void.class).isPresent();
             }

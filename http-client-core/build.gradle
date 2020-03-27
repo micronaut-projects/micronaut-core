@@ -3,8 +3,6 @@ dependencies {
     api dependencyVersion("rxjava2")
     api project(":runtime")
     api project(":websocket")
-
-    compileOnly dependencyVersion("reactor")
 }
 
 //tasks.withType(Test) {

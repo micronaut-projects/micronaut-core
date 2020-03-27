@@ -6,11 +6,31 @@ Micronaut {version} includes the following changes:
 
 Micronaut has been updated to support JDK 14.
 
-==== Support for RxJava 3
+==== New Reactive Modules
 
-You can now add support for RxJava 3 to your projects with the following dependency:
+Whilst RxJava 2 remains the default, individual modules for other reactive libraries have been added.
+
+For RxJava 3:
 
 dependency:io.micronaut.rxjava3:micronaut-rxjava3[scope="compile"]
+
+For Reactor:
+
+dependency:io.micronaut.reactor:micronaut-reactor[scope="compile"]
+
+And legacy support for RxJava 1:
+
+dependency:io.micronaut.rxjava1:micronaut-rxjava1[scope="compile"]
+
+Included within the new RxJava 3 and Reactor modules are variants of api:http.client.RxHttpClient[] called `Rx3HttpClient` and `ReactorHttpClient` respectively.
+
+To use the RxJava 3 HTTP client add the following dependency:
+
+dependency:io.micronaut.rxjava3:micronaut-rxjava3-http-client[scope="compile"]
+
+To use the Reactor HTTP client add:
+
+dependency:io.micronaut.rxjava3:micronaut-reactor-http-client[scope="compile"]
 
 ==== Support for Analyzing the Injection Point
 

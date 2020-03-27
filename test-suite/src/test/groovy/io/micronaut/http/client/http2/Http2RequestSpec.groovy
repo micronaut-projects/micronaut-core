@@ -4,7 +4,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
 import io.micronaut.docs.server.json.Person
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -18,7 +17,6 @@ import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
-import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -62,7 +60,7 @@ class Http2RequestSpec extends Specification {
         when:"An sse stream is obtain"
         def client = server.applicationContext.getBean(TestHttp2Client)
 
-        def results = client.rich().toIterable().toList()
+        def results = client.rich().toList().blockingGet()
 
         then:
         results.size() == 4
@@ -200,6 +198,6 @@ class Http2RequestSpec extends Specification {
     static interface TestHttp2Client {
 
         @Get(value = '/rich', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Event<Person>> rich()
+        Flowable<Event<Person>> rich()
     }
 }

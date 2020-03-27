@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.sse
 
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
@@ -25,10 +26,12 @@ import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.sse.Event
+import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
-import reactor.core.publisher.Flux
+import spock.lang.Specification
 
+import javax.inject.Inject
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 
@@ -36,12 +39,15 @@ import java.time.temporal.ChronoUnit
  * @author Graeme Rocher
  * @since 1.0
  */
-class ServerSentEventSpec extends AbstractMicronautSpec {
+@MicronautTest
+@Property(name = 'spec.name', value = 'ServerSentEventSpec')
+class ServerSentEventSpec extends Specification {
+
+    @Inject SseClient client
 
     void "test consume event stream object"() {
         given:
-        SseClient client = embeddedServer.applicationContext.getBean(SseClient)
-        List<Event<Foo>> events = client.object().collectList().block()
+        List<Event<Foo>> events = client.object().toList().blockingGet()
 
         expect:
         events.size() == 4
@@ -50,8 +56,7 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
 
     void "test consume event stream string"() {
         given:
-        SseClient client = embeddedServer.applicationContext.getBean(SseClient)
-        List<Event<String>> events = client.string().collectList().block()
+        List<Event<String>> events = client.string().toList().blockingGet()
 
         expect:
         events.size() == 4
@@ -60,8 +65,7 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
 
     void "test consume rich event stream object"() {
         given:
-        SseClient client = embeddedServer.applicationContext.getBean(SseClient)
-        List<Event<Foo>> events = client.rich().collectList().block()
+        List<Event<Foo>> events = client.rich().toList().blockingGet()
 
         expect:
         events.size() == 4
@@ -71,11 +75,8 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
     }
 
     void "test receive error from supplier"() {
-        given:
-        SseClient client = embeddedServer.applicationContext.getBean(SseClient)
-
         when:
-        List<Event<String>> events = client.exception().collectList().block()
+        List<Event<String>> events = client.exception().toList().blockingGet()
 
         then:
         events.size() == 0
@@ -85,19 +86,19 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
     static interface SseClient {
 
         @Get(value = '/object', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Event<Foo>> object()
+        Flowable<Event<Foo>> object()
 
         @Get(value = '/string', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Event<String>> string()
+        Flowable<Event<String>> string()
 
         @Get(value = '/rich', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Event<Foo>> rich()
+        Flowable<Event<Foo>> rich()
 
         @Get(value = '/exception', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Event<String>> exception()
+        Flowable<Event<String>> exception()
 
         @Get(value = '/on-error', processes = MediaType.TEXT_EVENT_STREAM)
-        Flux<Event<String>> onError()
+        Flowable<Event<String>> onError()
     }
 
     @Controller('/sse')

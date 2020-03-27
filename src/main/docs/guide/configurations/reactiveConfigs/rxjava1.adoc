@@ -1,0 +1,5 @@
+Legacy support for RxJava 1 can be added with the following module:
+
+dependency:io.micronaut.rxjava1:micronaut-rxjava1[scope="compile"]
+
+For more information see the https://micronaut-projects.github.io/micronaut-rxjava1/latest/guide/[Micronaut RxJava1] documentation.

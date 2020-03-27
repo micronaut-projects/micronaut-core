@@ -31,7 +31,6 @@ import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.reactivex.Flowable
 import io.reactivex.Single
-import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -100,18 +99,6 @@ class StreamSpec extends Specification {
         sum == n
     }
 
-    void "test receive client using byte[]"() {
-        given:
-        int n = 90659
-        StreamEchoClient myClient = context.getBean(StreamEchoClient)
-        when:
-        Flux<byte[]> responseFlowable = myClient.echoAsByteArrays(n, "Hello, World!")
-        // reduce to the total count of !'s
-        long sum = responseFlowable.reduce(0L, { long acc, byte[] bytes -> acc + bytes.count('!') }).block()
-        then:
-        sum == n
-    }
-
     void "test that the client is unable to convert bytes to elephants"() {
         given:
         StreamEchoClient myClient = context.getBean(StreamEchoClient)
@@ -148,9 +135,6 @@ class StreamSpec extends Specification {
 
         @Get(value = "/echo{?n,data}", consumes = MediaType.TEXT_PLAIN)
         Flowable<ByteBuffer<?>> echoAsByteBuffers(@QueryValue @Nullable int n, @QueryValue @Nullable String data);
-
-        @Get(value = "/echo{?n,data}", consumes = MediaType.TEXT_PLAIN)
-        Flux<byte[]> echoAsByteArrays(@QueryValue @Nullable int n, @QueryValue @Nullable String data);
 
         @Get(value = "/echo{?n,data}", consumes = MediaType.TEXT_PLAIN)
         Flowable<Elephant> echoAsElephant(@QueryValue @Nullable int n, @QueryValue @Nullable String data);

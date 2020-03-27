@@ -56,8 +56,17 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     default boolean isSingleResult() {
         ReturnType<? extends R> returnType = getReturnType();
         return returnType.isSingleResult() ||
-                (isReactive() && returnType.getFirstTypeVariable().filter(t -> HttpResponse.class.isAssignableFrom(t.getType())).isPresent()) ||
+                (isReactive() && returnType.getFirstTypeVariable()
+                        .filter(t -> HttpResponse.class.isAssignableFrom(t.getType())).isPresent()) ||
                 returnType.isSuspended();
+    }
+
+    /**
+     * @return Does the route emit a single result or multiple results
+     * @since 2.0
+     */
+    default boolean isSpecifiedSingle() {
+        return getReturnType().isSpecifiedSingle();
     }
 
     /**
