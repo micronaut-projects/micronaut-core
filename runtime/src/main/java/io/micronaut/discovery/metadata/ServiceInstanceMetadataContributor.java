@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery.metadata;
 
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.discovery.ServiceInstance;
 
 import java.util.Map;
@@ -26,6 +27,7 @@ import java.util.Map;
  * @author graemerocher
  * @since 1.0
  */
+@Indexed(ServiceInstanceMetadataContributor.class)
 public interface ServiceInstanceMetadataContributor {
 
     /**
