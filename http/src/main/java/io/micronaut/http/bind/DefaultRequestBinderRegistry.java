@@ -72,27 +72,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
         if (CollectionUtils.isNotEmpty(binders)) {
             for (RequestArgumentBinder binder : binders) {
-                if (binder instanceof AnnotatedRequestArgumentBinder) {
-                    AnnotatedRequestArgumentBinder<?, ?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
-                    Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
-                    if (binder instanceof TypedRequestArgumentBinder) {
-                        TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
-                        Argument argumentType = typedRequestArgumentBinder.argumentType();
-                        byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), binder);
-                        if (((TypedRequestArgumentBinder) binder).supportsSuperTypes()) {
-                            Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType.getType());
-                            for (Class<?> itfce : allInterfaces) {
-                                byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), binder);
-                            }
-                        }
-                    } else {
-                        byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
-                    }
-
-                } else if (binder instanceof TypedRequestArgumentBinder) {
-                    TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
-                    byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
-                }
+                addRequestArgumentBinder(binder);
             }
         }
 
@@ -124,6 +104,32 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             Cookie finalCookie = cookie;
             return () -> finalCookie != null ? Optional.of(finalCookie) : Optional.empty();
         });
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Override
+    public <T, ST> void addRequestArgumentBinder(ArgumentBinder<T, ST> binder) {
+        if (binder instanceof AnnotatedRequestArgumentBinder) {
+            AnnotatedRequestArgumentBinder<?, ?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
+            Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
+            if (binder instanceof TypedRequestArgumentBinder) {
+                TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+                Argument argumentType = typedRequestArgumentBinder.argumentType();
+                byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), (RequestArgumentBinder) binder);
+                if (((TypedRequestArgumentBinder) binder).supportsSuperTypes()) {
+                    Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType.getType());
+                    for (Class<?> itfce : allInterfaces) {
+                        byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), (RequestArgumentBinder) binder);
+                    }
+                }
+            } else {
+                byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
+            }
+
+        } else if (binder instanceof TypedRequestArgumentBinder) {
+            TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+            byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
+        }
     }
 
     @Override

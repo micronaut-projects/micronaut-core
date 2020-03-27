@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.core.async.subscriber.TypedSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -36,7 +35,6 @@ import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
@@ -45,8 +43,6 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
-@Internal
 public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> implements NonBlockingBodyArgumentBinder<Publisher> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);

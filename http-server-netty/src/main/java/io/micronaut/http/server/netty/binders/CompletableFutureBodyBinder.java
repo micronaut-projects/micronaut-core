@@ -40,7 +40,6 @@ import java.util.concurrent.CompletableFuture;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Singleton
 @Internal
 public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<CompletableFuture>
     implements NonBlockingBodyArgumentBinder<CompletableFuture> {

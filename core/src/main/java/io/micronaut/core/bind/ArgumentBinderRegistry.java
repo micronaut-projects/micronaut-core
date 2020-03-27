@@ -28,6 +28,17 @@ import java.util.Optional;
 public interface ArgumentBinderRegistry<S> {
 
     /**
+     * Adds a request argument binder to the registry.
+     * @param binder The binder
+     * @param <T> The argument type
+     * @param <ST> The source type
+     * @since 2.0
+     */
+    default <T, ST> void addRequestArgumentBinder(ArgumentBinder<T, ST> binder) {
+        throw new UnsupportedOperationException("Binder registry is not mutable");
+    }
+
+    /**
      * Locate an {@link ArgumentBinder} for the given argument and source type.
      *
      * @param argument The argument
