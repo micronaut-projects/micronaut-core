@@ -1331,9 +1331,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         Single<Object> single = Publishers.convertPublisher(body, Maybe.class)
                                 .switchIfEmpty(NOT_FOUND_SINGLE);
                         return single.map(o -> {
+                            MutableHttpResponse<?> singleResponse;
                             if (o == NOT_FOUND) {
                                 if (isCompletable || finalRoute.isVoid()) {
-                                    return forStatus(routeMatch.getAnnotationMetadata(), HttpStatus.OK)
+                                    singleResponse = forStatus(routeMatch.getAnnotationMetadata(), HttpStatus.OK)
                                             .header(HttpHeaders.CONTENT_LENGTH, HttpHeaderValues.ZERO);
                                 } else {
                                     return newNotFoundError(request);
@@ -1346,6 +1347,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                             .body(o);
                                 }
                             }
+                            singleResponse.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
+                            return singleResponse;
                         }).toFlowable();
                     }
                 }
@@ -1412,6 +1415,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     outgoingResponse.body(null);
                 }
             }
+            outgoingResponse.setAttribute(HttpAttributes.ROUTE_MATCH, finalRoute);
             return Flowable.just(outgoingResponse);
         });
 

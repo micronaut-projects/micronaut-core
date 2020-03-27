@@ -18,6 +18,8 @@ package io.micronaut.http.server.netty.interceptor
 import io.micronaut.context.annotation.AliasFor
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.http.HttpAttributes
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -99,6 +101,10 @@ class HttpFilterSpec extends Specification {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Flowable.fromPublisher(chain.proceed(request)).doOnNext({ response ->
+                if (request.getParameters().contains("username")) {
+                    assert response.getAttribute(HttpAttributes.ROUTE_MATCH,
+                            AnnotationMetadata.class).isPresent()
+                }
                 response.header("X-Root-Filter", "processed")
             })
         }
