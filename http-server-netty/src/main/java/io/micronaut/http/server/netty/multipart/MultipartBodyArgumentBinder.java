@@ -35,8 +35,6 @@ import io.netty.handler.codec.http.multipart.HttpData;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.inject.Singleton;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
