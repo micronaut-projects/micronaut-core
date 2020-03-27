@@ -1975,7 +1975,7 @@ public class DefaultBeanContext implements BeanContext {
                             resolutionContext,
                             beanCandidate,
                             beanCandidate.getBeanType(),
-                            beanCandidate.hasAnnotation(Context.class) ? null : resolveDeclaredQualifier(beanDefinition)
+                            beanCandidate.hasAnnotation(Context.class) ? null : beanDefinition.getDeclaredQualifier()
                     );
                 }
             }
