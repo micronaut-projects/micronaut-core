@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.http.filter.HttpFilterResolver;
 
 import java.net.URI;
 import java.util.Optional;
@@ -27,7 +28,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface FilterRoute {
+public interface FilterRoute extends HttpFilterResolver.FilterEntry<HttpFilter> {
 
     /**
      * @return The filter for this {@link FilterRoute}

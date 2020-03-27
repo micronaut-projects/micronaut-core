@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.inject.BeanType;
 
 import java.util.Optional;
@@ -31,6 +32,10 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public interface Qualifier<T> {
+    /**
+     * The name of the primary annotation class.
+     */
+    String PRIMARY = Primary.class.getName();
 
     /**
      * @param beanType   The bean type

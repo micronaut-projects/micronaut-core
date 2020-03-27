@@ -15,6 +15,9 @@
  */
 package io.micronaut.web.router;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
@@ -40,20 +43,37 @@ import java.util.function.Supplier;
  */
 class DefaultFilterRoute implements FilterRoute {
 
-    final List<String> patterns = new ArrayList<>(1);
-    final Supplier<HttpFilter> filterSupplier;
-    Set<HttpMethod> httpMethods;
+    private final List<String> patterns = new ArrayList<>(1);
+    private final Supplier<HttpFilter> filterSupplier;
+    private final AnnotationMetadataResolver annotationMetadataResolver;
+    private Set<HttpMethod> httpMethods;
     private HttpFilter filter;
+
+    /**
+     * @param pattern A pattern
+     * @param filter A {@link Supplier} for an HTTP filter
+     * @param annotationMetadataResolver The annotation metadata resolver
+     */
+    DefaultFilterRoute(String pattern, Supplier<HttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver) {
+        Objects.requireNonNull(pattern, "Pattern argument is required");
+        Objects.requireNonNull(pattern, "HttpFilter argument is required");
+        this.filterSupplier = filter;
+        this.patterns.add(pattern);
+        this.annotationMetadataResolver = annotationMetadataResolver;
+    }
 
     /**
      * @param pattern A pattern
      * @param filter A {@link Supplier} for an HTTP filter
      */
     DefaultFilterRoute(String pattern, Supplier<HttpFilter> filter) {
-        Objects.requireNonNull(pattern, "Pattern argument is required");
-        Objects.requireNonNull(pattern, "HttpFilter argument is required");
-        this.filterSupplier = filter;
-        this.patterns.add(pattern);
+       this(pattern, filter, AnnotationMetadataResolver.DEFAULT);
+    }
+
+    @NonNull
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return annotationMetadataResolver.resolveMetadata(getFilter());
     }
 
     @Override
@@ -69,6 +89,18 @@ class DefaultFilterRoute implements FilterRoute {
             }
         }
         return filter;
+    }
+
+    @NonNull
+    @Override
+    public Set<HttpMethod> getFilterMethods() {
+        return httpMethods;
+    }
+
+    @NonNull
+    @Override
+    public String[] getPatterns() {
+        return patterns.toArray(StringUtils.EMPTY_STRING_ARRAY);
     }
 
     @Override

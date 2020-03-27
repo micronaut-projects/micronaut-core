@@ -15,14 +15,15 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
+import io.micronaut.core.util.PathMatcher;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.web.router.exceptions.RoutingException;
 
@@ -34,6 +35,7 @@ import java.net.URI;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -44,7 +46,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Singleton
-public class DefaultRouter implements Router {
+public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatch<?>> {
 
     private static final List<MediaType> ACCEPT_ALL = Collections.singletonList(MediaType.ALL_TYPE);
     private final Map<String, List<UriRoute>> routesByMethod = new HashMap<>();
@@ -137,7 +139,6 @@ public class DefaultRouter implements Router {
                 .filter((match) -> match.test(request) && (!permitsBody || match.doesConsume(request.getContentType().orElse(null))));
     }
 
-    @SuppressWarnings("unchecked")
     @NonNull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
@@ -389,18 +390,25 @@ public class DefaultRouter implements Router {
     @NonNull
     @Override
     public List<HttpFilter> findFilters(@NonNull HttpRequest<?> request) {
-        List<HttpFilter> httpFilters = new ArrayList<>(filterRoutes.size());
-        HttpMethod method = request.getMethod();
-        URI uri = request.getUri();
-        for (FilterRoute filterRoute : filterRoutes) {
-            Optional<HttpFilter> match = filterRoute.match(method, uri);
-            match.ifPresent(httpFilters::add);
-        }
-        if (!httpFilters.isEmpty()) {
-            OrderUtil.sort(httpFilters);
-            return Collections.unmodifiableList(httpFilters);
+        Object o = request.getAttribute(HttpAttributes.ROUTE_MATCH).orElse(null);
+        if (o instanceof RouteMatch) {
+            RouteMatch<?> routeMatch = (RouteMatch<?>) o;
+            return resolveFilters(request, filterRouteStream(routeMatch));
         } else {
-            return Collections.emptyList();
+
+            List<HttpFilter> httpFilters = new ArrayList<>(filterRoutes.size());
+            HttpMethod method = request.getMethod();
+            URI uri = request.getUri();
+            for (FilterRoute filterRoute : filterRoutes) {
+                Optional<HttpFilter> match = filterRoute.match(method, uri);
+                match.ifPresent(httpFilters::add);
+            }
+            if (!httpFilters.isEmpty()) {
+                OrderUtil.sort(httpFilters);
+                return Collections.unmodifiableList(httpFilters);
+            } else {
+                return Collections.emptyList();
+            }
         }
     }
 
@@ -474,5 +482,57 @@ public class DefaultRouter implements Router {
             return match;
         }
         return Optional.empty();
+    }
+
+    @Override
+    public List<FilterEntry<HttpFilter>> resolveFilterEntries(RouteMatch<?> context) {
+        return filterRouteStream(context)
+                    .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<HttpFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry<HttpFilter>> filterEntries) {
+        Stream<FilterEntry<HttpFilter>> entryStream = filterEntries.stream();
+        return resolveFilters(request, entryStream);
+    }
+
+    private List<HttpFilter> resolveFilters(HttpRequest<?> request, Stream<? extends FilterEntry<HttpFilter>> entryStream) {
+        return entryStream
+                    .filter(entry -> {
+                        if (entry.hasMethods()) {
+                            if (!entry.getFilterMethods().contains(request.getMethod())) {
+                                return false;
+                            }
+                        }
+                        if (entry.hasPatterns()) {
+                            String uriStr = request.getUri().toString();
+                            String[] patterns = entry.getPatterns();
+                            for (String pattern : patterns) {
+                                if (PathMatcher.ANT.matches(pattern, uriStr)) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+                        return true;
+                    })
+                    .map(FilterEntry::getFilter)
+                    .sorted(OrderUtil.COMPARATOR)
+                    .collect(Collectors.toList());
+    }
+
+    private Stream<FilterRoute> filterRouteStream(RouteMatch<?> context) {
+        return filterRoutes.stream()
+                .filter(filterRoute -> {
+                    AnnotationMetadata annotationMetadata = filterRoute.getAnnotationMetadata();
+                    boolean matches = !annotationMetadata.hasStereotype(FilterMatcher.class);
+                    if (!matches) {
+                        String filterAnnotation = annotationMetadata.getAnnotationNameByStereotype(FilterMatcher.class).orElse(null);
+                        if (filterAnnotation != null) {
+                            matches = context.getAnnotationMetadata().hasAnnotation(filterAnnotation);
+                        }
+                    }
+                    return matches;
+                });
     }
 }

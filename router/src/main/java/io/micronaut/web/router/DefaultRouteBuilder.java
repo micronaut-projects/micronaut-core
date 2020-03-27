@@ -20,6 +20,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.type.Argument;
@@ -124,7 +125,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public FilterRoute addFilter(String pathPattern, Supplier<HttpFilter> filter) {
-        DefaultFilterRoute route = new DefaultFilterRoute(pathPattern, filter);
+        DefaultFilterRoute route = new DefaultFilterRoute(
+                pathPattern,
+                filter,
+                (AnnotationMetadataResolver) executionHandleLocator
+        );
         filterRoutes.add(route);
         return route;
     }

@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.Named;
@@ -50,6 +51,17 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     private BeanDefinitionDelegate(BeanDefinition<T> definition) {
         this.definition = definition;
+    }
+
+    @Nullable
+    @Override
+    public Qualifier<T> resolveDynamicQualifier() {
+        Qualifier<T> qualifier = null;
+        String name = get(NAMED_ATTRIBUTE, ConversionContext.STRING).orElse(null);
+        if (name != null) {
+            qualifier = Qualifiers.byName(name);
+        }
+        return qualifier;
     }
 
     /**

@@ -24,7 +24,6 @@ import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.async.subscriber.Completable;
-import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -98,7 +97,6 @@ public class DefaultBeanContext implements BeanContext {
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String ADAPTER_TYPE = "io.micronaut.aop.Adapter";
     private static final String NAMED_MEMBER = "named";
-    private static final String NAMED_ATTRIBUTE = Named.class.getName();
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
@@ -477,7 +475,7 @@ public class DefaultBeanContext implements BeanContext {
                 NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(singleton.getClass(), qualifier);
                 if (qualifier instanceof Named) {
                     final BeanDefinitionDelegate<T> delegate = BeanDefinitionDelegate.create(dynamicRegistration);
-                    delegate.put(NAMED_ATTRIBUTE, ((Named) qualifier).getName());
+                    delegate.put(BeanDefinition.NAMED_ATTRIBUTE, ((Named) qualifier).getName());
                     beanDefinition = delegate;
                 } else {
                     beanDefinition = dynamicRegistration;
@@ -1264,7 +1262,7 @@ public class DefaultBeanContext implements BeanContext {
         for (BeanDefinition<BeanCreatedEventListener> beanCreatedDefinition : beanCreatedDefinitions) {
             try (BeanResolutionContext context = newResolutionContext(beanCreatedDefinition, null)) {
                 final BeanCreatedEventListener listener;
-                final Qualifier qualifier = resolveDeclaredQualifier(beanCreatedDefinition);
+                final Qualifier qualifier = beanCreatedDefinition.getDeclaredQualifier();
                 if (beanCreatedDefinition.isSingleton()) {
                     listener = createAndRegisterSingleton(
                             context,
@@ -1299,7 +1297,7 @@ public class DefaultBeanContext implements BeanContext {
         final Collection<BeanDefinition<BeanInitializedEventListener>> beanInitializedDefinitions = getBeanDefinitions(BeanInitializedEventListener.class);
         for (BeanDefinition<BeanInitializedEventListener> definition : beanInitializedDefinitions) {
             try (BeanResolutionContext context = newResolutionContext(definition, null)) {
-                final Qualifier qualifier = resolveDeclaredQualifier(definition);
+                final Qualifier qualifier = definition.getDeclaredQualifier();
                 final BeanInitializedEventListener listener;
                 if (definition.isSingleton()) {
                     listener = createAndRegisterSingleton(
@@ -1638,7 +1636,7 @@ public class DefaultBeanContext implements BeanContext {
         if (argumentValues == null) {
             argumentValues = Collections.emptyMap();
         }
-        Qualifier declaredQualifier = resolveDeclaredQualifier(beanDefinition);
+        Qualifier declaredQualifier = beanDefinition.getDeclaredQualifier();
         T bean;
         Class<T> beanType = beanDefinition.getBeanType();
         if (isSingleton) {
@@ -1692,7 +1690,7 @@ public class DefaultBeanContext implements BeanContext {
                 } else {
                     boolean propagateQualifier = beanDefinition.isProxy() && declaredQualifier instanceof Named;
                     if (propagateQualifier) {
-                        resolutionContext.setAttribute(NAMED_ATTRIBUTE, ((Named) declaredQualifier).getName());
+                        resolutionContext.setAttribute(BeanDefinition.NAMED_ATTRIBUTE, ((Named) declaredQualifier).getName());
                     }
                     resolutionContext.setCurrentQualifier(declaredQualifier);
                     try {
@@ -1700,7 +1698,7 @@ public class DefaultBeanContext implements BeanContext {
                     } finally {
                         resolutionContext.setCurrentQualifier(null);
                         if (propagateQualifier) {
-                            resolutionContext.removeAttribute(NAMED_ATTRIBUTE);
+                            resolutionContext.removeAttribute(BeanDefinition.NAMED_ATTRIBUTE);
                         }
                     }
 
@@ -1770,19 +1768,6 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         return bean;
-    }
-
-    private <T> Qualifier resolveDeclaredQualifier(@NonNull BeanDefinition<T> beanDefinition) {
-        final Class<? extends Annotation> annotation = beanDefinition
-                .getAnnotationTypeByStereotype(javax.inject.Qualifier.class).orElse(null);
-        if (annotation != null) {
-            if (annotation == Primary.class) {
-                return null;
-            }
-            return Qualifiers.byAnnotation(beanDefinition, annotation.getName());
-        } else {
-            return resolveDynamicQualifier((BeanDefinition) beanDefinition);
-        }
     }
 
     /**
@@ -2142,7 +2127,7 @@ public class DefaultBeanContext implements BeanContext {
             return (T) scopedProxies.computeIfAbsent(key, (Function<BeanKey, T>) beanKey -> {
                 Qualifier<T> q = qualifier;
                 if (q == null) {
-                    q = resolveDeclaredQualifier(finalDefinition);
+                    q = finalDefinition.getDeclaredQualifier();
                 }
                 BeanDefinition<T> proxyDefinition = (BeanDefinition<T>) findProxyBeanDefinition((Class) proxiedType, q).orElse(finalDefinition);
 
@@ -2469,7 +2454,7 @@ public class DefaultBeanContext implements BeanContext {
     private <T> void registerSingletonBean(BeanDefinition<T> beanDefinition, Class<T> beanType, T createdBean, Qualifier<T> qualifier, boolean singleCandidate) {
         // for only one candidate create link to bean type as singleton
         if (qualifier == null) {
-            qualifier = resolveDynamicQualifier(beanDefinition);
+            qualifier = beanDefinition.getDeclaredQualifier();
         }
 
         BeanKey key = new BeanKey<>(beanDefinition, qualifier);
@@ -2529,21 +2514,6 @@ public class DefaultBeanContext implements BeanContext {
             }
             singletonObjects.put(createdBeanKey, registration);
         }
-    }
-
-    private <T> Qualifier<T> resolveDynamicQualifier(BeanDefinition<T> beanDefinition) {
-        Qualifier<T> qualifier = null;
-        if (beanDefinition instanceof BeanDefinitionDelegate) {
-            String name = ((BeanDefinitionDelegate<?>) beanDefinition).get(NAMED_ATTRIBUTE, ConversionContext.STRING).orElse(null);
-            if (name != null) {
-                qualifier = Qualifiers.byName(name);
-            }
-        }
-        if (qualifier == null) {
-            String name = beanDefinition.stringValue(javax.inject.Named.class).orElse(null);
-            qualifier = name != null ? Qualifiers.byAnnotation(beanDefinition, name) : null;
-        }
-        return qualifier;
     }
 
     private void readAllBeanDefinitionClasses() {

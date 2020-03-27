@@ -15,27 +15,41 @@
  */
 package io.micronaut.http.server.netty.interceptor
 
+import io.micronaut.context.annotation.AliasFor
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
+import io.micronaut.http.annotation.FilterMatcher
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
-import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.test.annotation.MicronautTest
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
+import spock.lang.Specification
+
+import javax.inject.Inject
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-class HttpFilterSpec extends AbstractMicronautSpec {
+@MicronautTest
+@Property(name = 'spec.name', value = "HttpFilterSpec")
+class HttpFilterSpec extends Specification {
+
+    @Inject
+    @Client("/")
+    RxHttpClient rxClient
 
     void "test interceptor execution and order - write replacement"() {
         when:
@@ -64,6 +78,18 @@ class HttpFilterSpec extends AbstractMicronautSpec {
         then:
         response.status == HttpStatus.OK
         response.headers.get("X-Root-Filter") == "processed"
+        !response.headers.contains("X-Matched-Filter")
+    }
+
+
+    void "test a filter on matched with filter matcher URI"() {
+        when:
+        HttpResponse response = rxClient.exchange("/matched").blockingFirst()
+
+        then:
+        response.status == HttpStatus.OK
+        response.headers.get("X-Root-Filter") == "processed"
+        response.headers.contains("X-Matched-Filter")
     }
 
     @Requires(property = 'spec.name', value = "HttpFilterSpec")
@@ -78,8 +104,22 @@ class HttpFilterSpec extends AbstractMicronautSpec {
         }
     }
 
+    @Filter("/**")
+    @MarkerStereotypeAnnotation
     @Requires(property = 'spec.name', value = "HttpFilterSpec")
+    static class MatchedFilter implements HttpServerFilter {
+
+        @Override
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            return Flowable.fromPublisher(chain.proceed(request)).doOnNext({ response ->
+                response.header("X-Matched-Filter", "processed")
+            })
+        }
+    }
+
+
     @Controller
+    @Requires(property = 'spec.name', value = "HttpFilterSpec")
     static class RootController {
 
         @Get
@@ -87,5 +127,19 @@ class HttpFilterSpec extends AbstractMicronautSpec {
             HttpResponse.ok()
         }
 
+        @Get("/matched")
+        @MarkerStereotypeAnnotation
+        HttpResponse matched() {
+            HttpResponse.ok()
+        }
+
     }
+
+
+}
+@FilterMatcher
+@interface MarkerStereotypeAnnotation {
+
+    @AliasFor(member = "methods", annotation = FilterMatcher.class)
+    HttpMethod[] methods() default [];
 }

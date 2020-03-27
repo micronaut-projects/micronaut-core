@@ -48,17 +48,17 @@ class ClientFilterStereotypeSpec extends Specification {
 
     void "test declarative client matching"() {
         when:
-        MarkedClient markedClient = ctx.getBean(MarkedClient)
-
-        then:
-        markedClient.echo() == "echo Intercepted URL"
-        markedClient.echoPost() == "echo Intercepted Post URL"
-
-        when:
         UnmarkedClient unmarkedClient = ctx.getBean(UnmarkedClient)
 
         then:
         unmarkedClient.echo() == "echo URL" // not intercepted by
+
+        when:
+        MarkedClient markedClient = ctx.getBean(MarkedClient)
+
+        then:
+        markedClient.echoPost() == "echo Intercepted Post URL"
+        markedClient.echo() == "echo Intercepted URL"
     }
 
     void "low-level client filter matching"() {
