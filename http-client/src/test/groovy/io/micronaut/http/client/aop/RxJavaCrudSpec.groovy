@@ -17,6 +17,7 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.PathVariable
 import io.reactivex.Maybe
 import io.reactivex.Single
 import io.micronaut.context.ApplicationContext
@@ -28,6 +29,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -104,13 +106,23 @@ class RxJavaCrudSpec extends Specification {
         book == null
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2905')
+    void "test maybe of number"() {
+        given:
+        BookClient client = context.getBean(BookClient)
+
+        expect:
+        client.getPrice("good").blockingGet() == 10
+        client.getPrice("empty").blockingGet() == null
+    }
+
 
     @Client('/rxjava/books')
-    static interface BookClient extends BookApi {
+    static interface BookClient extends BookApi, PriceApi {
     }
 
     @Controller("/rxjava/books")
-    static class BookController implements BookApi {
+    static class BookController implements BookApi, PriceApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
         AtomicLong currentId = new AtomicLong(0)
@@ -164,6 +176,14 @@ class RxJavaCrudSpec extends Specification {
                 return Maybe.empty()
             }
         }
+
+        @Override
+        Maybe<Integer> getPrice(String title) {
+            if (title == 'empty') {
+                return Maybe.empty()
+            }
+            return Maybe.just(10)
+        }
     }
 
     static interface BookApi {
@@ -185,6 +205,12 @@ class RxJavaCrudSpec extends Specification {
 
         @Patch("/{id}")
         Maybe<Book> update(Long id, String title)
+
+    }
+
+    static interface PriceApi {
+        @Get(uri = "/price/{title}")
+        Maybe<Integer> getPrice(@PathVariable String title)
     }
 
 
