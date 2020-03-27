@@ -1997,7 +1997,7 @@ public class DefaultBeanContext implements BeanContext {
 
         } else {
             try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
-                createAndRegisterSingleton(resolutionContext, beanDefinition, beanDefinition.getBeanType(), null);
+                createAndRegisterSingletonInternal(resolutionContext, beanDefinition, beanDefinition.getBeanType(), null);
             }
         }
     }
@@ -2432,19 +2432,23 @@ public class DefaultBeanContext implements BeanContext {
 
     private <T> T createAndRegisterSingleton(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier) {
         synchronized (singletonObjects) {
-            if (definition instanceof NoInjectionBeanDefinition) {
-                NoInjectionBeanDefinition<T> manuallyRegistered = (NoInjectionBeanDefinition) definition;
-                BeanRegistration<T> reg = (BeanRegistration<T>) singletonObjects.get(new BeanKey(manuallyRegistered.getBeanType(), manuallyRegistered.getQualifier()));
-                if (reg == null) {
-                    throw new IllegalStateException("Manually registered singleton no longer present in bean context");
-                }
-                registerSingletonBean(definition, beanType, reg.bean, qualifier, true);
-                return reg.bean;
-            } else {
-                T createdBean = doCreateBean(resolutionContext, definition, qualifier, true, null);
-                registerSingletonBean(definition, beanType, createdBean, qualifier, true);
-                return createdBean;
+            return createAndRegisterSingletonInternal(resolutionContext, definition, beanType, qualifier);
+        }
+    }
+
+    private <T> T createAndRegisterSingletonInternal(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier) {
+        if (definition instanceof NoInjectionBeanDefinition) {
+            NoInjectionBeanDefinition<T> manuallyRegistered = (NoInjectionBeanDefinition) definition;
+            BeanRegistration<T> reg = (BeanRegistration<T>) singletonObjects.get(new BeanKey(manuallyRegistered.getBeanType(), manuallyRegistered.getQualifier()));
+            if (reg == null) {
+                throw new IllegalStateException("Manually registered singleton no longer present in bean context");
             }
+            registerSingletonBean(definition, beanType, reg.bean, qualifier, true);
+            return reg.bean;
+        } else {
+            T createdBean = doCreateBean(resolutionContext, definition, qualifier, true, null);
+            registerSingletonBean(definition, beanType, createdBean, qualifier, true);
+            return createdBean;
         }
     }
 

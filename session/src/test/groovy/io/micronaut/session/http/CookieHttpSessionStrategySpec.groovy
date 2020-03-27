@@ -26,6 +26,7 @@ import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.cookie.Cookie
+import io.micronaut.http.cookie.SameSite
 import io.micronaut.http.netty.cookies.NettyCookie
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.netty.NettyHttpRequest
@@ -61,6 +62,7 @@ class CookieHttpSessionStrategySpec extends Specification {
         if (path) configuration.cookiePath = path
         if (prefix) configuration.prefix = prefix
         configuration.cookieSecure = configSecure
+        if (sameSite) configuration.sameSite = sameSite
         CookieHttpSessionStrategy strategy = new CookieHttpSessionStrategy(configuration)
 
         def request = Mock(HttpRequest)
@@ -79,16 +81,20 @@ class CookieHttpSessionStrategySpec extends Specification {
 
 
         where:
-        id     | prefix | path   | domain        | encoded             | expired | secure | configSecure | expected
-        "1234" | null   | null   | null          | encode(id)          | false   | false  | true         | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
-        "1234" | null   | null   | null          | encode(id)          | false   | false  | false        | "SESSION=$encoded; Path=/; HTTPOnly"
-        "1234" | "foo-" | null   | null          | encode(prefix + id) | false   | false  | false        | "SESSION=$encoded; Path=/; HTTPOnly"
-        "1234" | null   | "/foo" | null          | encode(id)          | false   | false  | false        | "SESSION=$encoded; Path=/foo; HTTPOnly"
-        "1234" | null   | null   | "example.com" | encode(id)          | false   | false  | false        | "SESSION=$encoded; Path=/; Domain=example.com; HTTPOnly"
-        "1234" | null   | null   | null          | encode(id)          | true    | false  | false        | ~/SESSION=; Max-Age=0; Expires=.*; Path=\/; HTTPOnly/
-        "1234" | null   | null   | null          | encode(id)          | false   | true   | false        | "SESSION=$encoded; Path=/; HTTPOnly"
-        "1234" | null   | null   | null          | encode(id)          | false   | true   | true         | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
-        "1234" | null   | null   | null          | encode(id)          | false   | true   | null         | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
+        id     | prefix | path   | domain        | encoded             | expired | secure | configSecure | sameSite       | expected
+        "1234" | null   | null   | null          | encode(id)          | false   | false  | true         | SameSite.Lax   | "SESSION=$encoded; Path=/; Secure; HTTPOnly; SameSite=Lax"
+        "1234" | null   | null   | null          | encode(id)          | false   | false  | true         | SameSite.Strict| "SESSION=$encoded; Path=/; Secure; HTTPOnly; SameSite=Strict"
+        "1234" | null   | null   | null          | encode(id)          | false   | false  | true         | SameSite.None  | "SESSION=$encoded; Path=/; Secure; HTTPOnly; SameSite=None"
+        "1234" | null   | null   | null          | encode(id)          | false   | false  | true         | null           | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | false   | false  | true         | null           | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | false   | false  | false        | null           | "SESSION=$encoded; Path=/; HTTPOnly"
+        "1234" | "foo-" | null   | null          | encode(prefix + id) | false   | false  | false        | null           | "SESSION=$encoded; Path=/; HTTPOnly"
+        "1234" | null   | "/foo" | null          | encode(id)          | false   | false  | false        | null           | "SESSION=$encoded; Path=/foo; HTTPOnly"
+        "1234" | null   | null   | "example.com" | encode(id)          | false   | false  | false        | null           | "SESSION=$encoded; Path=/; Domain=example.com; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | true    | false  | false        | null           | ~/SESSION=; Max-Age=0; Expires=.*; Path=\/; HTTPOnly/
+        "1234" | null   | null   | null          | encode(id)          | false   | true   | false        | null           | "SESSION=$encoded; Path=/; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | false   | true   | true         | null           | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | false   | true   | null         | null           | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
 
     }
 
