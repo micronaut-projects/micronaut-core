@@ -127,7 +127,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        if (!context.hasAnnotation(Client.class)) {
+        if (!context.hasStereotype(Client.class)) {
             throw new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context);
         }
 
