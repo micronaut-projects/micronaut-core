@@ -195,6 +195,11 @@ public interface HttpHeaders extends Headers {
     String COOKIE = "Cookie";
 
     /**
+     * {@code "Cross-Origin-Resource-Policy"}.
+     */
+    String CROSS_ORIGIN_RESOURCE_POLICY = "Cross-Origin-Resource-Policy";
+
+    /**
      * {@code "Date"}.
      */
     String DATE = "Date";
