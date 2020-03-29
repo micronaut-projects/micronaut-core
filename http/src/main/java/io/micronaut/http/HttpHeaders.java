@@ -310,6 +310,11 @@ public interface HttpHeaders extends Headers {
     String REFERER = "Referer";
 
     /**
+     * {@code "Referrer-Policy"}.
+     */
+    String REFERRER_POLICY = "Referrer-Policy";
+
+    /**
      * {@code "Retry-After"}.
      */
     String RETRY_AFTER = "Retry-After";
