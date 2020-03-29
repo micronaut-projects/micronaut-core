@@ -260,6 +260,11 @@ public interface HttpHeaders extends Headers {
     String LAST_MODIFIED = "Last-Modified";
 
     /**
+     * {@code "Link"}.
+     */
+    String LINK = "Link";
+
+    /**
      * {@code "Location"}.
      */
     String LOCATION = "Location";
