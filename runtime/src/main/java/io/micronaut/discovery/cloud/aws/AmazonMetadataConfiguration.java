@@ -46,7 +46,7 @@ public class AmazonMetadataConfiguration implements Toggleable {
      * The default url value.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final String DEFAULT_URL = "http://169.254.169.254/";
+    public static final String DEFAULT_URL = "http://169.254.169.254";
 
     private String url = DEFAULT_URL;
     private String metadataUrl;
