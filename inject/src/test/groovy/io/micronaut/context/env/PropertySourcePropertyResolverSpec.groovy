@@ -47,7 +47,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         )
 
         expect:
-        resolver.getPropertyEntries("datasource") == ['default', 'other', 'third']
+        resolver.getPropertyEntries("datasource") == ['default', 'other', 'third'] as Set
     }
 
     void "test resolve raw properties"() {
@@ -62,7 +62,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         )
 
         expect:
-        resolver.getPropertyEntries("twitter") == ['oauth2']
+        resolver.getPropertyEntries("twitter") == ['oauth2'] as Set
         resolver.containsProperty('TWITTER_OAUTH2_ACCESS_TOKEN')
         resolver.getProperty('TWITTER_OAUTH2_ACCESS_TOKEN', String).get() == 'xxx'
         resolver.containsProperty("camelCase.URL")
