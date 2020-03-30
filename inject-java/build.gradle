@@ -12,7 +12,7 @@ dependencies {
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":runtime")
     testImplementation dependencyVersion("rxjava2")
-    testImplementation "org.hibernate:hibernate-core:5.4.12.Final"    
+    testImplementation "org.hibernate:hibernate-core:5.4.13.Final"    
     testImplementation "junit:junit:4.13"
     testImplementation "com.google.testing.compile:compile-testing:0.18"
     testImplementation 'org.mongodb:mongo-java-driver:3.7.1'
