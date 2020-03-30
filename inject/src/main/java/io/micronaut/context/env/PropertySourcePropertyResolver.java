@@ -41,7 +41,6 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances.</p>
@@ -56,6 +55,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{\\s?random\\.(\\S+?)\\}");
     private static final char[] DOT_DASH = new char[] {'.', '-'};
     private static final Object NO_VALUE = new Object();
+    private static final StringConvention[] CONVENTIONS = {null, StringConvention.RAW};
     protected final ConversionService<?> conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
@@ -133,16 +133,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         } else {
             Boolean result = containsCache.get(name);
             if (result == null) {
-                String finalName = trimIndex(name);
-                result = Stream.of(null, StringConvention.RAW).anyMatch(convention -> {
-                    Map<String, Object> entries = resolveEntriesForKey(finalName, false, convention);
-                    if (entries == null) {
-                        return false;
-                    } else {
-                        return entries.containsKey(finalName);
-                    }
-                });
 
+                for (StringConvention convention : CONVENTIONS) {
+                    Map<String, Object> entries = resolveEntriesForKey(name, false, convention);
+                    if (entries != null) {
+                        String finalName = trimIndex(name);
+                        if (entries.containsKey(finalName)) {
+                            result = true;
+                            break;
+                        }
+                    }
+                }
+                if (result == null) {
+                    result = false;
+                }
                 containsCache.put(name, result);
             }
             return result;
@@ -151,27 +155,25 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
     @Override
     public boolean containsProperties(@Nullable String name) {
-        if (StringUtils.isEmpty(name)) {
-            return false;
-        } else {
-            String trimmedName = trimIndex(name);
-            return Stream.of(null, StringConvention.RAW).anyMatch(convention -> {
-                Map<String, Object> entries = resolveEntriesForKey(trimmedName, false, convention);
-                if (entries == null) {
-                    return false;
-                } else {
+        if (!StringUtils.isEmpty(name)) {
+            for (StringConvention convention : CONVENTIONS) {
+                Map<String, Object> entries = resolveEntriesForKey(name, false, convention);
+                if (entries != null) {
+                    String trimmedName = trimIndex(name);
                     if (entries.containsKey(trimmedName)) {
                         return true;
                     } else {
                         String finalName = trimmedName + ".";
-                        return entries.keySet().stream().anyMatch(key ->
-                                key.startsWith(finalName)
-                        );
+                        for (String key : entries.keySet()) {
+                            if (key.startsWith(finalName)) {
+                                return true;
+                            }
+                        }
                     }
                 }
-            });
-
+            }
         }
+        return false;
     }
 
     @Override
@@ -270,8 +272,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     }
 
                     if (value != null) {
+                        Optional<T> converted;
                         value = resolvePlaceHoldersIfNecessary(value);
-                        Optional<T> converted = conversionService.convert(value, conversionContext);
+                        if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
+                            converted = (Optional<T>) Optional.of(value);
+                        } else {
+                            converted = conversionService.convert(value, conversionContext);
+                        }
+
                         if (LOG.isTraceEnabled()) {
                             if (converted.isPresent()) {
                                 LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
@@ -292,7 +300,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         return Optional.of((T) properties);
                     } else if (Map.class.isAssignableFrom(requiredType)) {
                         Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
-                        return conversionService.convert(subMap, requiredType, conversionContext);
+                        if (!subMap.isEmpty()) {
+                            return conversionService.convert(subMap, requiredType, conversionContext);
+                        } else {
+                            return (Optional<T>) Optional.of(subMap);
+                        }
                     } else if (PropertyResolver.class.isAssignableFrom(requiredType)) {
                         Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
                         return Optional.of((T) new MapPropertyResolver(subMap, conversionService));

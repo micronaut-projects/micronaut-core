@@ -21,10 +21,7 @@ import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.micronaut.core.convert.*;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.naming.conventions.StringConvention;
@@ -254,7 +251,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 }
                             }
                         } else {
-                            Map entries = getProperty(property, Map.class, Collections.emptyMap());
+                            Map entries = getProperty(property, ConversionContext.MAP).orElse(Collections.emptyMap());
                             if (!entries.isEmpty()) {
                                 for (Object key : entries.keySet()) {
                                     BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);

@@ -755,12 +755,17 @@ public class DefaultBeanContext implements BeanContext {
                     path.pushConstructorResolve(
                             definition, requiredArgument
                     );
+                    Class<?> argumentType = requiredArgument.getType();
                     if (args.length > i) {
                         Object val = args[i];
                         if (val != null) {
-                            argumentValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
-                                    new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
-                            ));
+                            if (argumentType.isInstance(val) && !CollectionUtils.isIterableOrMap(argumentType)) {
+                                argumentValues.put(requiredArgument.getName(), val);
+                            } else {
+                                argumentValues.put(requiredArgument.getName(), ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
+                                        new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + argumentType)
+                                ));
+                            }
                         } else {
                             if (!requiredArgument.isDeclaredNullable()) {
                                 throw new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. Argument cannot be null");
@@ -768,12 +773,12 @@ public class DefaultBeanContext implements BeanContext {
                         }
                     } else {
                         // attempt resolve from context
-                        Optional<?> existingBean = findBean(resolutionContext, requiredArgument.getType(), null);
+                        Optional<?> existingBean = findBean(resolutionContext, argumentType, null);
                         if (existingBean.isPresent()) {
                             argumentValues.put(requiredArgument.getName(), existingBean.get());
                         } else {
                             if (!requiredArgument.isDeclaredNullable()) {
-                                throw new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. No bean found for type: " + requiredArgument.getType());
+                                throw new BeanInstantiationException(resolutionContext, "Invalid bean @Argument [" + requiredArgument + "]. No bean found for type: " + argumentType);
                             }
                         }
                     }
@@ -1223,14 +1228,14 @@ public class DefaultBeanContext implements BeanContext {
     protected @NonNull
     List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
         final SoftServiceLoader<BeanDefinitionReference> definitions = SoftServiceLoader.load(BeanDefinitionReference.class, classLoader);
-        List<BeanDefinitionReference> list = new ArrayList<>(300);
+        List<ServiceDefinition<BeanDefinitionReference>> list = new ArrayList<>(300);
         for (ServiceDefinition<BeanDefinitionReference> definition : definitions) {
-            if (definition.isPresent()) {
-                final BeanDefinitionReference ref = definition.load();
-                list.add(ref);
-            }
+            list.add(definition);
         }
-        return list;
+        return list.parallelStream()
+                .filter(ServiceDefinition::isPresent)
+                .map(ServiceDefinition::load)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -1241,13 +1246,14 @@ public class DefaultBeanContext implements BeanContext {
     protected @NonNull
     Iterable<BeanConfiguration> resolveBeanConfigurations() {
         final SoftServiceLoader<BeanConfiguration> definitions = SoftServiceLoader.load(BeanConfiguration.class, classLoader);
-        List<BeanConfiguration> list = new ArrayList<>(20);
+        List<ServiceDefinition<BeanConfiguration>> list = new ArrayList<>(300);
         for (ServiceDefinition<BeanConfiguration> definition : definitions) {
-            if (definition.isPresent()) {
-                list.add(definition.load());
-            }
+            list.add(definition);
         }
-        return list;
+        return list.parallelStream()
+                .filter(ServiceDefinition::isPresent)
+                .map(ServiceDefinition::load)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -1674,9 +1680,13 @@ public class DefaultBeanContext implements BeanContext {
                         BeanResolutionContext finalResolutionContext = resolutionContext;
                         Object convertedValue = null;
                         if (val != null) {
-                            convertedValue = ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
-                                    new BeanInstantiationException(finalResolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
-                            );
+                            if (requiredArgument.getType().isInstance(val)) {
+                                convertedValue = val;
+                            } else {
+                                convertedValue = ConversionService.SHARED.convert(val, requiredArgument).orElseThrow(() ->
+                                        new BeanInstantiationException(finalResolutionContext, "Invalid bean argument [" + requiredArgument + "]. Cannot convert object [" + val + "] to required type: " + requiredArgument.getType())
+                                );
+                            }
                         }
                         convertedValues.put(argumentName, convertedValue);
                     }

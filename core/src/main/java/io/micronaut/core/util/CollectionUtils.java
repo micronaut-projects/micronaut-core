@@ -32,6 +32,16 @@ import java.util.*;
 public class CollectionUtils {
 
     /**
+     * Is the given type an iterable or map type.
+     * @param type The type
+     * @return True if it is iterable or map
+     * @since 2.0.0
+     */
+    public static boolean isIterableOrMap(Class<?> type) {
+        return type != null && (Iterable.class.isAssignableFrom(type) || Map.class.isAssignableFrom(type));
+    }
+
+    /**
      * Null safe empty check.
      *
      * @param map The map
@@ -219,8 +229,12 @@ public class CollectionUtils {
             if (o == null) {
                 continue;
             } else {
-                Optional<String> converted = ConversionService.SHARED.convert(o, String.class);
-                converted.ifPresent(builder::append);
+                if (CharSequence.class.isInstance(o)) {
+                    builder.append(o.toString());
+                } else {
+                    Optional<String> converted = ConversionService.SHARED.convert(o, String.class);
+                    converted.ifPresent(builder::append);
+                }
             }
             if (i.hasNext()) {
                 builder.append(delimiter);

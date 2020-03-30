@@ -17,9 +17,9 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
-import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.stream.Stream;
@@ -53,18 +53,28 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
                 }
             } else if (o instanceof String[]) {
                 String[] values = (String[]) o;
-                return Arrays.stream(values)
-                        .flatMap(value -> {
-                            try {
-                                return Arrays.stream(resolver.resolveRequiredPlaceholder(value, String[].class));
-                            } catch (ConfigurationException e) {
-                                if (value.contains(resolver.getPrefix())) {
-                                    value = resolver.resolveRequiredPlaceholders(value);
-                                }
-                                return Stream.of(value);
-                            }
-                        })
-                        .toArray(String[]::new);
+                String[] resolvedValues = Arrays.copyOf(values, values.length);
+                boolean expandValues = false;
+                for (int i = 0; i < values.length; i++) {
+                    String value = values[i];
+                    if (value.contains(resolver.getPrefix())) {
+                        value = resolver.resolveRequiredPlaceholders(value);
+                        if (value.contains(",")) {
+                            expandValues = true;
+                        }
+                    }
+                    resolvedValues[i] = value;
+                }
+                if (expandValues) {
+                    return Stream.of(resolvedValues).flatMap(s -> {
+                        if (s.contains(",")) {
+                            return Arrays.stream(resolver.resolveRequiredPlaceholder(s, String[].class));
+                        }
+                        return Stream.of(s);
+                    }).toArray(String[]::new);
+                } else {
+                    return resolvedValues;
+                }
             }
             return o;
         } : null);
