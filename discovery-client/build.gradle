@@ -11,7 +11,7 @@ dependencies {
         exclude module:'micronaut-inject'
     }
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.748'
-    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.749'
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.754'
     compileOnly group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.688'
 
