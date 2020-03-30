@@ -17,6 +17,7 @@ package io.micronaut.function.executor;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
+import io.micronaut.context.ApplicationContextProvider;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.StringUtils;
@@ -35,7 +36,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-class AbstractExecutor<C> {
+class AbstractExecutor<C> implements ApplicationContextProvider {
 
     /**
      * The current {@link ApplicationContext}.
@@ -122,5 +123,10 @@ class AbstractExecutor<C> {
         } else {
             return applicationContext.getEnvironment();
         }
+    }
+
+    @Override
+    public ApplicationContext getApplicationContext() {
+        return this.applicationContext;
     }
 }
