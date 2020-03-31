@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertNotNull;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -43,6 +44,7 @@ public class WriteBufferWaterMarkConverterTest {
     NettyHttpServerConfiguration micronautConfig;
     Environment environment;
     long callCount = 0;
+    ApplicationContext ctx;
 
     @Before
     public void init() {
@@ -50,9 +52,16 @@ public class WriteBufferWaterMarkConverterTest {
         params.put("micronaut.server.netty.childOptions.write_buffer_water_mark.high", 262143);
         params.put("micronaut.server.netty.childOptions.write_buffer_water_mark.low", 65535);
 
-        ApplicationContext ctx = ApplicationContext.run(params, (String) null);
+        ctx = ApplicationContext.run(params, (String) null);
         micronautConfig = ctx.createBean(NettyHttpServerConfiguration.class);
         environment = ctx.getEnvironment();
+    }
+
+    @After
+    public void tearDown() {
+        micronautConfig = null;
+        environment.close();
+        ctx.close();
     }
 
     @Test
