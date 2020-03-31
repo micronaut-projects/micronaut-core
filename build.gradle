@@ -453,6 +453,11 @@ ext {
                     group  : 'io.micronaut.rxjava3',
                     name   : 'micronaut-rxjava3'
             ],
+            'micronaut.rxjava1'        : [
+                    version: micronautRxJava1Version,
+                    group  : 'io.micronaut.rxjava1',
+                    name   : 'micronaut-rxjava1'
+            ],
             'micronaut.reactor'        : [
                     version: micronautReactorVersion,
                     group  : 'io.micronaut.reactor',
