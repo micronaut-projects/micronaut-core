@@ -1,0 +1,75 @@
+group projectGroupId
+
+apply plugin: 'maven-publish'
+apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
+ext.startPomInfo = {
+    delegate.parent {
+        groupId projectGroupId
+        artifactId "micronaut-bom"
+        delegate.version projectVersion
+    }
+}
+ext.extraPomInfo = {
+    delegate.properties {
+        "micronaut.version"(projectVersion)
+    }
+    delegate.build {
+        delegate.plugins {
+            delegate.plugin {
+                groupId "io.micronaut.build"
+                artifactId "micronaut-maven-plugin"
+            }
+            delegate.plugin {
+                groupId "org.codehaus.mojo"
+                artifactId "exec-maven-plugin"
+            }
+        }
+        delegate.pluginManagement {
+            delegate.plugins {
+                delegate.plugin {
+                    groupId "io.micronaut.build"
+                    artifactId "micronaut-maven-plugin"
+                    delegate.version micronautMavenPluginVersion
+                }
+                delegate.plugin {
+                    groupId "org.codehaus.mojo"
+                    artifactId "exec-maven-plugin"
+                    delegate.version "1.6.0"
+                    delegate.configuration {
+                        executable("java")
+                        arguments {
+                            argument("-classpath")
+                            classpath()
+                            argument("-XX:TieredStopAtLevel=1")
+                            argument("-Dcom.sun.management.jmxremote")
+                            argument('${exec.mainClass}')
+                        }
+                    }
+                }
+                delegate.plugin {
+                    groupId "org.apache.maven.plugins"
+                    artifactId "maven-compiler-plugin"
+                    delegate.version "3.8.1"
+                    delegate.configuration {
+                        compilerArgs {
+                            arg("-parameters")
+                        }
+                    }
+                    delegate.executions {
+                        execution {
+                            delegate.id "test-compile"
+                            goals {
+                                goal "testCompile"
+                            }
+                            delegate.configuration {
+                                compilerArgs {
+                                    arg("-parameters")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
