@@ -257,7 +257,6 @@ cli:
     title: Reloading
     automaticRestart: Automatic Restart
     jrebel: JRebel
-    springloaded: Spring-Loaded
     gradleReload: Reloading with Gradle
     ideReload: Reloading with an IDE
   proxy: Proxy Configuration
