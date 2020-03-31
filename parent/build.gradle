@@ -69,6 +69,27 @@ ext.extraPomInfo = {
                         }
                     }
                 }
+                delegate.plugin {
+                    groupId "org.apache.maven.plugins"
+                    artifactId "maven-shade-plugin"
+                    delegate.version "3.1.0"
+                    delegate.executions {
+                        execution {
+                            delegate.phase "package"
+                            goals {
+                                goal "shade"
+                            }
+                            delegate.configuration {
+                                transformers {
+                                    transformer(implementation:'org.apache.maven.plugins.shade.resource.ManifestResourceTransformer') {
+                                        mainClass('${exec.mainClass}')
+                                    }
+                                    transformer(implementation:'org.apache.maven.plugins.shade.resource.ServicesResourceTransformer')
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
