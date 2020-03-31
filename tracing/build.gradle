@@ -19,8 +19,6 @@ dependencies {
     compileOnly dependencyVersion("brave.opentracing")
 
     compileOnly dependencyVersion("jaeger")
-    compileOnly dependencyVersion("reactor")
-
     testImplementation dependencyModuleVersion('micronaut.netflix', 'micronaut-netflix-hystrix'), {
         exclude group:"io.micronaut", module:'micronaut-runtime'
         exclude group:"io.micronaut.configuration", module:'micronaut-netflix-archaius'
@@ -31,7 +29,6 @@ dependencies {
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":http-server-netty")
 
-    testImplementation dependencyVersion("reactor")
     testImplementation dependencyVersion("zipkin.reporter")
     testImplementation dependencyVersion("brave.instrumentation")
     testImplementation dependencyVersion("brave.opentracing")

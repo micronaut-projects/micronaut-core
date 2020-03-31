@@ -41,7 +41,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances.</p>
@@ -56,6 +56,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{\\s?random\\.(\\S+?)\\}");
     private static final char[] DOT_DASH = new char[] {'.', '-'};
     private static final Object NO_VALUE = new Object();
+    private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
     protected final ConversionService<?> conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
@@ -64,6 +65,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     @SuppressWarnings("MagicNumber")
     protected final Map<String, Object>[] catalog = new Map[58];
     protected final Map<String, Object>[] rawCatalog = new Map[58];
+    protected final Map<String, Object>[] nonGenerated = new Map[58];
     private final Random random = new Random();
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
     private final Map<String, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
@@ -133,16 +135,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         } else {
             Boolean result = containsCache.get(name);
             if (result == null) {
-                String finalName = trimIndex(name);
-                result = Stream.of(null, StringConvention.RAW).anyMatch(convention -> {
-                    Map<String, Object> entries = resolveEntriesForKey(finalName, false, convention);
-                    if (entries == null) {
-                        return false;
-                    } else {
-                        return entries.containsKey(finalName);
-                    }
-                });
 
+                for (PropertyCatalog convention : CONVENTIONS) {
+                    Map<String, Object> entries = resolveEntriesForKey(name, false, convention);
+                    if (entries != null) {
+                        String finalName = trimIndex(name);
+                        if (entries.containsKey(finalName)) {
+                            result = true;
+                            break;
+                        }
+                    }
+                }
+                if (result == null) {
+                    result = false;
+                }
                 containsCache.put(name, result);
             }
             return result;
@@ -151,33 +157,54 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
     @Override
     public boolean containsProperties(@Nullable String name) {
-        if (StringUtils.isEmpty(name)) {
-            return false;
-        } else {
-            String trimmedName = trimIndex(name);
-            return Stream.of(null, StringConvention.RAW).anyMatch(convention -> {
-                Map<String, Object> entries = resolveEntriesForKey(trimmedName, false, convention);
-                if (entries == null) {
-                    return false;
-                } else {
+        if (!StringUtils.isEmpty(name)) {
+            for (PropertyCatalog propertyCatalog : CONVENTIONS) {
+                Map<String, Object> entries = resolveEntriesForKey(name, false, propertyCatalog);
+                if (entries != null) {
+                    String trimmedName = trimIndex(name);
                     if (entries.containsKey(trimmedName)) {
                         return true;
                     } else {
                         String finalName = trimmedName + ".";
-                        return entries.keySet().stream().anyMatch(key ->
-                                key.startsWith(finalName)
-                        );
+                        for (String key : entries.keySet()) {
+                            if (key.startsWith(finalName)) {
+                                return true;
+                            }
+                        }
                     }
                 }
-            });
-
+            }
         }
+        return false;
+    }
+
+    @NonNull
+    @Override
+    public Collection<String> getPropertyEntries(@NonNull String name) {
+        if (!StringUtils.isEmpty(name)) {
+            Map<String, Object> entries = resolveEntriesForKey(
+                    name, false, PropertyCatalog.NORMALIZED);
+            if (entries != null) {
+                String prefix = name + '.';
+                return entries.keySet().stream().filter(k -> k.startsWith(prefix))
+                              .map(k -> {
+                                  String withoutPrefix = k.substring(prefix.length());
+                                  int i = withoutPrefix.indexOf('.');
+                                  if (i > -1) {
+                                      return withoutPrefix.substring(0, i);
+                                  }
+                                  return withoutPrefix;
+                              })
+                              .collect(Collectors.toSet());
+            }
+        }
+        return Collections.emptySet();
     }
 
     @Override
     public @NonNull Map<String, Object> getProperties(String name, StringConvention keyFormat) {
         if (!StringUtils.isEmpty(name)) {
-            Map<String, Object> entries = resolveEntriesForKey(name, false, keyFormat);
+            Map<String, Object> entries = resolveEntriesForKey(name, false, keyFormat == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED);
             if (entries != null) {
                 if (keyFormat == null) {
                     keyFormat = StringConvention.RAW;
@@ -185,12 +212,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 return resolveSubMap(
                         name,
                         entries,
-                        ConversionContext.of(Map.class),
+                        ConversionContext.MAP,
                         keyFormat,
                         MapFormat.MapTransformation.FLAT
                 );
             } else {
-                entries = resolveEntriesForKey(name, false, null);
+                entries = resolveEntriesForKey(name, false, PropertyCatalog.GENERATED);
                 if (keyFormat == null) {
                     keyFormat = StringConvention.RAW;
                 }
@@ -200,7 +227,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 return resolveSubMap(
                         name,
                         entries,
-                        ConversionContext.of(Map.class),
+                        ConversionContext.MAP,
                         keyFormat,
                         MapFormat.MapTransformation.FLAT
                 );
@@ -221,9 +248,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             if (cached != null) {
                 return cached == NO_VALUE ? Optional.empty() : Optional.of((T) cached);
             } else {
-                Map<String, Object> entries = resolveEntriesForKey(name, false, null);
+                Map<String, Object> entries = resolveEntriesForKey(name, false, PropertyCatalog.GENERATED);
                 if (entries == null) {
-                    entries = resolveEntriesForKey(name, false, StringConvention.RAW);
+                    entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
                 }
                 if (entries != null) {
                     Object value = entries.get(name);
@@ -231,7 +258,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         value = entries.get(normalizeName(name));
                         if (value == null && name.indexOf('[') == -1) {
                             // last chance lookup the raw value
-                            Map<String, Object> rawEntries = resolveEntriesForKey(name, false, StringConvention.RAW);
+                            Map<String, Object> rawEntries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
                             value = rawEntries != null ? rawEntries.get(name) : null;
                             if (value != null) {
                                 entries = rawEntries;
@@ -270,8 +297,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     }
 
                     if (value != null) {
+                        Optional<T> converted;
                         value = resolvePlaceHoldersIfNecessary(value);
-                        Optional<T> converted = conversionService.convert(value, conversionContext);
+                        if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
+                            converted = (Optional<T>) Optional.of(value);
+                        } else {
+                            converted = conversionService.convert(value, conversionContext);
+                        }
+
                         if (LOG.isTraceEnabled()) {
                             if (converted.isPresent()) {
                                 LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
@@ -292,7 +325,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         return Optional.of((T) properties);
                     } else if (Map.class.isAssignableFrom(requiredType)) {
                         Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
-                        return conversionService.convert(subMap, requiredType, conversionContext);
+                        if (!subMap.isEmpty()) {
+                            return conversionService.convert(subMap, requiredType, conversionContext);
+                        } else {
+                            return (Optional<T>) Optional.of(subMap);
+                        }
                     } else if (PropertyResolver.class.isAssignableFrom(requiredType)) {
                         Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
                         return Optional.of((T) new MapPropertyResolver(subMap, conversionService));
@@ -373,7 +410,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         StringConvention keyConvention = annotationMetadata.enumValue(MapFormat.class, "keyFormat", StringConvention.class)
                                                            .orElse(null);
         if (keyConvention == StringConvention.RAW) {
-            entries = resolveEntriesForKey(name, false, keyConvention);
+            entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
         }
         String prefix = name + '.';
         entries.entrySet().stream()
@@ -401,7 +438,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
         StringConvention keyConvention = annotationMetadata.enumValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(null);
         if (keyConvention == StringConvention.RAW) {
-            entries = resolveEntriesForKey(name, false, keyConvention);
+            entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
         }
         MapFormat.MapTransformation transformation = annotationMetadata.enumValue(
                 MapFormat.class,
@@ -487,27 +524,40 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 }
 
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
+                boolean first = true;
                 for (String resolvedProperty : resolvedProperties) {
                     int i = resolvedProperty.indexOf('[');
                     if (i > -1) {
                         String propertyName = resolvedProperty.substring(0, i);
-                        Map<String, Object> entries = resolveEntriesForKey(propertyName, true, null);
+                        Map<String, Object> entries = resolveEntriesForKey(propertyName, true, PropertyCatalog.GENERATED);
                         if (entries != null) {
                             entries.put(resolvedProperty, value);
                             expandProperty(resolvedProperty.substring(i), val -> entries.put(propertyName, val), () -> entries.get(propertyName), value);
                         }
+                        if (first) {
+                            Map<String, Object> normalized = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.NORMALIZED);
+                            normalized.put(propertyName, value);
+                            first = false;
+                        }
                     } else {
-                        Map<String, Object> entries = resolveEntriesForKey(resolvedProperty, true, null);
+                        Map<String, Object> entries = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.GENERATED);
                         if (entries != null) {
                             if (value instanceof List || value instanceof Map) {
                                 collapseProperty(resolvedProperty, entries, value);
                             }
                             entries.put(resolvedProperty, value);
                         }
+                        if (first) {
+                            Map<String, Object> normalized = resolveEntriesForKey(resolvedProperty, true, PropertyCatalog.NORMALIZED);
+                            if (normalized != null) {
+                                normalized.put(resolvedProperty, value);
+                            }
+                            first = false;
+                        }
                     }
                 }
 
-                final Map<String, Object> rawEntries = resolveEntriesForKey(property, true, StringConvention.RAW);
+                final Map<String, Object> rawEntries = resolveEntriesForKey(property, true, PropertyCatalog.RAW);
                 if (rawEntries != null) {
                     rawEntries.put(property, value);
                 }
@@ -651,16 +701,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     /**
      * @param name        The name
      * @param allowCreate Whether allows creation
-     * @param convention The string convention
+     * @param propertyCatalog The string convention
      * @return The map with the resolved entries for the name
      */
     @SuppressWarnings("MagicNumber")
-    protected Map<String, Object> resolveEntriesForKey(String name, boolean allowCreate, @Nullable StringConvention convention) {
+    protected Map<String, Object> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
         Map<String, Object> entries = null;
         if (name.length() == 0) {
             return null;
         }
-        final Map<String, Object>[] catalog = convention == StringConvention.RAW ? this.rawCatalog : this.catalog;
+        final Map<String, Object>[] catalog = getCatalog(propertyCatalog);
+
         char firstChar = name.charAt(0);
         if (Character.isLetter(firstChar)) {
             int index = ((int) firstChar) - 65;
@@ -673,6 +724,22 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             }
         }
         return entries;
+    }
+
+    private Map<String, Object>[] getCatalog(@Nullable PropertyCatalog propertyCatalog) {
+        propertyCatalog = propertyCatalog != null ? propertyCatalog : PropertyCatalog.GENERATED;
+        final Map<String, Object>[] catalog;
+        switch (propertyCatalog) {
+            case RAW:
+                catalog = this.rawCatalog;
+            break;
+            case NORMALIZED:
+                catalog = this.nonGenerated;
+            break;
+            default:
+                catalog = this.catalog;
+        }
+        return catalog;
     }
 
     /**
@@ -807,5 +874,27 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 list.add(i, value);
             }
         }
+    }
+
+    /**
+     * The property catalog to use.
+     */
+    protected enum PropertyCatalog {
+        /**
+         * The catalog that contains the raw keys.
+         */
+        RAW,
+        /**
+         * The catalog that contains normalized keys. A key is normalized into
+         * lower case hyphen separated form. For example an environment variable {@code FOO_BAR} would be
+         * normalized to {@code foo.bar}.
+         */
+        NORMALIZED,
+        /**
+         * The catalog that contains normalized keys and also generated keys. A synthetic key can be generated from
+         * an environment variable such as {@code FOO_BAR_BAZ} which will produce the following keys: {@code foo.bar.baz},
+         * {@code foo.bar-baz}, and {@code foo-bar.baz}.
+         */
+        GENERATED
     }
 }

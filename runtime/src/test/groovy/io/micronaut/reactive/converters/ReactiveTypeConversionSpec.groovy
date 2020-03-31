@@ -20,8 +20,6 @@ import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService
 import io.reactivex.Maybe
-import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -46,8 +44,6 @@ class ReactiveTypeConversionSpec extends Specification {
         from                            | target
         Completable.complete()          | io.reactivex.Observable
         Completable.complete()          | Flowable
-        Completable.complete()          | Mono
-        Completable.complete()          | Flux
         Completable.complete()          | io.reactivex.Single
         Completable.complete()          | Maybe
     }

@@ -29,8 +29,6 @@ import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthResult;
 import org.reactivestreams.Publisher;
 
-import java.util.Optional;
-
 /**
  * A filter that matches the {@link io.micronaut.management.endpoint.health.HealthEndpoint}
  * and returns an appropriate HTTP status code.
@@ -65,9 +63,9 @@ public class HealthResultFilter extends OncePerRequestHttpServerFilter {
     @Override
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
         return Publishers.map(chain.proceed(request), response -> {
-            Optional<HealthResult> body = response.getBody(HealthResult.class);
-            if (body.isPresent()) {
-                HealthResult healthResult = body.get();
+            Object body = response.body();
+            if (body instanceof HealthResult) {
+                HealthResult healthResult = (HealthResult) body;
                 HealthStatus status = healthResult.getStatus();
 
                 HttpStatus httpStatus = healthEndpoint

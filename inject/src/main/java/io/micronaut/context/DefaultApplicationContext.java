@@ -21,10 +21,7 @@ import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.micronaut.core.convert.*;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.naming.conventions.StringConvention;
@@ -191,6 +188,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @NonNull
     @Override
+    public Collection<String> getPropertyEntries(@NonNull String name) {
+        return environment.getPropertyEntries(name);
+    }
+
+    @NonNull
+    @Override
     public Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
         return getEnvironment().getProperties(name, keyFormat);
     }
@@ -235,7 +238,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
                     if (StringUtils.isNotEmpty(property)) {
                         if (isList) {
-                            List entries = getProperty(property, List.class, Collections.emptyList());
+                            List entries = environment.getProperty(property, List.class, Collections.emptyList());
                             if (!entries.isEmpty()) {
                                 for (int i = 0; i < entries.size(); i++) {
                                     if (entries.get(i) != null) {
@@ -254,15 +257,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 }
                             }
                         } else {
-                            Map entries = getProperty(property, Map.class, Collections.emptyMap());
-                            if (!entries.isEmpty()) {
-                                for (Object key : entries.keySet()) {
+                            Collection<String> propertyEntries = environment.getPropertyEntries(property);
+                            if (!propertyEntries.isEmpty()) {
+                                for (String key : propertyEntries) {
                                     BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
-                                    if (primaryPrefix != null && primaryPrefix.equals(key.toString())) {
+                                    if (primaryPrefix != null && primaryPrefix.equals(key)) {
                                         delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
                                     }
                                     delegate.put(EachProperty.class.getName(), delegate.getBeanType());
-                                    delegate.put(Named.class.getName(), key.toString());
+                                    delegate.put(Named.class.getName(), key);
 
                                     if (delegate.isEnabled(this)) {
                                         transformedCandidates.add(delegate);

@@ -20,7 +20,8 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
-import java.time.Duration;
+import java.time.temporal.TemporalAmount;
+import java.util.Optional;
 
 /**
  * An interface representing a Cookie. See https://tools.ietf.org/html/rfc6265.
@@ -76,6 +77,27 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @return The maximum age of the cookie in seconds
      */
     long getMaxAge();
+
+    /**
+     * Checks to see if this {@link Cookie} can be sent along cross-site requests.
+     * For more information, please look
+     * <a href="https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-05">here</a>
+     * @return The SameSite attribute of the cookie
+     */
+    default Optional<SameSite> getSameSite() {
+        return Optional.empty();
+    }
+
+    /**
+     * Determines if this this {@link Cookie} can be sent along cross-site requests.
+     * For more information, please look
+     *  <a href="https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-05">here</a>
+     * @param sameSite SameSite value
+     * @return This cookie
+     */
+    default @NonNull Cookie sameSite(@Nullable SameSite sameSite) {
+        return this;
+    }
 
     /**
      * Sets the max age of the cookie in seconds.
@@ -152,6 +174,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
         if (isSecure) {
             configuration.isCookieSecure().ifPresent(this::secure);
         }
+        configuration.getCookieSameSite().ifPresent(this::sameSite);
         return this;
     }
 
@@ -161,7 +184,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param maxAge The max age
      * @return This cookie
      */
-    default @NonNull Cookie maxAge(@NonNull Duration maxAge) {
+    default @NonNull Cookie maxAge(@NonNull TemporalAmount maxAge) {
         ArgumentUtils.requireNonNull("maxAge", maxAge);
         return maxAge(maxAge.get(ChronoUnit.SECONDS));
     }

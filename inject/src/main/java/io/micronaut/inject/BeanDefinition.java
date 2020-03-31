@@ -15,15 +15,17 @@
  */
 package io.micronaut.inject;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
@@ -41,6 +43,11 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, BeanType<T> {
+
+    /**
+     * Attribute used to store a dynamic bean name.
+     */
+    String NAMED_ATTRIBUTE = Named.class.getName();
 
     /**
      * @return The scope of the bean
@@ -247,5 +254,34 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      */
     default boolean isAbstract() {
         return Modifier.isAbstract(getBeanType().getModifiers());
+    }
+
+    /**
+     * Resolve the declared qualifier for this bean.
+     * @return The qualifier or null if this isn't one
+     */
+    default @Nullable Qualifier<T> getDeclaredQualifier() {
+        final String annotation = getAnnotationNameByStereotype(javax.inject.Qualifier.class).orElse(null);
+        if (annotation != null) {
+            if (annotation.equals(Qualifier.PRIMARY)) {
+                // primary is the same as null
+                return null;
+            }
+            return Qualifiers.byAnnotation(this, annotation);
+        } else {
+            Qualifier<T> qualifier = resolveDynamicQualifier();
+            if (qualifier == null) {
+                String name = stringValue(javax.inject.Named.class).orElse(null);
+                qualifier = name != null ? Qualifiers.byAnnotation(this, name) : null;
+            }
+            return qualifier;
+        }
+    }
+
+    /**
+     * @return Method that can be overridden to resolve a dynamic qualifier
+     */
+    default @Nullable Qualifier<T> resolveDynamicQualifier() {
+        return null;
     }
 }

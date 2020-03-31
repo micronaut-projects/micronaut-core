@@ -26,5 +26,5 @@ jmh {
     warmupIterations = 2
     iterations = 3
     fork = 1
-//    jvmArgs = ["-agentpath:/Applications/YourKit-Java-Profiler-2018.04.app/Contents/Resources/bin/mac/libyjpagent.jnilib"]
+    jvmArgs = ["-agentpath:/Applications/YourKit-Java-Profiler-2018.04.app/Contents/Resources/bin/mac/libyjpagent.jnilib"]
 }

@@ -20,6 +20,7 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
@@ -83,6 +84,7 @@ import org.slf4j.LoggerFactory;
 
 import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.io.File;
 import java.lang.reflect.Field;
@@ -125,11 +127,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     public static final String OUTBOUND_KEY = "-outbound-";
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
-    private final ExecutorService ioExecutor;
-    private final ExecutorSelector executorSelector;
     private final List<ChannelOutboundHandler> outboundHandlers;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
-    private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
     private final NettyHttpServerConfiguration serverConfiguration;
     private final ServerSslConfiguration sslConfiguration;
     private final StaticResourceResolver staticResourceResolver;
@@ -141,7 +140,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final WebSocketBeanRegistry webSocketBeanRegistry;
     private final int specifiedPort;
     private final HttpCompressionStrategy httpCompressionStrategy;
-    private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
     private final HttpVersion httpVersion;
     private final HttpRequestCertificateHandler requestCertificateHandler;
@@ -179,35 +177,32 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     @SuppressWarnings("ParameterNumber")
     @Inject
     public NettyHttpServer(
-        NettyHttpServerConfiguration serverConfiguration,
-        ApplicationContext applicationContext,
-        Router router,
-        RequestArgumentSatisfier requestArgumentSatisfier,
-        MediaTypeCodecRegistry mediaTypeCodecRegistry,
-        NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
-        StaticResourceResolver resourceResolver,
-        @javax.inject.Named(TaskExecutors.IO) ExecutorService ioExecutor,
-        @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
-        ExecutorSelector executorSelector,
-        @Nullable ServerSslBuilder serverSslBuilder,
-        List<ChannelOutboundHandler> outboundHandlers,
-        EventLoopGroupFactory eventLoopGroupFactory,
-        EventLoopGroupRegistry eventLoopGroupRegistry,
-        HttpCompressionStrategy httpCompressionStrategy,
-        HttpContentProcessorResolver httpContentProcessorResolver
+            NettyHttpServerConfiguration serverConfiguration,
+            ApplicationContext applicationContext,
+            Router router,
+            RequestArgumentSatisfier requestArgumentSatisfier,
+            MediaTypeCodecRegistry mediaTypeCodecRegistry,
+            NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
+            StaticResourceResolver resourceResolver,
+            @javax.inject.Named(TaskExecutors.IO) Provider<ExecutorService> ioExecutor,
+            @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
+            ExecutorSelector executorSelector,
+            @Nullable ServerSslBuilder serverSslBuilder,
+            List<ChannelOutboundHandler> outboundHandlers,
+            EventLoopGroupFactory eventLoopGroupFactory,
+            EventLoopGroupRegistry eventLoopGroupRegistry,
+            HttpCompressionStrategy httpCompressionStrategy,
+            HttpContentProcessorResolver httpContentProcessorResolver
     ) {
         this.httpCompressionStrategy = httpCompressionStrategy;
-        this.httpContentProcessorResolver = httpContentProcessorResolver;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());
         this.applicationContext = applicationContext;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-        this.customizableResponseTypeHandlerRegistry = customizableResponseTypeHandlerRegistry;
         this.beanLocator = applicationContext;
         this.environment = applicationContext.getEnvironment();
         this.serverConfiguration = serverConfiguration;
         this.router = router;
-        this.ioExecutor = ioExecutor;
         this.specifiedPort = getHttpPort(serverConfiguration);
 
         int port = specifiedPort;
@@ -224,7 +219,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
         this.httpVersion = serverConfiguration.getHttpVersion();
         this.serverPort = getPortOrDefault(port);
-        this.executorSelector = executorSelector;
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
         this.requestArgumentSatisfier = requestArgumentSatisfier;
@@ -243,7 +237,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 serverConfiguration,
                 requestArgumentSatisfier,
                 executorSelector,
-                ioExecutor,
+                SupplierUtil.memoized(ioExecutor::get),
                 httpContentProcessorResolver
         );
     }

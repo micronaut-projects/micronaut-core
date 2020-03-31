@@ -6,6 +6,10 @@ Micronaut {version} includes the following changes:
 
 Micronaut has been updated to support JDK 14.
 
+==== Startup Performance Improvements
+
+Startup time has been further improved in this release with typical startup time for a new application around 20% faster.
+
 ==== Support for Analyzing the Injection Point
 
 Micronaut's Dependency Injection implementation has been improved such that you can now receive an api:inject.InjectionPoint[] instance to any ann:context.annotation.Factory[] method. This makes it possible to customize how the bean is created based on the annotation metadata at the point at which the bean is injected.
@@ -116,17 +120,43 @@ It is no longer necessary to use `@Client(..)` to inject a default api:http.clie
 
 If no host is provided at the time of a request, a api:http.client.exceptions.NoHostException[] will be thrown.
 
-=== Other Improvements
+=== Module Improvements
 
 ==== Micronaut SQL 2.0.0 Upgrade
 
-Micronaut SQL has been improved to default to Micronaut transaction management (making Spring management optional) and includes https://micronaut-projects.github.io/micronaut-sql/2.0.x/guide/#jdbi[support for Jdbi] (Thanks to https://github.com/drmaas[Dan Maas] for this contirubtion).
+Micronaut SQL has been improved to default to Micronaut transaction management (making Spring management optional) and includes https://micronaut-projects.github.io/micronaut-sql/2.0.x/guide/#jdbi[support for Jdbi] (Thanks to https://github.com/drmaas[Dan Maas] for this contribution).
+
+==== New Reactive Modules
+
+Whilst RxJava 2 remains the default, individual modules for other reactive libraries have been added.
+
+For RxJava 3:
+
+dependency:io.micronaut.rxjava3:micronaut-rxjava3[scope="compile"]
+
+For Reactor:
+
+dependency:io.micronaut.reactor:micronaut-reactor[scope="compile"]
+
+And legacy support for RxJava 1:
+
+dependency:io.micronaut.rxjava1:micronaut-rxjava1[scope="compile"]
+
+Included within the new RxJava 3 and Reactor modules are variants of api:http.client.RxHttpClient[] called `Rx3HttpClient` and `ReactorHttpClient` respectively.
+
+To use the RxJava 3 HTTP client add the following dependency:
+
+dependency:io.micronaut.rxjava3:micronaut-rxjava3-http-client[scope="compile"]
+
+To use the Reactor HTTP client add:
+
+dependency:io.micronaut.rxjava3:micronaut-reactor-http-client[scope="compile"]
 
 ==== Module Upgrades
 
 * Micronaut Neo4j - `1.3.0` -> `2.0.0`
 * Micronaut Mongo - `1.3.0` -> `2.0.0`
-* Micronaut SQL - `1.3.0` -> `2.0.0.M1`
+* Micronaut SQL - `1.3.0` -> `2.0.0.RC1`
 
 ==== Dependency Upgrades
 

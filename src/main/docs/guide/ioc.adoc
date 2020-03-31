@@ -20,21 +20,21 @@ Note that the IoC part of Micronaut can be used completely independently of Micr
 [source,groovy,subs="attributes"]
 ----
 plugins {
-  id "net.ltgt.apt" version "0.18" // <1>
+  id "net.ltgt.apt" version "0.21" // <1>
 }
 
 ...
 dependencies {
-    annotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <2>
-    compile "io.micronaut:micronaut-inject:{version}"
+    annotationProcessor("io.micronaut:micronaut-inject-java:{version}") // <2>
+    implementation("io.micronaut:micronaut-inject:{version}")
     ...
-    testAnnotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <3>
+    testAnnotationProcessor("io.micronaut:micronaut-inject-java:{version}") // <3>
     ...
 }
 
 ----
 
-<1> Apply the Annotation Processing plugin
+<1> Apply net.ltgt.apt Gradle plugin which makes it easier/safer to use Java annotation processors
 <2> Include the minimal dependencies required to perform dependency injection
 <3> This is necessary to create beans in the `test` directory
 

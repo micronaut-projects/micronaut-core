@@ -15,8 +15,10 @@
  */
 package io.micronaut.web.router;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
+import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
@@ -26,13 +28,9 @@ import io.micronaut.http.context.ServerContextPathProvider;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.qualifiers.Qualifiers;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.util.Collection;
 
 /**
  * An {@link io.micronaut.context.processor.ExecutableMethodProcessor} for the {@link Filter} annotation.
@@ -41,7 +39,7 @@ import java.util.Collection;
  * @since 1.0
  */
 @Singleton
-public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
+public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements BeanDefinitionProcessor<Filter> {
 
     private final BeanContext beanContext;
     private final ServerContextPathProvider contextPathProvider;
@@ -67,33 +65,25 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder {
         this.contextPathProvider = contextPathProvider;
     }
 
-    /**
-     * Executed after the bean creation.
-     */
-    @PostConstruct
-    public void process() {
-        Collection<BeanDefinition<?>> filterDefinitions = beanContext.getBeanDefinitions(Qualifiers.byStereotype(Filter.class));
-        for (BeanDefinition<?> beanDefinition : filterDefinitions) {
-            if (HttpClientFilter.class.isAssignableFrom(beanDefinition.getBeanType())) {
-                // ignore http client filters
-                continue;
+    @Override
+    public void process(BeanDefinition<?> beanDefinition, BeanContext object) {
+        if (HttpClientFilter.class.isAssignableFrom(beanDefinition.getBeanType())) {
+            // ignore http client filters
+            return;
+        }
+        String[] patterns = getPatterns(beanDefinition);
+        if (ArrayUtils.isNotEmpty(patterns)) {
+            HttpMethod[] methods = beanDefinition.enumValues(Filter.class, "methods", HttpMethod.class);
+            String first = patterns[0];
+            FilterRoute filterRoute = addFilter(first, () -> beanContext.getBean((Class<HttpFilter>) beanDefinition.getBeanType()));
+            if (patterns.length > 1) {
+                for (int i = 1; i < patterns.length; i++) {
+                    String pattern = patterns[i];
+                    filterRoute.pattern(pattern);
+                }
             }
-            String[] patterns = getPatterns(beanDefinition);
-            if (ArrayUtils.isNotEmpty(patterns)) {
-                HttpMethod[] methods = beanDefinition.findAnnotation(Filter.class)
-                        .map(av -> av.enumValues("methods", HttpMethod.class))
-                        .orElse(null);
-                String first = patterns[0];
-                FilterRoute filterRoute = addFilter(first, () -> beanContext.getBean((Class<HttpFilter>) beanDefinition.getBeanType()));
-                if (patterns.length > 1) {
-                    for (int i = 1; i < patterns.length; i++) {
-                        String pattern = patterns[i];
-                        filterRoute.pattern(pattern);
-                    }
-                }
-                if (ArrayUtils.isNotEmpty(methods)) {
-                    filterRoute.methods(methods);
-                }
+            if (ArrayUtils.isNotEmpty(methods)) {
+                filterRoute.methods(methods);
             }
         }
     }

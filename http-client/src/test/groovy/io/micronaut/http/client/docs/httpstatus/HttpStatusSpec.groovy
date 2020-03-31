@@ -65,7 +65,8 @@ class HttpStatusSpec extends Specification {
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/866")
-    void "Verify a controller can be annotated with @Status and void return"() {
+    @Unroll
+    void "Verify a controller can be annotated with @Status and void return for #uri"() {
         when:
         HttpResponse response = client.toBlocking().exchange(HttpRequest.GET(uri))
 

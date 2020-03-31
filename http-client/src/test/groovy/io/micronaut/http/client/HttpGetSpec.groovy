@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.client
 
-
+import io.micronaut.context.annotation.Property
 import io.micronaut.core.convert.format.Format
 import io.micronaut.core.type.Argument
 import io.micronaut.http.*
@@ -31,7 +31,6 @@ import io.reactivex.Completable
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.functions.Consumer
-import reactor.core.publisher.Mono
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -45,6 +44,8 @@ import java.time.LocalDate
  * @since 1.0
  */
 @MicronautTest
+@Property(name = "micronaut.server.netty.log-level", value = 'trace')
+@Property(name = "micronaut.http.client.log-level", value = 'trace')
 class HttpGetSpec extends Specification {
 
     @Inject
@@ -405,26 +406,14 @@ class HttpGetSpec extends Specification {
         client.close()
     }
 
-    void "test mono empty list returns ok"() {
-        when:
-        HttpResponse response = client.exchange(HttpRequest.GET("/get/emptyList/mono"), Argument.listOf(Book)).blockingFirst()
-
-        then:
-        noExceptionThrown()
-        response.status == HttpStatus.OK
-        response.body().isEmpty()
-
-        cleanup:
-        client.close()
-    }
-
     void "test completable returns 200"() {
         when:
         MyGetClient client = this.myGetClient
+        def returnsNull = client.completable().blockingGet()
         def ex = client.completableError().blockingGet()
 
         then:
-        client.completable().blockingGet() == null
+        returnsNull == null
         ex instanceof HttpClientResponseException
         ex.message.contains("completable error")
     }
@@ -535,11 +524,6 @@ class HttpGetSpec extends Specification {
         @Get("/emptyList/single")
         Single<List<Book>> emptyListSingle() {
             return Single.just([])
-        }
-
-        @Get("/emptyList/mono")
-        Mono<List<Book>> emptyListMono() {
-            return Mono.just([])
         }
 
         @Get(value = "/error", produces = MediaType.TEXT_PLAIN)

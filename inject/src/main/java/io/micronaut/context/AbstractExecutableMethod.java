@@ -15,11 +15,11 @@
  */
 package io.micronaut.context;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
@@ -199,7 +199,6 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
      */
     class ReturnTypeImpl implements ReturnType {
 
-        @SuppressWarnings("unchecked")
         @Override
         public Class<?> getType() {
             if (genericReturnType != null) {
@@ -207,6 +206,17 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
             } else {
                 return void.class;
             }
+        }
+
+        @Override
+        public boolean isSuspended() {
+            return AbstractExecutableMethod.this.isSuspend();
+        }
+
+        @NonNull
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return AbstractExecutableMethod.this.getAnnotationMetadata();
         }
 
         @Override
@@ -229,7 +239,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         public Argument asArgument() {
             Collection<Argument<?>> values = getTypeVariables().values();
             final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            return Argument.of(getType(), NameUtils.decapitalize(getType().getSimpleName()), annotationMetadata, values.toArray(new Argument[0]));
+            return Argument.of(getType(), annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
         }
     }
 

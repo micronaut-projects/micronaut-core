@@ -1,7 +1,6 @@
 package io.micronaut.docs.inject.qualifiers.named;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.DefaultBeanContext;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.junit.Test;
 

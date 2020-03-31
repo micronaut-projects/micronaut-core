@@ -31,7 +31,6 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
-import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -66,7 +65,6 @@ class ServerRequestContextSpec extends Specification {
         method          | uri
         "method"        | '/test-context/method'
         "rxjava"        | '/test-context/rxjava'
-        "reactor"       | '/test-context/reactor'
         "thread"        | '/test-context/thread'
         "error"         | '/test-context/error'
         "handlerError"  | '/test-context/handler-error'
@@ -81,9 +79,6 @@ class ServerRequestContextSpec extends Specification {
 
         @Get("/rxjava")
         String rxjava()
-
-        @Get("/reactor")
-        String reactor()
 
         @Get("/thread")
         String thread()
@@ -115,14 +110,6 @@ class ServerRequestContextSpec extends Specification {
                 def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 request.uri
             }).subscribeOn(Schedulers.computation())
-        }
-
-        @Get("/reactor")
-        Mono<String> reactor() {
-            Mono.fromCallable({ ->
-                def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
-                request.uri
-            }).subscribeOn(reactor.core.scheduler.Schedulers.elastic())
         }
 
         @Get("/thread")

@@ -81,6 +81,36 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     }
 
     @Override
+    public final boolean isSuspended() {
+        return this.abstractRoute.isSuspended();
+    }
+
+    @Override
+    public final boolean isReactive() {
+        return this.abstractRoute.isReactive();
+    }
+
+    @Override
+    public final boolean isSingleResult() {
+        return this.abstractRoute.isSingleResult();
+    }
+
+    @Override
+    public final boolean isSpecifiedSingle() {
+        return this.abstractRoute.isSpecifiedSingle();
+    }
+
+    @Override
+    public final boolean isAsync() {
+        return this.abstractRoute.isAsync();
+    }
+
+    @Override
+    public final boolean isVoid() {
+        return this.abstractRoute.isVoid();
+    }
+
+    @Override
     public T getTarget() {
         return executableMethod.getTarget();
     }

@@ -202,9 +202,13 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
         @Override
         public <T> T getValue(Class<T> type) throws ConfigurationException {
-            return conversionService.convert(text, type)
-                    .orElseThrow(() ->
-                            new ConfigurationException("Could not convert: [" + text + "] to the required type: [" + type.getName() + "]"));
+            if (type.isInstance(text)) {
+                return (T) text;
+            } else {
+                return conversionService.convert(text, type)
+                        .orElseThrow(() ->
+                                new ConfigurationException("Could not convert: [" + text + "] to the required type: [" + type.getName() + "]"));
+            }
         }
     }
 

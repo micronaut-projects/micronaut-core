@@ -108,15 +108,15 @@ Flowable.fromPublisher(
 );
 ----
 
-The api:runtime.server.EmbeddedServerInstance[] is available through event listeners that listen for the api:discovery.event.ServiceStartedEvent[]. The ann:runtime.event.annotation.EventListener[] annotation makes it easy to listen for the event inside one of your existing beans.
+The api:runtime.server.EmbeddedServerInstance[] is available through event listeners that listen for the api:discovery.event.ServiceReadyEvent[]. The ann:runtime.event.annotation.EventListener[] annotation makes it easy to listen for the event inside one of your existing beans.
 
-To obtain metadata for the locally running server use an <<events,EventListener>> for the api:discovery.event.ServiceStartedEvent[]:
+To obtain metadata for the locally running server use an <<events,EventListener>> for the api:discovery.event.ServiceReadyEvent[]:
 
 .Obtaining Metadata for a Local Server
 [source,java]
 ----
 @EventListener
-void onServiceStarted(ServiceStartedEvent event) {
+void onServiceStarted(ServiceReadyEvent event) {
     ServiceInstance serviceInstance = event.getSource()
     ConvertibleValues<String> metadata = serviceInstance.metadata
 }

@@ -17,7 +17,7 @@ package io.micronaut.http.cookie;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 
-import java.time.Duration;
+import java.time.temporal.TemporalAmount;
 import java.util.Optional;
 
 /**
@@ -63,5 +63,12 @@ public interface CookieConfiguration {
     /**
      * @return The max age to use for the cookie
      */
-    Optional<Duration> getCookieMaxAge();
+    Optional<TemporalAmount> getCookieMaxAge();
+
+    /**
+     * @return return the SameSite to use for the cookie.
+     */
+    default Optional<SameSite> getCookieSameSite() {
+        return Optional.empty();
+    }
 }

@@ -26,7 +26,6 @@ dependencies {
     testImplementation dependencyModuleVersion("groovy", "groovy-json")
     testImplementation dependencyModuleVersion("groovy", "groovy-templates")
     testImplementation dependencyVersion("rxjava2")
-    testImplementation dependencyVersion("reactor")
     testImplementation(dependencyModuleVersion("netty", "netty-transport-native-epoll") + ":linux-x86_64")
     testImplementation(dependencyModuleVersion("netty", "netty-transport-native-kqueue") + ":osx-x86_64")
 }

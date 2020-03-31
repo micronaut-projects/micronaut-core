@@ -9,7 +9,6 @@ dependencies {
     testImplementation project(":management")
     testImplementation project(":session")
     testImplementation dependencyVersion("jcache")
-    testImplementation dependencyVersion("reactor")
     testImplementation dependencyModuleVersion("micronaut.test", "micronaut-test-spock"), {
         exclude module:'micronaut-runtime'
         exclude module:'micronaut-inject'

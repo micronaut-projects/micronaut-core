@@ -24,7 +24,7 @@ class HeadlineControllerSpec: StringSpec() {
                     .applicationContext
                     .getBean(HeadlineClient::class.java)
 
-            val headline = headlineClient.streamHeadlines().blockFirst()
+            val headline = headlineClient.streamHeadlines().blockingFirst()
 
             assertNotNull(headline)
             assertTrue(headline!!.data.text!!.startsWith("Latest Headline"))

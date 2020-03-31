@@ -67,7 +67,7 @@ class HealthEndpointSpec extends Specification {
         context.containsBean(HealthEndpoint)
         !context.containsBean(DiskSpaceIndicator)
         context.containsBean(RxJavaHealthAggregator)
-        context.containsBean(JdbcIndicator)
+        !context.containsBean(JdbcIndicator)
 
         cleanup:
         context.close()
@@ -125,7 +125,7 @@ class HealthEndpointSpec extends Specification {
         context.containsBean(HealthEndpoint)
         context.containsBean(DiskSpaceIndicator)
         context.containsBean(RxJavaHealthAggregator)
-        context.containsBean(JdbcIndicator)
+        !context.containsBean(JdbcIndicator)
 
         cleanup:
         context.close()

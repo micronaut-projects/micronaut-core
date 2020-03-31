@@ -309,11 +309,21 @@ ext {
                     name:'micronaut-spring-annotation',
                     modules:['micronaut-spring-boot', 'micronaut-spring-boot-annotation', 'micronaut-spring-context', 'micronaut-spring-web', 'micronaut-spring-web-annotation']
             ],
+            'micronaut.spring.core': [
+                    version:micronautSpringCoreVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-spring'
+            ],
             'micronaut.sql': [
                     version:micronautSqlVersion,
                     group:'io.micronaut.configuration',
                     name:'micronaut-hibernate-jpa',
                     modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-dbcp', 'micronaut-postgres-reactive', 'micronaut-jasync-sql', 'micronaut-jooq', 'micronaut-jdbi']
+            ],
+            'micronaut.jdbc': [
+                    version:micronautJdbcVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-jdbc'
             ],
             'micronaut.mongo': [
                     version:micronautMongoVersion,
@@ -437,6 +447,21 @@ ext {
                     version: rxJava2Version,
                     group  : 'io.reactivex.rxjava2',
                     name   : 'rxjava'
+            ],
+            'micronaut.rxjava3'        : [
+                    version: micronautRxJava3Version,
+                    group  : 'io.micronaut.rxjava3',
+                    name   : 'micronaut-rxjava3'
+            ],
+            'micronaut.rxjava1'        : [
+                    version: micronautRxJava1Version,
+                    group  : 'io.micronaut.rxjava1',
+                    name   : 'micronaut-rxjava1'
+            ],
+            'micronaut.reactor'        : [
+                    version: micronautReactorVersion,
+                    group  : 'io.micronaut.reactor',
+                    name   : 'micronaut-reactor'
             ],
             reactor                    : [
                     version: reactorVersion,

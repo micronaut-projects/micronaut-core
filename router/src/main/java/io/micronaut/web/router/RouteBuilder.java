@@ -443,7 +443,6 @@ public interface RouteBuilder {
         return POST(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
     }
 
-
     /**
      * <p>Route the specified URI template to the specified target.</p>
      * <p>

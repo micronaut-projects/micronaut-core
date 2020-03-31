@@ -23,7 +23,9 @@ ioc:
   qualifiers: Bean Qualifiers
   scopes:
     title: Scopes
-    builtInScopes: Built-In Scopes
+    builtInScopes:
+      title: Built-In Scopes
+      eagerInit: Eager Initialization of Singletons
     refreshable: Refreshable Scope
     metaScopes: Scopes on Meta Annotations
   factories: Bean Factories
@@ -182,6 +184,11 @@ commandLineApps:
     title: Picocli Support
 configurations:
   title: Configurations
+  reactiveConfigs:
+    title: Configurations for Reactive Programming
+    rxjava3: RxJava 3 Support
+    reactor: Reactor Support
+    rxjava1: RxJava 1 Support
   dataAccess:
     title: Configurations for Data Access
     sqlSupport: Configuring a SQL Data Source

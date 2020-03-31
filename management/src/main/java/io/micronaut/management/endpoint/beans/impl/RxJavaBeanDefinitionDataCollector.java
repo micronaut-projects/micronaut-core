@@ -20,18 +20,14 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.beans.BeanDefinitionData;
 import io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector;
 import io.micronaut.management.endpoint.beans.BeansEndpoint;
-import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
-import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 
 /**
  * The default {@link BeanDefinitionDataCollector} implementation. Returns a {@link Map} with
@@ -45,16 +41,12 @@ import java.util.concurrent.ExecutorService;
 public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataCollector<Map<String, Object>> {
 
     private BeanDefinitionData beanDefinitionData;
-    private ExecutorService executorService;
 
     /**
      * @param beanDefinitionData The {@link BeanDefinitionData}
-     * @param executorService    The Executor service
      */
-    RxJavaBeanDefinitionDataCollector(BeanDefinitionData beanDefinitionData,
-                                      @Named(TaskExecutors.IO) ExecutorService executorService) {
+    RxJavaBeanDefinitionDataCollector(BeanDefinitionData beanDefinitionData) {
         this.beanDefinitionData = beanDefinitionData;
-        this.executorService = executorService;
     }
 
     @Override
@@ -75,7 +67,6 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
 
         return Flowable
             .fromIterable(definitions)
-            .subscribeOn(Schedulers.from(executorService))
             .collectInto(beans, (map, definition) ->
                 map.put(definition.getClass().getName(), beanDefinitionData.getData(definition))
             );

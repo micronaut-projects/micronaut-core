@@ -19,7 +19,7 @@ public class HeadlineControllerSpec {
                     .getApplicationContext()
                     .getBean(HeadlineClient.class);
 
-            Event<Headline> headline = headlineClient.streamHeadlines().blockFirst();
+            Event<Headline> headline = headlineClient.streamHeadlines().blockingFirst();
 
             assertNotNull( headline );
             assertTrue( headline.getData().getText().startsWith("Latest Headline") );

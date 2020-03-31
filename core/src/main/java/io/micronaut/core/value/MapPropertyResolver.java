@@ -15,11 +15,16 @@
  */
 package io.micronaut.core.value;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.util.StringUtils;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * A {@link PropertyResolver} that resolves values from a backing map.
@@ -62,5 +67,25 @@ public class MapPropertyResolver implements PropertyResolver {
     public <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext) {
         Object value = map.get(name);
         return conversionService.convert(value, conversionContext);
+    }
+
+    @NonNull
+    @Override
+    public Collection<String> getPropertyEntries(@NonNull String name) {
+        if (StringUtils.isNotEmpty(name)) {
+            String prefix = name + ".";
+            return map.keySet().stream().filter(k -> k.startsWith(prefix))
+                    .map(k -> {
+                        String withoutPrefix = k.substring(prefix.length());
+                        int i = withoutPrefix.indexOf('.');
+                        if (i > -1) {
+                            return withoutPrefix.substring(0, i);
+                        }
+                        return withoutPrefix;
+                    })
+                    // to list to retain order from linked hash map
+                    .collect(Collectors.toList());
+        }
+        return Collections.emptySet();
     }
 }
