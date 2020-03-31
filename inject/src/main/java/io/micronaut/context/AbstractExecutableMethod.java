@@ -239,7 +239,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         public Argument asArgument() {
             Collection<Argument<?>> values = getTypeVariables().values();
             final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            return Argument.of(getType(), getType().getSimpleName(), annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
+            return Argument.of(getType(), annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
         }
     }
 

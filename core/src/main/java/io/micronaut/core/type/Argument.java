@@ -254,6 +254,8 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
         return new DefaultArgument<>(type, name, AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
+
+
     /**
      * Creates a new argument for the given type and name.
      *
@@ -272,6 +274,24 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
         AnnotationMetadata annotationMetadata,
         @Nullable Argument... typeParameters) {
         return new DefaultArgument<>(type, name, annotationMetadata, typeParameters);
+    }
+
+    /**
+     * Creates a new argument for the given type and name.
+     *
+     * @param type               The type
+     * @param annotationMetadata the annotation metadata
+     * @param typeParameters     the type parameters
+     * @param <T>                The generic type
+     * @return The argument instance
+     */
+    @UsedByGeneratedCode
+    @NonNull
+    static <T> Argument<T> of(
+            Class<T> type,
+            AnnotationMetadata annotationMetadata,
+            @Nullable Argument... typeParameters) {
+        return new DefaultArgument<>(type, annotationMetadata, typeParameters);
     }
 
     /**
@@ -319,7 +339,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
     @NonNull
     static <T> Argument<T> of(
         Class<T> type) {
-        return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
+        return new DefaultArgument<>(type, AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
     }
 
     /**
@@ -347,7 +367,7 @@ public interface Argument<T> extends TypeVariableResolver, AnnotatedElement, Typ
             TypeVariable<Class<T>> parameter = parameters[i];
             typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
         }
-        return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, typeArguments);
+        return new DefaultArgument<>(type, AnnotationMetadata.EMPTY_METADATA, typeArguments);
     }
 
     /**

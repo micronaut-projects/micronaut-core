@@ -3106,7 +3106,7 @@ public class DefaultBeanContext implements BeanContext {
             if (qualifier instanceof Named) {
                 return ((Named) qualifier).getName();
             }
-            return Primary.class.getSimpleName();
+            return Primary.SIMPLE_NAME;
         }
     }
 

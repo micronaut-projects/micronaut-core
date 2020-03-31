@@ -34,4 +34,8 @@ import java.lang.annotation.Retention;
 @Documented
 @Retention(RUNTIME)
 public @interface Primary {
+    /**
+     * The simple name of this annotation.
+     */
+    String SIMPLE_NAME = Primary.class.getSimpleName();
 }
