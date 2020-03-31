@@ -23,11 +23,14 @@ import io.micronaut.core.async.annotation.SingleResult
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.SingleEmitter
+import io.reactivex.schedulers.Schedulers
 import org.reactivestreams.Publisher
 import spock.lang.Issue
 import spock.lang.Specification
 
 import javax.inject.Singleton
+import java.time.LocalTime
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class CachePublisherSpec extends Specification {
@@ -57,6 +60,28 @@ class CachePublisherSpec extends Specification {
         ctx.close()
     }
 
+    def "test cache atomic - Flowable merging"() {
+        given:
+        def ctx = ApplicationContext.run(
+                'micronaut.caches.num-cache-atomic-delayed.maximum-size':10
+        )
+        HelloService helloService = ctx.getBean(HelloService)
+
+        when:
+        def merger = Flowable.merge(
+                helloService.calculateValueDelayed(10),
+                helloService.calculateValueDelayed(10)
+        )
+
+        println("Startin at ${LocalTime.now()}")
+        then:
+        def all = merger.blockingIterable().asList()
+
+        all.size() == 2
+        all.every {
+            it == "Hello 1: 10"
+        }
+    }
 
     @Singleton
     static class HelloService {
@@ -71,6 +96,19 @@ class CachePublisherSpec extends Specification {
                 println("Calculating value for $num")
                 return "Hello $n: $num".toString()
             })
+        }
+
+        @Cacheable(value = "num-cache-atomic-delayed", atomic = true)
+        @SingleResult
+        Publisher<String> calculateValueDelayed(Integer num) {
+            return Flowable.fromCallable({ ->
+                def n = invocations.incrementAndGet()
+                println("Calculating value for $num on ${Thread.currentThread()} at ${LocalTime.now()}")
+                return "Hello $n: $num".toString()
+            })
+            // delay may break the atomicity
+            // similarly to issuing an http client call
+                    .delay(5, TimeUnit.SECONDS, Schedulers.io())
         }
 
         @CachePut("mult-cache")
