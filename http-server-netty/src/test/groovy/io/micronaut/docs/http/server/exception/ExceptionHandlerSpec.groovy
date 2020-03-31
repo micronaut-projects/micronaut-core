@@ -48,6 +48,28 @@ class ExceptionHandlerSpec extends Specification {
         stock != null
         stock == 0
     }
+    
+    void "test wrapped HttpStatusException in CompletionException is unwrapped and handled by ExceptionHandler"() {
+        when:
+        HttpRequest request = HttpRequest.GET('/books/stock/future/1234')
+        Integer stock = client.toBlocking().retrieve(request, Integer)
+
+        then:
+        noExceptionThrown()
+        stock != null
+        stock == 1234
+    }
+    
+    void "test wrapped HttpStatusException in ExecutionException is unwrapped and handled by ExceptionHandler"() {
+        when:
+        HttpRequest request = HttpRequest.GET('/books/stock/blocking/1234')
+        Integer stock = client.toBlocking().retrieve(request, Integer)
+
+        then:
+        noExceptionThrown()
+        stock != null
+        stock == 1234
+    }
 
     void "test error route with @Status"() {
         when:
