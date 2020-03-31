@@ -90,7 +90,10 @@ class NettyHttpServerConfigurationSpec extends Specification {
                  'micronaut.server.netty.worker.threads'       : 8,
                  'micronaut.server.netty.parent.threads'       : 8,
                  'micronaut.server.multipart.maxFileSize'      : 2048,
-                 'micronaut.server.maxRequestSize'             : '2MB']
+                 'micronaut.server.maxRequestSize'             : '2MB',
+                 'micronaut.server.netty.childOptions.write_buffer_water_mark.high': 262143,
+                 'micronaut.server.netty.childOptions.write_buffer_water_mark.low' : 65535
+                ]
 
         ))
         beanContext.start()
@@ -102,12 +105,15 @@ class NettyHttpServerConfigurationSpec extends Specification {
         !config.useNativeTransport
         config.maxRequestSize == 2097152
         config.multipart.maxFileSize == 2048
-        config.childOptions.size() == 1
+        config.childOptions.size() == 2
         config.childOptions.keySet().first() instanceof ChannelOption
+        config.childOptions.keySet()[1] instanceof ChannelOption
+        config.childOptions.get(ChannelOption.WRITE_BUFFER_WATER_MARK).high == 262143
+        config.childOptions.get(ChannelOption.WRITE_BUFFER_WATER_MARK).low == 65535
         !config.host.isPresent()
         config.parent.numOfThreads == 8
         config.worker.numOfThreads == 8
-
+        
         then:
         NettyHttpServer server = beanContext.getBean(NettyHttpServer)
         server.start()
