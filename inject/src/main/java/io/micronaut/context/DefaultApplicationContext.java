@@ -162,8 +162,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     public synchronized @NonNull ApplicationContext start() {
-        startEnvironment();
-        return (ApplicationContext) super.start();
+        if (!isRunning()) {
+            startEnvironment();
+            return (ApplicationContext) super.start();
+        }
+        return this;
     }
 
     @Override

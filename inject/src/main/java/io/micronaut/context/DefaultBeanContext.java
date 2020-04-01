@@ -1513,7 +1513,7 @@ public class DefaultBeanContext implements BeanContext {
         if (!beanDefinitionsClasses.isEmpty()) {
 
             Stream<BeanDefinition<T>> candidateStream = beanDefinitionsClasses
-                    .stream()
+                    .parallelStream()
                     .filter(reference -> {
                         if (reference.isPresent()) {
                             Class<?> candidateType = reference.getBeanType();
@@ -1535,9 +1535,9 @@ public class DefaultBeanContext implements BeanContext {
             if (filter != null) {
                 candidateStream = candidateStream.filter(candidate -> !candidate.equals(filter));
             }
-            Set<BeanDefinition<T>> candidates = candidateStream
+            Collection<BeanDefinition<T>> candidates = candidateStream
                     .filter(candidate -> candidate.isEnabled(this))
-                    .collect(Collectors.toSet());
+                    .collect(Collectors.toList());
 
             if (!candidates.isEmpty()) {
                 if (filterProxied) {
