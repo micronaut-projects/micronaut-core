@@ -1023,8 +1023,7 @@ public class DefaultBeanContext implements BeanContext {
         // first traverse component definition classes and load candidates
         Collection candidates;
         if (!beanDefinitionsClasses.isEmpty()) {
-            Stream<BeanDefinitionReference> presentStream = beanDefinitionsClasses.stream().filter(BeanDefinitionReference::isPresent);
-            Stream<BeanDefinitionReference> reduced = qualifier.reduce(Object.class, presentStream);
+            Stream<BeanDefinitionReference> reduced = qualifier.reduce(Object.class, beanDefinitionsClasses.stream());
             Stream<BeanDefinition> candidateStream = qualifier.reduce(Object.class,
                     reduced
                             .map(ref -> ref.load(this))
@@ -1053,7 +1052,6 @@ public class DefaultBeanContext implements BeanContext {
         if (!beanDefinitionsClasses.isEmpty()) {
             List collection = beanDefinitionsClasses
                     .stream()
-                    .filter(BeanDefinitionReference::isPresent)
                     .map(ref -> ref.load(this))
                     .filter(candidate -> candidate.isEnabled(this))
                     .collect(Collectors.toList());
@@ -1068,7 +1066,7 @@ public class DefaultBeanContext implements BeanContext {
     public @NonNull
     Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences() {
         if (!beanDefinitionsClasses.isEmpty()) {
-            final List refs = beanDefinitionsClasses.stream().filter(ref -> ref.isPresent() && ref.isEnabled(this))
+            final List refs = beanDefinitionsClasses.stream().filter(ref -> ref.isEnabled(this))
                     .collect(Collectors.toList());
 
             return (Collection<BeanDefinitionReference<?>>) Collections.unmodifiableList(refs);
@@ -1237,6 +1235,7 @@ public class DefaultBeanContext implements BeanContext {
         return list.parallelStream()
                 .filter(ServiceDefinition::isPresent)
                 .map(ServiceDefinition::load)
+                .filter(BeanDefinitionReference::isPresent)
                 .collect(Collectors.toList());
     }
 
@@ -1515,12 +1514,9 @@ public class DefaultBeanContext implements BeanContext {
             Stream<BeanDefinition<T>> candidateStream = beanDefinitionsClasses
                     .stream()
                     .filter(reference -> {
-                        if (reference.isPresent()) {
-                            Class<?> candidateType = reference.getBeanType();
-                            final boolean isCandidate = candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
-                            return isCandidate && reference.isEnabled(this);
-                        }
-                        return false;
+                        Class<?> candidateType = reference.getBeanType();
+                        final boolean isCandidate = candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
+                        return isCandidate && reference.isEnabled(this);
                     })
                     .map(ref -> {
                         BeanDefinition<T> loadedBean;
