@@ -31,7 +31,7 @@ jobs:
       with:
         java-version: ${{ matrix.java }}   
     - name: Build with Gradle
-      run: ./gradlew discovery-client:check --no-daemon --parallel --continue
+      run: ./gradlew discovery-client:test --tests io.micronaut.discovery.consul.TtlHeartbeatSpec --no-daemon 
     - name: Publish to JFrog OSS
       if: success() && github.event_name == 'push' && matrix.java == '8' && github.ref == 'refs/heads/master'
       env:
