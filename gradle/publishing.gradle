@@ -28,8 +28,11 @@ import static groovyx.net.http.ContentType.*
 apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
 
+ext.startPomInfo = {}
 ext.extraPomInfo = {}
 ext.pomInfo = {
+    ext.startPomInfo.delegate = delegate
+    ext.startPomInfo.call()
     delegate.name project.title
     delegate.description project.projectDesc
     delegate.url projectUrl
@@ -62,7 +65,7 @@ ext.pomInfo = {
     ext.extraPomInfo.call()
 }
 
-if (project.name != 'bom') {
+if (project.name != 'bom' && project.name != 'parent') {
     task sourcesJar(type: Jar) {
         classifier = 'sources'
         from sourceSets.main.allJava
@@ -92,7 +95,16 @@ publishing {
         publications {
             maven(MavenPublication) {
                 artifactId("micronaut-" + project.name.substring(project.name.indexOf('/') + 1))
-                if (project.name == "bom") {
+                if (project.name == 'parent') {
+                    pom.withXml {
+                        def xml = asNode()
+
+                        xml.children().find {
+                            it.name().localPart == 'packaging'
+                        } + pomInfo
+                    }
+                }
+                else if (project.name == "bom") {
                     from components.javaPlatform
 
                     pom.withXml {

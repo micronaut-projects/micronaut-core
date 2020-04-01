@@ -137,7 +137,7 @@ $ ./gradlew run
 .Starting a Maven project
 [source,bash]
 ----
-$ ./mvnw compile exec:exec
+$ ./mvnw mn:run
 ----
 
 === Language/Test Features
@@ -249,7 +249,7 @@ $ ./gradlew run
 .Starting a Maven project
 [source,bash]
 ----
-$ ./mvnw compile exec:exec
+$ ./mvnw mn:run
 ----
 
 === Language/Test Features
