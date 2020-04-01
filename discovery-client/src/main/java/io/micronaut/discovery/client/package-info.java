@@ -20,4 +20,3 @@
  * @since 1.0
  */
 package io.micronaut.discovery.client;
-

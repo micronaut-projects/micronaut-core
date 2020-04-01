@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 /**
- * Contains cache annotations in Micronaut.
+ * Graal native specific substitutions.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.cache.annotation;
+package io.micronaut.caffeine;

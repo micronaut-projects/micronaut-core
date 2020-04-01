@@ -19,4 +19,7 @@
  * @author Graeme Rocher
  * @since 1.0
  */
+@Configuration
 package io.micronaut.management.endpoint;
+
+import io.micronaut.context.annotation.Configuration;

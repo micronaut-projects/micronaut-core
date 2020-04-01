@@ -16,6 +16,10 @@ snippet::io.micronaut.docs.http.server.executeon.PersonController[tags="imports,
 
 NOTE: If you wish to return to the previous behaviour as defined in Micronaut 1.x you can set `micronaut.server.thread-selection` to `AUTO` in configuration.
 
+=== Micronaut Cache Moved Out Of Runtime
+
+The `micronaut-runtime` module in Micronaut 1.x included support for caching AOP with the `@Cache` annotation. The core caching library and a default implementation based on caffeine were included. If you are using the caffeine backed cache support, you must add a dependency to continue doing so. Add `io.micronaut:micronaut-cache-caffeine` to your build to maintain the existing functionality.
+
 === Support for RxJava 1.x Removed from Core
 
 RxJava 1.x support is no longer included in core by default. You can re-enable suppot by adding the following dependency:
