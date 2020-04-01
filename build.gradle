@@ -641,7 +641,7 @@ subprojects { Project subproject ->
         shadowJarEnabled = false
     }
 
-    if (subproject.name.contains("bom")) {
+    if (subproject.name.contains("bom") || subproject.name.contains("parent")) {
         return
     }
 

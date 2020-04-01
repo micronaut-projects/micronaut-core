@@ -35,7 +35,6 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -52,6 +51,7 @@ import org.slf4j.LoggerFactory;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.inject.Singleton;
@@ -97,6 +97,9 @@ public class DefaultBeanContext implements BeanContext {
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String ADAPTER_TYPE = "io.micronaut.aop.Adapter";
     private static final String NAMED_MEMBER = "named";
+    private static final String PARALLEL_TYPE = Parallel.class.getName();
+    private static final String INDEXES_TYPE = Indexes.class.getName();
+    private static final String REPLACES_ANN = Replaces.class.getName();
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
@@ -222,8 +225,6 @@ public class DefaultBeanContext implements BeanContext {
                 }
                 publishEvent(new StartupEvent(this));
             }
-            // start thread for parallel beans
-            processParallelBeans();
             running.set(true);
             initializing.set(false);
         }
@@ -287,7 +288,6 @@ public class DefaultBeanContext implements BeanContext {
 
             terminating.set(false);
             running.set(false);
-            ClassLoadingReporter.finish();
         }
         return this;
     }
@@ -1021,8 +1021,7 @@ public class DefaultBeanContext implements BeanContext {
         // first traverse component definition classes and load candidates
         Collection candidates;
         if (!beanDefinitionsClasses.isEmpty()) {
-            Stream<BeanDefinitionReference> presentStream = beanDefinitionsClasses.stream().filter(BeanDefinitionReference::isPresent);
-            Stream<BeanDefinitionReference> reduced = qualifier.reduce(Object.class, presentStream);
+            Stream<BeanDefinitionReference> reduced = qualifier.reduce(Object.class, beanDefinitionsClasses.stream());
             Stream<BeanDefinition> candidateStream = qualifier.reduce(Object.class,
                     reduced
                             .map(ref -> ref.load(this))
@@ -1051,7 +1050,6 @@ public class DefaultBeanContext implements BeanContext {
         if (!beanDefinitionsClasses.isEmpty()) {
             List collection = beanDefinitionsClasses
                     .stream()
-                    .filter(BeanDefinitionReference::isPresent)
                     .map(ref -> ref.load(this))
                     .filter(candidate -> candidate.isEnabled(this))
                     .collect(Collectors.toList());
@@ -1066,7 +1064,7 @@ public class DefaultBeanContext implements BeanContext {
     public @NonNull
     Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences() {
         if (!beanDefinitionsClasses.isEmpty()) {
-            final List refs = beanDefinitionsClasses.stream().filter(ref -> ref.isPresent() && ref.isEnabled(this))
+            final List refs = beanDefinitionsClasses.stream().filter(ref -> ref.isEnabled(this))
                     .collect(Collectors.toList());
 
             return (Collection<BeanDefinitionReference<?>>) Collections.unmodifiableList(refs);
@@ -1235,6 +1233,7 @@ public class DefaultBeanContext implements BeanContext {
         return list.parallelStream()
                 .filter(ServiceDefinition::isPresent)
                 .map(ServiceDefinition::load)
+                .filter(BeanDefinitionReference::isPresent)
                 .collect(Collectors.toList());
     }
 
@@ -1291,7 +1290,7 @@ public class DefaultBeanContext implements BeanContext {
                     argument = Argument.OBJECT_ARGUMENT;
                 }
                 beanCreatedListeners.computeIfAbsent(argument.getType(), aClass -> new ArrayList<>(10))
-                         .add(listener);
+                        .add(listener);
 
             }
         }
@@ -1307,10 +1306,10 @@ public class DefaultBeanContext implements BeanContext {
                 final BeanInitializedEventListener listener;
                 if (definition.isSingleton()) {
                     listener = createAndRegisterSingleton(
-                        context,
-                        definition,
-                        definition.getBeanType(),
-                        qualifier
+                            context,
+                            definition,
+                            definition.getBeanType(),
+                            qualifier
                     );
                 } else {
 
@@ -1344,10 +1343,12 @@ public class DefaultBeanContext implements BeanContext {
      *
      * @param contextScopeBeans The context scope beans
      * @param processedBeans    The beans that require {@link ExecutableMethodProcessor} handling
+     * @param parallelBeans     The parallel bean definitions
      */
     protected void initializeContext(
             @NonNull List<BeanDefinitionReference> contextScopeBeans,
-            @NonNull List<BeanDefinitionReference> processedBeans) {
+            @NonNull List<BeanDefinitionReference> processedBeans,
+            @NonNull List<BeanDefinitionReference> parallelBeans) {
 
         if (CollectionUtils.isNotEmpty(contextScopeBeans)) {
             final Collection<BeanDefinition> contextBeans = new ArrayList<>(contextScopeBeans.size());
@@ -1369,7 +1370,6 @@ public class DefaultBeanContext implements BeanContext {
                     throw new BeanInstantiationException("Bean definition [" + contextScopeDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
                 }
             }
-            contextBeans.clear();
         }
 
         if (!processedBeans.isEmpty()) {
@@ -1454,6 +1454,9 @@ public class DefaultBeanContext implements BeanContext {
                             }));
         }
 
+        if (CollectionUtils.isNotEmpty(parallelBeans)) {
+            processParallelBeans(parallelBeans);
+        }
         final Runnable runnable = () ->
                 beanDefinitionsClasses.removeIf((BeanDefinitionReference beanDefinitionReference) ->
                         !beanDefinitionReference.isEnabled(this));
@@ -1509,12 +1512,9 @@ public class DefaultBeanContext implements BeanContext {
             Stream<BeanDefinition<T>> candidateStream = beanDefinitionsClasses
                     .stream()
                     .filter(reference -> {
-                        if (reference.isPresent()) {
-                            Class<?> candidateType = reference.getBeanType();
-                            final boolean isCandidate = candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
-                            return isCandidate && reference.isEnabled(this);
-                        }
-                        return false;
+                        Class<?> candidateType = reference.getBeanType();
+                        final boolean isCandidate = candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
+                        return isCandidate && reference.isEnabled(this);
                     })
                     .map(ref -> {
                         BeanDefinition<T> loadedBean;
@@ -1799,59 +1799,57 @@ public class DefaultBeanContext implements BeanContext {
 
     /**
      * Processes parallel bean definitions.
+     *
+     * @param parallelBeans The parallel beans
      */
-    protected void processParallelBeans() {
-        new Thread(() -> {
-            final List<BeanDefinitionReference> parallelBeans = beanDefinitionsClasses.stream()
-                    .filter(bd -> bd.isPresent() && bd.getAnnotationMetadata().hasDeclaredStereotype(Parallel.class) && bd.isEnabled(this))
-                    .collect(Collectors.toList());
-
-
-            Collection<BeanDefinition> parallelDefinitions = new ArrayList<>();
-            parallelBeans.forEach(beanDefinitionReference -> {
-                try {
-                    if (isRunning()) {
-                        synchronized (singletonObjects) {
-                            loadContextScopeBean(beanDefinitionReference, parallelDefinitions::add);
+    protected void processParallelBeans(List<BeanDefinitionReference> parallelBeans) {
+        if (!parallelBeans.isEmpty()) {
+            List<BeanDefinitionReference> finalParallelBeans = parallelBeans.stream().filter(bdr -> bdr.isEnabled(this)).collect(Collectors.toList());
+            if (!finalParallelBeans.isEmpty()) {
+                new Thread(() -> {
+                    Collection<BeanDefinition> parallelDefinitions = new ArrayList<>();
+                    finalParallelBeans.forEach(beanDefinitionReference -> {
+                        try {
+                            synchronized (singletonObjects) {
+                                loadContextScopeBean(beanDefinitionReference, parallelDefinitions::add);
+                            }
+                        } catch (Throwable e) {
+                            LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + "] could not be loaded: " + e.getMessage(), e);
+                            Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
+                            if (shutdownOnError) {
+                                stop();
+                            }
                         }
-                    }
-                } catch (Throwable e) {
-                    LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + "] could not be loaded: " + e.getMessage(), e);
-                    Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
-                    if (shutdownOnError) {
-                        stop();
-                    }
-                }
-            });
+                    });
 
-            filterProxiedTypes((Collection) parallelDefinitions, true, false);
-            filterReplacedBeans((Collection) parallelDefinitions);
+                    filterProxiedTypes((Collection) parallelDefinitions, true, false);
+                    filterReplacedBeans((Collection) parallelDefinitions);
 
-            parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
-                try {
-                    if (isRunning()) {
-                        synchronized (singletonObjects) {
-                            loadContextScopeBean(beanDefinition);
+                    parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
+                        try {
+                            synchronized (singletonObjects) {
+                                loadContextScopeBean(beanDefinition);
+                            }
+                        } catch (Throwable e) {
+                            LOG.error("Parallel Bean definition [" + beanDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
+                            Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
+                            if (shutdownOnError) {
+                                stop();
+                            }
                         }
-                    }
-                } catch (Throwable e) {
-                    LOG.error("Parallel Bean definition [" + beanDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
-                    Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
-                    if (shutdownOnError) {
-                        stop();
-                    }
-                }
-            }));
-            parallelDefinitions.clear();
+                    }));
+                    parallelDefinitions.clear();
 
-        }).start();
+                }).start();
+            }
+        }
     }
 
     private <T> void filterReplacedBeans(Collection<? extends BeanType<T>> candidates) {
         List<BeanType<T>> replacedTypes = new ArrayList<>(2);
 
         for (BeanType<T> candidate : candidates) {
-            if (candidate.getAnnotationMetadata().hasStereotype(Replaces.class)) {
+            if (candidate.getAnnotationMetadata().hasStereotype(REPLACES_ANN)) {
                 replacedTypes.add(candidate);
             }
         }
@@ -2529,6 +2527,7 @@ public class DefaultBeanContext implements BeanContext {
     private void readAllBeanDefinitionClasses() {
         List<BeanDefinitionReference> contextScopeBeans = new ArrayList<>(20);
         List<BeanDefinitionReference> processedBeans = new ArrayList<>(10);
+        List<BeanDefinitionReference> parallelBeans = new ArrayList<>(10);
         List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
         beanDefinitionsClasses.addAll(beanDefinitionReferences);
 
@@ -2536,7 +2535,8 @@ public class DefaultBeanContext implements BeanContext {
                 .collect(Collectors.toMap(Function.identity(), bc -> bc.isEnabled(this)));
         final Set<Map.Entry<BeanConfiguration, Boolean>> configurationEnabledEntries = configurationEnabled.entrySet();
 
-        reference: for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
+        reference:
+        for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
             for (Map.Entry<BeanConfiguration, Boolean> entry : configurationEnabledEntries) {
                 if (entry.getKey().isWithin(beanDefinitionReference) && !entry.getValue()) {
                     beanDefinitionsClasses.remove(beanDefinitionReference);
@@ -2544,14 +2544,16 @@ public class DefaultBeanContext implements BeanContext {
                 }
             }
             final AnnotationMetadata annotationMetadata = beanDefinitionReference.getAnnotationMetadata();
-            final List<AnnotationValue<Indexed>> indexes = annotationMetadata.getAnnotationValuesByType(Indexed.class);
-            if (CollectionUtils.isNotEmpty(indexes)) {
-                for (AnnotationValue<Indexed> index : indexes) {
-                    index.classValue().ifPresent(t -> resolveTypeIndex(t).add(beanDefinitionReference));
+            Class[] indexes = annotationMetadata.classValues(INDEXES_TYPE);
+            if (indexes.length > 0) {
+                //noinspection ForLoopReplaceableByForEach
+                for (int i = 0; i < indexes.length; i++) {
+                    Class indexedType = indexes[i];
+                    resolveTypeIndex(indexedType).add(beanDefinitionReference);
                 }
             } else {
                 if (annotationMetadata.hasStereotype(ADAPTER_TYPE)) {
-                    final Class aClass = annotationMetadata.classValue(ADAPTER_TYPE).orElse(null);
+                    final Class aClass = annotationMetadata.classValue(ADAPTER_TYPE, AnnotationMetadata.VALUE_MEMBER).orElse(null);
                     if (indexedTypes.contains(aClass)) {
                         resolveTypeIndex(aClass).add(beanDefinitionReference);
                     }
@@ -2559,14 +2561,18 @@ public class DefaultBeanContext implements BeanContext {
             }
             if (isEagerInit(beanDefinitionReference)) {
                 contextScopeBeans.add(beanDefinitionReference);
+            } else if (annotationMetadata.hasDeclaredStereotype(PARALLEL_TYPE)) {
+                parallelBeans.add(beanDefinitionReference);
             }
+
             if (beanDefinitionReference.requiresMethodProcessing()) {
                 processedBeans.add(beanDefinitionReference);
             }
+
         }
 
         initializeEventListeners();
-        initializeContext(contextScopeBeans, processedBeans);
+        initializeContext(contextScopeBeans, processedBeans, parallelBeans);
     }
 
     private boolean isEagerInit(BeanDefinitionReference beanDefinitionReference) {

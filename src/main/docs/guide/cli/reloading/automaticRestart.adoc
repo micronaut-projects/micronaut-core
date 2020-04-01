@@ -8,15 +8,26 @@ Given the problems with existing solutions and a lack of a way built into the JV
 
 Micronaut's startup time is fast and automatic restart leads to a clean slate without potential hard to debug problems cropping up or memory leaks.
 
-=== Configuring File Watch
+=== Maven Restart
 
-The following demonstrates how to configure Micronaut to automatically stop the application if a change occurs to an external file.
+To have automatic application restarts with Maven use the Micronaut Maven plugin (including by default when creating new Maven projects) and run the following command:
 
-TIP: You can create a new application with the `file-watch` feature already configured using the CLI with the command `mn create-app myapp --features file-watch`
+.Using the Micronaut Maven Plugin
+[source,bash]
+----
+$ ./mvnw mn:run
+----
 
-First configure your `application.yml` file to enable file watch:
+Every time you change a class Micronaut's plugin will automatically restart the server.
 
-.Configuring File Watch
+
+=== Gradle Restart
+
+For Gradle restart yoou can create a new application with the `file-watch` feature already configured using the CLI with the command `mn create-app myapp --features file-watch`
+
+This essentially introduces the following configuration to `application.yml`:
+
+.File Watch Configuration
 [source,yaml]
 ----
 micronaut:
@@ -29,6 +40,16 @@ micronaut:
 By setting `micronaut.io.watch.paths` what happens is that Micronaut will fire a api:scheduling.io.watch.event.FileChangedEvent[] if any file is changed. Setting `micronaut.io.watch.restart` tells Micronaut to stop the server if a file is changed.
 
 TIP: The `micronaut.io.watch.paths` setting can be used for more than just automatic restart, you can use this setting to monitor for file changes within your production application.
+
+Once this is in place to have Gradle automatically restart on any change add run the following command:
+
+.Using Gradle for Automatic Restart
+[source,bash]
+----
+./gradlew run --continuous
+----
+
+Every time you make a change to class or resources Gradle will recompile and restart the application.
 
 === File Watch and Mac OS X
 
@@ -72,29 +93,4 @@ Or with Maven:
 NOTE: The `provided` scope is used to ensure the dependencies don't go into the production JAR.
 
 
-=== Restarting the Server
 
-Once set to `true` the `micronaut.io.watch.restart` setting will stop  the server when a file changes, it is then up to an external process to restart the server. For example, with Gradle this can be achieved with a continuous build:
-
-.Automatic Restart with Gradle Continuous Build
-[source,bash]
-----
-$ gradle run --continuous
-----
-
-TIP: You can also use a Kubernetes replication controller to restart the application if this feature is used in production
-
-Maven does not have an equivalent feature, however you can achieve a similar effect with a bash script:
-
-.Automatic Restart with Maven and Bash
-[source,bash]
-----
-#!/usr/bin/env sh
-
-while true; do
-	./mvn compile exec:exec
-	sleep 1s
-done
-----
-
-If automatic restart is for some reason not your preferred approach then you can use most JVM agents with Micronaut. See the following sections for a description on how to setup JVM agents.

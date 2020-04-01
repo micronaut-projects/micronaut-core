@@ -106,7 +106,7 @@ class GradleBuildTokens extends BuildTokens {
     protected List<GradleDependency> getDependencies(Profile profile, List<Feature> features) {
         List<Dependency> dependencies = super.materializeDependencies(profile, features)
         List<GradleDependency> gradleDependencies = []
-        final String enforcedPlatform = ' platform("io.micronaut:micronaut-bom:$micronautVersion")'
+        final String enforcedPlatform = ' enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion")'
         gradleDependencies.add(new GradleDependency("implementation", enforcedPlatform))
         gradleDependencies.add(new GradleDependency("testImplementation", enforcedPlatform))
         if (sourceLanguage == "groovy") {

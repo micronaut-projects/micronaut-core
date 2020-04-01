@@ -215,9 +215,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
+    protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans, List<BeanDefinitionReference> parallelBeans) {
         initializeTypeConverters(this);
-        super.initializeContext(contextScopeBeans, processedBeans);
+        super.initializeContext(contextScopeBeans, processedBeans, parallelBeans);
     }
 
     @Override
@@ -625,12 +625,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         @Override
-        protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
+        protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans, List<BeanDefinitionReference> parallelBeans) {
             // no-op .. @Context scope beans are not started for bootstrap
         }
 
         @Override
-        protected void processParallelBeans() {
+        protected void processParallelBeans(List<BeanDefinitionReference> parallelBeans) {
             // no-op
         }
 

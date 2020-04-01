@@ -12,7 +12,7 @@ If you are creating your project using the Micronaut CLI, supply the `springload
 $ mn create-app my-app --features springloaded
 ----
 
-You can start the application with `./gradlew run` (Gradle) or `./mvnw compile exec:exec` (Maven).
+You can start the application with `./gradlew run` (Gradle) or `./mvnw mn:run` (Maven).
 ====
 
 == Configuration
@@ -37,7 +37,6 @@ run.jvmArgs('-noverify', '-javaagent:/usr/local/libs/springloaded/springloaded-1
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
-                <version>1.6.0</version>
                 <configuration>
                     <executable>java</executable>
                     <arguments>
@@ -49,5 +48,5 @@ run.jvmArgs('-noverify', '-javaagent:/usr/local/libs/springloaded/springloaded-1
 <2> Add `javaagent` argument
 
 
-You can now start the application with `./gradlew run` (Gradle) or `./mvnw compile exec:exec` (Maven).
+You can now start the application with `./gradlew run` (Gradle) or `./mvnw mn:run` (Maven).
 
