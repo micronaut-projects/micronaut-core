@@ -19,7 +19,7 @@ snippet::io.micronaut.docs.context.events.application.SampleEventListener,io.mic
 
 NOTE: The link:{api}/io/micronaut/context/event/ApplicationEventListener.html#supports-E-[supports] method can be overridden to further clarify events that should be processed.
 
-Alternatively you can use the ann:runtime.event.annotation.EventListener[] annotation if you do not wish to specifically implement an interface:
+Alternatively you can use the ann:runtime.event.annotation.EventListener[] annotation if you do not wish to specifically implement an interface or utilize one of the built in events like api:context.event.StartupEvent[] and api:context.event.ShutdownEvent[]:
 
 snippet::io.micronaut.docs.context.events.listener.SampleEventListener[tags="imports,class",indent=0,title="Listening for Events with `@EventListener`"]
 

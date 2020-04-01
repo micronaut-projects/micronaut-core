@@ -17,6 +17,8 @@ package io.micronaut.docs.context.events.listener
 
 // tag::imports[]
 import io.micronaut.docs.context.events.SampleEvent
+import io.micronaut.context.event.StartupEvent
+import io.micronaut.context.event.ShutdownEvent
 import io.micronaut.runtime.event.annotation.EventListener
 // end::imports[]
 import javax.inject.Singleton
@@ -29,6 +31,16 @@ class SampleEventListener {
     @EventListener
     internal fun onSampleEvent(event: SampleEvent) {
         invocationCounter++
+    }
+
+    @EventListener
+    internal fun onStartupEvent(event: StartupEvent) {
+        // startup logic here
+    }
+
+    @EventListener
+    internal fun onShutdownEvent(event: ShutdownEvent) {
+        // shutdown logic here
     }
 }
 // end::class[]
