@@ -18,7 +18,6 @@ package io.micronaut.core.reflect;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.Toggleable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.NOPLogger;
@@ -62,9 +61,6 @@ public class ClassUtils {
      * A logger that should be used for any reflection access.
      */
     public static final Logger REFLECTION_LOGGER;
-
-    static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
-    static final boolean CLASS_LOADING_REPORTER_ENABLED;
 
     private static final boolean ENABLE_CLASS_LOADER_LOGGING = Boolean.getBoolean(PROPERTY_MICRONAUT_CLASSLOADER_LOGGING);
 
@@ -140,25 +136,6 @@ public class ClassUtils {
         BASIC_TYPE_MAP.put(LocalDate.class.getName(), LocalDate.class);
         BASIC_TYPE_MAP.put(Instant.class.getName(), Instant.class);
         BASIC_TYPE_MAP.put(ZonedDateTime.class.getName(), ZonedDateTime.class);
-
-        List<ClassLoadingReporter> reporterList = new ArrayList<>();
-        try {
-            ServiceLoader<ClassLoadingReporter> reporters = ServiceLoader.load(ClassLoadingReporter.class);
-            for (ClassLoadingReporter reporter : reporters) {
-                if (reporter.isEnabled()) {
-                    reporterList.add(reporter);
-                }
-            }
-        } catch (Throwable e) {
-            reporterList = Collections.emptyList();
-        }
-
-        CLASS_LOADING_REPORTERS = reporterList;
-        if (CLASS_LOADING_REPORTERS == Collections.EMPTY_LIST) {
-            CLASS_LOADING_REPORTER_ENABLED = false;
-        } else {
-            CLASS_LOADING_REPORTER_ENABLED = reporterList.stream().anyMatch(Toggleable::isEnabled);
-        }
     }
 
     /**
@@ -297,14 +274,12 @@ public class ClassUtils {
                     REFLECTION_LOGGER.debug("Attempting to dynamically load class {}", name);
                 }
                 Class<?> type = Class.forName(name, true, classLoader);
-                ClassLoadingReporter.reportPresent(type);
                 if (REFLECTION_LOGGER.isDebugEnabled()) {
                     REFLECTION_LOGGER.debug("Successfully loaded class {}", name);
                 }
                 return Optional.of(type);
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
-            ClassLoadingReporter.reportMissing(name);
             if (REFLECTION_LOGGER.isDebugEnabled()) {
                 REFLECTION_LOGGER.debug("Class {} is not present", name);
             }

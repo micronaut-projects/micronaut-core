@@ -35,7 +35,6 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -289,7 +288,6 @@ public class DefaultBeanContext implements BeanContext {
 
             terminating.set(false);
             running.set(false);
-            ClassLoadingReporter.finish();
         }
         return this;
     }

@@ -16,17 +16,15 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.Toggleable;
-import org.slf4j.LoggerFactory;
-
-import static io.micronaut.core.reflect.ClassUtils.CLASS_LOADING_REPORTERS;
-import static io.micronaut.core.reflect.ClassUtils.CLASS_LOADING_REPORTER_ENABLED;
 
 /**
  * An interface that can be implemented by classes that wish to listen to the classloading requirements for the an application. The {@link #close()} method will be called when the application terminates.
  *
  * @author graemerocher
  * @since 1.0
+ * @deprecated Replaced by compile time computation
  */
+@Deprecated
 public interface ClassLoadingReporter extends AutoCloseable, Toggleable {
 
     /**
@@ -58,7 +56,7 @@ public interface ClassLoadingReporter extends AutoCloseable, Toggleable {
      * @return True if it is
      */
     static boolean isReportingEnabled() {
-        return CLASS_LOADING_REPORTER_ENABLED;
+        return false;
     }
 
     /**
@@ -67,11 +65,6 @@ public interface ClassLoadingReporter extends AutoCloseable, Toggleable {
      * @param type The type
      */
     static void reportPresent(Class<?> type) {
-        if (CLASS_LOADING_REPORTER_ENABLED) {
-            for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
-                reporter.onPresent(type);
-            }
-        }
     }
 
     /**
@@ -80,11 +73,6 @@ public interface ClassLoadingReporter extends AutoCloseable, Toggleable {
      * @param type The type
      */
     static void reportBeanPresent(Class<?> type) {
-        if (CLASS_LOADING_REPORTER_ENABLED) {
-            for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
-                reporter.onBeanPresent(type);
-            }
-        }
     }
 
     /**
@@ -93,26 +81,11 @@ public interface ClassLoadingReporter extends AutoCloseable, Toggleable {
      * @param type The type
      */
     static void reportMissing(String type) {
-        if (CLASS_LOADING_REPORTER_ENABLED) {
-            for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
-                reporter.onMissing(type);
-            }
-        }
     }
-
 
     /**
      * Finish reporting classloading.
      */
     static void finish() {
-        if (CLASS_LOADING_REPORTER_ENABLED) {
-            for (ClassLoadingReporter classLoadingReporter : ClassUtils.CLASS_LOADING_REPORTERS) {
-                try {
-                    classLoadingReporter.close();
-                } catch (Throwable e) {
-                    LoggerFactory.getLogger(ClassLoadingReporter.class).warn("Error reporting classloading with loader [" + classLoadingReporter + "]: " + e.getMessage(), e);
-                }
-            }
-        }
     }
 }
