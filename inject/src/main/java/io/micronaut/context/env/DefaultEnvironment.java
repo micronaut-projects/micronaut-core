@@ -369,10 +369,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         refreshablePropertySources.clear();
         List<PropertySource> propertySources = readPropertySourceList(name);
         addDefaultPropertySources(propertySources);
-        propertySources.addAll(readPropertySourceListFromFiles(System.getProperty(Environment.PROPERTY_SOURCES_KEY)));
-        propertySources.addAll(readPropertySourceListFromFiles(
-            readPropertySourceListKeyFromEnvironment())
-        );
+        String propertySourcesSystemProperty = System.getProperty(Environment.PROPERTY_SOURCES_KEY);
+        if (propertySourcesSystemProperty != null) {
+            propertySources.addAll(readPropertySourceListFromFiles(propertySourcesSystemProperty));
+        }
+        String propertySourcesEnv = readPropertySourceListKeyFromEnvironment();
+        if (propertySourcesEnv != null) {
+            propertySources.addAll(readPropertySourceListFromFiles(propertySourcesEnv));
+        }
         refreshablePropertySources.addAll(propertySources);
 
         propertySources.addAll(this.propertySources.values());
@@ -585,15 +589,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         if (inspectTrace) {
             StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-            ListIterator<StackTraceElement> stackTraceIterator = Arrays.asList(stackTrace).listIterator();
-
-            while (stackTraceIterator.hasNext()) {
-                StackTraceElement stackTraceElement = stackTraceIterator.next();
+            int len = stackTrace.length;
+            for (int i = 0; i < len; i++) {
+                StackTraceElement stackTraceElement = stackTrace[i];
                 String className = stackTraceElement.getClassName();
 
                 if (className.startsWith("io.micronaut")) {
-                    if (stackTraceIterator.hasNext()) {
-                        StackTraceElement next = stackTrace[stackTraceIterator.nextIndex()];
+                    int nextIndex = i + 1;
+                    if (nextIndex < len) {
+                        StackTraceElement next = stackTrace[nextIndex];
                         if (!next.getClassName().startsWith("io.micronaut")) {
                             environmentsAndPackage.aPackage = NameUtils.getPackageName(next.getClassName());
                         }
