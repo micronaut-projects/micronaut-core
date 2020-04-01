@@ -98,6 +98,8 @@ public class DefaultBeanContext implements BeanContext {
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
     private static final String ADAPTER_TYPE = "io.micronaut.aop.Adapter";
     private static final String NAMED_MEMBER = "named";
+    private static final String PARALLEL_TYPE = Parallel.class.getName();
+    private static final String INDEXES_TYPE = Indexes.class.getName();
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
@@ -1370,7 +1372,6 @@ public class DefaultBeanContext implements BeanContext {
                     throw new BeanInstantiationException("Bean definition [" + contextScopeDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
                 }
             }
-            contextBeans.clear();
         }
 
         if (!processedBeans.isEmpty()) {
@@ -1812,10 +1813,8 @@ public class DefaultBeanContext implements BeanContext {
                 Collection<BeanDefinition> parallelDefinitions = new ArrayList<>();
                 parallelBeans.forEach(beanDefinitionReference -> {
                     try {
-                        if (isRunning()) {
-                            synchronized (singletonObjects) {
-                                loadContextScopeBean(beanDefinitionReference, parallelDefinitions::add);
-                            }
+                        synchronized (singletonObjects) {
+                            loadContextScopeBean(beanDefinitionReference, parallelDefinitions::add);
                         }
                     } catch (Throwable e) {
                         LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + "] could not be loaded: " + e.getMessage(), e);
@@ -1831,10 +1830,8 @@ public class DefaultBeanContext implements BeanContext {
 
                 parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
                     try {
-                        if (isRunning()) {
-                            synchronized (singletonObjects) {
-                                loadContextScopeBean(beanDefinition);
-                            }
+                        synchronized (singletonObjects) {
+                            loadContextScopeBean(beanDefinition);
                         }
                     } catch (Throwable e) {
                         LOG.error("Parallel Bean definition [" + beanDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
@@ -2549,14 +2546,16 @@ public class DefaultBeanContext implements BeanContext {
                 }
             }
             final AnnotationMetadata annotationMetadata = beanDefinitionReference.getAnnotationMetadata();
-            final List<AnnotationValue<Indexed>> indexes = annotationMetadata.getAnnotationValuesByType(Indexed.class);
-            if (CollectionUtils.isNotEmpty(indexes)) {
-                for (AnnotationValue<Indexed> index : indexes) {
-                    index.classValue().ifPresent(t -> resolveTypeIndex(t).add(beanDefinitionReference));
+            Class[] indexes = annotationMetadata.classValues(INDEXES_TYPE);
+            if (indexes.length > 0) {
+                //noinspection ForLoopReplaceableByForEach
+                for (int i = 0; i < indexes.length; i++) {
+                    Class indexedType = indexes[i];
+                    resolveTypeIndex(indexedType).add(beanDefinitionReference);
                 }
             } else {
                 if (annotationMetadata.hasStereotype(ADAPTER_TYPE)) {
-                    final Class aClass = annotationMetadata.classValue(ADAPTER_TYPE).orElse(null);
+                    final Class aClass = annotationMetadata.classValue(ADAPTER_TYPE, AnnotationMetadata.VALUE_MEMBER).orElse(null);
                     if (indexedTypes.contains(aClass)) {
                         resolveTypeIndex(aClass).add(beanDefinitionReference);
                     }
@@ -2564,13 +2563,14 @@ public class DefaultBeanContext implements BeanContext {
             }
             if (isEagerInit(beanDefinitionReference)) {
                 contextScopeBeans.add(beanDefinitionReference);
+            } else if (annotationMetadata.hasDeclaredStereotype(PARALLEL_TYPE)) {
+                parallelBeans.add(beanDefinitionReference);
             }
+
             if (beanDefinitionReference.requiresMethodProcessing()) {
                 processedBeans.add(beanDefinitionReference);
             }
-            if (annotationMetadata.hasStereotype(Parallel.class)) {
-                parallelBeans.add(beanDefinitionReference);
-            }
+
         }
 
         initializeEventListeners();
