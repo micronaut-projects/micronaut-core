@@ -22,18 +22,17 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Put
-import io.micronaut.http.client.netty.DefaultHttpClient
-import io.micronaut.http.client.ServiceHttpClientConfiguration
-import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.ServiceHttpClientConfiguration
+import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.netty.DefaultHttpClient
 import io.micronaut.http.server.netty.NettyHttpRequest
 import io.micronaut.http.ssl.ClientAuthentication
 import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.ssl.SslHandler
-import spock.lang.Retry
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -41,7 +40,6 @@ import javax.inject.Singleton
 import java.security.cert.X509Certificate
 import java.time.Duration
 
-@Retry // sometimes fails due to port binding on CI, so retry
 class ManualHttpServiceDefinitionSpec extends Specification {
 
 
@@ -191,6 +189,8 @@ class ManualHttpServiceDefinitionSpec extends Specification {
     void "test working SSL configuration"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.ssl.enabled': true,
+                // let the HTTPS port be random
+                'micronaut.ssl.port': -1,
                 'micronaut.server.ssl.client-authentication': 'NEED',
                 'micronaut.server.ssl.key-store.path': 'classpath:certs/server.p12',
                 'micronaut.server.ssl.key-store.password': 'secret',
@@ -199,7 +199,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         ])
 
         ApplicationContext ctx = ApplicationContext.run(
-                'micronaut.http.services.client1.urls': ['https://localhost:8443'],
+                'micronaut.http.services.client1.urls': ["https://localhost:${embeddedServer.port}"],
                 'micronaut.http.services.client1.path': ['/ssl-test'],
                 'micronaut.http.services.client1.ssl.enabled': true,
                 'micronaut.http.services.client1.ssl.client-authentication': 'NEED',
