@@ -46,7 +46,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author graemerocher
  * @since 1.1.0
  */
-@Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
+@Requires(property = FileWatchConfiguration.PATHS)
+@Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Requires(condition = FileWatchCondition.class)
 @Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
 @Requires(beans = WatchService.class)

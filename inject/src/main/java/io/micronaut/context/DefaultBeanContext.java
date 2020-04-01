@@ -100,6 +100,7 @@ public class DefaultBeanContext implements BeanContext {
     private static final String NAMED_MEMBER = "named";
     private static final String PARALLEL_TYPE = Parallel.class.getName();
     private static final String INDEXES_TYPE = Indexes.class.getName();
+    private static final String REPLACES_ANN = Replaces.class.getName();
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
@@ -1809,41 +1810,44 @@ public class DefaultBeanContext implements BeanContext {
      */
     protected void processParallelBeans(List<BeanDefinitionReference> parallelBeans) {
         if (!parallelBeans.isEmpty()) {
-            new Thread(() -> {
-                Collection<BeanDefinition> parallelDefinitions = new ArrayList<>();
-                parallelBeans.forEach(beanDefinitionReference -> {
-                    try {
-                        synchronized (singletonObjects) {
-                            loadContextScopeBean(beanDefinitionReference, parallelDefinitions::add);
+            List<BeanDefinitionReference> finalParallelBeans = parallelBeans.stream().filter(bdr -> bdr.isEnabled(this)).collect(Collectors.toList());
+            if (!finalParallelBeans.isEmpty()) {
+                new Thread(() -> {
+                    Collection<BeanDefinition> parallelDefinitions = new ArrayList<>();
+                    finalParallelBeans.forEach(beanDefinitionReference -> {
+                        try {
+                            synchronized (singletonObjects) {
+                                loadContextScopeBean(beanDefinitionReference, parallelDefinitions::add);
+                            }
+                        } catch (Throwable e) {
+                            LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + "] could not be loaded: " + e.getMessage(), e);
+                            Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
+                            if (shutdownOnError) {
+                                stop();
+                            }
                         }
-                    } catch (Throwable e) {
-                        LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + "] could not be loaded: " + e.getMessage(), e);
-                        Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
-                        if (shutdownOnError) {
-                            stop();
-                        }
-                    }
-                });
+                    });
 
-                filterProxiedTypes((Collection) parallelDefinitions, true, false);
-                filterReplacedBeans((Collection) parallelDefinitions);
+                    filterProxiedTypes((Collection) parallelDefinitions, true, false);
+                    filterReplacedBeans((Collection) parallelDefinitions);
 
-                parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
-                    try {
-                        synchronized (singletonObjects) {
-                            loadContextScopeBean(beanDefinition);
+                    parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
+                        try {
+                            synchronized (singletonObjects) {
+                                loadContextScopeBean(beanDefinition);
+                            }
+                        } catch (Throwable e) {
+                            LOG.error("Parallel Bean definition [" + beanDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
+                            Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
+                            if (shutdownOnError) {
+                                stop();
+                            }
                         }
-                    } catch (Throwable e) {
-                        LOG.error("Parallel Bean definition [" + beanDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
-                        Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
-                        if (shutdownOnError) {
-                            stop();
-                        }
-                    }
-                }));
-                parallelDefinitions.clear();
+                    }));
+                    parallelDefinitions.clear();
 
-            }).start();
+                }).start();
+            }
         }
     }
 
@@ -1851,7 +1855,7 @@ public class DefaultBeanContext implements BeanContext {
         List<BeanType<T>> replacedTypes = new ArrayList<>(2);
 
         for (BeanType<T> candidate : candidates) {
-            if (candidate.getAnnotationMetadata().hasStereotype(Replaces.class)) {
+            if (candidate.getAnnotationMetadata().hasStereotype(REPLACES_ANN)) {
                 replacedTypes.add(candidate);
             }
         }
