@@ -42,8 +42,6 @@ dependencies {
 }
 
 tasks.withType(Test) {
-    useJUnitPlatform()
-
     jvmArgs('-Dio.netty.leakDetection.level=paranoid')
     testLogging {
         showStandardStreams = true
