@@ -155,15 +155,21 @@ If no host is provided at the time of a request, a api:http.client.exceptions.No
 
 Micronaut is more modular than ever, with several components now available in separate modules and upgrades to those modules.
 
-==== Micronat Cache 2.0.0 Upgrade
+==== Micronaut Cache 2.0.0 Upgrade
 
 Caching has been moved into a separate module and out of `micronaut-runtime`. If you need caching (including the annotations within `io.micronaut.cache.annotation`) you just need to add the individual module for the cache provider you are interested (for example Caffeine, Redis, Hazelcast etc.).
 
-See the documentation for the https://micronaut-projects.github.io/micronaut-cache/snapshot/guide/[Cache module] for more information.
+See the documentation for the https://micronaut-projects.github.io/micronaut-cache/2.0.x/guide/[Cache module] for more information.
 
 ==== Micronaut SQL 2.0.0 Upgrade
 
 Micronaut SQL has been improved to default to Micronaut transaction management (making Spring management optional) and includes https://micronaut-projects.github.io/micronaut-sql/2.0.x/guide/#jdbi[support for Jdbi] (Thanks to https://github.com/drmaas[Dan Maas] for this contribution).
+
+==== Micronaut Security 2.0.0 Upgrade
+
+The security module has seen many changes to improve the API and introduce new features to support a wider array of use cases.
+
+See the https://micronaut-projects.github.io/micronaut-security/2.0.x/guide[Security module] for more information.
 
 ==== New Reactive Modules
 
@@ -198,6 +204,7 @@ dependency:io.micronaut.rxjava3:micronaut-reactor-http-client[scope="compile"]
 * Micronaut SQL - `1.3.0` -> `2.0.0.RC1`
 * Micronaut Cache - `1.2.0` -> `2.0.0.M1`
 * Micronaut AWS - `1.3.9` -> `1.4.0`
+* Micronaut Security - `1.4.0` -> `2.0.0.M1`
 
 ==== Dependency Upgrades
 
