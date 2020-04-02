@@ -130,6 +130,8 @@ import org.slf4j.LoggerFactory;
 
 import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
 import static io.micronaut.inject.util.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Internal implementation of the {@link io.netty.channel.ChannelInboundHandler} for Micronaut.
@@ -264,7 +266,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void exceptionCaughtInternal(ChannelHandlerContext ctx,
-                                         Throwable cause,
+                                         Throwable t,
                                          NettyHttpRequest nettyHttpRequest,
                                          boolean nettyException) {
         RouteMatch<?> errorRoute = null;
@@ -273,6 +275,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         Class declaringType = null;
         if (originalRoute instanceof MethodExecutionHandle) {
             declaringType = ((MethodExecutionHandle) originalRoute).getDeclaringType();
+        }
+
+        final Throwable cause;
+        // top level exceptions returned by CompletableFutures. These always wrap the real exception thrown.
+        if ((t instanceof CompletionException || t instanceof ExecutionException) && t.getCause() != null) {
+            cause = t.getCause();
+        } else {
+            cause = t;
         }
 
         // when arguments do not match, then there is UnsatisfiedRouteException, we can handle this with a routed bad request
