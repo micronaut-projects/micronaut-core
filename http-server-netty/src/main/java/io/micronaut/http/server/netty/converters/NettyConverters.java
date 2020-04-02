@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -29,6 +30,7 @@ import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.netty.buffer.*;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.WriteBufferWaterMark;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
@@ -39,7 +41,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Factory for bytebuf related converters.
@@ -151,6 +155,32 @@ public class NettyConverters implements TypeConverterRegistrar {
                 Attribute.class,
                 Object.class,
                 nettyAttributeToObjectConverter()
+        );
+
+        conversionService.addConverter(
+                String.class,
+                ChannelOption.class,
+                s -> ChannelOption.valueOf(NameUtils.environmentName(s))
+        );
+
+        conversionService.addConverter(
+                Map.class,
+                WriteBufferWaterMark.class,
+                (map, targetType, context) -> {
+                    Object h = map.get("high");
+                    Object l = map.get("low");
+                    if (h != null && l != null) {
+                        try {
+                            int high = Integer.parseInt(h.toString());
+                            int low = Integer.parseInt(l.toString());
+                            return Optional.of(new WriteBufferWaterMark(low, high));
+                        } catch (NumberFormatException e) {
+                            context.reject(e);
+                            return Optional.empty();
+                        }
+                    }
+                    return Optional.empty();
+                }
         );
     }
 

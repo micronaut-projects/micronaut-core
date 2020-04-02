@@ -1,5 +1,6 @@
 dependencies {
     annotationProcessor project(":inject-java")
+    annotationProcessor project(":graal")
 
     api project(":http-server")
     api project(":core")

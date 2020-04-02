@@ -28,6 +28,7 @@ import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
 import io.reactivex.Flowable;
 
+import javax.inject.Provider;
 import javax.inject.Singleton;
 
 /**
@@ -43,7 +44,7 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
     private final ConversionService<?> conversionService;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final BeanLocator beanLocator;
-    private final HttpServerConfiguration httpServerConfiguration;
+    private final Provider<HttpServerConfiguration> httpServerConfiguration;
 
     /**
      * Default constructor.
@@ -57,7 +58,7 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
             @Nullable ConversionService<?> conversionService,
             HttpContentProcessorResolver httpContentProcessorResolver,
             BeanLocator beanLocator,
-            HttpServerConfiguration httpServerConfiguration) {
+            Provider<HttpServerConfiguration> httpServerConfiguration) {
         this.conversionService = conversionService == null ? ConversionService.SHARED : conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;

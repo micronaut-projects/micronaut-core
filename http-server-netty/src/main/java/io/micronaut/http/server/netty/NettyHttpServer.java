@@ -20,6 +20,7 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.Named;
@@ -107,6 +108,10 @@ import java.util.function.BiConsumer;
  */
 @Singleton
 @Internal
+@TypeHint(
+        value = ChannelOption.class,
+        accessType = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS}
+)
 public class NettyHttpServer implements EmbeddedServer, WebSocketSessionRepository {
     public static final String HTTP_STREAMS_CODEC = "http-streams-codec";
     public static final String HTTP_CHUNKED_HANDLER = "http-chunked-handler";
