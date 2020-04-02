@@ -133,7 +133,7 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
         }
     }
 
-    public NettyHttpServerConfiguration getServerConfiguration() {
+    private NettyHttpServerConfiguration getServerConfiguration() {
         NettyHttpServerConfiguration nettyHttpServerConfiguration = this.nettyServerConfiguration;
         if (nettyHttpServerConfiguration == null) {
             synchronized (this) { // double check
