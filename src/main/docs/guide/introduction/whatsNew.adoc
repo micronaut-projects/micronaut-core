@@ -73,18 +73,18 @@ It is recommended users of Micronaut use this API instead (although the `javax.a
 Micronaut now provides a new parent POM that can be used in Maven projects to get setup quickly:
 
 .Using the Maven Parent POM
-[source,xml,subs="attributes"]
+[source,xml]
 ----
 <parent>
     <groupId>io.micronaut</groupId>
     <artifactId>micronaut-parent</artifactId>
-    <version>{version}</version>
+    <version>${micronaut.version}</version>
 </parent>
 ----
 
 ==== New Maven Plugin
 
-The parent POM mentioned above supplies a new Micronaut Maven Plugin that enables automatic application restart during development. Just run the following:
+The parent POM mentioned above includes a new Micronaut Maven Plugin that enables automatic application restart during development. Just run the following:
 
 [source,bash]
 ----
