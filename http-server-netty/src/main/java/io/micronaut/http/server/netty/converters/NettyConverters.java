@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -43,7 +42,6 @@ import java.nio.ByteBuffer;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * Factory for bytebuf related converters.
