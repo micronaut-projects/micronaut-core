@@ -554,7 +554,7 @@ ext {
             'micronaut.cache': [
                     version:micronautCacheVersion,
                     group:'io.micronaut.cache',
-                    modules: ['micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop']
+                    modules: ['micronaut-cache-caffeine', 'micronaut-cache-management', 'micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop', 'micronaut-cache-infinispan']
             ],
             'micronaut.servlet': [
                 version:micronautServlet,
