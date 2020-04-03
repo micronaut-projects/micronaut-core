@@ -180,6 +180,59 @@ class ValidatorSpec extends Specification {
         v2.constraintDescriptor.annotation instanceof NotBlank
     }
 
+    void "test array elements"() {
+        given:
+        ObjectArray arrayTest = new ObjectArray(strings: [] as String[])
+        def violations = validator.validate(arrayTest)
+
+        expect:
+        violations.size() == 1
+        violations[0].invalidValue == []
+        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[0].constraintDescriptor.annotation.min() == 1
+        violations[0].constraintDescriptor.annotation.max() == 2
+
+        when:
+        arrayTest = new ObjectArray(strings: ["a", "b", "c"] as String[])
+        violations = validator.validate(arrayTest)
+
+        then:
+        violations.size() == 1
+        violations[0].invalidValue == ["a", "b", "c"]
+        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[0].constraintDescriptor.annotation.min() == 1
+        violations[0].constraintDescriptor.annotation.max() == 2
+
+        when:
+        arrayTest = new ObjectArray(numbers: [] as Long[])
+        violations = validator.validate(arrayTest)
+
+        then:
+        violations.size() == 1
+        violations[0].invalidValue == []
+        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[0].constraintDescriptor.annotation.min() == 1
+        violations[0].constraintDescriptor.annotation.max() == 2
+
+        when:
+        arrayTest = new ObjectArray(numbers: [1L, 2L, 3L] as long[])
+        violations = validator.validate(arrayTest)
+
+        then:
+        violations.size() == 1
+        violations[0].invalidValue == [1L, 2L, 3L]
+        violations[0].messageTemplate == '{javax.validation.constraints.Size.message}'
+        violations[0].constraintDescriptor != null
+        violations[0].constraintDescriptor.annotation instanceof Size
+        violations[0].constraintDescriptor.annotation.min() == 1
+        violations[0].constraintDescriptor.annotation.max() == 2
+    }
 
     void "test cascade to array elements"() {
         given:
@@ -324,6 +377,15 @@ class ValidatorSpec extends Specification {
         !beanDescriptor.isBeanConstrained()
         beanDescriptor.getConstrainedProperties().size() == 0
     }
+}
+
+@Introspected
+class ObjectArray {
+    @Size(min = 1, max = 2)
+    String[] strings
+
+    @Size(min = 1, max = 2)
+    Long[] numbers
 }
 
 @Introspected
