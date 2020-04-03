@@ -642,18 +642,21 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * Negotiates with the browser if HTTP2 or HTTP is going to be used. Once decided, the Netty
      * pipeline is setup with the correct handlers for the selected protocol.
      */
+    @ChannelHandler.Sharable
     private final class Http2OrHttpHandler extends ApplicationProtocolNegotiationHandler {
-
-        private final SslContext sslContext;
+        private final boolean useSsl;
+        // both are Sharable
+        final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
+        final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
 
         /**
          * Default constructor.
-         * @param sslContext The SSL context
+         * @param useSsl true when using ssl
          * @param fallbackProtocol The fallback protocol
          */
-        Http2OrHttpHandler(SslContext sslContext, String fallbackProtocol) {
+        Http2OrHttpHandler(boolean useSsl, String fallbackProtocol) {
             super(fallbackProtocol);
-            this.sslContext = sslContext;
+            this.useSsl = useSsl;
         }
 
         @Override
@@ -686,8 +689,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
         @NotNull
         private Map<String, ChannelHandler> getHandlerForProtocol(@Nullable String protocol) {
-            final HttpRequestDecoder requestDecoder = new HttpRequestDecoder(NettyHttpServer.this, environment, serverConfiguration);
-            final HttpResponseEncoder responseDecoder = new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration);
             final Duration idleTime = serverConfiguration.getIdleTimeout();
             Map<String, ChannelHandler> handlers = new LinkedHashMap<>(15);
             if (!idleTime.isNegative()) {
@@ -721,7 +722,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             handlers.put(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
             handlers.put(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
             handlers.put(HttpRequestDecoder.ID, requestDecoder);
-            if (sslContext != null) {
+            if (useSsl) {
                 handlers.put("request-certificate-handler", requestCertificateHandler);
             }
             handlers.put(HttpResponseEncoder.ID, responseDecoder);
@@ -742,7 +743,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * An HTTP server initializer for Netty.
      */
     private class NettyHttpServerInitializer extends ChannelInitializer<SocketChannel> {
-
+        final Http2OrHttpHandler http2OrHttpHandler = new Http2OrHttpHandler(sslContext != null, serverConfiguration.getFallbackProtocol());
         final LoggingHandler loggingHandler =
                 serverConfiguration.getLogLevel().isPresent() ? new LoggingHandler(NettyHttpServer.class, serverConfiguration.getLogLevel().get()) : null;
 
@@ -761,10 +762,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
 
             if (httpVersion != io.micronaut.http.HttpVersion.HTTP_2_0) {
-                new Http2OrHttpHandler(sslContext, serverConfiguration.getFallbackProtocol())
-                        .configurePipeline(ApplicationProtocolNames.HTTP_1_1, pipeline);
+              http2OrHttpHandler.configurePipeline(ApplicationProtocolNames.HTTP_1_1, pipeline);
             } else {
-                final Http2OrHttpHandler http2OrHttpHandler = new Http2OrHttpHandler(sslContext, serverConfiguration.getFallbackProtocol());
                 if (ssl) {
                     pipeline.addLast(http2OrHttpHandler);
                 } else {
