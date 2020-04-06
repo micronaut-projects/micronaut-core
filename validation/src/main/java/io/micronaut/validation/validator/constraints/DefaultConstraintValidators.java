@@ -252,6 +252,8 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
     private final ConstraintValidator<NotEmpty, Map> notEmptyMapValidator =
             (value, annotationMetadata, context) -> CollectionUtils.isNotEmpty(value);
 
+    private final SizeValidator<Object[]> sizeObjectArrayValidator = value -> value.length;
+
     private final SizeValidator<byte[]> sizeByteArrayValidator = value -> value.length;
 
     private final SizeValidator<char[]> sizeCharArrayValidator = value -> value.length;
@@ -692,6 +694,15 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
      */
     public ConstraintValidator<NotEmpty, Map> getNotEmptyMapValidator() {
         return notEmptyMapValidator;
+    }
+
+    /**
+     * The {@link Size} validator for Object[].
+     *
+     * @return The validator
+     */
+    public SizeValidator<Object[]> getSizeObjectArrayValidator() {
+        return sizeObjectArrayValidator;
     }
 
     /**
