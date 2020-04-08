@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.convert.ConversionContext;
@@ -47,7 +48,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -98,6 +98,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = SupplierUtil.memoizedNonEmpty(() -> Optional.ofNullable((T) buildBody()));
+    }
+
+    @NonNull
+    @Override
+    public Optional<Object> getAttribute(CharSequence name) {
+        return Optional.ofNullable(getAttributes().getValue(Objects.requireNonNull(name, "Name cannot be null").toString()));
     }
 
     @Override
@@ -171,7 +177,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             synchronized (this) { // double check
                 attributes = this.attributes;
                 if (attributes == null) {
-                    attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4));
+                    attributes = new MutableConvertibleValuesMap<>(new HashMap<>(4));
                     this.attributes = attributes;
                 }
             }

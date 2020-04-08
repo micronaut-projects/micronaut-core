@@ -160,6 +160,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
     private final Supplier<ExecutorService> ioExecutorSupplier;
+    private final String serverHeader;
     private ExecutorService ioExecutor;
 
     /**
@@ -194,6 +195,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.router = router;
         this.requestArgumentSatisfier = requestArgumentSatisfier;
         this.serverConfiguration = serverConfiguration;
+        this.serverHeader = serverConfiguration.getServerHeader().orElse(null);
         this.httpContentProcessorResolver = httpContentProcessorResolver;
     }
 
@@ -676,7 +678,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (!route.isExecutable() && io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && nativeRequest instanceof StreamedHttpRequest) {
             httpContentProcessorResolver.resolve(request, route).subscribe(buildSubscriber(request, context, route));
         } else {
-            context.read();
+            if (nativeRequest instanceof StreamedHttpRequest) {
+                context.read();
+            }
             route = prepareRouteForExecution(route, request, skipOncePerRequest);
             route.execute();
         }
@@ -1512,37 +1516,44 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
         MediaType specifiedMediaType = message.getContentType().orElse(null);
         MediaType responseMediaType = specifiedMediaType != null ? specifiedMediaType : defaultResponseMediaType;
-        Optional<NettyCustomizableResponseTypeHandler> typeHandler = customizableResponseTypeHandlerRegistry
-                .findTypeHandler(body.getClass());
-        if (typeHandler.isPresent()) {
-            NettyCustomizableResponseTypeHandler th = typeHandler.get();
-            setBodyContent(message, new NettyCustomizableResponseTypeHandlerInvoker(th, body));
-        } else if (specifiedMediaType != null) {
-
-            Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(responseMediaType, body.getClass());
-            if (registeredCodec.isPresent()) {
-                MediaTypeCodec codec = registeredCodec.get();
-                if (!message.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
-                    message.header(HttpHeaders.CONTENT_TYPE, responseMediaType);
-                }
-                encodeBodyWithCodec(message, body, codec, responseMediaType, context, request);
-            }
+        if (body instanceof CharSequence) {
+            ByteBuf byteBuf = Unpooled.wrappedBuffer(body.toString().getBytes(message.getCharacterEncoding()));
+            setResponseBody(message, responseMediaType, byteBuf);
         } else {
-            Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(defaultResponseMediaType, body.getClass());
-            if (registeredCodec.isPresent()) {
-                MediaTypeCodec codec = registeredCodec.get();
-                if (!message.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
-                    message.header(HttpHeaders.CONTENT_TYPE, responseMediaType);
+            Optional<NettyCustomizableResponseTypeHandler> typeHandler = customizableResponseTypeHandlerRegistry
+                    .findTypeHandler(body.getClass());
+            if (typeHandler.isPresent()) {
+                NettyCustomizableResponseTypeHandler th = typeHandler.get();
+                setBodyContent(message, new NettyCustomizableResponseTypeHandlerInvoker(th, body));
+            } else if (specifiedMediaType != null) {
+
+                Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(responseMediaType, body.getClass());
+                if (registeredCodec.isPresent()) {
+                    MediaTypeCodec codec = registeredCodec.get();
+                    if (!message.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
+                        message.header(HttpHeaders.CONTENT_TYPE, responseMediaType);
+                    }
+                    encodeBodyWithCodec(message, body, codec, responseMediaType, context, request);
                 }
-                encodeBodyWithCodec(message, body, codec, responseMediaType, context, request);
             } else {
-                if (!message.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
-                    message.header(HttpHeaders.CONTENT_TYPE, responseMediaType);
+                Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(defaultResponseMediaType, body.getClass());
+                if (registeredCodec.isPresent()) {
+                    MediaTypeCodec codec = registeredCodec.get();
+                    if (!message.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
+                        message.header(HttpHeaders.CONTENT_TYPE, responseMediaType);
+                    }
+                    encodeBodyWithCodec(message, body, codec, responseMediaType, context, request);
+                } else {
+                    if (!message.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
+                        message.header(HttpHeaders.CONTENT_TYPE, responseMediaType);
+                    }
+                    MediaTypeCodec defaultCodec = new TextPlainCodec(serverConfiguration.getDefaultCharset());
+                    encodeBodyWithCodec(message, body, defaultCodec, responseMediaType, context, request);
                 }
-                MediaTypeCodec defaultCodec = new TextPlainCodec(serverConfiguration.getDefaultCharset());
-                encodeBodyWithCodec(message, body, defaultCodec, responseMediaType, context, request);
             }
+
         }
+
 
     }
 
@@ -1587,9 +1598,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
                 boolean expectKeepAlive = nettyResponse.protocolVersion().isKeepAliveDefault() || request.getHeaders().isKeepAlive();
                 if (!expectKeepAlive || httpStatus.getCode() > 299) {
-                    nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                    nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                 } else {
-                    nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                    nettyHeaders.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                 }
             }
         }
@@ -1601,7 +1612,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
             // default to Transfer-Encoding: chunked if Content-Length not set or not already set
             if (!nettyHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && !nettyHeaders.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
-                nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                nettyHeaders.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             }
             // close handled by HttpServerKeepAliveHandler
             final NettyHttpRequest<?> nettyHttpRequest = (NettyHttpRequest<?>) request;
@@ -1620,8 +1631,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                         LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
                                     }
                                 }
-                            } else {
-                                context.read();
                             }
                         } finally {
                             cleanupRequest(context, nettyHttpRequest);
@@ -1677,20 +1686,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         ByteBuf byteBuf;
         try {
             byteBuf = encodeBodyAsByteBuf(body, codec, context, request);
-            int len = byteBuf.readableBytes();
-            MutableHttpHeaders headers = response.getHeaders();
-            if (!headers.contains(HttpHeaders.CONTENT_TYPE)) {
-                headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
-            }
-            headers.remove(HttpHeaders.CONTENT_LENGTH);
-            headers.add(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
-
-            setBodyContent(response, byteBuf);
+            setResponseBody(response, mediaType, byteBuf);
             return response;
         } catch (LinkageError e) {
             // rxjava swallows linkage errors for some reasons so if one occurs, rethrow as a internal error
             throw new InternalServerException("Fatal error encoding bytebuf: " + e.getMessage(), e);
         }
+    }
+
+    private void setResponseBody(MutableHttpResponse<?> response, MediaType mediaType, ByteBuf byteBuf) {
+        int len = byteBuf.readableBytes();
+        MutableHttpHeaders headers = response.getHeaders();
+        if (!headers.contains(HttpHeaders.CONTENT_TYPE)) {
+            headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
+        }
+        headers.set(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
+
+        setBodyContent(response, byteBuf);
     }
 
     private MutableHttpResponse<?> setBodyContent(MutableHttpResponse response, Object bodyContent) {
@@ -1831,11 +1843,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (serverConfiguration.isDateHeader() && !headers.contains(HttpHeaders.DATE)) {
             headers.date(LocalDateTime.now());
         }
-        serverConfiguration.getServerHeader().ifPresent((server) -> {
+        if (serverHeader != null) {
             if (!headers.contains(HttpHeaders.SERVER)) {
-                headers.add(HttpHeaders.SERVER, server);
+                headers.add(HttpHeaders.SERVER, serverHeader);
             }
-        });
+        }
     }
 
     /**
