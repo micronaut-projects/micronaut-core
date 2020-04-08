@@ -16,13 +16,13 @@
 package io.micronaut.web.router;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
@@ -39,13 +39,10 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.web.router.exceptions.RoutingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import edu.umd.cs.findbugs.annotations.Nullable;
-import javax.inject.Qualifier;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -398,13 +395,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * @return The uri route corresponding to the method.
      */
     protected UriRoute buildBeanRoute(String httpMethodName, HttpMethod httpMethod, String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        io.micronaut.context.Qualifier<?> qualifier = beanDefinition.getAnnotationTypeByStereotype(Qualifier.class).map(aClass -> Qualifiers.byAnnotation(beanDefinition, aClass)).orElse(null);
-        if (qualifier == null && beanDefinition.isIterable() && beanDefinition instanceof NameResolver) {
-            qualifier = ((NameResolver) beanDefinition).resolveName()
-                    .map(Qualifiers::byName).orElse(null);
-        }
-        MethodExecutionHandle<?, Object> executionHandle = executionHandleLocator.findExecutionHandle(beanDefinition.getBeanType(), qualifier, method.getMethodName(), method.getArgumentTypes())
-                .orElseThrow(() -> new RoutingException("No such route: " + beanDefinition.getBeanType().getName() + "." + method));
+        MethodExecutionHandle<?, Object> executionHandle = executionHandleLocator
+                                                                .createExecutionHandle(beanDefinition, (ExecutableMethod<Object, ?>) method);
         return buildRoute(httpMethodName, httpMethod, uri, executionHandle);
     }
 

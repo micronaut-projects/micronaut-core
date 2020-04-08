@@ -384,6 +384,82 @@ public class DefaultBeanContext implements BeanContext {
         return findExecutionHandle(beanType, null, method, arguments);
     }
 
+    @Override
+    public MethodExecutionHandle<?, Object> createExecutionHandle(BeanDefinition<? extends Object> beanDefinition, ExecutableMethod<Object, ?> method) {
+        return new MethodExecutionHandle<Object, Object>() {
+
+            private Object target;
+
+            @NonNull
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return method.getAnnotationMetadata();
+            }
+
+            @SuppressWarnings("rawtypes")
+            @Override
+            public Object getTarget() {
+                Object target = this.target;
+                if (target == null) {
+                    synchronized (this) { // double check
+                        target = this.target;
+                        if (target == null) {
+                            try (BeanResolutionContext context = newResolutionContext(beanDefinition, null)) {
+                                BeanDefinition rawDefinition = beanDefinition;
+                                target = getBeanForDefinition(
+                                        context,
+                                        rawDefinition.getBeanType(),
+                                        rawDefinition.getDeclaredQualifier(),
+                                        true,
+                                        rawDefinition
+                                );
+                            }
+
+                            this.target = target;
+                        }
+                    }
+                }
+                return target;
+            }
+
+            @Override
+            public Class getDeclaringType() {
+                return beanDefinition.getBeanType();
+            }
+
+            @Override
+            public String getMethodName() {
+                return method.getMethodName();
+            }
+
+            @Override
+            public Argument[] getArguments() {
+                return method.getArguments();
+            }
+
+            @Override
+            public Method getTargetMethod() {
+                return method.getTargetMethod();
+            }
+
+            @Override
+            public ReturnType getReturnType() {
+                return method.getReturnType();
+            }
+
+            @Override
+            public Object invoke(Object... arguments) {
+                return method.invoke(getTarget(), arguments);
+            }
+
+            @NonNull
+            @Override
+            public ExecutableMethod<?, Object> getExecutableMethod() {
+                return (ExecutableMethod<?, Object>) method;
+            }
+        };
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> qualifier, String method, Class... arguments) {
