@@ -34,7 +34,7 @@ import java.util.function.Supplier;
  * @author graemerocher
  * @since 1.0
  */
-@Filter("/**")
+@Filter(Filter.MATCH_ALL_PATTERN)
 @Internal
 public final class ServerRequestContextFilter implements HttpServerFilter {
 

@@ -18,10 +18,7 @@ package io.micronaut.web.router;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.PathMatcher;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.Toggleable;
+import io.micronaut.core.util.*;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.HttpFilter;
 
@@ -48,6 +45,7 @@ class DefaultFilterRoute implements FilterRoute {
     private final AnnotationMetadataResolver annotationMetadataResolver;
     private Set<HttpMethod> httpMethods;
     private HttpFilter filter;
+    private AnnotationMetadata annotationMetadata;
 
     /**
      * @param pattern A pattern
@@ -73,7 +71,17 @@ class DefaultFilterRoute implements FilterRoute {
     @NonNull
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return annotationMetadataResolver.resolveMetadata(getFilter());
+        AnnotationMetadata annotationMetadata = this.annotationMetadata;
+        if (annotationMetadata == null) {
+            synchronized (this) { // double check
+                annotationMetadata = this.annotationMetadata;
+                if (annotationMetadata == null) {
+                    annotationMetadata = annotationMetadataResolver.resolveMetadata(getFilter());
+                    this.annotationMetadata = annotationMetadata;
+                }
+            }
+        }
+        return annotationMetadata;
     }
 
     @Override
@@ -109,8 +117,9 @@ class DefaultFilterRoute implements FilterRoute {
             return Optional.empty();
         }
         String uriStr = uri.getPath();
+        AntPathMatcher matcher = PathMatcher.ANT;
         for (String pattern : patterns) {
-            if (PathMatcher.ANT.matches(pattern, uriStr)) {
+            if (matcher.matches(pattern, uriStr)) {
                 HttpFilter filter = getFilter();
                 if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
                     return Optional.empty();

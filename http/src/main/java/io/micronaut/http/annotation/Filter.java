@@ -44,6 +44,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface Filter {
 
     /**
+     * Pattern used to match all requests.
+     */
+    String MATCH_ALL_PATTERN = "/**";
+
+    /**
      * @return The patterns this filter should match
      */
     String[] value() default {};

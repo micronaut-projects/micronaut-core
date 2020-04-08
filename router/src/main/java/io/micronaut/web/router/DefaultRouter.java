@@ -21,6 +21,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.http.*;
+import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
@@ -390,26 +391,30 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @NonNull
     @Override
     public List<HttpFilter> findFilters(@NonNull HttpRequest<?> request) {
-        Object o = request.getAttribute(HttpAttributes.ROUTE_MATCH).orElse(null);
-        if (o instanceof RouteMatch) {
-            RouteMatch<?> routeMatch = (RouteMatch<?>) o;
-            return resolveFilters(request, filterRouteStream(routeMatch));
-        } else {
+        if (!filterRoutes.isEmpty()) {
 
-            List<HttpFilter> httpFilters = new ArrayList<>(filterRoutes.size());
-            HttpMethod method = request.getMethod();
-            URI uri = request.getUri();
-            for (FilterRoute filterRoute : filterRoutes) {
-                Optional<HttpFilter> match = filterRoute.match(method, uri);
-                match.ifPresent(httpFilters::add);
-            }
-            if (!httpFilters.isEmpty()) {
-                OrderUtil.sort(httpFilters);
-                return Collections.unmodifiableList(httpFilters);
+            Object o = request.getAttribute(HttpAttributes.ROUTE_MATCH).orElse(null);
+            if (o instanceof RouteMatch) {
+                RouteMatch<?> routeMatch = (RouteMatch<?>) o;
+                return resolveFilters(request, filterRouteStream(routeMatch));
             } else {
-                return Collections.emptyList();
+
+                List<HttpFilter> httpFilters = new ArrayList<>(filterRoutes.size());
+                HttpMethod method = request.getMethod();
+                URI uri = request.getUri();
+                for (FilterRoute filterRoute : filterRoutes) {
+                    Optional<HttpFilter> match = filterRoute.match(method, uri);
+                    match.ifPresent(httpFilters::add);
+                }
+                if (!httpFilters.isEmpty()) {
+                    OrderUtil.sort(httpFilters);
+                    return Collections.unmodifiableList(httpFilters);
+                } else {
+                    return Collections.emptyList();
+                }
             }
         }
+        return Collections.emptyList();
     }
 
     @SuppressWarnings("unchecked")
@@ -508,7 +513,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                             String uriStr = request.getUri().toString();
                             String[] patterns = entry.getPatterns();
                             for (String pattern : patterns) {
-                                if (PathMatcher.ANT.matches(pattern, uriStr)) {
+                                if (Filter.MATCH_ALL_PATTERN.equals(pattern) || PathMatcher.ANT.matches(pattern, uriStr)) {
                                     return true;
                                 }
                             }
