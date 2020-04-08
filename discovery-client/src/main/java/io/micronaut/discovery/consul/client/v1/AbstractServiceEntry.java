@@ -25,6 +25,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -233,11 +234,11 @@ public abstract class AbstractServiceEntry {
         }
         AbstractServiceEntry that = (AbstractServiceEntry) o;
         return Objects.equals(name, that.name) &&
-                Objects.equals(address, that.address) &&
-                Objects.equals(port, that.port) &&
-                Objects.equals(tags, that.tags) &&
-                Objects.equals(meta, that.meta) &&
-                Objects.equals(ID, that.ID);
+            Objects.equals(address, that.address) &&
+            Objects.equals(port, that.port) &&
+            Objects.equals(tags, that.tags) &&
+            Objects.equals(meta, that.meta) &&
+            Objects.equals(ID, that.ID);
     }
 
     @Override

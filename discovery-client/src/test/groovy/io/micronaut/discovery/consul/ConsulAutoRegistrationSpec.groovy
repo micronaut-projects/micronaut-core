@@ -223,7 +223,7 @@ class ConsulAutoRegistrationSpec extends Specification {
         discoveryClient.close()
     }
 
-        void "test that when Consul is explicitly configured, no AWS service discovery stuff is registered"() {
+    void "test that when Consul is explicitly configured, no AWS service discovery stuff is registered"() {
         when: "A new server is bootstrapped"
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             ['micronaut.application.name': 'test-consul-aws',
