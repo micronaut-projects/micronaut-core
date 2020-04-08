@@ -16,6 +16,7 @@
 package io.micronaut.retry.intercept
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.retry.annotation.RetryPredicate
 import io.micronaut.retry.annotation.Retryable
 import io.micronaut.retry.event.RetryEvent
 import io.micronaut.retry.event.RetryEventListener
@@ -192,6 +193,29 @@ class SimpleRetrySpec extends Specification {
         context.stop()
     }
 
+    void "test retry with predicate"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountPredicate(true)
+
+        then: "retry didn't kick in because the exception thrown doesn't match predicate"
+        thrown(IllegalStateException)
+        counterService.countPredicate == 1
+
+        when:
+        counterService.getCountPredicate(false)
+
+        then: "retry kicks in because the exception thrown matches predicate"
+        noExceptionThrown()
+        counterService.countPredicate == counterService.countThreshold
+
+        cleanup:
+        context.stop()
+    }
+
     @Singleton
     static class MyRetryListener implements RetryEventListener {
 
@@ -205,6 +229,14 @@ class SimpleRetrySpec extends Specification {
             events.add(event)
         }
     }
+
+    static class MyRetryPredicate implements RetryPredicate {
+        @Override
+        boolean test(Throwable throwable) {
+            return throwable instanceof MyCustomException
+        }
+    }
+
     @Singleton
     static class CounterService {
         int count = 0
@@ -214,6 +246,7 @@ class SimpleRetrySpec extends Specification {
         int countExcludes = 0
         int countCompletion = 0
         int _countCompletionStage = 0
+        int countPredicate = 0
         int countThreshold = 3
 
         @Retryable(attempts = '5', delay = '5ms')
@@ -282,6 +315,19 @@ class SimpleRetrySpec extends Specification {
                 }
                 return _countCompletionStage
             })
+        }
+
+        @Retryable(attempts = '5', delay = '5ms', predicate = MyRetryPredicate.class)
+        Integer getCountPredicate(boolean illegalState) {
+            countPredicate++
+            if(countPredicate < countThreshold) {
+                if (illegalState) {
+                    throw new IllegalStateException("Bad count")
+                } else {
+                    throw new MyCustomException()
+                }
+            }
+            return countPredicate
         }
     }
 }

@@ -92,4 +92,11 @@ public @interface CircuitBreaker {
      * @return The {@link java.time.Duration} of time before reset
      */
     String reset() default "20s";
+
+    /**
+     * @return The retry predicate class to use instead of {@link Retryable#includes} and {@link Retryable#excludes}
+     * (defaults to none)
+     */
+    @AliasFor(annotation = Retryable.class, member = "predicate")
+    Class<? extends RetryPredicate> predicate() default DefaultRetryPredicate.class;
 }

@@ -18,6 +18,7 @@ package io.micronaut.retry.intercept
 import io.micronaut.context.ApplicationContext
 import io.micronaut.retry.CircuitState
 import io.micronaut.retry.annotation.CircuitBreaker
+import io.micronaut.retry.annotation.RetryPredicate
 import io.reactivex.Single
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -187,10 +188,49 @@ class CircuitBreakerRetrySpec extends Specification {
         context.stop()
     }
 
+    void "test circuit breaker with predicate"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountPredicate(false)
+
+        then: "the circuit is open so the original exception is thrown"
+        noExceptionThrown()
+        counterService.countPredicate == counterService.countThreshold
+
+        when:
+        counterService.countPredicate = 0
+        counterService.getCountPredicate(true)
+
+        then: "retry didn't kick in because the exception thrown doesn't match predicate"
+        thrown(IllegalStateException)
+        counterService.countPredicate == 1
+
+        when:
+        counterService.getCountPredicate(false)
+
+        then: "the circuit is open so the original exception is thrown"
+        thrown(IllegalStateException)
+        counterService.countPredicate == 1
+
+        cleanup:
+        context.stop()
+    }
+
+    static class MyRetryPredicate implements RetryPredicate {
+        @Override
+        boolean test(Throwable throwable) {
+            return throwable instanceof MyCustomException
+        }
+    }
+
     @Singleton
     static class CounterService {
         int countIncludes = 0
         int countExcludes = 0
+        int countPredicate = 0
         int countThreshold = 3
 
         @CircuitBreaker(attempts = '5', delay = '5ms', includes = MyCustomException.class)
@@ -222,6 +262,19 @@ class CircuitBreakerRetrySpec extends Specification {
         @CircuitBreaker(attempts = '1', delay = '0ms')
         Single<Integer> getCount() {
             Single.error(new IllegalStateException("Bad count"))
+        }
+
+        @CircuitBreaker(attempts = '5', delay = '5ms', predicate = MyRetryPredicate.class)
+        Integer getCountPredicate(boolean illegalState) {
+            countPredicate++
+            if(countPredicate < countThreshold) {
+                if (illegalState) {
+                    throw new IllegalStateException("Bad count")
+                } else {
+                    throw new MyCustomException()
+                }
+            }
+            return countPredicate
         }
     }
 
