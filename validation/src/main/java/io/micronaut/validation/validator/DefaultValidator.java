@@ -84,8 +84,6 @@ import java.util.stream.Collectors;
 public class DefaultValidator implements Validator, ExecutableMethodValidator, ReactiveValidator, AnnotatedElementValidator, BeanDefinitionValidator {
 
     private static final List<Class> DEFAULT_GROUPS = Collections.singletonList(Default.class);
-    private static final String ANN_VALID = Valid.class.getName();
-    private static final String ANN_CONSTRAINT = Constraint.class.getName();
     private final ConstraintValidatorRegistry constraintValidatorRegistry;
     private final ClockProvider clockProvider;
     private final ValueExtractorRegistry valueExtractorRegistry;
@@ -691,8 +689,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
             final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
 
-            final boolean hasValid = annotationMetadata.hasStereotype(ANN_VALID);
-            final boolean hasConstraint = annotationMetadata.hasStereotype(ANN_CONSTRAINT);
+            final boolean hasValid = annotationMetadata.hasStereotype(Validator.ANN_VALID);
+            final boolean hasConstraint = annotationMetadata.hasStereotype(Validator.ANN_CONSTRAINT);
 
 
             if (!hasValid && !hasConstraint) {

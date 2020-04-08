@@ -29,10 +29,8 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import javax.validation.Constraint;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
-import javax.validation.Valid;
 import javax.validation.ValidatorFactory;
 import javax.validation.executable.ExecutableValidator;
 import java.lang.reflect.Method;
@@ -106,7 +104,7 @@ public class ValidatingInterceptor implements MethodInterceptor {
             final boolean supportsReactive = micronautValidator instanceof ReactiveValidator;
             if (constraintViolations.isEmpty()) {
                 final Object result = context.proceed();
-                if (context.hasStereotype(Valid.class) || context.hasStereotype(Constraint.class)) {
+                if (context.hasStereotype(Validator.ANN_VALID) || context.hasStereotype(Validator.ANN_CONSTRAINT)) {
                     final boolean hasResult = result != null;
                     if (supportsReactive & hasResult && Publishers.isConvertibleToPublisher(result)) {
                         ReactiveValidator reactiveValidator = (ReactiveValidator) micronautValidator;
@@ -152,7 +150,7 @@ public class ValidatingInterceptor implements MethodInterceptor {
 
     private Object validateReturnValue(@NonNull ExecutableValidator validator, MethodInvocationContext context, Object target, Method targetMethod, Object result) {
         Set<ConstraintViolation<Object>> constraintViolations;
-        if (context.hasStereotype(Valid.class)) {
+        if (context.hasStereotype(Validator.ANN_VALID)) {
             constraintViolations = validator.validateReturnValue(
                     target,
                     targetMethod,

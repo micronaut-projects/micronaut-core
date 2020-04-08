@@ -133,12 +133,12 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         if (uri == null) {
             throw new IllegalArgumentException("Argument 'uri' cannot be null");
         }
-        if (uri.length() > 1 && uri.charAt(uri.length() - 1) == '/') {
-            uri = uri.substring(0, uri.length() - 1);
+        int length = uri.length();
+        if (length > 1 && uri.charAt(length - 1) == '/') {
+            uri = uri.substring(0, length - 1);
         }
 
-        int len = uri.length();
-        if (isRoot && (len == 0 || (len == 1 && uri.charAt(0) == '/'))) {
+        if (isRoot && (length == 0 || (length == 1 && uri.charAt(0) == '/'))) {
             return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
         }
         //Remove any url parameters before matching
@@ -151,8 +151,8 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             if (variables.isEmpty()) {
                 return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
             } else {
-                Map<String, Object> variableMap = new LinkedHashMap<>();
                 int count = matcher.groupCount();
+                Map<String, Object> variableMap = new LinkedHashMap<>(count);
                 for (int j = 0; j < variables.size(); j++) {
                     int index = (j * 2) + 2;
                     if (index > count) {
