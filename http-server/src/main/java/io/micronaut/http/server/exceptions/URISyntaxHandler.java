@@ -16,12 +16,10 @@
 package io.micronaut.http.server.exceptions;
 
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.hateoas.JsonError;
-import io.micronaut.http.hateoas.Link;
 
 import javax.inject.Singleton;
 import java.net.URISyntaxException;
