@@ -140,6 +140,10 @@ public class ConsulServiceInstance implements ServiceInstance {
                 map.put(tag.substring(0, i), tag.substring(i + 1));
             }
         }
+
+        Map<String, String> meta = healthEntry.getService().getMeta();
+        map.putAll(meta);
+
         return ConvertibleValues.of(map);
     }
 }
