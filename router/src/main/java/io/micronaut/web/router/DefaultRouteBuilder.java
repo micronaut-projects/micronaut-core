@@ -30,6 +30,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.filter.HttpFilter;
@@ -449,6 +450,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             single = RouteInfo.super.isSingleResult();
             isVoid = RouteInfo.super.isVoid();
             specifiedSingle = RouteInfo.super.isSpecifiedSingle();
+            for (Argument argument : targetMethod.getArguments()) {
+                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
+                    this.bodyArgument = argument;
+                }
+            }
         }
 
         @NonNull
