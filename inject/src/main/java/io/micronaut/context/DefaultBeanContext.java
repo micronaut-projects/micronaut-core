@@ -1163,6 +1163,21 @@ public class DefaultBeanContext implements BeanContext {
         return getBeanInternal(resolutionContext, beanType, null, true, true);
     }
 
+    @NonNull
+    @Override
+    public <T> T getBean(@NonNull BeanDefinition<T> definition) {
+        ArgumentUtils.requireNonNull("definition", definition);
+        try (BeanResolutionContext context = newResolutionContext(definition, null)) {
+            return getBeanForDefinition(
+                    context,
+                    definition.getBeanType(),
+                    definition.getDeclaredQualifier(),
+                    true,
+                    definition
+            );
+        }
+    }
+
     /**
      * Get a bean of the given type and qualifier.
      *

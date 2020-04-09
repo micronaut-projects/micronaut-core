@@ -19,6 +19,8 @@ import io.micronaut.core.reflect.InstantiationUtils;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.micronaut.inject.BeanDefinition;
+
 import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -30,6 +32,18 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public interface BeanLocator {
+
+    /**
+     * Obtains a Bean for the given bean definition.
+     *
+     * @param definition  The bean type
+     * @param <T>       The bean type parameter
+     * @return An instanceof said bean
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     */
+    @NonNull <T> T getBean(@NonNull BeanDefinition<T> definition);
 
     /**
      * Obtains a Bean for the given type and qualifier.

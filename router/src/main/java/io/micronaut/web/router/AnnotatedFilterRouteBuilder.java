@@ -66,7 +66,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, BeanContext object) {
+    public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
         if (HttpClientFilter.class.isAssignableFrom(beanDefinition.getBeanType())) {
             // ignore http client filters
             return;
@@ -75,7 +75,8 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
         if (ArrayUtils.isNotEmpty(patterns)) {
             HttpMethod[] methods = beanDefinition.enumValues(Filter.class, "methods", HttpMethod.class);
             String first = patterns[0];
-            FilterRoute filterRoute = addFilter(first, () -> beanContext.getBean((Class<HttpFilter>) beanDefinition.getBeanType()));
+            @SuppressWarnings("unchecked")
+            FilterRoute filterRoute = addFilter(first, beanContext, (BeanDefinition<? extends HttpFilter>) beanDefinition);
             if (patterns.length > 1) {
                 for (int i = 1; i < patterns.length; i++) {
                     String pattern = patterns[i];

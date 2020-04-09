@@ -18,6 +18,7 @@ package io.micronaut.web.router;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -127,6 +128,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 pathPattern,
                 filter,
                 (AnnotationMetadataResolver) executionHandleLocator
+        );
+        filterRoutes.add(route);
+        return route;
+    }
+
+    @Override
+    public FilterRoute addFilter(String pathPattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> beanDefinition) {
+        DefaultFilterRoute route = new BeanDefinitionFilterRoute(
+                pathPattern,
+                beanLocator,
+                beanDefinition
         );
         filterRoutes.add(route);
         return route;
