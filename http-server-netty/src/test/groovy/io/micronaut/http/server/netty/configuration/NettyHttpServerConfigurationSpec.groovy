@@ -15,18 +15,38 @@
  */
 package io.micronaut.http.server.netty.configuration
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.AppenderBase
+import java.util.ArrayList
+import java.util.List
+
+import org.slf4j.LoggerFactory
+
 import io.micronaut.http.server.HttpServerConfiguration
+import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.ChannelOption
+import io.netty.channel.epoll.Epoll
+import io.netty.channel.epoll.EpollChannelOption
+import io.netty.channel.epoll.EpollServerSocketChannel
+import io.netty.util.internal.logging.InternalLogger
+import io.netty.util.internal.logging.InternalLoggerFactory
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpMethod
+import io.micronaut.http.netty.channel.EpollEventLoopGroupFactory
+import io.micronaut.http.netty.channel.EventLoopGroupFactory
 import io.micronaut.http.server.cors.CorsOriginConfiguration
 import io.micronaut.http.server.netty.NettyHttpServer
+import io.micronaut.http.server.types.files.SystemFile
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.time.Duration
+import java.util.AbstractMap.SimpleEntry
 
 /**
  * @author Graeme Rocher
@@ -57,22 +77,92 @@ class NettyHttpServerConfigurationSpec extends Specification {
         'idle-timeout'       | 'idleTimeout'      | '-1s' | Duration.ofSeconds(-1)
     }
 
-    void "test netty server use native transport"() {
+    void "test netty server use native transport configuration"() {
         given:
         ApplicationContext beanContext = new DefaultApplicationContext("test")
         beanContext.environment.addPropertySource(PropertySource.of("test",
-              ['micronaut.server.netty.use-native-transport': true]
+              ['micronaut.server.netty.use-native-transport': true,
+               'micronaut.server.netty.childOptions.tcpQuickack': true]
 
         ))
         beanContext.start()
+        EpollEventLoopGroupFactory eventLoopGroupFactory = new EpollEventLoopGroupFactory()
 
         when:
         NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
 
         then:
         config.useNativeTransport
+        config.childOptions.size() == 1
+
+        when:
+        def option = config.childOptions.keySet().first()
+        def wrappedOption = eventLoopGroupFactory.processChannelOption(null, new SimpleEntry<>(option, true), beanContext.environment).getKey()
+
+        then:
+        option != EpollChannelOption.TCP_QUICKACK
+        wrappedOption == EpollChannelOption.TCP_QUICKACK
 
         cleanup:
+        beanContext.close()
+    }
+
+    @IgnoreIf({ ! Epoll.isAvailable() })
+    void "test netty server use native transport"() {
+        given:
+        InternalLogger logger = InternalLoggerFactory.getInstance(ServerBootstrap.class)
+        MemoryAppender appender = new MemoryAppender()
+        Logger l = (Logger) LoggerFactory.getLogger(ServerBootstrap.class);
+        l.addAppender(appender);
+        appender.start()
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+              ['micronaut.server.netty.use-native-transport': true,
+               'micronaut.server.netty.childOptions.tcpQuickack': true]
+
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+        EventLoopGroupFactory eventLoopGroupFactory = beanContext.getBean(EventLoopGroupFactory)
+
+        then:
+        config.useNativeTransport
+        config.childOptions.size() == 1
+
+        when:
+        def option = config.childOptions.keySet().first()
+        def wrappedOption = eventLoopGroupFactory.processChannelOption(null, new SimpleEntry<>(option, true), beanContext.environment).getKey()
+
+        then:
+        option != EpollChannelOption.TCP_QUICKACK
+        wrappedOption == EpollChannelOption.TCP_QUICKACK
+        eventLoopGroupFactory.serverSocketChannelClass() == EpollServerSocketChannel.class
+
+        when:
+        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        server.start()
+
+        then:
+        server != null
+
+        when:
+        server.stop()
+        Thread.sleep(1000L)
+        def error = null
+        for (String message: appender.getEvents()) {
+            if (message.contains('Unknown channel option \'TCP_QUICKACK\'')) {
+                error = message
+                break
+            }
+        }
+
+        then:
+        error == null
+
+        cleanup:
+        server.stop()
         beanContext.close()
     }
 
@@ -107,7 +197,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         !config.host.isPresent()
         config.parent.numOfThreads == 8
         config.worker.numOfThreads == 8
-        
+
         then:
         NettyHttpServer server = beanContext.getBean(NettyHttpServer)
         server.start()
@@ -163,6 +253,22 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         cleanup:
         beanContext.close()
+    }
+
+}
+
+class MemoryAppender extends AppenderBase<ILoggingEvent> {
+    private final List<String> events = new ArrayList<>();
+
+    @Override
+    protected void append(ILoggingEvent e) {
+        synchronized (events) {
+            events.add(e.toString())
+        }
+    }
+
+    public List<String> getEvents() {
+        return events;
     }
 
 }

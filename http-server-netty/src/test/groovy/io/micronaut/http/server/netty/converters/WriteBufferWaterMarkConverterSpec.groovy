@@ -26,7 +26,7 @@ class WriteBufferWaterMarkConverterSpec extends Specification {
         given:
         def options = httpServerConfiguration.getChildOptions()
         ServerBootstrap bootstrap = new ServerBootstrap()
-        embeddedServer.processOptions(options, { option, val -> bootstrap.option(option, val)})
+        embeddedServer.processOptions(null, options, { option, val -> bootstrap.option(option, val)})
         def writeBufferWaterMark = bootstrap.config().options().get(ChannelOption.WRITE_BUFFER_WATER_MARK)
         expect:
         writeBufferWaterMark instanceof WriteBufferWaterMark

@@ -29,6 +29,7 @@ dependencies {
     testImplementation dependencyVersion("rxjava2")
     testImplementation(dependencyModuleVersion("netty", "netty-transport-native-epoll") + ":linux-x86_64")
     testImplementation(dependencyModuleVersion("netty", "netty-transport-native-kqueue") + ":osx-x86_64")
+    testImplementation "ch.qos.logback:logback-classic:1.2.3"
 }
 
 //tasks.withType(Test) {

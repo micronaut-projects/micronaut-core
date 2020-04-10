@@ -19,23 +19,32 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
+import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.kqueue.KQueue;
+import io.netty.channel.kqueue.KQueueChannelOption;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.kqueue.KQueueServerSocketChannel;
 import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.unix.UnixChannelOption;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
+
+import static io.micronaut.http.netty.channel.DefaultEventLoopGroupFactory.processChannelOptionValue;
+
+import java.util.AbstractMap.SimpleEntry;
+import java.util.Map.Entry;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for KQueueEventLoopGroup.
- * 
+ *
  * @author croudet
  */
 @Singleton
@@ -44,6 +53,11 @@ import java.util.concurrent.ThreadFactory;
 @Named(EventLoopGroupFactory.NATIVE)
 @BootstrapContextCompatible
 class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
+
+    static {
+        // force loading the class for the wrapChannelOption to work
+        KQueueChannelOption.SO_ACCEPTFILTER.name();
+    }
 
     /**
      * Creates a KQueueEventLoopGroup.
@@ -104,6 +118,7 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
      *
      * @return KQueueServerSocketChannel.
      */
+    @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return KQueueServerSocketChannel.class;
     }
@@ -119,5 +134,13 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
             group.setIoRatio(ioRatio);
         }
         return group;
+    }
+
+    @Override
+    public Entry<ChannelOption, Object> processChannelOption(@Nullable EventLoopGroupConfiguration configuration, Entry<ChannelOption, Object> entry, Environment env) {
+        final String name = entry.getKey().name();
+        final ChannelOption option = DefaultEventLoopGroupFactory.channelOption(name, KQueueChannelOption.class, UnixChannelOption.class);
+        final Object value = processChannelOptionValue(KQueueChannelOption.class, name, entry.getValue(), env);
+        return new SimpleEntry<>(option, value);
     }
 }

@@ -25,8 +25,6 @@ import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
-import io.micronaut.core.reflect.GenericTypeUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.discovery.event.ServiceReadyEvent;
@@ -88,11 +86,11 @@ import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.io.File;
-import java.lang.reflect.Field;
 import java.net.*;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -304,8 +302,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             parentGroup = createParentEventLoopGroup();
             ServerBootstrap serverBootstrap = createServerBootstrap();
 
-            processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
-            processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
+            processOptions(workerConfig, serverConfiguration.getOptions(), serverBootstrap::option);
+            processOptions(workerConfig, serverConfiguration.getChildOptions(), serverBootstrap::childOption);
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
                 .channel(eventLoopGroupFactory.serverSocketChannelClass(workerConfig))
                 .childHandler(new NettyHttpServerInitializer());
@@ -576,25 +574,13 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
     }
 
-    private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
-        for (ChannelOption channelOption : options.keySet()) {
-            String name = channelOption.name();
-            Object value = options.get(channelOption);
-            Optional<Field> declaredField = ReflectionUtils.findDeclaredField(ChannelOption.class, name);
-            declaredField.ifPresent((field) -> {
-                Optional<Class> typeArg = GenericTypeUtils.resolveGenericTypeArgument(field);
-                typeArg.ifPresent((arg) -> {
-                    Optional converted = environment.convert(value, arg);
-                    converted.ifPresent((convertedValue) ->
-                        biConsumer.accept(channelOption, convertedValue)
-                    );
-                });
+    private void processOptions(EventLoopGroupConfiguration workerConfig, Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
+        options.entrySet().stream().forEach(entry -> processOption(workerConfig, biConsumer, entry));
+    }
 
-            });
-            if (!declaredField.isPresent()) {
-                biConsumer.accept(channelOption, value);
-            }
-        }
+    private void processOption(EventLoopGroupConfiguration workerConfig, BiConsumer<ChannelOption, Object> biConsumer, Entry<ChannelOption, Object> entry) {
+        entry = eventLoopGroupFactory.processChannelOption(workerConfig, entry, environment);
+        biConsumer.accept(entry.getKey(), entry.getValue());
     }
 
     @Override

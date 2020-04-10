@@ -15,11 +15,15 @@
  */
 package io.micronaut.http.netty.channel;
 
+import java.util.AbstractMap.SimpleEntry;
+import java.util.Map.Entry;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.ArgumentUtils;
+import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 
@@ -28,7 +32,7 @@ import io.netty.channel.socket.SocketChannel;
 
 /**
  * Factory for EventLoopGroup.
- * 
+ *
  * @author croudet
  * @author graemerocher
  * @since 1.2.0
@@ -106,7 +110,7 @@ public interface EventLoopGroupFactory {
 
     /**
      * Creates a default EventLoopGroup.
-     * 
+     *
      * @param ioRatio The io ratio.
      * @return An EventLoopGroup.
      * @deprecated Use {@link #createEventLoopGroup(EventLoopGroupConfiguration, ThreadFactory)} instead
@@ -118,7 +122,7 @@ public interface EventLoopGroupFactory {
 
     /**
      * Returns the server channel class.
-     * 
+     *
      * @return A ServerChannelClass.
      */
     @NonNull Class<? extends ServerSocketChannel> serverSocketChannelClass();
@@ -140,4 +144,16 @@ public interface EventLoopGroupFactory {
      * @return A SocketChannel.
      */
     @NonNull Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration);
+
+    /**
+     * Process the specified ChannelOption entry. Useful for EpollChannelOption and KQueueChannelOperation.
+     * @param configuration The configuration
+     * @param entry The channel option to process.
+     * @param env The Environment.
+     * @return A channel option.
+     */
+    default Entry<ChannelOption, Object> processChannelOption(@Nullable EventLoopGroupConfiguration configuration, Entry<ChannelOption, Object> entry, Environment env) {
+        Object value = DefaultEventLoopGroupFactory.processChannelOptionValue(entry.getKey().getClass(), entry.getKey().name(), entry.getValue(), env);
+        return new SimpleEntry<>(entry.getKey(), value);
+    }
 }
