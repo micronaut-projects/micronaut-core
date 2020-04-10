@@ -28,10 +28,10 @@ class WriteBufferWaterMarkConverterSpec extends Specification {
         ServerBootstrap bootstrap = new ServerBootstrap()
         embeddedServer.processOptions(options, { option, val -> bootstrap.option(option, val)})
         def writeBufferWaterMark = bootstrap.config().options().get(ChannelOption.WRITE_BUFFER_WATER_MARK)
+
         expect:
         writeBufferWaterMark instanceof WriteBufferWaterMark
         writeBufferWaterMark.high == 262143
         writeBufferWaterMark.low == 65535
-
     }
 }

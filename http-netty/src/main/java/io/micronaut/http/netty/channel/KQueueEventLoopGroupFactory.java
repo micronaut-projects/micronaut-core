@@ -30,12 +30,13 @@ import io.netty.channel.socket.SocketChannel;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
+
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
 /**
  * Factory for KQueueEventLoopGroup.
- * 
+ *
  * @author croudet
  */
 @Singleton
@@ -104,6 +105,7 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
      *
      * @return KQueueServerSocketChannel.
      */
+    @Override
     public Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return KQueueServerSocketChannel.class;
     }
@@ -120,4 +122,5 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
         }
         return group;
     }
+
 }

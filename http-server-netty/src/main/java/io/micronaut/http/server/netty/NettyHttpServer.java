@@ -25,8 +25,6 @@ import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
-import io.micronaut.core.reflect.GenericTypeUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.discovery.event.ServiceReadyEvent;
@@ -34,6 +32,7 @@ import io.micronaut.http.HttpVersion;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.channel.*;
+import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
@@ -88,7 +87,6 @@ import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.io.File;
-import java.lang.reflect.Field;
 import java.net.*;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
@@ -155,6 +153,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
     private final EventLoopGroupFactory eventLoopGroupFactory;
+    private final ChannelOptionFactory channelOptionFactory;
     private boolean shutdownWorker = false;
     private boolean shutdownParent = false;
     private EventLoopGroup workerGroup;
@@ -178,6 +177,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param eventLoopGroupFactory                   The EventLoopGroupFactory
      * @param httpCompressionStrategy                 The http compression strategy
      * @param httpContentProcessorResolver            The http content processor resolver
+     * @param channelOptionFactory                    The channel option factory
      */
     @SuppressWarnings("ParameterNumber")
     @Inject
@@ -197,7 +197,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             EventLoopGroupFactory eventLoopGroupFactory,
             EventLoopGroupRegistry eventLoopGroupRegistry,
             HttpCompressionStrategy httpCompressionStrategy,
-            HttpContentProcessorResolver httpContentProcessorResolver
+            HttpContentProcessorResolver httpContentProcessorResolver,
+            ChannelOptionFactory channelOptionFactory
     ) {
         this.httpCompressionStrategy = httpCompressionStrategy;
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
@@ -245,6 +246,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 SupplierUtil.memoized(ioExecutor::get),
                 httpContentProcessorResolver
         );
+        this.channelOptionFactory = channelOptionFactory;
     }
 
     /**
@@ -577,24 +579,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     }
 
     private void processOptions(Map<ChannelOption, Object> options, BiConsumer<ChannelOption, Object> biConsumer) {
-        for (ChannelOption channelOption : options.keySet()) {
-            String name = channelOption.name();
-            Object value = options.get(channelOption);
-            Optional<Field> declaredField = ReflectionUtils.findDeclaredField(ChannelOption.class, name);
-            declaredField.ifPresent((field) -> {
-                Optional<Class> typeArg = GenericTypeUtils.resolveGenericTypeArgument(field);
-                typeArg.ifPresent((arg) -> {
-                    Optional converted = environment.convert(value, arg);
-                    converted.ifPresent((convertedValue) ->
-                        biConsumer.accept(channelOption, convertedValue)
-                    );
-                });
-
-            });
-            if (!declaredField.isPresent()) {
-                biConsumer.accept(channelOption, value);
-            }
-        }
+        options.forEach((option, value) -> biConsumer.accept(option, channelOptionFactory.convertValue(option, value, environment)));
     }
 
     @Override
