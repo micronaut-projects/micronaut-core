@@ -142,6 +142,9 @@ public class OracleCloudVaultClientConfiguration {
         this.region = region;
     }
 
+    /**
+     * An Oracle Cloud Vault
+     */
     @EachProperty(value = "vaults", list = true)
     @BootstrapContextCompatible
     public static class OracleCloudVault {
@@ -158,9 +161,9 @@ public class OracleCloudVaultClientConfiguration {
         }
 
         /**
-         * Sets the OCID of the vault that contains secrets that will be retrieved, decoded and set as config vars.
+         * Sets the OCID of the vault that contains secrets that will be retrieved, decoded and set as config vars
          *
-         * @param ocid
+         * @param ocid the ocid of the vault
          */
         public void setOcid(String ocid) {
             this.ocid = ocid;

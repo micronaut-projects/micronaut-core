@@ -79,6 +79,7 @@ public class OracleCloudVaultConfigurationClient implements ConfigurationClient 
      * @param oracleCloudVaultClientConfiguration   Oracle CloudVault Client Configuration
      * @param applicationConfiguration              The application configuration
      * @param executorService                       Executor Service
+     * @throws Exception                            If no configuration is provided
      */
     public OracleCloudVaultConfigurationClient(OracleCloudVaultClientConfiguration oracleCloudVaultClientConfiguration,
                                     ApplicationConfiguration applicationConfiguration,
