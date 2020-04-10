@@ -131,8 +131,10 @@ public class OracleCloudVaultConfigurationClient implements ConfigurationClient 
         Map<String, Object> secrets = new HashMap<>();
 
         for (OracleCloudVaultClientConfiguration.OracleCloudVault vault : oracleCloudVaultClientConfiguration.getVaults()) {
-            if (LOG.isInfoEnabled()) {
-                LOG.info("Retrieving secrets from Oracle Cloud Vault with OCID: {}", vault.getOcid());
+            int retrieved = 0;
+
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Retrieving secrets from Oracle Cloud Vault with OCID: {}", vault.getOcid());
             }
             List<ListSecretsResponse> responses = new ArrayList<>();
             ListSecretsRequest listSecretsRequest = buildRequest(
@@ -154,6 +156,7 @@ public class OracleCloudVaultConfigurationClient implements ConfigurationClient 
             }
 
             for (ListSecretsResponse response : responses) {
+                retrieved += response.getItems().size();
                 response.getItems().forEach((summary) -> {
                     String secretValue = getSecretValue(summary.getId());
                     secrets.put(
@@ -161,6 +164,9 @@ public class OracleCloudVaultConfigurationClient implements ConfigurationClient 
                             secretValue
                     );
                 });
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("{} secrets where retrieved from Oracle Cloud Vault with OCID: {}", retrieved, vault.getOcid());
             }
         }
 

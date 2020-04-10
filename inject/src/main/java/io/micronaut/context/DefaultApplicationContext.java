@@ -255,7 +255,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 }
                             }
                         } else {
-                            Collection<String> propertyEntries = this.environment.getPropertyEntries(property);
+                            Collection<String> propertyEntries = getEnvironment().getPropertyEntries(property);
                             if (!propertyEntries.isEmpty()) {
                                 for (String key : propertyEntries) {
                                     BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
