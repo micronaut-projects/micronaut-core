@@ -20,7 +20,11 @@ import com.oracle.bmc.auth.BasicAuthenticationDetailsProvider;
 import com.oracle.bmc.auth.ConfigFileAuthenticationDetailsProvider;
 import com.oracle.bmc.auth.InstancePrincipalsAuthenticationDetailsProvider;
 import com.oracle.bmc.secrets.SecretsClient;
+import com.oracle.bmc.secrets.model.Base64SecretBundleContentDetails;
+import com.oracle.bmc.secrets.requests.GetSecretBundleRequest;
+import com.oracle.bmc.secrets.responses.GetSecretBundleResponse;
 import com.oracle.bmc.vault.VaultsClient;
+import com.oracle.bmc.vault.model.SecretSummary;
 import com.oracle.bmc.vault.requests.ListSecretsRequest;
 import com.oracle.bmc.vault.responses.ListSecretsResponse;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
@@ -33,6 +37,7 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
 import io.reactivex.Scheduler;
 import io.reactivex.schedulers.Schedulers;
+import org.apache.commons.codec.binary.Base64;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,9 +46,7 @@ import javax.annotation.Nullable;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -85,13 +88,12 @@ public class OracleCloudVaultConfigurationClient implements ConfigurationClient 
         this.executorService = executorService;
 
         BasicAuthenticationDetailsProvider provider = null;
-        if( oracleCloudVaultClientConfiguration.isUseInstancePrincipal() ) {
+        if (oracleCloudVaultClientConfiguration.isUseInstancePrincipal()) {
             provider = InstancePrincipalsAuthenticationDetailsProvider.builder().build();
         } else {
             try {
                 provider = new ConfigFileAuthenticationDetailsProvider(oracleCloudVaultClientConfiguration.getPathToConfig(), oracleCloudVaultClientConfiguration.getProfile());
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -126,45 +128,80 @@ public class OracleCloudVaultConfigurationClient implements ConfigurationClient 
         List<Flowable<PropertySource>> propertySources = new ArrayList<>();
         Scheduler scheduler = executorService != null ? Schedulers.from(executorService) : null;
 
+        Map<String, Object> secrets = new HashMap<>();
+
         for (OracleCloudVaultClientConfiguration.OracleCloudVault vault : oracleCloudVaultClientConfiguration.getVaults()) {
-            LOG.info("Working with OCID: " + vault.getOcid());
-            ListSecretsRequest listSecretsRequest = ListSecretsRequest.builder()
-                    .vaultId(vault.getOcid())
-                    .compartmentId(vault.getCompartmentOcid())
-                    .build();
+            if (LOG.isInfoEnabled()) {
+                LOG.info("Retrieving secrets from Oracle Cloud Vault with OCID: {}", vault.getOcid());
+            }
+            List<ListSecretsResponse> responses = new ArrayList<>();
+            ListSecretsRequest listSecretsRequest = buildRequest(
+                    vault.getOcid(),
+                    vault.getCompartmentOcid(),
+                    null
+            );
             ListSecretsResponse listSecretsResponse = vaultsClient.listSecrets(listSecretsRequest);
-            listSecretsResponse.getItems().forEach( (summary) -> {
-                System.out.println(summary.getSecretName());
-            });
+            responses.add(listSecretsResponse);
+
+            while (listSecretsResponse.getOpcNextPage() != null) {
+                listSecretsRequest = buildRequest(
+                        vault.getOcid(),
+                        vault.getCompartmentOcid(),
+                        listSecretsResponse.getOpcNextPage()
+                );
+                listSecretsResponse = vaultsClient.listSecrets(listSecretsRequest);
+                responses.add(listSecretsResponse);
+            }
+
+            for (ListSecretsResponse response : responses) {
+                response.getItems().forEach((summary) -> {
+                    String secretValue = getSecretValue(summary.getId());
+                    secrets.put(
+                            summary.getSecretName(),
+                            secretValue
+                    );
+                });
+            }
         }
 
-        /*
-        buildVaultKeys(applicationName, activeNames).entrySet().forEach(entry -> {
-            Flowable<PropertySource> propertySourceFlowable = Flowable.fromPublisher(
-                    configHttpClient.readConfigurationValues(token, engine, entry.getValue()))
-                    .filter(data -> !data.getSecrets().isEmpty())
-                    .map(data -> PropertySource.of(entry.getValue(), data.getSecrets(), entry.getKey()))
-                    .onErrorResumeNext(throwable -> {
-                        //TODO: Discover why the below hack is necessary
-                        Throwable t = (Throwable) throwable;
-                        if (t instanceof HttpClientResponseException) {
-                            if (((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
-                                if (vaultClientConfiguration.isFailFast()) {
-                                    return Flowable.error(new ConfigurationException(
-                                            "Could not locate PropertySource and the fail fast property is set", t));
-                                }
-                            }
-                            return Flowable.empty();
-                        }
-                        return Flowable.error(new ConfigurationException("Error reading distributed configuration from Vault: " + t.getMessage(), t));
-                    });
-            if (scheduler != null) {
-                propertySourceFlowable = propertySourceFlowable.subscribeOn(scheduler);
-            }
-            propertySources.add(propertySourceFlowable);
-        });
-        */
+        Flowable<PropertySource> propertySourceFlowable = Flowable.just(
+                PropertySource.of(secrets)
+        );
+
+        if (scheduler != null) {
+            propertySourceFlowable = propertySourceFlowable.subscribeOn(scheduler);
+        }
+        propertySources.add(propertySourceFlowable);
         return Flowable.merge(propertySources);
+    }
+
+    private ListSecretsRequest buildRequest(String vaultId, String compartmentId, @Nullable String page) {
+        ListSecretsRequest.Builder request = ListSecretsRequest.builder()
+                .vaultId(vaultId)
+                .compartmentId(compartmentId)
+                .lifecycleState(SecretSummary.LifecycleState.Active);
+        if (page != null) {
+            request.page(page);
+        }
+        return request.build();
+    }
+
+    private String getSecretValue(String secretOcid) {
+        GetSecretBundleRequest getSecretBundleRequest = GetSecretBundleRequest
+                .builder()
+                .secretId(secretOcid)
+                .stage(GetSecretBundleRequest.Stage.Current)
+                .build();
+
+        GetSecretBundleResponse getSecretBundleResponse = secretsClient.
+                getSecretBundle(getSecretBundleRequest);
+
+        Base64SecretBundleContentDetails base64SecretBundleContentDetails =
+                (Base64SecretBundleContentDetails) getSecretBundleResponse.
+                        getSecretBundle().getSecretBundleContent();
+
+        byte[] secretValueDecoded = Base64.decodeBase64(base64SecretBundleContentDetails.getContent());
+        return new String(secretValueDecoded);
     }
 
     @Override

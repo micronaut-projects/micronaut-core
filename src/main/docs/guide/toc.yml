@@ -144,6 +144,7 @@ cloud:
     distributedConfigurationVault: HashiCorp Vault Support
     distributedConfigurationSpringCloud: Spring Cloud Config Support
     distributedConfigurationAwsParameterStore: AWS Parameter Store Support
+    distributedConfigurationOracleCloudVault: Oracle Cloud Vault Support
   serviceDiscovery:
     title: Service Discovery
     serviceDiscoveryConsul: Consul Support

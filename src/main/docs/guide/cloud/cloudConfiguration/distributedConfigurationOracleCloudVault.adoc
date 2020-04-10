@@ -1,0 +1,156 @@
+Micronaut supports loading configuration values stored in Oracle Cloud Vaults. To use this feature, add the following dependencies:
+
+.Example `build.gradle` for Oracle Cloud Vault
+[source,groovy]
+----
+compile "io.micronaut:micronaut-discovery-client"
+compile group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-vault', version: '1.15.4'
+compile group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-secrets', version: '1.15.4'
+compile group: 'com.oracle.oci.sdk', name: 'oci-java-sdk-common', version: '1.15.4'
+----
+
+To enable distributed configuration a `src/main/resources/bootstrap.yml` configuration file must be created and configured to use one or more Oracle Cloud Vaults:
+
+.bootstrap.yml
+[source,yaml]
+----
+micronaut:
+  application:
+    name: vault-test
+  config-client:
+    enabled: true
+oraclecloud:
+  vault:
+    config:
+      enabled: true
+    vaults:
+      - ocid: ocid1.vault.oc1.phx...
+        compartment-ocid: ocid1.compartment.oc1...
+    use-instance-principal: false
+    path-to-config: ~/.oci/config
+    profile: DEFAULT
+    region: US-PHOENIX-1
+----
+
+include::{includedir}configurationProperties/io.micronaut.discovery.oraclecloud.vault.config.OracleCloudVaultClientConfiguration.adoc[]
+
+NOTE: You can learn more about Oracle Cloud Vault Secrets by https://blogs.oracle.com/developers/protect-your-sensitive-data-with-secrets-in-the-oracle-cloud[reading this blog post].
+
+Each configured vault will be read and all of the secrets within the vault will be retrieved and set into configuration variables with the exact same name as the secret in the Oracle Cloud Vault.
+
+For example, if you create a secret with the name of `SECRET_ONE` in your Oracle Cloud Vault, then it will be available to use in your application like any standard configuration variable:
+
+[source,java]
+----
+@Value("${SECRET_ONE}") String secretOne
+----
+
+You can also use `@PropertyName`:
+
+[source,java]
+----
+@Property(name = "SECRET_ONE") String secretOne
+----
+
+Another option is to inject your variables in to your configuration files which gives you the ability to store things like database passwords and API keys in your vault:
+
+.application.yaml
+[source, yaml]
+----
+datasources:
+  default:
+    password: ${DB_PASSWORD}
+----
+
+Vault retrieved values are always `String`, but you can use `@ConfigurationProperties` on a bean in conjunction with your `application.yml` file to provide properly typed configuration variables.
+
+So if you where to create secrets in your Oracle Cloud Vault like so:
+
+|===
+|Name |Value
+
+|SECRET_ONE
+|Value One
+|SECRET_TWO
+|value two
+|SECRET_THREE
+|true
+|SECRET_FOUR
+|42
+|SECRET_FIVE
+|3.16
+
+|===
+
+And then added the following to your `application.yml` file:
+
+.application.yml
+[source, yaml]
+----
+secrets:
+  one: ${SECRET_ONE}
+  two: ${SECRET_TWO}
+  three: ${SECRET_THREE}
+  four: ${SECRET_FOUR}
+  five: ${SECRET_FIVE}
+----
+
+You could add a config bean like so:
+
+.Config.java
+[source, java]
+----
+@ConfigurationProperties("secrets")
+public class Config {
+    private String one;
+    private String two;
+    private boolean three;
+    private int four;
+    private Double five;
+
+    /* getters/setters removed for brevity */
+}
+----
+
+You could then inject and use this bean in your application with properly typed values.
+
+.HelloController.java
+[source, java]
+----
+@Controller("/hello")
+public class HelloController {
+
+    private Config config;
+
+    public HelloController(
+            Config config
+    ) {
+        this.config = config;
+    }
+
+    @Get("/")
+    public HttpStatus index() {
+        return HttpStatus.OK;
+    }
+
+    @Get("/secret")
+    public HttpResponse getSecret() {
+        return HttpResponse.ok(config);
+    }
+}
+----
+
+Calling the `/hello/secret` endpoint would return:
+
+[source, json]
+----
+{
+  "one": "Value One",
+  "two": "value two",
+  "three": true,
+  "four": 42,
+  "five": 3.16
+}
+----
+
+TIP: If you need support for different configurations per environment, you can create an environment specific `bootstrap.yml` file and utilize a different vault(s) configuration per environment.
