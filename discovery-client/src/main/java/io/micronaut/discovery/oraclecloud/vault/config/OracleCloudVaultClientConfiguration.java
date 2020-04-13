@@ -53,7 +53,7 @@ public class OracleCloudVaultClientConfiguration {
     }
 
     /**
-     * A list of {@link OracleCloudVault} objects that contain secrets that will be retrieved, decoded and set into your application as config variables.
+     * A list of {@link io.micronaut.discovery.oraclecloud.vault.config.OracleCloudVaultClientConfiguration$OracleCloudVault} objects that contain secrets that will be retrieved, decoded and set into your application as config variables.
      *
      * @return A list of Vaults to retrieve
      */
@@ -62,7 +62,7 @@ public class OracleCloudVaultClientConfiguration {
     }
 
     /**
-     * A list of {@link OracleCloudVault} objects that contain secrets that will be retrieved, decoded and set into your application as config variables.
+     * A list of {@link io.micronaut.discovery.oraclecloud.vault.config.OracleCloudVaultClientConfiguration$OracleCloudVault} objects that contain secrets that will be retrieved, decoded and set into your application as config variables.
      *
      * @param vaults A list of Vaults
      */
@@ -71,18 +71,20 @@ public class OracleCloudVaultClientConfiguration {
     }
 
     /**
-     * Whether or not the configuration client should use <a href="https://docs.cloud.oracle.com/en-us/iaas/Content/Identity/Tasks/callingservicesfrominstances.htm">Instance Principal Authentication</a> to interact with the SDK. If this value is false, you must include a path to an OCI Config file to use Config File based auth.
+     * Whether or not the configuration client should use https://docs.cloud.oracle.com/en-us/iaas/Content/Identity/Tasks/callingservicesfrominstances.htm[Instance Principal Authentication] to interact with the SDK. If this value is false, you must include a path to an OCI Config file to use Config File based auth.
      *
      * @return Whether or not we should use instance principal authentication
+     * @see <a href="https://docs.cloud.oracle.com/en-us/iaas/Content/Identity/Tasks/callingservicesfrominstances.htm">Instance Principal Authentication</a>
      */
     public boolean isUseInstancePrincipal() {
         return useInstancePrincipal;
     }
 
     /**
-     * Whether or not the configuration client should use <a href="https://docs.cloud.oracle.com/en-us/iaas/Content/Identity/Tasks/callingservicesfrominstances.htm">Instance Principal Authentication</a> to interact with the SDK. If this value is false, you must include a path to an OCI Config file to use Config File based auth.
+     * Whether or not the configuration client should use https://docs.cloud.oracle.com/en-us/iaas/Content/Identity/Tasks/callingservicesfrominstances.htm[Instance Principal Authentication] to interact with the SDK. If this value is false, you must include a path to an OCI Config file to use Config File based auth.
      *
      * @param useInstancePrincipal Should we use instance principal authentication
+     * @see <a href="https://docs.cloud.oracle.com/en-us/iaas/Content/Identity/Tasks/callingservicesfrominstances.htm">Instance Principal Authentication</a>
      */
     public void setUseInstancePrincipal(boolean useInstancePrincipal) {
         this.useInstancePrincipal = useInstancePrincipal;
