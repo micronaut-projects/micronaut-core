@@ -333,7 +333,7 @@ ext {
             ],
             'micronaut.redis': [
                     version:micronautRedisVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.redis',
                     name:'micronaut-redis-lettuce'
             ],
             'micronaut.neo4j': [
