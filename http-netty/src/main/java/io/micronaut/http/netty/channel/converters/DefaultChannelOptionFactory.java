@@ -23,6 +23,7 @@ import javax.inject.Singleton;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.netty.channel.ChannelOption;
@@ -34,6 +35,7 @@ import io.netty.channel.ChannelOption;
 @Internal
 @Requires(missingBeans = { EpollChannelOptionFactory.class, KQueueChannelOptionFactory.class })
 @Singleton
+@TypeHint(value = ChannelOption.class, accessType = TypeHint.AccessType.ALL_DECLARED_FIELDS)
 public class DefaultChannelOptionFactory implements ChannelOptionFactory {
 
     private static Object processChannelOptionValue(Class<? extends ChannelOption> cls, String name, Object value, Environment env) {

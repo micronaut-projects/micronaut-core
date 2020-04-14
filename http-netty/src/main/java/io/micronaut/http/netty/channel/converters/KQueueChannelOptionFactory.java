@@ -23,6 +23,7 @@ import javax.inject.Singleton;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.netty.channel.KQueueAvailabilityCondition;
@@ -39,6 +40,7 @@ import io.netty.channel.unix.UnixChannelOption;
 @Internal
 @Singleton
 @Requires(classes = KQueue.class, condition = KQueueAvailabilityCondition.class)
+@TypeHint(value = KQueueChannelOption.class, accessType = TypeHint.AccessType.ALL_DECLARED_FIELDS)
 public class KQueueChannelOptionFactory implements ChannelOptionFactory, TypeConverterRegistrar {
 
     static {
