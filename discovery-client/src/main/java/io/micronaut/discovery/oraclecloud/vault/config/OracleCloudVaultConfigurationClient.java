@@ -95,7 +95,9 @@ public class OracleCloudVaultConfigurationClient implements ConfigurationClient 
             try {
                 provider = new ConfigFileAuthenticationDetailsProvider(oracleCloudVaultClientConfiguration.getPathToConfig(), oracleCloudVaultClientConfiguration.getProfile());
             } catch (IOException e) {
-                e.printStackTrace();
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("An error occurred when attempting to connect with a ConfigFileAuthenticationDetailsProvider: {}", e.getMessage());
+                }
             }
         }
         Region region = Region.fromRegionCodeOrId(oracleCloudVaultClientConfiguration.getRegion());
