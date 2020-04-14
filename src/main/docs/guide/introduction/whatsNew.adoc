@@ -151,6 +151,16 @@ It is no longer necessary to use `@Client(..)` to inject a default api:http.clie
 
 If no host is provided at the time of a request, a api:http.client.exceptions.NoHostException[] will be thrown.
 
+=== Serverless Improvements
+
+==== Support for Google Cloud Function
+
+You can now write Serverless functions that target Google Cloud Function using Micronaut. See the https://micronaut-projects.github.io/micronaut-gcp/2.0.x/guide/[Micronaut GCP] documentation and https://github.com/micronaut-projects/micronaut-gcp/tree/master/examples/hello-world-cloud-function[example application] for more information.
+
+==== Support for Microsoft Azure Function
+
+You can now write Serverless functions that target Microsoft Azure using Micronaut. See the https://micronaut-projects.github.io/micronaut-azure/1.0.x/guide/[Micronaut Azure] documentation and https://github.com/micronaut-projects/micronaut-azure/tree/master/examples/azure-functions-example[example application] for more information.
+
 === Module Improvements
 
 Micronaut is more modular than ever, with several components now available in separate modules and upgrades to those modules.

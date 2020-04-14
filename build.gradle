@@ -187,7 +187,13 @@ ext {
                     version:micronautGcpVersion,
                     group:'io.micronaut.gcp',
                     name:'micronaut-gcp-common',
-                    modules:['micronaut-gcp-tracing']
+                    modules:['micronaut-gcp-tracing', 'micronaut-gcp-function-http']
+            ],
+            'micronaut.azure': [
+                    version:micronautAzureVersion,
+                    group:'io.micronaut.azure',
+                    name:'micronaut-azure-function',
+                    modules:['micronaut-azure-function-http']
             ],
             'micronaut.elasticsearch': [
                 version:micronautElasticsearch,
