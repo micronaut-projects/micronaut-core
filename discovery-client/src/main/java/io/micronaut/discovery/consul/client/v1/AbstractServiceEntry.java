@@ -25,6 +25,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -44,6 +45,7 @@ public abstract class AbstractServiceEntry {
     private Integer port;
     private List<String> tags;
     private String ID;
+    private Map<String, String> meta;
 
     /**
      * @param name The service name
@@ -134,6 +136,27 @@ public abstract class AbstractServiceEntry {
     }
 
     /**
+     * See https://www.consul.io/api/agent/service.html#meta.
+     *
+     * @return The service metadata
+     */
+    public Map<String, String> getMeta() {
+        if (meta == null) {
+            return Collections.emptyMap();
+        }
+        return meta;
+    }
+
+    /**
+     * See https://www.consul.io/api/agent/service.html#meta.
+     *
+     * @param meta The service metadata
+     */
+    public void setMeta(Map<String, String> meta) {
+        this.meta = meta;
+    }
+
+    /**
      * See https://www.consul.io/api/agent/service.html#name.
      *
      * @return The name of the service
@@ -191,6 +214,16 @@ public abstract class AbstractServiceEntry {
         return this;
     }
 
+    /**
+     *
+     * @param meta The service metadata
+     * @return The {@link AbstractServiceEntry} instance
+     */
+    public AbstractServiceEntry meta(Map<String, String> meta) {
+        this.meta = meta;
+        return this;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -204,11 +237,12 @@ public abstract class AbstractServiceEntry {
             Objects.equals(address, that.address) &&
             Objects.equals(port, that.port) &&
             Objects.equals(tags, that.tags) &&
+            Objects.equals(meta, that.meta) &&
             Objects.equals(ID, that.ID);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, address, port, tags, ID);
+        return Objects.hash(name, address, port, tags, meta, ID);
     }
 }

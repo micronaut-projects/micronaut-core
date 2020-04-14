@@ -189,6 +189,40 @@ class ConsulAutoRegistrationSpec extends Specification {
         discoveryClient.close()
     }
 
+    void 'test that a service can be registered with metadata'() {
+        when: "A new server is bootstrapped"
+        String serviceId = 'myService'
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.application.name'     : serviceId,
+                 'consul.client.registration.meta': [foo: 'bar', key: 'value'],
+                 'consul.client.host'             : consulHost,
+                 'consul.client.port'             : consulPort]
+        )
+        Map discoveryClientMap = ['consul.client.host'                       : consulHost,
+                                  'consul.client.port'                       : consulPort,
+                                  "micronaut.caches.discovery-client.enabled": false]
+        DiscoveryClient discoveryClient = ApplicationContext.builder(discoveryClientMap)
+                .build()
+                .start()
+                .getBean(DiscoveryClient)
+
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+
+        then: "the server is registered with Consul and includes the meta data"
+        conditions.eventually {
+            List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst()
+            instances.size() == 1
+            instances[0].port == embeddedServer.getPort()
+            instances[0].metadata.contains('foo')
+            instances[0].metadata.get('foo', String).get() == 'bar'
+            instances[0].metadata.contains('key')
+            instances[0].metadata.get('key', String).get() == 'value'
+        }
+        cleanup:
+        embeddedServer.stop()
+        discoveryClient.close()
+    }
+
     void "test that when Consul is explicitly configured, no AWS service discovery stuff is registered"() {
         when: "A new server is bootstrapped"
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,

@@ -327,6 +327,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         public static final String PREFIX = ConsulConfiguration.PREFIX + "." + RegistrationConfiguration.PREFIX;
 
         private List<String> tags = Collections.emptyList();
+        private Map<String, String> meta = Collections.emptyMap();
         private CheckConfiguration check = new CheckConfiguration();
 
         /**
@@ -341,6 +342,20 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
          */
         public void setTags(List<String> tags) {
             this.tags = tags;
+        }
+
+        /**
+         * @return That metadata to use for registering the service
+         */
+        public Map<String, String> getMeta() {
+            return meta;
+        }
+
+        /**
+         * @param meta The metadata for registering the service
+         */
+        public void setMeta(Map<String, String> meta) {
+            this.meta = meta;
         }
 
         /**
@@ -361,6 +376,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         public String toString() {
             return "ConsulRegistrationConfiguration{" +
                 "tags=" + tags +
+                ", meta=" + meta +
                 ", check=" + check +
                 '}';
         }

@@ -50,6 +50,7 @@ public class ServiceEntry extends AbstractServiceEntry {
         entry.getAddress().ifPresent(this::address);
         entry.getPort().ifPresent(this::port);
         tags(entry.getTags());
+        meta(entry.getMeta());
     }
 
     /**
