@@ -23,18 +23,19 @@ import io.netty.channel.kqueue.KQueue;
 
 /**
  * Checks if kqueue is available.
- * 
+ *
  * @author croudet
  */
 @Internal
-class KQueueAvailabilityCondition implements Condition {
+public class KQueueAvailabilityCondition implements Condition {
 
     /**
      * Checks if netty's kqueue native transport is available.
-     * 
+     *
      * @param context The ConditionContext.
      * @return true if the kqueue native transport is available.
      */
+    @Override
     public boolean matches(ConditionContext context) {
         return KQueue.isAvailable();
     }

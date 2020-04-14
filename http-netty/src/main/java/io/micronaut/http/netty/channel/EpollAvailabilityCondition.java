@@ -23,18 +23,19 @@ import io.netty.channel.epoll.Epoll;
 
 /**
  * Checks if epoll is available.
- * 
+ *
  * @author croudet
  */
 @Internal
-class EpollAvailabilityCondition implements Condition {
+public class EpollAvailabilityCondition implements Condition {
 
     /**
      * Checks if netty's epoll native transport is available.
-     * 
+     *
      * @param context The ConditionContext.
      * @return true if the epoll native transport is available.
      */
+    @Override
     public boolean matches(ConditionContext context) {
         return Epoll.isAvailable();
     }

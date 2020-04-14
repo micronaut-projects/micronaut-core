@@ -483,6 +483,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         /**
          * @return The I/O ratio to use
          */
+        @Override
         public Optional<Integer> getIoRatio() {
             if (ioRatio != null) {
                 return Optional.of(ioRatio);
@@ -493,6 +494,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         /**
          * @return The name of the configured executor to use
          */
+        @Override
         public Optional<String> getExecutorName() {
             if (executor != null) {
                 return Optional.of(executor);

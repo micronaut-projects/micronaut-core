@@ -28,6 +28,7 @@ import io.netty.channel.socket.SocketChannel;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
+
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
@@ -106,7 +107,6 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         } else {
             return this.defaultFactory.serverSocketChannelClass(configuration);
         }
-
     }
 
     @NonNull
@@ -118,4 +118,5 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
             return this.defaultFactory.clientSocketChannelClass(configuration);
         }
     }
+
 }
