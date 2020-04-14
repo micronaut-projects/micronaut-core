@@ -12,7 +12,7 @@ class MalformedUriSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': MalformedUriSpec.simpleName], Environment.TEST);
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer);
 
     void testMalformedUriReturns400() {
         when:
