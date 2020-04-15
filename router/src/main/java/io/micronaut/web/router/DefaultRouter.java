@@ -172,7 +172,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             // take the highest priority accepted type
             final MediaType mediaType = acceptedProducedTypes.iterator().next();
             List<UriRouteMatch<T, R>> mostSpecific = uriRoutes.stream()
-                    .filter(routeMatch -> !routeMatch.doesProduce(mediaType))
+                    .filter(routeMatch -> routeMatch.doesProduce(mediaType))
                     .collect(Collectors.toList());
             if (!mostSpecific.isEmpty() || !acceptedProducedTypes.contains(MediaType.ALL_TYPE)) {
                 uriRoutes = mostSpecific;
