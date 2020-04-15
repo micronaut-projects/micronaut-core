@@ -1519,6 +1519,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (body instanceof CharSequence) {
             ByteBuf byteBuf = Unpooled.wrappedBuffer(body.toString().getBytes(message.getCharacterEncoding()));
             setResponseBody(message, responseMediaType, byteBuf);
+        } else if (body instanceof byte[]) {
+            ByteBuf byteBuf = Unpooled.wrappedBuffer((byte[]) body);
+            setResponseBody(message, responseMediaType, byteBuf);
+        } else if (body instanceof ByteBuffer) {
+            ByteBuffer<?> byteBuffer = (ByteBuffer) body;
+            Object nativeBuffer = byteBuffer.asNativeBuffer();
+            if (nativeBuffer instanceof ByteBuf) {
+                setResponseBody(message, responseMediaType, (ByteBuf) nativeBuffer);
+            } else if (nativeBuffer instanceof java.nio.ByteBuffer) {
+                ByteBuf byteBuf = Unpooled.wrappedBuffer((java.nio.ByteBuffer) nativeBuffer);
+                setResponseBody(message, responseMediaType, byteBuf);
+            }
+        } else if (body instanceof ByteBuf) {
+            setResponseBody(message, responseMediaType, (ByteBuf) body);
         } else {
             Optional<NettyCustomizableResponseTypeHandler> typeHandler = customizableResponseTypeHandlerRegistry
                     .findTypeHandler(body.getClass());
@@ -1553,8 +1567,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
 
         }
-
-
     }
 
     @SuppressWarnings("rawtypes")
