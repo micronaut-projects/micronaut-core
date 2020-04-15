@@ -100,7 +100,7 @@ public class AntPathMatcher implements PathMatcher {
      * <code>false</code> if it didn't
      */
     protected boolean doMatch(String pattern, String path, boolean fullMatch) {
-        if (path.startsWith(this.pathSeparator) != pattern.startsWith(this.pathSeparator)) {
+        if (path == null || pattern == null || path.startsWith(this.pathSeparator) != pattern.startsWith(this.pathSeparator)) {
             return false;
         }
 
