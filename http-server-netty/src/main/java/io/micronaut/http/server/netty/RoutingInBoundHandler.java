@@ -1375,9 +1375,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 routeMatch instanceof MethodBasedRouteMatch &&
                                         isKotlinFunctionReturnTypeUnit(((MethodBasedRouteMatch) routeMatch).getExecutableMethod());
                         final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(incomingRequest);
-                        Object result = routeMatch.execute();
                         Object suspendedBody;
-                        if (isKotlinCoroutineSuspended(result)) {
+                        if (isKotlinCoroutineSuspended(body)) {
                             if (isKotlinFunctionReturnTypeUnit) {
                                 suspendedBody = Completable.create(emitter -> {
                                     CompletableFuture<?> f = supplier.get();
@@ -1405,7 +1404,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             if (isKotlinFunctionReturnTypeUnit) {
                                 suspendedBody = Completable.complete();
                             } else {
-                                suspendedBody = Single.just(result);
+                                suspendedBody = Single.just(body);
                             }
                         }
                         outgoingResponse = forStatus(routeMatch.getAnnotationMetadata(), isErrorRoute ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK)

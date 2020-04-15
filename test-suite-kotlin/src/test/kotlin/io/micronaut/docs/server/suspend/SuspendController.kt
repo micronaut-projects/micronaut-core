@@ -20,6 +20,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Status
 import kotlinx.coroutines.delay
+import java.util.concurrent.atomic.AtomicInteger
 
 @Controller("/suspend")
 class SuspendController {
@@ -53,4 +54,11 @@ class SuspendController {
         delay(1)
     }
     // end::suspendStatusDelayed[]
+
+    val count : AtomicInteger = AtomicInteger(0)
+
+    @Get("/count")
+    suspend fun count(): Int { // <1>
+        return count.incrementAndGet()
+    }
 }

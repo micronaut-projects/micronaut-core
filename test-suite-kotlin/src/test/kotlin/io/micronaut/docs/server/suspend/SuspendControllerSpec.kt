@@ -61,5 +61,13 @@ class SuspendControllerSpec: StringSpec() {
 
             response.status shouldBe HttpStatus.CREATED
         }
+
+        "test suspend invoked once"() {
+            val response = client.exchange(HttpRequest.GET<Any>("/suspend/count"), Integer::class.java).blockingFirst()
+            val body = response.body.get()
+
+            body shouldBe 1
+            response.status shouldBe HttpStatus.OK
+        }
     }
 }
