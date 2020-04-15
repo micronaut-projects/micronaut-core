@@ -595,7 +595,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     mutableHttpResponse.body(),
                     defaultResponseMediaType
             );
-        });
+        }, throwable -> exceptionCaughtInternal(ctx, throwable, nettyHttpRequest, false));
     }
 
     private Optional<? extends FileCustomizableResponseType> matchFile(String path) {
