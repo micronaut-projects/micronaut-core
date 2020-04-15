@@ -26,6 +26,7 @@ import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
@@ -71,7 +72,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @Internal
 public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHandler<NettyHttpRequest<?>> {
 
-    public static final String ID = "websocket-upgrade-handler";
+    public static final String ID = ChannelPipelineCustomizer.HANDLER_WEBSOCKET_UPGRADE;
     public static final String SCHEME_WEBSOCKET = "ws://";
     public static final String SCHEME_SECURE_WEBSOCKET = "wss://";
 
@@ -185,7 +186,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
 
                     try {
                         // re-configure the pipeline
-                        pipeline.remove(NettyHttpServer.HTTP_STREAMS_CODEC);
+                        pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
                         pipeline.remove(NettyServerWebSocketUpgradeHandler.this);
                         NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
                                 webSocketSessionRepository,

@@ -38,7 +38,7 @@ dependencies {
     testImplementation project(":function-client")
     testImplementation project(":function-web")
     testImplementation 'io.kotlintest:kotlintest-runner-junit5:3.4.2'
-
+    testImplementation 'org.zalando:logbook-netty:2.1.0'
     kaptTest project(':inject-java')
     kaptTest project(':validation')
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$junit5Version"
