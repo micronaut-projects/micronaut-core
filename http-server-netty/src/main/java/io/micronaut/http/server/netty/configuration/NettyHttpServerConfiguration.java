@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -29,6 +30,7 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 
 import javax.inject.Inject;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -95,6 +97,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_COMPRESSIONLEVEL = 6;
+    private final List<ChannelPipelineListener> pipelineCustomizers;
 
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
     private Map<ChannelOption, Object> options = Collections.emptyMap();
@@ -116,14 +119,33 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * Default empty constructor.
      */
     public NettyHttpServerConfiguration() {
+        this(null, Collections.EMPTY_LIST);
     }
 
     /**
      * @param applicationConfiguration The application configuration
      */
-    @Inject
     public NettyHttpServerConfiguration(ApplicationConfiguration applicationConfiguration) {
+        this(applicationConfiguration, Collections.EMPTY_LIST);
+    }
+
+    /**
+     * @param applicationConfiguration The application configuration
+     * @param pipelineCustomizers A list of pipeline customizers
+     */
+    @Inject
+    public NettyHttpServerConfiguration(
+            ApplicationConfiguration applicationConfiguration,
+            List<ChannelPipelineListener> pipelineCustomizers) {
         super(applicationConfiguration);
+        this.pipelineCustomizers = pipelineCustomizers;
+    }
+
+    /**
+     * @return The pipeline customizers
+     */
+    public List<ChannelPipelineListener> getPipelineCustomizers() {
+        return pipelineCustomizers;
     }
 
     /**

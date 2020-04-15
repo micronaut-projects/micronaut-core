@@ -106,6 +106,7 @@ httpServer:
   serverConfiguration:
     title: Configuring the HTTP Server
     threadPools: Configuring Server Thread Pools
+    nettyPipeline: Configuring the Netty Pipeline
     cors: Configuring CORS
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS

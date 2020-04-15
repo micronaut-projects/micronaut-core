@@ -59,7 +59,6 @@ public interface EmbeddedServer extends EmbeddedApplication<EmbeddedServer> {
         return true;
     }
 
-
     /**
      * Most servers provide a way to block such that the server doesn't exit, however some require the creation of a keep alive thread.
      *
