@@ -24,7 +24,6 @@ import edu.umd.cs.findbugs.annotations.NonNull;
  * @author graemerocher
  * @since 2.0.0
  */
-@FunctionalInterface
 public interface ChannelPipelineCustomizer {
     String HANDLER_HTTP_COMPRESSOR = "http-compressor";
     String HANDLER_HTTP_DECOMPRESSOR = "http-decompressor";
@@ -54,6 +53,18 @@ public interface ChannelPipelineCustomizer {
     String HANDLER_HTTP2_PROTOCOL_NEGOTIATOR = "http2-protocol-negotiator";
     String HANDLER_WEBSOCKET_UPGRADE = "websocket-upgrade-handler";
     String HANDLER_MICRONAUT_INBOUND = "micronaut-inbound-handler";
+
+    /**
+     * @return Is this customizer the client.
+     */
+    boolean isClientChannel();
+
+    /**
+     * @return Is this customizer the server.
+     */
+    default boolean isServerChannel() {
+        return !isClientChannel();
+    }
 
     /**
      * A hook to customize the pipeline upon establishing a connection.

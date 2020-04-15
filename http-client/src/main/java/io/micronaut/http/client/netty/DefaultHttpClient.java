@@ -2441,6 +2441,11 @@ public class DefaultHttpClient implements
     }
 
     @Override
+    public boolean isClientChannel() {
+        return true;
+    }
+
+    @Override
     public void doOnConnect(@NonNull ChannelPipelineListener listener) {
         this.pipelineListeners.add(Objects.requireNonNull(listener, "The listener cannot be null"));
     }

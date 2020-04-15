@@ -614,6 +614,11 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     }
 
     @Override
+    public boolean isClientChannel() {
+        return false;
+    }
+
+    @Override
     public void doOnConnect(@NonNull ChannelPipelineListener listener) {
         this.pipelineListeners.add(Objects.requireNonNull(listener, "The listener cannot be null"));
     }

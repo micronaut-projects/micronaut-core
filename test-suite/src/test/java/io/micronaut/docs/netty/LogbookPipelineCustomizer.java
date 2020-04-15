@@ -3,9 +3,7 @@ package io.micronaut.docs.netty;
 // tag::imports[]
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.*;
-import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
-import io.micronaut.runtime.server.EmbeddedServer;
 import org.zalando.logbook.Logbook;
 import org.zalando.logbook.netty.*;
 import javax.inject.Singleton;
@@ -25,7 +23,7 @@ public class LogbookPipelineCustomizer implements BeanCreatedEventListener<Chann
     public ChannelPipelineCustomizer onCreated(BeanCreatedEvent<ChannelPipelineCustomizer> event) {
         ChannelPipelineCustomizer customizer = event.getBean();
 
-        if (customizer instanceof EmbeddedServer) { // <2>
+        if (customizer.isServerChannel()) { // <2>
             customizer.doOnConnect(pipeline -> {
                 pipeline.addAfter(
                     ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC,
@@ -34,7 +32,7 @@ public class LogbookPipelineCustomizer implements BeanCreatedEventListener<Chann
                 );
                 return pipeline;
             });
-        } else if (customizer instanceof HttpClient) { // <3>
+        } else { // <3>
             customizer.doOnConnect(pipeline -> {
                 pipeline.addAfter(
                         ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,

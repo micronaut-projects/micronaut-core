@@ -3,9 +3,7 @@ package io.micronaut.docs.netty
 // tag::imports[]
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.*
-import io.micronaut.http.client.HttpClient
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
-import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.ChannelPipeline
 import org.zalando.logbook.Logbook
 import org.zalando.logbook.netty.*
@@ -19,7 +17,7 @@ class LogbookPipelineCustomizer(private val logbook: Logbook) : BeanCreatedEvent
 
     override fun onCreated(event: BeanCreatedEvent<ChannelPipelineCustomizer>): ChannelPipelineCustomizer {
         val customizer = event.bean
-        if (customizer is EmbeddedServer) { // <2>
+        if (customizer.isServerChannel) { // <2>
             customizer.doOnConnect { pipeline: ChannelPipeline ->
                 pipeline.addAfter(
                         ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC,
@@ -28,7 +26,7 @@ class LogbookPipelineCustomizer(private val logbook: Logbook) : BeanCreatedEvent
                 )
                 pipeline
             }
-        } else if (customizer is HttpClient) { // <3>
+        } else { // <3>
             customizer.doOnConnect { pipeline: ChannelPipeline ->
                 pipeline.addAfter(
                         ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
