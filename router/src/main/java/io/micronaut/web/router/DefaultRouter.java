@@ -171,14 +171,18 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         if (CollectionUtils.isNotEmpty(acceptedProducedTypes)) {
             // take the highest priority accepted type
             final MediaType mediaType = acceptedProducedTypes.iterator().next();
-            uriRoutes.removeIf(routeMatch -> !routeMatch.doesProduce(mediaType));
+            List<UriRouteMatch<T, R>> mostSpecific = uriRoutes.stream()
+                    .filter(routeMatch -> !routeMatch.doesProduce(mediaType))
+                    .collect(Collectors.toList());
+            if (!mostSpecific.isEmpty() || !acceptedProducedTypes.contains(MediaType.ALL_TYPE)) {
+                uriRoutes = mostSpecific;
+            }
         }
         routeCount = uriRoutes.size();
         if (routeCount > 1 && permitsBody) {
 
             List<UriRouteMatch<T, R>> explicitlyConsumedRoutes = new ArrayList<>(routeCount);
             List<UriRouteMatch<T, R>> consumesRoutes = new ArrayList<>(routeCount);
-
 
             for (UriRouteMatch<T, R> match: uriRoutes) {
                 if (match.explicitlyConsumes(contentType != null ? contentType : MediaType.ALL_TYPE)) {
