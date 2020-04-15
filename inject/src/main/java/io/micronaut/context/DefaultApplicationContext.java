@@ -96,7 +96,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         });
     }
 
-
     /**
      * Construct a new ApplicationContext for the given environment name and classloader.
      *
@@ -235,10 +234,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     prefix.substring(0, prefix.length() - (isList ? 3 : 2)))
                             .orElseGet(() -> candidate.stringValue(EachProperty.class).orElse(null));
                     String primaryPrefix = candidate.stringValue(EachProperty.class, "primary").orElse(null);
-
                     if (StringUtils.isNotEmpty(property)) {
                         if (isList) {
-                            List entries = environment.getProperty(property, List.class, Collections.emptyList());
+                            List entries = getEnvironment().getProperty(property, List.class, Collections.emptyList());
                             if (!entries.isEmpty()) {
                                 for (int i = 0; i < entries.size(); i++) {
                                     if (entries.get(i) != null) {
@@ -257,7 +255,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 }
                             }
                         } else {
-                            Collection<String> propertyEntries = environment.getPropertyEntries(property);
+                            Collection<String> propertyEntries = getEnvironment().getPropertyEntries(property);
                             if (!propertyEntries.isEmpty()) {
                                 for (String key : propertyEntries) {
                                     BeanDefinitionDelegate delegate = BeanDefinitionDelegate.create(candidate);
