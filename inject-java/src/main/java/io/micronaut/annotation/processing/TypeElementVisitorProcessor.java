@@ -179,7 +179,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         @Override
         public Object visitType(TypeElement classElement, Object o) {
 
-
             for (LoadedVisitor visitor : visitors) {
                 final io.micronaut.inject.ast.Element resultingElement = visitor.visit(classElement, typeAnnotationMetadata);
                 if (resultingElement != null) {
