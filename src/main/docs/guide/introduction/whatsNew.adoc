@@ -222,3 +222,4 @@ dependency:io.micronaut.rxjava3:micronaut-reactor-http-client[scope="compile"]
 * Groovy `2.5.8` -> `2.5.10`
 * Mongo Reactive Streams `1.13.0` -> `4.0.1`
 * Mongo Java Driver `3.12.0` -> `4.0.1`
+* Jaeger `1.0.0` -> `1.2.0`
