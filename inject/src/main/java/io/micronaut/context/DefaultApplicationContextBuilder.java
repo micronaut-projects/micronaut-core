@@ -25,6 +25,8 @@ import io.micronaut.core.util.StringUtils;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
+import java.lang.annotation.Annotation;
 import java.util.*;
 
 /**
@@ -47,8 +49,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private List<String> envVarIncludes = new ArrayList<>();
     private List<String> envVarExcludes = new ArrayList<>();
     private String[] args = new String[0];
-    private boolean eagerInitConfiguration;
-    private boolean eagerInitSingletons;
+    private Set<Class<? extends Annotation>> eagerInitAnnotated = new HashSet<>(3);
 
     /**
      * Default constructor.
@@ -56,28 +57,18 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     protected DefaultApplicationContextBuilder() {
     }
 
-    @Override
-    public boolean isEagerInitSingletons() {
-        return eagerInitSingletons;
-    }
-
-    @Override
-    public boolean isEagerInitConfiguration() {
-        return eagerInitConfiguration;
-    }
-
     @NonNull
     @Override
-    public ApplicationContextBuilder eagerInitConfiguration(boolean eagerInitConfiguration) {
-        this.eagerInitConfiguration = eagerInitConfiguration;
+    public ApplicationContextBuilder eagerInitAnnotated(Class<? extends Annotation>... annotations) {
+        if (annotations != null) {
+            eagerInitAnnotated.addAll(Arrays.asList(annotations));
+        }
         return this;
     }
 
-    @NonNull
     @Override
-    public ApplicationContextBuilder eagerInitSingletons(boolean eagerInitSingletons) {
-        this.eagerInitSingletons = eagerInitSingletons;
-        return this;
+    public Set<Class<? extends Annotation>> getEagerInitAnnotated() {
+        return Collections.unmodifiableSet(eagerInitAnnotated);
     }
 
     @Override

@@ -108,10 +108,9 @@ public class DefaultBeanContext implements BeanContext {
     final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(100);
     final Map<BeanIdentifier, Object> singlesInCreation = new ConcurrentHashMap<>(5);
     final Map<BeanKey, Object> scopedProxies = new ConcurrentHashMap<>(20);
+
     Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners;
 
-    private final boolean eagerInitConfig;
-    private final boolean eagerInitSingletons;
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     private final Map<String, BeanConfiguration> beanConfigurations = new HashMap<>(10);
     private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
@@ -133,6 +132,9 @@ public class DefaultBeanContext implements BeanContext {
             BeanInitializedEventListener.class
     );
     private final CustomScopeRegistry customScopeRegistry;
+    private final String[] eagerInitStereotypes;
+    private final boolean eagerInitStereotypesPresent;
+    private final boolean eagerInitSingletons;
     private Set<Map.Entry<Class, List<BeanCreatedEventListener>>> beanCreationEventListeners;
     private BeanDefinitionValidator beanValidator;
 
@@ -186,8 +188,11 @@ public class DefaultBeanContext implements BeanContext {
         System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, "true");
         this.classLoader = contextConfiguration.getClassLoader();
         this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
-        this.eagerInitSingletons = contextConfiguration.isEagerInitSingletons();
-        this.eagerInitConfig = contextConfiguration.isEagerInitConfiguration();
+        Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
+        this.eagerInitStereotypes = eagerInitAnnotated
+            .stream().map(Class::getName).toArray(String[]::new);
+        this.eagerInitStereotypesPresent = eagerInitStereotypes.length > 0;
+        this.eagerInitSingletons = eagerInitStereotypesPresent && eagerInitAnnotated.contains(Singleton.class);
     }
 
     @Override
@@ -1644,6 +1649,17 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
+     * Method that transforms iterable candidates if possible.
+     * @param candidates The candidates.
+     * @param filterProxied Whether to filter proxied.
+     * @param <T> The bean type
+     * @return The candidates
+     */
+    protected <T> Collection<BeanDefinition<T>> transformIterables(Collection<BeanDefinition<T>> candidates, boolean filterProxied) {
+        return candidates;
+    }
+
+    /**
      * Find bean candidates for the given type.
      *
      * @param instance The bean instance
@@ -2066,8 +2082,8 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private void loadContextScopeBean(BeanDefinition beanDefinition) {
-        if (beanDefinition.isIterable()) {
-            Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null, true);
+        if (beanDefinition.isIterable() || beanDefinition.hasStereotype(ConfigurationReader.class.getName())) {
+            Collection<BeanDefinition> beanCandidates = (Collection<BeanDefinition>) transformIterables(Collections.singleton(beanDefinition), true);
             for (BeanDefinition beanCandidate : beanCandidates) {
                 try (BeanResolutionContext resolutionContext = newResolutionContext(beanDefinition, null)) {
                     createAndRegisterSingleton(
@@ -2669,7 +2685,7 @@ public class DefaultBeanContext implements BeanContext {
     private boolean isEagerInit(BeanDefinitionReference beanDefinitionReference) {
         return beanDefinitionReference.isContextScope() ||
                 (eagerInitSingletons && beanDefinitionReference.isSingleton()) ||
-                (eagerInitConfig && beanDefinitionReference.isConfigurationProperties());
+                (eagerInitStereotypesPresent && beanDefinitionReference.getAnnotationMetadata().hasStereotype(eagerInitStereotypes));
     }
 
     @NonNull

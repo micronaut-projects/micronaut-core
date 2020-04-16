@@ -15,11 +15,15 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.ArgumentUtils;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
+import javax.inject.Singleton;
+import java.lang.annotation.Annotation;
 import java.util.Map;
 
 /**
@@ -36,7 +40,12 @@ public interface ApplicationContextBuilder {
      * @return The context builder
      * @since 2.0
      */
-    @NonNull ApplicationContextBuilder eagerInitConfiguration(boolean eagerInitConfiguration);
+    default @NonNull ApplicationContextBuilder eagerInitConfiguration(boolean eagerInitConfiguration) {
+        if (eagerInitConfiguration) {
+            return eagerInitAnnotated(ConfigurationReader.class);
+        }
+        return this;
+    }
 
     /**
      * Whether to eager initialize singleton beans.
@@ -44,7 +53,21 @@ public interface ApplicationContextBuilder {
      * @return The context builder
      * @since 2.0
      */
-    @NonNull ApplicationContextBuilder eagerInitSingletons(boolean eagerInitSingletons);
+    default @NonNull ApplicationContextBuilder eagerInitSingletons(boolean eagerInitSingletons) {
+        if (eagerInitSingletons) {
+            return eagerInitAnnotated(Singleton.class);
+        }
+        return this;
+    }
+
+    /**
+     * Specifies to eager init the given annotated types.
+     *
+     * @param annotations The annotation stereotypes
+     * @return The context builder
+     * @since 2.0
+     */
+    @NonNull ApplicationContextBuilder eagerInitAnnotated(Class<? extends Annotation>... annotations);
 
     /**
      * Additional singletons to register prior to startup.

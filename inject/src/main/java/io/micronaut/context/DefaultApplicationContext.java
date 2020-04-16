@@ -35,6 +35,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
 import javax.inject.Provider;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -222,6 +223,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @Override
     protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType, BeanDefinition<?> filter, boolean filterProxied) {
         Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(beanType, filter, filterProxied);
+        return transformIterables(candidates, filterProxied);
+    }
+
+    @Override
+    protected <T> Collection<BeanDefinition<T>> transformIterables(Collection<BeanDefinition<T>> candidates, boolean filterProxied) {
         if (!candidates.isEmpty()) {
 
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
