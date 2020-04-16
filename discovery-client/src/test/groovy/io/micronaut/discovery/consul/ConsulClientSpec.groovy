@@ -29,6 +29,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import org.testcontainers.containers.GenericContainer
 import spock.lang.AutoCleanup
 import spock.lang.IgnoreIf
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
@@ -38,6 +39,7 @@ import spock.lang.Stepwise
  * @since 1.0
  */
 @Stepwise
+@Retry
 class ConsulClientSpec extends Specification {
     @Shared
     @AutoCleanup
