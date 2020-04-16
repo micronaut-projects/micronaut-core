@@ -4,7 +4,7 @@ buildscript {
     }
     dependencies {
         classpath "org.grails:grails-docs:$grailsVersion"
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.5'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
         classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
         classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.2.1"

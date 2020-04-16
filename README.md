@@ -2,18 +2,22 @@
 
 [![Build Status](https://github.com/micronaut-projects/micronaut-core/workflows/Java%20CI/badge.svg)](https://github.com/micronaut-projects/micronaut-core/actions)
 
-Micronaut is a modern, JVM-based, full stack microservices framework designed for building modular, easily testable microservice applications.
+[Micronaut](https://micronaut.io) is a modern, JVM-based, full stack Java framework designed for building modular, easily testable JVM applications with support for Java, Kotlin and the Groovy language.
 
 Micronaut is developed by the creators of the Grails framework and takes inspiration from lessons learnt over the years building real-world applications from monoliths to microservices using Spring, Spring Boot and Grails.
 
-Micronaut aims to provide all the tools necessary to build microservice applications including:
+Micronaut aims to provide all the tools necessary to build JVM applications including:
 
 * Dependency Injection and Inversion of Control (IoC)
+* Aspect Oriented Programming (AOP)
 * Sensible Defaults and Auto-Configuration
-* Configuration and Configuration Sharing
+
+With Micronaut you can build Message-Driven Applications, Command Line Applications, HTTP Servers and more whilst for Microservices in particular Micronaut also provides:
+
+* Distributed Configuration
 * Service Discovery
 * HTTP Routing
-* HTTP Client with Client-Side Load Balancing
+* Client-Side Load Balancing
 
 At the same time Micronaut aims to avoid the downsides of frameworks like Spring, Spring Boot and Grails by providing:
 
@@ -21,7 +25,10 @@ At the same time Micronaut aims to avoid the downsides of frameworks like Spring
 * Reduced memory footprint
 * Minimal use of reflection
 * Minimal use of proxies
+* No runtime bytecode generation
 * Easy Unit Testing
+
+This is achieved by pre-computing the framework infrastructure at compilation time which reduces the logic required at runtime for the application to work.
 
 For more information on using Micronaut see the documentation at [micronaut.io](http://micronaut.io)
 
