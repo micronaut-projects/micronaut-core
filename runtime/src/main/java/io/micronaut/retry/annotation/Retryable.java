@@ -80,4 +80,10 @@ public @interface Retryable {
      */
     @Digits(integer = 2, fraction = 2)
     String multiplier() default "1.0";
+
+    /**
+     * @return The retry predicate class to use instead of {@link Retryable#includes} and {@link Retryable#excludes}
+     * (defaults to none)
+     */
+    Class<? extends RetryPredicate> predicate() default DefaultRetryPredicate.class;
 }
