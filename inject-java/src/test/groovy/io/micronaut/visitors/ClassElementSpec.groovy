@@ -40,11 +40,59 @@ public class TestController extends BaseTestController {
         return null;
     }
 
+    @Get("/hello/annotinbase")
+    @Override
+    public String baseOverrideAnnotInBase(String name) {
+        return name;
+    }
+
+    @Get("/noannotinbase")
+    @Override
+    public String baseOverrideNoAnnotInBase(String name) {
+        return name;
+    }
+
+    @Get("/hellohello")
+    @Override
+    public String hellohello(String name) {
+        return name;
+    }
+
 }
 
-class BaseTestController {
+class BaseTestController extends Base {
 
     public String hello(String name) {
+        return name;
+    }
+
+    @Get("/base")
+    public String base(String name) {
+        return name;
+    }
+
+    public String baseOverrideAnnotInBase(String name) {
+        return name;
+    }
+
+    @Get("/noannotinbase")
+    public String baseOverrideNoAnnotInBase(String name) {
+        return name;
+    }
+
+}
+
+class Base {
+
+    public String hellohello(String name) {
+        return name;
+    }
+}
+
+class B {
+
+    @Get("/b")
+    public String b(String name) {
         return name;
     }
 
@@ -52,7 +100,8 @@ class BaseTestController {
 ''')
         expect:
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
-        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].hasAnnotation(Controller)
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 6
+        ControllerGetVisitor.VISITED_METHOD_ELEMENTS.size() == 5
     }
 
     void "test visit methods that take and return arrays"() {

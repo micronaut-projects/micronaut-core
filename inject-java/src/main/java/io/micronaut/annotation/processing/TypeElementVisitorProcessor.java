@@ -63,7 +63,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             return false;
         }
 
-
         Collection<TypeElementVisitor> typeElementVisitors = findTypeElementVisitors();
         List<LoadedVisitor> loadedVisitors = new ArrayList<>(typeElementVisitors.size());
         for (TypeElementVisitor visitor : typeElementVisitors) {
@@ -96,9 +95,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
                 .map(modelUtils::classElementFor)
                 .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
-                .forEach((typeElement) -> {
+                .forEach(typeElement -> {
                     String className = typeElement.getQualifiedName().toString();
-                    List<LoadedVisitor> matchedVisitors = loadedVisitors.stream().filter((v) -> v.matches(typeElement)).collect(Collectors.toList());
+                    List<LoadedVisitor> matchedVisitors = loadedVisitors.stream().filter(v -> v.matches(typeElement)).collect(Collectors.toList());
                     typeElement.accept(new ElementVisitor(typeElement, matchedVisitors), className);
                 });
 
@@ -190,7 +189,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             // don't process inner class unless this is the visitor for it
             boolean shouldVisit = !JavaModelUtils.isClass(enclosingElement) ||
                     concreteClass.getQualifiedName().equals(classElement.getQualifiedName());
-
             if (shouldVisit) {
                 if (typeAnnotationMetadata.hasStereotype(Introduction.class) || (typeAnnotationMetadata.hasStereotype(Introspected.class) && modelUtils.isAbstract(classElement))) {
                     classElement.asType().accept(new PublicAbstractMethodVisitor<Object, Object>(classElement, modelUtils, elementUtils) {
@@ -205,16 +203,63 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                         }
                     }, null);
                     return null;
-                } else {
-                    TypeElement superClass = modelUtils.superClassFor(classElement);
-                    if (superClass != null && !modelUtils.isObjectClass(superClass)) {
-                        superClass.accept(this, o);
-                    }
-
+                } else if (JavaModelUtils.isEnum(classElement)) {
                     return scan(classElement.getEnclosedElements(), o);
+                } else {
+                    return scan(enclosedElements(classElement), o);
                 }
             } else {
                 return null;
+            }
+        }
+
+        private List enclosedElements(TypeElement classElement) {
+            List enclosedElements = new ArrayList<>(classElement.getEnclosedElements());
+            TypeElement superClass = modelUtils.superClassFor(classElement);
+            // collect fields and methods, skip overrides
+            while (superClass != null && !modelUtils.isObjectClass(superClass)) {
+                List elements = superClass.getEnclosedElements();
+                for (Object elt1: elements) {
+                    if (elt1 instanceof ExecutableElement) {
+                        checkMethodOverride(enclosedElements, elt1);
+                    } else if (elt1 instanceof VariableElement) {
+                        checkFieldHide(enclosedElements, elt1);
+                    }
+                }
+                superClass = modelUtils.superClassFor(superClass);
+            }
+            return enclosedElements;
+        }
+
+        private void checkFieldHide(List enclosedElements, Object elt1) {
+            boolean hides = false;
+            for (Object elt2: enclosedElements) {
+                if (elt1.equals(elt2) || ! (elt2 instanceof VariableElement)) {
+                    continue;
+                }
+                if (elementUtils.hides((VariableElement) elt2, (VariableElement) elt1)) {
+                    hides = true;
+                    break;
+                }
+            }
+            if (! hides) {
+                enclosedElements.add(elt1);
+            }
+        }
+
+        private void checkMethodOverride(List enclosedElements, Object elt1) {
+            boolean overrides = false;
+            for (Object elt2: enclosedElements) {
+                if (elt1.equals(elt2) || ! (elt2 instanceof ExecutableElement)) {
+                    continue;
+                }
+                if (elementUtils.overrides((ExecutableElement) elt2, (ExecutableElement) elt1,  modelUtils.classElementFor((ExecutableElement) elt2))) {
+                    overrides = true;
+                    break;
+                }
+            }
+            if (! overrides) {
+                enclosedElements.add(elt1);
             }
         }
 
