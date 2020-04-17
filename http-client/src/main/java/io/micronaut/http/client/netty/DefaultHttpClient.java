@@ -61,11 +61,14 @@ import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
+import io.micronaut.http.netty.NettyHttpRequestBuilder;
+import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.sse.Event;
@@ -161,6 +164,7 @@ public class DefaultHttpClient implements
         RxHttpClient,
         RxStreamingHttpClient,
         RxSseClient,
+        RxProxyHttpClient,
         ChannelPipelineCustomizer,
         Closeable,
         AutoCloseable {
@@ -833,14 +837,11 @@ public class DefaultHttpClient implements
         return requestURI -> {
             Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(parentRequest, request, requestURI);
             return streamResponsePublisher.switchMap(response -> {
-                if (!(response instanceof NettyStreamedHttpResponse)) {
-                    throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
-                }
-                NettyStreamedHttpResponse<ByteBuffer<?>> nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
-                Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
+                StreamedHttpResponse streamedHttpResponse = NettyHttpResponseBuilder.toStreamResponse(response);
+                Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(streamedHttpResponse);
                 return httpContentFlowable
                         .filter(message -> !(message.content() instanceof EmptyByteBuf))
-                        .map((Function<HttpContent, io.micronaut.http.HttpResponse<ByteBuffer<?>>>) message -> {
+                        .map(message -> {
                             ByteBuf byteBuf = message.content();
                             if (log.isTraceEnabled()) {
                                 log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
@@ -848,12 +849,13 @@ public class DefaultHttpClient implements
                                 traceBody("Response", byteBuf);
                             }
                             ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
-                            return new HttpResponseWrapper<ByteBuffer<?>>(nettyStreamedHttpResponse) {
-                                @Override
-                                public Optional<ByteBuffer<?>> getBody() {
-                                    return Optional.of(byteBuffer);
-                                }
-                            };
+                            NettyStreamedHttpResponse<ByteBuffer<?>> thisResponse = new NettyStreamedHttpResponse<>(
+                                    streamedHttpResponse,
+                                    response.status()
+                            );
+                            thisResponse.setBody(byteBuffer);
+                            HttpResponse<ByteBuffer<?>> finalResponse = new HttpResponseWrapper<>(thisResponse);
+                            return finalResponse;
                         }).doAfterNext(res -> {
                             ByteBuffer<?> buffer = res.body();
                             if (buffer instanceof ReferenceCounted) {
@@ -880,9 +882,13 @@ public class DefaultHttpClient implements
      * @param <O>           The output type
      * @return A {@link Function}
      */
-    protected <I, O> Function<URI, Flowable<O>> buildJsonStreamPublisher(io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
+    protected <I, O> Function<URI, Flowable<O>> buildJsonStreamPublisher(
+            io.micronaut.http.HttpRequest<?> parentRequest,
+            io.micronaut.http.HttpRequest<I> request,
+            io.micronaut.core.type.Argument<O> type) {
         return requestURI -> {
-            Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(parentRequest, request, requestURI);
+            Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher =
+                    buildStreamExchange(parentRequest, request, requestURI);
             return streamResponsePublisher.switchMap(response -> {
                 if (!(response instanceof NettyStreamedHttpResponse)) {
                     throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
@@ -891,8 +897,8 @@ public class DefaultHttpClient implements
                 JsonMediaTypeCodec mediaTypeCodec = (JsonMediaTypeCodec) mediaTypeCodecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE)
                         .orElseThrow(() -> new IllegalStateException("No JSON codec found"));
 
-                NettyStreamedHttpResponse<?> nettyStreamedHttpResponse = (NettyStreamedHttpResponse) response;
-                Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
+                StreamedHttpResponse streamResponse = NettyHttpResponseBuilder.toStreamResponse(response);
+                Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(streamResponse);
 
                 boolean isJsonStream = response.getContentType().map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE)).orElse(false);
                 boolean streamArray = !Iterable.class.isAssignableFrom(type.getType()) && !isJsonStream;
@@ -992,7 +998,8 @@ public class DefaultHttpClient implements
                                     requestURI,
                                     requestWrapper,
                                     emitter,
-                                    channel
+                                    channel,
+                                    true
                             );
                         } catch (Throwable e) {
                             emitter.onError(e);
@@ -1010,7 +1017,8 @@ public class DefaultHttpClient implements
                                             requestURI,
                                             requestWrapper,
                                             emitter,
-                                            channel
+                                            channel,
+                                            true
                                     );
                                 } else {
                                     Throwable cause = f.cause();
@@ -1267,7 +1275,8 @@ public class DefaultHttpClient implements
             String host,
             int port,
             @Nullable SslContext sslCtx,
-            boolean isStream, Consumer<ChannelHandlerContext> contextConsumer) {
+            boolean isStream,
+            Consumer<ChannelHandlerContext> contextConsumer) {
         Bootstrap localBootstrap = this.bootstrap.clone();
         localBootstrap.handler(new HttpClientInitializer(
                 sslCtx,
@@ -1451,23 +1460,23 @@ public class DefaultHttpClient implements
             boolean closeChannelAfterWrite) throws HttpPostRequestEncoder.ErrorDataEncoderException {
 
         io.netty.handler.codec.http.HttpRequest nettyRequest;
-        NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) request;
         HttpPostRequestEncoder postRequestEncoder = null;
         if (permitsBody) {
-            Optional body = clientHttpRequest.getBody();
+            Optional body = request.getBody();
             boolean hasBody = body.isPresent();
             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody) {
                 Object bodyValue = body.get();
                 if (bodyValue instanceof CharSequence) {
                     ByteBuf byteBuf = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
-                    nettyRequest = clientHttpRequest.getFullRequest(byteBuf);
+                    request.body(byteBuf);
+                    nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
                 } else {
-                    postRequestEncoder = buildFormDataRequest(clientHttpRequest, bodyValue);
+                    postRequestEncoder = buildFormDataRequest(request, bodyValue);
                     nettyRequest = postRequestEncoder.finalizeRequest();
                 }
             } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
                 Object bodyValue = body.get();
-                postRequestEncoder = buildMultipartRequest(clientHttpRequest, bodyValue);
+                postRequestEncoder = buildMultipartRequest(request, bodyValue);
                 nettyRequest = postRequestEncoder.finalizeRequest();
             } else {
                 ByteBuf bodyContent = null;
@@ -1548,9 +1557,8 @@ public class DefaultHttpClient implements
 
                         requestBodyPublisher = requestBodyPublisher.doOnError(onError);
 
-                        nettyRequest = clientHttpRequest.getStreamedRequest(
-                                requestBodyPublisher
-                        );
+                        request.body(requestBodyPublisher);
+                        nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
                         try {
                             nettyRequest.setUri(requestURI.toURL().getFile());
                         } catch (MalformedURLException e) {
@@ -1570,10 +1578,11 @@ public class DefaultHttpClient implements
                         );
                     }
                 }
-                nettyRequest = clientHttpRequest.getFullRequest(bodyContent);
+                request.body(bodyContent);
+                nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
             }
         } else {
-            nettyRequest = clientHttpRequest.getFullRequest(null);
+            nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
         }
         try {
             nettyRequest.setUri(requestURI.toURL().getFile());
@@ -1666,7 +1675,7 @@ public class DefaultHttpClient implements
         pipeline.addLast(upgradeHandler);
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST, new UpgradeRequestHandler(httpClientInitializer) {
             @Override
-            public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+            public void handlerRemoved(ChannelHandlerContext ctx) {
                 final Consumer<ChannelHandlerContext> contextConsumer = httpClientInitializer.contextConsumer;
                 if (contextConsumer != null) {
                     contextConsumer.accept(ctx);
@@ -1761,8 +1770,9 @@ public class DefaultHttpClient implements
             io.micronaut.http.HttpRequest<?> parentRequest,
             URI requestURI,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
-            FlowableEmitter<io.micronaut.http.HttpResponse<Object>> emitter,
-            Channel channel) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+            FlowableEmitter emitter,
+            Channel channel,
+            boolean failOnError) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         NettyRequestWriter requestWriter = prepareRequest(
                 requestWrapper.get(),
                 requestURI,
@@ -1843,7 +1853,7 @@ public class DefaultHttpClient implements
                         }
                     } else {
                         boolean errorStatus = statusCode >= 400;
-                        if (errorStatus) {
+                        if (errorStatus && failOnError) {
                             emitter.onError(new HttpClientResponseException(response.getStatus().getReason(), response));
                         } else {
                             emitter.onNext(response);
@@ -1923,7 +1933,7 @@ public class DefaultHttpClient implements
                         headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
                     }
                 }
-            } else {
+            } else if (!(nettyRequest instanceof StreamedHttpRequest)) {
                 headers.set(HttpHeaderNames.CONTENT_LENGTH, 0);
             }
         }
@@ -2216,8 +2226,8 @@ public class DefaultHttpClient implements
         };
     }
 
-    private HttpPostRequestEncoder buildFormDataRequest(NettyClientHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(clientHttpRequest.getFullRequest(null), false);
+    private HttpPostRequestEncoder buildFormDataRequest(MutableHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(NettyHttpRequestBuilder.toHttpRequest(clientHttpRequest), false);
 
         Map<String, Object> formData;
         if (bodyValue instanceof Map) {
@@ -2248,9 +2258,9 @@ public class DefaultHttpClient implements
         }
     }
 
-    private HttpPostRequestEncoder buildMultipartRequest(NettyClientHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+    private HttpPostRequestEncoder buildMultipartRequest(MutableHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         HttpDataFactory factory = new DefaultHttpDataFactory(DefaultHttpDataFactory.MINSIZE);
-        io.netty.handler.codec.http.HttpRequest request = clientHttpRequest.getFullRequest(null);
+        io.netty.handler.codec.http.HttpRequest request = NettyHttpRequestBuilder.toHttpRequest(clientHttpRequest);
         HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(factory, request, true, CharsetUtil.UTF_8, HttpPostRequestEncoder.EncoderMode.HTML5);
         if (bodyValue instanceof MultipartBody.Builder) {
             bodyValue = ((MultipartBody.Builder) bodyValue).build();
@@ -2361,7 +2371,7 @@ public class DefaultHttpClient implements
                 .orElse(MediaType.APPLICATION_JSON_TYPE);
 
         boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod());
-        NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) request;
+        MutableHttpRequest clientHttpRequest = (MutableHttpRequest) request;
         NettyRequestWriter requestWriter = buildNettyRequest(
                 clientHttpRequest,
                 requestURI,
@@ -2448,6 +2458,81 @@ public class DefaultHttpClient implements
     @Override
     public void doOnConnect(@NonNull ChannelPipelineListener listener) {
         this.pipelineListeners.add(Objects.requireNonNull(listener, "The listener cannot be null"));
+    }
+
+    @Override
+    public Flowable<MutableHttpResponse<?>> proxy(io.micronaut.http.HttpRequest<?> request) {
+        Flowable<MutableHttpResponse<?>> responsePublisher = Flowable.fromPublisher(resolveRequestURI(request))
+                .flatMap(requestURI -> {
+                    AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
+                    Flowable<MutableHttpResponse<Object>> proxyResponsePublisher = Flowable.create(emitter -> {
+                        SslContext sslContext = buildSslContext(requestURI);
+                        ChannelFuture channelFuture;
+                        try {
+                            if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+
+                                channelFuture = doConnect(request, requestURI, sslContext, true, channelHandlerContext -> {
+                                    try {
+                                        final Channel channel = channelHandlerContext.channel();
+                                        request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
+                                        streamRequestThroughChannel(
+                                                request,
+                                                requestURI,
+                                                requestWrapper,
+                                                emitter,
+                                                channel,
+                                                false
+                                        );
+                                    } catch (Throwable e) {
+                                        emitter.onError(e);
+                                    }
+                                });
+                            } else {
+                                channelFuture = doConnect(request, requestURI, sslContext, true, null);
+                                channelFuture
+                                        .addListener((ChannelFutureListener) f -> {
+                                            if (f.isSuccess()) {
+                                                Channel channel = f.channel();
+                                                request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
+                                                streamRequestThroughChannel(
+                                                        request,
+                                                        requestURI,
+                                                        requestWrapper,
+                                                        emitter,
+                                                        channel,
+                                                        false
+                                                );
+                                            } else {
+                                                Throwable cause = f.cause();
+                                                emitter.onError(
+                                                        new HttpClientException("Connect error:" + cause.getMessage(), cause)
+                                                );
+                                            }
+                                        });
+                            }
+                        } catch (HttpClientException e) {
+                            emitter.onError(e);
+                            return;
+                        }
+
+                        Disposable disposable = buildDisposableChannel(channelFuture);
+                        emitter.setDisposable(disposable);
+                        emitter.setCancellable(disposable::dispose);
+                    }, BackpressureStrategy.BUFFER);
+                    // apply filters
+                    //noinspection unchecked
+                    proxyResponsePublisher = Flowable.fromPublisher(
+                            applyFilterToResponsePublisher(
+                                    request,
+                                    requestWrapper.get(),
+                                    requestURI,
+                                    requestWrapper,
+                                    (Publisher) proxyResponsePublisher
+                            )
+                    );
+                    return proxyResponsePublisher;
+                });
+        return responsePublisher;
     }
 
 

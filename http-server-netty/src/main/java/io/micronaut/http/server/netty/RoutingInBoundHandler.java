@@ -71,6 +71,7 @@ import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
+import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
@@ -1597,8 +1598,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private void writeFinalNettyResponse(MutableHttpResponse<?> message, HttpRequest<?> request, ChannelHandlerContext context) {
-        NettyMutableHttpResponse<?> nettyHttpResponse = toNettyResponse(message);
-        FullHttpResponse nettyResponse = nettyHttpResponse.getNativeResponse();
+        io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(message);
         io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyResponse.headers();
         HttpStatus httpStatus = message.status();
 
@@ -1619,7 +1619,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         final Object body = message.body();
         if (body instanceof NettyCustomizableResponseTypeHandlerInvoker) {
             NettyCustomizableResponseTypeHandlerInvoker handler = (NettyCustomizableResponseTypeHandlerInvoker) body;
-            handler.invoke(request, nettyHttpResponse, context);
+            handler.invoke(request, message, context);
         } else {
             // default to Transfer-Encoding: chunked if Content-Length not set or not already set
             if (!nettyHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && !nettyHeaders.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
@@ -1874,7 +1874,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         @SuppressWarnings("unchecked")
-        void invoke(HttpRequest<?> request, NettyMutableHttpResponse response, ChannelHandlerContext channelHandlerContext) {
+        void invoke(HttpRequest<?> request, MutableHttpResponse response, ChannelHandlerContext channelHandlerContext) {
             this.handler.handle(body, request, response, channelHandlerContext);
         }
     }

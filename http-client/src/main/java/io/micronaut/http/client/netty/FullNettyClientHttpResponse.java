@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionContext;
@@ -31,6 +32,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.NettyHttpHeaders;
+import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
@@ -52,7 +54,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completable {
+public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completable, NettyHttpResponseBuilder {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
@@ -264,5 +266,22 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     @Override
     public void onComplete() {
         this.complete = true;
+    }
+
+    @NonNull
+    @Override
+    public FullHttpResponse toFullHttpResponse() {
+        return this.nettyHttpResponse;
+    }
+
+    @NonNull
+    @Override
+    public io.netty.handler.codec.http.HttpResponse toHttpResponse() {
+        return nettyHttpResponse;
+    }
+
+    @Override
+    public boolean isStream() {
+        return false;
     }
 }

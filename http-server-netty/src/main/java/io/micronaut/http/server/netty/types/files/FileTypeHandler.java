@@ -57,7 +57,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     @SuppressWarnings("MagicNumber")
     @Override
-    public void handle(Object obj, HttpRequest<?> request, NettyMutableHttpResponse<?> response, ChannelHandlerContext context) {
+    public void handle(Object obj, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
         NettyFileCustomizableResponseType type;
         if (obj instanceof File) {
             type = new NettySystemFileCustomizableResponseType((File) obj);

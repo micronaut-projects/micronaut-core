@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.netty.NettyMutableHttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import io.netty.channel.ChannelHandlerContext;
 
 /**
@@ -43,7 +43,7 @@ public interface NettyCustomizableResponseTypeHandler<T> extends Ordered {
      * @param response The mutable Micronaut response
      * @param context  The channel context
      */
-    void handle(T object, HttpRequest<?> request, NettyMutableHttpResponse<?> response, ChannelHandlerContext context);
+    void handle(T object, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context);
 
     /**
      * @param type The type to check

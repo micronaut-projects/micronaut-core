@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -30,10 +31,13 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpParameters;
+import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.uri.UriBuilder;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import org.reactivestreams.Publisher;
@@ -53,7 +57,7 @@ import java.util.Set;
  * @since 1.0
  */
 @Internal
-class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
+class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpRequestBuilder {
 
     static final CharSequence CHANNEL = "netty_channel";
     private final NettyHttpHeaders headers = new NettyHttpHeaders();
@@ -61,16 +65,8 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
     private final HttpMethod httpMethod;
     private final String httpMethodName;
     private URI uri;
-    private B body;
+    private Object body;
     private NettyHttpParameters httpParameters;
-
-    /**
-     * @param httpMethod The Http method
-     * @param uri        The URI
-     */
-    NettyClientHttpRequest(HttpMethod httpMethod, URI uri) {
-        this(httpMethod, uri, httpMethod.name());
-    }
 
     /**
      * This constructor is actually required for the case of non-standard http methods.
@@ -154,7 +150,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
     @Override
     public Optional<B> getBody() {
-        return Optional.ofNullable(body);
+        return (Optional<B>) Optional.ofNullable(body);
     }
 
     @Override
@@ -168,9 +164,9 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
     }
 
     @Override
-    public MutableHttpRequest<B> body(B body) {
+    public <T> MutableHttpRequest<T> body(T body) {
         this.body = body;
-        return this;
+        return (MutableHttpRequest<T>) this;
     }
 
     @Override
@@ -223,34 +219,8 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
         return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
     }
 
-    /**
-     * @param content The {@link ByteBuf}
-     * @return The http request
-     */
-    HttpRequest getFullRequest(ByteBuf content) {
-        String uriStr = resolveUriPath();
-        io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
-        DefaultFullHttpRequest req = content != null ? new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, content) :
-                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
-        req.headers().set(headers.getNettyHeaders());
-        return req;
-    }
-
     private static io.netty.handler.codec.http.HttpMethod getMethod(String httpMethodName) {
         return io.netty.handler.codec.http.HttpMethod.valueOf(httpMethodName);
-    }
-
-    /**
-     * @param publisher A publisher for the Http content
-     * @return The Http request
-     */
-    HttpRequest getStreamedRequest(Publisher<HttpContent> publisher) {
-        String uriStr = resolveUriPath();
-        io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
-        HttpRequest req = publisher != null ? new DefaultStreamedHttpRequest(HttpVersion.HTTP_1_1, method, uriStr, publisher) :
-                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uriStr);
-        req.headers().set(headers.getNettyHeaders());
-        return req;
     }
 
     private String resolveUriPath() {
@@ -274,5 +244,72 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
     @Override
     public String getMethodName() {
         return httpMethodName;
+    }
+
+    @NonNull
+    @Override
+    public FullHttpRequest toFullHttpRequest() {
+        String uriStr = resolveUriPath();
+        io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
+        DefaultFullHttpRequest req;
+        if (body != null) {
+            if (body instanceof ByteBuf) {
+                req = new DefaultFullHttpRequest(
+                        HttpVersion.HTTP_1_1,
+                        method,
+                        uriStr,
+                        (ByteBuf) body,
+                        headers.getNettyHeaders(),
+                        EmptyHttpHeaders.INSTANCE
+                );
+            } else {
+                req = new DefaultFullHttpRequest(
+                        HttpVersion.HTTP_1_1,
+                        method,
+                        uriStr
+                );
+                req.headers().setAll(headers.getNettyHeaders());
+            }
+        } else {
+            req = new DefaultFullHttpRequest(
+                    HttpVersion.HTTP_1_1,
+                    method,
+                    uriStr,
+                    Unpooled.EMPTY_BUFFER,
+                    headers.getNettyHeaders(),
+                    EmptyHttpHeaders.INSTANCE
+            );
+        }
+        return req;
+    }
+
+    @NonNull
+    @Override
+    public StreamedHttpRequest toStreamHttpRequest() {
+        if (body instanceof Publisher) {
+            String uriStr = resolveUriPath();
+            io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
+            DefaultStreamedHttpRequest req = new DefaultStreamedHttpRequest(
+                    HttpVersion.HTTP_1_1, method, uriStr, (Publisher<HttpContent>) body);
+            req.headers().setAll(headers.getNettyHeaders());
+            return req;
+        } else {
+            throw new IllegalStateException("Body must be set to a publisher of HTTP content first!");
+        }
+    }
+
+    @NonNull
+    @Override
+    public HttpRequest toHttpRequest() {
+        if (isStream()) {
+            return toStreamHttpRequest();
+        } else {
+            return toFullHttpRequest();
+        }
+    }
+
+    @Override
+    public boolean isStream() {
+        return body instanceof Publisher;
     }
 }

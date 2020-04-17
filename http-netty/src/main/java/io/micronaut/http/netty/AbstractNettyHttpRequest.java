@@ -15,9 +15,16 @@
  */
 package io.micronaut.http.netty;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.*;
+import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultLastHttpContent;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
@@ -37,7 +44,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap implements HttpRequest<B> {
+public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap implements HttpRequest<B>, NettyHttpRequestBuilder {
 
     public static final AsciiString STREAM_ID = HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text();
     public static final AsciiString HTTP2_SCHEME = HttpConversionUtil.ExtensionHeaderNames.SCHEME.text();
@@ -65,6 +72,59 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         this.uri = URI.create(fullUri);
         this.httpMethodName = nettyRequest.method().name();
         this.httpMethod = HttpMethod.parse(httpMethodName);
+    }
+
+    @NonNull
+    @Override
+    public io.netty.handler.codec.http.HttpRequest toHttpRequest() {
+        return this.nettyRequest;
+    }
+
+    @NonNull
+    @Override
+    public io.netty.handler.codec.http.FullHttpRequest toFullHttpRequest() {
+        if (this.nettyRequest instanceof io.netty.handler.codec.http.FullHttpRequest) {
+            return (io.netty.handler.codec.http.FullHttpRequest) this.nettyRequest;
+        }
+        DefaultFullHttpRequest httpRequest = new DefaultFullHttpRequest(
+                this.nettyRequest.protocolVersion(),
+                this.nettyRequest.method(),
+                this.nettyRequest.uri()
+        );
+        httpRequest.headers().setAll(this.nettyRequest.headers());
+        return httpRequest;
+    }
+
+    @NonNull
+    @Override
+    public StreamedHttpRequest toStreamHttpRequest() {
+        if (isStream()) {
+            return (StreamedHttpRequest) this.nettyRequest;
+        } else {
+            if (this.nettyRequest instanceof io.netty.handler.codec.http.FullHttpRequest) {
+
+                return new DefaultStreamedHttpRequest(
+                        io.netty.handler.codec.http.HttpVersion.HTTP_1_1,
+                        this.nettyRequest.method(),
+                        this.nettyRequest.uri(),
+                        true,
+                        Publishers.just(new DefaultLastHttpContent(((io.netty.handler.codec.http.FullHttpRequest) this.nettyRequest).content()))
+                        );
+            } else {
+                return new DefaultStreamedHttpRequest(
+                        io.netty.handler.codec.http.HttpVersion.HTTP_1_1,
+                        this.nettyRequest.method(),
+                        this.nettyRequest.uri(),
+                        true,
+                        Publishers.just(LastHttpContent.EMPTY_LAST_CONTENT)
+                );
+            }
+        }
+    }
+
+    @Override
+    public boolean isStream() {
+        return this.nettyRequest instanceof StreamedHttpRequest;
     }
 
     @Override
