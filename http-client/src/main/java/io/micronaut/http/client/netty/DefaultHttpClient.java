@@ -1735,9 +1735,15 @@ public class DefaultHttpClient implements
 
         boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(finalRequest.getMethod());
 
-        NettyClientHttpRequest clientHttpRequest = (NettyClientHttpRequest) finalRequest;
+        MutableHttpRequest clientHttpRequest = (MutableHttpRequest) finalRequest;
         NettyRequestWriter requestWriter = buildNettyRequest(
-                clientHttpRequest, requestURI, requestContentType, permitsBody, emitter::tryOnError, true);
+                clientHttpRequest,
+                requestURI,
+                requestContentType,
+                permitsBody,
+                emitter::tryOnError,
+                true
+        );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
 
         prepareHttpHeaders(
