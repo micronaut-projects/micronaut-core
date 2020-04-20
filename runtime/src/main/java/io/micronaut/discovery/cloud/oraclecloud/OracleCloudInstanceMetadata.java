@@ -17,6 +17,7 @@ package io.micronaut.discovery.cloud.oraclecloud;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.micronaut.context.env.ComputePlatform;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
 
 /**
@@ -25,6 +26,7 @@ import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
  * @author Todd Sharp
  * @since 1.2.0
  */
+@Introspected
 public class OracleCloudInstanceMetadata extends AbstractComputeInstanceMetadata {
 
     private final ComputePlatform computePlatform = ComputePlatform.ORACLE_CLOUD;
