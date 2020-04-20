@@ -133,7 +133,7 @@ ext {
             ],
             'micronaut.kafka': [
                     version:micronautKafkaVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.kafka',
                     name:'micronaut-kafka',
                     modules:['micronaut-kafka-streams']
             ],
