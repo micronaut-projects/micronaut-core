@@ -32,6 +32,21 @@ import static io.netty.handler.codec.http.HttpMethod.*
  */
 class NettyHttpRequestSpec extends Specification {
 
+    void "test mutate request"() {
+        given:
+        DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, GET, "/foo/bar")
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
+
+        when:
+        def altered = request.mutate()
+                            .uri({ builder -> builder.replacePath("/another")})
+                            .header("foo", 'bar')
+
+        then:
+        altered.path == '/another'
+        altered.headers.get("foo") == 'bar'
+    }
+
     void "test netty http request parameters"() {
         given:
         DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri)

@@ -15,16 +15,23 @@
  */
 package io.micronaut.http.client.netty;
 
-import io.micronaut.http.netty.stream.StreamedHttpResponse;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
+import io.micronaut.http.*;
+import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.netty.NettyHttpHeaders;
+import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.netty.cookies.NettyCookie;
+import io.micronaut.http.netty.stream.StreamedHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -35,10 +42,10 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
+class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
 
     private final StreamedHttpResponse nettyResponse;
-    private final HttpStatus status;
+    private HttpStatus status;
     private final NettyHttpHeaders headers;
     private B body;
     private MutableConvertibleValues<Object> attributes;
@@ -71,7 +78,7 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
     }
 
     @Override
-    public HttpHeaders getHeaders() {
+    public MutableHttpHeaders getHeaders() {
         return headers;
     }
 
@@ -102,5 +109,52 @@ class NettyStreamedHttpResponse<B> implements HttpResponse<B> {
     @Override
     public Optional<B> getBody() {
         return Optional.ofNullable(body);
+    }
+
+    @NonNull
+    @Override
+    public FullHttpResponse toFullHttpResponse() {
+        throw new UnsupportedOperationException("Cannot convert a stream response to a full response");
+    }
+
+    @NonNull
+    @Override
+    public StreamedHttpResponse toStreamHttpResponse() {
+        return this.nettyResponse;
+    }
+
+    @NonNull
+    @Override
+    public io.netty.handler.codec.http.HttpResponse toHttpResponse() {
+        return this.nettyResponse;
+    }
+
+    @Override
+    public boolean isStream() {
+        return true;
+    }
+
+    @Override
+    public MutableHttpResponse<B> cookie(Cookie cookie) {
+        if (cookie instanceof NettyCookie) {
+            NettyCookie nettyCookie = (NettyCookie) cookie;
+            String value = ClientCookieEncoder.STRICT.encode(nettyCookie.getNettyCookie());
+            headers.add(HttpHeaderNames.SET_COOKIE, value);
+        } else {
+            throw new IllegalArgumentException("Argument is not a Netty compatible Cookie");
+        }
+        return this;
+    }
+
+    @Override
+    public <T> MutableHttpResponse<T> body(@Nullable T body) {
+        this.body = (B) body;
+        return (MutableHttpResponse<T>) this;
+    }
+
+    @Override
+    public MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
+        this.status = Objects.requireNonNull(status, "Status is required");
+        return this;
     }
 }

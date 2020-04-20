@@ -125,6 +125,7 @@ httpClient:
     clientConfiguration: Configuring HTTP clients
     lowLevelClientError: Error Responses
     bindErrors: Bind Errors
+  proxyClient: Proxying Requests with ProxyHttpClient
   clientAnnotation:
     title: Declarative HTTP Clients with @Client
     clientParameters: Customizing Parameter Binding

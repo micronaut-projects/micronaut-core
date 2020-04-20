@@ -53,12 +53,13 @@ class ServerRedirectSpec extends Specification {
         given:"An HTTPS URL issues an HTTPS"
         YoutubeClient youtubeClient=  embeddedServer.getApplicationContext().getBean(YoutubeClient)
         def client = HttpClient.create(new URL("https://www.youtube.com"))
+        def declarativeResult = youtubeClient.test().blockingGet()
         def response= client
                 .toBlocking().retrieve("/")
-
+//
         expect:"The response was returned and doesn't loop"
         response
-        youtubeClient.test().blockingGet()
+        declarativeResult
 
         cleanup:
         client.close()
@@ -225,7 +226,7 @@ class ServerRedirectSpec extends Specification {
 
     }
 
-    @Client("https://youtube.com")
+    @Client("https://www.youtube.com")
     static interface YoutubeClient {
         @Get
         Single<String> test()

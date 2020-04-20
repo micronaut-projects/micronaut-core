@@ -46,7 +46,7 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
 
     private HttpStatus status = HttpStatus.OK;
-    private B body;
+    private Object body;
 
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
@@ -74,13 +74,13 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public Optional<B> getBody() {
-        return Optional.ofNullable(body);
+        return (Optional<B>) Optional.ofNullable(body);
     }
 
     @Override
-    public MutableHttpResponse<B> body(@Nullable B body) {
+    public <T> MutableHttpResponse<T> body(@Nullable T body) {
         this.body = body;
-        return this;
+        return (MutableHttpResponse<T>) this;
     }
 
     @Override

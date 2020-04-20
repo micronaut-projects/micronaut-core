@@ -15,8 +15,11 @@
  */
 package io.micronaut.http.netty;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -30,12 +33,10 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.netty.cookies.NettyCookie;
+import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
+import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 
 import java.util.*;
@@ -50,13 +51,13 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 @TypeHint(value = NettyMutableHttpResponse.class)
-public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
+public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
     private static final ServerCookieEncoder DEFAULT_SERVER_COOKIE_ENCODER = ServerCookieEncoder.LAX;
 
     protected FullHttpResponse nettyResponse;
     final NettyHttpHeaders headers;
     private final ConversionService conversionService;
-    private B body;
+    private Object body;
     private final Map<Class, Optional> convertedBodies = new LinkedHashMap<>(1);
     private MutableConvertibleValues<Object> attributes;
 
@@ -153,10 +154,9 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
 
     @Override
     public Optional<B> getBody() {
-        return Optional.ofNullable(body);
+        return (Optional<B>) Optional.ofNullable(body);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(Class<T1> type) {
         return getBody(Argument.of(type));
@@ -189,7 +189,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
     }
 
     @Override
-    public NettyMutableHttpResponse<B> body(B body) {
+    public <T> MutableHttpResponse<T> body(@Nullable T body) {
         if (this.body != body) {
             if (this.body instanceof ByteBuf) {
                 ((ByteBuf) this.body).release();
@@ -199,7 +199,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
                 replace((ByteBuf) body);
             }
         }
-        return this;
+        return (MutableHttpResponse<T>) this;
     }
 
     /**
@@ -227,4 +227,35 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
     public void setServerCookieEncoder(ServerCookieEncoder serverCookieEncoder) {
         this.serverCookieEncoder = serverCookieEncoder;
     }
+
+    @NonNull
+    @Override
+    public FullHttpResponse toFullHttpResponse() {
+        return this.nettyResponse;
+    }
+
+    @NonNull
+    @Override
+    public StreamedHttpResponse toStreamHttpResponse() {
+        DefaultStreamedHttpResponse streamedHttpResponse = new DefaultStreamedHttpResponse(
+                HttpVersion.HTTP_1_1,
+                this.nettyResponse.status(),
+                true,
+                Publishers.just(new DefaultLastHttpContent(this.nettyResponse.content()))
+        );
+        streamedHttpResponse.headers().setAll(this.nettyResponse.headers());
+        return streamedHttpResponse;
+    }
+
+    @NonNull
+    @Override
+    public HttpResponse toHttpResponse() {
+        return this.nettyResponse;
+    }
+
+    @Override
+    public boolean isStream() {
+        return false;
+    }
+
 }

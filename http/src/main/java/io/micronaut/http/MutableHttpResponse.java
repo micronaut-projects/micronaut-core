@@ -63,7 +63,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @return This response object
      */
     @Override
-    MutableHttpResponse<B> body(@Nullable B body);
+    <T> MutableHttpResponse<T> body(@Nullable T body);
 
     /**
      * Sets the response status.

@@ -151,6 +151,10 @@ It is no longer necessary to use `@Client(..)` to inject a default api:http.clie
 
 If no host is provided at the time of a request, a api:http.client.exceptions.NoHostException[] will be thrown.
 
+==== API for Proxying Requests
+
+A new API for writing API gateways and proxying requests has been added. See the documentation on the <<proxyClient, ProxyHttpClient>> for more information.
+
 === Serverless Improvements
 
 ==== Support for Google Cloud Function
