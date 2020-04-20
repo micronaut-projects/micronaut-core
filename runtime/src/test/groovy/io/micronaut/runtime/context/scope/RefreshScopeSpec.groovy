@@ -22,6 +22,8 @@ import io.micronaut.context.env.Environment
 import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
+import io.micronaut.runtime.context.scope.refresh.RefreshInterceptor
+import io.micronaut.runtime.context.scope.refresh.RefreshScope
 import io.micronaut.scheduling.TaskExecutors
 import org.junit.Rule
 import spock.lang.Specification
@@ -35,6 +37,39 @@ import java.util.concurrent.Executor
  */
 @RestoreSystemProperties
 class RefreshScopeSpec extends Specification {
+
+    void "RefreshScope bean is not loaded for function environment"() {
+        when:
+        ApplicationContext ctx = ApplicationContext.run(Environment.FUNCTION)
+
+        then:
+        !ctx.containsBean(RefreshScope)
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "RefreshScope bean is loaded by default"() {
+        when:
+        ApplicationContext ctx = ApplicationContext.run()
+
+        then:
+        ctx.containsBean(RefreshScope)
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "RefreshScope bean is not loaded for android environment"() {
+        when:
+        ApplicationContext ctx = ApplicationContext.run(Environment.ANDROID)
+
+        then:
+        !ctx.containsBean(RefreshScope)
+
+        cleanup:
+        ctx.close()
+    }
 
     void "test fire refresh event that refreshes all"() {
         given:
