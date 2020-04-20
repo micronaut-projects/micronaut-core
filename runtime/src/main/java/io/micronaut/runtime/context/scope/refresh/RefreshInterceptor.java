@@ -17,7 +17,8 @@ package io.micronaut.runtime.context.scope.refresh;
 
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
-
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import javax.inject.Singleton;
 import java.util.concurrent.locks.Lock;
 
@@ -29,6 +30,7 @@ import java.util.concurrent.locks.Lock;
  * @since 1.0
  */
 @Singleton
+@Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
 public class RefreshInterceptor implements MethodInterceptor {
 
     private final RefreshScope refreshScope;
