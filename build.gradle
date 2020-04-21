@@ -7,7 +7,6 @@ buildscript {
         classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.5'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
         classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
-        classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.2.1"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.2"
         classpath 'javax.xml.bind:jaxb-api:2.3.1'
@@ -24,7 +23,6 @@ plugins {
     id 'com.github.ben-manes.versions' version '0.27.0'
 }
 
-apply plugin: "io.sdkman.vendors"
 apply plugin: 'org.aim42.htmlSanityCheck'
 
 repositories {
@@ -810,16 +808,6 @@ allprojects {
         }
     }
     apply from: rootProject.file('gradle/license.gradle')
-}
-
-sdkman {
-    api = "https://vendors.sdkman.io"
-    consumerKey = System.getenv("GVM_SDKVENDOR_KEY") ?: project.hasProperty("gvmSdkvendorKey") ? project.gvmSdkvendorKey : ''
-    consumerToken = System.getenv("GVM_SDKVENDOR_TOKEN") ?: project.hasProperty("gvmSdkvendorToken") ? project.gvmSdkvendorToken : ''
-    candidate = "micronaut"
-    version = project.version
-    url = "https://github.com/micronaut-projects/micronaut-core/releases/download/v${project.version}/micronaut-${project.version}.zip"
-    hashtag = "#micronautfw"
 }
 
 htmlSanityCheck {
