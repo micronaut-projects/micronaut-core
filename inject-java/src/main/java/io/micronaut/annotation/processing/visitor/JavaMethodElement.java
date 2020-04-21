@@ -93,28 +93,25 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
         ).toArray(ParameterElement[]::new);
     }
 
-	@Override
-	public ClassElement getDeclaringType() {
-		Element enclosingElement = executableElement.getEnclosingElement();
-		ClassElement result = declaringClass;
-		while (enclosingElement instanceof TypeElement) {
-			TypeElement te = (TypeElement) enclosingElement;
-			for (Element elt : te.getEnclosedElements()) {
-				if (!(elt instanceof ExecutableElement)) {
-					continue;
-				}
-				ExecutableElement ex = (ExecutableElement) elt;
-				if (visitorContext.getElements().overrides(executableElement, ex,
-						(TypeElement) executableElement.getEnclosingElement())) {
-					result = new JavaClassElement(te, visitorContext.getAnnotationUtils().getAnnotationMetadata(te),
-							visitorContext, declaringClass.getGenericTypeInfo());
-					break;
-				}
-			}
-			enclosingElement = visitorContext.getTypes().asElement(te.getSuperclass());
-		}
-		return result;
-	}
+    @Override
+    public ClassElement getDeclaringType() {
+        Element enclosingElement = executableElement.getEnclosingElement();
+        if (enclosingElement instanceof TypeElement) {
+            TypeElement te = (TypeElement) enclosingElement;
+            if (declaringClass.getName().equals(te.getQualifiedName().toString())) {
+                return declaringClass;
+            } else {
+                return new JavaClassElement(
+                        te,
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(te),
+                        visitorContext,
+                        declaringClass.getGenericTypeInfo()
+                );
+            }
+        } else {
+            return declaringClass;
+        }
+    }
 
     @Override
     public ClassElement getOwningType() {
