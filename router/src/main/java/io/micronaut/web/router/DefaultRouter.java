@@ -514,10 +514,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                             }
                         }
                         if (entry.hasPatterns()) {
-                            String uriStr = request.getUri().toString();
+                            String path = request.getPath();
                             String[] patterns = entry.getPatterns();
                             for (String pattern : patterns) {
-                                if (Filter.MATCH_ALL_PATTERN.equals(pattern) || PathMatcher.ANT.matches(pattern, uriStr)) {
+                                if (Filter.MATCH_ALL_PATTERN.equals(pattern) || PathMatcher.ANT.matches(pattern, path)) {
                                     return true;
                                 }
                             }
