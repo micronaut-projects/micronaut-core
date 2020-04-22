@@ -573,6 +573,7 @@ ext {
             'micronaut.servlet': [
                 version:micronautServlet,
                 group:'io.micronaut.servlet',
+                name:'micronaut-servlet-core',
                 modules: ['micronaut-http-server-tomcat', 'micronaut-http-server-jetty', 'micronaut-http-server-undertow']
             ],
     ]
