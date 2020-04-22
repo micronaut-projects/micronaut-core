@@ -529,7 +529,12 @@ ext {
                     version:micronautCacheVersion,
                     group:'io.micronaut.cache',
                     modules: ['micronaut-cache-hazelcast', 'micronaut-cache-ehcache', 'micronaut-cache-noop']
-            ]
+            ],
+            'micronaut.jaxrs': [
+                version: micronautJaxrsVersion,
+                group  : 'io.micronaut.jaxrs',
+                modules: ['micronaut-jaxrs-server', 'micronaut-jaxrs-processor']
+            ],
     ]
 
     dependencyVersion = { String name ->
