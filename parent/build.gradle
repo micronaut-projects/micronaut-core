@@ -47,6 +47,11 @@ ext.extraPomInfo = {
                     delegate.version "2.1.0"
                 }
                 delegate.plugin {
+                    groupId "com.microsoft.azure"
+                    artifactId "azure-functions-maven-plugin"
+                    delegate.version "1.4.1"
+                }
+                delegate.plugin {
                     groupId "org.apache.maven.plugins"
                     artifactId "maven-compiler-plugin"
                     delegate.version "3.8.1"
