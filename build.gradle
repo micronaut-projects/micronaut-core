@@ -575,6 +575,12 @@ ext {
                 group:'io.micronaut.servlet',
                 modules: ['micronaut-http-server-tomcat', 'micronaut-http-server-jetty', 'micronaut-http-server-undertow']
             ],
+            'micronaut.jaxrs': [
+                version: micronautJaxrsVersion,
+                group  : 'io.micronaut.jaxrs',
+                modules: ['micronaut-jaxrs-server', 'micronaut-jaxrs-processor']
+            ],
+
     ]
 
     dependencyVersion = { String name ->
