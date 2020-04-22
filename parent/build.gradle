@@ -37,6 +37,11 @@ ext.extraPomInfo = {
                     }
                 }
                 delegate.plugin {
+                    groupId "com.google.cloud.functions"
+                    artifactId "function-maven-plugin"
+                    delegate.version "0.9.2"
+                }
+                delegate.plugin {
                     groupId "com.google.cloud.tools"
                     artifactId "jib-maven-plugin"
                     delegate.version "2.1.0"
