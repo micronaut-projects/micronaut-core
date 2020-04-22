@@ -427,12 +427,12 @@ ext {
                     name   : 'swagger-core',
                     modules: ['swagger-models', 'swagger-annotations']
             ],
-            'groovy.function.framework'                    : [
+            'google.function.framework'                    : [
                     version: '1.0.1',
                     group  : 'com.google.cloud.functions',
                     name   : 'functions-framework-api'
             ],
-            'groovy.function.invoker'                    : [
+            'google.function.invoker'                    : [
                     version: '1.0.0-alpha-2-rc4',
                     group  : 'com.google.cloud.functions.invoker',
                     name   : 'java-function-invoker'
