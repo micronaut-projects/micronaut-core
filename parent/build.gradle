@@ -53,6 +53,11 @@ ext.extraPomInfo = {
                 }
                 delegate.plugin {
                     groupId "org.apache.maven.plugins"
+                    artifactId "maven-resources-plugin"
+                    delegate.version "3.1.0"
+                }
+                delegate.plugin {
+                    groupId "org.apache.maven.plugins"
                     artifactId "maven-compiler-plugin"
                     delegate.version "3.8.1"
                     delegate.configuration {
