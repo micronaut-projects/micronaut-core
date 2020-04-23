@@ -26,6 +26,10 @@ import io.micronaut.inject.ExecutableMethod;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+
+import javax.annotation.PreDestroy;
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Optional;
 
 /**
@@ -36,7 +40,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-class AbstractExecutor<C> implements ApplicationContextProvider {
+class AbstractExecutor<C> implements ApplicationContextProvider, Closeable, AutoCloseable  {
 
     /**
      * The current {@link ApplicationContext}.
@@ -128,5 +132,15 @@ class AbstractExecutor<C> implements ApplicationContextProvider {
     @Override
     public ApplicationContext getApplicationContext() {
         return this.applicationContext;
+    }
+
+    @Override
+    @PreDestroy
+    public void close() throws IOException {
+        try {
+            applicationContext.close();
+        } catch (Exception e) {
+            // ignore
+        }
     }
 }
