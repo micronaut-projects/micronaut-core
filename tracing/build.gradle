@@ -37,6 +37,7 @@ dependencies {
     testImplementation dependencyVersion("zipkin.reporter")
     testImplementation dependencyVersion("brave.instrumentation")
     testImplementation dependencyVersion("brave.opentracing")
+    testImplementation dependencyVersion("jaeger")
 
 }
 
