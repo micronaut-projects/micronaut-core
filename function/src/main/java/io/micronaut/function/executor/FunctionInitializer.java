@@ -23,7 +23,6 @@ import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.function.Function;
 
@@ -33,7 +32,7 @@ import java.util.function.Function;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class FunctionInitializer extends AbstractExecutor implements Closeable, AutoCloseable {
+public class FunctionInitializer extends AbstractExecutor {
 
     protected final boolean closeContext;
     private FunctionExitHandler functionExitHandler = new DefaultFunctionExitHandler();

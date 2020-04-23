@@ -129,18 +129,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                 encode(env, localFunctionRegistry, returnJavaType, result, output);
             }
         } finally {
-            closeApplicationContext();
-        }
-    }
-
-    /**
-     * Close the application context.
-     */
-    protected void closeApplicationContext() {
-        try {
-            applicationContext.close();
-        } catch (Exception e) {
-            // ignore
+            close();
         }
     }
 
