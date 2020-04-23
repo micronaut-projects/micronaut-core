@@ -68,6 +68,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final Map<String, Collection<AnnotationValueIndex>> indexes = new HashMap<>(2);
     private final Map<String, GeneratorAdapter> localLoadTypeMethods = new HashMap<>();
     private final ClassElement classElement;
+    private boolean executed = false;
     private int propertyIndex = 0;
     private MethodElement constructor;
     private MethodElement defaultConstructor;
@@ -183,10 +184,17 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        // write the reference
-        writeIntrospectionReference(classWriterOutputVisitor);
-        // write the introspection
-        writeIntrospectionClass(classWriterOutputVisitor);
+        if (!executed) {
+
+            // Run only once
+            executed = true;
+
+            // write the reference
+            writeIntrospectionReference(classWriterOutputVisitor);
+            // write the introspection
+            writeIntrospectionClass(classWriterOutputVisitor);
+
+        }
     }
 
     private void writeIntrospectionClass(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {

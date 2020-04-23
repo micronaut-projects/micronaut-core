@@ -31,6 +31,9 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import javax.annotation.processing.ProcessingEnvironment;
+
+import javax.annotation.Nonnull;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
@@ -56,13 +59,48 @@ import static javax.lang.model.element.ElementKind.FIELD;
 @SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS})
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
 
-    private boolean executed = false;
+    private List<LoadedVisitor> loadedVisitors;
     private Collection<TypeElementVisitor> typeElementVisitors;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
+
         super.init(processingEnv);
+
         this.typeElementVisitors = findTypeElementVisitors();
+
+        // set supported options as system properties to keep compatibility
+        // in particular for micronaut-openapi
+        processingEnv.getOptions().entrySet().stream()
+            .filter(entry -> entry.getKey() != null && entry.getKey().startsWith(VisitorContext.MICRONAUT_BASE_OPTION_NAME))
+            .forEach(entry -> System.setProperty(entry.getKey(), entry.getValue() == null ? "" : entry.getValue()));
+
+        this.loadedVisitors = new ArrayList<>(typeElementVisitors.size());
+
+        for (TypeElementVisitor visitor : typeElementVisitors) {
+            try {
+                loadedVisitors.add(new LoadedVisitor(
+                    visitor,
+                    javaVisitorContext,
+                    genericUtils,
+                    processingEnv
+                ));
+            } catch (TypeNotPresentException | NoClassDefFoundError e) {
+                // ignored, means annotations referenced are not on the classpath
+            }
+
+        }
+
+        OrderUtil.reverseSort(loadedVisitors);
+
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            try {
+                loadedVisitor.getVisitor().start(javaVisitorContext);
+            } catch (Throwable e) {
+                error("Error initializing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
+            }
+        }
+
     }
 
     @Override
@@ -85,37 +123,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        //Only run on the first pass
-        if (executed) {
-            return false;
-        }
-        // set supported options as system properties to keep compatibility
-        // in particular for micronaut-openapi
-        processingEnv.getOptions().entrySet().stream().filter(entry -> entry.getKey() != null && entry.getKey().startsWith(VisitorContext.MICRONAUT_BASE_OPTION_NAME))
-          .forEach(entry -> System.setProperty(entry.getKey(), entry.getValue() == null ? "" : entry.getValue()));
-
-        List<LoadedVisitor> loadedVisitors = new ArrayList<>(typeElementVisitors.size());
-        for (TypeElementVisitor visitor : typeElementVisitors) {
-            try {
-                loadedVisitors.add(new LoadedVisitor(
-                        visitor,
-                        javaVisitorContext,
-                        genericUtils,
-                        processingEnv
-                ));
-            } catch (TypeNotPresentException | NoClassDefFoundError e) {
-                // ignored, means annotations referenced are not on the classpath
-            }
-
-        }
-        OrderUtil.reverseSort(loadedVisitors);
-        for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            try {
-                loadedVisitor.getVisitor().start(javaVisitorContext);
-            } catch (Throwable e) {
-                error("Error initializing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
-            }
-        }
 
         TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
         TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
@@ -139,8 +146,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             }
         }
 
-        javaVisitorContext.finish();
-        executed = true;
+        if (roundEnv.processingOver()) {
+            javaVisitorContext.finish();
+        }
+
         return false;
     }
 

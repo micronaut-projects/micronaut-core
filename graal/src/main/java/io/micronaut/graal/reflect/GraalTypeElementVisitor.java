@@ -82,6 +82,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private boolean isSubclass = getClass() != GraalTypeElementVisitor.class;
 
+    private boolean executed = false;
+
     @Override
     public int getOrder() {
         return POSITION; // allow mutation of metadata
@@ -208,8 +210,12 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     @Override
     public final void finish(VisitorContext visitorContext) {
-        // don't do this for subclasses
-        if (!isSubclass) {
+
+        // Execute only once and never for subclasses
+        if (!executed && !isSubclass) {
+
+            executed = true;
+
             List<Map> json;
             ObjectMapper mapper = new ObjectMapper();
             ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
