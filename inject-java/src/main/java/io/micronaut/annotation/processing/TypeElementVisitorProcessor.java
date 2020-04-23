@@ -19,6 +19,8 @@ import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Generated;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -130,6 +132,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         roundEnv.getRootElements()
                 .stream()
                 .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))
+                .filter(element -> element.getAnnotation(Generated.class) == null)
                 .map(modelUtils::classElementFor)
                 .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
                 .forEach((typeElement) -> {
