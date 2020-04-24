@@ -108,4 +108,34 @@ public class TestController {
         AllClassesVisitor.getVisited() == ["test.TestController", "getMethod"]
         InjectVisitor.getVisited() == ["test.TestController", "privateField"]
     }
+
+    void "test @Generated class is not visited by any visitor"() {
+        buildBeanDefinition('test.TestGenerated', '''
+package test;
+
+import io.micronaut.core.annotation.Generated
+import javax.inject.Inject
+
+@Generated
+public class TestGenerated {
+
+    @Inject private String privateField
+    protected String protectedField  
+    public String publicField
+    @groovy.transform.PackageScope String packagePrivateField
+    String property
+    
+    
+    TestGenerated(String constructorArg) {}
+    
+    void setterMethod(String method) {}
+
+}
+''')
+        expect:
+        ControllerGetVisitor.getVisited().empty
+        AllElementsVisitor.getVisited().empty
+        AllClassesVisitor.getVisited().empty
+        InjectVisitor.getVisited().empty
+    }
 }
