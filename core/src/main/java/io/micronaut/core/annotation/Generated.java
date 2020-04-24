@@ -26,7 +26,9 @@ import java.lang.annotation.Target;
  * @author David Bidorff
  * @since 2.0
  */
-@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
+@Target({ElementType.PACKAGE, ElementType.TYPE, ElementType.METHOD, ElementType.CONSTRUCTOR,
+    ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.PARAMETER})
 @Retention(RetentionPolicy.CLASS)
 public @interface Generated {
+
 }
