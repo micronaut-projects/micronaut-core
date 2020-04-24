@@ -494,6 +494,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName(),
                 interfaceInternalNames);
 
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
+
         if (buildMethodVisitor == null) {
             throw new IllegalStateException("At least one call to visitBeanDefinitionConstructor() is required");
         }

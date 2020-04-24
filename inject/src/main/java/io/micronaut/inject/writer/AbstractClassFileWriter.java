@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -62,6 +63,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected static final Type TYPE_OBJECT = Type.getType(Object.class);
     protected static final Type TYPE_CLASS = Type.getType(Class.class);
     protected static final int DEFAULT_MAX_STACK = 13;
+    protected static final Type TYPE_GENERATED = Type.getType(Generated.class);
 
     protected static final Map<String, String> NAME_TO_TYPE_MAP = new HashMap<>();
     private static final Method METHOD_CREATE_ARGUMENT_SIMPLE = Method.getMethod(
@@ -1048,6 +1050,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V1_8, ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
     /**
@@ -1057,6 +1060,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected void startPublicClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V1_8, ACC_PUBLIC | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
     /**
@@ -1066,6 +1070,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected void startFinalClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V1_8, ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
     /**
@@ -1077,6 +1082,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected void startPublicFinalClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
     /**
@@ -1087,6 +1093,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected void startClass(ClassWriter classWriter, String className, Type superType, String genericSignature) {
         classWriter.visit(V1_8, ACC_SYNTHETIC, className, genericSignature, superType.getInternalName(), null);
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
     /**

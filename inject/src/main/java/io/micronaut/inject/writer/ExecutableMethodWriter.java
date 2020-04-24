@@ -204,6 +204,8 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             Type.getInternalName(AbstractExecutableMethod.class),
             null);
 
+        classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
+
         // initialize and write the annotation metadata
         if (!(annotationMetadata instanceof AnnotationMetadataReference)) {
             writeAnnotationMetadataStaticInitializer(classWriter);
