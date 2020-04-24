@@ -20,7 +20,6 @@ import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -32,9 +31,6 @@ import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import edu.umd.cs.findbugs.annotations.NonNull;
-import javax.annotation.processing.ProcessingEnvironment;
-
-import javax.annotation.Nonnull;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
