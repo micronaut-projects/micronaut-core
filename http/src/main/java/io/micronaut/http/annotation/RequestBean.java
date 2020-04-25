@@ -17,33 +17,39 @@ package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.core.bind.annotation.Bindable;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.bind.annotation.Bindable;
+
 /**
- * Indicates that the parameter to a method should be bound from a value in the query string or path of the URI.
+ * Used to bind Bindable parameters to a Bean object.
  *
- * @author Graeme Rocher
- * @see java.net.URI#getQuery()
- * @see java.net.URI#getPath()
- * @since 1.0
+ * @author Anze Sodja
+ * @since 2.0
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.ANNOTATION_TYPE})
+@Target({ ElementType.PARAMETER, ElementType.ANNOTATION_TYPE })
 @Bindable
-public @interface QueryValue {
+public @interface RequestBean {
 
     /**
      * @return The name of the parameter
      */
     @AliasFor(annotation = Bindable.class, member = "value")
+    @AliasFor(member = "name")
     String value() default "";
+
+    /**
+     * @return The name of the parameter
+     */
+    @AliasFor(annotation = Bindable.class, member = "value")
+    @AliasFor(member = "value")
+    String name() default "";
 
     /**
      * @see Bindable#defaultValue()
@@ -51,4 +57,5 @@ public @interface QueryValue {
      */
     @AliasFor(annotation = Bindable.class, member = "defaultValue")
     String defaultValue() default "";
+
 }

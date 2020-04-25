@@ -53,7 +53,7 @@ import java.lang.annotation.*;
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.PARAMETER, ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE}) // this can be either type or param
+@Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE}) // this can be either type or param
 @Repeatable(value = Headers.class)
 @Bindable
 public @interface Header {
