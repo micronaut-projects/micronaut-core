@@ -152,7 +152,7 @@ ext {
             ],
             'micronaut.picocli': [
                     version:micronautPicocliVersion,
-                    group:'io.micronaut.configuration',
+                    group:'io.micronaut.picocli',
                     name:'micronaut-picocli'
             ],
             'micronaut.rabbitmq': [
