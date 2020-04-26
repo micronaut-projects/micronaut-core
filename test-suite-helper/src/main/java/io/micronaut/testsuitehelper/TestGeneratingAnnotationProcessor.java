@@ -53,12 +53,19 @@ public class TestGeneratingAnnotationProcessor extends AbstractProcessor {
                     break;
                 case "test":
                 case "test-classes":
-                    final JavaFileObject issue = processingEnv
-                        .getFiler()
-                        .createSourceFile("io.micronaut.test.generated.Example");
-                    try (final Writer w = issue.openWriter()) {
+
+                    try (final Writer w = processingEnv.getFiler()
+                        .createSourceFile("io.micronaut.test.generated.Example")
+                        .openWriter()) {
                         w.write("package io.micronaut.test.generated;\n\npublic interface Example {}");
                     }
+
+                    try (final Writer w = processingEnv.getFiler()
+                        .createSourceFile("io.micronaut.test.generated.IntrospectedExample")
+                        .openWriter()) {
+                        w.write("package io.micronaut.test.generated;\n\nimport io.micronaut.core.annotation.Introspected;\n\n@Introspected\npublic class IntrospectedExample {}");
+                    }
+
                     break;
                 default:
                     throw new IllegalStateException("Unknown builder for output " + outputDir);

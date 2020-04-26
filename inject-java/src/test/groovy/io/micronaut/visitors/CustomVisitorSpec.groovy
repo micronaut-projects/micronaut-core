@@ -100,4 +100,32 @@ public class TestController {
         AllClassesVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
         InjectVisitor.VISITED_ELEMENTS == ["test.TestController", "privateField"]
     }
+
+    void "test @Generated class is not visited by any visitor"() {
+        buildBeanDefinition('test.TestGenerated', '''
+package test;
+
+import io.micronaut.core.annotation.Generated;
+import javax.inject.Inject;
+
+@Generated
+public class TestGenerated {
+
+    @Inject private String privateField;  
+    protected String protectedField;   
+    public String publicField;
+    String packagePrivateField;
+    
+    TestGenerated(String constructorArg) {}
+    
+    void setterMethod(String method) {}
+
+}
+''')
+        expect:
+        ControllerGetVisitor.VISITED_ELEMENTS == []
+        AllElementsVisitor.VISITED_ELEMENTS == []
+        AllClassesVisitor.VISITED_ELEMENTS == []
+        InjectVisitor.VISITED_ELEMENTS == []
+    }
 }
