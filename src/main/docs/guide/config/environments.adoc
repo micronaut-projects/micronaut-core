@@ -1,4 +1,4 @@
-The application environment is modelled by the api:context.env.Environment interface, which allows specifying one or many unique environment names when creating an api:context.ApplicationContext[].
+The application environment is modelled by the api:context.env.Environment[] interface, which allows specifying one or many unique environment names when creating an api:context.ApplicationContext[].
 
 snippet::io.micronaut.docs.context.env.EnvironmentSpec[tags="env",indent=0,title="Initializing the Environment"]
 
