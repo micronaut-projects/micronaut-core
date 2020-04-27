@@ -334,6 +334,27 @@ class HttpTracingSpec extends Specification {
         context.close()
     }
 
+    void "tested customising span name"() {
+        given:
+        ApplicationContext context = buildContext()
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
+
+        when:
+        client.toBlocking().exchange('/traced/customised/name', String)
+
+        then:
+        conditions.eventually {
+            reporter.spans.any { it.operationName == "custom name" }
+        }
+
+        cleanup:
+        client.close()
+        context.close()
+    }
+
 
     ApplicationContext buildContext() {
         def reporter = new InMemoryReporter()
@@ -388,6 +409,12 @@ class HttpTracingSpec extends Specification {
         @Get("/nestedError/{name}")
         String nestedError(String name) {
             tracedClient.error(name)
+        }
+
+        @Get("/customised/name")
+        String cusomisedName() {
+            spanCustomizer.activeSpan().setOperationName("custom name")
+            "response"
         }
 
         @Get("/nestedRx/{name}")
